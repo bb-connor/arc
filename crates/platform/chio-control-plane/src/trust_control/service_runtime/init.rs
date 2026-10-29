@@ -608,7 +608,7 @@ mod windows_authority_tests {
             issuance_policy: None,
             runtime_assurance_policy: None,
             advertise_url: None,
-            allow_local_peer_urls: false,
+            egress_allowances: Default::default(),
             certification_public_metadata_ttl_seconds: 300,
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,

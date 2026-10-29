@@ -1,18 +1,21 @@
 use super::super::super::caller_credentials::{
     PeerRequestTarget, CLUSTER_AUTH_BODY_SHA256_HEADER, CLUSTER_AUTH_NONCE_HEADER,
 };
+use chio_egress_contract::{BlockingContractAgent, BlockingContractRequest};
+
 use super::super::*;
+use super::factory::egress_refusal;
 
 impl TrustControlClient {
     /// A GET to a peer's internal listener, signed with this node's key for
     /// that peer. `request_path` is the path and raw query exactly as sent.
     pub(super) fn build_internal_get_request(
         &self,
-        client: &Agent,
+        client: &BlockingContractAgent,
         url: &str,
         request_path: &str,
         term: Option<u64>,
-    ) -> Result<ureq::Request, CliError> {
+    ) -> Result<BlockingContractRequest, CliError> {
         let cluster_peer_auth = self.cluster_peer_auth.as_ref().ok_or_else(|| {
             CliError::cli_other_error(
                 "internal trust-control routes require a cluster peer client".to_owned(),
@@ -44,13 +47,14 @@ impl TrustControlClient {
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         let mut request = client
             .get(url)
-            .set(CLUSTER_NODE_ID_HEADER, &node_id)
-            .set(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
-            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signed.signature)
-            .set(CLUSTER_AUTH_NONCE_HEADER, &signed.nonce)
-            .set(CLUSTER_AUTH_BODY_SHA256_HEADER, &signed.body_sha256);
+            .map_err(egress_refusal)?
+            .header(CLUSTER_NODE_ID_HEADER, &node_id)
+            .header(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
+            .header(CLUSTER_AUTH_SIGNATURE_HEADER, &signed.signature)
+            .header(CLUSTER_AUTH_NONCE_HEADER, &signed.nonce)
+            .header(CLUSTER_AUTH_BODY_SHA256_HEADER, &signed.body_sha256);
         if let Some(term) = term {
-            request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
+            request = request.header(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
         }
         Ok(request)
     }

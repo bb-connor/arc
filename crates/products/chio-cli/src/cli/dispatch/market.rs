@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use super::output::{write_bytes, write_pretty_json_line};
 use super::*;
 
@@ -12,7 +13,7 @@ fn fiscal_marketplace_client(
         )
     })?;
     let token = require_control_token(control_token)?;
-    chio_control_plane::trust_control::service_runtime::client::build_client(url, token)
+    chio_control_plane::trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())
 }
 
 pub(crate) fn parse_market_tier(value: &str) -> Result<chio_reputation::ReputationTier, CliError> {

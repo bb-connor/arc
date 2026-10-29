@@ -1979,7 +1979,12 @@ fn pinned_peer_at_a_link_local_url_is_refused_at_load() {
         refusal(&config(&format!("{}{peer_text}", reader()))),
         TrustAccessError::InvalidPeerUrl {
             node_id: node.to_string(),
-            reason: "cluster URL must not target the link-local or cloud metadata address `169.254.169.254`".to_string(),
+            reason: crate::trust_control::service_runtime::client::egress_refusal(
+                chio_egress_contract::HttpEgressError::LinkLocalDenied {
+                    host: "169.254.169.254".to_string(),
+                }
+            )
+            .to_string(),
         }
     );
 }

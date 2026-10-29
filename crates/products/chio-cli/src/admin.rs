@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::fs;
 use std::path::Path;
 
@@ -79,7 +80,7 @@ pub(crate) fn cmd_trust_provider_list(
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .list_enterprise_providers()?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
@@ -118,7 +119,7 @@ pub(crate) fn cmd_trust_provider_get(
 ) -> Result<(), CliError> {
     let provider = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .get_enterprise_provider(provider_id)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
@@ -166,7 +167,7 @@ pub(crate) fn cmd_trust_provider_upsert(
     let provider: EnterpriseProviderRecord = crate::input::json(&crate::input::read(input_path)?)?;
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .upsert_enterprise_provider(&provider.provider_id, &provider)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
@@ -193,7 +194,7 @@ pub(crate) fn cmd_trust_provider_delete(
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .delete_enterprise_provider(provider_id)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
@@ -224,7 +225,7 @@ pub(crate) fn cmd_trust_federation_policy_list(
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .list_federation_policies()?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
@@ -265,7 +266,7 @@ pub(crate) fn cmd_trust_federation_policy_get(
 ) -> Result<(), CliError> {
     let record = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .get_federation_policy(policy_id)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
@@ -307,7 +308,7 @@ pub(crate) fn cmd_trust_federation_policy_upsert(
         crate::input::json(&crate::input::read(input_path)?)?;
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .upsert_federation_policy(&record.policy.body.policy_id, &record)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
@@ -345,7 +346,7 @@ pub(crate) fn cmd_trust_federation_policy_delete(
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .delete_federation_policy(policy_id)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
@@ -383,7 +384,7 @@ pub(crate) fn cmd_trust_federation_policy_evaluate(
     let token = require_control_token(control_token)?;
     let request: FederationAdmissionEvaluationRequest =
         crate::input::json(&crate::input::read(input_path)?)?;
-    let response = trust_control::service_runtime::client::build_client(control_url, token)?
+    let response = trust_control::service_runtime::client::build_client(control_url, token, &EgressAllowanceSet::default())?
         .evaluate_federation_policy(&request)?;
 
     if json_output {
@@ -423,7 +424,7 @@ pub(crate) fn cmd_certify_registry_publish(
         let token = require_control_token(control_token)?;
         let artifact: certify::SignedCertificationCheck =
             crate::input::json(&crate::input::read(input_path)?)?;
-        let entry = trust_control::service_runtime::client::build_client(url, token)?
+        let entry = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .publish_certification(&artifact)?;
         if json_output {
             println!("{}", serde_json::to_string_pretty(&entry)?);
@@ -449,7 +450,7 @@ pub(crate) fn cmd_certify_registry_list(
 ) -> Result<(), CliError> {
     if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
+        let response = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .list_certifications()?;
         if json_output {
             println!("{}", serde_json::to_string_pretty(&response)?);
@@ -481,7 +482,7 @@ pub(crate) fn cmd_certify_registry_get(
 ) -> Result<(), CliError> {
     if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let entry = trust_control::service_runtime::client::build_client(url, token)?
+        let entry = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .get_certification(artifact_id)?;
         if json_output {
             println!("{}", serde_json::to_string_pretty(&entry)?);
@@ -508,7 +509,7 @@ pub(crate) fn cmd_certify_registry_resolve(
 ) -> Result<(), CliError> {
     if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
+        let response = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .resolve_certification(tool_server_id)?;
         if json_output {
             println!("{}", serde_json::to_string_pretty(&response)?);
@@ -546,7 +547,7 @@ pub(crate) fn cmd_certify_registry_revoke(
 ) -> Result<(), CliError> {
     if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let entry = trust_control::service_runtime::client::build_client(url, token)?
+        let entry = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .revoke_certification(
                 artifact_id,
                 &certify::CertificationRevocationRequest {
@@ -617,7 +618,7 @@ pub(crate) fn cmd_trust_federated_issue(
         })
         .transpose()?;
 
-    let response = trust_control::service_runtime::client::build_client(control_url, token)?
+    let response = trust_control::service_runtime::client::build_client(control_url, token, &EgressAllowanceSet::default())?
         .federated_issue(&trust_control::FederatedIssueRequest {
             presentation,
             expected_challenge,

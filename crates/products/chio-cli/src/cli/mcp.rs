@@ -11,7 +11,10 @@ use chio_mcp_adapter::edge::McpTransport as _;
 /// renders an inferred capability-scope manifest scaffold, and (when
 /// `--emit-config` is supplied) emits a paste-ready IDE configuration blob
 /// for Cursor / Claude Desktop / Continue / Zed.
-pub(crate) fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_mcp_wrap(
+    args: &McpWrapArgs,
+    egress: &chio_egress_contract::EgressAllowanceSet,
+) -> Result<(), CliError> {
     if let Some(fixture) = args.e2e_fixture.as_ref() {
         return cmd_mcp_wrap_e2e_fixture(args, fixture);
     }
@@ -40,7 +43,7 @@ pub(crate) fn cmd_mcp_wrap(args: &McpWrapArgs) -> Result<(), CliError> {
             "chio mcp wrap requires a wrapped command after `--`".to_string(),
         ));
     }
-    cmd_mcp_wrap_run(args)
+    cmd_mcp_wrap_run(args, egress)
 }
 
 /// Load a JSON `tools/list` fixture and decode it as a slice of

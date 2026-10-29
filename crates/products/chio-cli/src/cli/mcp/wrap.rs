@@ -18,6 +18,7 @@
 // `--strict-execution-nonce` is enabled, allowed tool calls are executed
 // through a local kernel preflight plus nonce-presenting dispatch path.
 
+use chio_egress_contract::EgressAllowanceSet;
 use super::*;
 
 use super::cage_policy::load_native_mcp_launch;
@@ -140,7 +141,10 @@ pub(crate) struct McpWrapArgs {
 /// Render the wrap loop output for the dispatch arm. The default gate
 /// reads the user's promoted manifest from disk; if no manifest is
 /// supplied, every tool denies.
-pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
+pub(crate) fn cmd_mcp_wrap_run(
+    args: &McpWrapArgs,
+    egress: &chio_egress_contract::EgressAllowanceSet,
+) -> Result<(), CliError> {
     let allowed = match args.manifest.as_ref() {
         Some(path) => load_manifest_allowlist(path, &args.server_id)?,
         None => std::collections::BTreeSet::new(),
@@ -197,6 +201,7 @@ pub(crate) fn cmd_mcp_wrap_run(args: &McpWrapArgs) -> Result<(), CliError> {
                 transport.clone(),
             )),
             &allowed,
+            egress,
         ) {
             Ok(mediated) => run_wrap_with_gate(
                 &mediated,
@@ -367,6 +372,7 @@ impl KernelMediatedMcpTransport {
         server_version: &str,
         transport: Box<dyn chio_mcp_adapter::edge::McpTransport>,
         allowed: &std::collections::BTreeSet<String>,
+        egress: &chio_egress_contract::EgressAllowanceSet,
     ) -> Result<Self, CliError> {
         let tools = transport
             .list_tools()
@@ -400,12 +406,9 @@ impl KernelMediatedMcpTransport {
             kernel.add_guard(guard);
         }
         kernel.set_post_invocation_pipeline(default_guard_profile.post_invocation_pipeline);
-        let payment_adapter_config = PaymentAdapterConfig::from_env()
+        let payment_adapter_config = PaymentAdapterConfig::from_env(egress)
             .map_err(CliError::cli_other_error)?
             .unwrap_or_else(PaymentAdapterConfig::default_safe);
-        payment_adapter_config
-            .validate()
-            .map_err(CliError::cli_other_error)?;
         kernel.set_payment_adapter(payment_adapter_config.build_adapter());
         let nonce_config = chio_kernel::ExecutionNonceConfig {
             nonce_ttl_secs: chio_kernel::DEFAULT_EXECUTION_NONCE_TTL_SECS,
@@ -940,6 +943,7 @@ pub(crate) fn cmd_mcp_wrap_e2e_fixture(
             env!("CARGO_PKG_VERSION"),
             Box::new(transport),
             &gate.allowed,
+            &EgressAllowanceSet::default(),
         )?;
         run_wrap_with_gate(
             &mediated,

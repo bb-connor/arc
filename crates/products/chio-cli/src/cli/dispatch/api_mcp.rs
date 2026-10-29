@@ -12,6 +12,7 @@ pub(crate) fn dispatch_api(
     control_url: Option<String>,
     control_token: Option<String>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         ApiCommands::Protect {
@@ -42,6 +43,7 @@ pub(crate) fn dispatch_api(
             control_authority_public_key,
             allow_ephemeral_receipts,
             upstream_timeout_secs,
+            egress,
         ),
     }
 }
@@ -60,6 +62,7 @@ pub(crate) fn dispatch_mcp(
     control_token: Option<String>,
     control_authority_public_key: Option<chio_core::PublicKey>,
     control_authority_trusted_public_keys: Vec<chio_core::PublicKey>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         McpCommands::Wrap(args) => {
@@ -68,7 +71,7 @@ pub(crate) fn dispatch_mcp(
                     "mcp wrap does not support --receipt-db",
                 ));
             }
-            cmd_mcp_wrap(&args)
+            cmd_mcp_wrap(&args, egress)
         }
         McpCommands::GovernedSim(args) => cmd_mcp_governed_sim(&args),
         McpCommands::Serve {

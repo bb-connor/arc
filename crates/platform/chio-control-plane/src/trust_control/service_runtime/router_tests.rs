@@ -71,7 +71,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         issuance_policy: None,
         runtime_assurance_policy: None,
         advertise_url: None,
-        allow_local_peer_urls: true,
+        egress_allowances: Default::default(),
         certification_public_metadata_ttl_seconds: 300,
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
@@ -342,7 +342,7 @@ async fn standalone_holds_use_exact_versioned_rich_lifecycle(
         tokio::spawn(async move { axum::serve(listener, super::build_router(state)).await });
 
     let lifecycle = tokio::task::spawn_blocking(move || {
-        let store = build_remote_budget_store(&url, "service-secret")?;
+        let store = build_remote_budget_store(&url, "service-secret", &chio_egress_contract::EgressAllowanceSet::default())?;
         let authorize = |hold_id: &str| {
             store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
                 capability_id: "standalone-rich".to_string(),
@@ -632,7 +632,11 @@ async fn live_structured_denial_has_no_invented_usage_sequence_or_cache_mutation
         tokio::spawn(async move { axum::serve(listener, super::build_router(state)).await });
 
     tokio::task::spawn_blocking(move || {
-        let store = build_remote_budget_store(&url, "service-secret")?;
+        let store = build_remote_budget_store(
+            &url,
+            "service-secret",
+            &chio_egress_contract::EgressAllowanceSet::default(),
+        )?;
         let revocation_set =
             CanonicalRevocationSet::canonicalize(vec!["denied-composite".to_string()])?;
         let request = |hold_id: &str, operation_id: &str| BudgetAuthorizeHoldRequest {

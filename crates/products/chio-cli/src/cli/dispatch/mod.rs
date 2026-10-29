@@ -197,6 +197,7 @@ pub(crate) fn run() {
     let budget_db = cli.budget_db.clone();
     let session_db = cli.session_db.clone();
     let control_url = cli.control_url.clone();
+    let egress_allowance_file = cli.egress_allowance_file.clone();
     let control_internal_url = cli.control_internal_url.clone();
     let control_token = cli.control_token.clone();
     let control_authority_public_key = cli.control_authority_public_key.clone();
@@ -204,6 +205,15 @@ pub(crate) fn run() {
     let json_output = cli.json_output();
 
     init_redacted_tracing();
+
+    let egress = match crate::egress_allowance::load(egress_allowance_file.as_deref()) {
+        Ok(egress) => egress,
+        Err(error) => {
+            let mut stderr = std::io::stderr();
+            let _ = write_cli_error(&mut stderr, &error, json_output);
+            std::process::exit(1);
+        }
+    };
 
     let command = cli.command;
     let result = match command {
@@ -276,6 +286,7 @@ pub(crate) fn run() {
             control_url,
             control_token,
             control_authority_public_key.as_ref(),
+            &egress,
         ),
         Commands::Mcp { command } => dispatch_mcp(
             command,
@@ -290,6 +301,7 @@ pub(crate) fn run() {
             control_token,
             control_authority_public_key,
             control_authority_trusted_public_keys,
+            &egress,
         ),
         Commands::Trust { command } => dispatch_trust(
             command,
@@ -302,6 +314,7 @@ pub(crate) fn run() {
             session_db,
             control_url,
             control_token,
+            &egress,
         ),
         Commands::Receipt { command } => {
             dispatch_receipt(command, json_output, receipt_db, control_url, control_token)
@@ -386,7 +399,7 @@ pub(crate) fn run() {
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
         Commands::Finding { command } => {
-            dispatch_finding(command, json_output, control_url, control_token)
+            dispatch_finding(command, json_output, control_url, control_token, &egress)
         }
         Commands::Replay(args) => cmd_replay(&args),
         Commands::Lineage { command } => dispatch_lineage(command, json_output),
@@ -430,6 +443,7 @@ pub(crate) fn run() {
                 control_authority_public_key.as_ref(),
                 allow_ephemeral_receipts,
                 print_config,
+                &egress,
             )
         }),
     };

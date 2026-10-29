@@ -4,6 +4,7 @@
 
 use super::*;
 use axum::body::Body;
+use chio_egress_contract::EgressAllowanceSet;
 use tower::ServiceExt;
 
 const ADMIN_BACKEND_FAILED: &str = "urn:chio:error:transport:admin-backend-failed";
@@ -148,8 +149,11 @@ async fn every_control_backend_failure_answers_the_fixed_urn_without_the_backend
         config.control_token = Some("separate-control-token".into());
     })?;
     insert_terminal_session(&state).await?;
-    let client =
-        trust_control::service_runtime::client::build_client(&endpoint, "separate-control-token")?;
+    let client = trust_control::service_runtime::client::build_client(
+        &endpoint,
+        "separate-control-token",
+        &EgressAllowanceSet::default(),
+    )?;
     let cause = tokio::task::spawn_blocking(move || {
         client
             .list_budgets(&trust_control::BudgetQuery {

@@ -31,6 +31,7 @@ pub(crate) fn dispatch_trust(
     session_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         TrustCommands::Serve {
@@ -41,7 +42,6 @@ pub(crate) fn dispatch_trust(
             authority_keyring_receipt_anchor_root,
             receipt_query_snapshot_quota_bytes,
             advertise_url,
-            allow_local_peer_urls,
             cluster_sync_interval_ms,
             cluster_peer_replay_db,
             authority_replication_max_future_skew_seconds,
@@ -98,7 +98,7 @@ pub(crate) fn dispatch_trust(
             budget_db.as_deref(),
             session_db.as_deref(),
             advertise_url.as_deref(),
-            allow_local_peer_urls,
+            std::sync::Arc::clone(egress),
             certification_public_metadata_ttl_seconds,
             cluster_sync_interval_ms,
             cluster_peer_replay_db.as_deref(),
@@ -108,7 +108,7 @@ pub(crate) fn dispatch_trust(
         ),
         TrustCommands::Config { command } => match command {
             TrustConfigCommands::Check { access_config } => {
-                crate::trust_config_check::cmd_trust_config_check(&access_config, json_output)
+                crate::trust_config_check::cmd_trust_config_check(&access_config, egress, json_output)
             }
             TrustConfigCommands::Credential {
                 id,

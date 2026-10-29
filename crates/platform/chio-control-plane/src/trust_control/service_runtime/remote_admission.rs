@@ -72,8 +72,9 @@ pub(crate) fn build_remote_admission_stores(
     control_internal_url: &str,
     control_token: &str,
     signer: Keypair,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<RemoteAdmissionStores, CliError> {
-    let client = build_client(control_internal_url, control_token)?;
+    let client = build_client(control_internal_url, control_token, allowances)?;
     let request = AdmissionAuthorityRequest::new(
         None,
         AdmissionAuthorityAction::Status,
@@ -92,6 +93,7 @@ pub(crate) fn build_remote_admission_stores(
         control_internal_url,
         control_token,
         status.fence.clone(),
+        allowances,
     )?;
     let authority = Arc::new(RemoteAdmissionAuthority {
         client,

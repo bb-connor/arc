@@ -9,6 +9,7 @@ use chio_kernel::{
     AcpPaymentAdapter, PaymentAdapter, X402Network, X402PaymentAdapter, X402RailConfig,
     DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
 };
+use chio_egress_contract::EgressAllowanceSet;
 use chio_store_sqlite::SqliteExecutionNonceStore;
 
 #[derive(Debug, Clone)]
@@ -18,8 +19,7 @@ pub enum PaymentAdapterConfig {
         adapter: X402PaymentAdapter,
     },
     HttpAcp {
-        base_url: String,
-        bearer_token: Option<String>,
+        adapter: AcpPaymentAdapter,
     },
 }
 
@@ -52,12 +52,15 @@ impl PaymentAdapterConfig {
     /// variable is present but its value is not a recognized adapter kind -
     /// an unrecognized value would otherwise silently mask a misconfigured
     /// real payment rail.
-    pub fn from_env() -> Result<Option<Self>, String> {
-        Self::from_lookup(|name| std::env::var(name).ok())
+    pub fn from_env(allowances: &EgressAllowanceSet) -> Result<Option<Self>, String> {
+        Self::from_lookup(|name| std::env::var(name).ok(), allowances)
     }
 
     /// [`Self::from_env`] over an explicit variable lookup.
-    fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Result<Option<Self>, String> {
+    fn from_lookup(
+        lookup: impl Fn(&str) -> Option<String>,
+        allowances: &EgressAllowanceSet,
+    ) -> Result<Option<Self>, String> {
         let Some(kind) = lookup("CHIO_PAYMENT_ADAPTER") else {
             return Ok(None);
         };
@@ -94,7 +97,7 @@ impl PaymentAdapterConfig {
                 let mut adapter = X402PaymentAdapter::new(
                     base_url,
                     rail,
-                    &chio_egress_contract::EgressAllowanceSet::default(),
+                    allowances,
                     clock,
                     Arc::new(replay),
                 )
@@ -104,10 +107,15 @@ impl PaymentAdapterConfig {
                 }
                 Ok(Some(Self::HttpX402 { adapter }))
             }
-            "http-acp" => Ok(Some(Self::HttpAcp {
-                base_url,
-                bearer_token,
-            })),
+            "http-acp" => {
+                let mut adapter = AcpPaymentAdapter::new(base_url)
+                    .with_private_network_allowances(allowances)
+                    .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
+                if let Some(token) = bearer_token {
+                    adapter = adapter.with_bearer_token(token);
+                }
+                Ok(Some(Self::HttpAcp { adapter }))
+            }
             other => Err(format!(
                 "CHIO_PAYMENT_ADAPTER: unrecognized adapter kind {:?}; \
                  expected one of: sim, http-x402, http-acp",
@@ -116,36 +124,12 @@ impl PaymentAdapterConfig {
         }
     }
 
-    /// Load-time config-consistency check (house rule: invalid policies reject
-    /// at load time). This is a config-shape check only; the authoritative
-    /// fail-closed enforcement is the kernel runtime MustPrepay gate.
-    pub fn validate(&self) -> Result<(), String> {
-        match self {
-            Self::Sim | Self::HttpX402 { .. } => Ok(()),
-            Self::HttpAcp { base_url, .. } => {
-                if base_url.trim().is_empty() {
-                    return Err("http payment adapter requires a non-empty base_url".to_string());
-                }
-                Ok(())
-            }
-        }
-    }
-
     #[must_use]
     pub fn build_adapter(&self) -> Box<dyn PaymentAdapter> {
         match self {
             Self::Sim => Box::new(SimPaymentAdapter::new()),
             Self::HttpX402 { adapter } => Box::new(adapter.clone()),
-            Self::HttpAcp {
-                base_url,
-                bearer_token,
-            } => {
-                let mut adapter = AcpPaymentAdapter::new(base_url.clone());
-                if let Some(token) = bearer_token {
-                    adapter = adapter.with_bearer_token(token.clone());
-                }
-                Box::new(adapter)
-            }
+            Self::HttpAcp { adapter } => Box::new(adapter.clone()),
         }
     }
 }
@@ -214,7 +198,7 @@ mod tests {
         // not silently fall back to Sim. This prevents a misconfigured real rail
         // from being masked by a silent default.
         std::env::set_var("CHIO_PAYMENT_ADAPTER", "mystery-rail");
-        let result = PaymentAdapterConfig::from_env();
+        let result = PaymentAdapterConfig::from_env(&EgressAllowanceSet::default());
         std::env::remove_var("CHIO_PAYMENT_ADAPTER");
         let error = result.test_expect_err("unknown adapter kind must fail at load time");
         assert!(
@@ -237,27 +221,38 @@ mod tests {
             adapter: X402PaymentAdapter::new(
                 "https://facilitator.example",
                 rail,
-                &chio_egress_contract::EgressAllowanceSet::default(),
+                &EgressAllowanceSet::default(),
                 crate::input::time::clock(),
                 Arc::new(chio_kernel::InMemoryExecutionNonceStore::default()),
             )
             .test_unwrap(),
         };
-        cfg.validate().test_unwrap();
         assert_eq!(cfg.build_adapter().rail_id(), "x402");
     }
 
     #[test]
-    fn valid_variants_pass_validation_and_build() {
-        let sim = PaymentAdapterConfig::Sim;
-        sim.validate().test_unwrap();
-        let _ = sim.build_adapter();
-        let http = PaymentAdapterConfig::HttpAcp {
-            base_url: "https://facilitator.example".to_string(),
-            bearer_token: Some("tok".to_string()),
+    fn http_acp_rail_takes_its_allowance_at_load() {
+        let lookup = |name: &str| match name {
+            "CHIO_PAYMENT_ADAPTER" => Some("http-acp".to_owned()),
+            "CHIO_PAYMENT_BASE_URL" => Some("https://10.20.0.5:8443".to_owned()),
+            _ => None,
         };
-        http.validate().test_unwrap();
-        let _ = http.build_adapter();
+        let error = PaymentAdapterConfig::from_lookup(lookup, &EgressAllowanceSet::default())
+            .test_expect_err("an unlisted private rail is refused at load");
+        assert_eq!(
+            error,
+            "CHIO_PAYMENT_BASE_URL: payment rail error: payment rail egress denied"
+        );
+        let allowances = EgressAllowanceSet::new([chio_egress_contract::PrivateNetworkAllowance {
+            host: "10.20.0.5".to_owned(),
+            port: 8443,
+            cidr: "10.20.0.5/32".parse().test_unwrap(),
+        }])
+        .test_unwrap();
+        let config = PaymentAdapterConfig::from_lookup(lookup, &allowances)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(config.build_adapter().rail_id(), "acp");
     }
 
     #[test]
@@ -338,7 +333,7 @@ mod tests {
             (":memory:", X402ReplayStorePathError::NonDurable),
             ("file://localhost", X402ReplayStorePathError::NonDurable),
         ] {
-            let error = PaymentAdapterConfig::from_lookup(variables(replay_db))
+            let error = PaymentAdapterConfig::from_lookup(variables(replay_db), &EgressAllowanceSet::default())
                 .test_expect_err("a non-durable replay store is refused at load");
             assert_eq!(error, format!("CHIO_PAYMENT_X402_REPLAY_DB: {refusal}"));
         }

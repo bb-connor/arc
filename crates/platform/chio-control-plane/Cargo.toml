@@ -135,6 +135,7 @@ proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
 tower = { workspace = true }
+ureq = { version = "2.10", features = ["json"] }
 
 [lints]
 workspace = true

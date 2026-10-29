@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -273,8 +274,12 @@ pub fn cmd_certify_registry_search(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .search_certification_marketplace(&query)?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .search_certification_marketplace(&query)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -325,8 +330,12 @@ pub fn cmd_certify_registry_transparency(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .certification_marketplace_transparency(&query)?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .certification_marketplace_transparency(&query)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -373,8 +382,12 @@ pub fn cmd_certify_registry_consume(
     };
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .consume_certification_marketplace(&request)?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .consume_certification_marketplace(&request)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -414,8 +427,12 @@ pub fn cmd_certify_registry_dispute(
     };
     let entry = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .dispute_certification(artifact_id, &request)?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .dispute_certification(artifact_id, &request)?
     } else {
         let path = certification_registry_file.ok_or_else(|| {
             CliError::attest_error(

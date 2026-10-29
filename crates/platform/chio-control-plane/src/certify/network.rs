@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::path::Path;
 
 use crate::enterprise_federation::CertificationDiscoveryNetwork;
@@ -511,6 +512,7 @@ pub fn publish_certification_across_network(
         match crate::trust_control::service_runtime::client::build_client(
             &operator.registry_url,
             token,
+            &EgressAllowanceSet::default(),
         )
         .and_then(|client| client.publish_certification(artifact))
         {
@@ -546,8 +548,12 @@ pub fn cmd_certify_registry_discover(
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .discover_certification(tool_server_id)?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .discover_certification(tool_server_id)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
@@ -599,11 +605,15 @@ pub fn cmd_certify_registry_publish_network(
     let artifact = load_signed_certification_check(input)?;
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
-            .publish_certification_network(&CertificationNetworkPublishRequest {
-                artifact,
-                operator_ids: operator_ids.to_vec(),
-            })?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .publish_certification_network(&CertificationNetworkPublishRequest {
+            artifact,
+            operator_ids: operator_ids.to_vec(),
+        })?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;

@@ -147,6 +147,12 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) control_url: Option<String>,
 
+    /// Operator egress allowance file: the private network destinations,
+    /// each a host, port and CIDR, that payment rails and trust-control
+    /// clients may reach. Absent means none.
+    #[arg(long, global = true)]
+    pub(crate) egress_allowance_file: Option<PathBuf>,
+
     /// Trust-control internal listener base URL, which a kernel host with
     /// durable admission reaches the admission authority through.
     #[arg(long, global = true, env = "CHIO_CONTROL_INTERNAL_URL")]

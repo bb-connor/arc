@@ -13,11 +13,14 @@ use serde::{Deserialize, Serialize};
 use url::{Host, Url};
 
 mod allowance;
+mod allowance_file;
 pub use allowance::{
-    private_network_allowance_digest, AllowanceScheme, EgressAllowanceSet, IpCidr,
-    PrivateNetworkAllowance, PrivateNetworkAllowanceError, EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST,
-    MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX, PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
+    address_is_reserved, private_network_allowance_digest, AllowanceScheme, EgressAllowanceSet,
+    IpCidr, PrivateNetworkAllowance, PrivateNetworkAllowanceError,
+    EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST, MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX,
+    PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
 };
+pub use allowance_file::MAX_EGRESS_ALLOWANCE_FILE_BYTES;
 
 /// Typed egress policy that must be declared before substrate HTTP egress.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -600,6 +603,11 @@ mod tests;
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 #[path = "allowance_tests.rs"]
 mod allowance_tests;
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "allowance_file_tests.rs"]
+mod allowance_file_tests;
 
 fn validate_scheme_token(scheme: &str) -> Result<(), HttpEgressError> {
     let bytes = scheme.as_bytes();

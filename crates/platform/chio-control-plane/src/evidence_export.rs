@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::cmp::{max, min};
 use std::fs;
 use std::path::Path;
@@ -547,8 +548,11 @@ pub fn cmd_evidence_export(
         }
         (None, Some(control_url)) => {
             let token = super::require_control_token(control_token)?;
-            let client =
-                crate::trust_control::service_runtime::client::build_client(control_url, token)?;
+            let client = crate::trust_control::service_runtime::client::build_client(
+                control_url,
+                token,
+                &EgressAllowanceSet::default(),
+            )?;
             client.export_evidence(&RemoteEvidenceExportRequest {
                 query: prepared.query,
                 require_proofs: prepared.require_proofs,
@@ -684,8 +688,11 @@ pub fn cmd_evidence_import(
         }
         (None, Some(control_url)) => {
             let token = super::require_control_token(control_token)?;
-            let client =
-                crate::trust_control::service_runtime::client::build_client(control_url, token)?;
+            let client = crate::trust_control::service_runtime::client::build_client(
+                control_url,
+                token,
+                &EgressAllowanceSet::default(),
+            )?;
             client
                 .import_evidence(&RemoteEvidenceImportRequest {
                     package,

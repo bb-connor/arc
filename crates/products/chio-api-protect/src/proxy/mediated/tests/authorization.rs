@@ -1176,6 +1176,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         approval: None,
         control_url: Some("http://127.0.0.1:1".to_string()),
         control_token: Some("token".to_string()),
+        control_egress_allowances: Default::default(),
         budget_db: Some(db.to_string_lossy().to_string()),
         revocation_db: None,
         allow_advisory: false,

@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use super::*;
 use crate::runtime_trust_reports::build_credit_loss_lifecycle_query;
 
@@ -54,7 +55,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_evaluate(
 
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .credit_loss_lifecycle_report(&query)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
@@ -144,7 +145,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_issue(
 
     let event = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .issue_credit_loss_lifecycle(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
@@ -206,7 +207,7 @@ pub(crate) fn cmd_trust_credit_loss_lifecycle_list(
 
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .list_credit_loss_lifecycle(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
@@ -284,7 +285,7 @@ pub(crate) fn cmd_trust_credit_backtest_export(
 
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?.credit_backtest(&query)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?.credit_backtest(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -347,7 +348,7 @@ pub(crate) fn cmd_trust_provider_risk_package_export(
 
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
-        trust_control::service_runtime::client::build_client(url, token)?
+        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
             .credit_provider_risk_package(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {

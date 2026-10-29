@@ -19,8 +19,13 @@ enum StructuredUsageSequenceRelation {
 pub fn build_remote_budget_store(
     control_url: &str,
     control_token: &str,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn BudgetStore>, CliError> {
-    Ok(Box::new(remote_budget_store(control_url, control_token)?))
+    Ok(Box::new(remote_budget_store(
+        control_url,
+        control_token,
+        allowances,
+    )?))
 }
 
 pub(crate) fn build_shared_remote_budget_store(
@@ -28,10 +33,11 @@ pub(crate) fn build_shared_remote_budget_store(
     control_internal_url: &str,
     control_token: &str,
     recovery_fence: chio_kernel::admission_operation::StoreMutationFence,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Arc<RemoteBudgetStore>, CliError> {
-    let mut store = remote_budget_store(control_url, control_token)?;
+    let mut store = remote_budget_store(control_url, control_token, allowances)?;
     store.recovery = Some(BudgetRecoveryAuthority {
-        client: build_client(control_internal_url, control_token)?,
+        client: build_client(control_internal_url, control_token, allowances)?,
         fence: recovery_fence,
     });
     Ok(Arc::new(store))
@@ -40,9 +46,10 @@ pub(crate) fn build_shared_remote_budget_store(
 fn remote_budget_store(
     control_url: &str,
     control_token: &str,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<RemoteBudgetStore, CliError> {
     Ok(RemoteBudgetStore {
-        client: build_client(control_url, control_token)?,
+        client: build_client(control_url, control_token, allowances)?,
         recovery: None,
         cached_usage: Mutex::new(HashMap::new()),
     })

@@ -19,7 +19,7 @@ mod trust_control_health;
 // Shared import set for the entire trust-control surface. The sibling modules
 // below inherit these via `use super::*;`.
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr};
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -249,7 +249,6 @@ use serde_json::{json, Value};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
-use ureq::Agent;
 use url::form_urlencoded::Serializer as UrlFormSerializer;
 use url::{Host, Url};
 

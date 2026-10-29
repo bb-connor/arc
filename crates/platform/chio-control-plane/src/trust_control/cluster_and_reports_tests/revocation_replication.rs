@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 /// The grant the route table attaches to a verified request from node B.
 fn peer_grant() -> Option<axum::Extension<RouteGrant>> {
@@ -229,9 +230,12 @@ fn streamless_peer_is_a_transient_revocation_pull_error_that_applies_nothing() {
         capability_id: "cap-1".to_string(),
     };
     update_peer_revocation_cursor(&state, "https://node-a", cursor.clone());
-    let client =
-        service_runtime::client::build_cluster_peer_client(&state.config.access, "https://node-a")
-            .test_unwrap();
+    let client = service_runtime::client::build_cluster_peer_client(
+        &state.config.access,
+        "https://node-a",
+        &EgressAllowanceSet::default(),
+    )
+    .test_unwrap();
 
     let outcome = sync_peer_revocations(
         &state,

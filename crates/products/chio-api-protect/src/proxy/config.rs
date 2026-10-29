@@ -59,6 +59,8 @@ pub struct ProtectConfig {
     pub control_url: Option<String>,
     /// Bearer token for the control-plane budget endpoints.
     pub control_token: Option<String>,
+    /// Operator private network allowances for the control-plane client.
+    pub control_egress_allowances: std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
     /// Local SQLite budget-store path used when no `control_url` is configured.
     /// Rejected at startup with a durable `receipt_db`: durable admission
     /// reserves budget in the authority co-located with the receipt store.

@@ -144,7 +144,7 @@ pub struct TrustControlClient {
     pub(crate) endpoints: Arc<Vec<String>>,
     pub(crate) preferred_index: Arc<Mutex<usize>>,
     pub(crate) token: Arc<str>,
-    pub(crate) http: Agent,
+    pub(crate) http: chio_egress_contract::BlockingContractAgent,
     pub(crate) cluster_peer_auth: Option<ClusterPeerClientAuth>,
 }
 

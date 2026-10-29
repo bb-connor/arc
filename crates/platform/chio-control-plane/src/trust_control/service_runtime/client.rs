@@ -17,7 +17,7 @@ mod validation;
 
 pub use factory::{build_client, build_public_client};
 
-pub(crate) use factory::build_cluster_peer_client;
+pub(crate) use factory::{build_cluster_peer_client, egress_refusal, is_transport_failure};
 #[cfg(test)]
 pub(crate) use validation::encode_path_segment;
 pub(crate) use validation::{

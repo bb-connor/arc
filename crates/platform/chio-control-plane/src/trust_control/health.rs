@@ -19,6 +19,12 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         Ok(snapshot) => snapshot,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
     };
+    let egress_allowance_digest = match chio_egress_contract::private_network_allowance_digest(
+        state.config.egress_allowances.entries(),
+    ) {
+        Ok(digest) => digest,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+    };
     let authority = trust_authority_health_snapshot(&state).await;
     let ready = authority.get("configured").and_then(Value::as_bool) == Some(false)
         || authority.get("available").and_then(Value::as_bool) == Some(true);
@@ -39,6 +45,7 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
             "receiptQuerySnapshot": super::receipt_query_service::health(&state).await,
             "federation": federation,
             "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
+            "egressAllowanceDigest": egress_allowance_digest,
         })),
     )
         .into_response()

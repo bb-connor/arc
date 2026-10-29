@@ -6,6 +6,7 @@ use super::super::errors::{
 };
 use super::super::issuance::ensure_signed_by_trusted_authority;
 use super::support::{assert_json_post, StaticResponseServer};
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::budget_store::ReservedHoldEnvelope;
 use chio_test_support::prelude::*;
 
@@ -15,7 +16,8 @@ mod legacy_budget_projection;
 #[test]
 fn budget_wrappers_use_split_budget_routes() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 4);
-    let client = build_client(&server.url, "secret").test_expect("build client");
+    let client = build_client(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build client");
 
     let _ = client.try_charge_cost("cap-budget", 2, Some(9), 120, Some(150), Some(900));
     let _ = client.capture_invocation_reservations(
@@ -65,7 +67,8 @@ fn budget_wrappers_use_split_budget_routes() {
 #[test]
 fn budget_wrappers_include_budget_event_identity_when_provided() {
     let server = StaticResponseServer::spawn(200, "{}", "application/json", 4);
-    let client = build_client(&server.url, "secret").test_expect("build client");
+    let client = build_client(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build client");
 
     let _ = client.try_charge_cost_with_ids(
         "cap-budget",
@@ -160,7 +163,8 @@ fn remote_budget_store_binds_authorize_response_identity_and_event(
         });
         body[field] = substituted;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
+        let store =
+            build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
         let result = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
             capability_id: "cap-budget".to_string(),
             grant_index: 2,
@@ -213,7 +217,7 @@ fn remote_budget_store_binds_authorize_response_identity_and_event(
         .to_string();
         let server = StaticResponseServer::spawn(200, &substituted, "application/json", 2);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -288,7 +292,11 @@ fn remote_budget_store_requires_coherent_authorize_event_state(
     })
     .to_string();
     let generated_server = StaticResponseServer::spawn(200, &generated_body, "application/json", 1);
-    let generated_store = build_remote_budget_store(&generated_server.url, "secret")?;
+    let generated_store = build_remote_budget_store(
+        &generated_server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     let generated = generated_store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
         capability_id: "cap-budget".to_string(),
         grant_index: 2,
@@ -357,7 +365,8 @@ fn remote_budget_store_requires_coherent_authorize_event_state(
         })
         .to_string();
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
+        let store =
+            build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
         let result = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
             capability_id: "cap-budget".to_string(),
             grant_index: 2,
@@ -417,7 +426,7 @@ fn remote_budget_store_rejects_incomplete_event_projection_without_poisoning_cac
     .to_string();
     let server = StaticResponseServer::spawn(200, &incomplete, "application/json", 2);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -501,7 +510,7 @@ fn remote_budget_store_rejects_impossible_authorize_projection_without_poisoning
         .to_string();
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -540,7 +549,11 @@ fn remote_budget_store_rejects_oversized_grant_before_network_io(
     let Ok(oversized_grant) = usize::try_from(u64::from(u32::MAX) + 1) else {
         return Ok(());
     };
-    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
+    let store = build_remote_budget_store(
+        "http://127.0.0.1:1",
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     let legacy = store.try_charge_cost("cap-budget", oversized_grant, None, 10, Some(10), Some(10));
     let rich = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
         capability_id: "cap-budget".to_string(),
@@ -565,7 +578,11 @@ fn remote_budget_store_rejects_oversized_grant_before_network_io(
 #[test]
 fn remote_budget_store_rejects_unsupported_hold_persistence_before_minting_nonce(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
+    let store = build_remote_budget_store(
+        "http://127.0.0.1:1",
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     let envelope = ReservedHoldEnvelope::default();
 
     let monetary = store.mark_hold_reserved("hold-budget", 100, "USD", None, &envelope);
@@ -584,7 +601,11 @@ fn remote_budget_store_rejects_unsupported_hold_persistence_before_minting_nonce
 #[test]
 fn remote_budget_store_legacy_with_ids_validates_identity_before_network(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
+    let store = build_remote_budget_store(
+        "http://127.0.0.1:1",
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     for (hold_id, event_id) in [
         (Some("hold-budget"), None),
         (Some(""), Some("event")),
@@ -618,7 +639,7 @@ fn remote_budget_store_legacy_with_ids_validates_identity_before_network(
     })
     .to_string();
     let server = StaticResponseServer::spawn(200, &body, "application/json", 4);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     assert!(store.try_charge_cost_with_ids(
         "cap-budget",
         0,
@@ -651,7 +672,8 @@ fn remote_budget_store_legacy_with_ids_validates_identity_before_network(
         })
         .to_string();
         let server = StaticResponseServer::spawn(200, &body, "application/json", 4);
-        let store = build_remote_budget_store(&server.url, "secret")?;
+        let store =
+            build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
         for result in [
             store
                 .try_charge_cost_with_ids(
@@ -713,7 +735,7 @@ fn remote_budget_store_rejects_legacy_identity_substitution_without_poisoning_ca
     for operation in ["charge", "reverse", "release", "settle"] {
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -762,7 +784,7 @@ fn remote_budget_store_preserves_captured_authorize_replay_decision(
     })
     .to_string();
     let server = legacy_budget_projection::ProjectionServer::spawn(&body)?;
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     let decision = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
         capability_id: "cap-budget".to_string(),
@@ -841,7 +863,7 @@ fn remote_capture_cancel_and_authorize_replays_cannot_regress_cached_usage(
         &legacy_budget_projection::list_body(&[baseline, unversioned])?,
     )?;
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -931,7 +953,7 @@ fn remote_budget_list_cannot_regress_or_conflict_with_newer_cached_usage(
         &legacy_budget_projection::list_body(std::slice::from_ref(&baseline))?,
     )?;
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -980,7 +1002,7 @@ fn remote_budget_get_reloads_costs_seeded_by_a_partial_response(
     .to_string();
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -1034,7 +1056,7 @@ fn remote_budget_get_rejects_substituted_capability_without_partial_cache_update
     .to_string();
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -1175,8 +1197,8 @@ fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
     .to_string();
     let server = legacy_budget_projection::ProjectionServer::spawn(&body)
         .test_expect("bounded response server");
-    let store =
-        build_remote_budget_store(&server.url, "secret").test_expect("build remote budget store");
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())
+        .test_expect("build remote budget store");
 
     let decision = store
         .authorize_budget_hold(BudgetAuthorizeHoldRequest {

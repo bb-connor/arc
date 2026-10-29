@@ -35,13 +35,13 @@ impl std::error::Error for BatchFailure {
 }
 
 enum Backend {
-    Remote(trust_control::TrustControlClient),
+    Remote(Box<trust_control::TrustControlClient>),
     Local(chio_store_sqlite::SqliteRevocationStore),
 }
 impl Backend {
     fn open(state: &RemoteAppState) -> Result<Self, Response> {
         match control_client(state)? {
-            Some(client) => Ok(Self::Remote(client)),
+            Some(client) => Ok(Self::Remote(Box::new(client))),
             None => open_revocation_store(state).map(Self::Local),
         }
     }

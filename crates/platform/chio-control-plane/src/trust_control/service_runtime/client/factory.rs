@@ -1,3 +1,10 @@
+use std::collections::BTreeSet;
+
+use chio_egress_contract::{
+    BlockingContractAgent, EgressAllowanceSet, HttpEgressContract, HttpEgressError,
+};
+use chio_errors::_generated::error_codes::POLICY_DECISION_DENIED;
+
 use super::super::super::report_validation::{normalize_cluster_config_url, normalize_cluster_url};
 use super::super::*;
 use super::validation::{normalize_control_endpoint, validate_control_token};
@@ -5,17 +12,28 @@ use super::validation::{normalize_control_endpoint, validate_control_token};
 pub fn build_client(
     control_url: &str,
     control_token: &str,
+    allowances: &EgressAllowanceSet,
 ) -> Result<TrustControlClient, CliError> {
     build_client_with_cluster_peer(
         control_url,
         control_token,
+        allowances,
         None,
         ControlClientAuthKind::Service,
     )
 }
 
-pub fn build_public_client(control_url: &str) -> Result<TrustControlClient, CliError> {
-    build_client_with_cluster_peer(control_url, "", None, ControlClientAuthKind::Public)
+pub fn build_public_client(
+    control_url: &str,
+    allowances: &EgressAllowanceSet,
+) -> Result<TrustControlClient, CliError> {
+    build_client_with_cluster_peer(
+        control_url,
+        "",
+        allowances,
+        None,
+        ControlClientAuthKind::Public,
+    )
 }
 
 /// A client for one pinned peer's internal listener. Requests are signed with
@@ -23,20 +41,40 @@ pub fn build_public_client(control_url: &str) -> Result<TrustControlClient, CliE
 pub(crate) fn build_cluster_peer_client(
     access: &Arc<crate::trust_control::caller_credentials::TrustAccess>,
     peer_node_id: &str,
+    allowances: &EgressAllowanceSet,
 ) -> Result<TrustControlClient, CliError> {
     let recipient = normalize_cluster_url(peer_node_id)?;
     let peer = access.peers().get(&recipient).ok_or_else(|| {
         CliError::cli_other_error(format!("cluster peer {recipient} is not pinned"))
     })?;
-    normalize_cluster_config_url(&peer.internal_url, true)?;
+    normalize_cluster_config_url(&peer.internal_url)?;
     build_client_with_cluster_peer(
         &peer.internal_url,
         "",
+        allowances,
         Some(ClusterPeerClientAuth {
             access: Arc::clone(access),
             recipient: Arc::<str>::from(recipient),
         }),
         ControlClientAuthKind::Peer,
+    )
+}
+
+/// A refusal by the client's egress contract, which aborts the request
+/// instead of failing over to another endpoint.
+pub(crate) fn egress_refusal(error: HttpEgressError) -> CliError {
+    CliError::with_public_source(
+        &POLICY_DECISION_DENIED,
+        "trust-control egress refused by the HttpEgressContract",
+        error,
+    )
+}
+
+/// Only a transport failure lets the client try its next endpoint.
+pub(crate) fn is_transport_failure(error: &HttpEgressError) -> bool {
+    matches!(
+        error,
+        HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. }
     )
 }
 
@@ -50,6 +88,7 @@ enum ControlClientAuthKind {
 fn build_client_with_cluster_peer(
     control_url: &str,
     control_token: &str,
+    allowances: &EgressAllowanceSet,
     cluster_peer_auth: Option<ClusterPeerClientAuth>,
     auth_kind: ControlClientAuthKind,
 ) -> Result<TrustControlClient, CliError> {
@@ -67,13 +106,12 @@ fn build_client_with_cluster_peer(
             "control URL must not be empty".to_string(),
         ));
     }
-    // Credential-bearing and public clients use the same fixed authority boundary.
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: trust-control client for the operator-configured control
-    // endpoints, redirects off
-    let http = ureq::AgentBuilder::new()
-        .timeout(CONTROL_HTTP_TIMEOUT)
-        .redirects(0)
-        .build();
+    let contract = control_client_contract(&endpoints, allowances)?;
+    for endpoint in &endpoints {
+        contract.enforce_url(endpoint, 0).map_err(egress_refusal)?;
+    }
+    let http = BlockingContractAgent::new(&contract, CONTROL_HTTP_TIMEOUT, CONTROL_HTTP_TIMEOUT)
+        .map_err(egress_refusal)?;
     Ok(TrustControlClient {
         endpoints: Arc::new(endpoints),
         preferred_index: Arc::new(Mutex::new(0)),
@@ -81,4 +119,59 @@ fn build_client_with_cluster_peer(
         http,
         cluster_peer_auth,
     })
+}
+
+/// One contract per client: exactly its endpoints' schemes and authorities,
+/// loopback only when an endpoint is a loopback literal, no redirects, the
+/// peer response ceiling, and the operator allowances that pin one of its
+/// endpoints.
+fn control_client_contract(
+    endpoints: &[String],
+    allowances: &EgressAllowanceSet,
+) -> Result<HttpEgressContract, CliError> {
+    let mut allowed_schemes = BTreeSet::new();
+    let mut allowed_authority_set = BTreeSet::new();
+    let mut loopback = false;
+    for endpoint in endpoints {
+        let url = Url::parse(endpoint).map_err(|error| {
+            CliError::cli_other_error(format!("control URL must be a valid URL: {error}"))
+        })?;
+        let host = match url.host() {
+            Some(Host::Domain(domain)) => {
+                let domain = domain.trim_end_matches('.').to_ascii_lowercase();
+                loopback |= domain == "localhost";
+                domain
+            }
+            Some(Host::Ipv4(address)) => {
+                loopback |= address.is_loopback();
+                address.to_string()
+            }
+            Some(Host::Ipv6(address)) => {
+                loopback |= address.is_loopback();
+                format!("[{address}]")
+            }
+            None => {
+                return Err(egress_refusal(HttpEgressError::MissingAuthority));
+            }
+        };
+        allowed_schemes.insert(url.scheme().to_owned());
+        allowed_authority_set.insert(match url.port() {
+            Some(port) => format!("{host}:{port}"),
+            None => host,
+        });
+    }
+    let contract = HttpEgressContract {
+        tenant_egress_namespace: "trust-control-client".to_owned(),
+        allowed_schemes,
+        allowed_authority_set,
+        deny_loopback: !loopback,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 0,
+        max_response_bytes: MAX_PEER_RESPONSE_BYTES,
+        private_network_allowances: BTreeSet::new(),
+    }
+    .with_private_network_allowances(allowances);
+    contract.validate().map_err(egress_refusal)?;
+    Ok(contract)
 }
