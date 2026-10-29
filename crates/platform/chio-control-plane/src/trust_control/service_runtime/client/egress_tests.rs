@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use chio_egress_contract::{EgressAllowanceSet, HttpEgressError, PrivateNetworkAllowance};
 
-use super::factory::{build_client, build_cluster_peer_client};
+use super::factory::{build_client, build_cluster_peer_client, MixedLoopbackControlEndpoints};
 use crate::trust_control::caller_credentials::tests as credentials;
 use crate::trust_control::caller_credentials::{TrustAccess, TrustAccessConfig};
 use crate::CliError;
@@ -281,6 +281,20 @@ fn loopback_literal_beside_another_endpoint_is_refused_at_construction() {
         assert_eq!(
             error.report().message,
             "trust-control endpoints mix loopback and non-loopback hosts",
+            "{control_url}"
+        );
+        let mut cause: Option<&(dyn Error + 'static)> = Some(&error);
+        let mut typed = None;
+        while let Some(current) = cause {
+            typed = typed.or_else(|| current.downcast_ref::<MixedLoopbackControlEndpoints>());
+            cause = current.source();
+        }
+        assert_eq!(
+            typed,
+            Some(&MixedLoopbackControlEndpoints {
+                loopback: loopback.to_string(),
+                other: other.to_string(),
+            }),
             "{control_url}"
         );
         assert_eq!(

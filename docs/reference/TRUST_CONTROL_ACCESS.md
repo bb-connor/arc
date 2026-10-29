@@ -268,14 +268,18 @@ its bearer.
 Every trust-control client, including the clients a node uses to reach its
 pinned peers and the cluster leader, dials under an `HttpEgressContract` that
 admits exactly its endpoints, follows no redirects, and refuses private,
-loopback (except a loopback literal endpoint), link-local, unique-local and
-cloud metadata addresses. Link-local and metadata addresses are refused at
-construction and at connect. A refusal aborts the request; only a transport
+loopback, link-local, unique-local and cloud metadata addresses. Loopback is
+admitted only when every endpoint in the list is a loopback literal; a list that
+names a loopback literal beside any other endpoint is refused at construction.
+Link-local and metadata addresses are refused at construction and at connect. A refusal aborts the request; only a transport
 failure moves the client to its next endpoint.
 
 A peer or control plane on a private network (for example inside a VPC) is
 reached only through an operator allowance. Declare it in the file named by the
-global `--egress-allowance-file` flag:
+global `--egress-allowance-file` flag. `chio trust serve`, `chio trust config
+check`, `chio start`, `chio api protect`, `chio mcp wrap` and `chio finding
+operator serve` consume the file; every other command refuses the flag with an
+error and exits nonzero rather than ignoring it:
 
 ```toml
 [[allow]]

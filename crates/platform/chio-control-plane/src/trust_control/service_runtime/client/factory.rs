@@ -70,6 +70,19 @@ pub(crate) fn egress_refusal(error: HttpEgressError) -> CliError {
     )
 }
 
+/// A control endpoint list naming a loopback literal beside another endpoint.
+/// One contract covers the whole list, so admitting loopback for the literal
+/// would admit it for every DNS name in the list too.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error(
+    "control endpoints mix loopback `{loopback}` with non-loopback `{other}`; \
+     a client dials loopback literals only or no loopback at all"
+)]
+pub(crate) struct MixedLoopbackControlEndpoints {
+    pub(crate) loopback: String,
+    pub(crate) other: String,
+}
+
 /// Only a transport failure lets the client try its next endpoint.
 pub(crate) fn is_transport_failure(error: &HttpEgressError) -> bool {
     matches!(
@@ -122,49 +135,62 @@ fn build_client_with_cluster_peer(
 }
 
 /// One contract per client: exactly its endpoints' schemes and authorities,
-/// loopback only when an endpoint is a loopback literal, no redirects, the
+/// loopback only when every endpoint is a loopback literal, no redirects, the
 /// peer response ceiling, and the operator allowances that pin one of its
-/// endpoints.
+/// endpoints. A list mixing a loopback literal with any other endpoint is
+/// refused.
 fn control_client_contract(
     endpoints: &[String],
     allowances: &EgressAllowanceSet,
 ) -> Result<HttpEgressContract, CliError> {
     let mut allowed_schemes = BTreeSet::new();
     let mut allowed_authority_set = BTreeSet::new();
-    let mut loopback = false;
+    let mut first_loopback = None;
+    let mut first_other = None;
     for endpoint in endpoints {
         let url = Url::parse(endpoint).map_err(|error| {
             CliError::cli_other_error(format!("control URL must be a valid URL: {error}"))
         })?;
-        let host = match url.host() {
+        let (host, is_loopback) = match url.host() {
             Some(Host::Domain(domain)) => {
                 let domain = domain.trim_end_matches('.').to_ascii_lowercase();
-                loopback |= domain == "localhost";
-                domain
+                let is_loopback = domain == "localhost";
+                (domain, is_loopback)
             }
-            Some(Host::Ipv4(address)) => {
-                loopback |= address.is_loopback();
-                address.to_string()
-            }
-            Some(Host::Ipv6(address)) => {
-                loopback |= address.is_loopback();
-                format!("[{address}]")
-            }
+            Some(Host::Ipv4(address)) => (address.to_string(), address.is_loopback()),
+            Some(Host::Ipv6(address)) => (format!("[{address}]"), address.is_loopback()),
             None => {
                 return Err(egress_refusal(HttpEgressError::MissingAuthority));
             }
         };
-        allowed_schemes.insert(url.scheme().to_owned());
-        allowed_authority_set.insert(match url.port() {
+        let authority = match url.port() {
             Some(port) => format!("{host}:{port}"),
             None => host,
-        });
+        };
+        let first = if is_loopback {
+            &mut first_loopback
+        } else {
+            &mut first_other
+        };
+        first.get_or_insert_with(|| authority.clone());
+        allowed_schemes.insert(url.scheme().to_owned());
+        allowed_authority_set.insert(authority);
+    }
+    if let (Some(loopback), Some(other)) = (&first_loopback, &first_other) {
+        return Err(CliError::with_public_source(
+            &POLICY_DECISION_DENIED,
+            "trust-control endpoints mix loopback and non-loopback hosts",
+            MixedLoopbackControlEndpoints {
+                loopback: loopback.clone(),
+                other: other.clone(),
+            },
+        ));
     }
     let contract = HttpEgressContract {
         tenant_egress_namespace: "trust-control-client".to_owned(),
         allowed_schemes,
         allowed_authority_set,
-        deny_loopback: !loopback,
+        deny_loopback: first_loopback.is_none(),
         deny_link_local: true,
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
