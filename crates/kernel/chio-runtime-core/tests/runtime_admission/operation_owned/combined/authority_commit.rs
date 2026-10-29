@@ -1,22 +1,10 @@
 use super::*;
 
 #[test]
-fn treaty_epoch_missing_refuses_without_trust_floor_update() -> TestResult {
+fn treaty_epoch_missing_refuses_before_authority_commit() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = CombinedFixture::new()?;
-    let (_, _, report, policy, weights) = signed_policy_inputs(0.1)?;
-    let hook = ChioRuntimeAdmissionHook::new(
-        profile(),
-        SqliteRuntimeOrchestrationStore::open(fixture.inner.directory().join("runtime.sqlite3"))?,
-        fixture.inner.binding.clone(),
-    )
-    .with_pheromone_query_report(report)
-    .with_runtime_pheromone_policy(policy, weights)
-    .with_swarm_graph_source(Arc::new(IssuedGraphs(
-        fixture.inner.authority.work_graph_store(),
-    )))
-    .with_swarm_witness_keys(trusted_swarm_witness_keys());
-    let kernel = fixture.kernel(hook)?;
+    let kernel = fixture.kernel(fixture.hook()?)?;
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
         &fixture.inner.request,
         Some(swarm_route_metadata()),
