@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use chio_anchor::{
     build_anchor_batch, AnchorBatch, AnchorBatchWitness, AnchorBatchWitnessKind,
-    AnchorWitnessClient, AnchorWitnessError, OtsClient, RekorClient,
+    AnchorWitnessClient, AnchorWitnessError, OtsClient, RekorClient, WitnessReceipt,
 };
 use chio_core::hashing::Hash;
 use chio_core::Keypair;
@@ -112,5 +112,61 @@ fn witness_clients_refuse_endpoints_outside_their_contract() -> TestResult {
             HttpEgressError::LinkLocalDenied { .. }
         ))
     ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn rekor_lookup_never_dials_a_redirect_target_outside_the_log() -> TestResult {
+    let log = TcpListener::bind("127.0.0.1:0").await?;
+    let elsewhere = TcpListener::bind("127.0.0.1:0").await?;
+    let log_url = format!("http://{}", log.local_addr()?);
+    let elsewhere_url = format!(
+        "http://{}/api/v1/log/entries/entry-1",
+        elsewhere.local_addr()?
+    );
+    let redirect = format!(
+        "HTTP/1.1 307 Temporary Redirect\r\nLocation: {elsewhere_url}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    );
+    let log_task = tokio::spawn(respond_once(log, redirect));
+    let dialed = Arc::new(AtomicBool::new(false));
+    let elsewhere_task = {
+        let dialed = Arc::clone(&dialed);
+        tokio::spawn(async move {
+            if let Ok((mut stream, _)) = elsewhere.accept().await {
+                dialed.store(true, Ordering::SeqCst);
+                let _ = stream
+                    .write_all(b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                    .await;
+            }
+        })
+    };
+
+    let contract = HttpEgressContract::permissive_for_tests(log_url.trim_start_matches("http://"));
+    let client = RekorClient::new(log_url, &contract, 0)?;
+    let receipt = WitnessReceipt {
+        kind: AnchorBatchWitnessKind::Rekor,
+        external_uuid: "entry-1".to_owned(),
+        published_at: 1_700_000_000,
+        inclusion_proof: Vec::new(),
+        witness_root: Hash::zero(),
+        body_hash: Hash::zero(),
+    };
+    let result = client.verify_inclusion(&receipt).await;
+    log_task.await??;
+    elsewhere_task.abort();
+
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                HttpEgressError::AuthorityDenied { .. }
+            ))
+        ),
+        "{result:?}"
+    );
+    assert!(
+        !dialed.load(Ordering::SeqCst),
+        "Rekor lookup followed a redirect to an authority outside its log"
+    );
     Ok(())
 }
