@@ -119,6 +119,21 @@ fn seed(store: &SqliteReceiptStore) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn seed_unchecked(store: &SqliteReceiptStore) -> Result<(), Box<dyn std::error::Error>> {
+    let keypair = keypair();
+    for index in 0..4u64 {
+        let receipt = sample_receipt_with_keypair_and_timestamp(
+            &format!("fork-open-{index}"),
+            index + 1,
+            100,
+            &keypair,
+        );
+        store.append_chio_receipt_returning_seq(&receipt)?;
+    }
+    store.flush_receipt_writes()?;
+    Ok(())
+}
+
 type Operation = fn(&SqliteReceiptStore, &Path, &str) -> Result<(), Box<dyn std::error::Error>>;
 
 fn append_receipt(
@@ -155,6 +170,16 @@ fn writer_closure(
     Ok(())
 }
 
+fn checkpoint_batch(
+    store: &SqliteReceiptStore,
+    _: &Path,
+    label: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let max_batch = if label == "a" { 2 } else { 3 };
+    store.create_next_receipt_checkpoint(max_batch, &keypair())?;
+    Ok(())
+}
+
 fn retention_delete(
     store: &SqliteReceiptStore,
     archives: &Path,
@@ -168,6 +193,14 @@ fn retention_delete(
 
 fn assert_equal_generation_fork_is_refused(
     name: &str,
+    operation: Operation,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_fork_from_seed_is_refused(name, seed, operation)
+}
+
+fn assert_fork_from_seed_is_refused(
+    name: &str,
+    seed: fn(&SqliteReceiptStore) -> Result<(), Box<dyn std::error::Error>>,
     operation: Operation,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let world = World::new(&format!("chio-fork-{name}"))?;
@@ -229,6 +262,12 @@ fn a_writer_closure_fork_at_the_anchored_generation_is_refused(
 fn a_retention_fork_at_the_anchored_generation_is_refused() -> Result<(), Box<dyn std::error::Error>>
 {
     assert_equal_generation_fork_is_refused("retention", retention_delete)
+}
+
+#[test]
+fn a_checkpoint_fork_at_the_anchored_generation_is_refused(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_fork_from_seed_is_refused("checkpoint", seed_unchecked, checkpoint_batch)
 }
 
 #[test]

@@ -118,6 +118,28 @@ fn main_tables(connection: &Connection) -> rusqlite::Result<Vec<String>> {
     names.collect()
 }
 
+/// Every main table with its columns. A change here between installing the
+/// triggers and computing the head means the triggers no longer cover the rows.
+fn table_signature(connection: &Connection) -> rusqlite::Result<String> {
+    let mut lines = Vec::new();
+    for table in main_tables(connection)? {
+        lines.push(format!(
+            "{table}({})",
+            table_columns(connection, &table)?.join(",")
+        ));
+    }
+    Ok(lines.join("\n"))
+}
+
+fn log_triggers(connection: &Connection) -> rusqlite::Result<Vec<String>> {
+    let mut statement = connection.prepare(
+        "SELECT name FROM temp.sqlite_master WHERE type = 'trigger' \
+         AND name LIKE 'chio\\_tx\\_log\\_%' ESCAPE '\\' ORDER BY name",
+    )?;
+    let names = statement.query_map([], |row| row.get::<_, String>(0))?;
+    names.collect()
+}
+
 fn table_columns(connection: &Connection, table: &str) -> rusqlite::Result<Vec<String>> {
     let mut statement =
         connection.prepare(&format!("PRAGMA main.table_info({})", quote_literal(table)))?;
@@ -208,7 +230,7 @@ pub(crate) fn begin_change_log(
         "CREATE TEMP TABLE IF NOT EXISTS {LOG_TABLE} (\
              seq INTEGER PRIMARY KEY AUTOINCREMENT, tbl TEXT NOT NULL, op TEXT NOT NULL, \
              old_digest BLOB, new_digest BLOB); \
-         CREATE TEMP TABLE IF NOT EXISTS {LOG_META_TABLE} (schema_version INTEGER NOT NULL, tables TEXT NOT NULL); \
+         CREATE TEMP TABLE IF NOT EXISTS {LOG_META_TABLE} (schema_version INTEGER NOT NULL, tables TEXT NOT NULL, triggers TEXT NOT NULL); \
          DELETE FROM temp.{LOG_TABLE};"
     ))?;
     let schema_version: i64 =
@@ -224,8 +246,15 @@ pub(crate) fn begin_change_log(
         install_triggers(connection, scope)?;
         connection.execute_batch(&format!("DELETE FROM temp.{LOG_META_TABLE};"))?;
         connection.execute(
-            &format!("INSERT INTO temp.{LOG_META_TABLE} (schema_version, tables) VALUES (?1, ?2)"),
-            rusqlite::params![schema_version, main_tables(connection)?.join("\n")],
+            &format!(
+                "INSERT INTO temp.{LOG_META_TABLE} (schema_version, tables, triggers) \
+                 VALUES (?1, ?2, ?3)"
+            ),
+            rusqlite::params![
+                schema_version,
+                table_signature(connection)?,
+                log_triggers(connection)?.join("\n")
+            ],
         )?;
     }
     Ok(())
@@ -238,14 +267,19 @@ pub(crate) fn next_head_hex(
     connection: &Connection,
     previous_head_hex: &str,
 ) -> rusqlite::Result<String> {
-    let logged_tables: String = connection.query_row(
-        &format!("SELECT tables FROM temp.{LOG_META_TABLE}"),
+    let (logged_tables, installed_triggers): (String, String) = connection.query_row(
+        &format!("SELECT tables, triggers FROM temp.{LOG_META_TABLE}"),
         [],
-        |row| row.get(0),
+        |row| Ok((row.get(0)?, row.get(1)?)),
     )?;
-    if logged_tables != main_tables(connection)?.join("\n") {
+    if logged_tables != table_signature(connection)? {
         return Err(change_log_error(
-            "a table was created or dropped inside an anchored transaction".to_string(),
+            "a table was created, dropped or altered inside an anchored transaction".to_string(),
+        ));
+    }
+    if installed_triggers != log_triggers(connection)?.join("\n") {
+        return Err(change_log_error(
+            "the change-log triggers are not the installed set".to_string(),
         ));
     }
     let mut hasher = Sha256::new();
@@ -299,6 +333,17 @@ mod tests {
             )
             .unwrap();
         connection
+    }
+
+    fn log_trigger_names(connection: &Connection) -> Vec<String> {
+        let mut statement = connection
+            .prepare(
+                "SELECT name FROM temp.sqlite_master WHERE type = 'trigger' \
+                 AND name LIKE 'chio\\_tx\\_log\\_%' ESCAPE '\\' ORDER BY name",
+            )
+            .unwrap();
+        let names = statement.query_map([], |row| row.get(0)).unwrap();
+        names.map(Result::unwrap).collect()
     }
 
     fn head_after(connection: &Connection, work: &str) -> String {
@@ -366,6 +411,119 @@ mod tests {
         begin_change_log(&tx, &NO_SKIP).unwrap();
         tx.execute_batch("CREATE TABLE late (v TEXT);").unwrap();
         assert!(next_head_hex(&tx, &genesis_head_hex()).is_err());
+    }
+
+    #[test]
+    fn a_table_without_triggers_refuses_the_head() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        let names = log_trigger_names(&tx);
+        assert_eq!(names.len(), 9);
+        for suffix in ["i", "u", "d"] {
+            tx.execute_batch(&format!("DROP TRIGGER temp.\"chio_tx_log_plain_{suffix}\""))
+                .unwrap();
+            assert!(next_head_hex(&tx, &genesis_head_hex()).is_err(), "{suffix}");
+            tx.execute_batch("ROLLBACK").unwrap();
+            tx.execute_batch("BEGIN").unwrap();
+            begin_change_log(&tx, &NO_SKIP).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_schema_change_inside_the_transaction_refuses_the_head() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.execute_batch("ALTER TABLE plain ADD COLUMN extra TEXT;")
+            .unwrap();
+        assert!(next_head_hex(&tx, &genesis_head_hex()).is_err());
+    }
+
+    #[test]
+    fn a_schema_change_between_transactions_reinstalls_the_triggers() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.execute_batch("ALTER TABLE plain ADD COLUMN extra TEXT;")
+            .unwrap();
+        tx.commit().unwrap();
+        let with_a = head_after(
+            &connection,
+            "INSERT INTO plain (body, extra) VALUES ('x', 'a');",
+        );
+        let with_b = head_after(
+            &connection,
+            "INSERT INTO plain (body, extra) VALUES ('x', 'b');",
+        );
+        assert_ne!(with_a, with_b);
+    }
+
+    #[test]
+    fn a_missing_row_digest_function_fails_the_write() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.remove_function(ROW_DIGEST_FUNCTION, -1).unwrap();
+        let error = tx
+            .execute_batch("INSERT INTO plain (body) VALUES ('x');")
+            .expect_err("write without the digest function");
+        assert!(error.to_string().contains(ROW_DIGEST_FUNCTION), "{error}");
+    }
+
+    #[test]
+    fn an_erroring_row_digest_function_fails_the_write() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.create_scalar_function(ROW_DIGEST_FUNCTION, -1, FunctionFlags::SQLITE_UTF8, |_| {
+            Err::<Vec<u8>, _>(rusqlite::Error::UserFunctionError(
+                "digest unavailable".into(),
+            ))
+        })
+        .unwrap();
+        assert!(tx
+            .execute_batch("INSERT INTO plain (body) VALUES ('x');")
+            .is_err());
+    }
+
+    #[test]
+    fn a_rolled_back_transaction_leaves_nothing_in_the_log() {
+        let connection = connection();
+        let empty = head_after(&connection, "SELECT 1;");
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.execute_batch("INSERT INTO plain (body) VALUES ('x');")
+            .unwrap();
+        tx.rollback().unwrap();
+        let logged: i64 = connection
+            .query_row("SELECT COUNT(*) FROM temp.chio_tx_log", [], |row| {
+                row.get(0)
+            })
+            .unwrap_or(0);
+        assert_eq!(logged, 0);
+        assert_eq!(empty, head_after(&connection, "SELECT 1;"));
+    }
+
+    #[test]
+    fn text_is_digested_as_utf8_whatever_the_database_encoding() {
+        let work = "INSERT INTO plain (body) VALUES ('h\u{e9}llo \u{1f600} \u{4e16}\u{754c}');";
+        let utf8 = head_after(&connection(), work);
+        let utf16 = Connection::open_in_memory().unwrap();
+        utf16
+            .execute_batch(
+                "PRAGMA encoding = 'UTF-16le'; \
+                 CREATE TABLE plain (id INTEGER PRIMARY KEY, body TEXT NOT NULL); \
+                 CREATE TABLE keyed (k TEXT PRIMARY KEY, v BLOB) WITHOUT ROWID; \
+                 CREATE TABLE counters (id INTEGER PRIMARY KEY, generation INTEGER NOT NULL, note TEXT);\
+                 INSERT INTO counters VALUES (1, 0, 'a');",
+            )
+            .unwrap();
+        let encoding: String = utf16
+            .query_row("PRAGMA encoding", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(encoding, "UTF-16le");
+        assert_eq!(utf8, head_after(&utf16, work));
     }
 
     #[test]
