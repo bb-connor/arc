@@ -15,7 +15,7 @@ name = "chio_a2a_adapter"
 async-trait = { workspace = true }
 base64 = "0.22"
 chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
-chio-egress-contract = { workspace = true }
+chio-egress-contract = { workspace = true, features = ["ureq-egress"] }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true }
 chio-manifest = { workspace = true }
@@ -24,8 +24,6 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tempfile = { workspace = true }
 url = { workspace = true }
-ureq = { version = "2.10", features = ["json"] }
-webpki-roots = "0.26"
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
 # free of fuzz instrumentation. Pulled in by `fuzz/fuzz_targets/a2a_envelope_decode.rs`
 # via `chio-a2a-adapter = { features = ["fuzz"] }`.
@@ -40,6 +38,7 @@ fuzz = ["dep:arbitrary"]
 
 [dev-dependencies]
 rcgen = "0.13"
+ureq = "2.10"
 tokio = { workspace = true }
 
 [lints]

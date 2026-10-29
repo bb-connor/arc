@@ -1541,7 +1541,7 @@
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire",
     "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire",
-    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
+    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response::from_wire",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire",
@@ -18557,7 +18557,7 @@
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire#1::decode_canonical",
     "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire#1::decode_signed",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire#1::decode_signed",
-    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_document",
+    "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/transport.rs::process_sse_event::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-edge/src/conversion.rs::extract_arguments_from_message::from_wire#1::canonicalize",
@@ -22810,10 +22810,10 @@
       "main::shared-reader::crates/products/chio-wall/src/commands.rs::cmd_chio_wall_siem_export"
     ],
     "crates/protocol/chio-a2a-adapter/src/auth.rs": [
-      "fetch_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract",
-      "post_form_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract",
-      "post_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract",
-      "read_json_response_with_contract::original-json-reader::UntrustedJsonText",
+      "fetch_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response",
+      "post_form_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response",
+      "post_json::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response",
+      "read_json_response::original-json-reader::UntrustedJsonText",
       "request_client_credentials_token::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::post_form_json",
       "request_client_credentials_token::shared-reader::crates/protocol/chio-a2a-adapter/src/auth.rs::post_form_json"
     ],
