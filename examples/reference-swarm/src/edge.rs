@@ -101,6 +101,8 @@ impl EdgeSession {
 
     fn detached(target: &EdgeTarget, bearer: &str, session_id: Option<String>) -> Fallible<Self> {
         Ok(Self {
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: operator-run example reaching the
+            // Chio edges of its own reference stack.
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(30))
                 .build()?,
@@ -164,6 +166,7 @@ impl EdgeSession {
             .http
             .delete(format!("{}/mcp", self.base_url))
             .headers(self.headers())
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send();
     }
 
@@ -191,6 +194,7 @@ impl EdgeSession {
             .post(format!("{}/mcp", self.base_url))
             .headers(self.headers())
             .json(&json!({ "jsonrpc": "2.0", "method": method, "params": {} }))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?;
         Ok(())
     }
@@ -205,6 +209,7 @@ impl EdgeSession {
             .post(format!("{}/mcp", self.base_url))
             .headers(self.headers())
             .json(&json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?;
         if let Some(session) = response
             .headers()
@@ -280,6 +285,8 @@ pub struct EdgeAdmin {
 impl EdgeAdmin {
     pub fn new(target: &EdgeTarget, admin_bearer: &str) -> Fallible<Self> {
         Ok(Self {
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: operator-run example reaching the
+            // Chio edges of its own reference stack.
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(15))
                 .build()?,
@@ -292,6 +299,7 @@ impl EdgeAdmin {
         self.http
             .get(format!("{}/admin/health", self.base_url))
             .header(AUTHORIZATION, format!("Bearer {}", self.bearer))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .is_ok_and(|response| response.status().is_success())
     }
@@ -305,6 +313,7 @@ impl EdgeAdmin {
                 self.base_url
             ))
             .header(AUTHORIZATION, format!("Bearer {}", self.bearer))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?
             .error_for_status()?
             .json()?;
@@ -323,6 +332,7 @@ impl EdgeAdmin {
             .post(format!("{}/admin/revocations", self.base_url))
             .header(AUTHORIZATION, format!("Bearer {}", self.bearer))
             .json(&json!({ "capability_id": capability_id }))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?
             .error_for_status()?
             .json()?;
