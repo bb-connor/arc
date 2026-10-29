@@ -1629,11 +1629,11 @@ rust_symbols = [
   "PreparedHookAdmission",
   "ChioRuntimeAdmissionHook::prepare_request",
 ]
-normalized_sha256 = "6c2a2c433f3ca74f34b8486f9d391d76466b76ac534522cd76e933e2af70483f"
+normalized_sha256 = "ddb6e432ce8c3520a99f40b022f8d243b81c093481fa8aa7eb5f146d14794d4c"
 symbol_sha256 = [
   { symbol = "HookAdmissionPreparation", sha256 = "4d0eb4e4cd05c48edb6e8361ed3c47c214bdcaca17d6f5b9a30e800a49cc6c70" },
-  { symbol = "PreparedHookAdmission", sha256 = "b72a3882c480a5e04c8c4cf83cd16770913a438db8a96dcedfe566620cfe70f3" },
-  { symbol = "ChioRuntimeAdmissionHook::prepare_request", sha256 = "ee87d6e0ae42eccdca3a294ff14a83038da7bcce01f0be170b3d70a5d267e516" },
+  { symbol = "PreparedHookAdmission", sha256 = "ef866d680c5be59f62471b731fdfec3f12501b50cb790ec72dafdca2b49fb333" },
+  { symbol = "ChioRuntimeAdmissionHook::prepare_request", sha256 = "9261402573ee0132fc27d6fcdd798948a01e75059e3cfbae5a0eb0e735b73b5f" },
 ]
 
 [[mirror]]
@@ -1645,9 +1645,9 @@ rust_symbols = [
   "verify_treaty_reference_from_store",
   "verified_federation_treaty_material",
 ]
-normalized_sha256 = "368c59a5b17cd0c16cef2c5eda83761dee5a0e83dfae6b7198729a515e5a5d39"
+normalized_sha256 = "9a2d67dceacb12c991550f6911ab4f728ef23df04b4093e8bfe399f208dc8e43"
 symbol_sha256 = [
-  { symbol = "verify_treaty_reference_from_store", sha256 = "c6bf11bf65131a208b2ef99434f806747ad51d299d13c1ebb125d887b94fa972" },
+  { symbol = "verify_treaty_reference_from_store", sha256 = "e818f3afbaae2042de681ed25f6cab9356179f95f529f8bcebbd41b94bf00697" },
   { symbol = "verified_federation_treaty_material", sha256 = "b5a7d2ce9e60e0784975f26ab061dee234760f7f87e6a98166b770441395b472" },
 ]
 
@@ -1720,11 +1720,11 @@ rust_symbols = [
   "PreparedRuntimeAdmission::resume_operation_owned",
   "PreparedRuntimeAdmission::operation_owned_report",
 ]
-normalized_sha256 = "3ad48baaf2abe8972576d28d1924cd64b0643c89124bda469c7bbe8fd2828df9"
+normalized_sha256 = "5a2d8e24d5db0c30ba96a4c3a572539d39fe6921a3520d1507d90529ac074d71"
 symbol_sha256 = [
   { symbol = "PreparedRuntimeAdmission::destructive_resource", sha256 = "09c261195096914f50985bdb0b535d9098fdd023b21efa402becfae81badc24e" },
-  { symbol = "PreparedRuntimeAdmission::commit_operation_owned", sha256 = "b824589cf7a4aeb8388d3afa11cea051a63a39d7dc249c20cd2a40bd15dbb39b" },
-  { symbol = "PreparedRuntimeAdmission::resume_operation_owned", sha256 = "9d5d2ff4c0a9b3c54a9f16ec6e084eca4043836fa3d3b718698c14ef69793d46" },
+  { symbol = "PreparedRuntimeAdmission::commit_operation_owned", sha256 = "78f531ccc97fc1ddb741c6578c659abac0e2aa6c80e736a2697d7ed062491b6d" },
+  { symbol = "PreparedRuntimeAdmission::resume_operation_owned", sha256 = "cdf030504a26fa5aba3ed44135e7dbd4b2ab6e1032a205d3cbe3310a2f760744" },
   { symbol = "PreparedRuntimeAdmission::operation_owned_report", sha256 = "bdff9f24871e0350a8a44bd5c763aed28b6374494e0b4d78738a95c1edff9504" },
 ]
 
@@ -1741,10 +1741,10 @@ rust_symbols = [
   "PreparedHookAdmission::operation_owned_resources",
   "PreparedHookAdmission::operation_owned_plan_digest",
 ]
-normalized_sha256 = "05b71cdd2417252938e9f548637544669c43a5f1e519ed0aeca34099094c3cb0"
+normalized_sha256 = "8754b4f617bc225f9ea8d9881d06e994c8a1a935837f0e2f5ad0934a8f454efe"
 symbol_sha256 = [
-  { symbol = "PreparedHookAdmission::reserve_operation_owned", sha256 = "e5f8a3b0efc82c488f4a8b554b0308e2afedcc2e677e34a1bbb06fd9ac88a6af" },
-  { symbol = "PreparedHookAdmission::resume_operation_owned", sha256 = "53fedff21e12eb2a000767ce565c51b6fb19c54f9843a2116ad707f4828a8261" },
+  { symbol = "PreparedHookAdmission::reserve_operation_owned", sha256 = "0d0de3c52ce2d9486a3a9a2dbd1a66330db9df0f67e7896879767d02b29cf9ca" },
+  { symbol = "PreparedHookAdmission::resume_operation_owned", sha256 = "ff58fb22c1b52d09fc49c0ac14c5ef7550e763714a94b32da64f0b7043c1e807" },
   { symbol = "verify_revalidation_material", sha256 = "df3c06296d84ea736bef73e0a01619157d5d464dcb6d587742f18565e6aab6fb" },
   { symbol = "PreparedHookAdmission::verify_owned_dispatch", sha256 = "899a2e5e62949a0ff2095348ad641c37bdfe163ad363f9ee5c6e64a5246d112e" },
   { symbol = "PreparedHookAdmission::operation_owned_resources", sha256 = "97b39cb2ea86f760991eca11f357695d548bcedb5c43c55f2831aeffb32db84c" },
