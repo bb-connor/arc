@@ -289,7 +289,9 @@ mod tests {
             .collect::<Result<Vec<_>, chio_kernel::admission_operation::AdmissionOperationError>>(
             )?;
         let mut at_limit = body.clone();
-        at_limit.participants.truncate(MAX_TREATY_EPOCH_PARTICIPANTS);
+        at_limit
+            .participants
+            .truncate(MAX_TREATY_EPOCH_PARTICIPANTS);
         verify_treaty_epoch_update(
             SignedTreatyEpochV1::sign(at_limit, &key)?,
             &key.public_key(),
