@@ -70,10 +70,20 @@ impl Guard for GuardPipeline {
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         let mut final_verdict = Verdict::Allow;
         let mut evidence = Vec::new();
+        let mut witness = None;
         for guard in &self.guards {
             match guard.evaluate(ctx) {
                 Ok(decision) => {
                     evidence.extend(decision.evidence);
+                    if let Some(child_witness) = decision.witness {
+                        if witness.is_some() {
+                            return Err(KernelError::GuardDenied(format!(
+                                "guard \"{}\" returned a duplicate decision-model witness",
+                                guard.name()
+                            )));
+                        }
+                        witness = Some(child_witness);
+                    }
                     match decision.verdict {
                         Verdict::Allow => continue,
                         Verdict::PendingApproval => {
@@ -91,7 +101,10 @@ impl Guard for GuardPipeline {
                                     "action=deny; reason=guard denied request".to_string(),
                                 ),
                             });
-                            return Ok(GuardDecision::deny(evidence));
+                            return Ok(GuardDecision {
+                                witness,
+                                ..GuardDecision::deny(evidence)
+                            });
                         }
                     }
                 }
@@ -102,13 +115,17 @@ impl Guard for GuardPipeline {
                         verdict: false,
                         details: Some(format!("action=error; reason=fail-closed; error={e}")),
                     });
-                    return Ok(GuardDecision::deny(evidence));
+                    return Ok(GuardDecision {
+                        witness,
+                        ..GuardDecision::deny(evidence)
+                    });
                 }
             }
         }
         Ok(GuardDecision {
             verdict: final_verdict,
             evidence,
+            witness,
         })
     }
 
@@ -456,5 +473,97 @@ mod tests {
             )
             .is_ok());
         assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    struct WitnessGuard(GuardDecision);
+    impl Guard for WitnessGuard {
+        fn name(&self) -> &str {
+            "witness-guard"
+        }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
+        fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    fn witness() -> chio_kernel::DecisionModelWitness {
+        let witness = chio_kernel::DecisionModelWitness::evaluated(
+            chio_core::crypto::sha256_hex(b"decision-model-card"),
+            chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+            chio_core::receipt::metadata::DecisionModelOutcome::Allow,
+            1_413,
+        );
+        assert!(witness.is_ok(), "{witness:?}");
+        witness.unwrap_or_else(|_| unreachable!())
+    }
+
+    fn evaluate_pipeline(pipeline: &GuardPipeline) -> Result<GuardDecision, KernelError> {
+        let (request, scope, agent_id, server_id) = make_ctx();
+        let mut ctx = GuardContext::new(&request, &scope);
+        ctx.agent_id = &agent_id;
+        ctx.server_id = &server_id;
+        pipeline.evaluate(&ctx)
+    }
+
+    #[test]
+    fn pipeline_carries_a_child_witness() {
+        let mut pipeline = GuardPipeline::new();
+        pipeline.add(Box::new(AllowGuard));
+        pipeline.add(Box::new(WitnessGuard(
+            GuardDecision::allow().with_witness(witness()),
+        )));
+        pipeline.add(Box::new(AllowGuard));
+
+        let result = evaluate_pipeline(&pipeline);
+        assert!(
+            matches!(
+                result,
+                Ok(ref decision)
+                    if decision.verdict == Verdict::Allow && decision.witness == Some(witness())
+            ),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn pipeline_refuses_a_second_witness() {
+        let mut pipeline = GuardPipeline::new();
+        pipeline.add(Box::new(WitnessGuard(
+            GuardDecision::allow().with_witness(witness()),
+        )));
+        pipeline.add(Box::new(WitnessGuard(
+            GuardDecision::allow().with_witness(witness()),
+        )));
+
+        let result = evaluate_pipeline(&pipeline);
+        assert!(
+            matches!(
+                result,
+                Err(KernelError::GuardDenied(ref reason))
+                    if reason == "guard \"witness-guard\" returned a duplicate decision-model witness"
+            ),
+            "{result:?}"
+        );
+    }
+
+    #[test]
+    fn pipeline_deny_after_a_witness_keeps_the_witness() {
+        let mut pipeline = GuardPipeline::new();
+        pipeline.add(Box::new(WitnessGuard(
+            GuardDecision::allow().with_witness(witness()),
+        )));
+        pipeline.add(Box::new(DenyGuard));
+
+        let result = evaluate_pipeline(&pipeline);
+        assert!(
+            matches!(
+                result,
+                Ok(ref decision)
+                    if decision.verdict == Verdict::Deny && decision.witness == Some(witness())
+            ),
+            "{result:?}"
+        );
     }
 }

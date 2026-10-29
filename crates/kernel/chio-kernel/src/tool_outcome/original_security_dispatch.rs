@@ -156,7 +156,7 @@ impl RawInvocationOutcomeV1 {
             output: value.output,
             reported_cost: value.reported_cost,
             receipt_metadata_snapshot: value.receipt_metadata_snapshot,
-            pre_invocation_guard_evidence: value.pre_invocation_guard_evidence,
+            pre_invocation_guard_output: value.pre_invocation_guard_output,
             request_canonical_json: value.request_canonical_json,
             security_invocation_context: value.security_invocation_context,
             federation_context_json: value.federation_context_json,

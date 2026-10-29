@@ -32,7 +32,7 @@ pub(in crate::kernel) struct PostEffectInputs<'a> {
     pub budget: PreExecutionBudgetMutation,
     pub payment: Option<PaymentAuthorization>,
     pub metadata: Option<serde_json::Value>,
-    pub evidence: Vec<GuardEvidence>,
+    pub evidence: crate::kernel::PreInvocationGuardOutput,
     pub payee: Option<VerifiedGovernedPayeeBinding>,
     pub admission: Option<DurableToolAdmission>,
     pub return_context: Option<DurableToolReturnContext>,

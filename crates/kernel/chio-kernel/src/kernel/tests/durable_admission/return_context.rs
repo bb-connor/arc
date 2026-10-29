@@ -164,12 +164,18 @@ fn pending_admission(
     Ok((admission, mutation))
 }
 
+static EMPTY_GUARD_OUTPUT: crate::kernel::PreInvocationGuardOutput =
+    crate::kernel::PreInvocationGuardOutput {
+        evidence: Vec::new(),
+        witness: None,
+    };
+
 fn input(request: &ToolCallRequest) -> DurableToolReturnContextInput<'_> {
     DurableToolReturnContextInput {
         request,
         matched_grant_index: 0,
         extra_receipt_metadata: Some(serde_json::json!({"admitted_value": "original"})),
-        pre_invocation_guard_evidence: &[],
+        pre_invocation_guard_output: &EMPTY_GUARD_OUTPUT,
         verified_payee_binding: None,
         verified_purchase: None,
         verified_recovery: None,
@@ -403,5 +409,226 @@ fn frozen_return_context_cannot_cross_operations_with_the_same_request_id() -> T
         other_store.operation().state(),
         AdmissionOperationState::DispatchCommitted
     );
+    Ok(())
+}
+
+/// A witness frozen into the durable return context is persisted with the raw
+/// outcome, and the terminal receipt built from that persisted outcome binds
+/// the identical validated witness.
+#[test]
+fn frozen_return_context_binds_the_decision_model_witness_into_the_terminal_receipt() -> TestResult
+{
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY,
+    };
+
+    let (kernel, request, store, invocations) = durable_admission_fixture("frozen-dm-witness");
+    let (mut admission, mut mutation) = pending_admission(&kernel, &request)?;
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    let output = crate::kernel::PreInvocationGuardOutput {
+        evidence: Vec::new(),
+        witness: Some(witness.clone()),
+    };
+    let mut frozen = input(&request);
+    frozen.pre_invocation_guard_output = &output;
+    let context = kernel.freeze_and_commit_durable_dispatch(
+        &mut admission,
+        &request.capability,
+        &mut mutation,
+        frozen,
+    )?;
+    let returned = kernel.record_durable_tool_return(
+        &mut admission,
+        DurableToolReturnInput {
+            request: &request,
+            output: &ToolServerOutput::Value(serde_json::json!({"done": true})),
+            reported_cost: None,
+            context: &context,
+            elapsed: Duration::ZERO,
+            trusted_now_unix_ms: current_unix_timestamp_ms(),
+        },
+    )?;
+    {
+        let state = store.state.lock().map_err(|_| "test lock")?;
+        let raw = state.raw_outcome.as_ref().ok_or("missing raw outcome")?;
+        assert_eq!(
+            raw.pre_invocation_guard_output().witness.as_ref(),
+            Some(&witness)
+        );
+    }
+    let response = kernel.finalize_durable_tool_return_with_security_release(
+        &mut admission,
+        &request,
+        &returned,
+        None,
+    )?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    assert!(response.receipt.verify_signature()?);
+    let block = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY))
+        .cloned()
+        .ok_or("terminal receipt carries no witness")?;
+    let bound: DecisionModelWitness = serde_json::from_value(block)?;
+    bound.validate()?;
+    assert_eq!(bound, witness);
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}
+
+struct DecisionModelWitnessGuard(chio_core::receipt::metadata::DecisionModelWitness);
+
+impl Guard for DecisionModelWitnessGuard {
+    fn name(&self) -> &str {
+        "decision-model-witness"
+    }
+
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
+    fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
+        Ok(GuardDecision::allow().with_witness(self.0.clone()))
+    }
+}
+
+/// A completed replay validates the retained receipt against the retained raw
+/// outcome, so the witness persisted with that outcome is part of the
+/// expectation and the replay returns the original witness without
+/// re-dispatching.
+#[test]
+fn completed_replay_returns_the_retained_decision_model_witness() -> TestResult {
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY,
+    };
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("completed-dm-witness-replay");
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    kernel.add_guard(Box::new(DecisionModelWitnessGuard(witness.clone())));
+    let response = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(response.verdict, Verdict::Allow);
+    let original = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY))
+        .cloned()
+        .ok_or("original receipt carries no witness")?;
+    assert_eq!(
+        serde_json::from_value::<DecisionModelWitness>(original.clone())?,
+        witness
+    );
+
+    let replay = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_same_receipt(&replay.receipt, &response.receipt);
+    assert_eq!(
+        replay
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY)),
+        Some(&original)
+    );
+    assert_eq!(replay.output, response.output);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[test]
+fn completed_in_session_replay_returns_the_session_anchor_and_the_witness() -> TestResult {
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, ReceiptSessionAnchorV1,
+        DECISION_MODEL_WITNESS_METADATA_KEY, SESSION_ANCHOR_METADATA_KEY,
+    };
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("completed-anchor-dm-witness-replay");
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    kernel.add_guard(Box::new(DecisionModelWitnessGuard(witness.clone())));
+    let session_id =
+        kernel.open_session(request.agent_id.clone(), vec![request.capability.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let anchor = kernel.with_session(&session_id, |session| {
+        Ok(session.session_anchor().reference())
+    })?;
+    let anchor_block = ReceiptSessionAnchorV1::commit(&anchor)?.to_metadata_value()?;
+    let evaluate =
+        |owner_request_id: &str| -> Result<ToolCallResponse, Box<dyn std::error::Error>> {
+            let owner = make_operation_context(&session_id, owner_request_id, &request.agent_id);
+            kernel.begin_session_request(&owner, OperationKind::ToolCall, true)?;
+            let response = kernel.evaluate_tool_call_with_nested_flow_client(
+                &owner,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )?;
+            kernel.complete_session_request(&session_id, &owner.request_id)?;
+            Ok(response)
+        };
+
+    let response = evaluate("completed-anchor-dm-witness-owner")?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("original receipt carries no metadata")?;
+    assert_eq!(
+        metadata.get(SESSION_ANCHOR_METADATA_KEY),
+        Some(&anchor_block)
+    );
+    assert_eq!(
+        serde_json::from_value::<DecisionModelWitness>(
+            metadata
+                .get(DECISION_MODEL_WITNESS_METADATA_KEY)
+                .cloned()
+                .ok_or("original receipt carries no witness")?
+        )?,
+        witness
+    );
+
+    let replay = evaluate("completed-anchor-dm-witness-replay-owner")?;
+    assert_same_receipt(&replay.receipt, &response.receipt);
+    let replayed = replay
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("replayed receipt carries no metadata")?;
+    assert_eq!(
+        replayed.get(SESSION_ANCHOR_METADATA_KEY),
+        Some(&anchor_block)
+    );
+    assert_eq!(
+        replayed.get(DECISION_MODEL_WITNESS_METADATA_KEY),
+        metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY)
+    );
+    assert_eq!(replay.output, response.output);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }

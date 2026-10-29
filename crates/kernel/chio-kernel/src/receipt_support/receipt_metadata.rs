@@ -111,6 +111,33 @@ pub(crate) fn merge_metadata_objects(
     }
 }
 
+/// Binds the call's decision-model witness as the kernel-owned
+/// `decision_model_witness` block. Receipt metadata that already names the key,
+/// or is not an object, is refused.
+pub(crate) fn bind_decision_model_witness(
+    metadata: Option<serde_json::Value>,
+    witness: Option<&chio_core::receipt::metadata::DecisionModelWitness>,
+) -> Result<Option<serde_json::Value>, KernelError> {
+    let Some(witness) = witness else {
+        return Ok(metadata);
+    };
+    let key = chio_core::receipt::metadata::DECISION_MODEL_WITNESS_METADATA_KEY;
+    let block = serde_json::to_value(witness).map_err(|error| {
+        KernelError::Internal(format!("decision-model witness did not serialize: {error}"))
+    })?;
+    let mut metadata = metadata.unwrap_or_else(|| serde_json::Value::Object(Default::default()));
+    let object = metadata
+        .as_object_mut()
+        .ok_or_else(|| KernelError::Internal("receipt metadata is not an object".to_string()))?;
+    if object.contains_key(key) {
+        return Err(KernelError::Internal(format!(
+            "receipt metadata already carries {key}"
+        )));
+    }
+    object.insert(key.to_string(), block);
+    Ok(Some(metadata))
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 struct ReceiptProvenanceMetadata {

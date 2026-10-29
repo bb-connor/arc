@@ -226,7 +226,7 @@ fn prepare_ordinary(
     );
     let metadata = with_identity_disposition(metadata, IdentityDisposition::Terminal);
     let prepared = kernel
-        .with_pre_invocation_guard_evidence(&inputs.evidence, || match observed {
+        .with_pre_invocation_guard_output(&inputs.evidence, || match observed {
             Ok(((output, reported_cost), elapsed)) => {
                 if let Err(denial) = kernel.revalidate_ordinary_recovery_status(
                     inputs.matched_grant_index,

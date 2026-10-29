@@ -25,7 +25,7 @@ pub(super) struct StrictNoncePreflight<'a> {
     pub(super) budget_mutation: &'a PreExecutionBudgetMutation,
     pub(super) durable_admission: &'a mut Option<DurableToolAdmission>,
     pub(super) extra_metadata: Option<serde_json::Value>,
-    pub(super) pre_invocation_guard_evidence: &'a [GuardEvidence],
+    pub(super) pre_invocation_guard_output: &'a crate::kernel::PreInvocationGuardOutput,
     pub(super) verified_governed_payee_binding: &'a Option<VerifiedGovernedPayeeBinding>,
     pub(super) budget_lease_acquired: bool,
 }
@@ -54,7 +54,7 @@ impl ChioKernel {
             budget_mutation,
             durable_admission,
             extra_metadata,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
             verified_governed_payee_binding,
             budget_lease_acquired,
         } = preflight;
@@ -77,7 +77,7 @@ impl ChioKernel {
             let reason =
                 "output-digest delivery cannot be enforced on a no-output authorization path";
             warn!(request_id = %request.request_id, reason, "delivery contract denied");
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+            return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
                     reason,
@@ -96,7 +96,7 @@ impl ChioKernel {
             });
         }
         if preflight_disposition == PreflightHoldDisposition::ReverseForRetry {
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+            return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 self.build_execution_nonce_preflight_allow_response_after_cleanup(
                     request,
                     now,
@@ -126,26 +126,23 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "reserve-for-caller credential reservation denied"
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
-                            request,
-                            reason: &reason,
-                            timestamp: now,
-                            matched_grant_index,
-                            cap,
-                            budget_mutation,
-                            payment_authorization: None,
-                            durable_operation: durable_admission
-                                .as_ref()
-                                .map(DurableToolAdmission::operation),
-                            runtime_admission_metadata: extra_metadata.clone(),
-                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                            budget_lease_acquired,
-                        })
-                    },
-                );
+                return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
+                    self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
+                        request,
+                        reason: &reason,
+                        timestamp: now,
+                        matched_grant_index,
+                        cap,
+                        budget_mutation,
+                        payment_authorization: None,
+                        durable_operation: durable_admission
+                            .as_ref()
+                            .map(DurableToolAdmission::operation),
+                        runtime_admission_metadata: extra_metadata.clone(),
+                        verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                        budget_lease_acquired,
+                    })
+                });
             }
         };
 
@@ -160,7 +157,7 @@ impl ChioKernel {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata: extra_metadata.clone(),
-                    pre_invocation_guard_evidence: pre_invocation_guard_evidence.to_vec(),
+                    pre_invocation_guard_output: pre_invocation_guard_output.clone(),
                     verified_payee_binding: verified_governed_payee_binding.clone(),
                 },
                 budget_lease_acquired,
@@ -214,7 +211,7 @@ impl ChioKernel {
                 reason = %redacted!(&reason),
                 "reserve-for-caller revalidation denied"
             );
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+            return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 let denial = PreDispatchCleanupDeny {
                     request,
                     reason: &reason,
@@ -248,7 +245,7 @@ impl ChioKernel {
             if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
                 reason = format!("{reason}; {rollback_error}");
             }
-            return self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+            return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
                     reason: &reason,
@@ -326,19 +323,16 @@ impl ChioKernel {
                     metadata,
                     credential_disposition,
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_deny_response_with_metadata_and_payee_binding(
-                            request,
-                            &reason,
-                            revalidation_now_unix_ms / 1000,
-                            Some(matched_grant_index),
-                            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
-                            verified_governed_payee_binding.as_ref(),
-                        )
-                    },
-                );
+                return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
+                    self.build_deny_response_with_metadata_and_payee_binding(
+                        request,
+                        &reason,
+                        revalidation_now_unix_ms / 1000,
+                        Some(matched_grant_index),
+                        RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
+                        verified_governed_payee_binding.as_ref(),
+                    )
+                });
             }
             Err(ReservedPrepaymentFailure::Denied { error, ambiguity }) => {
                 let mut reason = error.to_string();
@@ -368,29 +362,26 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "reserve-for-caller prepayment gate denied"
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: revalidation_now_unix_ms / 1000,
-                                matched_grant_index,
-                                cap,
-                                budget_mutation,
-                                payment_authorization: None,
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: denial_metadata.clone(),
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            credential_disposition,
-                        )
-                    },
-                );
+                return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
+                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                        PreDispatchCleanupDeny {
+                            request,
+                            reason: &reason,
+                            timestamp: revalidation_now_unix_ms / 1000,
+                            matched_grant_index,
+                            cap,
+                            budget_mutation,
+                            payment_authorization: None,
+                            durable_operation: durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            runtime_admission_metadata: denial_metadata.clone(),
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                            budget_lease_acquired,
+                        },
+                        credential_disposition,
+                    )
+                });
             }
         };
 
@@ -402,56 +393,52 @@ impl ChioKernel {
                 let reason = format!(
                     "reserve-for-caller credential retention failed before authorization: {error}"
                 );
-                return self.with_pre_invocation_guard_evidence(
-                    pre_invocation_guard_evidence,
-                    || {
-                        self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                            PreDispatchCleanupDeny {
-                                request,
-                                reason: &reason,
-                                timestamp: self
-                                    .read_authority_time()
-                                    .map(|time| time.as_secs())
-                                    .unwrap_or(now),
-                                matched_grant_index,
-                                cap,
-                                budget_mutation,
-                                payment_authorization: settled_prepayment
-                                    .as_ref()
-                                    .map(|prepayment| &prepayment.authorization),
-                                durable_operation: durable_admission
-                                    .as_ref()
-                                    .map(DurableToolAdmission::operation),
-                                runtime_admission_metadata: extra_metadata.clone(),
-                                verified_payee_binding: verified_governed_payee_binding.as_ref(),
-                                budget_lease_acquired,
-                            },
-                            PaymentCredentialDisposition::RetentionOutcomeUnknown,
-                        )
-                    },
-                );
+                return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
+                    self.build_pre_dispatch_cleanup_deny_response_with_credentials(
+                        PreDispatchCleanupDeny {
+                            request,
+                            reason: &reason,
+                            timestamp: self
+                                .read_authority_time()
+                                .map(|time| time.as_secs())
+                                .unwrap_or(now),
+                            matched_grant_index,
+                            cap,
+                            budget_mutation,
+                            payment_authorization: settled_prepayment
+                                .as_ref()
+                                .map(|prepayment| &prepayment.authorization),
+                            durable_operation: durable_admission
+                                .as_ref()
+                                .map(DurableToolAdmission::operation),
+                            runtime_admission_metadata: extra_metadata.clone(),
+                            verified_payee_binding: verified_governed_payee_binding.as_ref(),
+                            budget_lease_acquired,
+                        },
+                        PaymentCredentialDisposition::RetentionOutcomeUnknown,
+                    )
+                });
             }
         };
 
         let reserved_payment_reference = settled_prepayment
             .as_ref()
             .and_then(|prepayment| prepayment.payment_reference.clone());
-        let response =
-            self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
-                self.build_execution_nonce_authorization_reserving_response(
-                    ExecutionNonceReservingResponse {
-                        durable_admission: None,
-                        request,
-                        timestamp: now,
-                        matched_grant_index,
-                        budget_mutation,
-                        runtime_admission_metadata: extra_metadata,
-                        reserved_payment_reference,
-                        budget_lease_acquired,
-                        nonce: PreflightNonceSource::Mint,
-                    },
-                )
-            });
+        let response = self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
+            self.build_execution_nonce_authorization_reserving_response(
+                ExecutionNonceReservingResponse {
+                    durable_admission: None,
+                    request,
+                    timestamp: now,
+                    matched_grant_index,
+                    budget_mutation,
+                    runtime_admission_metadata: extra_metadata,
+                    reserved_payment_reference,
+                    budget_lease_acquired,
+                    nonce: PreflightNonceSource::Mint,
+                },
+            )
+        });
         if response.is_err() {
             if let Some(prepayment) = settled_prepayment.as_ref() {
                 self.refund_reserved_mustprepay_prepayment(request, &prepayment.authorization);

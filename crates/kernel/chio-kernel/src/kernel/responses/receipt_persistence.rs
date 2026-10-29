@@ -206,8 +206,10 @@ impl ChioKernel {
             merge_metadata_objects(params.metadata, request_metadata),
             session_anchor_metadata,
         );
+        let pre_invocation = current_pre_invocation_guard_output();
+        let metadata = bind_decision_model_witness(metadata, pre_invocation.witness.as_ref())?;
 
-        let mut evidence = current_pre_invocation_guard_evidence();
+        let mut evidence = pre_invocation.evidence;
         evidence.extend(current_post_invocation_guard_evidence());
 
         let body = ChioReceiptBody {

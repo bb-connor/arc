@@ -27,6 +27,7 @@ impl Guard for SleepingGuard {
         Ok(GuardDecision {
             verdict: Verdict::Allow,
             evidence: Vec::new(),
+            witness: None,
         })
     }
 }
@@ -50,6 +51,7 @@ impl Guard for RecordingGuard {
         Ok(GuardDecision {
             verdict: Verdict::Allow,
             evidence: Vec::new(),
+            witness: None,
         })
     }
 }
@@ -697,6 +699,7 @@ impl Guard for ThreadRecordingGuard {
         Ok(GuardDecision {
             verdict: Verdict::Allow,
             evidence: Vec::new(),
+            witness: None,
         })
     }
 }

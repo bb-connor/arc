@@ -44,7 +44,7 @@ struct CallerReturnWire {
     admitted_metadata: Option<serde_json::Value>,
     purchase_replay_metadata: Option<serde_json::Value>,
     recovery_replay_metadata: Option<serde_json::Value>,
-    pre_invocation_guard_evidence: Vec<chio_core::receipt::metadata::GuardEvidence>,
+    pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput,
     security_invocation_context: Option<SecurityInvocationContext>,
     federation_context_json: Option<String>,
     runtime_participant_ledger_digest: Option<AdmissionDigest>,
@@ -266,7 +266,7 @@ impl ChioKernel {
             admitted_metadata: context.admitted_metadata.clone(),
             purchase_replay_metadata: context.purchase_replay_metadata.clone(),
             recovery_replay_metadata: context.recovery_replay_metadata.clone(),
-            pre_invocation_guard_evidence: context.pre_invocation_guard_evidence.clone(),
+            pre_invocation_guard_output: context.pre_invocation_guard_output.clone(),
             security_invocation_context: context.security_invocation_context.clone(),
             federation_context_json: context
                 .federation_context
@@ -466,7 +466,7 @@ impl ChioKernel {
             admitted_metadata: wire.admitted_metadata,
             purchase_replay_metadata: wire.purchase_replay_metadata,
             recovery_replay_metadata: wire.recovery_replay_metadata,
-            pre_invocation_guard_evidence: wire.pre_invocation_guard_evidence,
+            pre_invocation_guard_output: wire.pre_invocation_guard_output,
             security_invocation_context: wire.security_invocation_context,
             security_release_required: wire.native_custody.is_some(),
             original_security_dispatch_binding,

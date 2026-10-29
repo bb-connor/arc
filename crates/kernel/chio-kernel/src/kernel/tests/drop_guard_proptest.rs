@@ -34,7 +34,7 @@ pub(super) fn drop_owned_post_effect(
             budget: &mutation,
             payment: None,
             metadata: &metadata,
-            evidence: &[],
+            evidence: &crate::kernel::PreInvocationGuardOutput::default(),
             payee: None,
             admission: None,
             evaluation_started_at: now,
@@ -47,7 +47,7 @@ pub(super) fn drop_owned_post_effect(
                 budget: mutation,
                 payment: None,
                 metadata,
-                evidence: Vec::new(),
+                evidence: crate::kernel::PreInvocationGuardOutput::default(),
                 payee: None,
                 admission: None,
                 return_context: None,
@@ -165,7 +165,7 @@ fn drop_guard_disposition_table() -> Result<(), TestCaseError> {
                 None,
                 PostAdmissionReceiptContext {
                     extra_metadata,
-                    pre_invocation_guard_evidence: Vec::new(),
+                    pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
                     verified_payee_binding: None,
                 },
                 // Root capabilities have no delegated budget reservation to release.

@@ -13,7 +13,7 @@ pub(super) struct NonDurableInvocationCapture<'a> {
     pub(super) extra_metadata: &'a Option<serde_json::Value>,
     pub(super) budget_lease_acquired: bool,
     pub(super) verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
-    pub(super) pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pub(super) pre_invocation_guard_output: &'a crate::kernel::PreInvocationGuardOutput,
 }
 
 impl ChioKernel {
@@ -33,13 +33,13 @@ impl ChioKernel {
             extra_metadata,
             budget_lease_acquired,
             verified_payee_binding,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
         } = capture;
         match self.capture_invocation(cap, budget_mutation) {
             Ok(BudgetInvocationCaptureDecision::Captured(_)) => Ok(None),
             Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
                 let reason = "monetary invocation was already dispatched";
-                self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+                self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_capture_replay_deny_response(
                         request,
                         reason,
@@ -62,7 +62,7 @@ impl ChioKernel {
                     "budget invocation capture could not be confirmed"
                 );
                 let reason = "budget invocation capture could not be confirmed";
-                self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+                self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_deny_response_with_metadata(
                         request,
                         reason,
