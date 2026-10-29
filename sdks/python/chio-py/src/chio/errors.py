@@ -9,6 +9,7 @@ ChioInvariantErrorCode = Literal[
     "invalid_hex",
     "invalid_public_key",
     "invalid_signature",
+    "disclosure",
 ]
 
 
