@@ -352,7 +352,6 @@ fn a_signed_root_with_an_unknown_nested_field_is_refused() -> TestResult {
         "root": serde_json::to_value(&root)?,
         "signature": {
             "signer_id": "operator",
-            "algorithm": "ed25519",
             "signature_bytes": [1, 2, 3],
         },
     });

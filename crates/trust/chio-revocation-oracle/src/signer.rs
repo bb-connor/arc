@@ -73,7 +73,7 @@ pub trait EpochRootVerifier {
     fn signer_id(&self) -> &str;
 
     /// Verify `signature` over `root`. Returns `Ok(())` only when the signer
-    /// identity, algorithm tag, signature length, and cryptographic check all
+    /// identity, signature length, and cryptographic check all
     /// pass. Any mismatch or decode failure denies fail-closed.
     fn verify_epoch_root(&self, root: &EpochRoot, signature: &RootSignature) -> Result<()>;
 }
@@ -314,6 +314,19 @@ mod tests {
             other.verifier().verify_epoch_root(&root, &signature),
             Err(RevocationOracleError::SignatureVerificationFailed)
         );
+    }
+
+    #[test]
+    fn root_signature_carrying_an_algorithm_member_is_refused() {
+        let signer = Ed25519RootSigner::from_signing_key("oracle-a", SEED_A).test_unwrap();
+        let signature = signer.sign_epoch_root(&epoch_root(7)).test_unwrap();
+        let mut value = serde_json::to_value(&signature).test_unwrap();
+        value["algorithm"] = serde_json::json!("ed25519");
+        let error = serde_json::from_value::<RootSignature>(value)
+            .err()
+            .map(|error| error.to_string())
+            .unwrap_or_default();
+        assert!(error.contains("unknown field `algorithm`"), "{error}");
     }
 
     #[test]
