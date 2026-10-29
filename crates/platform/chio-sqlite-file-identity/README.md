@@ -117,13 +117,25 @@ identity, the complete debt inventory and prepaid purpose, and hold the
 required writer ownership while observing capacity and committing. This
 function performs no I/O, allocates no reserve and grants no write authority.
 
+## File custody
+
+`custody::private_directory` accepts a directory owned by the effective user
+that neither group nor others can write. `custody::private_file` accepts a
+regular, single-link file owned by the effective user with mode 0600.
+`custody::device_inode` returns the device and inode that identify a file
+across reopen, and `custody::read_exact_at` and `custody::write_all_at` do
+positioned I/O that refuses a short read or a zero-length write. Every
+function returns `ErrorKind::Unsupported` off Unix. The checks take metadata
+the caller already holds; callers choose the refusal for a failed check and
+keep their own path, symlink and identity policy.
+
 ## Status
 
 Implemented for the pinned bundled SQLite Unix file layout. The runtime
 checks require a VFS name beginning with `unix`; callers must preserve the
 workspace's bundled-build assumption. Tests cover descriptor identity and
 available space after path replacement and unlink, in-memory refusal, typed
-errors, available-space arithmetic, and lock preservation against a competing
+errors, custody owner and mode checks, positioned I/O, available-space arithmetic, and lock preservation against a competing
 process. Geometry tests cover an actual file, pending reserved bytes, and
 validation boundaries. This crate declares no Cargo features.
 

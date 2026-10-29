@@ -120,7 +120,7 @@ pub struct SqliteReceiptStore {
     clock: crate::store_clock::StoreClock,
     pub(crate) pool: Pool<SqliteConnectionManager>,
     receipt_commit_actor: ReceiptCommitActor,
-    pub(crate) rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
+    pub(crate) rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
     settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
     durable_sink_id: Option<String>,
     pub(crate) receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
@@ -588,7 +588,7 @@ impl ReceiptCommitActor {
         pool: Pool<SqliteConnectionManager>,
         clock: crate::store_clock::StoreClock,
         incremental_verification: bool,
-        rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
+        rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
         sink_qualification: Option<Arc<ReceiptSinkQualification>>,
     ) -> Self {
         let (sender, receiver) = receipt_commit_channel_with_clock(clock);
@@ -1284,7 +1284,7 @@ fn receipt_commit_actor_loop(
     receiver: &mpsc::Receiver<QueuedWriterCommand>,
     health: Arc<ReceiptCommitWriterHealth>,
     incremental_verification: bool,
-    rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
+    rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
     sink_qualification: Option<Arc<ReceiptSinkQualification>>,
     checkpoint_signer: &mut Option<BackgroundCheckpointSigner>,
 ) -> SupervisedOutcome {
@@ -2087,7 +2087,7 @@ fn build_due_checkpoints_and_record(
     head: &mut VerifiedHead,
     checkpoint_signer: &Option<BackgroundCheckpointSigner>,
     health: &ReceiptCommitWriterHealth,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     sink_qualification: Option<&ReceiptSinkQualification>,
 ) -> Option<ReceiptStoreError> {
     let signer = checkpoint_signer.as_ref()?;
@@ -2132,7 +2132,7 @@ fn build_due_checkpoints(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     sink_qualification: Option<&ReceiptSinkQualification>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<bool, ReceiptStoreError> {
@@ -2169,7 +2169,7 @@ fn maybe_build_checkpoint(
     connection: &mut SqliteStoreConnection,
     head: &mut VerifiedHead,
     signer: &BackgroundCheckpointSigner,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<bool, ReceiptStoreError> {
     if signer.max_batch == 0 {
@@ -2322,7 +2322,7 @@ fn commit_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
     head_state: &mut WriterHeadState,
     incremental_verification: bool,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     requests: Vec<ReceiptCommitRequest>,
     health: &ReceiptCommitWriterHealth,
 ) -> Option<ReceiptStoreError> {
@@ -2835,7 +2835,7 @@ fn append_receipt_batch(
     pool: &Pool<SqliteConnectionManager>,
     head: &mut VerifiedHead,
     incremental_verification: bool,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     sink_qualification: Option<&ReceiptSinkQualification>,
     requests: &[ReceiptCommitRequest],
 ) -> Result<Vec<Result<u64, ReceiptStoreError>>, ReceiptStoreError> {
@@ -3021,7 +3021,7 @@ fn execute_anchored_receipt_write(
     connection: &mut Connection,
     head: &mut VerifiedHead,
     incremental_verification: bool,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     job: WriterClosure,
 ) -> (WriterResponder, ReceiptWriterJobState) {
     let tx = match connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate) {

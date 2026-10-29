@@ -153,7 +153,7 @@ impl ReceiptSinkQualification {
 pub(in crate::receipt_store) struct ReceiptWriterQualification<'a> {
     pub(in crate::receipt_store) incremental_verification: bool,
     pub(in crate::receipt_store) rollback_anchor:
-        Option<&'a crate::rollback_generation::RollbackGenerationAnchor>,
+        Option<&'a chio_rollback_anchor::RollbackGenerationAnchor>,
     pub(in crate::receipt_store) sink_qualification: Option<&'a ReceiptSinkQualification>,
 }
 
@@ -172,7 +172,7 @@ pub(crate) fn receipt_pool_connection(
 
 pub(crate) fn verify_rollback(
     connection: &Connection,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     appends_receipts: bool,
 ) -> Result<(), ReceiptStoreError> {
     if appends_receipts {

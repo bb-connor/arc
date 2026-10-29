@@ -107,7 +107,6 @@ mod receipt_query_snapshot_backing;
 pub mod receipt_store;
 mod replay_clock;
 pub mod revocation_store;
-mod rollback_generation;
 mod schema_catalog;
 pub mod schema_version;
 pub mod sealed_decoy_registry;

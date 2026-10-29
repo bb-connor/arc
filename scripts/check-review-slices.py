@@ -142,6 +142,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/platform/chio-finding-market-store-postgres/**",
             "crates/platform/chio-finding-worker/**",
             "crates/platform/chio-risk-comptroller/**",
+            "crates/platform/chio-rollback-anchor/**",
             "crates/platform/chio-sqlite-file-identity/**",
             "crates/platform/chio-store-sqlite/**",
             "crates/platform/chio-transaction-passport/**",

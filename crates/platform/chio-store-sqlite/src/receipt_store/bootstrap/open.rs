@@ -12,7 +12,7 @@ const RECEIPT_APPROVAL_NAMESPACES: &[&str] = &["receipt", "approval"];
 
 struct QualifiedReceiptSink {
     durable_sink_id: Option<String>,
-    rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
+    rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
     receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
 }
 
@@ -182,13 +182,10 @@ fn qualify_receipt_sink(
         });
     };
     let filesystem_path = receipt_sink_filesystem_path(path)?;
-    crate::rollback_generation::require_separate_snapshot_domain(
-        &filesystem_path,
-        rollback_anchor_root,
-    )
-    .map_err(|error| {
-        ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-    })?;
+    chio_rollback_anchor::require_separate_snapshot_domain(&filesystem_path, rollback_anchor_root)
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+        })?;
     let qualification = Arc::new(ReceiptSinkQualification::capture(
         &filesystem_path,
         internal_sink_id,
@@ -198,12 +195,11 @@ fn qualify_receipt_sink(
     let mut scope = Vec::new();
     append_receipt_sink_binding_part(&mut scope, b"chio.receipt-store.rollback-generation.v1");
     append_receipt_sink_binding_part(&mut scope, file_sink_binding.as_bytes());
-    let anchor =
-        crate::rollback_generation::RollbackGenerationAnchor::open(rollback_anchor_root, &scope)
-            .map(Arc::new)
-            .map_err(|error| {
-                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-            })?;
+    let anchor = chio_rollback_anchor::RollbackGenerationAnchor::open(rollback_anchor_root, &scope)
+        .map(Arc::new)
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+        })?;
     anchor
         .bind_initial_while(|| {
             let generation =

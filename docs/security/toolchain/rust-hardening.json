@@ -27,6 +27,7 @@
     "chio-supervisor": "crates/core/chio-supervisor/src/lib.rs",
     "chio-swarm-authority": "crates/kernel/chio-swarm-authority/src/lib.rs",
     "chio-store-sqlite": "crates/platform/chio-store-sqlite/src/lib.rs",
+    "chio-rollback-anchor": "crates/platform/chio-rollback-anchor/src/lib.rs",
     "chio-cage": "crates/security/chio-cage/src/lib.rs",
     "chio-flow": "crates/security/chio-flow/src/lib.rs",
     "chio-decoy": "crates/security/chio-decoy/src/lib.rs",

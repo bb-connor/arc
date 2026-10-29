@@ -2641,6 +2641,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-rollback-anchor"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-sqlite-file-identity",
+ "libc",
+ "serde",
+ "uuid",
+]
+
+[[package]]
 name = "chio-secure-ipc"
 version = "0.1.0"
 dependencies = [
@@ -2769,6 +2780,7 @@ name = "chio-sqlite-file-identity"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "nix",
  "rusqlite",
 ]
 
@@ -2786,6 +2798,7 @@ dependencies = [
  "chio-fiscal",
  "chio-kernel",
  "chio-kernel-core",
+ "chio-rollback-anchor",
  "chio-security-types",
  "chio-semantic-contracts",
  "chio-settle",

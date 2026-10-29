@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
+use chio_sqlite_file_identity::custody::{self, read_exact_at, write_all_at};
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 
@@ -802,141 +803,39 @@ fn is_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-#[cfg(unix)]
-fn validate_secure_lock_root(path: &Path) -> Result<(), SqliteServingOwnerError> {
-    use std::os::unix::fs::MetadataExt;
+fn unix_only(_error: std::io::Error) -> SqliteServingOwnerError {
+    invalid("sqlite serving rollback anchors require Unix file identity")
+}
 
+fn validate_secure_lock_root(path: &Path) -> Result<(), SqliteServingOwnerError> {
     let metadata = fs::symlink_metadata(path)?;
-    if !metadata.file_type().is_dir()
-        || metadata.uid() != nix::unistd::geteuid().as_raw()
-        || metadata.mode() & 0o022 != 0
-    {
+    if !custody::private_directory(&metadata).map_err(unix_only)? {
         return Err(invalid("serving rollback anchor lock root is insecure"));
     }
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn validate_secure_lock_root(_path: &Path) -> Result<(), SqliteServingOwnerError> {
-    Err(invalid(
-        "sqlite serving rollback anchors require Unix file identity",
-    ))
-}
-
-#[cfg(unix)]
 fn validate_lock_metadata(metadata: &fs::Metadata) -> Result<(), SqliteServingOwnerError> {
-    use std::os::unix::fs::MetadataExt;
-
-    if !metadata.file_type().is_file()
-        || metadata.nlink() != 1
-        || metadata.mode() & 0o777 != 0o600
-        || metadata.uid() != nix::unistd::geteuid().as_raw()
-    {
+    if !custody::private_file(metadata).map_err(unix_only)? {
         return Err(invalid("serving rollback anchor inode is insecure"));
     }
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn validate_lock_metadata(_metadata: &fs::Metadata) -> Result<(), SqliteServingOwnerError> {
-    Err(invalid(
-        "sqlite serving rollback anchors require Unix file identity",
-    ))
-}
-
-#[cfg(unix)]
 fn metadata_device(metadata: &fs::Metadata) -> Result<u64, SqliteServingOwnerError> {
-    use std::os::unix::fs::MetadataExt;
-
-    Ok(metadata.dev())
+    custody::device_inode(metadata)
+        .map(|(device, _)| device)
+        .map_err(unix_only)
 }
 
-#[cfg(not(unix))]
-fn metadata_device(_metadata: &fs::Metadata) -> Result<u64, SqliteServingOwnerError> {
-    Err(invalid(
-        "sqlite serving rollback anchors require Unix file identity",
-    ))
-}
-
-#[cfg(unix)]
 fn metadata_inode(metadata: &fs::Metadata) -> Result<u64, SqliteServingOwnerError> {
-    use std::os::unix::fs::MetadataExt;
-
-    Ok(metadata.ino())
-}
-
-#[cfg(not(unix))]
-fn metadata_inode(_metadata: &fs::Metadata) -> Result<u64, SqliteServingOwnerError> {
-    Err(invalid(
-        "sqlite serving rollback anchors require Unix file identity",
-    ))
-}
-
-#[cfg(unix)]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "The OS read or write count cannot exceed the supplied buffer length."
-)]
-fn read_exact_at(file: &File, mut bytes: &mut [u8], mut offset: usize) -> std::io::Result<()> {
-    use std::os::unix::fs::FileExt;
-
-    while !bytes.is_empty() {
-        let read = file.read_at(bytes, io_offset(offset)?)?;
-        if read == 0 {
-            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
-        }
-        offset += read;
-        bytes = &mut bytes[read..];
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn read_exact_at(_file: &File, _bytes: &mut [u8], _offset: usize) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "sqlite serving rollback anchors require Unix positioned I/O",
-    ))
-}
-
-#[cfg(unix)]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "The OS read or write count cannot exceed the supplied buffer length."
-)]
-fn write_all_at(file: &File, mut bytes: &[u8], mut offset: usize) -> std::io::Result<()> {
-    use std::os::unix::fs::FileExt;
-
-    while !bytes.is_empty() {
-        let written = file.write_at(bytes, io_offset(offset)?)?;
-        if written == 0 {
-            return Err(std::io::Error::from(std::io::ErrorKind::WriteZero));
-        }
-        offset += written;
-        bytes = &bytes[written..];
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn write_all_at(_file: &File, _bytes: &[u8], _offset: usize) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "sqlite serving rollback anchors require Unix positioned I/O",
-    ))
+    custody::device_inode(metadata)
+        .map(|(_, inode)| inode)
+        .map_err(unix_only)
 }
 
 fn invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
     SqliteServingOwnerError::Invalid(detail.into())
-}
-
-fn io_offset(offset: usize) -> std::io::Result<u64> {
-    u64::try_from(offset).map_err(|_| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "rollback anchor offset overflowed u64",
-        )
-    })
 }
 
 #[cfg(all(test, unix))]
