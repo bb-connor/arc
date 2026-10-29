@@ -1,0 +1,19 @@
+{
+  "expires_at": 1792234920,
+  "holder": "edge_session",
+  "principal": "ops:carol",
+  "request_id": "req-1",
+  "schema": "chio.operator-root-request.v1",
+  "scope": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "crm",
+        "tool_name": "search"
+      }
+    ]
+  },
+  "tenant_value": "acme"
+}

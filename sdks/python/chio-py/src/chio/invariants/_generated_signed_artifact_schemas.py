@@ -279,6 +279,7 @@ KNOWN_SIGNED_ARTIFACT_SCHEMAS: frozenset[str] = frozenset(
         "chio.mcp.session-credential.v1",
         "chio.obligation.status-proof.v1",
         "chio.operation_execution_nonce.v1",
+        "chio.operator-root-request.v1",
         "chio.oracle-conversion-evidence.v1",
         "chio.outcome.contractual-zero.v1",
         "chio.outcome.delivery-acknowledgement.v1",

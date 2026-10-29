@@ -2799,6 +2799,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.operator-root-request.v1",
+      "schema_id": "chio.operator-root-request.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100cbe852f31c0603b334f37e7310d915c6fa0518d2cfcf56e1cefae9a77771ab8c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.oracle-conversion-evidence.v1",
       "schema_id": "chio.oracle-conversion-evidence.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631004b36a0b02fd4af239817a5546dbefe9e0b38fd0c6571727b17379cac28a1e1a2015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
