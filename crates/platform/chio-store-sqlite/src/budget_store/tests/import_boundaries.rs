@@ -172,3 +172,44 @@ fn anchor_provenance_refuses_an_unwrapped_leader_signature() -> TestResult {
     assert!(store.list_usage_history_anchors()?.is_empty());
     Ok(())
 }
+
+#[test]
+fn anchor_provenance_accepts_a_wrapper_signature_under_its_pinned_id() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    crate::test_authority::secure_directory(directory.path());
+    let store = SqliteBudgetStore::open(directory.path().join("budget.db"))?;
+    let authority =
+        crate::authority::SqliteCapabilityAuthority::open(directory.path().join("authority.db"))?;
+    let snapshot = BudgetStoreSnapshot {
+        usages: vec![],
+        usage_history_anchors: vec![],
+        mutation_events: vec![],
+        abandoned_seq_ranges: vec![],
+        covered_head: 0,
+        origin_ack_heads: vec![],
+    };
+    let chain = authority.commit_budget_snapshot_anchor_set(
+        &budget_snapshot_anchor_set_digest(&[])?,
+        "https://leader",
+        1,
+        10,
+    )?;
+    let leader_node = chio_core::crypto::Keypair::generate();
+    let signature = leader_node.sign_wrapped(
+        "chio.cluster-budget-anchor-signature.v1",
+        &chio_core::canonical::CanonicalBytes::from_serializable(&chain)?,
+    )?;
+    let provenance = BudgetSnapshotAnchorProvenance {
+        schema: "chio.budget-snapshot-anchor-provenance.v1".into(),
+        cluster_authenticator: signature.to_hex(),
+        chain,
+    };
+    store.import_budget_snapshot_with_anchor_provenance(
+        &snapshot,
+        &provenance,
+        "https://leader",
+        1,
+        &leader_node.public_key(),
+    )?;
+    Ok(())
+}
