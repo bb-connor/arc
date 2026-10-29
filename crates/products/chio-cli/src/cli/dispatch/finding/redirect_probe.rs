@@ -2,11 +2,14 @@
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const PROBE_PATH: &str = "/probe";
-/// Longest either authority waits for a request head.
+/// Longest either authority waits, from accepting a connection, for its
+/// complete request head.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(5);
+/// Largest request head either authority reads.
+const MAX_HEAD_BYTES: usize = 16 * 1024;
 
 pub(super) struct RedirectProbe {
     pub(super) venue_url: String,
@@ -29,12 +32,17 @@ fn answer_one(listener: &TcpListener, reply: &[u8]) -> bool {
     let Ok((mut stream, _)) = listener.accept() else {
         return false;
     };
-    if stream.set_read_timeout(Some(HEAD_TIMEOUT)).is_err() {
-        return false;
-    }
+    let deadline = Instant::now() + HEAD_TIMEOUT;
     let mut head = Vec::new();
     let mut byte = [0_u8; 1];
-    while !head.ends_with(b"\r\n\r\n") && matches!(stream.read(&mut byte), Ok(1)) {
+    while !head.ends_with(b"\r\n\r\n") && head.len() < MAX_HEAD_BYTES {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero()
+            || stream.set_read_timeout(Some(remaining)).is_err()
+            || !matches!(stream.read(&mut byte), Ok(1))
+        {
+            break;
+        }
         head.push(byte[0]);
     }
     let _ = stream.write_all(reply);
@@ -71,8 +79,9 @@ impl RedirectProbe {
     }
 
     /// Release both authorities and report what they received. A listener
-    /// still waiting gets a probe request, and a stalled client is cut off
-    /// after [`HEAD_TIMEOUT`], so the call always returns.
+    /// still waiting gets a probe request, and a client whose request head is
+    /// incomplete [`HEAD_TIMEOUT`] after it connected is cut off, so the call
+    /// always returns.
     pub(super) fn finish(self) -> ProbeOutcome {
         for address in [self.venue_address, self.second_address] {
             if let Ok(mut probe) = TcpStream::connect(address) {
