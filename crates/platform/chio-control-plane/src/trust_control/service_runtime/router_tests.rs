@@ -382,7 +382,11 @@ async fn standalone_holds_use_exact_versioned_rich_lifecycle(
         tokio::spawn(async move { axum::serve(listener, super::build_router(state)).await });
 
     let lifecycle = tokio::task::spawn_blocking(move || {
-        let store = build_remote_budget_store(&url, "service-secret", &chio_egress_contract::EgressAllowanceSet::default())?;
+        let store = build_remote_budget_store(
+            &url,
+            "service-secret",
+            &chio_egress_contract::EgressAllowanceSet::default(),
+        )?;
         let authorize = |hold_id: &str| {
             store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
                 capability_id: "standalone-rich".to_string(),

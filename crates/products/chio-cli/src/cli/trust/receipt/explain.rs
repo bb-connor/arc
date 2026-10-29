@@ -1,5 +1,5 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 pub(crate) struct ReceiptExplainArgs<'a> {
     pub(crate) receipt_id: &'a str,
@@ -599,7 +599,11 @@ pub(crate) fn load_receipt_for_explain(
             ));
         }
         let token = require_control_token(backend.control_token)?;
-        let client = trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?;
+        let client = trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?;
         let mut cursor = None;
         let mut matches = Vec::new();
         loop {

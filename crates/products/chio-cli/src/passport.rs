@@ -356,7 +356,10 @@ fn resolve_passport_lifecycle(
     required: bool,
 ) -> Result<Option<PassportLifecycleResolution>, CliError> {
     if let Some(url) = control_url {
-        let client = crate::trust_control::service_runtime::client::build_public_client(url, &EgressAllowanceSet::default())?;
+        let client = crate::trust_control::service_runtime::client::build_public_client(
+            url,
+            &EgressAllowanceSet::default(),
+        )?;
         let passport_id = passport_artifact_id(passport).map_err(|error| {
             CliError::policy_error(format!("failed to derive passport artifact id: {error}"))
         })?;
@@ -990,8 +993,11 @@ pub(crate) fn cmd_passport_issuance_metadata(
     _control_token: Option<&str>,
 ) -> Result<(), CliError> {
     let metadata = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(url, &EgressAllowanceSet::default())?
-            .passport_issuer_metadata()?
+        crate::trust_control::service_runtime::client::build_public_client(
+            url,
+            &EgressAllowanceSet::default(),
+        )?
+        .passport_issuer_metadata()?
     } else {
         local_passport_issuer_metadata(
             require_credential_issuer_url(issuer_url)?,
@@ -1036,14 +1042,18 @@ pub(crate) fn cmd_passport_issuance_offer_create(
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let record = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
-            .create_passport_issuance_offer(
-                &crate::trust_control::CreatePassportIssuanceOfferRequest {
-                    passport,
-                    ttl_seconds: ttl_secs,
-                    credential_configuration_id: credential_configuration_id.map(str::to_string),
-                },
-            )?
+        crate::trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .create_passport_issuance_offer(
+            &crate::trust_control::CreatePassportIssuanceOfferRequest {
+                passport,
+                ttl_seconds: ttl_secs,
+                credential_configuration_id: credential_configuration_id.map(str::to_string),
+            },
+        )?
     } else {
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
         PassportIssuanceOfferRegistry::update_for_issuance(path, |registry| {
@@ -1104,8 +1114,11 @@ pub(crate) fn cmd_passport_issuance_token_redeem(
         pre_authorized_code: offer.pre_authorized_code()?.to_string(),
     };
     let token = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(url, &EgressAllowanceSet::default())?
-            .redeem_passport_issuance_token(&request)?
+        crate::trust_control::service_runtime::client::build_public_client(
+            url,
+            &EgressAllowanceSet::default(),
+        )?
+        .redeem_passport_issuance_token(&request)?
     } else {
         let metadata = default_oid4vci_passport_issuer_metadata_with_status_distribution(
             &offer.credential_issuer,
@@ -1151,8 +1164,11 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
     let offer = load_oid4vci_offer(offer_path)?;
     let token = load_oid4vci_token(token_path)?;
     let metadata = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(url, &EgressAllowanceSet::default())?
-            .passport_issuer_metadata()?
+        crate::trust_control::service_runtime::client::build_public_client(
+            url,
+            &EgressAllowanceSet::default(),
+        )?
+        .passport_issuer_metadata()?
     } else {
         local_passport_issuer_metadata(&offer.credential_issuer, signing_seed_file, None, None)?
     };
@@ -1179,8 +1195,11 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
             .unwrap_or_default(),
     };
     let response = if let Some(url) = control_url {
-        crate::trust_control::service_runtime::client::build_public_client(url, &EgressAllowanceSet::default())?
-            .redeem_passport_issuance_credential(&token.access_token, &request)?
+        crate::trust_control::service_runtime::client::build_public_client(
+            url,
+            &EgressAllowanceSet::default(),
+        )?
+        .redeem_passport_issuance_credential(&token.access_token, &request)?
     } else {
         let path = require_passport_issuance_registry_path(passport_issuance_offers_file)?;
         PassportIssuanceOfferRegistry::update(path, |registry| {

@@ -4,23 +4,19 @@
 
 use std::sync::Arc;
 
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::payment::SimPaymentAdapter;
 use chio_kernel::{
     AcpPaymentAdapter, PaymentAdapter, X402Network, X402PaymentAdapter, X402RailConfig,
     DEFAULT_EXECUTION_NONCE_STORE_CAPACITY,
 };
-use chio_egress_contract::EgressAllowanceSet;
 use chio_store_sqlite::SqliteExecutionNonceStore;
 
 #[derive(Debug, Clone)]
 pub enum PaymentAdapterConfig {
     Sim,
-    HttpX402 {
-        adapter: X402PaymentAdapter,
-    },
-    HttpAcp {
-        adapter: AcpPaymentAdapter,
-    },
+    HttpX402 { adapter: X402PaymentAdapter },
+    HttpAcp { adapter: AcpPaymentAdapter },
 }
 
 impl PaymentAdapterConfig {
@@ -94,14 +90,9 @@ impl PaymentAdapterConfig {
                     clock.clone(),
                 )
                 .map_err(|error| format!("CHIO_PAYMENT_X402_REPLAY_DB: {error}"))?;
-                let mut adapter = X402PaymentAdapter::new(
-                    base_url,
-                    rail,
-                    allowances,
-                    clock,
-                    Arc::new(replay),
-                )
-                .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
+                let mut adapter =
+                    X402PaymentAdapter::new(base_url, rail, allowances, clock, Arc::new(replay))
+                        .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token);
                 }
@@ -333,8 +324,11 @@ mod tests {
             (":memory:", X402ReplayStorePathError::NonDurable),
             ("file://localhost", X402ReplayStorePathError::NonDurable),
         ] {
-            let error = PaymentAdapterConfig::from_lookup(variables(replay_db), &EgressAllowanceSet::default())
-                .test_expect_err("a non-durable replay store is refused at load");
+            let error = PaymentAdapterConfig::from_lookup(
+                variables(replay_db),
+                &EgressAllowanceSet::default(),
+            )
+            .test_expect_err("a non-durable replay store is refused at load");
             assert_eq!(error, format!("CHIO_PAYMENT_X402_REPLAY_DB: {refusal}"));
         }
     }

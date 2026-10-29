@@ -18,8 +18,8 @@
 // `--strict-execution-nonce` is enabled, allowed tool calls are executed
 // through a local kernel preflight plus nonce-presenting dispatch path.
 
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 use super::cage_policy::load_native_mcp_launch;
 use super::ide::IdeTarget;

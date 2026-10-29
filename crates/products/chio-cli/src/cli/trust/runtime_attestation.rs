@@ -1,5 +1,5 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 pub(crate) fn parse_governed_autonomy_tier(value: &str) -> Result<GovernedAutonomyTier, CliError> {
     crate::input::literal(value).map_err(|_| {
@@ -43,10 +43,14 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_export(
     let evidence = load_runtime_attestation_evidence(input_path)?;
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
-            .runtime_attestation_appraisal(&RuntimeAttestationAppraisalRequest {
-                runtime_attestation: evidence,
-            })?
+        trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .runtime_attestation_appraisal(&RuntimeAttestationAppraisalRequest {
+            runtime_attestation: evidence,
+        })?
     } else {
         let runtime_assurance_policy = policy_file
             .map(load_policy)
@@ -115,13 +119,17 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_result_export(
     let evidence = load_runtime_attestation_evidence(input_path)?;
     let result = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
-            .runtime_attestation_appraisal_result(
-                &RuntimeAttestationAppraisalResultExportRequest {
-                    issuer: issuer.to_string(),
-                    runtime_attestation: evidence,
-                },
-            )?
+        trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .runtime_attestation_appraisal_result(
+            &RuntimeAttestationAppraisalResultExportRequest {
+                issuer: issuer.to_string(),
+                runtime_attestation: evidence,
+            },
+        )?
     } else {
         let runtime_assurance_policy = policy_file
             .map(load_policy)
@@ -177,8 +185,12 @@ pub(crate) fn cmd_trust_runtime_attestation_appraisal_import(
 
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        trust_control::service_runtime::client::build_client(url, token, &EgressAllowanceSet::default())?
-            .import_runtime_attestation_appraisal(&request)?
+        trust_control::service_runtime::client::build_client(
+            url,
+            token,
+            &EgressAllowanceSet::default(),
+        )?
+        .import_runtime_attestation_appraisal(&request)?
     } else {
         trust_control::reports::build_runtime_attestation_appraisal_import_report(
             &request,

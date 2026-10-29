@@ -1,5 +1,5 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_mcp_adapter::edge::{McpToolInfo, McpToolResult, McpTransport};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

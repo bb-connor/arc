@@ -1,12 +1,12 @@
 //! Failure reporting through the actual stdio session handler and durable stores.
 
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
 };
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::receipt::kinds::{BoundaryClass, ObservationOutcome, ReceiptKind};
+use chio_egress_contract::EgressAllowanceSet;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -33,7 +33,13 @@ impl Fixture {
         .ok_or("durable admission disabled")?;
         let mut kernel = build_kernel(loaded, &admission.kernel_keypair());
         let receipt_db_path = unique_db_path("chio-cli-failure-receipts");
-        configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, &EgressAllowanceSet::default())?;
+        configure_receipt_store(
+            &mut kernel,
+            Some(&receipt_db_path),
+            None,
+            None,
+            &EgressAllowanceSet::default(),
+        )?;
         admission.attach(&mut kernel, None)?;
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "failure-server".into(),
