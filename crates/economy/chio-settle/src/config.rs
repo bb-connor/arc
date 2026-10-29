@@ -367,6 +367,7 @@ impl SettlementChainConfig {
         self.evidence_substrate.validate()?;
         self.policy.validate()?;
         self.kernel_authority.validate()?;
+        self.capital_authority.validate()?;
         self.validate_rpc_egress_contract()?;
         Ok(())
     }
@@ -539,6 +540,7 @@ impl LocalDevnetDeployment {
         capital_authority: SettlementCapitalAuthority,
     ) -> Result<SettlementChainConfig, SettlementError> {
         kernel_authority.validate()?;
+        capital_authority.validate()?;
         let egress_contract = settlement_devnet_rpc_egress_contract(&self.rpc_url)?;
         Ok(SettlementChainConfig {
             chain_id: self.chain_id,

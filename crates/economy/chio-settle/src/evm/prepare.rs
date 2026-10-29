@@ -1323,9 +1323,17 @@ pub async fn prepare_bond_lock(
     config.validate()?;
     ensure_settlement_binding(config, binding, Web3KeyBindingPurpose::Settle)?;
     let operator_key_hash = settlement_operator_key_hash(binding)?;
+    let capital_key = config
+        .capital_authority
+        .trusted_member(&request.bond.signer_key)
+        .ok_or_else(|| {
+            SettlementError::Verification(
+                "credit bond signer is not a trusted settlement capital authority key".to_string(),
+            )
+        })?;
     let verified = request
         .bond
-        .verify_signature(&request.bond.signer_key)
+        .verify_signature(capital_key)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     if !verified {
         return Err(SettlementError::Verification(
