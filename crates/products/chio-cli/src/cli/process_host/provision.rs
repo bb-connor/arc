@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use chio_control_plane::prepare_private_directory;
 use chio_core_types::capability::attenuation::{
-    compute_attenuation_witness, delegate, scope_hash, AttenuationProof,
+    compute_attenuation_witness, delegate, DelegationStamp, scope_hash, AttenuationProof,
 };
 use chio_core_types::capability::scope::{ChioScope, Operation};
 use chio_core_types::capability::token::{
@@ -81,8 +81,7 @@ pub(super) fn child_capability(
             budget_share_bps: Some(child.budget_share_bps),
             ..Default::default()
         },
-        parent.issued_at,
-        *uuid::Uuid::new_v4().as_bytes(),
+        DelegationStamp { signed_at: parent.issued_at, nonce: *uuid::Uuid::new_v4().as_bytes() },
     )
     .map_err(error)?;
     CapabilityToken::sign_attenuated(

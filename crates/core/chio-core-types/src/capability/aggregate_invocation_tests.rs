@@ -8,7 +8,9 @@ use super::aggregate_invocation::{
     verify_aggregate_invocation_budget, AggregateBudgetRootBinding, AggregateInvocationBudget,
     AggregateInvocationScope,
 };
-use super::attenuation::{delegate, scope_hash, DelegationLink, DelegationLinkBody};
+use super::attenuation::{
+    delegate, scope_hash, DelegationLink, DelegationLinkBody, DelegationStamp,
+};
 use super::scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant};
 use super::token::{
     CapabilityToken, CapabilityTokenBody, CapabilityTokenSigningBody, CHIO_CAPABILITY_SCHEMA,
@@ -912,8 +914,10 @@ fn aggregate_invocation_rejects_multi_hop_scope_pivot_and_intermediate_predating
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [3_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [3_u8; 16],
+        },
     )?;
     let mut intermediate_body = token_body(
         "cap-intermediate",
@@ -995,8 +999,10 @@ fn aggregate_invocation_delegate_projects_marker_across_hops() -> TestResult {
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [1_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [1_u8; 16],
+        },
     )?;
     assert_eq!(first.aggregate_budget, first.link.aggregate_budget);
     assert!(first.aggregate_budget.is_some());
@@ -1019,8 +1025,10 @@ fn aggregate_invocation_delegate_projects_marker_across_hops() -> TestResult {
         &intermediate,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        300,
-        [2_u8; 16],
+        DelegationStamp {
+            signed_at: 300,
+            nonce: [2_u8; 16],
+        },
     )?;
 
     assert_eq!(second.aggregate_budget, first.aggregate_budget);

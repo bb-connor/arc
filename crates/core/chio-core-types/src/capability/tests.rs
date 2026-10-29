@@ -1821,8 +1821,10 @@ fn delegate_mints_signed_link_for_subset_scope() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [7_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [7_u8; 16],
+        },
     )
     .unwrap();
 
@@ -1861,8 +1863,10 @@ fn delegate_rejects_widening_scope() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -1886,8 +1890,10 @@ fn delegate_rejects_parent_without_delegate_operation() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -1921,8 +1927,10 @@ fn delegate_rejects_extending_expiry() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -1939,8 +1947,10 @@ fn delegate_rejects_extending_expiry() {
             child_expires_at: Some(1800),
             budget_share_bps: None,
         },
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     );
     assert!(ok.is_ok());
 }
@@ -1969,8 +1979,10 @@ fn delegate_rejects_wrong_delegator_key() {
         &imposter, // not parent.subject
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2000,8 +2012,10 @@ fn delegate_rejects_tampered_parent_signature() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
 
@@ -2031,8 +2045,10 @@ fn delegate_rejects_parent_before_issued_at() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        999,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 999,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
 
@@ -2065,8 +2081,8 @@ fn delegate_rejects_signed_at_at_or_after_parent_expiry() {
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        2000, // == parent.expires_at
-        [0_u8; 16],
+        DelegationStamp { signed_at: 2000, nonce: // == parent.expires_at
+        [0_u8; 16] },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2398,8 +2414,10 @@ fn delegate_accepts_valid_narrowing_step() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [9_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [9_u8; 16],
+        },
     )
     .unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
@@ -2448,8 +2466,10 @@ fn delegate_rejects_widening_step() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2486,8 +2506,10 @@ fn delegate_rejects_step_for_unknown_tool() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2543,8 +2565,10 @@ fn delegate_rejects_cost_step_currency_switch() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2601,8 +2625,10 @@ fn delegate_enforces_parent_relative_budget_share() {
         &subject,
         &delegatee.public_key(),
         over,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2620,8 +2646,10 @@ fn delegate_enforces_parent_relative_budget_share() {
         &subject,
         &delegatee.public_key(),
         within,
-        1500,
-        [1_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [1_u8; 16],
+        },
     );
     assert!(ok.is_ok());
 }
@@ -2681,8 +2709,10 @@ fn delegate_requires_child_share_under_attenuated_parent() {
         &subject,
         &delegatee.public_key(),
         omitted,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2700,8 +2730,10 @@ fn delegate_requires_child_share_under_attenuated_parent() {
         &subject,
         &delegatee.public_key(),
         within,
-        1500,
-        [2_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [2_u8; 16],
+        },
     );
     assert!(ok.is_ok());
 }
@@ -2754,8 +2786,10 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [3_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [3_u8; 16],
+        },
     )
     .unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
@@ -2826,8 +2860,10 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
         &subject,
         &delegatee.public_key(),
         omitted,
-        1500,
-        [7_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [7_u8; 16],
+        },
     );
     assert!(ok.is_ok());
 }
@@ -2879,8 +2915,10 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [8_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [8_u8; 16],
+        },
     )
     .unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
@@ -2923,8 +2961,10 @@ fn delegate_rejects_step_not_reflected_in_child() {
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -2975,8 +3015,10 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [9_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [9_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
@@ -3024,8 +3066,10 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [10_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [10_u8; 16],
+        },
     )
     .unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
@@ -3085,8 +3129,10 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
         &subject,
         &delegatee.public_key(),
         attenuation,
-        1500,
-        [11_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [11_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));

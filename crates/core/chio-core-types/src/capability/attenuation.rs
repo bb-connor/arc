@@ -993,6 +993,13 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
     Ok(())
 }
 
+/// Signing time and nonce for a minted delegation receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DelegationStamp {
+    pub signed_at: u64,
+    pub nonce: [u8; 16],
+}
+
 /// Recursive-delegation mint helper.
 ///
 /// `delegate` wraps [`DelegationLink::sign`] with fail-closed attenuation
@@ -1031,7 +1038,7 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
 ///   delegate further).
 ///
 /// The helper is intentionally pure with respect to the local clock:
-/// callers pass `signed_at` and `nonce` explicitly so unit tests, replay
+/// callers pass the [`DelegationStamp`] explicitly so unit tests, replay
 /// proofs, and proptest-driven invariants stay deterministic.
 ///
 /// This function is gated behind the `delegation` feature flag. Callers
@@ -1043,9 +1050,9 @@ pub fn delegate(
     delegator_keypair: &Keypair,
     delegatee: &PublicKey,
     attenuation: crate::delegation_receipt::ScopeAttenuation,
-    signed_at: u64,
-    nonce: [u8; 16],
+    stamp: DelegationStamp,
 ) -> Result<crate::delegation_receipt::DelegationReceipt> {
+    let DelegationStamp { signed_at, nonce } = stamp;
     if !parent.verify_signature(trusted_parent_issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }

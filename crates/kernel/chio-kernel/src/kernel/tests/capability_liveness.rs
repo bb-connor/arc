@@ -118,8 +118,10 @@ fn retained_capability_liveness_rejects_revoked_delegation_ancestors(
         &parent_subject,
         &child_subject,
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [21; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [21; 16],
+        },
     )?;
     let child = CapabilityToken::sign(
         CapabilityTokenBody {

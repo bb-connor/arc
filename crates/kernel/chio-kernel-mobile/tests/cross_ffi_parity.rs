@@ -8,7 +8,7 @@ mod chio_cpp_kernel_ffi;
 use std::ffi::CString;
 
 use chio_core_types::capability::{
-    attenuation::delegate,
+    attenuation::{delegate, DelegationStamp},
     features::{CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET},
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
@@ -107,8 +107,10 @@ fn aggregate_family_fixture() -> TestResult<(
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        ISSUED_AT + 1,
-        [11_u8; 16],
+        DelegationStamp {
+            signed_at: ISSUED_AT + 1,
+            nonce: [11_u8; 16],
+        },
     )?;
     child_body.issued_at = ISSUED_AT + 1;
     child_body.delegation_chain = receipt.complete_chain();
@@ -159,8 +161,10 @@ fn cumulative_family_fixture(
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        ISSUED_AT + 1,
-        [12_u8; 16],
+        DelegationStamp {
+            signed_at: ISSUED_AT + 1,
+            nonce: [12_u8; 16],
+        },
     )?;
     child_body.issued_at = ISSUED_AT + 1;
     child_body.delegation_chain = receipt.complete_chain();
