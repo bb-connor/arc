@@ -45,7 +45,9 @@ impl Fixture {
         {
             let connection = Connection::open(directory.path().join("source.sqlite3"))?;
             connection.pragma_update(None, "encoding", encoding)?;
-            connection.execute_batch("VACUUM")?;
+            connection.execute_batch(
+                "CREATE TABLE encoding_seed (value INTEGER); DROP TABLE encoding_seed;",
+            )?;
         }
         let store = SqliteRuntimeOrchestrationStore::open_with_clock(
             directory.path().join("source.sqlite3"),
