@@ -616,7 +616,7 @@ fn execute_tool_call_treats_pending_approval_as_denied() {
 
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
     assert!(result.denied);
-    assert!(result.content.contains("approval"));
+    assert_eq!(result.content, "Error: Governed transaction denied");
     assert!(result.receipt.is_some());
     assert!(result.receipt_ref.is_some());
 }

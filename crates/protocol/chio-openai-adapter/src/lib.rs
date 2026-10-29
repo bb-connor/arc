@@ -421,7 +421,7 @@ impl ChioOpenAiAdapter {
                 let execution_nonce = response.execution_nonce.as_deref().cloned();
                 let denied = !matches!(response.verdict, KernelVerdict::Allow) || preflight;
                 let content = preflight_reason.unwrap_or_else(|| {
-                    render_response_content(&response.output, response.reason.as_deref())
+                    render_response_content(&response.output, response.client_reason().as_deref())
                 });
                 let receipt_ref = Some(response.receipt.id.clone());
                 ToolCallResult {
