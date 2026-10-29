@@ -1,6 +1,6 @@
 use chio_core_types::{canonical_json_bytes, sha256};
 use chio_security_types::ports::{
-    CanonicalBody, CreateOutcome, Digest32, RecordId, ResponseCasRequest, ResponseEffectCasRequest,
+    CanonicalBody, CreateOutcome, Digest32, ResponseCasRequest, ResponseEffectCasRequest,
     ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
     ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseScheduledMutationCasRequest,
     ResponseSchedulerStore, ResponseStore, ScheduledWork, SchedulerClaimRequest,
@@ -327,9 +327,4 @@ impl ResponseSchedulerStore for TestResponseStore {
     fn release_lease(&self, _request: &SchedulerLeaseReleaseRequest) -> PortResult<()> {
         Err(PortError::unavailable())
     }
-}
-
-#[allow(dead_code)]
-pub fn record(value: &str) -> RecordId {
-    RecordId::new(value).unwrap_or_else(|error| panic!("invalid record id: {error}"))
 }

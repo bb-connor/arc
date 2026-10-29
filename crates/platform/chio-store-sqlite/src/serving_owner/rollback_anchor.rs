@@ -691,35 +691,36 @@ fn encode_slot(payload: &[u8]) -> Result<[u8; SLOT_SIZE], SqliteServingOwnerErro
 /// is the symmetry a single-write install relies on.
 #[cfg(feature = "fuzz")]
 pub(crate) fn exercise_slot_image(data: &[u8]) {
-    let mut image = [0_u8; FILE_SIZE];
-    let length = data.len().min(FILE_SIZE);
-    image[..length].copy_from_slice(&data[..length]);
+    assert_eq!(check_slot_image(data), Ok(()));
+}
+
+#[cfg(feature = "fuzz")]
+fn check_slot_image(data: &[u8]) -> Result<(), &'static str> {
     let mut slots = [[0_u8; SLOT_SIZE]; SLOT_COUNT];
-    for (index, slot) in slots.iter_mut().enumerate() {
-        slot.copy_from_slice(&image[index * SLOT_SIZE..(index + 1) * SLOT_SIZE]);
+    for (byte, input) in slots.iter_mut().flatten().zip(data) {
+        *byte = *input;
     }
     let Ok(Some(loaded)) = decode_slots(&slots) else {
-        return;
+        return Ok(());
     };
-    assert!(
-        loaded.record.validate().is_ok(),
-        "a decoded rollback anchor record must validate"
-    );
+    if loaded.record.validate().is_err() {
+        return Err("a decoded rollback anchor record must validate");
+    }
     for slot in &slots {
         let Ok(record) = decode_slot(slot) else {
             continue;
         };
-        let Ok(payload) = canonical_json_bytes(&record) else {
-            panic!("a decoded rollback anchor record must re-encode");
-        };
-        let Ok(encoded) = encode_slot(&payload) else {
-            panic!("a decoded rollback anchor payload must fit its slot");
-        };
-        assert!(
-            encoded[..] == slot[..],
-            "a decoded rollback anchor slot must re-encode to the bytes it was read from"
-        );
+        let payload = canonical_json_bytes(&record)
+            .map_err(|_| "a decoded rollback anchor record must re-encode")?;
+        let encoded = encode_slot(&payload)
+            .map_err(|_| "a decoded rollback anchor payload must fit its slot")?;
+        if encoded != *slot {
+            return Err(
+                "a decoded rollback anchor slot must re-encode to the bytes it was read from",
+            );
+        }
     }
+    Ok(())
 }
 
 /// A committed slot decodes only when its marker, length, checksum and

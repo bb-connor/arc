@@ -3,9 +3,8 @@ use super::*;
 use chio_core::{Ed25519Backend, Keypair, SigningBackend};
 
 pub fn response_authority_protocol(data: &[u8]) {
-    if let Err(error) = drive(data) {
-        panic!("valid authority corpus failed: {error}");
-    }
+    let outcome = drive(data).map_err(|error| error.to_string());
+    assert_eq!(outcome, Ok(()), "valid authority corpus failed");
 }
 fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let signer = Ed25519Backend::new(Keypair::from_seed(&[23; 32]));
@@ -43,13 +42,13 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // Present an unchanged, valid signature to a different trust context.
     let mut rebound = config.clone();
     rebound.deployment_digest = Digest32::new([5; 32]);
-    match decode_authority_request(&valid, &rebound, 1000) {
-        Err(error) => assert_eq!(
-            error.code().as_str(),
-            "urn:chio:error:transport:response-authority-deployment"
-        ),
-        Ok(_) => panic!("foreign deployment minted authority"),
-    }
+    let foreign = decode_authority_request(&valid, &rebound, 1000)
+        .err()
+        .ok_or("foreign deployment minted authority")?;
+    assert_eq!(
+        foreign.code().as_str(),
+        "urn:chio:error:transport:response-authority-deployment"
+    );
     let mut changed = signed.clone();
     let reason = match data.first().copied().unwrap_or(0) % 5 {
         0 => {
@@ -73,18 +72,19 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
             "signature"
         }
     };
-    match decode_authority_request(&canonical_json_bytes(&changed)?, &config, 1000) {
-        Err(error) => assert_eq!(
-            error.code().as_str(),
-            format!("urn:chio:error:transport:response-authority-{reason}")
-        ),
-        Ok(_) => panic!("substituted envelope minted authority"),
-    }
+    let substituted = decode_authority_request(&canonical_json_bytes(&changed)?, &config, 1000)
+        .err()
+        .ok_or("substituted envelope minted authority")?;
+    assert_eq!(
+        substituted.code().as_str(),
+        format!("urn:chio:error:transport:response-authority-{reason}")
+    );
     // Reach authenticated freshness checks across the full u64 domain, with
     // valid signatures. Overflow must reject instead of widening the window.
     let mut bytes = [0_u8; 8];
-    let supplied = data.len().min(bytes.len());
-    bytes[..supplied].copy_from_slice(&data[..supplied]);
+    for (byte, input) in bytes.iter_mut().zip(data) {
+        *byte = *input;
+    }
     let now = u64::from_le_bytes(bytes);
     let freshness =
         super::validation::validate_request_freshness(now, config.maximum_clock_skew_seconds, now);
@@ -115,8 +115,16 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     // structural and canonical refusal paths that arbitrary JSON rarely reaches.
     let mut wire = valid.clone();
     for edit in data.chunks_exact(3).take(64) {
-        let offset = usize::from(u16::from_le_bytes([edit[0], edit[1]])) % wire.len();
-        wire[offset] ^= edit[2];
+        let [low, high, mask] = *edit else {
+            continue;
+        };
+        let Some(byte) = usize::from(u16::from_le_bytes([low, high]))
+            .checked_rem(wire.len())
+            .and_then(|offset| wire.get_mut(offset))
+        else {
+            continue;
+        };
+        *byte ^= mask;
     }
     if let Ok(accepted) = decode_authority_request(&wire, &config, 1000) {
         assert_eq!(accepted.request(), &signed);
