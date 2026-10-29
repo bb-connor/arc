@@ -4,6 +4,14 @@ from .capability import (
     verify_capability,
     verify_capability_json,
 )
+from .disclosure import (
+    Opening,
+    ReceiptDisclosure,
+    decode_salt,
+    open_commitments,
+    parse_receipt_disclosure,
+    parse_receipt_disclosure_json,
+)
 from .hashing import sha256_hex_bytes, sha256_hex_utf8
 from .json import canonicalize_json, canonicalize_json_string
 from .receipt import (
@@ -26,12 +34,18 @@ from .signing import (
 )
 
 __all__ = [
-    "capability_signing_body_canonical_json",
+    "Opening",
+    "ReceiptDisclosure",
     "canonicalize_json",
     "canonicalize_json_string",
+    "capability_signing_body_canonical_json",
+    "decode_salt",
     "is_valid_public_key_hex",
     "is_valid_signature_hex",
+    "open_commitments",
     "parse_capability_json",
+    "parse_receipt_disclosure",
+    "parse_receipt_disclosure_json",
     "parse_receipt_json",
     "public_key_hex_matches",
     "receipt_body_canonical_json",

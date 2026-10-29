@@ -24,6 +24,7 @@ pub const CHAIN_DIGEST_DOMAIN: &[u8] = b"chio.receipt.chain-digest.v1\0";
 pub const DELEGATION_SUBJECT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.subject.v1\0";
 pub const DELEGATION_TENANT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.tenant.v1\0";
 pub const DELEGATION_CLAIM_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.claim.v1\0";
+pub const METADATA_COMMITMENT_DOMAIN: &[u8] = b"chio.receipt.metadata.v1\0";
 pub const PARAMS_SALT_REF: &str = "params";
 pub const CONTENT_SALT_REF: &str = "content";
 
@@ -152,6 +153,9 @@ pub enum CommitmentDomain<'a> {
     DelegationTenant,
     /// `chio.delegation-context.claim.v1\0 || utf8(name) || 0x00` precedes the salt.
     DelegationClaim(ClaimName<'a>),
+    /// `chio.receipt.metadata.v1\0 || utf8(salt_ref) || 0x00` precedes the salt, so an opening
+    /// of one metadata field never verifies as another field's or as any other commitment.
+    Metadata(&'a SaltRef),
 }
 
 impl CommitmentDomain<'_> {
@@ -164,6 +168,11 @@ impl CommitmentDomain<'_> {
             Self::DelegationClaim(name) => {
                 state.update(DELEGATION_CLAIM_COMMITMENT_DOMAIN);
                 state.update(name.as_str().as_bytes());
+                state.update(&[0]);
+            }
+            Self::Metadata(salt_ref) => {
+                state.update(METADATA_COMMITMENT_DOMAIN);
+                state.update(salt_ref.as_str().as_bytes());
                 state.update(&[0]);
             }
         }

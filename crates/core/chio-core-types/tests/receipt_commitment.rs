@@ -91,7 +91,11 @@ fn commit_reproduces_committed_vectors() {
     let cases = field(&vectors, &["cases"]).as_array().test_unwrap();
     let mut checked = 0;
     for case in cases {
-        if field(case, &["expected", "disclosure_valid"]) != &Value::Bool(true) {
+        let expected = field(case, &["expected"]);
+        let structural_fault = field(expected, &["disclosure_valid"]) == &Value::Bool(false)
+            && field(expected, &["parameters"]).as_str() == Some("rejected")
+            && field(expected, &["content"]).as_str() == Some("rejected");
+        if structural_fault {
             continue;
         }
         let openings = field(case, &["disclosure", "openings"])

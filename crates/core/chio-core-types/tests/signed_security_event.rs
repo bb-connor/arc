@@ -277,3 +277,109 @@ fn strict_wire_decode_rejects_unknown_or_unsigned_envelopes() {
         "deserialization alone must never establish trusted-producer provenance"
     );
 }
+
+#[cfg(feature = "tenant-index")]
+mod projection {
+    use super::*;
+    use std::cell::Cell;
+
+    use chio_core_types::receipt::metadata::{MetadataOpenings, MetadataValue};
+    use chio_core_types::rng::{Rng, RngError};
+    use chio_core_types::root_authority::SaltRef;
+    use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
+
+    struct CountingRng(Cell<u64>);
+
+    impl Rng for CountingRng {
+        fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+            let next = self.0.get().wrapping_add(1);
+            self.0.set(next);
+            for (index, byte) in dest.iter_mut().enumerate() {
+                let shift = (index % 8) * 8;
+                *byte = ((next >> shift) & 0xff) as u8 ^ (index as u8);
+            }
+            Ok(())
+        }
+    }
+
+    fn rng() -> CountingRng {
+        CountingRng(Cell::new(0))
+    }
+
+    fn key(fill: u8) -> TenantIndexKey {
+        TenantIndexKey::from_set_key(&[fill; 32])
+            .unwrap_or_else(|error| panic!("tenant index key: {error}"))
+    }
+
+    fn key_set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
+        TenantIndexKeySet::new(key(active), retired.iter().map(|fill| key(*fill)).collect())
+            .unwrap_or_else(|error| panic!("tenant index key set: {error}"))
+    }
+
+    /// No opening's raw value appears in the serialized projection.
+    fn assert_no_raw_value(projection: &str, openings: &MetadataOpenings) {
+        for (salt_ref, opening) in openings.iter() {
+            let raw = String::from_utf8_lossy(opening.value.as_bytes()).into_owned();
+            assert!(!projection.contains(&raw), "{salt_ref} leaks {raw}");
+        }
+    }
+
+    use chio_core_types::security_event::SecurityEventProjection;
+
+    #[test]
+    fn security_event_projection_carries_no_raw_tenant_or_subject() {
+        let keys = key_set(7, &[]);
+        let event = body();
+        let (projection, openings) = SecurityEventProjection::project(&event, &keys, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert!(projection.matches(&event, &openings, &keys));
+        assert!(keys.verify("tenant-a", &projection.tenant_binding).is_ok());
+        let encoded = chio_core_types::canonical_json_string(&projection)
+            .unwrap_or_else(|error| panic!("encodes: {error}"));
+        for raw in [
+            "tenant-a",
+            "subject-a",
+            "agent-a",
+            "session-a",
+            "capability-a",
+        ] {
+            assert!(!encoded.contains(raw), "{raw}");
+        }
+        assert_no_raw_value(&encoded, &openings);
+        assert_eq!(
+            projection.subject.salt_ref().as_str(),
+            "metadata.security_event.subject"
+        );
+        let decoded: SecurityEventProjection =
+            serde_json::from_str(&encoded).unwrap_or_else(|error| panic!("decodes: {error}"));
+        assert_eq!(decoded, projection);
+    }
+
+    #[test]
+    fn security_event_projection_refuses_other_bodies_openings_and_generations() {
+        let keys = key_set(7, &[]);
+        let event = body();
+        let (projection, openings) = SecurityEventProjection::project(&event, &keys, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert!(!projection.matches(&alternate_body(), &openings, &keys));
+        assert!(!projection.matches(&event, &MetadataOpenings::new(), &keys));
+        let (again, again_openings) =
+            SecurityEventProjection::project(&event, &keys, &CountingRng(Cell::new(99)))
+                .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert_ne!(again.subject, projection.subject);
+        assert!(!projection.matches(&event, &again_openings, &keys));
+        assert!(!projection.matches(&event, &openings, &key_set(8, &[])));
+        assert!(projection.matches(&event, &openings, &key_set(8, &[7])));
+        let mut padded = openings.clone();
+        padded
+            .commit_value(
+                SaltRef::new("metadata.security_event.unused")
+                    .unwrap_or_else(|error| panic!("salt ref: {error}")),
+                MetadataValue::from_json(&"unused")
+                    .unwrap_or_else(|error| panic!("value: {error}")),
+                &CountingRng(Cell::new(500)),
+            )
+            .unwrap_or_else(|error| panic!("pads: {error}"));
+        assert!(!projection.matches(&event, &padded, &keys));
+    }
+}
