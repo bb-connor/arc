@@ -588,6 +588,9 @@ mod tests {
             2,
             &step,
             &vendor_key,
+            &chio_core_types::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(
+                &[1_u8; 32],
+            )),
             step.arguments.as_ref().ok_or_else(|| {
                 crate::RuntimeLoopbackError::message(
                     "runtime loopback test step missing arguments".to_string(),
@@ -697,6 +700,9 @@ mod tests {
             0,
             &step,
             &vendor_key,
+            &chio_core_types::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(
+                &[1_u8; 32],
+            )),
             step.arguments.as_ref().ok_or_else(|| {
                 crate::RuntimeLoopbackError::message(
                     "runtime loopback test step missing arguments".to_string(),

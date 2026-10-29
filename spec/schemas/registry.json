@@ -3233,6 +3233,12 @@
       "artifactKind": "settlement_closure",
       "introducedBy": "root-authority-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/receipt/settlement-closure.schema.json"
+    },
+    {
+      "schema": "chio.treaty-epoch.v1",
+      "artifactKind": "treaty_epoch",
+      "introducedBy": "treaty-epoch-commit-v1",
+      "schemaFile": "spec/schemas/chio-runtime/v1/treaty-epoch.schema.json"
     }
   ]
 }
