@@ -68,7 +68,7 @@
 - Every function in `root_authority` and the resolver takes time as a parameter (spec 10.1); `scripts/check-security-clocks.py` passes.
 - Every new decoder gets a trust-boundary inventory entry with its contract and reader evidence; `scripts/check-trust-boundaries.py` returns 0 at each PR head.
 - `docs/formal/COVERAGE.md` is regenerated as the last commit of each PR.
-- Signed fixtures regenerate only through `cargo xtask gen signed-fixtures` (`xtask/src/signed_fixtures.rs`, added by item 1 #1837), at the integrated base; `cargo xtask gen signed-fixtures --check` passes at each PR head.
+- Signed fixtures regenerate only through `cargo xtask gen signed-fixtures` (`xtask/src/signed_fixtures.rs`, added by item 1 #1837), at the integrated base. `cargo xtask gen signed-fixtures --check` passes at the head of 3b and 3c, and of 3a only if #1837 is on `main` at 3a's base (before that the command does not exist and 3a changes no signed fixture).
 
 ## PR slicing and order
 
