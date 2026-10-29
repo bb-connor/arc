@@ -1,18 +1,30 @@
 use super::*;
 
-#[tokio::test]
-async fn a2a_contract_resolver_rejects_loopback_answers() {
-    let mut contract = HttpEgressContract::permissive_for_tests("127.0.0.1:80");
+#[test]
+fn a2a_transport_refuses_a_loopback_target_the_contract_denies() {
+    let mut contract = HttpEgressContract::permissive_for_tests("localhost:80");
     contract.deny_loopback = true;
-    let resolver = A2aContractResolver { contract };
-
-    let error = ureq::Resolver::resolve(&resolver, "127.0.0.1:80")
-        .expect_err("loopback DNS answers are rejected at resolver time");
-
-    assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied);
+    let transport_config = A2aTransportConfig {
+        default_tls_config: None,
+        mutual_tls_config: None,
+        egress_contract: Some(contract),
+    };
+    let agent = build_agent(
+        Duration::from_secs(1),
+        &transport_config,
+        A2aTlsMode::Default,
+    )
+    .expect("agent");
+    let error = dispatch_with_redirect_validation(
+        "http://localhost:80/card",
+        &transport_config,
+        true,
+        |target, _| agent.get(target)?.call(),
+    )
+    .expect_err("a loopback target is refused before dispatch");
     assert!(
         error.to_string().contains("loopback"),
-        "unexpected resolver error: {error}"
+        "unexpected transport error: {error}"
     );
 }
 

@@ -31,8 +31,11 @@ Configure credentials and optional partner policy before discovery.
 ## Guarantees
 
 - `A2aAdapter::discover` rejects empty skill sets and unsupported interfaces.
-- `enforce_egress_contract` requires a contract before HTTP dispatch; the
-  transport validates redirects and checks resolved addresses.
+- Every request goes through a `BlockingContractAgent`. A missing contract fails
+  closed before dispatch, each redirect target passes the contract before it is
+  followed, and resolved addresses are checked and pinned before dialing.
+  Custom roots and the mTLS identity extend server verification and never
+  disable it.
 - `build_manifest` validates the derived manifest shape. The configured public
   key is metadata; discovery does not authenticate a signed agent card.
 

@@ -53,8 +53,8 @@ struct A2aResolvedRequestAuth {
 
 #[derive(Debug, Clone)]
 struct A2aTransportConfig {
-    default_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
-    mutual_tls_config: Option<Arc<ureq::rustls::ClientConfig>>,
+    default_tls_config: Option<BlockingContractTls>,
+    mutual_tls_config: Option<BlockingContractTls>,
     /// Typed HTTP egress contract that gates every outbound A2A dispatch.
     /// `None` fails closed before dispatch; production callers must thread a
     /// tenant-scoped contract via [`A2aAdapterConfig::with_egress_contract`].
