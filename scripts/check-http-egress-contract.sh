@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Workspace lint: HttpEgressContract enforcement coverage.
 #
-# Walks every crate that initiates outbound HTTP and asserts that each
+# Walks every crate and example that initiates outbound HTTP and asserts that each
 # `reqwest` dispatch call site in production code is paired with an
 # `HttpEgressContract` invocation (or its `send_with_contract` helper).
 #
@@ -21,7 +21,6 @@
 # Allowed to skip:
 # - `chio-egress-contract` (owns the contract)
 # - `chio-http-core` (re-exports the contract)
-# - `chio-mcp-adapter` (kernel-side adapter that owns its own protocol stack)
 # - test files (`tests.rs`, `*-tests.rs`, files under `tests/` or
 #   `crates/*/tests/`), plus named `*_tests/` modules bound by `cfg(test)`.
 #
@@ -38,10 +37,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="${CHIO_EGRESS_LINT_ROOT:-$(dirname "$SCRIPT_DIR")}"
 cd "$REPO_ROOT"
 
+SCAN_ROOTS=(crates/ examples/)
+
 ALLOW_LIST=(
     "crates/protocol/chio-egress-contract/"
     "crates/platform/chio-http-core/"
-    "crates/protocol/chio-mcp-adapter/"
 )
 
 # Compose a regex that catches:
@@ -64,7 +64,7 @@ while IFS= read -r candidate_file; do
     CANDIDATE_FILES+=("$candidate_file")
 done < <(
     grep -rln -E "reqwest(::blocking)?::(Client|ClientBuilder)" --include='*.rs' \
-        crates/ 2>/dev/null || true
+        "${SCAN_ROOTS[@]}" 2>/dev/null || true
 )
 
 # Top-level reqwest dispatch helpers such as `reqwest::get(...)` are also
@@ -73,7 +73,7 @@ while IFS= read -r candidate_file; do
     CANDIDATE_FILES+=("$candidate_file")
 done < <(
     grep -rln -E "reqwest(::blocking)?::(get|post|put|delete|patch|head)\\(" --include='*.rs' \
-        crates/ 2>/dev/null || true
+        "${SCAN_ROOTS[@]}" 2>/dev/null || true
 )
 
 # Imported Client builders, including `use reqwest::blocking::Client;`,
@@ -85,7 +85,7 @@ while IFS= read -r import_match; do
         CANDIDATE_FILES+=("$file")
     fi
 done < <(
-    grep -rn -E "use[[:space:]]+reqwest(::blocking)?(::[A-Za-z_][A-Za-z0-9_]*|::\\{[^;]*\\b(Client|ClientBuilder)\\b|[[:space:]]+as[[:space:]]+[A-Za-z_][A-Za-z0-9_]*)" --include='*.rs' crates/ 2>/dev/null || true
+    grep -rn -E "use[[:space:]]+reqwest(::blocking)?(::[A-Za-z_][A-Za-z0-9_]*|::\\{[^;]*\\b(Client|ClientBuilder)\\b|[[:space:]]+as[[:space:]]+[A-Za-z_][A-Za-z0-9_]*)" --include='*.rs' "${SCAN_ROOTS[@]}" 2>/dev/null || true
 )
 
 # Aliased imports: scan for `use reqwest as foo;` and expand the candidate
@@ -102,7 +102,7 @@ while IFS= read -r alias_match; do
             CANDIDATE_FILES+=("$file")
         fi
     fi
-done < <(grep -rn -E "use[[:space:]]+reqwest(::blocking)?[[:space:]]+as[[:space:]]+[A-Za-z_]" --include='*.rs' crates/ 2>/dev/null || true)
+done < <(grep -rn -E "use[[:space:]]+reqwest(::blocking)?[[:space:]]+as[[:space:]]+[A-Za-z_]" --include='*.rs' "${SCAN_ROOTS[@]}" 2>/dev/null || true)
 
 # De-duplicate.
 if [[ ${#CANDIDATE_FILES[@]} -gt 0 ]]; then
