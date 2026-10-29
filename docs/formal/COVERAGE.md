@@ -30,6 +30,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-credit::formal_economy.rs` | - | 2 | - | 2 | - | - | - | - | - | - |
 | `chio-data-guards::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-decision-model::*` | - | - | - | 3 | - | - | - | - | - | - |
+| `chio-decision-model::envelope.rs` | 5 | - | - | - | 1 | - | - | - | - | - |
 | `chio-did::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-eval-receipt::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-federation-authority::frost_ceremony.rs` | - | - | - | - | - | - | 1 | - | - | - |
@@ -38,6 +39,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-finding-worker::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-finding::status.rs` | 1 | - | - | - | - | - | - | - | - | - |
 | `chio-fixed::*` | - | - | - | 3 | - | - | - | - | - | - |
+| `chio-fixed::q16.rs` | 2 | - | - | - | - | - | - | - | - | - |
 | `chio-guards::*` | - | - | - | - | - | - | 1 | 2 | - | - |
 | `chio-kernel-core::*` | - | - | - | 1 | - | - | 1 | 2 | - | - |
 | `chio-kernel-core::capability_verify.rs` | - | - | 2 | 1 | - | - | - | - | - | - |
@@ -54,6 +56,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-kernel::kernel/delegation.rs` | - | - | - | - | 1 | - | - | - | - | - |
 | `chio-kernel::kernel/kernel_drop_guard.rs` | - | - | - | - | 1 | - | - | - | 1 | - |
 | `chio-kernel::kernel/signing_task.rs` | - | - | - | - | - | - | - | - | 1 | - |
+| `chio-kernel::receipt_support/receipt_metadata.rs` | - | - | - | - | 1 | - | - | - | - | - |
 | `chio-kernel::request_matching.rs` | - | - | - | - | - | - | - | - | 1 | - |
 | `chio-kernel::session.rs` | - | - | - | - | - | - | - | - | 1 | - |
 | `chio-manifest::*` | - | - | - | - | - | - | 1 | - | - | - |
@@ -62,7 +65,9 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 | `chio-open-market::finding_slash_amount.rs` | - | - | - | 1 | - | - | - | - | - | - |
 | `chio-openapi-mcp-bridge::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-policy::*` | - | - | - | - | - | - | 2 | 2 | - | - |
-| `chio-predicate-dag::*` | - | - | - | 3 | - | - | 1 | - | - | - |
+| `chio-predicate-dag::*` | 1 | - | - | 3 | - | - | 1 | - | - | - |
+| `chio-predicate-dag::eval.rs` | 5 | - | - | - | - | - | - | - | - | - |
+| `chio-predicate-dag::thresholds.rs` | 1 | - | - | - | - | - | - | - | - | - |
 | `chio-predicate-dag::trit.rs` | - | - | - | 1 | - | - | - | - | - | - |
 | `chio-quarantine::*` | - | - | - | - | - | - | 1 | - | - | - |
 | `chio-revocation-oracle::*` | - | - | - | - | - | - | 1 | - | - | - |
@@ -252,6 +257,20 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.kani/harnesses.toml::chio-decision-model/verify_projection_total_and_admitted` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-decision-model/verify_select_in_envelope` (execution_lane=pr)
 
+### `chio-decision-model::envelope.rs`
+
+**lean**
+
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/fallback_mem`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/project_admitted`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/project_idem`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/project_identity_iff`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/project_mem`
+
+**tla**
+
+- `formal/MAPPING.md::Decision-model envelope invariants (DecisionEnvelope.tla)/ChosenInFeasible`
+
 ### `chio-did::*`
 
 **fuzz**
@@ -301,6 +320,13 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `.kani/harnesses.toml::chio-fixed/verify_q16_checked_add_never_wraps` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-fixed/verify_q16_checked_mul_matches_i128_reference` (execution_lane=pr)
 - `.kani/harnesses.toml::chio-fixed/verify_ratio_cmp_total_order` (execution_lane=pr)
+
+### `chio-fixed::q16.rs`
+
+**lean**
+
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/checked_mul_none_iff`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/checked_mul_spec`
 
 ### `chio-guards::*`
 
@@ -531,6 +557,12 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 
 - `.loom/harnesses.toml::chio-kernel/loom_concurrency::loom_receipt_channel_producer_drain` (lane=nightly, max_preemptions=3, scope=bounded_abstract_model)
 
+### `chio-kernel::receipt_support/receipt_metadata.rs`
+
+**tla**
+
+- `formal/MAPPING.md::Decision-model envelope invariants (DecisionEnvelope.tla)/WitnessBeforeAllow`
+
 ### `chio-kernel::request_matching.rs`
 
 **loom**
@@ -583,6 +615,10 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 
 ### `chio-predicate-dag::*`
 
+**lean**
+
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/widen_no_admit`
+
 **kani**
 
 - `.kani/harnesses.toml::chio-predicate-dag/verify_classify_respects_thresholds` (execution_lane=pr)
@@ -592,6 +628,22 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 **fuzz**
 
 - `fuzz/target-map.toml::decision_model_artifact`
+
+### `chio-predicate-dag::eval.rs`
+
+**lean**
+
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/evalFrom_mono`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/kleene_and_or_monotone_info`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/outcome_allow_iff`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/widen_deny_to_hold_example`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/widen_no_admit_atoms`
+
+### `chio-predicate-dag::thresholds.rs`
+
+**lean**
+
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/classify_widen`
 
 ### `chio-predicate-dag::trit.rs`
 
@@ -741,6 +793,7 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `audits/mutation/per-crate-configs/chio-policy.toml`: `chio-policy::compiler/budgets.rs`, `chio-policy::compiler/detection.rs`, `chio-policy::compiler/patterns.rs`, `chio-policy::compiler/rules.rs`, `chio-policy::compiler/scope.rs`, `chio-policy::compiler/sender_proof.rs`, `chio-policy::conditions.rs`, `chio-policy::detection.rs`, `chio-policy::evaluate.rs`, `chio-policy::merge.rs`, `chio-policy::receipt.rs`, `chio-policy::regex_safety.rs`, `chio-policy::resolve.rs`, `chio-policy::validate.rs`
 - `audits/mutation/per-crate-configs/chio-weights.toml`: `chio-weights::bundle.rs`, `chio-weights::card.rs`, `chio-weights::error.rs`, `chio-weights::lineage.rs`
 - `formal/MAPPING.md::Apalache named invariants (kernel-state subset)/PostDispatchConstructionFailureUnreachable`: `chio-kernel::kernel/effect_obligation.rs`, `chio-kernel::kernel/effect_obligation/preparation.rs`, `chio-kernel::kernel/effect_obligation/recovery.rs`
+- `formal/MAPPING.md::Lean decision-model theorems (DecisionModel/)/widen_no_admit`: `chio-predicate-dag::eval.rs`, `chio-predicate-dag::thresholds.rs`
 - `formal/MAPPING.md::Lean delivery-contract theorems (Proofs/DeliveryContract.lean)/denied_after_delivery_cannot_settle`: `chio-kernel::admission_operation/state.rs`, `chio-kernel::kernel/admission_coordinator/terminal.rs`
 - `formal/MAPPING.md::Trace validation/TraceEvaluationIncomplete`: `chio-trace-validate::apalache.rs`, `chio-trace-validate::itf.rs`, `chio-trace-validate::report.rs`
 - `formal/mutation/registry.toml::spec-kernel-transition-cancel`: `chio-kernel::kernel/kernel_drop_guard.rs`, `chio-kernel::kernel/validation.rs`
@@ -817,6 +870,20 @@ Theorem inventory and differential-test artifacts without a machine-readable Rus
 - `formal/theorem-inventory.json::assume.hash.collision_resistant` (`lean`) (claim_class=symbolic_crypto, kind=axiom, status=assumed): formal/lean4/Chio/Chio/Json/Hash.lean has property links but no machine-readable Rust surface link Properties: P4, P7.
 - `formal/theorem-inventory.json::core.scope.empty_isSubsetOf` (`lean`) (claim_class=bounded_model, kind=theorem, status=unknown): formal/lean4/Chio/Chio/Core/Scope.lean has property links but no machine-readable Rust surface link Properties: P1.
 - `formal/theorem-inventory.json::core.tool_grant.isSubsetOf_refl` (`lean`) (claim_class=bounded_model, kind=theorem, status=unknown): formal/lean4/Chio/Chio/Core/Scope.lean has property links but no machine-readable Rust surface link Properties: P1.
+- `formal/theorem-inventory.json::decision_model.envelope.fallback_mem` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Envelope.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.envelope.project_admitted` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Envelope.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.envelope.project_idem` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Envelope.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.envelope.project_identity_iff` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Envelope.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.envelope.project_mem` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Envelope.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.fixed.checked_mul_none_iff` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Fixed.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.fixed.checked_mul_spec` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Fixed.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.classify_widen` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.evalFrom_mono` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.kleene_and_or_monotone_info` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.outcome_allow_iff` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.widen_deny_to_hold_example` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.widen_no_admit` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
+- `formal/theorem-inventory.json::decision_model.kleene.widen_no_admit_atoms` (`lean`) (claim_class=bounded_model, kind=theorem, status=proved): formal/lean4/Chio/Chio/DecisionModel/Kleene.lean has property links but no machine-readable Rust surface link Properties: P3.
 - `formal/theorem-inventory.json::proof.added_constraint_is_subset` (`lean`) (claim_class=bounded_model, kind=theorem, status=unknown): formal/lean4/Chio/Chio/Proofs/Monotonicity.lean has property links but no machine-readable Rust surface link Properties: P1.
 - `formal/theorem-inventory.json::proof.admitSession_invalid_anchor_rejects` (`lean`) (claim_class=bounded_model, kind=theorem, status=unknown): formal/lean4/Chio/Chio/Proofs/Protocol.lean has property links but no machine-readable Rust surface link Properties: P3, P8.
 - `formal/theorem-inventory.json::proof.admitSession_invalid_dpop_rejects` (`lean`) (claim_class=bounded_model, kind=theorem, status=unknown): formal/lean4/Chio/Chio/Proofs/Protocol.lean has property links but no machine-readable Rust surface link Properties: P3, P8.
@@ -1028,6 +1095,11 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/core/chio-core-types/src/receipt/body.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/core/chio-core-types/src/receipt/body.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=d4990b381b86933363a34ac93282bfc36153b821371e5840091da53291164d11, rust_symbols=ChioReceipt::sign_with_backend)
 - `formal/proof-manifest.toml::mirror::crates/core/chio-core-types/src/receipt/body.rs->formal/lean4/Chio/Chio/Core/Receipt.lean` (`manual_mirror`, `transliteration`): `crates/core/chio-core-types/src/receipt/body.rs` -> `formal/lean4/Chio/Chio/Core/Receipt.lean` (model_kind=lean, normalized_sha256=d5bcd84b4e207842f58a4cb0f4440f8164d1174c0240f1d0ad3c0b74eb8e13ba, rust_symbols=ChioReceiptBody,ChioReceiptIdInput,chio_receipt_id,ChioReceipt,ChioReceipt::verify_signature)
 - `formal/proof-manifest.toml::mirror::crates/core/chio-core-types/src/receipt/checkpoint.rs->formal/lean4/Chio/Chio/Core/Receipt.lean` (`manual_mirror`, `transliteration`): `crates/core/chio-core-types/src/receipt/checkpoint.rs` -> `formal/lean4/Chio/Chio/Core/Receipt.lean` (model_kind=lean, normalized_sha256=0c2a7baf20e933b03f68d2d9ca58fc924082140cd7ccc38c71becfe02ec16991, rust_symbols=KernelCheckpointBody,KernelCheckpoint,ReceiptInclusionProof,ReceiptInclusionProof::verify)
+- `formal/proof-manifest.toml::mirror::crates/core/chio-decision-model/src/envelope.rs->formal/apalache/DecisionEnvelope.tla` (`manual_mirror`, `abstraction_anchor`): `crates/core/chio-decision-model/src/envelope.rs` -> `formal/apalache/DecisionEnvelope.tla` (model_kind=tla, normalized_sha256=a349a4fd9dbdfb9746ef74ae5099d932744201e29d824cf1a37abab18caf5dab, rust_symbols=Envelope::project)
+- `formal/proof-manifest.toml::mirror::crates/core/chio-decision-model/src/envelope.rs->formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` (`manual_mirror`, `abstraction_anchor`): `crates/core/chio-decision-model/src/envelope.rs` -> `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean` (model_kind=lean, normalized_sha256=8f578ca37071a3cda14af153728f3af2d61d400f4bf11dfc6d99ab43a71faaa2, rust_symbols=Envelope::new,Envelope::admits,Envelope::project)
+- `formal/proof-manifest.toml::mirror::crates/core/chio-fixed/src/q16.rs->formal/lean4/Chio/Chio/DecisionModel/Fixed.lean` (`manual_mirror`, `abstraction_anchor`): `crates/core/chio-fixed/src/q16.rs` -> `formal/lean4/Chio/Chio/DecisionModel/Fixed.lean` (model_kind=lean, normalized_sha256=a35a39338a49f373355bc4ee0f6045f1cd7ed3cc18dc152b0e3eaff235f2f9c1, rust_symbols=Q16_16::checked_mul)
+- `formal/proof-manifest.toml::mirror::crates/guards/chio-predicate-dag/src/eval.rs->formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` (`manual_mirror`, `abstraction_anchor`): `crates/guards/chio-predicate-dag/src/eval.rs` -> `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` (model_kind=lean, normalized_sha256=d7cafe856259fb8ee537535f3abc2a93a6f95c73604e642355f38122fa619a2f, rust_symbols=Schedule::evaluate)
+- `formal/proof-manifest.toml::mirror::crates/guards/chio-predicate-dag/src/thresholds.rs->formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` (`manual_mirror`, `abstraction_anchor`): `crates/guards/chio-predicate-dag/src/thresholds.rs` -> `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean` (model_kind=lean, normalized_sha256=82795b9d49d7834677a29942ce4932fd77c1ab846cd3703d454e3bfc8fa18150, rust_symbols=classify)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel-core/src/evaluate.rs->formal/lean4/Chio/Chio/Core/Protocol.lean` (`manual_mirror`, `transliteration`): `crates/kernel/chio-kernel-core/src/evaluate.rs` -> `formal/lean4/Chio/Chio/Core/Protocol.lean` (model_kind=lean, normalized_sha256=33427de5d1e364934fa7977e59dce6341746121337c63e11ba2f0555a681bcee, rust_symbols=finish_verified_evaluation)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel-core/src/evaluate.rs->formal/lean4/Chio/Chio/Core/Revocation.lean` (`manual_mirror`, `transliteration`): `crates/kernel/chio-kernel-core/src/evaluate.rs` -> `formal/lean4/Chio/Chio/Core/Revocation.lean` (model_kind=lean, normalized_sha256=91ed2a71889559334eb12ddddf7fbee2c4e14d5404298141ec701f068ae5baf9, rust_symbols=evaluate)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel-core/src/evidence_verify.rs->formal/lean4/Chio/Chio/Core/Receipt.lean` (`manual_mirror`, `transliteration`): `crates/kernel/chio-kernel-core/src/evidence_verify.rs` -> `formal/lean4/Chio/Chio/Core/Receipt.lean` (model_kind=lean, normalized_sha256=6c84f0408b67ec7c5f3aee3cd0538cbddab2ed27ae0da57ff3c84697a10f15b7, rust_symbols=build_inclusion_proof,verify_checkpoint_signature)
@@ -1168,6 +1240,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs->formal/tla/RevocationPropagation.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs` -> `formal/tla/RevocationPropagation.tla` (model_kind=tla, normalized_sha256=4c8ee2f53d7a4554c16e2615a0eead9fc47a78e55240def478ade382d08fb4a8, rust_symbols=ChioKernel::revoke_capability)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/validation/tool_output.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/validation/tool_output.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=11836b003bb9c2b94c9994dae037d0f20782f53c99bf52e41a705842528e0ced, rust_symbols=ChioKernel::prepare_budgeted_tool_output_with_cost_and_metadata)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/receipt_store.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/receipt_store.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=8316725d3b848005111ee73f3950fe8f5d79a7509e3882cc156956a11e33e9bb, rust_symbols=AdmissionNativeDispatchCapture,QualifiedAdmissionProjectionStore)
+- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs->formal/apalache/DecisionEnvelope.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs` -> `formal/apalache/DecisionEnvelope.tla` (model_kind=tla, normalized_sha256=9f1e14e77167a76a64897e9dc4bbdd947b527455c0d2d40b7ff489f62a68cf50, rust_symbols=bind_decision_model_witness)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/tool_outcome.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/tool_outcome.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=2f3b9f5f6db0f0f06d26243dfacae4b6c124a9cff076965c46f4d8f8c60c0b34, rust_symbols=RawInvocationOutcomeV1,PersistedRawInvocationOutcomeV1,RawInvocationOutcomeV1::from_persisted,RawInvocationOutcomeV1::to_persisted,RawInvocationOutcomeV1::canonical_blob_bounded,RawInvocationOutcomeV1::requires_security_release,ToolOutcomeStore,RawInvocationOutcomeV1::from_canonical_bytes,RawInvocationContext,RawInvocationOutcomeV1::from_committed_dispatch,required_option)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=27750fc30d2c61a54f9dbb3eb4688e683e7df17054e00d2bb6ff058a37d1814c, rust_symbols=RawInvocationOutcomeV1::from_persisted_fields)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/tool_outcome/receipt_signing.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/tool_outcome/receipt_signing.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=3128f7d40895eafb240b14e8a5f5ec70eb685360b1053dfe1fd317992daea248, rust_symbols=FrozenReceiptSigningIdentityV1,FrozenReceiptSigningIdentityV1::new,FrozenReceiptSigningIdentityV1::validate,FrozenReceiptSigningIdentityV1::public_key,FrozenReceiptSigningIdentityV1::crypto_floor,RawInvocationOutcomeV1::receipt_signing_identity)
@@ -1350,7 +1423,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `625e013d88e159e14bee58492e751503137aac6fc961bc3cf3c9c4895ac36e65`
+- Input digest: `4968e326c7d6594ce3254f9bcb7c3e48ef6305ab867f9b39c3a22507a9af049b`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1507,6 +1580,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/tenant_index/tests.rs`: `cbaf4ddf440a46ccc127ec46aa1c7948fd4d8120a5d9c5e8f5a49783c1a1673d`
 - `crates/core/chio-core-types/src/wire_text.rs`: `053c6b60bf760efcc526f96b4a5c2652900242c973ee62e9d14b2f1857200954`
 - `crates/core/chio-decision-model/src/kani_public_harnesses.rs`: `e31525897886b46529fc226e62e02947351f3a49812648f03ff41f9b16439ac2`
+- `crates/core/chio-decision-model/tests/envelope.rs`: `6bd9c68c19d9e0685ae1207b4ba0ce1c7806f165a25ce37a701ccb6d2ead63b0`
 - `crates/core/chio-fixed/src/kani_public_harnesses.rs`: `463e8d306cfc89b0a735b9cdeab45a3873be201cdfb33de872679053cbf82d45`
 - `crates/economy/chio-credit/src/formal_economy.rs`: `0e659e620f921da7e51f17f3bcd6d3b40a902fa52dd4f3e2836101c712da23f6`
 - `crates/economy/chio-credit/src/kani_public_harnesses.rs`: `1cc7f5c38ca1ba5d420b21c005932014232e44e35a568aead55bdfe8181e8275`
@@ -1569,11 +1643,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/trust/chio-revocation-oracle/src/api.rs`: `e233372f57277eb0a104047a5f10a242e6064be670dd2df395b4748c80d06341`
 - `crates/trust/chio-revocation-oracle/src/freshness.rs`: `d699d5c59f1c5a660d9c06f294bb2ac1ee2c0fcd00cd9eebbe043df74ba733b8`
 - `docs/fuzzing/trust-boundary-mutants-baseline.toml`: `7331fb69499474ca22b14b6fb5a6f9a966eae2e2a26d3433d9030a4c985efee9`
-- `formal/MAPPING.md`: `0d85c438621c826d3002e09d1541fc810944fdd3d62a350bad24a8cef5fac34a`
+- `formal/MAPPING.md`: `e71bdaa8cd166419fe8a566e203fee76c84c9dd6cf748ec36670d52d07446a5b`
 - `formal/aeneas/pilot.toml`: `86627b363717b47ced94caeb826185d400cf70fe357a55fe34d02ea70670956c`
 - `formal/aeneas/production.toml`: `2a3e3189ae4d283ddd6392ca373da61452c55252247be8050e068239745ef93e`
 - `formal/aeneas/verified_core.rs`: `44ef85fbe6c537e8c65a483a67c167f502ca1a108a25293414b27ab2a85046b8`
 - `formal/apalache/Common.tla`: `4a82138d298b02577c8d17759939a97e173c0b483a52ce497636e1647de20ae4`
+- `formal/apalache/DecisionEnvelope.tla`: `2d70b95e57e758814445ab6cc0e755ef72cba0a3884c4a3a12d9bd67a0b0a57e`
 - `formal/apalache/KernelTransitionCancelSafe.tla`: `3ad6bf72ec4865087e42bb3efb708e76820603a01d97bb0f7f1b7dbe970d1d0e`
 - `formal/apalache/MCKernelTransitionCancelSafe.cfg`: `51a0e07e246317382f2922ccf560d1e5ebe0c14f002a6220e2eb1b88d79677fc`
 - `formal/apalache/MCMonotoneLogApalache.cfg`: `51a0e07e246317382f2922ccf560d1e5ebe0c14f002a6220e2eb1b88d79677fc`
@@ -1586,6 +1661,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/ResponseLifecycle.tla`: `95edb9bb1b4c317ec15eb91d10b511161b90855ec98b24baf2a0c3be042aa2d4`
 - `formal/apalache/RevocationCutCompleteness.tla`: `0cfb9ccdc7fe7d9daf7cab2f73fa39b423d86a0f6793c75d4d332e40f4f602a9`
 - `formal/apalache/_negative_tests/Common.tla`: `4a82138d298b02577c8d17759939a97e173c0b483a52ce497636e1647de20ae4`
+- `formal/apalache/_negative_tests/DecisionEnvelopeNoFallback.tla`: `a6eee0ff5b431b618aaf27c187c086d3b50d945c7cd45c215fa630fc8eadeb64`
 - `formal/apalache/_negative_tests/DistributedRevocationEvaluationCountWitness.tla`: `e1dc31f58adaf4293e4c3b3846f5c5a3ee0284012f03fa91368476f1321fbf66`
 - `formal/apalache/_negative_tests/DistributedRevocationFreshnessBroken.tla`: `b61a9c85afcd59765544738ce3162e11232fcf41cad214897f889cce255808cf`
 - `formal/apalache/_negative_tests/DistributedRevocationPartitionBroken.tla`: `e8a2f230cf967a38eef7cf1f72843d0447671f09645ec63a24e1161fb085d1c8`
@@ -1602,6 +1678,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/_negative_tests/DropGuardReleaseOnPostDispatchAbortBroken.tla`: `df0903741860ed6f24397c79df3fa0753c5e81a5cc77086c471fd5d23f6f6e8d`
 - `formal/apalache/_negative_tests/DropGuardSkipChildBudgetReleaseBroken.tla`: `8a4dac0e5aee07e362cd96dec4c97d20f323c6d14fa24eca5077d1ef4838b627`
 - `formal/apalache/_negative_tests/DropGuardSkipInvocationReversalBroken.tla`: `92d32f4f948c6a8b5b770cf06b701f8c018e8b650ad41771ccfea10d02eb70fc`
+- `formal/apalache/_negative_tests/MCDecisionEnvelopeNoFallback.cfg`: `e19b8117a49687ae6fd3590a84ddaf1a31a0c4abfc61972246f3ff2adae9bb76`
 - `formal/apalache/_negative_tests/MCDistributedRevocationEvaluationCountWitness.cfg`: `8db3dd39ebb645f2ba5e751fea2d9839dcf37129b5683fdcc8c949fd20ffd558`
 - `formal/apalache/_negative_tests/MCDistributedRevocationFreshnessBroken.cfg`: `e6f40b6b01932aadb0eea08e834e5cd227aed78df092e8102d3dab21a02a4096`
 - `formal/apalache/_negative_tests/MCDistributedRevocationPartitionBroken.cfg`: `bfe5f89facd248a511dc46f22d3a61dd65f9fd8bf567365bca4fef06399c51e4`
@@ -1620,7 +1697,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/apalache/_negative_tests/MCDropGuardSkipInvocationReversalBroken.cfg`: `ebcbd674fb0697fd0c3926386f7f813c12101598fc9a3183cbc1585423f8fa32`
 - `formal/apalache/_negative_tests/MCReceiptBeforeAllowBroken.cfg`: `3e23a139ce2fdae0376cb62c35c98350125d673d8da2e8dfdaa82bfe959854a4`
 - `formal/apalache/_negative_tests/MCRevocationCutCompletenessBroken.cfg`: `83d51064e2a31aab461c5f47e78ad924e65d6c450884f01c48071ae72d09a717`
-- `formal/apalache/_negative_tests/REGISTRY.toml`: `53c0e1c86abb1ae0b28b3fe6c94d9c1abf65687679644326d42785156df66c86`
+- `formal/apalache/_negative_tests/REGISTRY.toml`: `3aecc61390c2241b99a522d7223b1d388ddfd7c79fd8646cfdcaf23357efc6d8`
 - `formal/apalache/_negative_tests/ReceiptBeforeAllowBroken.tla`: `b7e376d87e4190165778cc15907414d9ab68485637a47a3d049ec4400fc48381`
 - `formal/apalache/_negative_tests/ResponseLifecycleAcknowledgeUnexecutedBroken.tla`: `df8732f4c9f246c4257dee6af6896393cfb8eb6d05ce8f948f36549e145bbde5`
 - `formal/apalache/_negative_tests/ResponseLifecycleActivateUnacknowledgedBroken.tla`: `2bd1af1614da89c290110973b97df8e442f7de77d7a47a23d2c3665d3758556e`
@@ -1642,6 +1719,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/diff-tests/tests/scope_diff.rs`: `c21aaa2cb891fd1fc19482ec6f8dc9c81930b5890af74f86c6fb5dd3104489ab`
 - `formal/diff-tests/tests/treaty_predicate_diff.rs`: `2b684aded85659663c102fa16d4499d10b981c852d18f5b5a64df301169dc3de`
 - `formal/lean4/Chio/Chio/Capability/Delegation.lean`: `a6a44ca25cb3fec5385b6a2d6703d933236453d8d5b9b336061a42f675d2cfa6`
+- `formal/lean4/Chio/Chio/DecisionModel/Envelope.lean`: `4a61666fa127c7f672a977ecdc3eb8f7883d75c3f47f42c9daedaf97324c5e70`
+- `formal/lean4/Chio/Chio/DecisionModel/Fixed.lean`: `66be66f151795ed0b4e4b1eea746b3b49235f87ad1a3e9021d0ff885d267713e`
+- `formal/lean4/Chio/Chio/DecisionModel/Kleene.lean`: `c3ded9a45f3bfd0c7c5c883d05ab3ee7f2c06d2c2628176a5307054fc7374150`
 - `formal/lean4/Chio/Chio/Proofs/CanonicalInjective.lean`: `a75b5101c8c2c7b62d90ea6909558aca59b1e0a8a5960237825f17e527e71d04`
 - `formal/lean4/Chio/Chio/Proofs/DeliveryContract.lean`: `1f638ca47f4ecd6bb976dddb1ac7adfccfc0e7b074ed4ebd038259303b8eace9`
 - `formal/lean4/Chio/Chio/Proofs/FindingStatusFreshness.lean`: `3d57461a0bfe5275d0b8f5c7642aa37ed5a7f252e35ef1ba17530a0ac0c46506`
@@ -1651,12 +1731,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `822e43519bed48c4d334cff834790176ed9fce6fdcd6e76706b1775d39842950`
+- `formal/proof-manifest.toml`: `9d9b12f7362227201ff8880eaf42f85579293d088242589bb04fb6cc0b623b88`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
 - `formal/rust-verification/kani-public-harnesses.toml`: `e2be8015e08d174ea66efa4063fa6e6f1e07a7d1a6ce25b935f593fa622f60a5`
-- `formal/theorem-inventory.json`: `9c71bfb9847dda56ca28d424ea8057039a1d3bc4f3b8976b7a6cc20b7627ead2`
+- `formal/theorem-inventory.json`: `6b4c14791ebb303d48345bd7ea86a5efbb5c054cd03f4bce8847fad87ac79318`
 - `formal/tla/DelegationDepthBound.tla`: `69c28ca6b16ef3b2174235347d8bb2aab40fce4cbb79123e4512f363b9717be9`
 - `formal/tla/DistributedRevocation.tla`: `59110faa37eeeaac45b9b206594ae5ef39f94404323a377967012431489b8aa7`
 - `formal/tla/DistributedRevocationTemporal.tla`: `cf1228fc40ac7929443e04f6a0112e6c980cd6a5e4b14ca76e56b616be52ca25`
