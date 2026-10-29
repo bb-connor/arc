@@ -719,8 +719,8 @@ impl Oid4vciCredentialResponse {
         }
         let (passport_id, subject) = match &self.credential {
             Oid4vciIssuedCredential::AgentPassport(passport) => {
-                let verification = verify_agent_passport(passport, now)?;
-                (verification.passport_id, verification.subject)
+                let inspection = inspect_agent_passport_structure(passport, now)?;
+                (inspection.passport_id, inspection.subject)
             }
             Oid4vciIssuedCredential::Compact(compact) => {
                 let context = self.chio_credential_context.as_ref().ok_or_else(|| {
@@ -916,7 +916,7 @@ pub fn build_oid4vci_passport_offer(
     passport: &AgentPassport,
     expires_at: u64,
 ) -> Result<Oid4vciCredentialOffer, CredentialError> {
-    let verification = verify_agent_passport(passport, expires_at)?;
+    let inspection = inspect_agent_passport_structure(passport, expires_at)?;
     let offer = Oid4vciCredentialOffer {
         credential_issuer: metadata.credential_issuer.clone(),
         credential_configuration_ids: vec![credential_configuration_id.to_string()],
@@ -927,8 +927,8 @@ pub fn build_oid4vci_passport_offer(
             }),
         },
         chio_offer_context: Some(Oid4vciChioOfferContext {
-            passport_id: verification.passport_id,
-            subject: verification.subject,
+            passport_id: inspection.passport_id,
+            subject: inspection.subject,
             expires_at: rfc3339_from_unix(expires_at)?,
         }),
     };

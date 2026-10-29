@@ -508,11 +508,11 @@ pub struct LocalReputationQuery {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReputationCompareRequest {
     pub passport: AgentPassport,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub verifier_policy: Option<PassportVerifierPolicy>,
+    /// Registry policy whose issuer allowlist pins the passport issuers.
+    pub verifier_policy_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

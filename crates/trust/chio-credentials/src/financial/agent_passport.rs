@@ -686,7 +686,7 @@ fn validate_manifest_credential(
 ) -> Result<(), CredentialError> {
     match credential {
         FinancialPassportCredential::Reputation(credential) => {
-            verify_reputation_credential(credential, now)?;
+            verify_reputation_credential(credential, &BTreeSet::from([issuer.to_string()]), now)?;
             if now < unix_from_rfc3339(&credential.unsigned.issuance_date)? {
                 return Err(CredentialError::CredentialNotYetValid);
             }
@@ -714,7 +714,7 @@ fn validate_manifest_credential_shape(
 ) -> Result<(), CredentialError> {
     match credential {
         FinancialPassportCredential::Reputation(credential) => {
-            verify_reputation_credential(credential, now)?;
+            verify_reputation_credential(credential, &BTreeSet::from([issuer.to_string()]), now)?;
             if credential.unsigned.issuer != issuer
                 || credential.unsigned.credential_subject.id != subject
             {

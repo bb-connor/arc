@@ -186,6 +186,7 @@ pub fn verify_signed_cross_issuer_migration(
 
 pub fn verify_cross_issuer_portfolio(
     portfolio: &CrossIssuerPortfolio,
+    trusted_issuers: &BTreeSet<String>,
     now: u64,
 ) -> Result<CrossIssuerPortfolioVerification, CredentialError> {
     if portfolio.schema != CROSS_ISSUER_PORTFOLIO_SCHEMA {
@@ -233,7 +234,7 @@ pub fn verify_cross_issuer_portfolio(
                 portfolio.portfolio_id, entry.entry_id
             )));
         }
-        let verification = verify_agent_passport(&entry.passport, now)?;
+        let verification = verify_agent_passport(&entry.passport, trusted_issuers, now)?;
         let passport_id = verification.passport_id.clone();
         if !seen_passport_ids.insert(passport_id.clone()) {
             return Err(CredentialError::InvalidCrossIssuerPortfolio(format!(

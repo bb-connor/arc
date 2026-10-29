@@ -208,8 +208,8 @@ impl RemotePortableIssuerFetch {
 
 /// Decide which keys verify a presented portable credential, performing no
 /// network I/O. Trust is fixed before any fetch: our own advertised issuer uses
-/// local keys, every other issuer must appear in the signed verifier request's
-/// issuer allowlist, and an empty allowlist trusts only the local issuer.
+/// local keys and every other issuer must appear in the signed verifier
+/// request's issuer allowlist, so an empty allowlist trusts no remote issuer.
 pub(crate) fn plan_portable_issuer_keys(
     config: &TrustServiceConfig,
     issuer: &str,

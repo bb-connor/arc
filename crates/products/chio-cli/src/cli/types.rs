@@ -1146,9 +1146,14 @@ pub(crate) enum ReputationCommands {
         /// Optional HushSpec policy file whose local reputation scoring config should be applied.
         #[arg(long)]
         local_policy: Option<PathBuf>,
-        /// Optional YAML or JSON verifier policy used to evaluate the passport during comparison.
+        /// Local YAML or JSON verifier policy whose issuer allowlist pins the passport issuers.
+        /// Required without --control-url.
         #[arg(long)]
         verifier_policy: Option<PathBuf>,
+        /// Trust service registry policy id whose issuer allowlist pins the passport issuers.
+        /// Required with --control-url.
+        #[arg(long)]
+        verifier_policy_id: Option<String>,
     },
 }
 

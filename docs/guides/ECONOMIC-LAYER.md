@@ -345,6 +345,11 @@ chio reputation compare \
   --verifier-policy policy.json
 ```
 
+The verifier policy `issuerAllowlist` pins the trusted passport issuers and
+must be non-empty. Against a trust-control service (`--control-url`), name a
+policy registered on the service with `--verifier-policy-id` instead; an inline
+policy is refused there.
+
 The compare path returns per-dimension deltas plus a drift summary. Use it
 to detect staleness or federation-boundary discrepancies.
 
@@ -375,7 +380,8 @@ signatures on the remaining credentials.
 ### 7.2 Evaluation vs. verification
 
 - **Verify** (`chio passport verify`) -- signature checks on every embedded
-  credential. No relying-party policy required.
+  credential, whose issuer must be named with `--trusted-issuer` (at least one
+  is required). No relying-party policy required.
 - **Evaluate** (`chio passport evaluate --policy <file>`) -- applies a
   `PassportVerifierPolicy` (allow-lists, minimum scores, maximum age,
   required issuers) and produces a pass/fail resolution.
@@ -418,8 +424,8 @@ chio passport create \
   --validity-days 30 \
   --since <unix-ts> --until <unix-ts>
 
-# Verify signatures on every embedded credential
-chio passport verify --input passport.json
+# Verify signatures on every embedded credential from a pinned issuer
+chio passport verify --input passport.json --trusted-issuer did:chio:<issuer>
 
 # Evaluate against a relying-party policy
 chio passport evaluate --input passport.json --policy verifier-policy.yaml

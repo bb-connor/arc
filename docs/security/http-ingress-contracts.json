@@ -1411,7 +1411,7 @@
       "method": "POST",
       "route": "REPUTATION_COMPARE_PATH",
       "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a credential of either kind holding `reputation:write` with deployment tenant authority. The handler repeats validate_caller with `reputation:write` after typed extraction.",
-      "semantics": "The comparison request embeds a signed passport and an optional verifier policy; passport verification still determines the interpretation."
+      "semantics": "The comparison request embeds a signed passport and names a verifier policy registered on the trust-control service; the passport is verified against that policy's issuer allowlist."
     },
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/risk_finance_handlers/underwriting.rs",

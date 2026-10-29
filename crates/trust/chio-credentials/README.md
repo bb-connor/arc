@@ -38,12 +38,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Guarantees
 
-- `verify_reputation_credential` binds issuer proof method, subject DID and score
-  key, credential validity, and canonical signature. Issuer trust is policy input.
-- `verify_agent_passport` verifies every credential and subject binding.
-  `evaluate_agent_passport` accepts when at least one credential matches policy.
+- `verify_reputation_credential` refuses an issuer outside the non-empty
+  verifier-held trusted issuer set, then binds issuer proof method, subject DID
+  and score key, credential validity, and canonical signature.
+- `verify_agent_passport` requires every credential issuer to be in a non-empty
+  trusted issuer set, then verifies every credential and subject binding.
+  `trusted_issuers_from_keys` builds that set from pinned issuer keys.
+- `evaluate_agent_passport` verifies against the policy `issuerAllowlist`, which
+  must be non-empty, so a credential from any other issuer refuses the passport.
+  It accepts when at least one credential matches policy.
+- `inspect_agent_passport_structure` checks structure only and carries no issuer
+  trust.
 - Presentation verification binds the holder signature and, when supplied, the
-  exact expected challenge. The native verifier does not consume replay state.
+  exact expected challenge. Issuer trust comes from the expected challenge
+  allowlist or the resolved verifier policy allowlist, never from the presented
+  challenge; with neither, verification is refused. The native verifier does not
+  consume replay state.
 - `evaluate_financial_credentials` adds pinned issuer authority, verified policy,
   trusted time, lifecycle anchors, and source resolution to financial inspection.
 

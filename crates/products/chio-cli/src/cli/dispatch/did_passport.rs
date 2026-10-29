@@ -70,10 +70,12 @@ pub(crate) fn dispatch_passport(
         ),
         PassportCommands::Verify {
             input,
+            trusted_issuers,
             at,
             passport_statuses_file,
         } => passport::cmd_passport_verify(
             &input,
+            &trusted_issuers,
             at,
             passport_statuses_file.as_deref(),
             json_output,

@@ -460,9 +460,21 @@ pub(crate) fn cmd_passport_challenge_verify(
                 expected_challenge,
             })?
     } else {
+        let expected_challenge = match (expected_challenge, verifier_challenge_db) {
+            (Some(expected_challenge), _) => Some(expected_challenge),
+            (None, Some(path)) => Some(PassportVerifierChallengeStore::open(path)?.fetch_active(
+                &crate::passport_verifier::challenge_identifier(&response.challenge),
+                now,
+            )?),
+            (None, None) => None,
+        };
         let challenge = expected_challenge.as_ref().unwrap_or(&response.challenge);
-        let (resolved_policy, policy_source) =
-            resolve_challenge_policy_local(challenge, verifier_policies_file, now)?;
+        let (resolved_policy, policy_source) = match expected_challenge.as_ref() {
+            Some(expected_challenge) => {
+                resolve_challenge_policy_local(expected_challenge, verifier_policies_file, now)?
+            }
+            None => (None, None),
+        };
         require_passport_lifecycle_source(
             resolved_policy
                 .as_ref()

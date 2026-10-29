@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 
 use chio_core::{Keypair, PublicKey};
 use chio_credentials::{
@@ -9,7 +10,8 @@ use chio_credentials::{
     default_oid4vci_passport_issuer_metadata_with_signing_key,
     default_oid4vci_passport_issuer_metadata_with_status_distribution,
     ensure_signed_passport_verifier_policy_active, evaluate_agent_passport,
-    issue_reputation_credential_with_enterprise_identity, passport_artifact_id,
+    inspect_agent_passport_structure, issue_reputation_credential_with_enterprise_identity,
+    passport_artifact_id,
     present_agent_passport, respond_to_oid4vp_request, respond_to_passport_presentation_challenge,
     verify_agent_passport, verify_passport_presentation_response_with_policy,
     verify_signed_oid4vp_request_object_with_any_key, verify_signed_passport_verifier_policy,
@@ -20,6 +22,7 @@ use chio_credentials::{
     PassportPresentationChallenge, PassportPresentationOptions, PassportPresentationResponse,
     PassportStatusDistribution, PassportVerifierPolicy, PassportVerifierPolicyReference,
     PortableJwkSet, SignedPassportVerifierPolicy, OID4VP_VERIFIER_METADATA_PATH,
+    trusted_issuers_from_keys,
 };
 use chio_credentials::{synthesize_trust_tier, TrustTier};
 use chio_did::DidChio;
@@ -33,8 +36,8 @@ use url::Url;
 use crate::issuance::build_local_reputation_corpus;
 use crate::passport_verifier::{
     PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
-    PassportStatusRevocationRequest, PassportVerifierChallengeStore, PublishPassportStatusRequest,
-    VerifierPolicyRegistry,
+    PassportStatusRevocationRequest, PassportVerifierChallengeStore, PortableIssuanceSigner,
+    PublishPassportStatusRequest, VerifierPolicyRegistry,
 };
 use crate::trust_control::{
     CreateIdentityAssertionRequest, CreateOid4vpRequest, CreatePassportChallengeRequest,
@@ -765,15 +768,17 @@ pub(crate) fn cmd_passport_create(
 
 pub(crate) fn cmd_passport_verify(
     input: &Path,
+    trusted_issuers: &[String],
     at: Option<u64>,
     passport_statuses_file: Option<&Path>,
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
+    let trusted_issuers = trusted_issuer_set(trusted_issuers)?;
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
     let now = crate::input::time::seconds_or(at)?;
-    let mut verification = verify_agent_passport(&passport, now)
+    let mut verification = verify_agent_passport(&passport, &trusted_issuers, now)
         .map_err(|error| CliError::policy_error(error.to_string()))?;
     verification.passport_lifecycle = resolve_passport_lifecycle(
         &passport,
@@ -935,6 +940,26 @@ pub(crate) fn cmd_passport_evaluate(
     Ok(())
 }
 
+/// The did:chio issuers from `--trusted-issuer`, refused when empty or when
+/// an entry is not a did:chio identifier.
+fn trusted_issuer_set(trusted_issuers: &[String]) -> Result<BTreeSet<String>, CliError> {
+    let mut trusted = BTreeSet::new();
+    for issuer in trusted_issuers {
+        let did = DidChio::from_str(issuer).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "--trusted-issuer `{issuer}` is not a did:chio identifier: {error}"
+            ))
+        })?;
+        trusted.insert(did.to_string());
+    }
+    if trusted.is_empty() {
+        return Err(CliError::cli_other_error(
+            "passport verify requires at least one --trusted-issuer".to_string(),
+        ));
+    }
+    Ok(trusted)
+}
+
 pub(crate) fn cmd_passport_present(
     input: &Path,
     output: &Path,
@@ -943,7 +968,7 @@ pub(crate) fn cmd_passport_present(
     json_output: bool,
 ) -> Result<(), CliError> {
     let passport: AgentPassport = crate::input::json(&crate::input::read(input)?)?;
-    verify_agent_passport(&passport, unix_now()?)?;
+    inspect_agent_passport_structure(&passport, unix_now()?)?;
 
     let presented = present_agent_passport(
         &passport,
@@ -1182,6 +1207,10 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
             let portable_signing_keypair = signing_seed_file
                 .map(crate::load_existing_authority_keypair)
                 .transpose()?;
+            let portable_trusted_issuers = portable_signing_keypair
+                .as_ref()
+                .map(|keypair| trusted_issuers_from_keys(&[keypair.public_key()]))
+                .transpose()?;
             let portable_status_registry = passport_statuses_file
                 .map(load_passport_status_registry_for_admin)
                 .transpose()?;
@@ -1190,7 +1219,12 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
                 &token.access_token,
                 &request,
                 unix_now()?,
-                portable_signing_keypair.as_ref(),
+                portable_signing_keypair.as_ref().zip(portable_trusted_issuers.as_ref()).map(
+                    |(keypair, trusted_issuers)| PortableIssuanceSigner {
+                        keypair,
+                        trusted_issuers,
+                    },
+                ),
                 passport_statuses_file.zip(portable_status_registry.as_ref()),
             )
         })?
@@ -1282,7 +1316,14 @@ mod passport_error_classification_tests {
     fn signed_policy_failures_never_fall_back_to_bare_policy() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("policy.json");
-        let policy = PassportVerifierPolicy::default();
+        let policy = PassportVerifierPolicy {
+            issuer_allowlist: BTreeSet::from([DidChio::from_public_key(
+                Keypair::from_seed(&[44; 32]).public_key(),
+            )
+            .unwrap()
+            .to_string()]),
+            ..PassportVerifierPolicy::default()
+        };
         std::fs::write(&path, serde_json::to_vec(&policy).unwrap()).unwrap();
         assert_eq!(load_passport_verifier_policy(&path).unwrap(), policy);
         let signer = Keypair::from_seed(&[43; 32]);

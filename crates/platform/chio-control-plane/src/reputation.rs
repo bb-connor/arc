@@ -187,6 +187,13 @@ pub struct PortableReputationComparison {
     pub imported_trust: Option<issuance::ImportedTrustReport>,
 }
 
+const REPUTATION_COMPARE_REMOTE_INLINE_POLICY: &str =
+    "reputation compare against --control-url resolves the verifier policy from the trust service registry; pass --verifier-policy-id and omit --verifier-policy";
+const REPUTATION_COMPARE_REMOTE_POLICY_ID_REQUIRED: &str =
+    "reputation compare against --control-url requires --verifier-policy-id";
+const REPUTATION_COMPARE_LOCAL_POLICY_REQUIRED: &str =
+    "reputation compare requires --verifier-policy <path> whose issuer allowlist pins the passport issuers";
+
 pub struct ReputationCompareCommand<'a> {
     pub subject_public_key: &'a str,
     pub passport_path: &'a Path,
@@ -194,6 +201,7 @@ pub struct ReputationCompareCommand<'a> {
     pub until: Option<u64>,
     pub local_policy_path: Option<&'a Path>,
     pub verifier_policy_path: Option<&'a Path>,
+    pub verifier_policy_id: Option<&'a str>,
     pub json_output: bool,
     pub receipt_db_path: Option<&'a Path>,
     pub budget_db_path: Option<&'a Path>,
@@ -217,6 +225,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         until,
         local_policy_path,
         verifier_policy_path,
+        verifier_policy_id,
         json_output,
         receipt_db_path,
         budget_db_path,
@@ -226,9 +235,6 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
     } = command;
 
     let passport: AgentPassport = crate::signed_input::read(passport_path)?;
-    let verifier_policy = verifier_policy_path
-        .map(load_passport_verifier_policy)
-        .transpose()?;
     let comparison = if let Some(url) = control_url {
         if local_policy_path.is_some() {
             return Err(CliError::cli_other_error(
@@ -236,17 +242,35 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
                     .to_string(),
             ));
         }
+        if verifier_policy_path.is_some() {
+            return Err(CliError::cli_other_error(
+                REPUTATION_COMPARE_REMOTE_INLINE_POLICY.to_string(),
+            ));
+        }
+        let verifier_policy_id = verifier_policy_id.ok_or_else(|| {
+            CliError::cli_other_error(REPUTATION_COMPARE_REMOTE_POLICY_ID_REQUIRED.to_string())
+        })?;
         let token = super::require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token)?.reputation_compare(
             subject_public_key,
             &trust_control::ReputationCompareRequest {
                 passport: passport.clone(),
-                verifier_policy: verifier_policy.clone(),
+                verifier_policy_id: verifier_policy_id.to_string(),
                 since,
                 until,
             },
         )?
     } else {
+        if verifier_policy_id.is_some() {
+            return Err(CliError::cli_other_error(
+                "--verifier-policy-id names a trust service registry policy and requires --control-url"
+                    .to_string(),
+            ));
+        }
+        let verifier_policy_path = verifier_policy_path.ok_or_else(|| {
+            CliError::cli_other_error(REPUTATION_COMPARE_LOCAL_POLICY_REQUIRED.to_string())
+        })?;
+        let verifier_policy = load_passport_verifier_policy(verifier_policy_path)?;
         let local = {
             let receipt_db_path = require_receipt_db_path(receipt_db_path)?;
             let issuance_policy = local_policy_path
@@ -289,7 +313,7 @@ pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(
         build_reputation_comparison(
             local,
             &passport,
-            verifier_policy.as_ref(),
+            &verifier_policy,
             clock_now,
             shared_evidence,
             Some(imported_trust),
@@ -346,18 +370,21 @@ fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, 
     Ok(policy)
 }
 
+/// Compares local reputation with `passport`. `verifier_policy` is
+/// verifier-held (a local operator file or a registry policy) and its issuer
+/// allowlist is the trusted issuer set for the passport.
 pub(crate) fn build_reputation_comparison(
     local: LocalReputationInspection,
     passport: &AgentPassport,
-    verifier_policy: Option<&PassportVerifierPolicy>,
+    verifier_policy: &PassportVerifierPolicy,
     now: u64,
     shared_evidence: SharedEvidenceReferenceReport,
     imported_trust: Option<issuance::ImportedTrustReport>,
 ) -> Result<PortableReputationComparison, CliError> {
-    let passport_verification = verify_agent_passport(passport, now)?;
-    let passport_evaluation = verifier_policy
-        .map(|policy| evaluate_agent_passport(passport, now, policy))
-        .transpose()?;
+    verifier_policy.validate()?;
+    let passport_verification =
+        verify_agent_passport(passport, &verifier_policy.issuer_allowlist, now)?;
+    let passport_evaluation = Some(evaluate_agent_passport(passport, now, verifier_policy)?);
     let local_did = DidChio::from_public_key(PublicKey::from_hex(&local.subject_key)?)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?
         .to_string();

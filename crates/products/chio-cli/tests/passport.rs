@@ -3565,7 +3565,7 @@ fn passport_portable_sd_jwt_metadata_and_issuance_roundtrip() {
     write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
-    let issuer = Keypair::generate();
+    let issuer = authority.clone();
     let subject = Keypair::generate();
     let passport = write_passport_artifact(
         &passport_path,
@@ -3766,7 +3766,7 @@ fn passport_portable_jwt_vc_json_metadata_and_issuance_roundtrip() {
     write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
-    let issuer = Keypair::generate();
+    let issuer = authority.clone();
     let subject = Keypair::generate();
     let passport = write_passport_artifact(
         &passport_path,
@@ -4038,7 +4038,7 @@ fn passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe() {
     write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
-    let issuer = Keypair::generate();
+    let issuer = authority.clone();
     let subject = Keypair::generate();
     let passport = write_passport_artifact(
         &passport_path,
@@ -4350,7 +4350,7 @@ fn passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_laun
     write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
-    let issuer = Keypair::generate();
+    let issuer = authority.clone();
     let subject = Keypair::generate();
     write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
         .expect("write holder seed");
@@ -4625,7 +4625,10 @@ fn passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request
     let service_token = "passport-oid4vp-rotation-service-token";
     let now = current_unix_secs();
 
-    let issuer = Keypair::generate();
+    let issuer = chio_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path)
+        .expect("fixture owner initializes the trust service authority")
+        .current_keypair()
+        .expect("trust service authority key");
     let subject = Keypair::generate();
     let passport = write_passport_artifact(
         &passport_path,
@@ -4865,7 +4868,7 @@ fn passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revo
     write_private_file(&authority_seed_path, format!("{}\n", authority.seed_hex()))
         .expect("write authority seed");
 
-    let issuer = Keypair::generate();
+    let issuer = authority.clone();
     let subject = Keypair::generate();
     let passport_a = write_passport_artifact(
         &passport_a_path,

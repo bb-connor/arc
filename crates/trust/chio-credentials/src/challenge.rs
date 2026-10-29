@@ -182,7 +182,48 @@ pub fn issue_reputation_credential_with_enterprise_identity(
     })
 }
 
+/// The did:chio issuer identities of `keys`, for verifiers whose trusted
+/// issuers are their own signing keys.
+pub fn trusted_issuers_from_keys(keys: &[PublicKey]) -> Result<BTreeSet<String>, CredentialError> {
+    let mut trusted = BTreeSet::new();
+    for key in keys {
+        trusted.insert(DidChio::from_public_key(key.clone())?.to_string());
+    }
+    if trusted.is_empty() {
+        return Err(CredentialError::TrustedIssuersMissing);
+    }
+    Ok(trusted)
+}
+
+/// Verifies `credential` only when its issuer is in `trusted_issuers`. The
+/// issuer key is taken from the credential, so membership in the
+/// verifier-held set is what makes the signature meaningful.
 pub fn verify_reputation_credential(
+    credential: &ReputationCredential,
+    trusted_issuers: &BTreeSet<String>,
+    now: u64,
+) -> Result<(), CredentialError> {
+    require_trusted_credential_issuer(credential, trusted_issuers)?;
+    inspect_reputation_credential_structure(credential, now)?;
+    verify_reputation_credential_signature(credential)
+}
+
+fn require_trusted_credential_issuer(
+    credential: &ReputationCredential,
+    trusted_issuers: &BTreeSet<String>,
+) -> Result<(), CredentialError> {
+    if trusted_issuers.is_empty() {
+        return Err(CredentialError::TrustedIssuersMissing);
+    }
+    if !trusted_issuers.contains(&credential.unsigned.issuer) {
+        return Err(CredentialError::CredentialIssuerNotTrusted(
+            credential.unsigned.issuer.clone(),
+        ));
+    }
+    Ok(())
+}
+
+fn inspect_reputation_credential_structure(
     credential: &ReputationCredential,
     now: u64,
 ) -> Result<(), CredentialError> {
@@ -215,7 +256,13 @@ pub fn verify_reputation_credential(
     if let Some(provenance) = credential.unsigned.enterprise_identity_provenance.as_ref() {
         provenance.validate()?;
     }
+    Ok(())
+}
 
+fn verify_reputation_credential_signature(
+    credential: &ReputationCredential,
+) -> Result<(), CredentialError> {
+    let issuer = DidChio::from_str(&credential.unsigned.issuer)?;
     let signature = Signature::from_hex(&credential.proof.proof_value)?;
     let signed = chio_core::crypto::verify_wrapped(
         issuer.public_key(),
@@ -294,10 +341,13 @@ pub fn passport_credential_digests(passport: &AgentPassport) -> Result<Vec<Strin
     Ok(digests.into_iter().collect())
 }
 
-pub fn verify_agent_passport(
+/// Structural inspection of `passport`: schema, non-empty, subject
+/// consistency, validity windows and provenance aggregation. Issuer
+/// signatures are not checked, so the result carries no issuer trust.
+pub fn inspect_agent_passport_structure(
     passport: &AgentPassport,
     now: u64,
-) -> Result<PassportVerification, CredentialError> {
+) -> Result<PassportStructuralInspection, CredentialError> {
     if !is_supported_passport_schema(&passport.schema) {
         return Err(CredentialError::InvalidPassportSchema);
     }
@@ -312,7 +362,7 @@ pub fn verify_agent_passport(
     let mut min_credential_valid_until = u64::MAX;
 
     for credential in &passport.credentials {
-        verify_reputation_credential(credential, now)?;
+        inspect_reputation_credential_structure(credential, now)?;
         if credential.unsigned.credential_subject.id != subject {
             return Err(CredentialError::PassportSubjectMismatch(
                 credential.unsigned.credential_subject.id.clone(),
@@ -339,24 +389,53 @@ pub fn verify_agent_passport(
     if passport.enterprise_identity_provenance != enterprise_identity_provenance {
         return Err(CredentialError::PassportEnterpriseIdentityProvenanceMismatch);
     }
-    let issuers = issuers.into_iter().collect::<Vec<_>>();
 
-    Ok(PassportVerification {
+    Ok(PassportStructuralInspection {
         passport_id: passport_artifact_id(passport)?,
         subject,
-        issuer: if issuers.len() == 1 {
-            issuers.first().cloned()
-        } else {
-            None
-        },
-        issuers: issuers.clone(),
-        issuer_count: issuers.len(),
+        issuers: issuers.into_iter().collect(),
         credential_count: passport.credentials.len(),
         merkle_root_count: merkle_roots.len(),
         enterprise_identity_provenance,
+        inspected_at: now,
+        valid_until: passport.valid_until.clone(),
+    })
+}
+
+/// Verifies every credential of `passport` against `trusted_issuers`. Any
+/// credential whose issuer is outside the set refuses the whole passport.
+pub fn verify_agent_passport(
+    passport: &AgentPassport,
+    trusted_issuers: &BTreeSet<String>,
+    now: u64,
+) -> Result<PassportVerification, CredentialError> {
+    if trusted_issuers.is_empty() {
+        return Err(CredentialError::TrustedIssuersMissing);
+    }
+    let inspection = inspect_agent_passport_structure(passport, now)?;
+    for credential in &passport.credentials {
+        require_trusted_credential_issuer(credential, trusted_issuers)?;
+    }
+    for credential in &passport.credentials {
+        verify_reputation_credential_signature(credential)?;
+    }
+
+    Ok(PassportVerification {
+        passport_id: inspection.passport_id,
+        subject: inspection.subject,
+        issuer: if inspection.issuers.len() == 1 {
+            inspection.issuers.first().cloned()
+        } else {
+            None
+        },
+        issuer_count: inspection.issuers.len(),
+        issuers: inspection.issuers,
+        credential_count: inspection.credential_count,
+        merkle_root_count: inspection.merkle_root_count,
+        enterprise_identity_provenance: inspection.enterprise_identity_provenance,
         passport_lifecycle: None,
         verified_at: now,
-        valid_until: passport.valid_until.clone(),
+        valid_until: inspection.valid_until,
     })
 }
 
@@ -364,14 +443,16 @@ pub fn present_agent_passport(
     passport: &AgentPassport,
     options: &PassportPresentationOptions,
 ) -> Result<AgentPassport, CredentialError> {
+    if options.issuer_allowlist.is_empty() {
+        return Err(CredentialError::PresentationIssuerAllowlistMissing);
+    }
     let mut credentials: Vec<ReputationCredential> = passport
         .credentials
         .iter()
         .filter(|credential| {
-            options.issuer_allowlist.is_empty()
-                || options
-                    .issuer_allowlist
-                    .contains(&credential.unsigned.issuer)
+            options
+                .issuer_allowlist
+                .contains(&credential.unsigned.issuer)
         })
         .cloned()
         .collect();
@@ -411,7 +492,7 @@ pub fn evaluate_agent_passport(
     policy: &PassportVerifierPolicy,
 ) -> Result<PassportPolicyEvaluation, CredentialError> {
     policy.validate()?;
-    let verification = verify_agent_passport(passport, now)?;
+    let verification = verify_agent_passport(passport, &policy.issuer_allowlist, now)?;
     let mut matched_credential_indexes = Vec::new();
     let mut matched_issuers = BTreeSet::new();
     let credential_results = passport

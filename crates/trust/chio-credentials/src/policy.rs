@@ -45,10 +45,9 @@ fn evaluate_credential_against_policy(
     let metrics = &credential.unsigned.credential_subject.metrics;
     let evidence = &credential.unsigned.evidence;
 
-    if !policy.issuer_allowlist.is_empty()
-        && !policy
-            .issuer_allowlist
-            .contains(&credential.unsigned.issuer)
+    if !policy
+        .issuer_allowlist
+        .contains(&credential.unsigned.issuer)
     {
         reasons.push(format!(
             "issuer {} is not in the allowlist",

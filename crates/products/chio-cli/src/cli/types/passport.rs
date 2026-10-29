@@ -65,6 +65,10 @@ pub(crate) enum PassportCommands {
         /// Passport JSON file to verify.
         #[arg(long)]
         input: PathBuf,
+        /// did:chio issuer the verifier trusts. Repeat for each trusted issuer; every
+        /// passport credential must come from one of them.
+        #[arg(long = "trusted-issuer", required = true)]
+        trusted_issuers: Vec<String>,
         /// Verification timestamp override in Unix seconds. Defaults to now.
         #[arg(long)]
         at: Option<u64>,

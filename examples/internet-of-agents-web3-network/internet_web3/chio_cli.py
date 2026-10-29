@@ -399,7 +399,14 @@ def run_provider_passport_workflow(
         ]),
         encoding="utf-8",
     )
-    verify = _run_chio(["passport", "verify", "--input", str(passport_path)])
+    verify = _run_chio([
+        "passport",
+        "verify",
+        "--input",
+        str(passport_path),
+        "--trusted-issuer",
+        issuer,
+    ])
     challenge_args = [
         "passport",
         "challenge",
@@ -408,6 +415,8 @@ def run_provider_passport_workflow(
         str(challenge_path),
         "--verifier",
         federation_control_url or "Meridian Federation Verifier",
+        "--issuer",
+        issuer,
         "--policy",
         str(verifier_policy_path),
         "--verifier-challenge-db",

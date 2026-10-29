@@ -5,7 +5,7 @@ pub fn respond_to_passport_presentation_challenge(
     now: u64,
 ) -> Result<PassportPresentationResponse, CredentialError> {
     verify_passport_presentation_challenge(challenge, now)?;
-    verify_agent_passport(passport, now)?;
+    inspect_agent_passport_structure(passport, now)?;
 
     let holder_did = DidChio::from_public_key(holder_keypair.public_key())?;
     if holder_did.to_string() != passport.subject {
@@ -66,24 +66,18 @@ pub fn verify_passport_presentation_response_with_policy(
         return Err(CredentialError::InvalidPresentationProofPurpose);
     }
 
-    let passport_verification = verify_agent_passport(&response.passport, now)?;
+    let trusted_issuers = presentation_trusted_issuers(expected_challenge, resolved_policy)?;
+    for credential in &response.passport.credentials {
+        if !trusted_issuers.contains(&credential.unsigned.issuer) {
+            return Err(CredentialError::PresentationIssuerNotAllowed(
+                credential.unsigned.issuer.clone(),
+            ));
+        }
+    }
+    let passport_verification = verify_agent_passport(&response.passport, trusted_issuers, now)?;
     let subject_did = DidChio::from_str(&response.passport.subject)?;
     if response.proof.verification_method != subject_did.verification_method_id() {
         return Err(CredentialError::PresentationVerificationMethodMismatch);
-    }
-
-    if !response.challenge.issuer_allowlist.is_empty() {
-        for credential in &response.passport.credentials {
-            if !response
-                .challenge
-                .issuer_allowlist
-                .contains(&credential.unsigned.issuer)
-            {
-                return Err(CredentialError::PresentationIssuerNotAllowed(
-                    credential.unsigned.issuer.clone(),
-                ));
-            }
-        }
     }
     if let Some(max_credentials) = response.challenge.max_credentials {
         let actual = response.passport.credentials.len();
@@ -122,7 +116,8 @@ pub fn verify_passport_presentation_response_with_policy(
         return Err(CredentialError::InvalidPresentationSignature);
     }
 
-    let evaluation_policy = resolved_policy.or(response.challenge.policy.as_ref());
+    let evaluation_policy =
+        resolved_policy.or(expected_challenge.and_then(|challenge| challenge.policy.as_ref()));
     let policy_source = if evaluation_policy.is_some() {
         Some(policy_source_override.unwrap_or_else(|| {
             if response.challenge.policy.is_some() {
@@ -166,4 +161,22 @@ pub fn verify_passport_presentation_response_with_policy(
         replay_state: None,
         policy_evaluation,
     })
+}
+
+/// The verifier-held issuer set for a presentation: the expected challenge
+/// allowlist, else the resolved policy allowlist. The presented challenge is
+/// never a source, because the presenter controls it.
+fn presentation_trusted_issuers<'a>(
+    expected_challenge: Option<&'a PassportPresentationChallenge>,
+    resolved_policy: Option<&'a PassportVerifierPolicy>,
+) -> Result<&'a BTreeSet<String>, CredentialError> {
+    expected_challenge
+        .map(|challenge| &challenge.issuer_allowlist)
+        .filter(|allowlist| !allowlist.is_empty())
+        .or_else(|| {
+            resolved_policy
+                .map(|policy| &policy.issuer_allowlist)
+                .filter(|allowlist| !allowlist.is_empty())
+        })
+        .ok_or(CredentialError::PresentationTrustedIssuersMissing)
 }

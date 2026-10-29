@@ -39,6 +39,26 @@ pub enum CredentialError {
     #[error("credential signature verification failed")]
     InvalidCredentialSignature,
 
+    #[error("credential verification requires a non-empty trusted issuer set")]
+    TrustedIssuersMissing,
+
+    #[error("credential issuer {0} is not in the verifier trusted issuer set")]
+    CredentialIssuerNotTrusted(String),
+
+    #[error("verifier policy issuer_allowlist must be non-empty")]
+    VerifierPolicyIssuerAllowlistMissing,
+
+    #[error("passport presentation options issuer_allowlist must be non-empty")]
+    PresentationIssuerAllowlistMissing,
+
+    #[error(
+        "presentation verification requires a non-empty issuer allowlist from the expected challenge or the resolved verifier policy"
+    )]
+    PresentationTrustedIssuersMissing,
+
+    #[error("OID4VP requested credential issuer_allowlist must be non-empty")]
+    Oid4vpIssuerAllowlistMissing,
+
     #[error("passport must contain at least one credential")]
     EmptyPassport,
 

@@ -29,6 +29,7 @@ function driftLabel(value?: number): string {
 export function PortableReputationPanel({ subjectKey }: PortableReputationPanelProps) {
   const [passportText, setPassportText] = useState<string | null>(null)
   const [passportName, setPassportName] = useState<string | null>(null)
+  const [verifierPolicyId, setVerifierPolicyId] = useState('')
   const [comparison, setComparison] = useState<PortableReputationComparison | null>(null)
   const [readingPassport, setReadingPassport] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -65,12 +66,17 @@ export function PortableReputationPanel({ subjectKey }: PortableReputationPanelP
       setError('Upload a passport JSON file before running comparison.')
       return
     }
+    const policyId = verifierPolicyId.trim()
+    if (!policyId) {
+      setError('Enter the verifier policy ID that pins the trusted passport issuers.')
+      return
+    }
 
     setLoading(true)
     setError(null)
     try {
       const passport = JSON.parse(passportText)
-      const next = await fetchReputationComparison(subjectKey, passport)
+      const next = await fetchReputationComparison(subjectKey, passport, policyId)
       setComparison(next)
     } catch (nextError) {
       setComparison(null)
@@ -99,11 +105,22 @@ export function PortableReputationPanel({ subjectKey }: PortableReputationPanelP
           <input type="file" accept="application/json,.json" onChange={handlePassportChange} />
           <span>{readingPassport ? 'Reading passport…' : passportName || 'No file selected'}</span>
         </label>
+        <label className="portable-compare-upload">
+          <span className="operator-card-label">Verifier Policy ID</span>
+          <input
+            type="text"
+            name="verifierPolicyId"
+            value={verifierPolicyId}
+            onChange={(event) => setVerifierPolicyId(event.target.value)}
+          />
+        </label>
         <button
           className="btn-page"
           type="button"
           onClick={handleCompare}
-          disabled={loading || readingPassport || !subjectKey || !passportText}
+          disabled={
+            loading || readingPassport || !subjectKey || !passportText || !verifierPolicyId.trim()
+          }
         >
           {loading ? 'Comparing...' : readingPassport ? 'Loading Passport...' : 'Run Comparison'}
         </button>

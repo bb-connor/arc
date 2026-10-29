@@ -41,6 +41,10 @@ against the live trust-control service.
 - the native delivery lane remains the Chio `AgentPassport` artifact
 - the standards-native delivery lane is a signed projection over that same
   passport truth, not a second source of trust
+- the trust service projects only passports its own authority issued: every
+  credential issuer must be the current signing key or a rotated key the
+  authority still lists as live, so a foreign passport or one signed by a
+  revoked or retired key is refused
 - verifier portability now uses a narrow signed OID4VP request-object profile
   over the projected passport lane
 - Chio-native challenge presentation remains a separate signed Chio challenge and
@@ -116,20 +120,14 @@ to fetch. Issuer trust is decided before any network request:
 
 - the verifier's own advertised issuer (`--advertise-url`) is verified with the
   local authority keys and is never fetched;
-- any other credential issuer must be listed explicitly in the signed OID4VP
-  request's `issuerAllowlist` (the CLI `--issuer` option on
-  `passport oid4vp create`);
-- an empty `issuerAllowlist` means local-only trust: no remote issuer is
-  trusted and no issuer JWKS is fetched.
+- every credential issuer, the advertised issuer included, must be listed
+  explicitly in the signed OID4VP request's `issuerAllowlist` (the CLI
+  `--issuer` option on `passport oid4vp create`);
+- an empty `issuerAllowlist` is refused: no issuer is trusted and no issuer
+  JWKS is fetched.
 
-A credential whose issuer is neither the advertised issuer nor allowlisted is
-refused before any outbound request.
-
-Migration note: a deployment that previously relied on an empty
-`issuerAllowlist` to accept any issuer's self-published keys must now list each
-remote issuer it intends to trust. An empty allowlist no longer accepts remote
-issuers; this closes a path where a holder could present a self-issued
-credential and have its own JWKS fetched and trusted.
+A credential whose issuer is not allowlisted is refused before any outbound
+request.
 
 When a remote allowlisted issuer's JWKS (or a credential's lifecycle resolve
 URL) is fetched, the transport is strict and bounded:

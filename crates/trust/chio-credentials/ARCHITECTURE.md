@@ -60,6 +60,10 @@ lifecycle results with generation and high-water anchors.
 
 ## Trust and invariants
 
+`verify_agent_passport` takes a verifier-held trusted issuer set. An empty set is
+refused, and every credential issuer must be a member before any signature is
+checked. `inspect_agent_passport_structure` runs the structural checks without
+signature or issuer trust; holder-side presentation and record lookups use it.
 `verify_agent_passport` checks credential time windows and caps passport validity
 against their minimum expiry. It does not independently enforce the outer
 passport's issued-at field or reject a shorter outer validity already in the past.

@@ -962,11 +962,13 @@ pub fn verify_oid4vp_direct_post_response(
 
     let credential_verification =
         verify_chio_passport_sd_jwt_vc(&response.vp_token, issuer_public_key, now)?;
-    if !expected_credential.issuer_allowlist.is_empty()
-        && !expected_credential
-            .issuer_allowlist
-            .iter()
-            .any(|issuer| issuer == &credential_verification.issuer)
+    if expected_credential.issuer_allowlist.is_empty() {
+        return Err(CredentialError::Oid4vpIssuerAllowlistMissing);
+    }
+    if !expected_credential
+        .issuer_allowlist
+        .iter()
+        .any(|issuer| issuer == &credential_verification.issuer)
     {
         return Err(CredentialError::InvalidOid4vpResponse(format!(
             "portable credential issuer `{}` is outside the OID4VP request allowlist",

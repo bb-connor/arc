@@ -1159,14 +1159,14 @@ async fn a_delegation_policy_that_expires_during_the_partner_sync_does_not_issue
 fn multi_hop_request(
     door: &Door,
     store: &chio_store_sqlite::SqliteReceiptStore,
+    passport: &AgentPassport,
     challenge: &PassportPresentationChallenge,
     parent_expires_at: u64,
 ) -> FederatedIssueRequest {
-    let passport = door.passport(&[&door.authority]);
     let parent = import_parent(door, store, parent_expires_at);
     federated_request(
         door,
-        &passport,
+        passport,
         challenge,
         5,
         Some(delegation_policy(
@@ -1183,8 +1183,9 @@ async fn a_live_parent_snapshot_issues_through_the_partner_door() {
     let mut door = Door::new(0);
     let store = with_receipts(&mut door);
     door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
     let challenge = door.challenge(Some("parent-live"), VALID_FROM, VALID_UNTIL);
-    let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
+    let request = multi_hop_request(&door, &store, &passport, &challenge, BASE_UNIX_SECS + 10);
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
         service_headers(),
@@ -1199,8 +1200,9 @@ async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume
     let mut door = Door::new(30_000);
     let store = with_receipts(&mut door);
     door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
     let challenge = door.challenge(Some("parent-expiring"), VALID_FROM, VALID_UNTIL);
-    let request = multi_hop_request(&door, &store, &challenge, BASE_UNIX_SECS + 10);
+    let request = multi_hop_request(&door, &store, &passport, &challenge, BASE_UNIX_SECS + 10);
     let response = handle_federated_issue(
         State(receipts_state(&door, &store)),
         service_headers(),

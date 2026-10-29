@@ -444,6 +444,23 @@ pub struct PassportVerification {
     pub valid_until: String,
 }
 
+/// Structural facts about a passport: schema, subject consistency, validity
+/// windows and provenance aggregation. Issuer signatures are not checked, so
+/// an inspection carries no issuer trust.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PassportStructuralInspection {
+    pub passport_id: String,
+    pub subject: String,
+    pub issuers: Vec<String>,
+    pub credential_count: usize,
+    pub merkle_root_count: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub enterprise_identity_provenance: Vec<EnterpriseIdentityProvenance>,
+    pub inspected_at: u64,
+    pub valid_until: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PassportVerifierPolicy {
@@ -479,6 +496,9 @@ pub struct PassportVerifierPolicy {
 
 impl PassportVerifierPolicy {
     pub fn validate(&self) -> Result<(), CredentialError> {
+        if self.issuer_allowlist.is_empty() {
+            return Err(CredentialError::VerifierPolicyIssuerAllowlistMissing);
+        }
         validate_unit_interval("min_composite_score", self.min_composite_score)?;
         validate_unit_interval("min_reliability", self.min_reliability)?;
         validate_unit_interval("min_least_privilege", self.min_least_privilege)?;

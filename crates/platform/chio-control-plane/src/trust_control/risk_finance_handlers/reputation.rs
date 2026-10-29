@@ -134,14 +134,29 @@ pub(crate) async fn handle_reputation_compare(
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
+    let compared_at = match unix_timestamp_now() {
+        Ok(now) => now,
+        Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
+    };
+    let Some(registry_path) = state.config.verifier_policies_file.as_deref() else {
+        return plain_http_error(
+            StatusCode::CONFLICT,
+            "reputation compare requires --verifier-policies-file on the trust-control service",
+        );
+    };
+    let verifier_policy = match VerifierPolicyRegistry::load(registry_path).and_then(|registry| {
+        registry
+            .active_policy(&request.verifier_policy_id, compared_at)
+            .map(|document| document.body.policy.clone())
+    }) {
+        Ok(policy) => policy,
+        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    };
     match reputation::build_reputation_comparison(
         local,
         &request.passport,
-        request.verifier_policy.as_ref(),
-        match unix_timestamp_now() {
-            Ok(now) => now,
-            Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
-        },
+        &verifier_policy,
+        compared_at,
         shared_evidence,
         imported_trust,
     ) {

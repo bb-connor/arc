@@ -74,11 +74,12 @@ pub fn issue_chio_passport_jwt_vc_json(
     passport: &AgentPassport,
     credential_issuer: &str,
     issuer_keypair: &Keypair,
+    trusted_issuers: &BTreeSet<String>,
     now: u64,
     passport_status: Option<Oid4vciChioPassportStatusReference>,
 ) -> Result<ChioPassportJwtVcJsonEnvelope, CredentialError> {
     let credential_issuer = normalize_credential_issuer(credential_issuer)?;
-    let projection = build_chio_passport_portable_projection(passport, now)?;
+    let projection = build_chio_passport_portable_projection(passport, trusted_issuers, now)?;
     let subject_did = DidChio::from_str(&projection.subject_did).map_err(CredentialError::Did)?;
     let holder_jwk = PortableEd25519Jwk::from_public_key(subject_did.public_key())?;
     let holder_thumbprint = holder_jwk.thumbprint()?;

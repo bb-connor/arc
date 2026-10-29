@@ -1,18 +1,19 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair};
 use chio_credentials::{
     build_oid4vci_passport_offer, ensure_signed_passport_verifier_policy_active,
-    issue_chio_passport_jwt_vc_json, issue_chio_passport_sd_jwt_vc, verify_agent_passport,
-    verify_passport_presentation_challenge, verify_signed_passport_verifier_policy, AgentPassport,
-    Oid4vciChioPassportStatusReference, Oid4vciCredentialIssuerMetadata, Oid4vciCredentialOffer,
-    Oid4vciCredentialRequest, Oid4vciCredentialResponse, Oid4vciTokenRequest, Oid4vciTokenResponse,
-    Oid4vpRequestObject, PassportLifecycleRecord, PassportLifecycleResolution,
-    PassportLifecycleState, PassportPresentationChallenge, PassportStatusDistribution,
-    SignedPassportVerifierPolicy, WalletExchangeTransactionState, WalletExchangeTransactionStatus,
+    inspect_agent_passport_structure, issue_chio_passport_jwt_vc_json,
+    issue_chio_passport_sd_jwt_vc, verify_passport_presentation_challenge,
+    verify_signed_passport_verifier_policy, AgentPassport, Oid4vciChioPassportStatusReference,
+    Oid4vciCredentialIssuerMetadata, Oid4vciCredentialOffer, Oid4vciCredentialRequest,
+    Oid4vciCredentialResponse, Oid4vciTokenRequest, Oid4vciTokenResponse, Oid4vpRequestObject,
+    PassportLifecycleRecord, PassportLifecycleResolution, PassportLifecycleState,
+    PassportPresentationChallenge, PassportStatusDistribution, SignedPassportVerifierPolicy,
+    WalletExchangeTransactionState, WalletExchangeTransactionStatus,
     CHIO_PASSPORT_JWT_VC_JSON_FORMAT, CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID,
     CHIO_PASSPORT_SD_JWT_VC_FORMAT,
 };
@@ -411,26 +412,29 @@ impl PassportStatusRegistry {
         self.passports.get(passport_id)
     }
 
+    /// Records lifecycle status for a locally published passport. The passport
+    /// is inspected structurally only: publishing records status and makes no
+    /// issuer trust decision.
     pub fn publish(
         &mut self,
         passport: &AgentPassport,
         published_at: u64,
         distribution: PassportStatusDistribution,
     ) -> Result<PassportLifecycleRecord, CliError> {
-        let verification = verify_agent_passport(passport, published_at)
+        let inspection = inspect_agent_passport_structure(passport, published_at)
             .map_err(|error| CliError::policy_error(error.to_string()))?;
         self.version = PASSPORT_STATUS_REGISTRY_VERSION.to_string();
-        if let Some(existing) = self.passports.get(&verification.passport_id) {
+        if let Some(existing) = self.passports.get(&inspection.passport_id) {
             return Ok(existing.clone());
         }
 
         let credential_digests = chio_credentials::passport_credential_digests(passport)
             .map_err(|error| CliError::policy_error(error.to_string()))?;
         let record = PassportLifecycleRecord {
-            passport_id: verification.passport_id.clone(),
-            subject: verification.subject.clone(),
-            issuers: verification.issuers.clone(),
-            issuer_count: verification.issuer_count,
+            passport_id: inspection.passport_id.clone(),
+            subject: inspection.subject.clone(),
+            issuers: inspection.issuers.clone(),
+            issuer_count: inspection.issuers.len(),
             credential_digests,
             published_at,
             updated_at: published_at,
@@ -439,26 +443,26 @@ impl PassportStatusRegistry {
             revoked_at: None,
             revoked_reason: None,
             distribution,
-            valid_until: verification.valid_until.clone(),
+            valid_until: inspection.valid_until.clone(),
         };
         // Load refuses an invalid record, so neither the new record nor a
         // record it supersedes is changed unless load would accept the result.
         verify_passport_lifecycle_record(&record)?;
         let mut superseded = Vec::new();
         for existing in self.passports.values() {
-            if existing.subject == verification.subject
-                && existing.issuers == verification.issuers
+            if existing.subject == inspection.subject
+                && existing.issuers == inspection.issuers
                 && existing.status == PassportLifecycleState::Active
             {
                 if published_at < existing.published_at {
                     return Err(CliError::policy_error(format!(
                         "passport `{}` published at {published_at} cannot supersede passport `{}`, published later at {}",
-                        verification.passport_id, existing.passport_id, existing.published_at
+                        inspection.passport_id, existing.passport_id, existing.published_at
                     )));
                 }
                 let mut replaced = existing.clone();
                 replaced.status = PassportLifecycleState::Superseded;
-                replaced.superseded_by = Some(verification.passport_id.clone());
+                replaced.superseded_by = Some(inspection.passport_id.clone());
                 replaced.updated_at = published_at;
                 verify_passport_lifecycle_record(&replaced)?;
                 superseded.push(replaced);
@@ -469,25 +473,31 @@ impl PassportStatusRegistry {
                 .insert(replaced.passport_id.clone(), replaced);
         }
         self.passports
-            .insert(verification.passport_id, record.clone());
+            .insert(inspection.passport_id, record.clone());
         Ok(record)
     }
 
+    /// Looks up the lifecycle of `passport` by its content identity.
+    ///
+    /// Precondition: the caller has already verified `passport` against its
+    /// verifier-held trusted issuer set. This lookup inspects structure only
+    /// and makes no issuer trust decision of its own.
     pub fn resolve_for_passport(
         &self,
         passport: &AgentPassport,
         at: u64,
     ) -> Result<PassportLifecycleResolution, CliError> {
-        let verification = verify_agent_passport(passport, at)
+        let inspection = inspect_agent_passport_structure(passport, at)
             .map_err(|error| CliError::policy_error(error.to_string()))?;
+        let issuer_count = inspection.issuers.len();
         Ok(self
-            .get(&verification.passport_id)
+            .get(&inspection.passport_id)
             .map(|record| passport_lifecycle_resolution_from_record(record, at))
             .unwrap_or_else(|| PassportLifecycleResolution {
-                passport_id: verification.passport_id,
-                subject: verification.subject,
-                issuers: verification.issuers,
-                issuer_count: verification.issuer_count,
+                passport_id: inspection.passport_id,
+                subject: inspection.subject,
+                issuers: inspection.issuers,
+                issuer_count,
                 state: PassportLifecycleState::NotFound,
                 published_at: None,
                 updated_at: None,
@@ -495,7 +505,7 @@ impl PassportStatusRegistry {
                 revoked_at: None,
                 revoked_reason: None,
                 distribution: PassportStatusDistribution::default(),
-                valid_until: verification.valid_until,
+                valid_until: inspection.valid_until,
                 source: None,
             }))
     }
@@ -629,6 +639,15 @@ impl crate::signed_input::RevocationReserve for PassportStatusRegistry {
         }
         Ok(reserved)
     }
+}
+
+/// A portable issuance signer. `trusted_issuers` holds the did:chio issuers
+/// of the signing authority's live key history, so only passports that
+/// authority issued are re-issued.
+#[derive(Clone, Copy)]
+pub struct PortableIssuanceSigner<'a> {
+    pub keypair: &'a Keypair,
+    pub trusted_issuers: &'a BTreeSet<String>,
 }
 
 impl PassportIssuanceOfferRegistry {
@@ -908,7 +927,7 @@ impl PassportIssuanceOfferRegistry {
         access_token: &str,
         request: &Oid4vciCredentialRequest,
         now: u64,
-        portable_signing_keypair: Option<&Keypair>,
+        portable_signer: Option<PortableIssuanceSigner<'_>>,
         portable_status_registry: Option<(&Path, &PassportStatusRegistry)>,
     ) -> Result<Oid4vciCredentialResponse, CliError> {
         request.validate()?;
@@ -973,7 +992,7 @@ impl PassportIssuanceOfferRegistry {
             .transpose()?;
 
         let response = if format == CHIO_PASSPORT_SD_JWT_VC_FORMAT {
-            let keypair = portable_signing_keypair.ok_or_else(|| {
+            let signer = portable_signer.ok_or_else(|| {
                 CliError::cli_other_error(
                     "portable sd-jwt vc issuance requires a signing keypair".to_string(),
                 )
@@ -982,7 +1001,8 @@ impl PassportIssuanceOfferRegistry {
             let envelope = issue_chio_passport_sd_jwt_vc(
                 &record.passport,
                 &metadata.credential_issuer,
-                keypair,
+                signer.keypair,
+                signer.trusted_issuers,
                 now,
                 status_reference.clone(),
             )
@@ -997,7 +1017,7 @@ impl PassportIssuanceOfferRegistry {
             )
             .map_err(|error| CliError::policy_error(error.to_string()))?
         } else if format == CHIO_PASSPORT_JWT_VC_JSON_FORMAT {
-            let keypair = portable_signing_keypair.ok_or_else(|| {
+            let signer = portable_signer.ok_or_else(|| {
                 CliError::cli_other_error(
                     "portable jwt_vc_json issuance requires a signing keypair".to_string(),
                 )
@@ -1006,7 +1026,8 @@ impl PassportIssuanceOfferRegistry {
             let envelope = issue_chio_passport_jwt_vc_json(
                 &record.passport,
                 &metadata.credential_issuer,
-                keypair,
+                signer.keypair,
+                signer.trusted_issuers,
                 now,
                 status_reference.clone(),
             )
@@ -1789,16 +1810,16 @@ fn verify_passport_issuance_offer_record(
         ));
     }
     record.offer.validate().map_err(CliError::from)?;
-    let verification =
-        verify_agent_passport(&record.passport, record.issued_at).map_err(CliError::from)?;
+    let inspection = inspect_agent_passport_structure(&record.passport, record.issued_at)
+        .map_err(CliError::from)?;
     if let Some(context) = record.offer.chio_offer_context.as_ref() {
-        if context.passport_id != verification.passport_id {
+        if context.passport_id != inspection.passport_id {
             return Err(CliError::cli_other_error(format!(
                     "passport issuance offer `{}` stores a passport_id that does not match the embedded passport",
                 record.offer_id
             )));
         }
-        if context.subject != verification.subject {
+        if context.subject != inspection.subject {
             return Err(CliError::cli_other_error(format!(
                     "passport issuance offer `{}` stores a subject that does not match the embedded passport",
                 record.offer_id

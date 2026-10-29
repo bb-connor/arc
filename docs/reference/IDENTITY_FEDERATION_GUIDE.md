@@ -186,7 +186,8 @@ chio --json --receipt-db receipts.sqlite3 reputation local \
 
 chio --json --receipt-db receipts.sqlite3 reputation compare \
   --subject-public-key <agent-ed25519-hex> \
-  --passport passport.json
+  --passport passport.json \
+  --verifier-policy verifier-policy.yaml
 ```
 
 The same reporting is available through trust-control:

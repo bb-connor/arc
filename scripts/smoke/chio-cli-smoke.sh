@@ -903,10 +903,12 @@ smoke_identity() {
     --output "${passport}" \
     --signing-seed-file "${seed}"
   [[ -f "${passport}" ]]
+  local passport_issuer
+  passport_issuer="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["credentials"][0]["issuer"])' "${passport}")"
 
   run_cmd "identity" "passport-verify" "${CHIO_BIN}" \
     --format json \
-    passport verify --input "${passport}"
+    passport verify --input "${passport}" --trusted-issuer "${passport_issuer}"
   json_assert "${ARTIFACT_ROOT}/identity/passport-verify.out" "payload['credentialCount'] >= 1 and payload['issuerCount'] >= 1"
 
   python3 - "${passport}" "${verifier_policy}" <<'PY'

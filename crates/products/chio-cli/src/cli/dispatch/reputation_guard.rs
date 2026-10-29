@@ -37,6 +37,7 @@ pub(crate) fn dispatch_reputation(
                 until,
                 local_policy,
                 verifier_policy,
+                verifier_policy_id,
             } => reputation::cmd_reputation_compare(reputation::ReputationCompareCommand {
                 subject_public_key: &subject_public_key,
                 passport_path: &passport,
@@ -44,6 +45,7 @@ pub(crate) fn dispatch_reputation(
                 until,
                 local_policy_path: local_policy.as_deref(),
                 verifier_policy_path: verifier_policy.as_deref(),
+                verifier_policy_id: verifier_policy_id.as_deref(),
                 json_output,
                 receipt_db_path: receipt_db.as_deref(),
                 budget_db_path: budget_db.as_deref(),

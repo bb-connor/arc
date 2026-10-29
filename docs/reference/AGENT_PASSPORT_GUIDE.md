@@ -190,11 +190,13 @@ coverage.
 ## Verify
 
 ```text
-chio passport verify --input passport.json
+chio passport verify --input passport.json --trusted-issuer did:chio:<issuer>
 ```
 
 Verification checks:
 
+- every credential issuer is named by a `--trusted-issuer` flag; at least one
+  is required and any other issuer is refused before signatures are checked
 - every embedded credential signature
 - `did:chio` issuer and subject consistency
 - credential validity windows
@@ -335,7 +337,8 @@ chio passport evaluate \
 This is the first relying-party verifier lane on top of the shipped passport
 format. The verifier:
 
-- performs the same structural passport verification as `chio passport verify`
+- verifies the passport against the policy `issuerAllowlist`, which must be
+  non-empty; a credential from any issuer outside it refuses the passport
 - evaluates each embedded credential independently against a relying-party policy
 - accepts the passport if at least one credential satisfies the policy
 - does not invent cross-issuer aggregation semantics beyond those independent
@@ -408,13 +411,18 @@ remote trust-control admin APIs.
 ```text
 chio reputation compare \
   --subject-public-key <agent-ed25519-hex> \
-  --passport passport.json
+  --passport passport.json \
+  --verifier-policy verifier-policy.yaml
 ```
 
 This compares the portable passport artifact against the live local reputation
 corpus and reports explicit per-credential drift as `local_minus_portable`.
+The passport is verified against the verifier policy `issuerAllowlist`, which
+must be non-empty.
 The same comparison contract is also available over trust-control through
-`POST /v1/reputation/compare/{subject_key}` and is now surfaced in the
+`POST /v1/reputation/compare/{subject_key}`, where the request names a verifier
+policy registered on the service (`verifierPolicyId`, CLI
+`--verifier-policy-id`) and is now surfaced in the
 dashboard portable comparison panel.
 
 The comparison payload now also includes `sharedEvidence`, which reports:
@@ -726,8 +734,8 @@ Shipped now:
   artifacts, public verifier metadata, and verifier `JWKS` trust bootstrap
 - OID4VP presentation issuer trust decided before any fetch: the advertised
   issuer uses local keys, every remote credential issuer must be listed in the
-  signed request `issuerAllowlist` (`--issuer`), and an empty allowlist is
-  local-only. A remote issuer JWKS or lifecycle fetch is HTTPS only with no
+  signed request `issuerAllowlist` (`--issuer`), the advertised issuer must be
+  listed too, and an empty allowlist is refused. A remote issuer JWKS or lifecycle fetch is HTTPS only with no
   private, loopback or link-local address, no redirects, pinned DNS, timeouts, a
   size cap and no error-body reflection, and acceptance time is rechecked after
   the remote waits. See `docs/reference/CREDENTIAL_INTEROP_GUIDE.md`.

@@ -22,9 +22,10 @@ struct Wallet {
     token: String,
     code: String,
     expires_at: u64,
+    authority_db: Option<PathBuf>,
 }
 
-fn passport(now: u64) -> TestResult<AgentPassport> {
+fn passport(issuer: &Keypair, now: u64) -> TestResult<AgentPassport> {
     let subject = Keypair::from_seed(&[93; 32]);
     let scorecard = chio_reputation::compute_local_scorecard(
         &subject.public_key().to_hex(),
@@ -33,7 +34,7 @@ fn passport(now: u64) -> TestResult<AgentPassport> {
         &chio_reputation::ReputationConfig::default(),
     );
     let credential = chio_credentials::issue_reputation_credential(
-        &Keypair::from_seed(&[94; 32]),
+        issuer,
         scorecard,
         chio_credentials::ChioCredentialEvidence {
             query: chio_credentials::AttestationWindow {
@@ -64,26 +65,37 @@ impl Wallet {
     }
 
     fn with_authority(ttl: u64, sqlite: bool) -> TestResult<Self> {
+        Self::with_passport_issuer(ttl, sqlite, None)
+    }
+
+    /// A wallet whose offered passport is issued by `foreign`, or by the
+    /// configured authority when `foreign` is `None`.
+    fn with_passport_issuer(ttl: u64, sqlite: bool, foreign: Option<&Keypair>) -> TestResult<Self> {
         let directory = chio_test_support::private_tempdir()?;
         let path = directory.path().join("offers.json");
         let seed = directory.path().join("authority.seed");
-        crate::load_or_create_authority_keypair(&seed)?;
+        let seed_authority = crate::load_or_create_authority_keypair(&seed)?;
         let mut state = metrics_state("service-secret");
         state.finding_challenge_clock = chio_test_support::clock::clock();
         state.config.advertise_url = Some("https://wallet.example.test".to_string());
-        if sqlite {
+        let mut authority_db = None;
+        let issuer = if sqlite {
             let database = directory.path().join("authority.sqlite3");
-            chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
+            let authority = chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
                 &database,
                 Arc::clone(&state.finding_challenge_clock),
             )?;
-            state.config.authority_db_path = Some(database);
+            state.config.authority_db_path = Some(database.clone());
+            authority_db = Some(database);
+            authority.current_keypair()?
         } else {
             state.config.authority_seed_path = Some(seed);
-        }
+            seed_authority
+        };
+        let issuer = foreign.cloned().unwrap_or(issuer);
         state.config.passport_issuance_offers_file = Some(path.clone());
         let now = state.finding_challenge_clock.unix_millis()?.as_secs();
-        let passport = passport(now)?;
+        let passport = passport(&issuer, now)?;
         let metadata = configured_passport_credential_issuer(&state.config)?;
         let mut registry = PassportIssuanceOfferRegistry::default();
         let offered = registry.issue_offer(
@@ -122,7 +134,33 @@ impl Wallet {
             token,
             code,
             expires_at,
+            authority_db,
         })
+    }
+
+    fn authority(&self) -> TestResult<chio_store_sqlite::SqliteCapabilityAuthority> {
+        let database = self
+            .authority_db
+            .as_ref()
+            .ok_or("wallet has no authority db")?;
+        Ok(
+            chio_store_sqlite::SqliteCapabilityAuthority::open_with_clock(
+                database,
+                Arc::clone(&self.state.finding_challenge_clock),
+            )?,
+        )
+    }
+
+    async fn redeem(&self) -> TestResult<(StatusCode, String)> {
+        let response = handle_redeem_passport_issuance_credential(
+            State(self.state.clone()),
+            self.headers(&self.token)?,
+            Json(self.request()),
+        )
+        .await;
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
+        Ok((status, String::from_utf8(body.to_vec())?))
     }
 
     fn headers(&self, token: &str) -> TestResult<HeaderMap> {
@@ -630,6 +668,68 @@ fn final_wallet_queued_expiry_clock_error_refuses_without_registry_mutation() ->
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(polls.load(Ordering::SeqCst), 0);
         assert_eq!(std::fs::read(&wallet.path)?, before);
+        Ok(())
+    })
+}
+
+fn untrusted_issuer_error(passport: &AgentPassport) -> String {
+    let issuer = &passport.credentials[0].unsigned.issuer;
+    format!("credential issuer {issuer} is not in the verifier trusted issuer set")
+}
+
+#[test]
+fn portable_redeem_reissues_a_passport_signed_before_rotation() -> TestResult {
+    runtime()?.block_on(async {
+        let wallet = Wallet::with_authority(3_600, true)?;
+        let now = wallet
+            .state
+            .finding_challenge_clock
+            .unix_millis()?
+            .as_secs();
+        wallet
+            .authority()?
+            .rotate_with_verification_deadline(now + 3_600)?;
+        let (status, body) = wallet.redeem().await?;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        Ok(())
+    })
+}
+
+#[test]
+fn portable_redeem_refuses_a_passport_signed_by_a_revoked_historic_key() -> TestResult {
+    runtime()?.block_on(async {
+        let wallet = Wallet::with_authority(3_600, true)?;
+        let authority = wallet.authority()?;
+        authority.initialize_replication("queued-wallet")?;
+        let historic = authority.current_keypair()?.public_key();
+        let now = wallet
+            .state
+            .finding_challenge_clock
+            .unix_millis()?
+            .as_secs();
+        authority.rotate_with_verification_deadline(now + 3_600)?;
+        authority.revoke_issuer(&historic)?;
+        let (status, body) = wallet.redeem().await?;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body.contains(&untrusted_issuer_error(&wallet.passport)),
+            "{body}"
+        );
+        Ok(())
+    })
+}
+
+#[test]
+fn portable_redeem_refuses_a_passport_from_a_foreign_issuer() -> TestResult {
+    runtime()?.block_on(async {
+        let foreign = Keypair::from_seed(&[94; 32]);
+        let wallet = Wallet::with_passport_issuer(3_600, false, Some(&foreign))?;
+        let (status, body) = wallet.redeem().await?;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(
+            body.contains(&untrusted_issuer_error(&wallet.passport)),
+            "{body}"
+        );
         Ok(())
     })
 }

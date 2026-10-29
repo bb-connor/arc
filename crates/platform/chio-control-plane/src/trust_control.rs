@@ -283,7 +283,8 @@ use crate::{
     passport_verifier::{
         Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry,
         PassportStatusListResponse, PassportStatusRegistry, PassportStatusRevocationRequest,
-        PassportVerifierChallengeStore, PublishPassportStatusRequest, VerifierPolicyRegistry,
+        PassportVerifierChallengeStore, PortableIssuanceSigner, PublishPassportStatusRequest,
+        VerifierPolicyRegistry,
     },
     reputation, rotate_authority_keypair,
     scim_lifecycle::{

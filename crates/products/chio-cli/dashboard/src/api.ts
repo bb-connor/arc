@@ -1207,15 +1207,18 @@ export async function fetchRelayAlertAssuranceExternalRetentionReviewReport(): P
 
 /**
  * Compare a portable passport artifact against the live local reputation view for one subject.
+ * The passport is verified against the issuer allowlist of the named verifier policy, which
+ * must be registered on the trust-control service.
  */
 export async function fetchReputationComparison(
   subjectKey: string,
   passport: unknown,
+  verifierPolicyId: string,
 ): Promise<PortableReputationComparison> {
   const encoded = encodeURIComponent(subjectKey)
   const res = await apiFetch(`/v1/reputation/compare/${encoded}`, {
     method: 'POST',
-    body: JSON.stringify({ passport }),
+    body: JSON.stringify({ passport, verifierPolicyId }),
   })
   return res.json() as Promise<PortableReputationComparison>
 }

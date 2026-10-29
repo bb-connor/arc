@@ -327,7 +327,7 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
                         &access_token,
                         &payload,
                         clock_now,
-                        signer,
+                        signer.map(issuer_authority::AdmittedIssuer::portable_signer),
                         state
                             .config
                             .passport_statuses_file
@@ -703,18 +703,21 @@ fn verify_passport_challenge_payload(
         return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()));
     }
     let challenge = expected_challenge.unwrap_or(&payload.presentation.challenge);
-    let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
-        state.config.verifier_policies_file.as_deref(),
-        challenge,
-        now,
-    ) {
-        Ok(values) => values,
-        Err(error) => {
-            return Err(plain_http_error(
-                StatusCode::BAD_REQUEST,
-                &error.to_string(),
-            ));
-        }
+    let (resolved_policy, policy_source) = match expected_challenge {
+        Some(expected_challenge) => match resolve_verifier_policy_for_challenge(
+            state.config.verifier_policies_file.as_deref(),
+            expected_challenge,
+            now,
+        ) {
+            Ok(values) => values,
+            Err(error) => {
+                return Err(plain_http_error(
+                    StatusCode::BAD_REQUEST,
+                    &error.to_string(),
+                ));
+            }
+        },
+        None => (None, None),
     };
     if resolved_policy
         .as_ref()
@@ -1258,8 +1261,8 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         .map(|credential| credential.issuer_allowlist.iter().cloned().collect())
         .unwrap_or_default();
     // Trust is decided before any network I/O: our own advertised issuer uses
-    // local keys, every other issuer must be in the verifier request's signed
-    // issuer allowlist, and an empty allowlist trusts only the local issuer.
+    // local keys and every other issuer must be in the verifier request's
+    // signed issuer allowlist. Verification refuses an empty allowlist.
     let issuer_public_keys =
         if state.config.advertise_url.as_deref() == Some(credential.issuer.as_str()) {
             match public_oid4vp_trusted_keys(&state).await {
@@ -1416,9 +1419,10 @@ pub(crate) async fn handle_federated_issue(
         Ok(instant) => instant,
         Err(response) => return response,
     };
-    if let Err(error) =
-        chio_credentials::verify_agent_passport(&payload.presentation.passport, first_seen)
-    {
+    if let Err(error) = chio_credentials::inspect_agent_passport_structure(
+        &payload.presentation.passport,
+        first_seen,
+    ) {
         return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
     let binding = PartnerPassportBinding::Native(payload.presentation.passport.clone());
@@ -1490,11 +1494,18 @@ pub(crate) async fn handle_federated_issue(
         Ok(values) => values,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    if resolved_policy.is_none() {
+    let Some(federation_policy) = resolved_policy.as_ref() else {
         return plain_http_error(
             StatusCode::BAD_REQUEST,
             "federated issuance requires an embedded or stored verifier policy",
         );
+    };
+    if let Err(error) = chio_credentials::verify_agent_passport(
+        &payload.presentation.passport,
+        &federation_policy.issuer_allowlist,
+        now,
+    ) {
+        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
     if resolved_policy
         .as_ref()

@@ -18617,6 +18617,7 @@
       "parse_policy::format-yaml::from_str"
     ],
     "crates/platform/chio-control-plane/src/reputation.rs": [
+      "cmd_reputation_compare::shared-reader::crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy",
       "cmd_reputation_compare::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::read",
       "load_passport_verifier_policy::format-yaml::from_slice",
       "load_passport_verifier_policy::original-json-reader::UntrustedJsonText"
