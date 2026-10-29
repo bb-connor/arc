@@ -51,8 +51,11 @@ fn a_credential_over_plaintext_loopback_is_allowed() {
 }
 
 #[test]
-fn plaintext_without_a_credential_and_https_with_one_are_allowed() {
-    assert!(transport("http://api.groq.com", AuthScheme::None).is_ok());
+fn plaintext_to_a_remote_host_is_refused_and_https_is_allowed() {
+    assert!(matches!(
+        transport("http://api.groq.com", AuthScheme::None),
+        Err(HttpTransportError::InvalidUrl { .. })
+    ));
     for auth in credentials() {
         assert!(transport("https://api.groq.com", auth).is_ok());
     }

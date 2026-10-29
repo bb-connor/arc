@@ -14,8 +14,9 @@
 //!   none for localhost). No provider key is hardcoded; an env-var convenience
 //!   constructor reads a named variable when a caller opts in.
 //! - [`HttpTransportConfig`]: base URL, auth, default headers, and timeout.
-//! - [`HttpTransport`]: a [`reqwest::Client`]-backed transport that performs
-//!   batch JSON posts and buffered streaming (SSE / NDJSON) posts.
+//! - [`HttpTransport`]: a transport bound to an egress contract built from its
+//!   base URL that performs batch JSON posts and buffered streaming
+//!   (SSE / NDJSON) posts.
 //! - [`ProviderHttpTransport`]: the async trait both [`HttpTransport`] and
 //!   [`MockHttpTransport`] implement so an adapter can hold
 //!   `Arc<dyn ProviderHttpTransport>` and swap the mock for the real client.
@@ -34,6 +35,10 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use chio_egress_contract::{
+    client_builder_with_contract, send_streaming_with_contract, ContractClient, ContractStream,
+    HttpEgressContract, HttpEgressError,
+};
 use chio_tool_call_fabric::ProviderError;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::Value;
@@ -107,11 +112,11 @@ pub struct HttpTransportConfig {
     /// How requests authenticate.
     pub auth: AuthScheme,
     /// Headers applied to every request (for example `anthropic-version`).
-    /// Custom headers may contain credentials, so they require HTTPS or loopback.
     pub extra_headers: Vec<(String, String)>,
     /// Per-request timeout.
     pub timeout: Duration,
-    /// Maximum bytes retained from a response, capped by the shared document limit.
+    /// Maximum bytes of one response document: the whole JSON body, or one
+    /// SSE event or NDJSON line of a stream. Capped by the shared document limit.
     pub max_response_bytes: usize,
 }
 
@@ -196,11 +201,6 @@ pub enum HttpTransportError {
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    #[error("urn:chio:error:transport:http-failed")]
-    Connect {
-        #[source]
-        source: reqwest::Error,
-    },
     #[error("HTTP request timed out after {timeout_ms}ms")]
     Timeout {
         timeout_ms: u64,
@@ -210,15 +210,10 @@ pub enum HttpTransportError {
     #[error("urn:chio:error:transport:http-failed")]
     Request {
         #[source]
-        source: reqwest::Error,
+        source: HttpEgressError,
     },
     #[error("upstream returned HTTP {code}")]
     Status { code: u16 },
-    #[error("urn:chio:error:transport:http-failed")]
-    Decode {
-        #[source]
-        source: reqwest::Error,
-    },
     #[error("HTTP response exceeds {maximum} bytes")]
     ResponseTooLarge { maximum: usize },
     #[error("HTTP transport requires a positive timeout and bounded response limit")]
@@ -284,9 +279,11 @@ pub trait ProviderHttpTransport: Send + Sync {
     async fn post_ndjson(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, HttpTransportError>;
 }
 
-/// A [`reqwest`]-backed implementation of [`ProviderHttpTransport`].
+/// The [`ProviderHttpTransport`] that sends through an egress contract bound
+/// to the configured base URL.
 pub struct HttpTransport {
-    client: reqwest::Client,
+    client: ContractClient,
+    contract: HttpEgressContract,
     config: HttpTransportConfig,
     default_headers: HeaderMap,
 }
@@ -294,12 +291,13 @@ pub struct HttpTransport {
 impl HttpTransport {
     /// Build a transport from `config`.
     ///
-    /// The reqwest client is created once and reused across requests, following
-    /// the workspace convention. Default headers (including any header-style
-    /// auth) are resolved up front so per-request work is minimal.
+    /// The contract admits only the base URL's exact authority over HTTPS. A
+    /// loopback base URL, such as a local model server, may also use plain
+    /// HTTP. Private, link-local, unique-local and metadata addresses are
+    /// refused, including after DNS resolution; redirects and environment
+    /// proxies are never followed.
     pub fn new(config: HttpTransportConfig) -> Result<Self, HttpTransportError> {
         validate_base_url(&config.base_url)?;
-        validate_credential_transport(&config)?;
         if config.timeout.is_zero()
             || config.max_response_bytes == 0
             || config.max_response_bytes > crate::input::MAX_DOCUMENT_BYTES
@@ -307,17 +305,18 @@ impl HttpTransport {
             return Err(HttpTransportError::InvalidLimits);
         }
         let default_headers = default_headers_for_config(&config)?;
-
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: shared provider-adapter
-        // transport client; egress is bounded by the validated base URL.
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
+        let contract = endpoint_contract(&config.base_url)?;
+        contract
+            .enforce_url(&config.base_url, 0)
+            .map_err(|error| endpoint_refused(&config.base_url, error))?;
+        let client = client_builder_with_contract(&contract)
             .timeout(config.timeout)
             .build()
             .map_err(HttpTransportError::Build)?;
 
         Ok(Self {
             client,
+            contract,
             config,
             default_headers,
         })
@@ -344,7 +343,7 @@ impl HttpTransport {
         &self,
         path: &str,
         body: &[u8],
-        accept: &'static str,
+        framing: BodyFraming,
     ) -> Result<HttpResponse, HttpTransportError> {
         if body.len() > crate::input::MAX_DOCUMENT_BYTES {
             return Err(HttpTransportError::ResponseTooLarge {
@@ -357,20 +356,18 @@ impl HttpTransport {
             .post(&url)
             .headers(self.default_headers.clone())
             .header(CONTENT_TYPE, "application/json")
-            .header(reqwest::header::ACCEPT, accept)
+            .header(reqwest::header::ACCEPT, framing.accept())
             .body(body.to_vec());
         if let AuthScheme::QueryParam { name, value } = &self.config.auth {
             request = request.query(&[(name.as_str(), value.as_str())]);
         }
+        let request = request.build().map_err(HttpTransportError::Build)?;
 
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: request issued by the shared
-        // transport client built above against the validated base URL.
-        let response = request
-            .send()
+        let mut stream = send_streaming_with_contract(&self.contract, &self.client, request)
             .await
-            .map_err(|error| map_send_error(error, self.config.timeout))?;
-        let status = response.status();
-        let content_type = response
+            .map_err(|error| self.egress_error(error))?;
+        let status = stream.status();
+        let content_type = stream
             .headers()
             .get(CONTENT_TYPE)
             .and_then(|value| value.to_str().ok())
@@ -380,10 +377,10 @@ impl HttpTransport {
                 code: status.as_u16(),
             });
         }
-        if accept == "text/event-stream" {
-            require_sse_content_type(response.headers())?;
+        if matches!(framing, BodyFraming::Events) {
+            require_sse_content_type(stream.headers())?;
         }
-        let bytes = collect_response(response, self.config.max_response_bytes).await?;
+        let bytes = self.read_body(&mut stream, framing).await?;
 
         Ok(HttpResponse {
             status: status.as_u16(),
@@ -391,6 +388,188 @@ impl HttpTransport {
             content_type,
         })
     }
+
+    async fn read_body(
+        &self,
+        stream: &mut ContractStream,
+        framing: BodyFraming,
+    ) -> Result<Vec<u8>, HttpTransportError> {
+        let document_limit = self.config.max_response_bytes;
+        let total_limit = match framing {
+            BodyFraming::Document => document_limit,
+            BodyFraming::Events | BodyFraming::Lines => crate::sse::MAX_STREAM_BYTES,
+        };
+        if stream
+            .content_length()
+            .is_some_and(|length| length > total_limit as u64)
+        {
+            return Err(HttpTransportError::ResponseTooLarge {
+                maximum: total_limit,
+            });
+        }
+        let mut records =
+            RecordBound::new(framing, document_limit.min(crate::sse::MAX_FRAME_BYTES));
+        let mut body = Vec::new();
+        while let Some(chunk) = stream
+            .chunk()
+            .await
+            .map_err(|error| self.egress_error(error))?
+        {
+            if chunk.len() > total_limit.saturating_sub(body.len()) {
+                return Err(HttpTransportError::ResponseTooLarge {
+                    maximum: total_limit,
+                });
+            }
+            records.observe(&chunk)?;
+            body.extend_from_slice(&chunk);
+        }
+        Ok(body)
+    }
+
+    fn egress_error(&self, error: HttpEgressError) -> HttpTransportError {
+        match error {
+            HttpEgressError::Transport(_) if is_timeout(&error) => HttpTransportError::Timeout {
+                timeout_ms: u64::try_from(self.config.timeout.as_millis()).unwrap_or(u64::MAX),
+                source: Box::new(error),
+            },
+            HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. } => {
+                HttpTransportError::Request { source: error }
+            }
+            HttpEgressError::ResponseTooLarge { max, .. } => HttpTransportError::ResponseTooLarge {
+                maximum: usize::try_from(max).unwrap_or(usize::MAX),
+            },
+            refused => endpoint_refused(&self.config.base_url, refused),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum BodyFraming {
+    Document,
+    Events,
+    Lines,
+}
+
+impl BodyFraming {
+    fn accept(self) -> &'static str {
+        match self {
+            Self::Document => "application/json",
+            Self::Events => "text/event-stream",
+            Self::Lines => "application/x-ndjson",
+        }
+    }
+}
+
+/// Bounds each SSE event or NDJSON line while the body is read. A whole JSON
+/// document is bounded by the total limit instead.
+struct RecordBound {
+    framing: BodyFraming,
+    limit: usize,
+    record: usize,
+    line: usize,
+    previous: u8,
+}
+
+impl RecordBound {
+    fn new(framing: BodyFraming, limit: usize) -> Self {
+        Self {
+            framing,
+            limit,
+            record: 0,
+            line: 0,
+            previous: 0,
+        }
+    }
+
+    fn observe(&mut self, bytes: &[u8]) -> Result<(), HttpTransportError> {
+        for &byte in bytes {
+            match self.framing {
+                BodyFraming::Document => return Ok(()),
+                BodyFraming::Lines => {
+                    if byte == b'\n' {
+                        self.record = 0;
+                        continue;
+                    }
+                }
+                BodyFraming::Events => {
+                    let previous = std::mem::replace(&mut self.previous, byte);
+                    if byte == b'\n' && previous == b'\r' {
+                        continue;
+                    }
+                    if byte == b'\n' || byte == b'\r' {
+                        if self.line == 0 {
+                            self.record = 0;
+                            continue;
+                        }
+                        self.line = 0;
+                    } else {
+                        self.line += 1;
+                    }
+                }
+            }
+            self.record += 1;
+            if self.record > self.limit {
+                return Err(HttpTransportError::ResponseTooLarge {
+                    maximum: self.limit,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+fn endpoint_contract(base_url: &str) -> Result<HttpEgressContract, HttpTransportError> {
+    let parsed = reqwest::Url::parse(base_url).map_err(|error| HttpTransportError::InvalidUrl {
+        url: base_url.to_owned(),
+        detail: "base URL parse failed".into(),
+        source: Some(Box::new(error)),
+    })?;
+    let (Some(host), Some(port)) = (parsed.host_str(), parsed.port_or_known_default()) else {
+        return Err(invalid_base_url(
+            base_url,
+            "base URL must name a host and port".to_string(),
+        ));
+    };
+    let loopback = is_loopback_host(host);
+    let mut allowed_schemes = std::collections::BTreeSet::from(["https".to_string()]);
+    if loopback {
+        allowed_schemes.insert("http".to_string());
+    }
+    Ok(HttpEgressContract {
+        tenant_egress_namespace: "chio-provider-adapter".to_string(),
+        allowed_schemes,
+        allowed_authority_set: std::collections::BTreeSet::from([format!(
+            "{}:{port}",
+            host.trim_end_matches('.')
+        )]),
+        deny_loopback: !loopback,
+        deny_link_local: true,
+        deny_ipv6_ula: true,
+        max_redirect_chain: 0,
+        max_response_bytes: u64::try_from(crate::sse::MAX_STREAM_BYTES).unwrap_or(u64::MAX),
+    })
+}
+
+fn endpoint_refused(base_url: &str, error: HttpEgressError) -> HttpTransportError {
+    HttpTransportError::InvalidUrl {
+        url: base_url.to_string(),
+        detail: "the egress contract refused the endpoint".into(),
+        source: Some(Box::new(error)),
+    }
+}
+
+fn is_timeout(error: &HttpEgressError) -> bool {
+    let mut source = std::error::Error::source(error);
+    while let Some(cause) = source {
+        if cause
+            .downcast_ref::<reqwest::Error>()
+            .is_some_and(reqwest::Error::is_timeout)
+        {
+            return true;
+        }
+        source = cause.source();
+    }
+    false
 }
 
 // Check the provider's declared response shape before attempting any body read.
@@ -467,27 +646,6 @@ fn validate_base_url(base_url: &str) -> Result<(), HttpTransportError> {
         ));
     }
     Ok(())
-}
-
-/// Credentials or arbitrary caller headers cross plaintext HTTP only to loopback.
-fn validate_credential_transport(config: &HttpTransportConfig) -> Result<(), HttpTransportError> {
-    if matches!(config.auth, AuthScheme::None) && config.extra_headers.is_empty() {
-        return Ok(());
-    }
-    let parsed =
-        reqwest::Url::parse(&config.base_url).map_err(|error| HttpTransportError::InvalidUrl {
-            url: config.base_url.clone(),
-            detail: "base URL parse failed".into(),
-            source: Some(Box::new(error)),
-        })?;
-    if parsed.scheme() == "https" || parsed.host_str().is_some_and(is_loopback_host) {
-        return Ok(());
-    }
-    Err(invalid_base_url(
-        &config.base_url,
-        "a base URL that carries credentials or custom headers must use https unless its host is loopback"
-            .to_string(),
-    ))
 }
 
 fn is_loopback_host(host: &str) -> bool {
@@ -654,46 +812,6 @@ fn insert_header(
     Ok(())
 }
 
-fn map_send_error(error: reqwest::Error, timeout: Duration) -> HttpTransportError {
-    let error = error.without_url();
-    if error.is_timeout() {
-        HttpTransportError::Timeout {
-            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
-            source: Box::new(error),
-        }
-    } else if error.is_connect() {
-        HttpTransportError::Connect { source: error }
-    } else {
-        HttpTransportError::Request { source: error }
-    }
-}
-
-async fn collect_response(
-    mut response: reqwest::Response,
-    maximum: usize,
-) -> Result<Vec<u8>, HttpTransportError> {
-    if response
-        .content_length()
-        .is_some_and(|length| length > maximum as u64)
-    {
-        return Err(HttpTransportError::ResponseTooLarge { maximum });
-    }
-    let mut body = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|error| HttpTransportError::Decode {
-            source: error.without_url(),
-        })?
-    {
-        if chunk.len() > maximum.saturating_sub(body.len()) {
-            return Err(HttpTransportError::ResponseTooLarge { maximum });
-        }
-        body.extend_from_slice(&chunk);
-    }
-    Ok(body)
-}
-
 #[async_trait]
 impl ProviderHttpTransport for HttpTransport {
     fn base_url(&self) -> &str {
@@ -701,15 +819,15 @@ impl ProviderHttpTransport for HttpTransport {
     }
 
     async fn post_json(&self, path: &str, body: &[u8]) -> Result<HttpResponse, HttpTransportError> {
-        self.send(path, body, "application/json").await
+        self.send(path, body, BodyFraming::Document).await
     }
 
     async fn post_sse(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, HttpTransportError> {
-        Ok(self.send(path, body, "text/event-stream").await?.body)
+        Ok(self.send(path, body, BodyFraming::Events).await?.body)
     }
 
     async fn post_ndjson(&self, path: &str, body: &[u8]) -> Result<Vec<u8>, HttpTransportError> {
-        Ok(self.send(path, body, "application/x-ndjson").await?.body)
+        Ok(self.send(path, body, BodyFraming::Lines).await?.body)
     }
 }
 
@@ -1411,10 +1529,7 @@ mod tests {
             transport.post_json("/v1/chat", b"{}").await,
             "an unreachable endpoint must fail closed",
         );
-        assert!(matches!(
-            error,
-            HttpTransportError::Connect { .. } | HttpTransportError::Request { .. }
-        ));
+        assert!(matches!(error, HttpTransportError::Request { .. }));
     }
 }
 

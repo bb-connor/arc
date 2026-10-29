@@ -702,8 +702,8 @@ pub use operator_readiness::{OperatorReadinessError, OperatorReadinessProbe};
 
 #[cfg(feature = "reqwest-egress")]
 pub use reqwest_helper::{
-    client_builder_with_contract, send_with_contract, ContractClient, ContractClientBuilder,
-    ContractRequestBuilder, ContractResponse,
+    client_builder_with_contract, send_streaming_with_contract, send_with_contract, ContractClient,
+    ContractClientBuilder, ContractRequestBuilder, ContractResponse, ContractStream,
 };
 
 impl HttpEgressContract {

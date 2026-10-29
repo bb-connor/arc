@@ -56,7 +56,7 @@ async fn redirects_are_denied_and_failure_body_is_not_retained() {
     assert!(!format!("{config:?}").contains("secret-key"));
     let transport = HttpTransport::new(config).unwrap();
     let error = transport.post_json("/", b"{}").await.unwrap_err();
-    assert!(matches!(error, HttpTransportError::Status { code: 307 }));
+    assert!(matches!(error, HttpTransportError::InvalidUrl { .. }));
     assert!(!format!("{error:?} {error}").contains("private-provider-payload"));
     assert!(target.received_requests().await.unwrap().is_empty());
 }

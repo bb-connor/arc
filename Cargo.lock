@@ -4916,6 +4916,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chio-core-types",
+ "chio-egress-contract",
  "chio-test-support",
  "chio-tool-call-fabric",
  "reqwest 0.13.2",

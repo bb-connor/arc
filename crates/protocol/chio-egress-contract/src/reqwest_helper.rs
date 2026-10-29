@@ -183,6 +183,48 @@ impl ContractRequestBuilder {
     }
 }
 
+/// Response returned by [`send_streaming_with_contract`] before its body is
+/// read. The caller reads the body chunk by chunk and applies its own record
+/// bounds; the contract byte ceiling still bounds the total.
+#[derive(Debug)]
+pub struct ContractStream {
+    prepared: PreparedHttpEgressContract,
+    response: reqwest::Response,
+    observed: u64,
+}
+
+impl ContractStream {
+    #[must_use]
+    pub fn status(&self) -> StatusCode {
+        self.response.status()
+    }
+
+    #[must_use]
+    pub fn url(&self) -> &Url {
+        self.response.url()
+    }
+
+    #[must_use]
+    pub fn headers(&self) -> &HeaderMap {
+        self.response.headers()
+    }
+
+    #[must_use]
+    pub fn content_length(&self) -> Option<u64> {
+        self.response.content_length()
+    }
+
+    /// Read the next body chunk, or `None` at the end of the body.
+    pub async fn chunk(&mut self) -> Result<Option<Vec<u8>>, HttpEgressError> {
+        let Some(chunk) = self.response.chunk().await.map_err(map_reqwest_error)? else {
+            return Ok(None);
+        };
+        self.observed = self.observed.saturating_add(chunk.len() as u64);
+        self.prepared.enforce_response_bytes(self.observed)?;
+        Ok(Some(chunk.to_vec()))
+    }
+}
+
 /// Wrap a [`ContractClient`] dispatch with [`HttpEgressContract`]
 /// enforcement before each network hop and while reading the response body.
 /// Redirects are followed here, one validated `Location` hop at a time.
@@ -192,6 +234,34 @@ pub async fn send_with_contract(
     request: reqwest::Request,
 ) -> Result<ContractResponse, HttpEgressError> {
     let prepared = contract.prepare()?;
+    let response = dispatch_with_contract(&prepared, client, request).await?;
+    collect_capped_response(&prepared, response).await
+}
+
+/// Dispatch like [`send_with_contract`], but hand back the response before its
+/// body is read so a streaming caller can bound each record while reading.
+pub async fn send_streaming_with_contract(
+    contract: &HttpEgressContract,
+    client: &ContractClient,
+    request: reqwest::Request,
+) -> Result<ContractStream, HttpEgressError> {
+    let prepared = contract.prepare()?;
+    let response = dispatch_with_contract(&prepared, client, request).await?;
+    if let Some(content_length) = response.content_length() {
+        prepared.enforce_response_bytes(content_length)?;
+    }
+    Ok(ContractStream {
+        prepared,
+        response,
+        observed: 0,
+    })
+}
+
+async fn dispatch_with_contract(
+    prepared: &PreparedHttpEgressContract,
+    client: &ContractClient,
+    request: reqwest::Request,
+) -> Result<reqwest::Response, HttpEgressError> {
     let mut request = request;
     let mut redirect_chain_len = 0_u8;
 
@@ -243,7 +313,7 @@ pub async fn send_with_contract(
             }
         }
 
-        return collect_capped_response(&prepared, response).await;
+        return Ok(response);
     }
 }
 

@@ -1,8 +1,8 @@
 use chio_tool_call_fabric::ProviderError;
 use serde_json::Value;
 
-const MAX_STREAM_BYTES: usize = 16 * 1024 * 1024;
-const MAX_FRAME_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_STREAM_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_FRAME_BYTES: usize = 1024 * 1024;
 const MAX_STREAM_FRAMES: usize = 16_384;
 
 /// Parsed SSE frame with original bytes retained for exact forwarding.
