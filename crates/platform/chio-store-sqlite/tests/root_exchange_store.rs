@@ -343,8 +343,12 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
             Box::new(|case| case.expires_at = NOW),
         ),
         (
-            MintRequestRefusal::ReplayRetentionPast,
+            MintRequestRefusal::ReplayRetentionShort,
             Box::new(|case| case.replay_retain_until = NOW),
+        ),
+        (
+            MintRequestRefusal::ReplayRetentionShort,
+            Box::new(|case| case.replay_retain_until = case.expires_at - 1),
         ),
         (
             MintRequestRefusal::UnknownRule,

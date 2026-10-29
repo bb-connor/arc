@@ -133,6 +133,8 @@ pub enum MintRequestRefusal {
     RootExpired,
     #[error("replay retention is already past")]
     ReplayRetentionPast,
+    #[error("replay retention ends before the root")]
+    ReplayRetentionShort,
     #[error("provider identity does not canonicalize")]
     ProviderIdentityNotCanonical,
     #[error("provider identity differs from the context")]
