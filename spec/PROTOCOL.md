@@ -4385,6 +4385,10 @@ Participants and `trustBundleSha256` are fixed for a treaty id. An update
 whose participants or trust bundle digest differ from its authenticated
 predecessor is refused with `treaty_epoch_binding_mismatch`; rotating either
 requires a new treaty id.
+A revoked or withdrawn treaty epoch is reactivated only by a higher-sequence
+update signed under the same pin, and participants and the trust bundle stay
+fixed through every status change. An update whose `issuedAtUnixMs` is below
+its predecessor's is refused with `treaty_epoch_update_conflict`.
 
 Fresh admission compares the authenticated active epoch, retains authorization
 for the exact operation claim, plan, request binding and phase, and applies any
