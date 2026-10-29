@@ -20,7 +20,7 @@ use chio_core::{sha256_hex, StoreMutationFence};
 use rusqlite::{params, Transaction, TransactionBehavior};
 use serde::Serialize;
 
-use crate::admission_operation_store::{verify_active_owner, verify_trusted_time};
+use crate::admission_operation_store::{authority_validation_time, verify_active_owner};
 use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 use crate::store_connection::{StoreConnection, StoreGuard};
 
@@ -415,6 +415,20 @@ impl SqliteRootExchangeStore {
         read(&tx)
     }
 
+    /// A read that judges expiry at the authority validation time.
+    fn read_at<T>(
+        &self,
+        trusted_now_unix_ms: u64,
+        read: impl FnOnce(&Transaction<'_>, u64) -> Result<T>,
+    ) -> Result<T> {
+        self.read_only(|tx| {
+            let now = authority_validation_time(tx, trusted_now_unix_ms, &self.serving_owner)
+                .map_err(unavailable)?
+                / 1000;
+            read(tx, now)
+        })
+    }
+
     /// Run one fenced mutation. The closure returns the change to commit, or
     /// `None` to commit nothing. A change is one event and one global commit.
     /// The closure's value is returned only after the commit and the anchor
@@ -446,7 +460,9 @@ impl SqliteRootExchangeStore {
     }
 
     /// The part of a mutation inside its transaction: the owner, anchor and
-    /// clock checks, the change, and its event and global commit. Returns
+    /// clock checks, the change, and its event and global commit. The change
+    /// sees the authority validation time, never earlier than the authority
+    /// clock, so a request that waited cannot act on an expired root. Returns
     /// whether a change was staged.
     fn stage<T>(
         &self,
@@ -459,12 +475,14 @@ impl SqliteRootExchangeStore {
         self.serving_owner
             .verify_authority_anchor(tx)
             .map_err(owner_error)?;
-        verify_trusted_time(tx, trusted_now_unix_ms, &self.serving_owner).map_err(unavailable)?;
-        let (value, change) = apply(tx, trusted_now_unix_ms / 1000)?;
+        let now = authority_validation_time(tx, trusted_now_unix_ms, &self.serving_owner)
+            .map_err(unavailable)?
+            / 1000;
+        let (value, change) = apply(tx, now)?;
         let Some(change) = change else {
             return Ok((value, false));
         };
-        let sequence = append_event(tx, &change, trusted_now_unix_ms / 1000)?;
+        let sequence = append_event(tx, &change, now)?;
         self.serving_owner
             .append_global_commit(
                 tx,

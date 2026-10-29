@@ -67,6 +67,7 @@ fn mint_transaction(
             return recovered(tx, request, revocation, root, now);
         }
     }
+    check_lifetime(request, now)?;
     refuse_revoked(
         tx,
         revocation,
@@ -183,10 +184,7 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if !request.root_policy.lists_exchange_key(&root.issuer) {
         return Err(refuse(MintRequestRefusal::IssuerNotInPolicy));
     }
-    request
-        .root_policy
-        .check_valid_at(now)
-        .map_err(|_| refuse(MintRequestRefusal::PolicyNotValid))?;
+    check_lifetime(request, now)?;
     let rule_id = context.root_policy_rule_id.as_str();
     let Some(rule) = request.root_policy.rule(&context.root_policy_rule_id) else {
         return Err(refuse(MintRequestRefusal::UnknownRule));
@@ -199,7 +197,7 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if scope_hash != context.effective_root_scope_hash {
         return Err(refuse(MintRequestRefusal::ScopeHashMismatch));
     }
-    if root.expires_at <= now || root.expires_at <= request.root.issued_at {
+    if root.expires_at <= request.root.issued_at {
         return Err(refuse(MintRequestRefusal::RootExpired));
     }
     if request.replay_retain_until < root.expires_at {
@@ -260,6 +258,20 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
         context_bytes: canonical_blob(context)?,
         capability_bytes: canonical_blob(root)?,
     })
+}
+
+/// The root policy and the root are both live at `now`. Checked before the
+/// transaction at the caller's time and again inside it at the authority
+/// validation time.
+fn check_lifetime(request: &MintRequest<'_>, now: u64) -> Result<()> {
+    request
+        .root_policy
+        .check_valid_at(now)
+        .map_err(|_| refuse(MintRequestRefusal::PolicyNotValid))?;
+    if request.root.expires_at <= now {
+        return Err(refuse(MintRequestRefusal::RootExpired));
+    }
+    Ok(())
 }
 
 /// The openings are exactly one salt per committed context value.
@@ -426,6 +438,10 @@ fn recover(
     if stored.root_policy_digest != *request.root_policy.digest() {
         return Err(RootExchangeStoreError::RootPolicyChanged { capability_id });
     }
+    request
+        .root_policy
+        .check_valid_at(now)
+        .map_err(|_| refuse(MintRequestRefusal::PolicyNotValid))?;
     let current = request
         .provider_identity
         .map(|identity| identity.digest())

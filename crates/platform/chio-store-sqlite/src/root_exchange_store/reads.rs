@@ -293,8 +293,7 @@ impl SqliteRootExchangeStore {
         token_digest: &Sha256Digest,
         trusted_now_unix_ms: u64,
     ) -> Result<BearerLookup> {
-        let now = trusted_now_unix_ms / 1000;
-        self.read_only(|tx| {
+        self.read_at(trusted_now_unix_ms, |tx, now| {
             let mapped: Option<String> = tx
                 .query_row(
                     "SELECT capability_id FROM root_exchange_bearer_tokens WHERE token_digest = ?1",
