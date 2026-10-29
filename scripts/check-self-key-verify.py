@@ -351,7 +351,6 @@ EMBEDDED_KEY_CALLERS: dict[tuple[str, str], tuple[str, int]] = {
     ("crates/tooling/chio-conformance/src/native_suite.rs", "evaluate_message_assertion"): ("INTEGRITY-ONLY", 1),
     ("crates/tooling/chio-trace-validate/src/map/revocation.rs", "project_revocation_trace"): ("INTEGRITY-ONLY", 1),
     ("crates/trust/chio-attest-buyer-core/src/report.rs", "verify_package_inner"): ("GUARDED", 1),
-    ("crates/trust/chio-attest-loopback/src/runtime_validation.rs", "validate_runtime_receipt_for_vendor"): ("PINNED", 1),
     ("crates/trust/chio-federation/src/bilateral_dsse/verify.rs", "verify_dsse_envelope"): ("PINNED", 1),
     ("crates/trust/chio-federation/src/bilateral_verifier/cosign.rs", "verify_bilateral_cosign_invocation"): ("PINNED", 1),
     ("crates/trust/chio-federation/src/bilateral_verifier/cosign.rs", "verify_chio_bilateral_invocation_inner"): ("PINNED", 1),
