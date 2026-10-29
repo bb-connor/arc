@@ -252,3 +252,6 @@ fn treaty_scope() -> TreatyScope {
 
 #[path = "runtime_store/authority_readers.rs"]
 mod authority_readers;
+#[cfg(unix)]
+#[path = "runtime_store/rollback_restore.rs"]
+mod rollback_restore;
