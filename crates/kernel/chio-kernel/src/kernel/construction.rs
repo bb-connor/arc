@@ -103,22 +103,19 @@ impl ChioKernel {
     /// Install the session's current anchor for receipts signed in this
     /// evaluation. No session, or a session that no longer exists, clears it,
     /// so an evaluation never inherits another evaluation's anchor and its
-    /// receipts carry no block. Any other failed session read is an error.
+    /// receipts carry no block.
     pub(crate) fn scope_receipt_session_anchor_for_request(
         &self,
         request_id: &str,
         session_id: Option<&SessionId>,
-    ) -> Result<ScopedKernelReceiptSessionAnchor, KernelError> {
-        let anchor = match session_id {
-            Some(session_id) => match self.with_session(session_id, |session| {
-                Ok(session.session_anchor().reference())
-            }) {
-                Ok(anchor) => Some(anchor),
-                Err(KernelError::UnknownSession(_)) => None,
-                Err(error) => return Err(error),
-            },
-            None => None,
-        };
+    ) -> ScopedKernelReceiptSessionAnchor {
+        let anchor = session_id
+            .and_then(|session_id| {
+                self.sessions
+                    .get(session_id)
+                    .map(|entry| Arc::clone(entry.value()))
+            })
+            .map(|session| session.session_anchor().reference());
         let scope_key = receipt_evaluation_map_key(request_id);
         let previous = match anchor {
             Some(anchor) => self
@@ -129,11 +126,11 @@ impl ChioKernel {
                 .remove(&scope_key)
                 .map(|(_, previous)| previous),
         };
-        Ok(ScopedKernelReceiptSessionAnchor {
+        ScopedKernelReceiptSessionAnchor {
             scope_key,
             anchors: Arc::clone(&self.receipt_session_anchors),
             previous,
-        })
+        }
     }
 
     pub(crate) fn receipt_session_anchor_for_request(
