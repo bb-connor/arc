@@ -15,7 +15,12 @@ fn signed_policy(id: &str) -> Result<SignedPassportVerifierPolicy, CliError> {
         "verifier",
         ISSUED_AT,
         ISSUED_AT + 3_600,
-        chio_credentials::PassportVerifierPolicy::default(),
+        chio_credentials::PassportVerifierPolicy {
+            issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))]
+                .into_iter()
+                .collect(),
+            ..chio_credentials::PassportVerifierPolicy::default()
+        },
     )?)
 }
 

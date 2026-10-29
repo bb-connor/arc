@@ -21,6 +21,7 @@ fn portable_sd_jwt_passport_projection_roundtrip_verifies() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )

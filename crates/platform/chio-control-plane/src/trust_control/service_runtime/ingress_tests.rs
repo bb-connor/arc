@@ -59,6 +59,9 @@ fn policy() -> Result<SignedPassportVerifierPolicy, Box<dyn std::error::Error>> 
         1,
         u64::MAX,
         PassportVerifierPolicy {
+            issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))]
+                .into_iter()
+                .collect(),
             min_composite_score: Some(0.1),
             ..Default::default()
         },

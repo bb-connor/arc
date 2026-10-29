@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use super::oid4vp_issuer_fetch_tests::{
-    config_with, register_request, response_parts, state_with, BASE_UNIX_SECS,
+    config_with, passport_issuer_set, register_request, response_parts, state_with, BASE_UNIX_SECS,
 };
 use super::*;
 
@@ -11,8 +11,8 @@ use chio_credentials::{
     build_agent_passport, create_passport_presentation_challenge_with_reference, credential_digest,
     issue_chio_passport_sd_jwt_vc, issue_reputation_credential, passport_artifact_id,
     present_agent_passport, respond_to_oid4vp_request, respond_to_passport_presentation_challenge,
-    AgentPassport, AttestationWindow, ChioCredentialEvidence, PassportPresentationChallengeArgs,
-    PassportPresentationOptions, PassportVerifierPolicy,
+    AgentPassport, AttestationWindow, ChioCredentialEvidence, CredentialError,
+    PassportPresentationChallengeArgs, PassportPresentationOptions, PassportVerifierPolicy,
 };
 use chio_revocation_oracle::{
     credential_revocation_key, passport_revocation_key, EpochRoot, RevocationKey, SignedEpochRoot,
@@ -186,6 +186,8 @@ struct Door {
     holder: Keypair,
     partners: Vec<serde_json::Value>,
     feed: PartnerFeed,
+    /// Issuers of every passport this door built; its challenges pin them.
+    issued_by: std::sync::Mutex<std::collections::BTreeSet<String>>,
 }
 
 impl Door {
@@ -211,6 +213,7 @@ impl Door {
             holder: Keypair::generate(),
             partners: Vec::new(),
             feed,
+            issued_by: Default::default(),
         };
         door.add_partner(
             PARTNER,
@@ -311,7 +314,19 @@ impl Door {
             .iter()
             .map(|issuer| issued_credential(issuer, &self.holder, valid_until))
             .collect();
-        build_agent_passport(&holder_did, credentials).test_unwrap()
+        let passport = build_agent_passport(&holder_did, credentials).test_unwrap();
+        self.issued_by
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .extend(passport_issuer_set(&passport));
+        passport
+    }
+
+    fn issued_issuers(&self) -> std::collections::BTreeSet<String> {
+        self.issued_by
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
     }
 
     fn challenge(
@@ -327,9 +342,15 @@ impl Door {
                 nonce: "partner-door-nonce".to_owned(),
                 issued_at,
                 expires_at,
-                options: PassportPresentationOptions::default(),
+                options: PassportPresentationOptions {
+                    issuer_allowlist: self.issued_issuers(),
+                    max_credentials: None,
+                },
                 policy_ref: None,
-                policy: Some(PassportVerifierPolicy::default()),
+                policy: Some(PassportVerifierPolicy {
+                    issuer_allowlist: self.issued_issuers(),
+                    ..PassportVerifierPolicy::default()
+                }),
             },
         )
         .test_unwrap();
@@ -471,6 +492,40 @@ async fn the_service_challenge_door_refuses_a_partner_revoked_passport() {
 }
 
 #[tokio::test]
+async fn a_partner_passport_outside_the_challenge_allowlist_is_refused_before_lifecycle_resolve() {
+    let mut door = Door::new(0);
+    let pinned = door.passport(&[&Keypair::generate()]);
+    let challenge = door.challenge(None, VALID_FROM, VALID_UNTIL);
+    let partner_passport = door.passport(&[&door.authority]);
+    door.feed.revoke(
+        passport_revocation_key(&passport_artifact_id(&partner_passport).test_unwrap()),
+        NOW_MS - 1_000,
+    );
+    door.mirror(PARTNER, &door.feed.publish(NOW_MS), NOW_MS);
+    let statuses = door.dir.path().join("passport-statuses.json");
+    std::fs::write(&statuses, b"not a passport status registry").test_unwrap();
+    door.config.passport_statuses_file = Some(statuses);
+
+    let mut request = door.service_request(&pinned, &challenge);
+    request.presentation.passport = partner_passport.clone();
+    let response = door.service_door(request).await;
+
+    let partner_issuer = passport_issuer_set(&partner_passport)
+        .into_iter()
+        .next()
+        .test_unwrap();
+    let (status, body) = response_parts(response).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&body).test_unwrap(),
+        serde_json::json!({
+            "error": CredentialError::PresentationIssuerNotAllowed(partner_issuer).to_string(),
+        })
+    );
+    assert_eq!(door.sync.calls(), 0);
+}
+
+#[tokio::test]
 async fn the_public_challenge_door_refuses_a_partner_revoked_passport() {
     let (door, passport) = door_with_revoked_passport();
     let challenge = door.challenge(Some("partner-door-challenge"), VALID_FROM, VALID_UNTIL);
@@ -486,11 +541,16 @@ async fn the_oid4vp_door_refuses_a_partner_revoked_passport() {
         &passport,
         ADVERTISE_URL,
         &door.authority,
+        &passport_issuer_set(&passport),
         BASE_UNIX_SECS,
         None,
     )
     .test_unwrap();
-    let request = register_request(&door.config, Vec::new(), BASE_UNIX_SECS);
+    let request = register_request(
+        &door.config,
+        vec![ADVERTISE_URL.to_string()],
+        BASE_UNIX_SECS,
+    );
     let response_jwt =
         respond_to_oid4vp_request(&door.holder, &envelope.compact, &request, BASE_UNIX_SECS)
             .test_unwrap();
@@ -804,11 +864,16 @@ fn oid4vp_submission(door: &Door, passport: &AgentPassport) -> (Oid4vpRequestObj
         passport,
         ADVERTISE_URL,
         &door.authority,
+        &passport_issuer_set(passport),
         BASE_UNIX_SECS,
         None,
     )
     .test_unwrap();
-    let request = register_request(&door.config, Vec::new(), BASE_UNIX_SECS);
+    let request = register_request(
+        &door.config,
+        vec![ADVERTISE_URL.to_string()],
+        BASE_UNIX_SECS,
+    );
     let response =
         respond_to_oid4vp_request(&door.holder, &envelope.compact, &request, BASE_UNIX_SECS)
             .test_unwrap();

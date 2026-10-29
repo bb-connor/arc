@@ -362,7 +362,16 @@ fn create_passport_with_enterprise_identity(
     );
 }
 
-fn create_challenge(output_path: &Path, verifier: &str, verifier_policy_path: Option<&Path>) {
+fn read_passport(path: &Path) -> serde_json::Value {
+    serde_json::from_slice(&fs::read(path).expect("read passport")).expect("parse passport")
+}
+
+fn create_challenge(
+    output_path: &Path,
+    verifier: &str,
+    issuer_did: &str,
+    verifier_policy_path: Option<&Path>,
+) {
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.current_dir(workspace_root()).args([
         "passport",
@@ -372,6 +381,8 @@ fn create_challenge(output_path: &Path, verifier: &str, verifier_policy_path: Op
         output_path.to_str().expect("challenge path"),
         "--verifier",
         verifier,
+        "--issuer",
+        issuer_did,
     ]);
     if let Some(verifier_policy_path) = verifier_policy_path {
         command.args([
@@ -393,6 +404,7 @@ fn create_remote_challenge(
     service_token: &str,
     output_path: &Path,
     verifier: &str,
+    issuer_did: &str,
     policy_id: &str,
 ) {
     let output = Command::new(env!("CARGO_BIN_EXE_chio"))
@@ -409,6 +421,8 @@ fn create_remote_challenge(
             output_path.to_str().expect("challenge path"),
             "--verifier",
             verifier,
+            "--issuer",
+            issuer_did,
             "--policy-id",
             policy_id,
         ])
@@ -752,9 +766,7 @@ fn setup_enterprise_federated_issue_case(
         Some(&enterprise_identity_path),
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -787,7 +799,12 @@ fn setup_enterprise_federated_issue_case(
     for _ in 0..5 {
         let listen = reserve_listen_addr();
         let base_url = format!("http://{listen}");
-        create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+        create_challenge(
+            &challenge_path,
+            &base_url,
+            issuer_did,
+            Some(&verifier_policy_path),
+        );
         create_challenge_response(
             &passport_path,
             &challenge_path,
@@ -899,9 +916,7 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
         &issuer_seed_path,
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -921,7 +936,12 @@ fn trust_service_federated_issue_consumes_challenge_bound_passport_response() {
     let listen = reserve_listen_addr();
     let base_url = format!("http://{listen}");
     let service_token = "federated-issue-token";
-    create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+    create_challenge(
+        &challenge_path,
+        &base_url,
+        issuer_did,
+        Some(&verifier_policy_path),
+    );
     create_challenge_response(
         &passport_path,
         &challenge_path,
@@ -1079,9 +1099,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
         &issuer_seed_path,
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -1133,6 +1151,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
         service_token,
         &challenge_path,
         &base_url,
+        issuer_did,
         "rp-default",
     );
     let challenge: serde_json::Value =
@@ -1261,7 +1280,11 @@ fn trust_service_federated_issue_requires_embedded_or_stored_verifier_policy() {
     let listen = reserve_listen_addr();
     let base_url = format!("http://{listen}");
     let service_token = "federated-issue-no-policy-token";
-    create_challenge(&challenge_path, &base_url, None);
+    let passport = read_passport(&passport_path);
+    let issuer_did = passport["credentials"][0]["issuer"]
+        .as_str()
+        .expect("issuer did");
+    create_challenge(&challenge_path, &base_url, issuer_did, None);
     create_challenge_response(
         &passport_path,
         &challenge_path,
@@ -1353,9 +1376,7 @@ fn trust_service_federated_issue_rejects_scope_outside_delegation_policy() {
         &issuer_seed_path,
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -1375,7 +1396,12 @@ fn trust_service_federated_issue_rejects_scope_outside_delegation_policy() {
     let listen = reserve_listen_addr();
     let base_url = format!("http://{listen}");
     let service_token = "federated-issue-scope-token";
-    create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+    create_challenge(
+        &challenge_path,
+        &base_url,
+        issuer_did,
+        Some(&verifier_policy_path),
+    );
     create_challenge_response(
         &passport_path,
         &challenge_path,
@@ -1500,9 +1526,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
         &issuer_seed_path,
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -1533,6 +1557,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     create_challenge(
         &challenge_a_path,
         &base_url_a,
+        issuer_did,
         Some(&verifier_policy_a_path),
     );
     create_challenge_response(
@@ -1677,6 +1702,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     create_challenge(
         &challenge_b_path,
         &base_url_b,
+        issuer_did,
         Some(&verifier_policy_b_path),
     );
     create_challenge_response(
@@ -1925,9 +1951,7 @@ fn federated_issue_scim_deprovisioned_identity_fails_closed() {
         Some(&enterprise_identity_path),
     );
 
-    let passport: serde_json::Value =
-        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
-            .expect("parse passport");
+    let passport = read_passport(&passport_path);
     let issuer_did = passport["credentials"][0]["issuer"]
         .as_str()
         .expect("issuer did");
@@ -1947,7 +1971,12 @@ fn federated_issue_scim_deprovisioned_identity_fails_closed() {
     let listen = reserve_listen_addr();
     let base_url = format!("http://{listen}");
     let service_token = "federated-issue-scim-token";
-    create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+    create_challenge(
+        &challenge_path,
+        &base_url,
+        issuer_did,
+        Some(&verifier_policy_path),
+    );
     create_challenge_response(
         &passport_path,
         &challenge_path,

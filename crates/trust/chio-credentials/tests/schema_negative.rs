@@ -1,6 +1,8 @@
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
 
+use std::collections::BTreeSet;
+
 use chio_core::crypto::Keypair;
 use chio_credentials::{
     build_agent_passport, create_passport_presentation_challenge,
@@ -144,6 +146,24 @@ fn sample_passport() -> (Keypair, AgentPassport) {
     (holder, passport)
 }
 
+fn sample_issuers() -> BTreeSet<String> {
+    BTreeSet::from([did_from_key(&Keypair::from_seed(&[11_u8; 32]))])
+}
+
+fn sample_options() -> PassportPresentationOptions {
+    PassportPresentationOptions {
+        issuer_allowlist: sample_issuers(),
+        max_credentials: None,
+    }
+}
+
+fn sample_policy() -> PassportVerifierPolicy {
+    PassportVerifierPolicy {
+        issuer_allowlist: sample_issuers(),
+        ..PassportVerifierPolicy::default()
+    }
+}
+
 fn insert_unknown_field(document: &mut serde_json::Value, field: &str) {
     match document {
         serde_json::Value::Object(object) => {
@@ -178,7 +198,7 @@ fn unsupported_passport_schema_variants_fail_closed_before_signature_checks() {
     for schema in bad_schemas {
         let mut tampered = passport.clone();
         tampered.schema = schema.to_string();
-        let error = verify_agent_passport(&tampered, VERIFY_NOW)
+        let error = verify_agent_passport(&tampered, &sample_issuers(), VERIFY_NOW)
             .test_err("unsupported passport schema must reject");
         assert!(
             matches!(error, CredentialError::InvalidPassportSchema),
@@ -196,7 +216,7 @@ fn unsupported_signed_verifier_policy_schema_variants_fail_closed() {
         "https://verifier.example.com",
         ISSUED_AT,
         VALID_UNTIL,
-        PassportVerifierPolicy::default(),
+        sample_policy(),
     )
     .test_ok("create signed policy");
 
@@ -224,7 +244,7 @@ fn unsupported_challenge_and_response_schema_variants_fail_closed() {
         "nonce-123",
         ISSUED_AT,
         VALID_UNTIL,
-        PassportPresentationOptions::default(),
+        sample_options(),
         None,
     )
     .test_ok("create challenge");
@@ -279,7 +299,7 @@ fn native_wire_documents_reject_unknown_fields_before_verification() {
         "https://verifier.example.com",
         ISSUED_AT,
         VALID_UNTIL,
-        PassportVerifierPolicy::default(),
+        sample_policy(),
     )
     .test_ok("create signed policy");
     let mut signed_policy_json =
@@ -294,7 +314,7 @@ fn native_wire_documents_reject_unknown_fields_before_verification() {
         "nonce-123",
         ISSUED_AT,
         VALID_UNTIL,
-        PassportPresentationOptions::default(),
+        sample_options(),
         None,
     )
     .test_ok("create challenge");

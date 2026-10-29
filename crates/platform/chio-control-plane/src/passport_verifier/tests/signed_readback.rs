@@ -13,7 +13,12 @@ fn signed_policy_registry_rejects_exact_record_under_wrong_key() -> TestResult {
         "verifier",
         1,
         100,
-        chio_credentials::PassportVerifierPolicy::default(),
+        chio_credentials::PassportVerifierPolicy {
+            issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))]
+                .into_iter()
+                .collect(),
+            ..chio_credentials::PassportVerifierPolicy::default()
+        },
     )?;
     let mut registry = VerifierPolicyRegistry::default();
     registry

@@ -501,7 +501,14 @@ fn passport_policy_admin_cli_supports_remote_upsert_list_get_and_delete() {
     let signed_policy_path = dir.join("signed-verifier-policy.json");
     let verifier_seed_path = dir.join("verifier-seed.txt");
 
-    fs::write(&raw_policy_path, "{}\n").expect("write raw verifier policy");
+    fs::write(
+        &raw_policy_path,
+        format!(
+            "{{\"issuerAllowlist\":[\"did:chio:{}\"]}}\n",
+            "11".repeat(32)
+        ),
+    )
+    .expect("write raw verifier policy");
 
     let service_token = "passport-policy-admin-http-token";
     let (_service, _client, base_url) = start_trust_service_with_policy_registry(
@@ -656,7 +663,14 @@ fn trust_service_health_reports_enterprise_and_verifier_policy_state() {
             Some("jwks:enterprise-login"),
         )],
     );
-    fs::write(&raw_policy_path, "{}\n").expect("write raw verifier policy");
+    fs::write(
+        &raw_policy_path,
+        format!(
+            "{{\"issuerAllowlist\":[\"did:chio:{}\"]}}\n",
+            "11".repeat(32)
+        ),
+    )
+    .expect("write raw verifier policy");
 
     let service_token = "trust-health-token";
     let (_service, client, base_url) = start_trust_service_with_policy_registry(

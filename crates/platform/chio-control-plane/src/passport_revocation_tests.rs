@@ -166,7 +166,12 @@ fn a_revoked_passport_with_rewritten_proof_metadata_is_refused() -> TestResult {
     for credential in &mut rewritten.credentials {
         credential.proof.created = "2030-01-01T00:00:00Z".to_string();
     }
-    verify_agent_passport(&rewritten, NOW)?;
+    let trusted_issuers = rewritten
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect();
+    verify_agent_passport(&rewritten, &trusted_issuers, NOW)?;
     let resolution = PassportStatusRegistry::load(&path)?.resolve_for_passport(&rewritten, NOW)?;
     assert_eq!(resolution.state, PassportLifecycleState::NotFound);
     assert_ne!(resolution.passport_id, record.passport_id);

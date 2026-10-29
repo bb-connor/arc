@@ -566,7 +566,12 @@ mod tests {
             "https://verifier.example",
             created_at,
             expires_at,
-            PassportVerifierPolicy::default(),
+            PassportVerifierPolicy {
+                issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))]
+                    .into_iter()
+                    .collect(),
+                ..PassportVerifierPolicy::default()
+            },
         )
         .test_expect("create signed verifier policy")
     }

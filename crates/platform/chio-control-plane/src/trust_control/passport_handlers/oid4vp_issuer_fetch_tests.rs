@@ -243,6 +243,17 @@ fn build_passport_until(
     build_agent_passport(&subject_did, vec![credential]).test_unwrap()
 }
 
+/// The issuers of `passport`, as the trusted set a portable signer projects.
+pub(super) fn passport_issuer_set(
+    passport: &chio_credentials::AgentPassport,
+) -> std::collections::BTreeSet<String> {
+    passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect()
+}
+
 pub(super) fn register_request(
     config: &TrustServiceConfig,
     issuer_allowlist: Vec<String>,
@@ -294,10 +305,17 @@ async fn public_direct_post_refuses_untrusted_issuer_before_any_fetch() {
             .test_unwrap();
     let server = IssuerServer::start(serde_json::to_string(&jwks).test_unwrap());
     let issuer_url = format!("http://{}", server.addr);
-    let envelope =
-        issue_chio_passport_sd_jwt_vc(&passport, &issuer_url, &attacker, now, None).test_unwrap();
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        &issuer_url,
+        &attacker,
+        &passport_issuer_set(&passport),
+        now,
+        None,
+    )
+    .test_unwrap();
 
-    // The verifier request carries an EMPTY issuer allowlist.
+    // The verifier request carries an EMPTY issuer allowlist, which trusts no issuer.
     let request = register_request(&config, Vec::new(), now);
     let response_jwt =
         respond_to_oid4vp_request(&subject, &envelope.compact, &request, now).test_unwrap();
@@ -339,10 +357,17 @@ async fn public_direct_post_accepts_locally_issued_credential_without_fetch() {
     let authority = resolve_oid4vp_verifier_signing_key(&config).test_unwrap();
     let subject = Keypair::generate();
     let passport = build_passport(&subject, now);
-    let envelope = issue_chio_passport_sd_jwt_vc(&passport, advertise_url, &authority, now, None)
-        .test_unwrap();
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        advertise_url,
+        &authority,
+        &passport_issuer_set(&passport),
+        now,
+        None,
+    )
+    .test_unwrap();
 
-    let request = register_request(&config, Vec::new(), now);
+    let request = register_request(&config, vec![advertise_url.to_string()], now);
     let response_jwt =
         respond_to_oid4vp_request(&subject, &envelope.compact, &request, now).test_unwrap();
 
@@ -380,9 +405,16 @@ async fn public_direct_post_refuses_acceptance_past_request_expiry() {
     let authority = resolve_oid4vp_verifier_signing_key(&config).test_unwrap();
     let subject = Keypair::generate();
     let passport = build_passport(&subject, base);
-    let envelope = issue_chio_passport_sd_jwt_vc(&passport, advertise_url, &authority, base, None)
-        .test_unwrap();
-    let request = register_request(&config, Vec::new(), base);
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        advertise_url,
+        &authority,
+        &passport_issuer_set(&passport),
+        base,
+        None,
+    )
+    .test_unwrap();
+    let request = register_request(&config, vec![advertise_url.to_string()], base);
     let response_jwt =
         respond_to_oid4vp_request(&subject, &envelope.compact, &request, base).test_unwrap();
 
@@ -442,9 +474,16 @@ async fn public_direct_post_refuses_credential_expired_during_the_wait() {
     let authority = resolve_oid4vp_verifier_signing_key(&config).test_unwrap();
     let subject = Keypair::generate();
     let passport = build_passport_until(&subject, base, credential_valid_until);
-    let envelope = issue_chio_passport_sd_jwt_vc(&passport, advertise_url, &authority, base, None)
-        .test_unwrap();
-    let request = register_request(&config, Vec::new(), base);
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        advertise_url,
+        &authority,
+        &passport_issuer_set(&passport),
+        base,
+        None,
+    )
+    .test_unwrap();
+    let request = register_request(&config, vec![advertise_url.to_string()], base);
     let response_jwt =
         respond_to_oid4vp_request(&subject, &envelope.compact, &request, base).test_unwrap();
 
@@ -506,9 +545,16 @@ async fn public_direct_post_reads_the_local_authority_database_without_writing()
 
     let subject = Keypair::generate();
     let passport = build_passport(&subject, now);
-    let envelope = issue_chio_passport_sd_jwt_vc(&passport, advertise_url, &authority, now, None)
-        .test_unwrap();
-    let request = register_request(&config, Vec::new(), now);
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        advertise_url,
+        &authority,
+        &passport_issuer_set(&passport),
+        now,
+        None,
+    )
+    .test_unwrap();
+    let request = register_request(&config, vec![advertise_url.to_string()], now);
     let response_jwt =
         respond_to_oid4vp_request(&subject, &envelope.compact, &request, now).test_unwrap();
 

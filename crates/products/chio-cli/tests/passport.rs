@@ -629,6 +629,26 @@ fn publish_passport_status(passport_path: &Path, registry_path: &Path) -> serde_
     serde_json::from_slice(&output.stdout).expect("parse passport status publish")
 }
 
+fn trusted_issuer_args(passport_path: &Path) -> Vec<String> {
+    let passport: serde_json::Value =
+        serde_json::from_slice(&fs::read(passport_path).expect("read passport"))
+            .expect("parse passport");
+    passport["credentials"]
+        .as_array()
+        .expect("credentials array")
+        .iter()
+        .flat_map(|credential| {
+            [
+                "--trusted-issuer".to_string(),
+                credential["issuer"]
+                    .as_str()
+                    .expect("issuer did")
+                    .to_string(),
+            ]
+        })
+        .collect()
+}
+
 #[test]
 fn passport_create_verify_and_present_roundtrip() {
     let receipt_db_path = unique_path("passport", ".sqlite3");
@@ -747,6 +767,7 @@ fn passport_create_verify_and_present_roundtrip() {
             "--input",
             passport_path.to_str().expect("passport path"),
         ])
+        .args(trusted_issuer_args(&passport_path))
         .output()
         .expect("run passport verify");
 
@@ -757,6 +778,41 @@ fn passport_create_verify_and_present_roundtrip() {
         String::from_utf8_lossy(&verify.stderr)
     );
     assert!(String::from_utf8_lossy(&verify.stdout).contains("passport verified"));
+
+    let verify_unpinned = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .current_dir(workspace_root())
+        .args([
+            "passport",
+            "verify",
+            "--input",
+            passport_path.to_str().expect("passport path"),
+        ])
+        .output()
+        .expect("run passport verify without a trusted issuer");
+    assert!(!verify_unpinned.status.success());
+    assert!(String::from_utf8_lossy(&verify_unpinned.stderr).contains("--trusted-issuer"));
+
+    let outsider_did = did_from_public_key(Keypair::generate().public_key()).to_string();
+    let verify_outsider = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .current_dir(workspace_root())
+        .args([
+            "passport",
+            "verify",
+            "--input",
+            passport_path.to_str().expect("passport path"),
+            "--trusted-issuer",
+            &outsider_did,
+        ])
+        .output()
+        .expect("run passport verify with an outsider trusted issuer");
+    assert!(!verify_outsider.status.success());
+    assert!(
+        String::from_utf8_lossy(&verify_outsider.stderr).contains(&format!(
+            "credential issuer {issuer_did} is not in the verifier trusted issuer set"
+        )),
+        "stderr={}",
+        String::from_utf8_lossy(&verify_outsider.stderr)
+    );
 
     fs::write(
         &accept_policy_path,
@@ -865,6 +921,7 @@ fn passport_create_verify_and_present_roundtrip() {
             "--input",
             presented_path.to_str().expect("presented path"),
         ])
+        .args(trusted_issuer_args(&presented_path))
         .output()
         .expect("run presented passport verify");
 
@@ -1080,6 +1137,7 @@ fn passport_create_and_verify_surface_enterprise_identity_provenance() {
             "--input",
             passport_path.to_str().expect("passport path"),
         ])
+        .args(trusted_issuer_args(&passport_path))
         .output()
         .expect("run passport verify");
 
@@ -1143,6 +1201,7 @@ fn passport_status_registry_supports_publish_supersede_and_revoke() {
             "--passport-statuses-file",
             registry_path.to_str().expect("registry path"),
         ])
+        .args(trusted_issuer_args(&passport_a_path))
         .output()
         .expect("run passport verify");
 
@@ -1394,6 +1453,8 @@ fn passport_lifecycle_policy_enforcement_rejects_superseded_and_revoked_passport
             "300",
             "--policy",
             policy_path.to_str().expect("policy path"),
+            "--issuer",
+            &issuer_did,
         ])
         .output()
         .expect("run lifecycle challenge create");
@@ -1688,6 +1749,8 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
             "https://rp.example.com",
             "--policy-id",
             "rp-default",
+            "--issuer",
+            &issuer_did,
             "--verifier-policies-file",
             policy_registry_path.to_str().expect("policy registry path"),
             "--verifier-challenge-db",
@@ -1802,7 +1865,7 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
 }
 
 #[test]
-fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
+fn passport_cli_verifies_multi_issuer_passports_and_evaluates_only_pinned_issuers() {
     let passport_path = unique_path("passport-multi-issuer", ".json");
     let presented_path = unique_path("passport-multi-issuer-presented", ".json");
     let verify_policy_path = unique_path("passport-multi-issuer-policy", ".yaml");
@@ -1830,11 +1893,8 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
     .expect("credential b");
     let issuer_a = credential_a.unsigned.issuer.clone();
     let issuer_b = credential_b.unsigned.issuer.clone();
-    let passport = build_agent_passport(
-        &subject_did.to_string(),
-        vec![credential_a.clone(), credential_b.clone()],
-    )
-    .expect("passport");
+    let passport = build_agent_passport(&subject_did.to_string(), vec![credential_a, credential_b])
+        .expect("passport");
     fs::write(
         &passport_path,
         serde_json::to_vec_pretty(&passport).expect("serialize passport"),
@@ -1857,6 +1917,7 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
             "--input",
             passport_path.to_str().expect("passport path"),
         ])
+        .args(trusted_issuer_args(&passport_path))
         .output()
         .expect("run passport verify");
     assert!(
@@ -1878,7 +1939,7 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
         .iter()
         .any(|issuer| issuer == &serde_json::json!(issuer_b)));
 
-    let evaluate = Command::new(env!("CARGO_BIN_EXE_chio"))
+    let evaluate_mixed = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
             "--json",
@@ -1890,32 +1951,15 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
             verify_policy_path.to_str().expect("verify policy path"),
         ])
         .output()
-        .expect("run passport evaluate");
+        .expect("run mixed-issuer passport evaluate");
+    assert!(!evaluate_mixed.status.success());
     assert!(
-        evaluate.status.success(),
-        "stdout={}\nstderr={}",
-        String::from_utf8_lossy(&evaluate.stdout),
-        String::from_utf8_lossy(&evaluate.stderr)
+        String::from_utf8_lossy(&evaluate_mixed.stderr).contains(&format!(
+            "credential issuer {issuer_b} is not in the verifier trusted issuer set"
+        )),
+        "stderr={}",
+        String::from_utf8_lossy(&evaluate_mixed.stderr)
     );
-    let evaluate_json: serde_json::Value =
-        serde_json::from_slice(&evaluate.stdout).expect("parse evaluate output");
-    assert_eq!(evaluate_json["accepted"], true);
-    assert_eq!(evaluate_json["verification"]["issuerCount"], 2);
-    assert_eq!(
-        evaluate_json["matchedCredentialIndexes"],
-        serde_json::json!([0])
-    );
-    assert_eq!(
-        evaluate_json["matchedIssuers"],
-        serde_json::json!([issuer_a])
-    );
-    assert_eq!(
-        evaluate_json["credentialResults"][0]["issuer"],
-        evaluate_json["matchedIssuers"][0]
-    );
-    assert_eq!(evaluate_json["credentialResults"][0]["accepted"], true);
-    assert_eq!(evaluate_json["credentialResults"][1]["issuer"], issuer_b);
-    assert_eq!(evaluate_json["credentialResults"][1]["accepted"], false);
 
     let present = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
@@ -1927,7 +1971,7 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
             "--output",
             presented_path.to_str().expect("presented path"),
             "--issuer",
-            &credential_b.unsigned.issuer,
+            &issuer_a,
             "--max-credentials",
             "1",
         ])
@@ -1949,9 +1993,37 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
             .len(),
         1
     );
+    assert_eq!(presented["credentials"][0]["issuer"], issuer_a);
+
+    let evaluate = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "passport",
+            "evaluate",
+            "--input",
+            presented_path.to_str().expect("presented path"),
+            "--policy",
+            verify_policy_path.to_str().expect("verify policy path"),
+        ])
+        .output()
+        .expect("run passport evaluate");
+    assert!(
+        evaluate.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&evaluate.stdout),
+        String::from_utf8_lossy(&evaluate.stderr)
+    );
+    let evaluate_json: serde_json::Value =
+        serde_json::from_slice(&evaluate.stdout).expect("parse evaluate output");
+    assert_eq!(evaluate_json["accepted"], true);
     assert_eq!(
-        presented["credentials"][0]["issuer"],
-        credential_b.unsigned.issuer
+        evaluate_json["matchedCredentialIndexes"],
+        serde_json::json!([0])
+    );
+    assert_eq!(
+        evaluate_json["matchedIssuers"],
+        serde_json::json!([issuer_a])
     );
 }
 
@@ -3122,6 +3194,7 @@ fn passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay() {
         now + 86_400,
         "public-holder-transport",
     );
+    let issuer_did = did_from_public_key(issuer.public_key()).to_string();
     write_private_file(&holder_seed_path, format!("{}\n", subject.seed_hex()))
         .expect("write holder seed");
 
@@ -3152,6 +3225,8 @@ fn passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay() {
             challenge_path.to_str().expect("challenge path"),
             "--verifier",
             "https://wallet-rp.example.com",
+            "--issuer",
+            &issuer_did,
         ])
         .output()
         .expect("run remote public-holder challenge create");
@@ -3382,6 +3457,15 @@ fn passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified()
             Some(subject_did),
         )
         .expect("validate credential response");
+    let delivered_passport = credential_response
+        .credential
+        .native_passport()
+        .expect("native passport credential");
+    let delivered_issuers = delivered_passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect::<Vec<_>>();
 
     let challenge_response: serde_json::Value = client
         .post(format!("{base_url}/v1/passport/challenges"))
@@ -3389,6 +3473,7 @@ fn passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified()
         .json(&serde_json::json!({
             "verifier": "https://interop-rp.example.com",
             "ttlSeconds": 300,
+            "issuers": delivered_issuers,
         }))
         .send()
         .expect("create verifier challenge")
@@ -3418,10 +3503,6 @@ fn passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified()
         fetched_challenge.challenge_id.as_deref(),
         Some(challenge_id)
     );
-    let delivered_passport = credential_response
-        .credential
-        .native_passport()
-        .expect("native passport credential");
 
     let presentation = respond_to_passport_presentation_challenge(
         &subject,

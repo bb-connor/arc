@@ -682,8 +682,15 @@ fn allowlisted_remote_issuer_verifies_end_to_end() {
     )
     .test_unwrap();
     let passport = build_agent_passport(&subject_did, vec![credential]).test_unwrap();
-    let envelope = issue_chio_passport_sd_jwt_vc(&passport, issuer_url, &issuer_keypair, now, None)
-        .test_unwrap();
+    let envelope = issue_chio_passport_sd_jwt_vc(
+        &passport,
+        issuer_url,
+        &issuer_keypair,
+        &passport_issuer_set(&passport),
+        now,
+        None,
+    )
+    .test_unwrap();
 
     let request = Oid4vpRequestObject {
         client_id: "https://verifier.example".to_string(),
@@ -859,4 +866,15 @@ fn a_local_lifecycle_is_resolved_again_at_acceptance() {
         recheck_oid4vp_passport_lifecycle(&config, "passport-1", None, planned, 1_000, 2_000)
             .test_unwrap_err();
     assert_eq!(recheck.to_string(), unreadable);
+}
+
+/// The issuers of `passport`, as the trusted set a portable signer projects.
+fn passport_issuer_set(
+    passport: &chio_credentials::AgentPassport,
+) -> std::collections::BTreeSet<String> {
+    passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect()
 }

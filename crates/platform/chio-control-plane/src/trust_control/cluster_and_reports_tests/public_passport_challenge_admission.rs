@@ -114,7 +114,15 @@ impl HolderSubmissions {
                 nonce: format!("nonce-{challenge_id}"),
                 issued_at: self.now,
                 expires_at: self.now.saturating_add(600),
-                options: PassportPresentationOptions::default(),
+                options: PassportPresentationOptions {
+                    issuer_allowlist: self
+                        .passport
+                        .credentials
+                        .iter()
+                        .map(|credential| credential.unsigned.issuer.clone())
+                        .collect(),
+                    max_credentials: None,
+                },
                 policy_ref: None,
                 policy: None,
             },

@@ -100,7 +100,7 @@ impl RunningService {
             .json(&CreatePassportChallengeRequest {
                 verifier: VERIFIER.to_string(),
                 ttl_seconds: 600,
-                issuers: Vec::new(),
+                issuers: vec![holder_issuer_did()],
                 max_credentials: None,
                 policy_id: Some(POLICY_ID.to_string()),
                 policy: None,
@@ -138,7 +138,7 @@ impl RunningService {
             .bearer_auth(TOKEN)
             .json(&VerifyPassportChallengeRequest {
                 presentation,
-                expected_challenge: None,
+                expected_challenge: Some(challenge.clone()),
             })
             // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
             .send()
@@ -149,6 +149,22 @@ impl RunningService {
 impl Drop for RunningService {
     fn drop(&mut self) {
         self.server.abort();
+    }
+}
+
+/// The did:chio of the issuer that signs the holder passport.
+fn holder_issuer_did() -> String {
+    chio_credentials::trusted_issuers_from_keys(&[Keypair::from_seed(&[72; 32]).public_key()])
+        .ok()
+        .and_then(|issuers| issuers.into_iter().next())
+        .unwrap_or_default()
+}
+
+/// A policy that pins the holder passport issuer.
+fn holder_policy() -> PassportVerifierPolicy {
+    PassportVerifierPolicy {
+        issuer_allowlist: [holder_issuer_did()].into_iter().collect(),
+        ..PassportVerifierPolicy::default()
     }
 }
 
@@ -265,7 +281,7 @@ async fn error_body(response: reqwest::Response) -> Result<serde_json::Value, re
 
 #[tokio::test]
 async fn a_policy_deleted_after_startup_refuses_the_next_challenge() -> TestResult {
-    let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
+    let initial = registry_with(signed_policy(holder_policy())?)?;
     let service = RunningService::start(Some(&initial)).await?;
     let deleted = service
         .client
@@ -291,9 +307,7 @@ async fn a_policy_deleted_after_startup_refuses_the_next_challenge() -> TestResu
 #[tokio::test]
 async fn a_policy_added_after_startup_serves_the_next_challenge() -> TestResult {
     let service = RunningService::start(None).await?;
-    service
-        .upsert(&signed_policy(PassportVerifierPolicy::default())?)
-        .await?;
+    service.upsert(&signed_policy(holder_policy())?).await?;
     let challenge = service.challenge().await?;
     assert_eq!(
         challenge.policy_ref.map(|reference| reference.policy_id),
@@ -304,7 +318,7 @@ async fn a_policy_added_after_startup_serves_the_next_challenge() -> TestResult 
 
 #[tokio::test]
 async fn a_policy_tightened_after_startup_denies_the_next_verification() -> TestResult {
-    let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
+    let initial = registry_with(signed_policy(holder_policy())?)?;
     let service = RunningService::start(Some(&initial)).await?;
     let holder = Holder::new()?;
 
@@ -324,7 +338,7 @@ async fn a_policy_tightened_after_startup_denies_the_next_verification() -> Test
     let challenge = service.challenge().await?;
     let tightened = PassportVerifierPolicy {
         min_receipt_count: Some(1),
-        ..PassportVerifierPolicy::default()
+        ..holder_policy()
     };
     service.upsert(&signed_policy(tightened.clone())?).await?;
     let response = service.verify(&holder, &challenge).await?;
@@ -346,7 +360,7 @@ async fn a_policy_tightened_after_startup_denies_the_next_verification() -> Test
 
 #[tokio::test]
 async fn a_registry_corrupted_after_startup_refuses_challenges_and_verifications() -> TestResult {
-    let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
+    let initial = registry_with(signed_policy(holder_policy())?)?;
     let service = RunningService::start(Some(&initial)).await?;
     let holder = Holder::new()?;
     let challenge = service.challenge().await?;

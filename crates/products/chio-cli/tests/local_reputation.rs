@@ -93,6 +93,10 @@ fn spawn_trust_service(
             &trust_access::write_access_config(service_token, &[]),
             "--policy",
             policy_path.to_str().expect("policy path"),
+            "--verifier-policies-file",
+            verifier_policies_path(receipt_db_path)
+                .to_str()
+                .expect("verifier policies path"),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -100,6 +104,64 @@ fn spawn_trust_service(
         .spawn()
         .expect("spawn trust service");
     ServerGuard { child }
+}
+
+const COMPARE_POLICY_ID: &str = "compare-default";
+
+fn verifier_policies_path(receipt_db_path: &Path) -> PathBuf {
+    receipt_db_path.with_file_name("verifier-policies.json")
+}
+
+/// Registers a verifier policy that pins the passport issuer, for remote
+/// reputation compare, in the registry the trust service reads.
+fn register_compare_policy(receipt_db_path: &Path, passport_path: &Path) {
+    let passport: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(passport_path).expect("read passport"))
+            .expect("parse passport");
+    let issuer_did = passport["credentials"][0]["issuer"]
+        .as_str()
+        .expect("issuer did");
+    let raw_policy_path = receipt_db_path.with_file_name("compare-policy.yaml");
+    let signed_policy_path = receipt_db_path.with_file_name("compare-policy.json");
+    let verifier_seed_path = receipt_db_path.with_file_name("compare-verifier-seed.txt");
+    std::fs::write(
+        &raw_policy_path,
+        format!("issuerAllowlist:\n  - \"{issuer_did}\"\n"),
+    )
+    .expect("write compare policy");
+    std::fs::write(&verifier_seed_path, Keypair::generate().seed_hex())
+        .expect("write verifier seed");
+    let output = Command::new(env!("CARGO_BIN_EXE_chio"))
+        .current_dir(workspace_root())
+        .args([
+            "passport",
+            "policy",
+            "create",
+            "--output",
+            signed_policy_path.to_str().expect("signed policy path"),
+            "--policy-id",
+            COMPARE_POLICY_ID,
+            "--verifier",
+            "https://rp.example.com",
+            "--signing-seed-file",
+            verifier_seed_path.to_str().expect("verifier seed path"),
+            "--policy",
+            raw_policy_path.to_str().expect("raw policy path"),
+            "--expires-at",
+            "4102444800",
+            "--verifier-policies-file",
+            verifier_policies_path(receipt_db_path)
+                .to_str()
+                .expect("verifier policies path"),
+        ])
+        .output()
+        .expect("run passport policy create");
+    assert!(
+        output.status.success(),
+        "chio passport policy create failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn wait_for_trust_service(client: &Client, base_url: &str) {
@@ -520,6 +582,7 @@ fn trust_service_exposes_reputation_compare_over_http() {
         &signing_seed_path,
     );
 
+    register_compare_policy(&receipt_db_path, &passport_path);
     let passport: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&passport_path).expect("read passport"))
             .expect("parse passport");
@@ -540,11 +603,28 @@ fn trust_service_exposes_reputation_compare_over_http() {
     let client = Client::builder().build().expect("build reqwest client");
     wait_for_trust_service(&client, &base_url);
 
+    let inline_policy = client
+        .post(format!("{base_url}/v1/reputation/compare/{subject_hex}"))
+        .header("Authorization", format!("Bearer {service_token}"))
+        .json(&serde_json::json!({
+            "passport": passport,
+            "verifierPolicyId": COMPARE_POLICY_ID,
+            "verifierPolicy": {"issuerAllowlist": [passport["credentials"][0]["issuer"]]},
+        }))
+        .send()
+        .expect("send inline-policy reputation compare request");
+    assert!(
+        inline_policy.status().is_client_error(),
+        "inline verifier policy must be refused: {}",
+        inline_policy.text().unwrap_or_default()
+    );
+
     let response = client
         .post(format!("{base_url}/v1/reputation/compare/{subject_hex}"))
         .header("Authorization", format!("Bearer {service_token}"))
         .json(&serde_json::json!({
             "passport": passport,
+            "verifierPolicyId": COMPARE_POLICY_ID,
         }))
         .send()
         .expect("send reputation compare request");
@@ -561,6 +641,7 @@ fn trust_service_exposes_reputation_compare_over_http() {
         .json(&serde_json::json!({
             "passport": serde_json::from_slice::<serde_json::Value>(&std::fs::read(&passport_path).expect("read passport again"))
                 .expect("parse passport again"),
+            "verifierPolicyId": COMPARE_POLICY_ID,
         }))
         .send()
         .expect("send reputation compare request")
@@ -855,6 +936,7 @@ fn cli_reputation_compare_supports_control_service_local_view() {
         &passport_path,
         &signing_seed_path,
     );
+    register_compare_policy(&receipt_db_path, &passport_path);
 
     let listen = reserve_listen_addr();
     let service_token = "local-reputation-compare-service-token";
@@ -886,6 +968,8 @@ fn cli_reputation_compare_supports_control_service_local_view() {
             &subject_hex,
             "--passport",
             passport_path.to_str().expect("passport path"),
+            "--verifier-policy-id",
+            COMPARE_POLICY_ID,
         ])
         .output()
         .expect("run chio reputation compare over control service");
@@ -952,6 +1036,7 @@ fn trust_service_reputation_views_include_imported_trust_provenance() {
         &passport_path,
         &signing_seed_path,
     );
+    register_compare_policy(&receipt_db_path, &passport_path);
     let passport: serde_json::Value =
         serde_json::from_slice(&std::fs::read(&passport_path).expect("read passport"))
             .expect("parse passport");
@@ -991,6 +1076,7 @@ fn trust_service_reputation_views_include_imported_trust_provenance() {
         .header("Authorization", format!("Bearer {service_token}"))
         .json(&serde_json::json!({
             "passport": passport,
+            "verifierPolicyId": COMPARE_POLICY_ID,
         }))
         .send()
         .expect("send reputation compare request")

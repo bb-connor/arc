@@ -704,7 +704,7 @@ describe('dashboard api helpers', () => {
     })
     vi.stubGlobal('fetch', fetchMock)
 
-    await fetchReputationComparison('agent-a', { schema: 'chio.agent-passport.v1' })
+    await fetchReputationComparison('agent-a', { schema: 'chio.agent-passport.v1' }, 'rp-default')
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/v1/reputation/compare/agent-a',
@@ -712,6 +712,7 @@ describe('dashboard api helpers', () => {
         method: 'POST',
         body: JSON.stringify({
           passport: { schema: 'chio.agent-passport.v1' },
+          verifierPolicyId: 'rp-default',
         }),
         headers: expect.objectContaining({
           Authorization: 'Bearer bearer-token',

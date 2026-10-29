@@ -396,7 +396,12 @@ fn policy(policy_id: &str) -> Result<SignedPassportVerifierPolicy, Box<dyn std::
         "verifier",
         now,
         now + 3_600,
-        chio_credentials::PassportVerifierPolicy::default(),
+        chio_credentials::PassportVerifierPolicy {
+            issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))]
+                .into_iter()
+                .collect(),
+            ..chio_credentials::PassportVerifierPolicy::default()
+        },
     )?)
 }
 

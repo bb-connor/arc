@@ -46,97 +46,95 @@ describe('PortableReputationPanel', () => {
 
   it('uploads a passport and renders comparison drift from the backend', async () => {
     sessionStorage.setItem('chio_token', 'bearer-token')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        subjectKey: 'agent-a',
+        passportSubject: 'did:chio:agent-a',
+        subjectMatches: true,
+        comparedAt: 1_700_000_000,
+        local: {
           subjectKey: 'agent-a',
-          passportSubject: 'did:chio:agent-a',
-          subjectMatches: true,
-          comparedAt: 1_700_000_000,
-          local: {
-            subjectKey: 'agent-a',
-            effectiveScore: 0.82,
-            probationary: false,
-            scoringSource: 'issuance_policy',
-            resolvedTier: { name: 'trusted' },
+          effectiveScore: 0.82,
+          probationary: false,
+          scoringSource: 'issuance_policy',
+          resolvedTier: { name: 'trusted' },
+        },
+        passportVerification: {
+          subject: 'did:chio:agent-a',
+          issuer: null,
+          issuers: ['did:chio:issuer-a', 'did:chio:issuer-b'],
+          issuerCount: 2,
+          credentialCount: 1,
+          merkleRootCount: 1,
+          verifiedAt: 1_700_000_000,
+          validUntil: '2026-03-30T00:00:00Z',
+        },
+        passportEvaluation: {
+          accepted: true,
+          matchedCredentialIndexes: [0],
+        },
+        credentialDrifts: [
+          {
+            index: 0,
+            issuer: 'did:chio:issuer-a',
+            issuanceDate: '2026-03-01T00:00:00Z',
+            expirationDate: '2026-03-30T00:00:00Z',
+            attestationUntil: 1_700_000_000,
+            receiptCount: 2,
+            lineageRecords: 1,
+            policyAccepted: true,
+            metrics: {
+              compositeScore: { localMinusPortable: 0 },
+              reliability: { localMinusPortable: 0.05 },
+              delegationHygiene: { localMinusPortable: -0.02 },
+              resourceStewardship: { localMinusPortable: 0.01 },
+            },
           },
-          passportVerification: {
-            subject: 'did:chio:agent-a',
-            issuer: null,
-            issuers: ['did:chio:issuer-a', 'did:chio:issuer-b'],
-            issuerCount: 2,
-            credentialCount: 1,
-            merkleRootCount: 1,
-            verifiedAt: 1_700_000_000,
-            validUntil: '2026-03-30T00:00:00Z',
+        ],
+        sharedEvidence: {
+          summary: {
+            matchingShares: 1,
+            matchingReferences: 1,
+            matchingLocalReceipts: 2,
+            remoteToolReceipts: 4,
+            remoteLineageRecords: 3,
+            distinctRemoteSubjects: 1,
+            proofRequiredShares: 1,
+            truncated: false,
           },
-          passportEvaluation: {
-            accepted: true,
-            matchedCredentialIndexes: [0],
-          },
-          credentialDrifts: [
+          references: [
             {
-              index: 0,
-              issuer: 'did:chio:issuer-a',
-              issuanceDate: '2026-03-01T00:00:00Z',
-              expirationDate: '2026-03-30T00:00:00Z',
-              attestationUntil: 1_700_000_000,
-              receiptCount: 2,
-              lineageRecords: 1,
-              policyAccepted: true,
-              metrics: {
-                compositeScore: { localMinusPortable: 0 },
-                reliability: { localMinusPortable: 0.05 },
-                delegationHygiene: { localMinusPortable: -0.02 },
-                resourceStewardship: { localMinusPortable: 0.01 },
+              share: {
+                shareId: 'share-1',
+                manifestHash: 'manifest-1',
+                importedAt: 1_700_000_100,
+                exportedAt: 1_700_000_050,
+                issuer: 'org-alpha',
+                partner: 'org-beta',
+                signerPublicKey: 'pubkey-1',
+                requireProofs: true,
+                toolReceipts: 4,
+                capabilityLineage: 3,
               },
+              capabilityId: 'cap-remote-1',
+              subjectKey: 'remote-subject',
+              issuerKey: 'remote-issuer',
+              delegationDepth: 0,
+              localAnchorCapabilityId: 'cap-local-1',
+              matchedLocalReceipts: 2,
+              allowCount: 2,
+              denyCount: 0,
+              cancelledCount: 0,
+              incompleteCount: 0,
+              firstSeen: 1_700_000_110,
+              lastSeen: 1_700_000_120,
             },
           ],
-          sharedEvidence: {
-            summary: {
-              matchingShares: 1,
-              matchingReferences: 1,
-              matchingLocalReceipts: 2,
-              remoteToolReceipts: 4,
-              remoteLineageRecords: 3,
-              distinctRemoteSubjects: 1,
-              proofRequiredShares: 1,
-              truncated: false,
-            },
-            references: [
-              {
-                share: {
-                  shareId: 'share-1',
-                  manifestHash: 'manifest-1',
-                  importedAt: 1_700_000_100,
-                  exportedAt: 1_700_000_050,
-                  issuer: 'org-alpha',
-                  partner: 'org-beta',
-                  signerPublicKey: 'pubkey-1',
-                  requireProofs: true,
-                  toolReceipts: 4,
-                  capabilityLineage: 3,
-                },
-                capabilityId: 'cap-remote-1',
-                subjectKey: 'remote-subject',
-                issuerKey: 'remote-issuer',
-                delegationDepth: 0,
-                localAnchorCapabilityId: 'cap-local-1',
-                matchedLocalReceipts: 2,
-                allowCount: 2,
-                denyCount: 0,
-                cancelledCount: 0,
-                incompleteCount: 0,
-                firstSeen: 1_700_000_110,
-                lastSeen: 1_700_000_120,
-              },
-            ],
-          },
-        }),
+        },
       }),
-    )
+    })
+    vi.stubGlobal('fetch', fetchMock)
 
     const container = await renderIntoDocument(<PortableReputationPanel subjectKey="agent-a" />)
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
@@ -154,6 +152,17 @@ describe('PortableReputationPanel', () => {
       await Promise.resolve()
     })
     await waitForText(container, 'passport.json')
+    expect(button.disabled).toBe(true)
+
+    const policyInput = container.querySelector(
+      'input[name="verifierPolicyId"]',
+    ) as HTMLInputElement
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+      setValue?.call(policyInput, 'rp-default')
+      policyInput.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
     await waitForEnabled(button)
 
     await act(async () => {
@@ -162,6 +171,15 @@ describe('PortableReputationPanel', () => {
     })
 
     await waitForText(container, 'Accepted')
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/reputation/compare/agent-a',
+      expect.objectContaining({
+        body: JSON.stringify({
+          passport: { schema: 'chio.agent-passport.v1' },
+          verifierPolicyId: 'rp-default',
+        }),
+      }),
+    )
     expect(container.textContent).toContain('Accepted')
     expect(container.textContent).toContain('Subject Match')
     expect(container.textContent).toContain('Composite 0.000')

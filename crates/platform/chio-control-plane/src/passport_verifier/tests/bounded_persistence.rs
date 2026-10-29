@@ -11,6 +11,10 @@ const ISSUED_AT: u64 = 1_710_000_000;
 const OFFER_TTL: u64 = 3_600;
 
 fn passport() -> Result<AgentPassport, Box<dyn std::error::Error>> {
+    passport_issued_by(94)
+}
+
+fn passport_issued_by(issuer_seed: u8) -> Result<AgentPassport, Box<dyn std::error::Error>> {
     let subject = Keypair::from_seed(&[93; 32]);
     let scorecard = chio_reputation::compute_local_scorecard(
         &subject.public_key().to_hex(),
@@ -19,7 +23,7 @@ fn passport() -> Result<AgentPassport, Box<dyn std::error::Error>> {
         &chio_reputation::ReputationConfig::default(),
     );
     let credential = issue_reputation_credential(
-        &Keypair::from_seed(&[94; 32]),
+        &Keypair::from_seed(&[issuer_seed; 32]),
         scorecard,
         ChioCredentialEvidence {
             query: AttestationWindow {
@@ -113,6 +117,26 @@ fn offer_registry_save_over_read_cap_is_refused_and_prior_file_survives() -> Tes
     assert_eq!(PassportIssuanceOfferRegistry::load(&path)?, small);
     let leftovers = fs::read_dir(directory.path())?.count();
     assert_eq!(leftovers, 1, "no temporary file may remain");
+    Ok(())
+}
+
+#[test]
+fn a_stored_offer_whose_passport_was_swapped_is_refused_on_load() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("offers.json");
+    let mut tampered = template()?;
+    tampered.passport = passport_issued_by(95)?;
+    registry_of(&tampered, 1).save(&path)?;
+
+    let error = PassportIssuanceOfferRegistry::load(&path)
+        .err()
+        .ok_or("a swapped stored passport must be refused")?;
+    assert!(
+        error
+            .to_string()
+            .contains("stores a passport_id that does not match the embedded passport"),
+        "{error}"
+    );
     Ok(())
 }
 

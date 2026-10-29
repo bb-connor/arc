@@ -135,7 +135,7 @@ fn a_credential_digest_ignores_every_proof_field() {
 
     let mut retimed = credential.clone();
     retimed.proof.created = "2030-01-01T00:00:00Z".to_string();
-    verify_reputation_credential(&retimed, 1_710_000_100)
+    verify_reputation_credential(&retimed, &passport_issuers(&passport), 1_710_000_100)
         .expect("proof.created is outside the signed body");
 
     let mut rebodied = credential.clone();

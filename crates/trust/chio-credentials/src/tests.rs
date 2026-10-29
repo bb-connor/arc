@@ -1,3 +1,4 @@
+mod issuer_pinning;
 mod passport_credential_digests;
 mod portable_sd_jwt;
 
@@ -124,6 +125,33 @@ fn sample_enterprise_identity_context() -> EnterpriseIdentityContext {
     }
 }
 
+fn trusted_set(keys: &[&Keypair]) -> BTreeSet<String> {
+    let keys = keys.iter().map(|key| key.public_key()).collect::<Vec<_>>();
+    trusted_issuers_from_keys(&keys).expect("trusted issuers")
+}
+
+fn passport_issuers(passport: &AgentPassport) -> BTreeSet<String> {
+    passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect()
+}
+
+fn issuer_options(passport: &AgentPassport) -> PassportPresentationOptions {
+    PassportPresentationOptions {
+        issuer_allowlist: passport_issuers(passport),
+        max_credentials: None,
+    }
+}
+
+fn issuer_policy(passport: &AgentPassport) -> PassportVerifierPolicy {
+    PassportVerifierPolicy {
+        issuer_allowlist: passport_issuers(passport),
+        ..PassportVerifierPolicy::default()
+    }
+}
+
 fn sample_passport(subject_seed: u8, issuer_seed: u8) -> AgentPassport {
     let subject = Keypair::from_seed(&[subject_seed; 32]);
     let issuer = Keypair::from_seed(&[issuer_seed; 32]);
@@ -210,7 +238,7 @@ fn new_passport_artifacts_use_chio_schema_ids() {
         "https://rp.example.com",
         1_710_000_000,
         1_710_086_400,
-        PassportVerifierPolicy::default(),
+        issuer_policy(&passport),
     )
     .expect("policy");
     let challenge = create_passport_presentation_challenge(
@@ -218,7 +246,7 @@ fn new_passport_artifacts_use_chio_schema_ids() {
         "nonce-123",
         1_710_000_010,
         1_710_000_310,
-        PassportPresentationOptions::default(),
+        issuer_options(&passport),
         Some(policy.body.policy.clone()),
     )
     .expect("challenge");
@@ -248,9 +276,10 @@ fn passport_artifacts_with_canonical_schema_verify() {
     let mut passport =
         build_agent_passport(&holder_did.to_string(), vec![credential]).expect("passport");
     passport.schema = PASSPORT_SCHEMA.to_string();
-    verify_agent_passport(&passport, 1_710_000_100).expect("passport verify");
+    verify_agent_passport(&passport, &trusted_set(&[&signer]), 1_710_000_100)
+        .expect("passport verify");
 
-    let policy = PassportVerifierPolicy::default();
+    let policy = issuer_policy(&passport);
     let policy_body = SignedPassportVerifierPolicyBody {
         schema: PASSPORT_VERIFIER_POLICY_SCHEMA.to_string(),
         policy_id: "rp-default".to_string(),
@@ -278,7 +307,7 @@ fn passport_artifacts_with_canonical_schema_verify() {
         "nonce-123",
         1_710_000_010,
         1_710_000_310,
-        PassportPresentationOptions::default(),
+        issuer_options(&passport),
         Some(policy),
     )
     .expect("challenge");
@@ -319,7 +348,8 @@ fn issued_credential_verifies_against_issuer_did() {
     )
     .expect("credential");
 
-    verify_reputation_credential(&credential, 1_710_010_000).expect("verify");
+    verify_reputation_credential(&credential, &trusted_set(&[&issuer]), 1_710_010_000)
+        .expect("verify");
 }
 
 #[test]
@@ -346,7 +376,9 @@ fn passport_verification_accepts_multi_issuer_bundle() {
 
     let passport = build_agent_passport(&did.to_string(), vec![credential_a, credential_b])
         .expect("multi-issuer passport");
-    let verification = verify_agent_passport(&passport, 1_710_010_000).expect("verify");
+    let verification =
+        verify_agent_passport(&passport, &passport_issuers(&passport), 1_710_010_000)
+            .expect("verify");
     assert_eq!(verification.issuer, None);
     assert_eq!(verification.issuer_count, 2);
     assert_eq!(verification.issuers.len(), 2);
@@ -411,7 +443,8 @@ fn cross_issuer_portfolio_rejects_duplicate_migration_ids() {
         migrations: vec![migration_a, migration_b],
     };
 
-    let error = verify_cross_issuer_portfolio(&portfolio, 1_710_000_200)
+    let trusted = trusted_set(&[&Keypair::from_seed(&[1u8; 32])]);
+    let error = verify_cross_issuer_portfolio(&portfolio, &trusted, 1_710_000_200)
         .expect_err("duplicate migration ids");
     assert!(matches!(
         error,
@@ -420,7 +453,7 @@ fn cross_issuer_portfolio_rejects_duplicate_migration_ids() {
 }
 
 #[test]
-fn verifier_policy_reports_mixed_multi_issuer_results() {
+fn verifier_policy_refuses_credentials_outside_issuer_allowlist() {
     let subject = Keypair::from_seed(&[7u8; 32]).public_key().to_hex();
     let issuer_a = Keypair::from_seed(&[1u8; 32]);
     let issuer_b = Keypair::from_seed(&[2u8; 32]);
@@ -447,24 +480,20 @@ fn verifier_policy_reports_mixed_multi_issuer_results() {
     let accepted_issuer = passport.credentials[0].unsigned.issuer.clone();
     let rejected_issuer = passport.credentials[1].unsigned.issuer.clone();
 
-    let evaluation = evaluate_agent_passport(
+    let error = evaluate_agent_passport(
         &passport,
         1_710_010_000,
         &PassportVerifierPolicy {
-            issuer_allowlist: [accepted_issuer.clone()].into_iter().collect(),
+            issuer_allowlist: [accepted_issuer].into_iter().collect(),
             ..PassportVerifierPolicy::default()
         },
     )
-    .expect("evaluation");
+    .expect_err("credential outside the allowlist");
 
-    assert!(evaluation.accepted);
-    assert_eq!(evaluation.verification.issuer_count, 2);
-    assert_eq!(evaluation.matched_credential_indexes, vec![0]);
-    assert_eq!(evaluation.matched_issuers, vec![accepted_issuer.clone()]);
-    assert_eq!(evaluation.credential_results[0].issuer, accepted_issuer);
-    assert!(evaluation.credential_results[0].accepted);
-    assert_eq!(evaluation.credential_results[1].issuer, rejected_issuer);
-    assert!(!evaluation.credential_results[1].accepted);
+    assert!(matches!(
+        error,
+        CredentialError::CredentialIssuerNotTrusted(issuer) if issuer == rejected_issuer
+    ));
 }
 
 #[test]
@@ -492,7 +521,8 @@ fn passport_verification_surfaces_enterprise_identity_provenance() {
         vec![enterprise_identity.clone()]
     );
 
-    let verification = verify_agent_passport(&passport, 1_710_010_000).expect("verify");
+    let verification =
+        verify_agent_passport(&passport, &trusted_set(&[&issuer]), 1_710_010_000).expect("verify");
     assert_eq!(
         verification.enterprise_identity_provenance,
         vec![enterprise_identity]
@@ -520,7 +550,8 @@ fn passport_verification_rejects_tampered_enterprise_identity_provenance() {
         build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
     passport.enterprise_identity_provenance.clear();
 
-    let error = verify_agent_passport(&passport, 1_710_010_000).expect_err("tampered passport");
+    let error = verify_agent_passport(&passport, &trusted_set(&[&issuer]), 1_710_010_000)
+        .expect_err("tampered passport");
     assert!(matches!(
         error,
         CredentialError::PassportEnterpriseIdentityProvenanceMismatch
@@ -549,7 +580,7 @@ fn verifier_policy_can_require_enterprise_identity_provenance() {
         1_710_010_000,
         &PassportVerifierPolicy {
             require_enterprise_identity_provenance: true,
-            ..PassportVerifierPolicy::default()
+            ..issuer_policy(&passport)
         },
     )
     .expect("evaluation");
@@ -563,7 +594,7 @@ fn verifier_policy_can_require_enterprise_identity_provenance() {
 }
 
 #[test]
-fn verifier_policy_rejects_multi_issuer_bundle_when_no_credential_matches() {
+fn verifier_policy_refuses_multi_issuer_bundle_when_no_issuer_is_allowlisted() {
     let subject = Keypair::from_seed(&[7u8; 32]).public_key().to_hex();
     let credential_a = issue_reputation_credential(
         &Keypair::from_seed(&[1u8; 32]),
@@ -586,7 +617,7 @@ fn verifier_policy_rejects_multi_issuer_bundle_when_no_credential_matches() {
     let passport = build_agent_passport(&subject_did.to_string(), vec![credential_a, credential_b])
         .expect("passport");
 
-    let evaluation = evaluate_agent_passport(
+    let error = evaluate_agent_passport(
         &passport,
         1_900_010_000,
         &PassportVerifierPolicy {
@@ -599,16 +630,12 @@ fn verifier_policy_rejects_multi_issuer_bundle_when_no_credential_matches() {
             ..PassportVerifierPolicy::default()
         },
     )
-    .expect("evaluation");
+    .expect_err("no allowlisted issuer");
 
-    assert!(!evaluation.accepted);
-    assert!(evaluation.matched_credential_indexes.is_empty());
-    assert!(evaluation.matched_issuers.is_empty());
-    assert_eq!(evaluation.credential_results.len(), 2);
-    assert!(evaluation
-        .credential_results
-        .iter()
-        .all(|result| !result.accepted));
+    assert!(matches!(
+        error,
+        CredentialError::CredentialIssuerNotTrusted(_)
+    ));
 }
 
 #[test]
@@ -638,7 +665,8 @@ fn presentation_can_filter_credentials_by_issuer() {
     .expect("presented passport");
 
     assert_eq!(presented.credentials.len(), 1);
-    verify_agent_passport(&presented, 1_710_010_000).expect("verify presented passport");
+    verify_agent_passport(&presented, &trusted_set(&[&issuer]), 1_710_010_000)
+        .expect("verify presented passport");
 }
 
 #[test]
@@ -712,7 +740,7 @@ fn verifier_policy_rejects_unknown_metric_and_stale_attestation() {
             max_attestation_age_days: Some(1),
             require_checkpoint_coverage: true,
             require_receipt_log_urls: true,
-            ..PassportVerifierPolicy::default()
+            ..issuer_policy(&passport)
         },
     )
     .expect("evaluate");
@@ -785,7 +813,7 @@ fn verifier_policy_accepts_if_any_credential_matches_without_fake_aggregation() 
         &PassportVerifierPolicy {
             min_composite_score: Some(0.80),
             min_reliability: Some(0.90),
-            ..PassportVerifierPolicy::default()
+            ..issuer_policy(&passport)
         },
     )
     .expect("evaluate");
@@ -1004,7 +1032,7 @@ fn challenge_bound_presentation_rejects_tampered_signature() {
         "nonce-123",
         1_710_000_050,
         1_710_000_350,
-        PassportPresentationOptions::default(),
+        issuer_options(&passport),
         None,
     )
     .expect("challenge");
@@ -1013,8 +1041,14 @@ fn challenge_bound_presentation_rejects_tampered_signature() {
             .expect("response");
     response.challenge.nonce = "tampered".to_string();
 
-    let error = verify_passport_presentation_response(&response, None, 1_710_000_120)
-        .expect_err("tampered signature should fail");
+    let error = verify_passport_presentation_response_with_policy(
+        &response,
+        None,
+        1_710_000_120,
+        Some(&issuer_policy(&passport)),
+        None,
+    )
+    .expect_err("tampered signature should fail");
     assert!(matches!(
         error,
         CredentialError::InvalidPresentationSignature
@@ -1041,7 +1075,7 @@ fn challenge_bound_presentation_rejects_expired_challenge() {
         "nonce-123",
         1_710_000_050,
         1_710_000_150,
-        PassportPresentationOptions::default(),
+        issuer_options(&passport),
         None,
     )
     .expect("challenge");
@@ -1391,6 +1425,7 @@ fn portable_jwt_vc_json_passport_projection_roundtrip_verifies() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1441,6 +1476,7 @@ fn portable_response_rejects_mismatched_compact_profile_format() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1489,6 +1525,7 @@ fn portable_sd_jwt_rejects_missing_holder_binding() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1526,6 +1563,7 @@ fn portable_sd_jwt_rejects_unknown_disclosure_claims() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1575,6 +1613,7 @@ fn portable_sd_jwt_allows_subset_disclosure_for_presentation() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1607,6 +1646,7 @@ fn oid4vp_request_and_direct_post_roundtrip_verifies() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &trusted_set(&[&issuer]),
         1_710_000_100,
         None,
     )
@@ -1875,7 +1915,7 @@ fn non_revoked_lifecycle_record_projects_into_none() {
 fn signed_input_rejects_duplicate_passport_and_nested_credential_members() {
     let passport = sample_passport(21, 22);
     let valid = serde_json::to_string(&passport).unwrap();
-    verify_agent_passport(&passport, 1_710_000_001).unwrap();
+    verify_agent_passport(&passport, &passport_issuers(&passport), 1_710_000_001).unwrap();
     let duplicate_schema = format!("{{\"schema\":\"invalid\",{}", &valid[1..]);
     let duplicate_issuer = valid.replacen("\"issuer\":", "\"issuer\":\"invalid\",\"issuer\":", 1);
     assert_ne!(duplicate_issuer, valid);

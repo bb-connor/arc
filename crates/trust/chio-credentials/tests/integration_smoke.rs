@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use chio_core::crypto::Keypair;
 use chio_credentials::{
     build_agent_passport, create_passport_presentation_challenge,
@@ -101,6 +103,14 @@ fn sample_evidence() -> ChioCredentialEvidence {
     }
 }
 
+fn passport_issuers(passport: &AgentPassport) -> BTreeSet<String> {
+    passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect()
+}
+
 fn sample_passport(subject_seed: u8, issuer_seed: u8) -> Result<AgentPassport, CredentialError> {
     let subject = Keypair::from_seed(&[subject_seed; 32]);
     let issuer = Keypair::from_seed(&[issuer_seed; 32]);
@@ -133,7 +143,8 @@ fn passport_issue_verify_and_present_round_trip() {
         .test_unwrap("build passport");
 
     let verification =
-        verify_agent_passport(&passport, 1_710_000_100).test_unwrap("verify passport");
+        verify_agent_passport(&passport, &passport_issuers(&passport), 1_710_000_100)
+            .test_unwrap("verify passport");
     assert_eq!(verification.subject, holder_did.to_string());
     assert_eq!(verification.credential_count, 1);
 
@@ -142,8 +153,12 @@ fn passport_issue_verify_and_present_round_trip() {
         "nonce-123",
         1_710_000_110,
         1_710_000_410,
-        PassportPresentationOptions::default(),
+        PassportPresentationOptions {
+            issuer_allowlist: passport_issuers(&passport),
+            max_credentials: None,
+        },
         Some(PassportVerifierPolicy {
+            issuer_allowlist: passport_issuers(&passport),
             min_receipt_count: Some(1),
             ..PassportVerifierPolicy::default()
         }),
@@ -208,6 +223,7 @@ fn portable_credentials_expire_at_exact_exp() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &passport_issuers(&passport),
         1_710_000_100,
         None,
     )
@@ -221,6 +237,7 @@ fn portable_credentials_expire_at_exact_exp() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &passport_issuers(&passport),
         1_710_000_100,
         None,
     )
@@ -251,6 +268,7 @@ fn oid4vp_artifacts_expire_at_exact_exp() {
         &passport,
         "https://trust.example.com",
         &issuer,
+        &passport_issuers(&passport),
         1_710_000_100,
         None,
     )
@@ -316,7 +334,12 @@ fn signed_verifier_policy_activation_window_is_inclusive() {
         "https://verifier.example.com",
         1_710_000_000,
         1_710_000_300,
-        PassportVerifierPolicy::default(),
+        PassportVerifierPolicy {
+            issuer_allowlist: BTreeSet::from(
+                [did_from_public_key(signer.public_key()).to_string()],
+            ),
+            ..PassportVerifierPolicy::default()
+        },
     )
     .test_unwrap("sign verifier policy");
 
@@ -332,7 +355,7 @@ fn unknown_passport_schema_rejects_before_verify() -> Result<(), CredentialError
     passport.schema = "chio.agent-passport.v99".to_string();
 
     assert!(matches!(
-        verify_agent_passport(&passport, 1_710_000_100),
+        verify_agent_passport(&passport, &passport_issuers(&passport), 1_710_000_100),
         Err(CredentialError::InvalidPassportSchema)
     ));
     Ok(())
@@ -347,7 +370,12 @@ fn unknown_signed_verifier_policy_schema_rejects_before_signature() -> Result<()
         "https://verifier.example.com",
         1_710_000_000,
         1_710_000_300,
-        PassportVerifierPolicy::default(),
+        PassportVerifierPolicy {
+            issuer_allowlist: BTreeSet::from(
+                [did_from_public_key(signer.public_key()).to_string()],
+            ),
+            ..PassportVerifierPolicy::default()
+        },
     )?;
     document.body.schema = "chio.passport-verifier-policy.v99".to_string();
 
@@ -387,7 +415,10 @@ fn unknown_presentation_response_schema_rejects_before_signature() -> Result<(),
         "nonce-123",
         1_710_000_110,
         1_710_000_410,
-        PassportPresentationOptions::default(),
+        PassportPresentationOptions {
+            issuer_allowlist: passport_issuers(&passport),
+            max_credentials: None,
+        },
         None,
     )?;
     let mut response =

@@ -74,8 +74,15 @@ fn policy(id: &str) -> TestResult<SignedPassportVerifierPolicy> {
         "verifier",
         now,
         now + 3_600,
-        PassportVerifierPolicy::default(),
+        pinned_policy(),
     )?)
+}
+
+fn pinned_policy() -> PassportVerifierPolicy {
+    PassportVerifierPolicy {
+        issuer_allowlist: [format!("did:chio:{}", "11".repeat(32))].into(),
+        ..PassportVerifierPolicy::default()
+    }
 }
 
 #[test]
@@ -92,10 +99,7 @@ fn local_policy_create_upsert_and_delete_observe_cross_process_busy_then_progres
     registry.policies.insert("removed".to_string(), removed);
     fs::write(&path, serde_json::to_vec(&registry)?)?;
     fs::write(&input, serde_json::to_vec(&unrelated)?)?;
-    fs::write(
-        &raw,
-        yaml_serde::to_string(&PassportVerifierPolicy::default())?,
-    )?;
+    fs::write(&raw, yaml_serde::to_string(&pinned_policy())?)?;
     let create = [
         "--json",
         "passport",

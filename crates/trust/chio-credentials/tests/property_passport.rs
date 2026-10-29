@@ -8,10 +8,12 @@
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
 
+use std::collections::BTreeSet;
+
 use chio_core::crypto::Keypair;
 use chio_credentials::{
-    build_agent_passport, issue_reputation_credential, verify_agent_passport, AttestationWindow,
-    ChioCredentialEvidence,
+    build_agent_passport, issue_reputation_credential, trusted_issuers_from_keys,
+    verify_agent_passport, AttestationWindow, ChioCredentialEvidence,
 };
 use chio_did::DidChio;
 use chio_reputation::{
@@ -134,6 +136,12 @@ fn build_well_formed_passport(
     build_agent_passport(&subject_did.to_string(), vec![credential])
 }
 
+fn trusted_issuers(
+    issuer_seed: [u8; 32],
+) -> Result<BTreeSet<String>, chio_credentials::CredentialError> {
+    trusted_issuers_from_keys(&[Keypair::from_seed(&issuer_seed).public_key()])
+}
+
 fn arb_seed() -> impl Strategy<Value = [u8; 32]> {
     // Avoid the all-zero seed which is not a curve-valid scalar in some
     // edge cases. Restricting to non-zero high byte is sufficient and keeps
@@ -161,9 +169,13 @@ proptest! {
             Ok(passport) => passport,
             Err(_) => return Ok(()),
         };
+        let trusted = match trusted_issuers(issuer_seed) {
+            Ok(trusted) => trusted,
+            Err(_) => return Ok(()),
+        };
 
-        let first = verify_agent_passport(&passport, VERIFY_NOW);
-        let second = verify_agent_passport(&passport, VERIFY_NOW);
+        let first = verify_agent_passport(&passport, &trusted, VERIFY_NOW);
+        let second = verify_agent_passport(&passport, &trusted, VERIFY_NOW);
 
         match (first, second) {
             (Ok(left), Ok(right)) => {
@@ -314,13 +326,17 @@ proptest! {
             Ok(passport) => passport,
             Err(_) => return Ok(()),
         };
+        let trusted = match trusted_issuers(issuer_seed) {
+            Ok(trusted) => trusted,
+            Err(_) => return Ok(()),
+        };
 
         // Sanity: the unmutated passport verifies.
-        prop_assert!(verify_agent_passport(&passport, VERIFY_NOW).is_ok());
+        prop_assert!(verify_agent_passport(&passport, &trusted, VERIFY_NOW).is_ok());
 
         apply_subject_mutation(&mut passport, mutation);
 
-        let verdict = verify_agent_passport(&passport, VERIFY_NOW);
+        let verdict = verify_agent_passport(&passport, &trusted, VERIFY_NOW);
         prop_assert!(
             verdict.is_err(),
             "mutating {:?} must invalidate the passport verification",
