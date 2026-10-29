@@ -3,7 +3,7 @@
 
 use sha2::{Digest, Sha256};
 
-const CATALOG_ROWS: usize = 442;
+const CATALOG_ROWS: usize = 443;
 
 /// SHA-256 of the catalog serialized as one `schema\tartifact_kind\tintroduced_by\n`
 /// line per row, in catalog order, with empty metadata fields for a row that

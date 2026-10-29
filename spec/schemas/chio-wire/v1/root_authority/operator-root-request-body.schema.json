@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/operator-root-request-body.schema.json",
+  "title": "chio.operator-root-request.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expires_at",
+    "holder",
+    "principal",
+    "request_id",
+    "schema",
+    "scope",
+    "tenant_value"
+  ],
+  "properties": {
+    "expires_at": {
+      "type": "integer"
+    },
+    "holder": {
+      "type": "string"
+    },
+    "principal": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.operator-root-request.v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grants"
+      ],
+      "properties": {
+        "grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operations",
+              "server_id",
+              "tool_name"
+            ],
+            "properties": {
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "server_id": {
+                "type": "string"
+              },
+              "tool_name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "tenant_value": {
+      "type": "string"
+    }
+  }
+}

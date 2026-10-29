@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/operator-root-request.schema.json",
+  "title": "Chio Operator Root Request",
+  "description": "`chio.operator-root-request.v1`, signed by the operator key the edge pins. The operator asks the edge for one `chio_operator_key` anchored root for `principal` in `tenant_value`. The signature covers the canonical JSON of every member except `signature`, and `request_id` is the replay key.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "request_id",
+    "principal",
+    "tenant_value",
+    "scope",
+    "holder",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.operator-root-request.v1"
+    },
+    "request_id": {
+      "$ref": "root-anchor.schema.json#/$defs/Identifier"
+    },
+    "principal": {
+      "$ref": "root-anchor.schema.json#/$defs/Identifier"
+    },
+    "tenant_value": {
+      "$ref": "root-anchor.schema.json#/$defs/Identifier"
+    },
+    "scope": {
+      "$ref": "../capability/token.schema.json#/$defs/chioScope"
+    },
+    "holder": {
+      "$ref": "root-anchor.schema.json#/$defs/HolderClass"
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "signature": {
+      "$ref": "root-anchor.schema.json#/$defs/SignatureHex"
+    }
+  }
+}
