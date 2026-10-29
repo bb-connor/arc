@@ -3575,25 +3575,40 @@ An operator declares allowances in one TOML file, read by
 with exactly the keys `host`, `port` and `cidr`; any other key is refused. It
 MUST be a regular UTF-8 file of at most 64 KiB, and every entry passes the rules
 above when it loads, so an invalid file stops the process before any contract
-uses it. Without the file the set is empty. A contract takes only the entries
-for its own authorities. The commands that consume the set are `chio trust
-serve`, `chio trust config check`, `chio start`, `chio api protect`, `chio mcp
-wrap` and `chio finding operator serve`; every other command MUST refuse the flag
-with a CLI error and a nonzero exit before doing any other work, until it threads
-the set into the contracts it dials. Trust-control clients dial under such a
-contract: a contract refusal aborts the request, and only a transport or
-name-resolution failure moves a client to its next endpoint. A trust-control
+uses it. A file that cannot be loaded is refused with a
+`PrivateNetworkAllowanceError`: `FileUnreadable` (`egress allowance file {path}
+cannot be read: {reason}`), `FileTooLarge` (`egress allowance file {path}
+exceeds {max_bytes} bytes`) or `FileInvalid` (`egress allowance file {path} is
+invalid: {reason}`), or the entry rule it breaks. Without the file the set is
+empty. A contract takes only the entries for its own authorities. Every `chio`
+command loads the set before it runs and MUST thread it into every
+trust-control, cluster peer and adapter contract it builds. The `chio finding`
+venue posts and the `chio passport` document fetches use raw ureq clients
+outside the egress contract; the set does not govern them. Trust-control
+clients dial under such a contract: a contract refusal aborts the request with
+`trust-control egress refused by the HttpEgressContract`, and only a transport
+or name-resolution failure moves a client to its next endpoint. A trust-control
 client admits loopback only when every endpoint in its list is a loopback
 literal; a list that names a loopback literal beside any other endpoint MUST be
-refused at construction, so a DNS name in the list never reaches loopback.
-Trust-control reports the set's digest as `egressAllowanceDigest` in its health
-document and in `chio trust config check`; the digest is not signed.
+refused at construction with `MixedLoopbackControlEndpoints` (``control
+endpoints mix loopback `{loopback}` with non-loopback `{other}`; a client dials
+loopback literals only or no loopback at all``), so a DNS name in the list never
+reaches loopback. Trust-control reports the set's digest as
+`egressAllowanceDigest` from `GET /v1/egress-allowances`, which requires a
+caller credential with `metrics:read`, and in `chio trust config check`; the
+unauthenticated health document does not carry it, and the digest is not
+signed.
 
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
 
-- loopback target rejected (`LoopbackDenied`),
-- link-local / cloud metadata target rejected (`LinkLocalDenied`),
-- IPv6 ULA target rejected (`Ipv6UlaDenied`),
+- loopback target rejected (`LoopbackDenied`: `loopback egress target denied:
+  {host}`),
+- link-local target rejected (`LinkLocalDenied`: `link-local egress target
+  denied: {host}`),
+- IPv6 ULA target rejected (`Ipv6UlaDenied`: `IPv6 unique-local egress target
+  denied: {host}`),
+- private address without an allowance rejected (`PrivateNetworkDenied`:
+  `private network egress target denied: {host}`),
 - cloud metadata target that the address-class flags would admit rejected
   (`ReservedAddressDenied`),
 - pinned host resolved outside its allowance (`PrivateNetworkAllowanceMismatch`),

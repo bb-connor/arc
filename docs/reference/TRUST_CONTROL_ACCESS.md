@@ -193,8 +193,11 @@ Forwarded authority mutations also carry `x-chio-forwarded-authority-term`.
 - declares `[[cluster.peers]]` without a `[cluster]` identity;
 - pins a peer whose `internal_url` is a link-local or cloud metadata address
   literal (`169.254.0.0/16`, `fe80::/10`, `100.100.100.200`, `fd00:ec2::/32`),
-  refused with `cluster URL must not target the link-local or cloud metadata
-  address`;
+  refused with `trust-control egress refused by the HttpEgressContract`. Its
+  source is `HttpEgressError::LinkLocalDenied` (`link-local egress target
+  denied: {host}`) for a link-local literal and
+  `HttpEgressError::ReservedAddressDenied` (`cloud metadata egress target
+  denied: {host}`) for a metadata literal outside link-local;
 - sets `internal_listen` equal to `--listen`.
 
 The service does not convert other configuration formats. Each deployment
@@ -277,10 +280,10 @@ next endpoint.
 
 A peer or control plane on a private network (for example inside a VPC) is
 reached only through an operator allowance. Declare it in the file named by the
-global `--egress-allowance-file` flag. `chio trust serve`, `chio trust config
-check`, `chio start`, `chio api protect`, `chio mcp wrap` and `chio finding
-operator serve` consume the file; every other command refuses the flag with an
-error and exits nonzero rather than ignoring it:
+global `--egress-allowance-file` flag. Every command loads the file before it
+runs, and every trust-control, cluster peer and adapter client it builds dials
+under the loaded set. `chio finding` venue posts and `chio passport` document
+fetches use raw HTTP clients outside the egress contract and ignore the file:
 
 ```toml
 [[allow]]
@@ -298,8 +301,10 @@ file of at most 64 KiB; unknown fields and invalid entries are refused at
 startup. Without the flag no private address is
 reachable. There is no flag that admits private or loopback peers wholesale.
 
-`/health` reports `egressAllowanceDigest`, the SHA-256 digest of the loaded
-allowance set, so operators can confirm which allowances a node runs under.
+`GET /v1/egress-allowances` returns `{"egressAllowanceDigest": ...}`, the
+SHA-256 digest of the loaded allowance set, so operators can confirm which
+allowances a node runs under. The route requires a caller credential with
+`metrics:read`; `/health` does not report the digest.
 
 ## Checking a configuration
 
