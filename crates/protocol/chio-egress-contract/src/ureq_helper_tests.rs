@@ -99,14 +99,41 @@ fn response_over_the_byte_ceiling_is_refused() {
         .get(&format!("http://{authority}/"))
         .expect("allowed")
         .call()
-        .expect_err("body over the ceiling");
+        .expect_err("declared body over the ceiling");
     assert_eq!(
         refusal,
+        HttpEgressError::ResponseTooLarge {
+            observed: 32,
+            max: 16
+        }
+    );
+    handle.join().expect("server");
+}
+
+#[test]
+fn a_lower_body_limit_bounds_an_undeclared_body_while_reading() {
+    let (authority, handle) =
+        serve_once("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n0123456789abcdef0123456789abcdef");
+    let stream = agent_for(&authority, 1024)
+        .get(&format!("http://{authority}/"))
+        .expect("allowed")
+        .body_limit(16)
+        .call_streaming()
+        .expect("response head");
+    assert_eq!(stream.status(), 200);
+    let mut body = Vec::new();
+    let refusal = stream
+        .into_body()
+        .read_to_end(&mut body)
+        .expect_err("body over the request limit");
+    assert_eq!(
+        body_read_error(refusal),
         HttpEgressError::ResponseTooLarge {
             observed: 17,
             max: 16
         }
     );
+    assert!(body.len() <= 16);
     handle.join().expect("server");
 }
 

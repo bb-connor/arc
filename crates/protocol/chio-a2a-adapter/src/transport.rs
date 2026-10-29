@@ -305,52 +305,8 @@ fn apply_request_auth_url(mut url: Url, request_auth: &A2aResolvedRequestAuth) -
     url
 }
 
-fn enforce_declared_content_length(
-    contract: &HttpEgressContract,
-    response: &BlockingContractResponse,
-    context: &str,
-) -> Result<(), AdapterError> {
-    if let Some(content_length) = response.header("Content-Length") {
-        let content_length = content_length.trim().parse::<u64>().map_err(|error| {
-            AdapterError::Protocol(format!(
-                "invalid A2A Content-Length from {context}: {error}"
-            ))
-        })?;
-        contract
-            .enforce_response_bytes(content_length)
-            .map_err(|err| {
-                AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}"))
-            })?;
-    }
-    Ok(())
-}
-
-fn response_body_with_contract<'a>(
-    response: &'a BlockingContractResponse,
-    contract: &HttpEgressContract,
-    context: &str,
-) -> Result<&'a [u8], AdapterError> {
-    enforce_declared_content_length(contract, response, context)?;
-    let body = response.body();
-    if body.len() > MAX_A2A_JSON_BYTES {
-        return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
-            bytes: body.len(),
-            bound: MAX_A2A_JSON_BYTES,
-        }
-        .into());
-    }
-    Ok(body)
-}
-
-fn error_status(response: &BlockingContractResponse, contract: &HttpEgressContract) -> AdapterError {
-    let status = response.status();
-    match response_body_with_contract(response, contract, &format!("HTTP {status} error")) {
-        Ok(body) => AdapterError::Remote(format!(
-            "HTTP {status}: {}",
-            String::from_utf8_lossy(body).trim()
-        )),
-        Err(error) => error,
-    }
+fn error_status(status: u16) -> AdapterError {
+    AdapterError::Remote(format!("HTTP {status}"))
 }
 
 fn map_egress_error(error: HttpEgressError) -> AdapterError {

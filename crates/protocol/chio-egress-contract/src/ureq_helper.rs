@@ -223,10 +223,10 @@ impl BlockingContractTls {
                     "mutual TLS client certificate chain",
                 )?;
                 let key = PrivateKeyDer::from_pem_slice(identity.private_key_pem.as_bytes())
-                    .map_err(|error| {
-                        InvalidTlsMaterial(format!(
-                            "failed to parse mutual TLS client private key: {error}"
-                        ))
+                    .map_err(|_| {
+                        InvalidTlsMaterial(
+                            "failed to parse mutual TLS client private key".to_string(),
+                        )
                     })?;
                 builder.with_client_auth_cert(chain, key).map_err(|error| {
                     InvalidTlsMaterial(format!(
@@ -342,6 +342,7 @@ impl BlockingContractAgent {
         Ok(BlockingContractRequest {
             agent: self.clone(),
             deadline: self.deadline,
+            body_limit: self.prepared.max_response_bytes(),
             method,
             url: url.to_string(),
             headers: Vec::new(),
@@ -350,11 +351,13 @@ impl BlockingContractAgent {
     }
 }
 
-/// A request whose URL passed the contract. Sending it reads the whole body
-/// under the contract byte ceiling, whatever the status.
+/// A request whose URL passed the contract. Its body is read under the
+/// contract byte ceiling, or a lower one set by [`Self::body_limit`],
+/// whatever the status.
 pub struct BlockingContractRequest {
     agent: BlockingContractAgent,
     deadline: Duration,
+    body_limit: u64,
     method: &'static str,
     url: String,
     headers: Vec<(String, String)>,
@@ -390,15 +393,36 @@ impl BlockingContractRequest {
         self
     }
 
+    /// Read at most `limit` body bytes when it is lower than the contract
+    /// ceiling. A declared or read length above it is refused.
+    #[must_use]
+    pub fn body_limit(mut self, limit: u64) -> Self {
+        self.body_limit = self.body_limit.min(limit);
+        self
+    }
+
     pub fn call(self) -> Result<BlockingContractResponse, HttpEgressError> {
-        self.dispatch(None)
+        self.dispatch(None)?.read_all()
     }
 
     pub fn send_bytes(self, body: &[u8]) -> Result<BlockingContractResponse, HttpEgressError> {
+        self.dispatch(Some(body))?.read_all()
+    }
+
+    /// As [`Self::call`], returning before the body is read.
+    pub fn call_streaming(self) -> Result<BlockingContractStream, HttpEgressError> {
+        self.dispatch(None)
+    }
+
+    /// As [`Self::send_bytes`], returning before the body is read.
+    pub fn send_bytes_streaming(
+        self,
+        body: &[u8],
+    ) -> Result<BlockingContractStream, HttpEgressError> {
         self.dispatch(Some(body))
     }
 
-    fn dispatch(self, body: Option<&[u8]>) -> Result<BlockingContractResponse, HttpEgressError> {
+    fn dispatch(self, body: Option<&[u8]>) -> Result<BlockingContractStream, HttpEgressError> {
         let ends = Instant::now().checked_add(self.deadline).ok_or_else(|| {
             HttpEgressError::InvalidContract("request deadline is out of range".to_string())
         })?;
@@ -428,7 +452,7 @@ impl BlockingContractRequest {
             Some(body) => request.send_bytes(body),
             None => request.call(),
         };
-        collect_capped_response(&self.agent.prepared, outcome)
+        open_capped_response(outcome, self.body_limit)
     }
 }
 
@@ -450,10 +474,7 @@ impl BlockingContractResponse {
     /// The first value of header `name`, matched without regard to case.
     #[must_use]
     pub fn header(&self, name: &str) -> Option<&str> {
-        self.headers
-            .iter()
-            .find(|(header, _)| header.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value.as_str())
+        header_value(&self.headers, name)
     }
 
     #[must_use]
@@ -462,16 +483,122 @@ impl BlockingContractResponse {
     }
 }
 
-fn collect_capped_response(
-    prepared: &PreparedHttpEgressContract,
+/// Status and headers of a contract dispatch whose body is still unread. A
+/// redirect status is returned unfollowed.
+pub struct BlockingContractStream {
+    status: u16,
+    headers: Vec<(String, String)>,
+    body: CappedBody,
+}
+
+impl std::fmt::Debug for BlockingContractStream {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BlockingContractStream")
+            .field("status", &self.status)
+            .field("body", &self.body)
+            .finish_non_exhaustive()
+    }
+}
+
+impl BlockingContractStream {
+    #[must_use]
+    pub fn status(&self) -> u16 {
+        self.status
+    }
+
+    /// The first value of header `name`, matched without regard to case.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        header_value(&self.headers, name)
+    }
+
+    /// The body, readable up to the request byte limit.
+    #[must_use]
+    pub fn into_body(self) -> CappedBody {
+        self.body
+    }
+
+    /// Read the whole body under the request byte limit.
+    pub fn read_all(self) -> Result<BlockingContractResponse, HttpEgressError> {
+        let mut body = Vec::new();
+        let mut reader = self.body;
+        reader.read_to_end(&mut body).map_err(body_read_error)?;
+        Ok(BlockingContractResponse {
+            status: self.status,
+            headers: self.headers,
+            body,
+        })
+    }
+}
+
+/// A response body that yields at most its limit and then fails with
+/// [`HttpEgressError::ResponseTooLarge`] inside the `io::Error`.
+pub struct CappedBody {
+    reader: Box<dyn Read + Send + Sync + 'static>,
+    remaining: u64,
+    limit: u64,
+}
+
+impl std::fmt::Debug for CappedBody {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("CappedBody")
+            .field("remaining", &self.remaining)
+            .field("limit", &self.limit)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Read for CappedBody {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        let window = usize::try_from(self.remaining.saturating_add(1))
+            .unwrap_or(usize::MAX)
+            .min(buf.len());
+        let read = self.reader.read(&mut buf[..window])?;
+        let read_bytes = u64::try_from(read).unwrap_or(u64::MAX);
+        if read_bytes > self.remaining {
+            return Err(io::Error::other(HttpEgressError::ResponseTooLarge {
+                observed: self.limit.saturating_add(1),
+                max: self.limit,
+            }));
+        }
+        self.remaining -= read_bytes;
+        Ok(read)
+    }
+}
+
+/// The egress refusal a body read carries, or a transport failure.
+fn body_read_error(error: io::Error) -> HttpEgressError {
+    match error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<HttpEgressError>())
+    {
+        Some(refusal) => refusal.clone(),
+        None => RequestFailure::new(error).into(),
+    }
+}
+
+fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(header, _)| header.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
+}
+
+fn open_capped_response(
     outcome: Result<ureq::Response, ureq::Error>,
-) -> Result<BlockingContractResponse, HttpEgressError> {
+    limit: u64,
+) -> Result<BlockingContractStream, HttpEgressError> {
     let response = match outcome {
         Ok(response) | Err(ureq::Error::Status(_, response)) => response,
         Err(ureq::Error::Transport(transport)) => return Err(transport_failure(transport)),
     };
     let status = response.status();
-    let headers = response
+    let headers: Vec<(String, String)> = response
         .headers_names()
         .into_iter()
         .filter_map(|name| {
@@ -479,17 +606,24 @@ fn collect_capped_response(
             Some((name, value))
         })
         .collect();
-    let mut body = Vec::new();
-    response
-        .into_reader()
-        .take(prepared.max_response_bytes().saturating_add(1))
-        .read_to_end(&mut body)
-        .map_err(RequestFailure::new)?;
-    prepared.enforce_response_bytes(u64::try_from(body.len()).unwrap_or(u64::MAX))?;
-    Ok(BlockingContractResponse {
+    if let Some(declared) =
+        header_value(&headers, "content-length").and_then(|value| value.trim().parse::<u64>().ok())
+    {
+        if declared > limit {
+            return Err(HttpEgressError::ResponseTooLarge {
+                observed: declared,
+                max: limit,
+            });
+        }
+    }
+    Ok(BlockingContractStream {
         status,
         headers,
-        body,
+        body: CappedBody {
+            reader: response.into_reader(),
+            remaining: limit,
+            limit,
+        },
     })
 }
 

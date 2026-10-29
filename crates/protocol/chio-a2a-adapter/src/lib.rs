@@ -25,7 +25,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 use chio_core::sha256_hex;
 use chio_egress_contract::{
-    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, BlockingContractTls,
+    BlockingContractAgent, BlockingContractRequest, BlockingContractStream, BlockingContractTls,
     ClientIdentityPem, HttpEgressContract, HttpEgressError,
 };
 use chio_kernel::{

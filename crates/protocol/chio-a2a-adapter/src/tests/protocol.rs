@@ -19,7 +19,8 @@ fn a2a_transport_refuses_a_loopback_target_the_contract_denies() {
         "http://localhost:80/card",
         &transport_config,
         true,
-        |target, _| agent.get(target)?.call(),
+        A2aTlsMode::Default,
+        |target, _| agent.get(target)?.call_streaming(),
     )
     .expect_err("a loopback target is refused before dispatch");
     assert!(

@@ -62,8 +62,7 @@ fn request_client_credentials_token(
         A2aTlsMode::Default,
     ) {
         Ok(response) => response,
-        Err(AdapterError::Remote(message))
-            if message.starts_with("HTTP 400:") || message.starts_with("HTTP 401:") =>
+        Err(AdapterError::Remote(message)) if message == "HTTP 400" || message == "HTTP 401" =>
         {
             let fallback_body = build_client_credentials_form(
                 scopes,
@@ -129,15 +128,18 @@ fn build_client_credentials_form(scopes: &[String], credentials: Option<(&str, &
 /// Send through the contract agent and follow each redirect only after its
 /// target passes the contract at its position in the chain. The agent never
 /// follows a redirect itself, and it resolves and checks every hop's host
-/// before dialing. Error statuses become [`AdapterError::Remote`].
+/// before dialing. Error statuses become [`AdapterError::Remote`] without
+/// reading their bodies. A request presenting a client identity never
+/// follows a redirect to another origin.
 fn dispatch_with_redirect_validation<F>(
     initial_url: &str,
     transport_config: &A2aTransportConfig,
     allow_cross_origin_redirects: bool,
+    tls_mode: A2aTlsMode,
     mut send: F,
-) -> Result<BlockingContractResponse, AdapterError>
+) -> Result<BlockingContractStream, AdapterError>
 where
-    F: FnMut(&str, bool) -> Result<BlockingContractResponse, HttpEgressError>,
+    F: FnMut(&str, bool) -> Result<BlockingContractStream, HttpEgressError>,
 {
     let contract = required_contract(transport_config)?;
     let max_chain = contract.max_redirect_chain;
@@ -148,7 +150,7 @@ where
         let response = send(&current_url, strip_sensitive_headers).map_err(map_egress_error)?;
         let status = response.status();
         if status >= 400 {
-            return Err(error_status(&response, contract));
+            return Err(error_status(status));
         }
         if !(300..400).contains(&status) {
             return Ok(response);
@@ -190,26 +192,27 @@ where
                 "A2A body-bearing request rejected cross-origin redirect from {previous_url} to {next_url}"
             )));
         }
+        if cross_origin && tls_mode == A2aTlsMode::MutualTls {
+            return Err(AdapterError::InvalidUrl(format!(
+                "A2A mutual TLS request rejected cross-origin redirect from {previous_url} to {next_url}"
+            )));
+        }
         strip_sensitive_headers = strip_sensitive_headers || cross_origin;
         current_url = next_url.into();
     }
 }
 
-fn read_json_response_with_contract<T: for<'de> Deserialize<'de>>(
-    response: BlockingContractResponse,
-    context: &str,
-    transport_config: &A2aTransportConfig,
+fn read_json_response<T: for<'de> Deserialize<'de>>(
+    response: BlockingContractStream,
 ) -> Result<T, AdapterError> {
-    let contract = required_contract(transport_config)?;
-    let body = response_body_with_contract(&response, contract, context)?;
-    chio_core::canonical::UntrustedJsonText::from_wire(body, MAX_A2A_JSON_BYTES)?
+    let response = response.read_all().map_err(map_egress_error)?;
+    chio_core::canonical::UntrustedJsonText::from_wire(response.body(), MAX_A2A_JSON_BYTES)?
         .decode_document()
         .map_err(Into::into)
 }
 
-fn read_sse_response_with_contract<F>(
-    response: BlockingContractResponse,
-    context: &str,
+fn read_sse_response<F>(
+    response: BlockingContractStream,
     transport_config: &A2aTransportConfig,
     decode_event: F,
 ) -> Result<ToolServerStreamResult, AdapterError>
@@ -217,8 +220,11 @@ where
     F: Fn(Value) -> Result<Value, AdapterError>,
 {
     let contract = required_contract(transport_config)?;
-    enforce_declared_content_length(contract, &response, context)?;
-    parse_sse_stream_with_limit(response.body(), contract.max_response_bytes, decode_event)
+    parse_sse_stream_with_limit(
+        response.into_body(),
+        contract.max_response_bytes,
+        decode_event,
+    )
 }
 
 fn fetch_json<T: for<'de> Deserialize<'de>>(
@@ -233,15 +239,17 @@ fn fetch_json<T: for<'de> Deserialize<'de>>(
         request_url.as_str(),
         transport_config,
         true,
+        request_auth.tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .get(target)?
+                .body_limit(MAX_A2A_JSON_BYTES as u64)
                 .header(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
             let request = apply_request_auth(request, request_auth, strip_sensitive_headers);
-            request.call()
+            request.call_streaming()
         },
     )?;
-    read_json_response_with_contract(response, request_url.as_str(), transport_config)
+    read_json_response(response)
 }
 
 fn delete_empty(
@@ -256,14 +264,18 @@ fn delete_empty(
         request_url.as_str(),
         transport_config,
         true,
+        request_auth.tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .delete(target)?
+                .body_limit(MAX_A2A_JSON_BYTES as u64)
                 .header(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
             let request = apply_request_auth(request, request_auth, strip_sensitive_headers);
-            request.call()
+            request.call_streaming()
         },
-    )?;
+    )?
+    .read_all()
+    .map_err(map_egress_error)?;
     Ok(())
 }
 
@@ -283,13 +295,15 @@ where
         request_url.as_str(),
         transport_config,
         true,
+        request_auth.tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .get(target)?
+                .body_limit(MAX_SSE_TOTAL_BYTES as u64)
                 .header("Accept", SSE_CONTENT_TYPE)
                 .header(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
             let request = apply_request_auth(request, request_auth, strip_sensitive_headers);
-            request.call()
+            request.call_streaming()
         },
     )?;
     let content_type = response.header("Content-Type").unwrap_or_default();
@@ -298,12 +312,7 @@ where
             "expected {SSE_CONTENT_TYPE} response, got {content_type}"
         )));
     }
-    read_sse_response_with_contract(
-        response,
-        request_url.as_str(),
-        transport_config,
-        decode_event,
-    )
+    read_sse_response(response, transport_config, decode_event)
 }
 
 fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
@@ -325,17 +334,19 @@ fn post_json<T: for<'de> Deserialize<'de>, B: Serialize>(
         request_url.as_str(),
         transport_config,
         false,
+        request_auth.tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)?
+                .body_limit(MAX_A2A_JSON_BYTES as u64)
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .header(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
             let request = apply_request_auth(request, request_auth, strip_sensitive_headers);
-            request.send_bytes(&body_bytes)
+            request.send_bytes_streaming(&body_bytes)
         },
     )?;
-    read_json_response_with_contract(response, request_url.as_str(), transport_config)
+    read_json_response(response)
 }
 
 fn post_form_json<T: for<'de> Deserialize<'de>>(
@@ -351,16 +362,18 @@ fn post_form_json<T: for<'de> Deserialize<'de>>(
         url.as_str(),
         transport_config,
         false,
+        tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)?
+                .body_limit(MAX_A2A_JSON_BYTES as u64)
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Accept", "application/json");
             let request = apply_request_headers(request, request_headers, strip_sensitive_headers);
-            request.send_bytes(body.as_bytes())
+            request.send_bytes_streaming(body.as_bytes())
         },
     )?;
-    read_json_response_with_contract(response, url.as_str(), transport_config)
+    read_json_response(response)
 }
 
 fn post_sse_json<T: Serialize, F>(
@@ -386,14 +399,16 @@ where
         request_url.as_str(),
         transport_config,
         false,
+        request_auth.tls_mode,
         |target, strip_sensitive_headers| {
             let request = agent
                 .post(target)?
+                .body_limit(MAX_SSE_TOTAL_BYTES as u64)
                 .header("Content-Type", "application/json")
                 .header("Accept", SSE_CONTENT_TYPE)
                 .header(A2A_VERSION_HEADER, A2A_PROTOCOL_VERSION_HEADER_VALUE);
             let request = apply_request_auth(request, request_auth, strip_sensitive_headers);
-            request.send_bytes(&body_bytes)
+            request.send_bytes_streaming(&body_bytes)
         },
     )?;
     let content_type = response.header("Content-Type").unwrap_or_default();
@@ -402,12 +417,7 @@ where
             "expected {SSE_CONTENT_TYPE} response, got {content_type}"
         )));
     }
-    read_sse_response_with_contract(
-        response,
-        request_url.as_str(),
-        transport_config,
-        decode_event,
-    )
+    read_sse_response(response, transport_config, decode_event)
 }
 
 fn build_optional_default_tls_config(

@@ -1,40 +1,110 @@
-#[derive(Debug, Clone, PartialEq, Eq)]
+const REDACTED: &str = "<redacted>";
+
+#[derive(Clone, PartialEq, Eq)]
 struct A2aRequestHeader {
     name: String,
     value: String,
     sensitive: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl std::fmt::Debug for A2aRequestHeader {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aRequestHeader")
+            .field("name", &self.name)
+            .field(
+                "value",
+                &if self.sensitive { REDACTED } else { self.value.as_str() },
+            )
+            .field("sensitive", &self.sensitive)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 struct A2aRequestQueryParam {
     name: String,
     value: String,
     sensitive: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl std::fmt::Debug for A2aRequestQueryParam {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aRequestQueryParam")
+            .field("name", &self.name)
+            .field(
+                "value",
+                &if self.sensitive { REDACTED } else { self.value.as_str() },
+            )
+            .field("sensitive", &self.sensitive)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
 struct A2aRequestCookie {
     name: String,
     value: String,
 }
 
-#[derive(Debug, Clone)]
+impl std::fmt::Debug for A2aRequestCookie {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aRequestCookie")
+            .field("name", &self.name)
+            .field("value", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 struct A2aOAuthClientCredentials {
     client_id: String,
     client_secret: String,
 }
 
-#[derive(Debug, Clone)]
+impl std::fmt::Debug for A2aOAuthClientCredentials {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aOAuthClientCredentials")
+            .field("client_id", &self.client_id)
+            .field("client_secret", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone)]
 struct A2aCachedBearerToken {
     cache_key: String,
     access_token: String,
     deadline: AuthorityDeadline,
 }
 
-#[derive(Debug, Clone)]
+impl std::fmt::Debug for A2aCachedBearerToken {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aCachedBearerToken")
+            .field("access_token", &REDACTED)
+            .field("deadline", &self.deadline)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone)]
 struct A2aMutualTlsIdentity {
     cert_chain_pem: String,
     private_key_pem: String,
+}
+
+impl std::fmt::Debug for A2aMutualTlsIdentity {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("A2aMutualTlsIdentity")
+            .field("cert_chain_pem", &self.cert_chain_pem)
+            .field("private_key_pem", &REDACTED)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
