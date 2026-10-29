@@ -8,7 +8,7 @@ fn web3_settlement_dispatch_refuses_retired_schema() {
     let mut dispatch = sample_dispatch();
     dispatch.schema = RETIRED_DISPATCH_SCHEMA.to_string();
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::UnsupportedSchema(schema)) if schema == RETIRED_DISPATCH_SCHEMA
     ));
 }
@@ -18,14 +18,14 @@ fn web3_settlement_receipt_refuses_retired_receipt_and_dispatch_schemas() {
     let mut receipt = sample_execution_receipt();
     receipt.schema = RETIRED_RECEIPT_SCHEMA.to_string();
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::UnsupportedSchema(schema)) if schema == RETIRED_RECEIPT_SCHEMA
     ));
 
     let mut receipt = sample_execution_receipt();
     receipt.dispatch.schema = RETIRED_DISPATCH_SCHEMA.to_string();
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::UnsupportedSchema(schema)) if schema == RETIRED_DISPATCH_SCHEMA
     ));
 }
@@ -59,7 +59,7 @@ fn web3_settlement_dispatch_refuses_zero_operator_key_hash() {
     let mut dispatch = sample_dispatch();
     dispatch.operator_key_hash = Hash::zero().to_hex_prefixed();
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message == "web3 settlement dispatch operator_key_hash must not be zero"
     ));

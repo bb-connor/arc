@@ -19,7 +19,7 @@ fn dual_sign_settlement_receipt_requires_registry_evidence() {
     receipt.reconciled_anchor_proof = None;
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &super::tests::capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("identity_registry_evidence")
     ));
@@ -37,7 +37,7 @@ fn dual_sign_settlement_receipt_rejects_registry_key_hash_mismatch() {
     receipt.identity_registry_evidence = Some(evidence);
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &super::tests::capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("operator_key_hash")
     ));
@@ -52,7 +52,7 @@ fn dual_sign_settlement_receipt_requires_registry_evidence_binding() {
     receipt.identity_registry_evidence = Some(sample_identity_registry_evidence());
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &super::tests::capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("identity_registry_evidence_binding")
     ));
@@ -67,7 +67,8 @@ fn dual_sign_settlement_receipt_accepts_registry_evidence() {
     receipt.identity_registry_evidence = Some(sample_identity_registry_evidence());
     receipt.identity_registry_evidence_binding = Some(sample_identity_registry_evidence_binding());
 
-    validate_web3_settlement_execution_receipt(&receipt).unwrap();
+    validate_web3_settlement_execution_receipt(&receipt, &super::tests::capital_authority())
+        .unwrap();
 }
 
 type RegistryBindingMutation = fn(&mut Web3SettlementIdentityRegistryEvidenceBinding);
@@ -107,7 +108,7 @@ fn dual_sign_settlement_receipt_rejects_registry_binding_mismatches() {
 
         assert!(
             matches!(
-                validate_web3_settlement_execution_receipt(&receipt),
+                validate_web3_settlement_execution_receipt(&receipt, &super::tests::capital_authority()),
                 Err(Web3ContractError::InvalidSettlement(message))
                     if message.contains("identity registry evidence")
             ),

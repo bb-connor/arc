@@ -216,8 +216,15 @@ fn standards_and_runtime_constants_remain_in_sync() {
         include_str!("../../../../docs/standards/CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json"),
     )
     .unwrap_or_else(|error| panic!("parse web3 settlement receipt standard: {error}"));
-    validate_web3_settlement_execution_receipt(&settlement_receipt)
-        .unwrap_or_else(|error| panic!("validate web3 settlement receipt standard: {error:?}"));
+    validate_web3_settlement_execution_receipt(
+        &settlement_receipt,
+        &[settlement_receipt
+            .dispatch
+            .capital_instruction
+            .signer_key
+            .clone()],
+    )
+    .unwrap_or_else(|error| panic!("validate web3 settlement receipt standard: {error:?}"));
 
     assert_eq!(contract_package.package_id, chain_configuration.package_id);
     assert_eq!(

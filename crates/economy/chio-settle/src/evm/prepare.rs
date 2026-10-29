@@ -239,7 +239,7 @@ pub async fn prepare_web3_escrow_dispatch(
         },
         note: request.note.clone(),
     };
-    validate_web3_settlement_dispatch(&dispatch)
+    validate_web3_settlement_dispatch(&dispatch, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
 
     Ok(PreparedEscrowCreate {
@@ -285,7 +285,7 @@ pub fn prepare_merkle_release(
     amount: EscrowExecutionAmount,
 ) -> Result<PreparedMerkleRelease, SettlementError> {
     config.validate()?;
-    validate_web3_settlement_dispatch(dispatch)
+    validate_web3_settlement_dispatch(dispatch, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     validate_merkle_dispatch_config(config, dispatch)?;
     if !config
@@ -368,7 +368,7 @@ pub fn prepare_authorized_channel_merkle_release(
     authorization: &VerifiedChannelReleaseAuthorizationV1,
 ) -> Result<Option<PreparedAuthorizedChannelMerkleReleaseV1>, SettlementError> {
     config.validate()?;
-    validate_web3_settlement_dispatch(dispatch)
+    validate_web3_settlement_dispatch(dispatch, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     validate_merkle_dispatch_config(config, dispatch)?;
     let dispatch_digest = sha256_hex(
@@ -685,7 +685,7 @@ pub fn prepare_merkle_release_root_publication(
     batch_seq: u64,
 ) -> Result<PreparedRootPublication, SettlementError> {
     config.validate()?;
-    validate_web3_settlement_dispatch(dispatch)
+    validate_web3_settlement_dispatch(dispatch, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     validate_merkle_dispatch_config(config, dispatch)?;
     if checkpoint_seq == 0 || batch_seq == 0 {
@@ -1140,7 +1140,7 @@ pub async fn prepare_dual_sign_release(
     input: &DualSignReleaseInput,
 ) -> Result<PreparedDualSignRelease, SettlementError> {
     config.validate()?;
-    validate_web3_settlement_dispatch(dispatch)
+    validate_web3_settlement_dispatch(dispatch, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     if dispatch.settlement_path != Web3SettlementPath::DualSignature {
         return Err(SettlementError::Unsupported(

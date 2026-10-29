@@ -20,7 +20,7 @@ use crate::credit::{
     CapitalExecutionReconciledState, CapitalExecutionRole, CapitalExecutionWindow,
     SignedCapitalExecutionInstruction, CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
 };
-use crate::crypto::{sha256_hex, Keypair, Signature};
+use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::Web3ContractError;
 use crate::hashing::Hash;
 use crate::identity::{
@@ -66,6 +66,8 @@ use std::collections::BTreeSet;
 
 mod anchor_versioning;
 mod settlement_versioning;
+
+mod capital_authority;
 
 const SAMPLE_ROOT_REGISTRY_RUNTIME_CODEHASH: &str =
     "0xfc5d76d87b02096c6ae32ce644a2b98ca0bdf3c56700ad16731fad2062e6bd7f";
@@ -566,6 +568,10 @@ fn sample_active_bond() -> crate::credit::SignedCreditBond {
         Ok(bond) => bond,
         Err(error) => panic!("sample active bond signs: {error}"),
     }
+}
+
+pub(super) fn capital_authority() -> Vec<PublicKey> {
+    vec![treasury_keypair().public_key()]
 }
 
 pub(super) fn resign_dispatch_capital_instruction(dispatch: &mut Web3SettlementDispatchArtifact) {
@@ -1202,7 +1208,7 @@ fn web3_dispatch_requires_web3_rail_kind() {
     dispatch.capital_instruction.body.rail.kind = CapitalExecutionRailKind::Api;
     resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(_))
     ));
 }
@@ -1220,7 +1226,7 @@ fn web3_dispatch_rejects_lowercase_settlement_currency() {
         .currency = "usd".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("currency")
     ));
@@ -1232,7 +1238,7 @@ fn web3_dispatch_rejects_malformed_operator_key_hash() {
     dispatch.operator_key_hash = "0x1234".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("operator_key_hash")
     ));
@@ -1245,7 +1251,7 @@ fn web3_dispatch_rejects_zero_operator_key_hash() {
         "0x0000000000000000000000000000000000000000000000000000000000000000".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("operator_key_hash")
     ));
@@ -1257,7 +1263,7 @@ fn web3_dispatch_rejects_malformed_v2_settlement_token_address() {
     dispatch.settlement_token_address = "not-an-address".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("settlement_token_address")
     ));
@@ -1269,7 +1275,7 @@ fn web3_dispatch_requires_completion_flow_binding_for_transfers() {
     dispatch.capital_instruction.body.completion_flow_row_id = None;
     resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::MissingField(
             "web3_settlement_dispatch.capital_instruction.completion_flow_row_id"
         ))
@@ -1283,7 +1289,7 @@ fn web3_dispatch_rejects_mismatched_completion_flow_binding() {
         Some("economic-completion-flow:other-receipt".to_string());
     resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(_))
     ));
 }
@@ -1293,7 +1299,7 @@ fn merkle_settlement_receipt_requires_anchor_proof() {
     let mut receipt = sample_execution_receipt();
     receipt.reconciled_anchor_proof = None;
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(_))
     ));
 }
@@ -1310,7 +1316,7 @@ fn merkle_settlement_receipt_rejects_tampered_anchor_signature() {
     .unwrap();
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::ProofSignatureInvalid(message))
             if message.contains("checkpoint statement signature verification failed")
     ));
@@ -1324,7 +1330,7 @@ fn merkle_settlement_receipt_rejects_unrelated_anchor_receipt() {
     ));
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("anchor proof receipt must match governed receipt")
     ));
@@ -1337,7 +1343,7 @@ fn merkle_settlement_receipt_rejects_dispatch_anchor_key_hash_mismatch() {
         "0x8888888888888888888888888888888888888888888888888888888888888888".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("dispatch operator_key_hash")
     ));
@@ -1351,7 +1357,7 @@ fn merkle_settlement_receipt_rejects_anchor_receipt_with_unrelated_content_hash(
     ));
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("anchor proof receipt content hash must bind settlement execution")
     ));
@@ -1362,7 +1368,7 @@ fn fx_sensitive_settlement_receipt_requires_oracle_evidence() {
     let mut receipt = sample_execution_receipt();
     receipt.oracle_evidence = None;
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(_))
     ));
 }
@@ -1376,7 +1382,7 @@ fn escrow_locked_execution_receipt_records_zero_settled_amount() {
     receipt.reconciled_anchor_proof = None;
     receipt.oracle_evidence = None;
 
-    validate_web3_settlement_execution_receipt(&receipt).unwrap();
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority()).unwrap();
 }
 
 #[test]
@@ -1394,7 +1400,7 @@ fn timed_out_settlement_receipt_allows_refund_after_execution_window() {
         + 1;
     receipt.issued_at = receipt.observed_execution.observed_at;
 
-    validate_web3_settlement_execution_receipt(&receipt).unwrap();
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority()).unwrap();
 }
 
 #[test]
@@ -1408,7 +1414,7 @@ fn failed_settlement_receipt_rejects_non_transaction_failure_reference_with_amou
         "incident:provider-rejected-before-chain".to_string();
 
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("non-zero amount requires transaction reference")
     ));
@@ -1420,7 +1426,7 @@ fn failed_settlement_receipt_accepts_transaction_failure_reference_with_amount()
     receipt.lifecycle_state = Web3SettlementLifecycleState::Failed;
     receipt.failure_reason = Some("on-chain settlement reverted".to_string());
 
-    validate_web3_settlement_execution_receipt(&receipt).unwrap();
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority()).unwrap();
 }
 
 #[test]
@@ -1430,7 +1436,7 @@ fn settlement_receipt_rejects_oracle_grant_currency_mismatch() {
     oracle_evidence.quote = "EUR".to_string();
     oracle_evidence.grant_currency = "EUR".to_string();
     assert!(matches!(
-        validate_web3_settlement_execution_receipt(&receipt),
+        validate_web3_settlement_execution_receipt(&receipt, &capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("oracle conversion grant_currency must match settlement currency")
     ));
@@ -2534,8 +2540,8 @@ fn reference_artifacts_parse_and_validate() {
     validate_web3_chain_configuration(&chain_configuration).unwrap();
     validate_anchor_inclusion_proof(&anchor_proof).unwrap();
     verify_anchor_inclusion_proof(&anchor_proof).unwrap();
-    validate_web3_settlement_dispatch(&dispatch).unwrap();
-    validate_web3_settlement_execution_receipt(&receipt).unwrap();
+    validate_web3_settlement_dispatch(&dispatch, &capital_authority()).unwrap();
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority()).unwrap();
     validate_web3_qualification_matrix(&matrix).unwrap();
 }
 

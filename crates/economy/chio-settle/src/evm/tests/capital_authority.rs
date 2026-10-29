@@ -151,3 +151,25 @@ async fn escrow_dispatch_refuses_an_empty_capital_authority() {
         EMPTY_CAPITAL_AUTHORITY
     );
 }
+
+#[test]
+fn failure_receipt_refuses_a_dispatch_instruction_outside_the_capital_authority() {
+    let outside = crate::SettlementCapitalAuthority {
+        trusted_keys: vec![outside_keypair().public_key()],
+    };
+    let error = build_failure_receipt(
+        &hex_dispatch(),
+        &outside,
+        "exec-failed".to_string(),
+        "settlement-ref".to_string(),
+        "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+        "node rejected tx".to_string(),
+    )
+    .test_expect_err("failure receipt must refuse")
+    .to_string();
+
+    assert_eq!(
+        error,
+        "verification error: invalid settlement: capital instruction signer is not a trusted capital authority key"
+    );
+}

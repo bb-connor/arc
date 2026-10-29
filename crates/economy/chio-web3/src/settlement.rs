@@ -11,7 +11,7 @@ use crate::credit::{
     CreditBondLifecycleState, SignedCapitalExecutionInstruction, SignedCreditBond,
     CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
 };
-use crate::crypto::sha256_hex;
+use crate::crypto::{sha256_hex, PublicKey};
 use crate::error::Web3ContractError;
 use crate::hashing::Hash;
 use crate::receipt::{
@@ -151,6 +151,7 @@ pub type SignedWeb3SettlementExecutionReceipt =
 
 pub fn validate_web3_settlement_dispatch(
     dispatch: &Web3SettlementDispatchArtifact,
+    _capital_authority: &[PublicKey],
 ) -> Result<(), Web3ContractError> {
     if dispatch.schema != CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA {
         return Err(Web3ContractError::UnsupportedSchema(
@@ -311,6 +312,7 @@ pub fn validate_web3_settlement_dispatch(
 
 pub fn validate_web3_settlement_execution_receipt(
     receipt: &Web3SettlementExecutionReceiptArtifact,
+    capital_authority: &[PublicKey],
 ) -> Result<(), Web3ContractError> {
     if receipt.schema != CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA {
         return Err(Web3ContractError::UnsupportedSchema(receipt.schema.clone()));
@@ -323,7 +325,7 @@ pub fn validate_web3_settlement_execution_receipt(
         &receipt.settlement_reference,
         "web3_settlement_receipt.settlement_reference",
     )?;
-    validate_web3_settlement_dispatch(&receipt.dispatch)?;
+    validate_web3_settlement_dispatch(&receipt.dispatch, capital_authority)?;
     let escrow_locked = receipt.lifecycle_state == Web3SettlementLifecycleState::EscrowLocked;
     ensure_receipt_money(
         &receipt.observed_execution.amount,

@@ -50,6 +50,7 @@ pub fn finalize_bond_lock(
 
 pub fn build_failure_receipt(
     dispatch: &Web3SettlementDispatchArtifact,
+    capital_authority: &crate::SettlementCapitalAuthority,
     execution_receipt_id: String,
     settlement_reference: String,
     failure_reference: String,
@@ -79,13 +80,14 @@ pub fn build_failure_receipt(
             "Runtime-marked failure after bounded retry or validation exhaustion.".to_string(),
         ),
     };
-    validate_web3_settlement_execution_receipt(&receipt)
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority.trusted_keys)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     Ok(receipt)
 }
 
 pub fn build_reversal_receipt(
     dispatch: &Web3SettlementDispatchArtifact,
+    capital_authority: &crate::SettlementCapitalAuthority,
     execution_receipt_id: String,
     settlement_reference: String,
     tx_hash: String,
@@ -121,7 +123,7 @@ pub fn build_reversal_receipt(
                 .to_string(),
         ),
     };
-    validate_web3_settlement_execution_receipt(&receipt)
+    validate_web3_settlement_execution_receipt(&receipt, &capital_authority.trusted_keys)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
     Ok(receipt)
 }

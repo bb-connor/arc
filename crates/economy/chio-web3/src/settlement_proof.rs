@@ -71,7 +71,10 @@ pub fn verify_public_settlement_proof(
     validate_bundle_header(bundle)?;
     validate_public_settlement_receipt_schema(bundle)?;
     validate_public_settlement_bundle_signature(bundle, trust)?;
-    validate_web3_settlement_execution_receipt(&bundle.settlement_receipt)?;
+    validate_web3_settlement_execution_receipt(
+        &bundle.settlement_receipt,
+        &trust.trusted_capital_signer_keys,
+    )?;
     validate_finality_settlement_state(bundle)?;
     validate_public_settlement_trust(bundle, trust)?;
     validate_public_settlement_verifier_policy(bundle, trust)?;

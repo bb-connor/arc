@@ -246,7 +246,7 @@ fn web3_dispatch_rejects_beneficiary_outside_signed_rail() {
     let mut dispatch = sample_dispatch();
     dispatch.beneficiary_address = "0x3333333333333333333333333333333333333333".to_string();
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &super::tests::capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("beneficiary_address must match")
     ));
@@ -259,7 +259,7 @@ fn web3_dispatch_rejects_beneficiary_outside_signed_rail() {
         .destination_account_ref = None;
     resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &super::tests::capital_authority()),
         Err(Web3ContractError::MissingField(
             "web3_settlement_dispatch.capital_instruction.rail.destination_account_ref"
         ))
@@ -277,7 +277,9 @@ fn web3_dispatch_accepts_equivalent_mixed_case_signed_rail_beneficiary() {
         .destination_account_ref = Some("0x1234567890abcdef1234567890abcdef12345678".to_string());
     resign_dispatch_capital_instruction(&mut dispatch);
 
-    assert!(validate_web3_settlement_dispatch(&dispatch).is_ok());
+    assert!(
+        validate_web3_settlement_dispatch(&dispatch, &super::tests::capital_authority()).is_ok()
+    );
 }
 
 #[test]
@@ -292,7 +294,7 @@ fn web3_dispatch_rejects_equal_malformed_evm_beneficiary_refs() {
     resign_dispatch_capital_instruction(&mut dispatch);
 
     assert!(matches!(
-        validate_web3_settlement_dispatch(&dispatch),
+        validate_web3_settlement_dispatch(&dispatch, &super::tests::capital_authority()),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("EVM address fields must be 0x-prefixed 20-byte hex values")
     ));

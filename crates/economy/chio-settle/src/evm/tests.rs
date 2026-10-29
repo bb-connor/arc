@@ -733,6 +733,7 @@ fn builds_failure_and_reversal_receipts() {
 
     let failure = build_failure_receipt(
         &dispatch,
+        &sample_config().capital_authority,
         "exec-failed".to_string(),
         "settlement-ref".to_string(),
         "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
@@ -747,6 +748,7 @@ fn builds_failure_and_reversal_receipts() {
 
     let reversal = build_reversal_receipt(
         &dispatch,
+        &sample_config().capital_authority,
         "exec-reversed".to_string(),
         "settlement-ref".to_string(),
         "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),

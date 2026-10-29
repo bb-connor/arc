@@ -227,7 +227,7 @@ pub async fn project_escrow_execution_receipt(
         failure_reason,
         note: input.note.clone(),
     };
-    validate_web3_settlement_execution_receipt(&receipt)
+    validate_web3_settlement_execution_receipt(&receipt, &config.capital_authority.trusted_keys)
         .map_err(|error| SettlementError::Verification(error.to_string()))?;
 
     let recovery_action = recovery_action_for_projection(finality.status, lifecycle_state);
