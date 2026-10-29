@@ -133,6 +133,26 @@ fn is_runtime_admission_store_schema(schema: &str) -> bool {
 }
 
 impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
+    fn commit_runtime_admission_authority(
+        &self,
+        _: &crate::RuntimeAdmissionAuthorityCommit,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support atomic treaty authority".into(),
+        })
+    }
+
+    fn verify_retained_runtime_treaty_authorization(
+        &self,
+        _: &crate::RuntimeTreatyAuthorizationBinding,
+    ) -> Result<(), ChioRuntimeError> {
+        Err(ChioRuntimeError::Rejected {
+            code: "treaty_epoch_unavailable",
+            detail: "runtime backend does not support retained treaty authorization".into(),
+        })
+    }
+
     fn bundle(
         &self,
         admission_id: &str,

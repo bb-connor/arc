@@ -16,12 +16,37 @@ impl PreparedRuntimeAdmission {
     pub(crate) fn commit_operation_owned(
         mut self,
         store: &dyn RuntimeAdmissionStore,
+        treaty: Option<RuntimeTreatyAuthorizationRequest>,
     ) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
-        if let Some((entry, previous_hash)) = self.trust_floor_update.take() {
+        let had_floor = self.trust_floor_update.is_some();
+        let has_treaty = treaty.is_some();
+        if has_treaty || had_floor {
+            let floor = self.trust_floor_update.take();
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                store.validate_and_record_runtime_trust_floor(entry, previous_hash.as_deref())
+                if let Some(treaty) = treaty {
+                    store.commit_runtime_admission_authority(&RuntimeAdmissionAuthorityCommit {
+                        treaty: Some(treaty),
+                        trust_floor: floor.map(|(entry, previous_hash_sha256)| {
+                            RuntimeTrustFloorUpdate {
+                                entry,
+                                previous_hash_sha256,
+                            }
+                        }),
+                    })
+                } else if let Some((entry, previous_hash)) = floor {
+                    store.validate_and_record_runtime_trust_floor(entry, previous_hash.as_deref())
+                } else {
+                    Ok(())
+                }
             })) {
-                Ok(Ok(())) => self.checks.push(passed("runtime_trust.floor")),
+                Ok(Ok(())) => {
+                    if had_floor {
+                        self.checks.push(passed("runtime_trust.floor"));
+                    }
+                    if has_treaty {
+                        self.checks.push(passed("treaty_epoch.authorization"));
+                    }
+                }
                 Ok(Err(ChioRuntimeError::Rejected { code, .. })) => {
                     return Ok(rejected_report(
                         self.report_schema,
@@ -35,7 +60,11 @@ impl PreparedRuntimeAdmission {
                     return Ok(rejected_report(
                         self.report_schema,
                         &self.admission_id,
-                        "runtime_trust_floor_error",
+                        if has_treaty {
+                            "treaty_epoch_authority_error"
+                        } else {
+                            "runtime_trust_floor_error"
+                        },
                         self.checks,
                     ))
                 }
@@ -49,7 +78,12 @@ impl PreparedRuntimeAdmission {
     pub(crate) fn resume_operation_owned(
         mut self,
         store: &dyn RuntimeAdmissionStore,
+        treaty: Option<&RuntimeTreatyAuthorizationBinding>,
     ) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
+        if let Some(binding) = treaty {
+            store.verify_retained_runtime_treaty_authorization(binding)?;
+            self.checks.push(passed("treaty_epoch.authorization"));
+        }
         if let Some((entry, previous_hash)) = self.trust_floor_update.take() {
             let retained = store.runtime_trust_floor(&entry.verifier_id, &entry.key_id)?;
             validate_runtime_trust_floor_transition(
