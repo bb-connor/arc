@@ -147,7 +147,7 @@ mod tests {
     use chio_manifest::LatencyHint;
 
     static METRICS_TEST_LOCK: Mutex<()> = Mutex::new(());
-    fn metrics_test_guard() -> MutexGuard<'static, ()> {
+    pub(super) fn metrics_test_guard() -> MutexGuard<'static, ()> {
         match METRICS_TEST_LOCK.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -951,7 +951,7 @@ mod tests {
 
     include!("agent_card.rs");
 
-    fn kernel_for_server(
+    pub(super) fn kernel_for_server(
         server: impl ToolServerConnection + 'static,
     ) -> (ChioKernel, A2aKernelExecutionContext) {
         let config = test_kernel_config();
@@ -2347,7 +2347,11 @@ mod tests {
         assert_eq!(task["status"]["state"].as_str(), Some("TASK_STATE_FAILED"));
         assert_eq!(
             task["status"]["message"]["parts"][0]["text"].as_str(),
-            Some("a2a edge runtime admission denied")
+            Some("Runtime admission denied")
+        );
+        assert_eq!(
+            task["metadata"]["chio"]["denialCode"].as_str(),
+            Some("runtime_admission_denied")
         );
         assert_eq!(
             task["metadata"]

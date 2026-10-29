@@ -64,7 +64,8 @@ impl OrchestratedToolCall {
                 "capabilityId": self.response.receipt.capability_id,
                 "authorityPath": CROSS_PROTOCOL_AUTHORITY_PATH,
                 "authoritative": true,
-                "reason": self.response.reason,
+                "reason": self.response.client_reason(),
+                "denialCode": self.response.client_denial().map(chio_kernel::ClientDenialCode::code),
                 "terminalState": self.response.terminal_state,
                 "executionNonce": self.response.execution_nonce,
                 "routeSelection": self

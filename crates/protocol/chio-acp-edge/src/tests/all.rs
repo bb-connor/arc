@@ -2831,7 +2831,7 @@ mod tests {
         assert_eq!(resumed["result"]["task"]["status"].as_str(), Some("failed"));
         assert_eq!(
             resumed["result"]["result"]["error"].as_str(),
-            Some("acp runtime admission denied")
+            Some("Runtime admission denied")
         );
         assert_eq!(
             resumed["result"]["result"]["metadata"]["chio"]["decision"].as_str(),
@@ -2839,7 +2839,11 @@ mod tests {
         );
         assert_eq!(
             resumed["result"]["result"]["metadata"]["chio"]["reason"].as_str(),
-            Some("acp runtime admission denied")
+            Some("Runtime admission denied")
+        );
+        assert_eq!(
+            resumed["result"]["result"]["metadata"]["chio"]["denialCode"].as_str(),
+            Some("runtime_admission_denied")
         );
     }
 
@@ -3390,4 +3394,6 @@ mod tests {
     #[path = "original_input.rs"]
     mod original_input;
     include!("config_and_serde.rs");
+    #[path = "kernel_denial_codes.rs"]
+    mod kernel_denial_codes;
 }

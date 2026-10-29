@@ -110,3 +110,7 @@ mod boundary_tests;
 #[cfg(test)]
 #[path = "tests/v1.rs"]
 mod v1_tests;
+
+#[cfg(test)]
+#[path = "tests/kernel_denial_codes.rs"]
+mod kernel_denial_code_tests;
