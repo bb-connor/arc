@@ -468,7 +468,7 @@ fn frozen_return_context_binds_the_decision_model_witness_into_the_terminal_rece
         None,
     )?;
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let block = response
         .receipt
         .metadata

@@ -1091,9 +1091,15 @@ fn signed_runtime_admission_report_detects_tampering() -> Result<(), Box<dyn std
     let report = prepared.commit_operation_owned(&store)?;
     let signer = Keypair::generate();
     let mut signed = sign_runtime_admission_report(report, &signer)?;
-    assert!(verify_signed_runtime_admission_report(&signed)?);
+    assert!(verify_signed_runtime_admission_report(
+        &signed,
+        &signer.public_key()
+    )?);
     signed.body.accepted = false;
-    assert!(!verify_signed_runtime_admission_report(&signed)?);
+    assert!(!verify_signed_runtime_admission_report(
+        &signed,
+        &signer.public_key()
+    )?);
     Ok(())
 }
 

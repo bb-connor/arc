@@ -277,7 +277,8 @@ fn same_receipt(left: &ChioReceipt, right: &ChioReceipt) -> bool {
 }
 
 fn passes_key_and_signature(fixture: &Fixture, receipt: &ChioReceipt) -> bool {
-    receipt.kernel_key == fixture.trusted_key() && matches!(receipt.verify_signature(), Ok(true))
+    receipt.kernel_key == fixture.trusted_key()
+        && matches!(receipt.verify_integrity_embedded_key(), Ok(true))
 }
 
 fn check_replay(

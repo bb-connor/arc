@@ -227,7 +227,10 @@ fn drain_trusted_historical_key_does_not_accept_an_invalid_signature() -> TestRe
     let current = harness.keypair.public_key();
     trust(&mut harness, vec![current, historical.public_key()])?;
     let mut receipt = positive_receipt(&historical, 1);
-    receipt.signature = historical.sign(b"not the receipt signing body");
+    receipt.signature = historical.sign_exempt(
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        b"not the receipt signing body",
+    );
     seed_receipt(&harness, &receipt)?;
     assert_eq!(harness.kernel.drain_settlement_attempts(1)?.completed, 1);
     assert_eq!(harness.hook.calls(), 0);

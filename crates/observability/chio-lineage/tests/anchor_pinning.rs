@@ -82,12 +82,10 @@ fn pin_frontier_signed_with_unverified_payload_fails_closed(
 fn pin_frontier_signed_verifies_with_trusted_key() -> Result<(), Box<dyn std::error::Error>> {
     let g = fixture_graph()?;
     let keypair = Keypair::from_seed(&[7_u8; 32]);
-    let signature = keypair
-        .sign_wrapped(
-            chio_lineage::anchor::LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
-            &frontier_signature_body(&g).unwrap(),
-        )
-        .unwrap();
+    let signature = keypair.sign_wrapped(
+        chio_lineage::anchor::LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
+        &frontier_signature_body(&g)?,
+    )?;
     let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
         .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
 

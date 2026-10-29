@@ -37,7 +37,7 @@ fn qualified_kernel_receipt_binds_admission_and_revalidates_original_trust() -> 
     let kernel = fixture.kernel(fixture.hook_with_inputs(inputs)?, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Allow, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     let metadata = response.receipt.metadata.ok_or("signed runtime metadata")?;
     assert_eq!(metadata["chio_runtime"]["admission_id"], "adm-live-1");
@@ -55,7 +55,7 @@ fn qualified_dispatch_revalidation_refuses_advanced_trust_floor() -> TestResult 
     let kernel = fixture.kernel(fixture.hook_with_inputs(inputs)?, true, false)?;
     let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;
     assert_eq!(response.verdict, Verdict::Allow, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response.receipt.metadata.ok_or("signed runtime metadata")?;
     revalidate(&fixture, &hook, &metadata)?;
     let current = fixture

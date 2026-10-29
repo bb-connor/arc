@@ -1284,12 +1284,13 @@ impl SqliteReceiptStore {
                     checkpoint_seq
                 ))
             })?;
-        let publication = chio_kernel_core::evidence_verify::build_trust_anchored_checkpoint_publication(
-            &checkpoint,
-            binding.clone(),
-            std::slice::from_ref(&checkpoint.body.kernel_key),
-        )
-        .map_err(checkpoint_error_to_receipt_store)?;
+        let publication =
+            chio_kernel_core::evidence_verify::build_trust_anchored_checkpoint_publication(
+                &checkpoint,
+                binding.clone(),
+                std::slice::from_ref(&checkpoint.body.kernel_key),
+            )
+            .map_err(checkpoint_error_to_receipt_store)?;
         let normalized_binding = publication.trust_anchor_binding.ok_or_else(|| {
             ReceiptStoreError::Conflict(format!(
                 "checkpoint {} trust-anchor binding was not preserved during validation",

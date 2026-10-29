@@ -227,8 +227,16 @@ pub(crate) fn sign_provider_trust_value(value: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("provider trust artifact object")
         .remove("signature");
-    let (signature, _) = commerce_provider_trust_signer()
-        .sign_canonical(value)
+    let schema_id = value["schema"]
+        .as_str()
+        .test_expect("provider trust artifact schema")
+        .to_string();
+    let signature = commerce_provider_trust_signer()
+        .sign_wrapped(
+            &schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(&*value)
+                .test_expect("provider trust artifact canonicalizes"),
+        )
         .test_expect("provider trust artifact signs");
     value["signature"] = serde_json::Value::String(signature.to_hex());
 }

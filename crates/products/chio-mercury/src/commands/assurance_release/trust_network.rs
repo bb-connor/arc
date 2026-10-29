@@ -72,7 +72,7 @@ pub(in crate::commands) fn export_trust_network(
     let mut shared_proof_package: MercuryProofPackage = read_json_file(&shared_proof_package_src)?;
     let witness_record_ref = relative_display(output, &witness_record_path)?;
     let trust_anchor_ref = relative_display(output, &trust_anchor_record_path)?;
-    let carried_kernel_keys = chio_kernel::checkpoint::verify_integrity_embedded_key_set(
+    let carried_kernel_keys = chio_kernel_core::evidence_verify::verify_integrity_embedded_key_set(
         &shared_proof_package.chio_bundle.checkpoints,
     )
     .map_err(|error| CliError::Other(error.to_string()))?;

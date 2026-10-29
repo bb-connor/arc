@@ -595,12 +595,11 @@ mod tests {
     fn pin_signed_with_trusted_key_verifies() {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
+        let body = frontier_signature_body(&g)
+            .unwrap_or_else(|error| panic!("frontier body canonicalizes: {error}"));
         let signature = keypair
-            .sign_wrapped(
-                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
-                &frontier_signature_body(&g).unwrap(),
-            )
-            .unwrap();
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &body)
+            .unwrap_or_else(|error| panic!("frontier signs: {error}"));
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
         assert!(!pinned.is_signed());
@@ -613,12 +612,11 @@ mod tests {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
         let wrong_keypair = Keypair::from_seed(&[8_u8; 32]);
+        let body = frontier_signature_body(&g)
+            .unwrap_or_else(|error| panic!("frontier body canonicalizes: {error}"));
         let signature = keypair
-            .sign_wrapped(
-                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
-                &frontier_signature_body(&g).unwrap(),
-            )
-            .unwrap();
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &body)
+            .unwrap_or_else(|error| panic!("frontier signs: {error}"));
         let pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature.to_hex())
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));
         let err = verify_frontier_signature(&pinned, &g, &wrong_keypair.public_key())
@@ -631,12 +629,11 @@ mod tests {
     fn verify_signed_frontier_rejects_noncanonical_algorithm_label() {
         let g = LineageGraph::empty();
         let keypair = Keypair::from_seed(&[7_u8; 32]);
+        let body = frontier_signature_body(&g)
+            .unwrap_or_else(|error| panic!("frontier body canonicalizes: {error}"));
         let signature = keypair
-            .sign_wrapped(
-                LINEAGE_FRONTIER_SIGNATURE_SCHEMA,
-                &frontier_signature_body(&g).unwrap(),
-            )
-            .unwrap();
+            .sign_wrapped(LINEAGE_FRONTIER_SIGNATURE_SCHEMA, &body)
+            .unwrap_or_else(|error| panic!("frontier signs: {error}"));
         let signature_hex = signature.to_hex();
         let mut pinned = pin_frontier_signed(&g, "ed25519", &keypair.public_key(), &signature_hex)
             .unwrap_or_else(|error| panic!("signed pin should verify: {error}"));

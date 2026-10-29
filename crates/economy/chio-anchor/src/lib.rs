@@ -904,7 +904,7 @@ mod tests {
         let checkpoint = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
             .test_expect("checkpoint");
         let transparency = build_checkpoint_transparency(
-            &[checkpoint.clone()],
+            std::slice::from_ref(&checkpoint),
             std::slice::from_ref(&checkpoint.body.kernel_key),
         )
         .test_expect("transparency summary");
