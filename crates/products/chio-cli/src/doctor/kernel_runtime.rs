@@ -6,6 +6,7 @@
 //! When `CHIO_DOCTOR_SKIP_NETWORK=1` is set or no metrics URL is
 //! configured the probe returns an info-level report.
 
+use super::egress::probe_get;
 use super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 /// Canonical inflight gauge exposed by `chio-tower`. Hard-coded so the
@@ -74,28 +75,8 @@ impl Probe for KernelRuntimeProbe {
             .with_context("expected_gauge", KERNEL_DISPATCH_INFLIGHT_GAUGE);
         }
 
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic metrics probes
-        // target a user-configured endpoint and are skipped by
-        // CHIO_DOCTOR_SKIP_NETWORK, outside substrate tool egress.
-        let client = match reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(5))
-            .build()
-        {
-            Ok(c) => c,
-            Err(err) => {
-                return ProbeReport::fail(
-                    self.name(),
-                    ProbeSeverity::Warning,
-                    "urn:chio:error:cli:doctor-otel-unresolved",
-                    format!("Could not build HTTP client: {err}"),
-                );
-            }
-        };
-
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic metrics probe,
-        // outside substrate tool egress.
-        match client.get(&url).send() {
-            Ok(resp) => match resp.text() {
+        match probe_get(&url) {
+            Ok(resp) => match std::str::from_utf8(resp.body()) {
                 Ok(body) => {
                     if body.contains(KERNEL_DISPATCH_INFLIGHT_GAUGE) {
                         ProbeReport::ok(
@@ -134,7 +115,7 @@ impl Probe for KernelRuntimeProbe {
                 self.name(),
                 ProbeSeverity::Warning,
                 "urn:chio:error:cli:doctor-otel-unresolved",
-                format!("Failed to fetch metrics from {url}: {err}"),
+                format!("Failed to fetch metrics from {url} (egress contract): {err}"),
             ),
         }
     }
@@ -165,5 +146,25 @@ mod tests {
             .context
             .iter()
             .any(|c| c.value == KERNEL_DISPATCH_INFLIGHT_GAUGE));
+    }
+
+    #[test]
+    fn redirect_to_another_authority_is_not_followed() {
+        use super::super::egress::test_support::{redirect_to, serve};
+        use std::sync::atomic::Ordering;
+        let target = serve("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string());
+        let origin = serve(redirect_to(&format!("http://127.0.0.1:{}/", target.port)));
+        let probe = KernelRuntimeProbe::default().with_metrics_url(format!("http://127.0.0.1:{}/", origin.port));
+        let _ = probe.run(&ProbeConfig::default());
+        assert_eq!(origin.hits.load(Ordering::SeqCst), 1);
+        assert_eq!(target.hits.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn link_local_authority_is_refused_without_dialing() {
+        let probe = KernelRuntimeProbe::default().with_metrics_url("http://169.254.169.254/latest/meta-data");
+        let report = probe.run(&ProbeConfig::default());
+        assert_eq!(report.severity, ProbeSeverity::Warning);
+        assert!(report.message.contains("egress"), "{}", report.message);
     }
 }
