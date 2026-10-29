@@ -38,7 +38,7 @@ impl PreparationStore {
 impl RuntimeAdmissionStore for PreparationStore {
     fn commit_runtime_admission_authority(
         &self,
-        _: &chio_runtime_core::RuntimeAdmissionAuthorityCommit,
+        _: &runtime_api::RuntimeAdmissionAuthorityCommit,
     ) -> Result<(), ChioRuntimeError> {
         Err(ChioRuntimeError::Rejected {
             code: "treaty_epoch_unavailable",
@@ -48,7 +48,7 @@ impl RuntimeAdmissionStore for PreparationStore {
 
     fn verify_retained_runtime_treaty_authorization(
         &self,
-        _: &chio_runtime_core::RuntimeTreatyAuthorizationBinding,
+        _: &runtime_api::RuntimeTreatyAuthorizationBinding,
     ) -> Result<(), ChioRuntimeError> {
         Err(ChioRuntimeError::Rejected {
             code: "treaty_epoch_unavailable",

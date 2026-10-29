@@ -141,7 +141,7 @@ impl SqliteRuntimeOrchestrationStore {
         if head.is_none() {
             check_count(&tx, "runtime_treaty_epoch_heads", MAX_PINS, true)?;
         }
-        tx.execute("INSERT INTO runtime_treaty_epoch_records (authority_id, record_digest, sequence, canonical_bytes) VALUES (?1, ?2, ?3, ?4)", params![key, update.body_digest().as_str(), body.sequence, bytes]).map_err(sqlite_error)?;
+        tx.execute("INSERT INTO runtime_treaty_epoch_records (authority_id, record_digest, sequence, canonical_bytes) VALUES (?1, ?2, ?3, ?4)", params![key, update.body_digest().as_str(), super::sqlite_i64(body.sequence, "treaty epoch sequence")?, bytes]).map_err(sqlite_error)?;
         tx.execute("INSERT INTO runtime_treaty_epoch_heads (authority_id, record_digest) VALUES (?1, ?2) ON CONFLICT(authority_id) DO UPDATE SET record_digest = excluded.record_digest", params![key, update.body_digest().as_str()]).map_err(sqlite_error)?;
         tx.commit().map_err(sqlite_error)
     }
