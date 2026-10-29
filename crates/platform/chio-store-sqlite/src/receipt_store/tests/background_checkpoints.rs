@@ -388,7 +388,7 @@ fn shared_db_background_build_adopts_external_checkpoint() -> Result<(), Box<dyn
     external.body.issued_at = external.body.issued_at.saturating_add(1_000);
     external.signature = keypair
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::CanonicalBytes::from_serializable(&external.body).test_unwrap(),
         )
         .test_unwrap();
@@ -607,7 +607,8 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
         &range_bytes,
         &keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)
+                .test_unwrap(),
         ),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
@@ -617,7 +618,7 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
     disconnected_two.body.previous_checkpoint_sha256 = Some("00".repeat(32));
     disconnected_two.signature = keypair
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::CanonicalBytes::from_serializable(&disconnected_two.body).test_unwrap(),
         )
         .test_unwrap();
@@ -805,7 +806,8 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
         &range_bytes,
         &keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_two).test_unwrap(),
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_two)
+                .test_unwrap(),
         ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?,
@@ -880,7 +882,7 @@ fn concurrent_valid_checkpoint_is_adopted_not_conflicted() -> Result<(), Box<dyn
     loser.body.issued_at = winner.body.issued_at.saturating_add(1_000);
     loser.signature = keypair
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::CanonicalBytes::from_serializable(&loser.body).test_unwrap(),
         )
         .test_unwrap();
@@ -1084,7 +1086,8 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         &canonical_receipt_bytes(&store, max_batch + 1, max_batch * 2),
         &keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)
+                .test_unwrap(),
         ),
         &[checkpoint_one_leaf],
     )?;
@@ -1376,7 +1379,8 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
         &canonical_receipt_bytes(&store, max_batch + 1, max_batch * 2),
         &keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint_one).test_unwrap(),
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)
+                .test_unwrap(),
         ),
         &old_frontier,
     )?;

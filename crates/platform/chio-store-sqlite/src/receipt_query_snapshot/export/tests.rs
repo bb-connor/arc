@@ -334,7 +334,7 @@ fn signed_checkpoint_time_rewrite_cannot_replace_the_authenticated_checkpoint() 
     let issued_at = i64::try_from(replacement.body.issued_at).unwrap();
     replacement.signature = evidence_receipt_keypair()
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::CanonicalBytes::from_serializable(&replacement.body).unwrap(),
         )
         .unwrap();

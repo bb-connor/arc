@@ -24,7 +24,7 @@ use crate::verify::{policy_covers, FindingCheckpointSignerStatusTrust, ResolvedR
 fn has_strict_checkpoint_signature(checkpoint: &KernelCheckpoint) -> bool {
     chio_core_types::crypto::verify_wrapped(
         &checkpoint.body.kernel_key,
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &checkpoint.body,
         &checkpoint.signature,
     )

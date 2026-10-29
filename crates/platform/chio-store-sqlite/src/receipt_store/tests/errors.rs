@@ -484,7 +484,9 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -497,7 +499,10 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         6,
         &[b"five".to_vec(), b"six".to_vec()],
         &kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&second).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&second)
+                .test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -607,7 +612,9 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -617,7 +624,7 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
     second.body.previous_checkpoint_sha256 = Some("00".repeat(32));
     second.signature = kp
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::CanonicalBytes::from_serializable(&second.body).test_unwrap(),
         )
         .test_unwrap();

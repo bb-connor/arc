@@ -328,7 +328,7 @@ pub(super) fn checkpoints(
         checkpoints.push(checkpoint);
     }
     let carried_kernel_keys =
-        chio_kernel::checkpoint::verify_integrity_embedded_key_set(&checkpoints)
+        chio_kernel_core::evidence_verify::verify_integrity_embedded_key_set(&checkpoints)
             .map_err(|error| metadata_refusal(error.to_string()))?;
     let mut summary = validate_checkpoint_transparency(&checkpoints, &carried_kernel_keys)
         .map_err(|error| metadata_refusal(error.to_string()))?;

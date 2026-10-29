@@ -44,7 +44,7 @@ fn production_checkpoint_must_predate_the_finding() -> TestResult {
         .ok_or("production checkpoint missing")?;
     checkpoint.body.issued_at = finding.issued_at.saturating_add(1);
     checkpoint.signature = keypair(23).sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core_types::CanonicalBytes::from_serializable(&checkpoint.body)?,
     )?;
     evidence.checkpoint_transparency = build_checkpoint_transparency(

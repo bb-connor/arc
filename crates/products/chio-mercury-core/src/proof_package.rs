@@ -15,6 +15,7 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
 use chio_kernel_core::evidence_verify::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
+    verify_integrity_embedded_key_set,
 };
 use chio_kernel_core::evidence_verify::{
     verify_checkpoint_signature, CheckpointError, VerifiedCheckpoint,
@@ -1330,7 +1331,11 @@ fn verified_checkpoint(
     checkpoint: &KernelCheckpoint,
     refusal: impl FnOnce() -> String,
 ) -> Result<VerifiedCheckpoint<'_>, MercuryContractError> {
-    verify_checkpoint_signature(checkpoint).map_err(|error| match error {
+    verify_checkpoint_signature(
+        checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .map_err(|error| match error {
         CheckpointError::InvalidSignature => MercuryContractError::Validation(refusal()),
         error => MercuryContractError::Validation(error.to_string()),
     })

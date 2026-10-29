@@ -2242,7 +2242,7 @@ fn maybe_build_checkpoint(
         let predecessor = head
             .latest_checkpoint
             .as_ref()
-            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .map(chio_kernel_core::evidence_verify::verify_integrity_embedded_key)
             .transpose()
             .map_err(checkpoint_error_to_receipt_store)?;
         let checkpoint =

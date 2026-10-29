@@ -40,8 +40,11 @@ fn selected_context_package() -> MercuryProofPackage {
         std::slice::from_ref(&selected_canonical),
         &checkpoint_keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&context_checkpoint)
-                .expect("verified predecessor"),
+            &chio_kernel_core::evidence_verify::validate_checkpoint(
+                &context_checkpoint,
+                std::slice::from_ref(&context_checkpoint.body.kernel_key),
+            )
+            .expect("verified predecessor"),
         ),
         &[context_chain_leaf],
     )

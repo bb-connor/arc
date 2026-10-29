@@ -91,9 +91,7 @@ fn rejected_checkpoint_commits_restored_guards_but_not_candidate(
         4,
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
 
@@ -326,9 +324,7 @@ fn panicked_savepoint_write_rolls_back_candidate_and_resumes_payload(
         4,
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
 
@@ -599,9 +595,7 @@ fn cache_hit_adopts_valid_different_batch_winner_frontier() -> Result<(), Box<dy
         4,
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &chain_leaves,
     )?;
     let winner = build_checkpoint_with_previous(
@@ -610,9 +604,7 @@ fn cache_hit_adopts_valid_different_batch_winner_frontier() -> Result<(), Box<dy
         5,
         &canonical_receipt_bytes(&store, 3, 5),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &chain_leaves,
     )?;
     assert_ne!(
@@ -674,9 +666,7 @@ fn cache_miss_adopts_valid_different_batch_winner_frontier(
         4,
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &chain_leaves,
     )?;
     let winner = build_checkpoint_with_previous(
@@ -685,9 +675,7 @@ fn cache_miss_adopts_valid_different_batch_winner_frontier(
         5,
         &canonical_receipt_bytes(&store, 3, 5),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &chain_leaves,
     )?;
     assert_ne!(loser.body.chain_root, winner.body.chain_root);
@@ -763,15 +751,13 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
         4,
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &chain_leaves,
     )?;
     let mut winner = loser.clone();
     winner.body.issued_at = loser.body.issued_at.saturating_add(1_000);
     winner.signature = keypair.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&winner.body)?,
     )?;
     assert_ne!(loser, winner);

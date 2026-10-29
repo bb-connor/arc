@@ -15,7 +15,7 @@ use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportReceiptQue
 use chio_kernel::ReceiptStoreError;
 use chio_kernel_core::evidence_verify::{
     bind_checkpoint_publication_trust_anchor, build_inclusion_proof,
-    validate_checkpoint_transparency,
+    validate_checkpoint_transparency, verify_integrity_embedded_key_set,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -804,7 +804,7 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             &checkpoint_key,
             Some(
-                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                     .expect("verified predecessor"),
             ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],
@@ -880,7 +880,7 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             &checkpoint_key,
             Some(
-                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                     .expect("verified predecessor"),
             ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],

@@ -840,9 +840,7 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
         6,
         &range_bytes,
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     insert_checkpoint_row(&store, &checkpoint_two, checkpoint_two.body.batch_end_seq);
@@ -929,9 +927,7 @@ fn catch_up_rejects_divergent_chain_root_before_advancing_head(
         6,
         &range_bytes,
         &keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(
-            &checkpoint_one,
-        )?),
+        Some(&chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint_one)?),
         &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     assert_ne!(
@@ -940,7 +936,7 @@ fn catch_up_rejects_divergent_chain_root_before_advancing_head(
     );
     forged.body.chain_root = Some(chio_core::hashing::Hash::zero());
     forged.signature = keypair.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&forged.body)?,
     )?;
     insert_checkpoint_row(&store, &forged, forged.body.batch_end_seq);

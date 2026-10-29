@@ -37,7 +37,7 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
         &batch_two,
         &kp,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                 .expect("verified predecessor"),
         ),
         &[first_leaf],
@@ -73,7 +73,7 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
     rewritten.body.chain_root = Some(fabricated_root);
     rewritten.signature = kp
         .sign_wrapped(
-            chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
             &chio_core::canonical::CanonicalBytes::from_serializable(&rewritten.body).unwrap(),
         )
         .unwrap();

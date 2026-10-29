@@ -850,7 +850,7 @@ pub(crate) fn build_checkpoint_after_frontier_cache_miss_with_hook(
         let predecessor = staged_head
             .latest_checkpoint
             .as_ref()
-            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .map(chio_kernel_core::evidence_verify::verify_integrity_embedded_key)
             .transpose()
             .map_err(checkpoint_error_to_receipt_store)?;
         let checkpoint =
@@ -1061,8 +1061,11 @@ pub(crate) fn latest_checkpoint_is_chain_connected(
         )));
     };
     let predecessor = parse_persisted_checkpoint_row(predecessor_row)?;
-    chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(&predecessor, checkpoint)
-        .map_err(checkpoint_error_to_receipt_store)
+    chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(
+        &predecessor,
+        checkpoint,
+    )
+    .map_err(checkpoint_error_to_receipt_store)
 }
 
 pub(crate) fn validate_checkpoint_against_claim_log(
@@ -1215,7 +1218,7 @@ fn create_next_receipt_checkpoint_tx(
     let chain_leaf_hashes = load_checkpoint_chain_leaf_hashes(connection)?;
     let predecessor = previous_checkpoint
         .as_ref()
-        .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+        .map(chio_kernel_core::evidence_verify::verify_integrity_embedded_key)
         .transpose()
         .map_err(checkpoint_error_to_receipt_store)?;
     let checkpoint = chio_kernel_core::evidence_verify::build_checkpoint_with_previous_at(
@@ -1255,7 +1258,7 @@ pub(crate) fn insert_checkpoint_incremental_tx(
     predecessor: Option<&KernelCheckpoint>,
     checkpoint: &KernelCheckpoint,
 ) -> Result<KernelCheckpoint, ReceiptStoreError> {
-    chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint)
+    chio_kernel_core::evidence_verify::verify_integrity_embedded_key(checkpoint)
         .map_err(checkpoint_error_to_receipt_store)?;
     match predecessor {
         Some(predecessor) => {
@@ -1384,7 +1387,7 @@ fn store_kernel_checkpoint_tx(
     tx: &Connection,
     checkpoint: &KernelCheckpoint,
 ) -> Result<(), ReceiptStoreError> {
-    chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&checkpoint)
+    chio_kernel_core::evidence_verify::verify_integrity_embedded_key(checkpoint)
         .map_err(checkpoint_error_to_receipt_store)?;
 
     if let Some(existing) = load_persisted_checkpoint_row(tx, checkpoint.body.checkpoint_seq)? {

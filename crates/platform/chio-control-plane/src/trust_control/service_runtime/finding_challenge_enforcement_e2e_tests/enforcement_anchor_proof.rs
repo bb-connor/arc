@@ -30,7 +30,7 @@ pub(super) fn enforcement_anchor_proof(
         .ok_or("checkpoint statement body is an object")?
         .remove("signature");
     let signature = kernel.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&statement)?,
     )?;
     proof.checkpoint_statement.signature = signature;

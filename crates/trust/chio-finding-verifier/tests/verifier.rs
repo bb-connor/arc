@@ -86,7 +86,7 @@ fn checkpoint_at(
 ) -> Result<KernelCheckpoint, Box<dyn Error>> {
     checkpoint.body.issued_at = issued_at;
     checkpoint.signature = signer.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core_types::CanonicalBytes::from_serializable(&checkpoint.body)?,
     )?;
     Ok(checkpoint)
@@ -1056,8 +1056,10 @@ fn resolved_delivery_with_times(
     let tree = MerkleTree::from_leaves(std::slice::from_ref(&receipt_bytes))?;
     let prior_chain_leaf = checkpoint_chain_leaf_hash(&fx.checkpoint.body)?;
     let checkpoint_signer = keypair(23);
-    let verified_predecessor =
-        chio_kernel_core::evidence_verify::validate_checkpoint(&fx.checkpoint)?;
+    let verified_predecessor = chio_kernel_core::evidence_verify::validate_checkpoint(
+        &fx.checkpoint,
+        std::slice::from_ref(&fx.checkpoint.body.kernel_key),
+    )?;
     let checkpoint = checkpoint_at(
         build_checkpoint_with_previous(
             2,

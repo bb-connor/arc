@@ -436,8 +436,11 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         std::slice::from_ref(&second_canonical),
         &checkpoint_keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&first_checkpoint)
-                .expect("verified predecessor"),
+            &chio_kernel_core::evidence_verify::validate_checkpoint(
+                &first_checkpoint,
+                std::slice::from_ref(&first_checkpoint.body.kernel_key),
+            )
+            .expect("verified predecessor"),
         ),
         &[first_chain_leaf],
     )
@@ -1366,7 +1369,7 @@ fn untrusted_proof_verification_rejects_flipped_checkpoint_signature() {
     flip_checkpoint_signature_byte(&mut package);
 
     let error = package
-        .verify(1_775_137_923)
+        .verify_integrity_only(1_775_137_923)
         .expect_err("flipped checkpoint signature");
 
     assert_eq!(

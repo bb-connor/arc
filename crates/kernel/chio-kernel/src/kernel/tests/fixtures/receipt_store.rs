@@ -267,7 +267,7 @@ impl SqliteReceiptStore {
         }
         let predecessor = previous_checkpoint
             .as_ref()
-            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .map(chio_kernel_core::evidence_verify::verify_integrity_embedded_key)
             .transpose()
             .map_err(|error| {
                 ReceiptStoreError::Conflict(format!("checkpoint predecessor invalid: {error}"))

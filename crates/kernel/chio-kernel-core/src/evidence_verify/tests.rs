@@ -5,7 +5,7 @@ extern crate std;
 use alloc::boxed::Box;
 use alloc::vec;
 
-use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{ExemptFormat, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::checkpoint::{
     CHECKPOINT_CONSISTENCY_PROOF_SCHEMA, CHECKPOINT_SCHEMA,
 };
@@ -91,7 +91,10 @@ fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn core::error::
         "0000000000000000000000000000000000000000000000000000000000000000"
     ))?;
     assert!(matches!(
-        verify_checkpoint_signature(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)),
+        verify_checkpoint_signature(
+            &checkpoint,
+            std::slice::from_ref(&checkpoint.body.kernel_key)
+        ),
         Err(CheckpointError::InvalidSignature)
     ));
     Ok(())
@@ -125,7 +128,7 @@ fn checkpoint_validates_under_trusted_kernel_key() -> Result<(), Box<dyn std::er
     let checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
     let trusted = [Keypair::generate().public_key(), signer.public_key()];
 
-    assert!(verify_checkpoint_signature(&checkpoint, &trusted)?);
+    verify_checkpoint_signature(&checkpoint, &trusted)?;
     validate_checkpoint(&checkpoint, &trusted)?;
     Ok(())
 }
@@ -172,10 +175,28 @@ fn build_checkpoint_signature_verifies() {
 fn checkpoint_validation_refuses_unwrapped_and_foreign_id_signatures() {
     let kp = Keypair::generate();
     let mut cp = build_checkpoint(1, 1, 5, &make_receipt_bytes(5), &kp).unwrap();
-    for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &cp.body) {
+    let canonical = CanonicalBytes::from_serializable(&cp.body).unwrap();
+    let refused = [
+        (
+            "raw canonical body",
+            kp.sign_exempt(ExemptFormat::JwsSigningInput, canonical.as_bytes()),
+        ),
+        (
+            "foreign schema id",
+            kp.sign_wrapped(
+                chio_core_types::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+                &canonical,
+            )
+            .unwrap(),
+        ),
+    ];
+    for (label, signature) in refused {
         cp.signature = signature;
         assert!(
-            !verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)).unwrap(),
+            matches!(
+                verify_checkpoint_signature(&cp, std::slice::from_ref(&cp.body.kernel_key)),
+                Err(CheckpointError::InvalidSignature)
+            ),
             "{label}"
         );
         assert!(
@@ -271,7 +292,10 @@ fn build_checkpoint_with_previous_sets_continuity_hash() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second checkpoint build failed");
@@ -307,7 +331,10 @@ fn build_checkpoint_with_chain_frontier_accepts_canonical_successor() -> Result<
         6,
         &make_receipt_bytes(3),
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &frontier,
     )?;
 
@@ -337,7 +364,10 @@ fn build_checkpoint_with_chain_frontier_rejects_a_rootless_predecessor(
         9,
         &make_receipt_bytes(3),
         &keypair,
-        Some(&validate_checkpoint(&detached).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&detached, core::slice::from_ref(&detached.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &frontier,
     );
 
@@ -360,16 +390,20 @@ fn build_checkpoint_with_chain_frontier_rejects_invalid_predecessor() -> Result<
     let mut invalid_signature = first.clone();
     invalid_signature.body.issued_at = invalid_signature.body.issued_at.saturating_add(1);
     assert!(matches!(
-        validate_checkpoint(&invalid_signature),
+        validate_checkpoint(
+            &invalid_signature,
+            core::slice::from_ref(&invalid_signature.body.kernel_key)
+        ),
         Err(CheckpointError::InvalidSignature)
     ));
 
     let mut invalid_body = first;
     invalid_body.body.tree_size = invalid_body.body.tree_size.saturating_add(1);
-    let body_bytes = canonical_json_bytes(&invalid_body.body)
-        .map_err(|error| CheckpointError::Serialization(error.to_string()))?;
-    invalid_body.signature = keypair.sign(&body_bytes);
-    let signed_invalid_body = verify_checkpoint_signature(&invalid_body)?;
+    invalid_body.signature = sign_checkpoint_body(&keypair, &invalid_body.body);
+    let signed_invalid_body = verify_checkpoint_signature(
+        &invalid_body,
+        core::slice::from_ref(&invalid_body.body.kernel_key),
+    )?;
     let result = build_checkpoint_with_chain_frontier(
         2,
         4,
@@ -402,7 +436,10 @@ fn build_checkpoint_with_chain_frontier_rejects_discontinuous_successor(
         6,
         &make_receipt_bytes(3),
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &frontier,
     );
     assert!(matches!(
@@ -417,7 +454,10 @@ fn build_checkpoint_with_chain_frontier_rejects_discontinuous_successor(
         6,
         &make_receipt_bytes(2),
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &frontier,
     );
     assert!(matches!(
@@ -434,7 +474,10 @@ fn build_checkpoint_with_chain_frontier_rejects_discontinuous_successor(
         3,
         &make_receipt_bytes(1),
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &frontier,
     );
     assert!(matches!(
@@ -459,7 +502,13 @@ fn build_checkpoint_with_chain_frontier_rejects_successor_overflow() -> Result<(
         2,
         &make_receipt_bytes(1),
         &keypair,
-        Some(&validate_checkpoint(&maximum_sequence).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(
+                &maximum_sequence,
+                core::slice::from_ref(&maximum_sequence.body.kernel_key),
+            )
+            .expect("verified predecessor"),
+        ),
         &CheckpointChainFrontier::empty(),
     );
     assert!(matches!(
@@ -477,7 +526,13 @@ fn build_checkpoint_with_chain_frontier_rejects_successor_overflow() -> Result<(
         u64::MAX,
         &make_receipt_bytes(1),
         &keypair,
-        Some(&validate_checkpoint(&maximum_batch).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(
+                &maximum_batch,
+                core::slice::from_ref(&maximum_batch.body.kernel_key),
+            )
+            .expect("verified predecessor"),
+        ),
         &frontier,
     );
     assert!(matches!(
@@ -499,7 +554,10 @@ fn build_checkpoint_transparency_derives_publications_and_witnesses() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("build second");
@@ -549,7 +607,9 @@ fn transparency_verifies_each_checkpoint_once_for_a_large_prefix() {
             &keypair,
             checkpoints
                 .last()
-                .map(validate_checkpoint)
+                .map(|previous| {
+                    validate_checkpoint(previous, core::slice::from_ref(&previous.body.kernel_key))
+                })
                 .transpose()
                 .expect("verified predecessor")
                 .as_ref(),
@@ -638,7 +698,10 @@ fn validate_checkpoint_transparency_rejects_duplicate_signed_checkpoints() {
         4,
         &make_receipt_bytes(2),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("build second");
@@ -668,7 +731,7 @@ fn validate_checkpoint_transparency_requires_the_first_receipt_prefix() {
     .expect("single-checkpoint integrity remains valid");
 
     let error = validate_checkpoint_transparency(
-        &[checkpoint.clone()],
+        core::slice::from_ref(&checkpoint),
         std::slice::from_ref(&checkpoint.body.kernel_key),
     )
     .expect_err("transparency must reject a prefix that starts after receipt one");
@@ -790,7 +853,10 @@ fn verify_checkpoint_transparency_records_rejects_duplicate_publication_coverage
         4,
         &make_receipt_bytes(2),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second checkpoint");
@@ -1063,7 +1129,10 @@ fn checkpoint_rejects_same_log_same_tree_size_fork() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1106,7 +1175,10 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1116,7 +1188,10 @@ fn checkpoint_consistency_proof_verifies_chain_growth() {
         9,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&second).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&second, core::slice::from_ref(&second.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first, &second]),
     )
     .expect("third");
@@ -1220,7 +1295,10 @@ fn consistency_proof_rejects_maximum_untrusted_leaf_index_without_panicking() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1257,7 +1335,10 @@ fn transparency_preserves_post_rotation_consistency_proofs() {
         6,
         &make_receipt_bytes(3),
         &rotated_key,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("rotated checkpoint");
@@ -1267,7 +1348,10 @@ fn transparency_preserves_post_rotation_consistency_proofs() {
         9,
         &make_receipt_bytes(3),
         &rotated_key,
-        Some(&validate_checkpoint(&second).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&second, core::slice::from_ref(&second.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first, &second]),
     )
     .expect("post-rotation checkpoint");
@@ -1294,7 +1378,10 @@ fn transparency_rejects_divergent_chain_root_at_key_rotation() {
         6,
         &make_receipt_bytes(3),
         &rotated_key,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("rotated checkpoint");
@@ -1325,7 +1412,10 @@ fn checkpoint_consistency_proof_rejects_unrelated_chain_root() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1399,7 +1489,10 @@ fn checkpoint_consistency_proof_requires_the_committed_chain_to_end_in_this_chec
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1469,7 +1562,10 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1479,7 +1575,10 @@ fn checkpoint_consistency_proof_binds_the_earlier_endpoint_too() {
         9,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&second).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&second, core::slice::from_ref(&second.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first, &second]),
     )
     .expect("third");
@@ -1563,7 +1662,10 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1573,7 +1675,10 @@ fn mid_chain_consistency_proof_requires_an_anchored_prefix() {
         9,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&second).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&second, core::slice::from_ref(&second.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first, &second]),
     )
     .expect("third");
@@ -1664,7 +1769,10 @@ fn checkpoint_consistency_proof_requires_chain_commitment() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1706,7 +1814,10 @@ fn validate_checkpoint_predecessor_rejects_chain_commitment_downgrade() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second");
@@ -1949,7 +2060,10 @@ fn validate_checkpoint_predecessor_accepts_contiguous_batches() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("build failed");
@@ -1993,7 +2107,10 @@ fn validate_checkpoint_predecessor_rejects_wrong_predecessor_digest() {
         6,
         &make_receipt_bytes(3),
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("build failed");
@@ -2043,7 +2160,10 @@ fn validate_checkpoint_transparency_rejects_predecessor_fork() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second checkpoint");
@@ -2053,7 +2173,10 @@ fn validate_checkpoint_transparency_rejects_predecessor_fork() {
         6,
         &[b"five".to_vec(), b"six".to_vec()],
         &kp,
-        Some(&validate_checkpoint(&second).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&second, core::slice::from_ref(&second.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first, &second]),
     )
     .expect("fork checkpoint");
@@ -2085,13 +2208,16 @@ fn validate_checkpoint_transparency_rejects_truncated_predecessor_chain() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &kp,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &chain_leaves(&[&first]),
     )
     .expect("second checkpoint");
 
     let error = validate_checkpoint_transparency(
-        &[second.clone()],
+        core::slice::from_ref(&second),
         std::slice::from_ref(&second.body.kernel_key),
     )
     .expect_err("a checkpoint set with an unresolved predecessor must fail closed");

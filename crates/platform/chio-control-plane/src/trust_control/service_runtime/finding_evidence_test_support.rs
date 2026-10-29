@@ -178,7 +178,7 @@ pub(super) fn checkpoint_at(
 ) -> Result<KernelCheckpoint, Box<dyn std::error::Error>> {
     checkpoint.body.issued_at = issued_at;
     checkpoint.signature = signer.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::CanonicalBytes::from_serializable(&checkpoint.body)?,
     )?;
     Ok(checkpoint)
