@@ -313,24 +313,38 @@ impl SqliteRootExchangeStore {
         })
     }
 
-    /// Every tag generation a stored root references must be loaded.
+    /// Every tag generation a stored root or a revocation entry references
+    /// must be loaded.
     pub(super) fn verify_tag_generations(&self, loaded: &[Sha256Digest]) -> Result<()> {
         self.read_only(|tx| {
-            let mut statement = tx
-                .prepare("SELECT DISTINCT tag_key_id FROM root_exchange_roots ORDER BY tag_key_id")
-                .map_err(sqlite_error)?;
-            let referenced = statement
-                .query_map([], |row| row.get::<_, String>(0))
-                .map_err(sqlite_error)?
-                .collect::<std::result::Result<Vec<_>, _>>()
-                .map_err(sqlite_error)?;
-            for key_id in referenced {
-                let key_id = parse_digest_column(&key_id)?;
+            for key_id in referenced_generations(tx, "root_exchange_roots")? {
                 if !loaded.contains(&key_id) {
                     return Err(RootExchangeStoreError::TagGenerationMissing { key_id });
+                }
+            }
+            for key_id in referenced_generations(tx, "revocation_entry_tags")? {
+                if !loaded.contains(&key_id) {
+                    return Err(RootExchangeStoreError::RevocationTagGenerationMissing { key_id });
                 }
             }
             Ok(())
         })
     }
+}
+
+fn referenced_generations(tx: &Transaction<'_>, table: &str) -> Result<Vec<Sha256Digest>> {
+    let mut statement = tx
+        .prepare(&format!(
+            "SELECT DISTINCT tag_key_id FROM {table} ORDER BY tag_key_id"
+        ))
+        .map_err(sqlite_error)?;
+    let referenced = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(sqlite_error)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(sqlite_error)?;
+    referenced
+        .iter()
+        .map(|key_id| parse_digest_column(key_id))
+        .collect()
 }

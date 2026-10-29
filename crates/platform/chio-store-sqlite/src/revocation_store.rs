@@ -216,6 +216,27 @@ impl SqliteRevocationStore {
             return Ok(false);
         }
         let entry_id = self.record_capability_entry(transaction, capability_id, revoked_at)?;
+        self.mark_revoked(transaction, capability_id, revoked_at, &entry_id)
+    }
+
+    /// Mark `capability_id` revoked by `entry_id` inside `transaction`: the
+    /// projection row, its delta-log entry and, under a serving owner, the
+    /// commit-chain entries. Returns false when it was already revoked.
+    fn mark_revoked(
+        &self,
+        transaction: &Transaction<'_>,
+        capability_id: &str,
+        revoked_at: i64,
+        entry_id: &RevocationEntryId,
+    ) -> Result<bool, RevocationStoreError> {
+        let exists = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if exists {
+            return Ok(false);
+        }
         let joint = self.serving_owner.is_some();
         let revocation_index = allocate_revocation_index(transaction, joint)?;
         let index_column = if joint {
@@ -914,6 +935,18 @@ const REVOCATION_SCHEMA: &str = r#"
             )
         ) STRICT;
 
+        CREATE TABLE IF NOT EXISTS revocation_entry_tags (
+            entry_id TEXT NOT NULL REFERENCES revocation_entries(entry_id),
+            tag_key_id TEXT NOT NULL CHECK (
+                length(tag_key_id) = 64 AND tag_key_id NOT GLOB '*[^0-9a-f]*'
+            ),
+            tag TEXT NOT NULL CHECK (length(tag) = 64 AND tag NOT GLOB '*[^0-9a-f]*'),
+            PRIMARY KEY (entry_id, tag_key_id)
+        ) STRICT, WITHOUT ROWID;
+
+        CREATE INDEX IF NOT EXISTS idx_revocation_entry_tags_tag
+            ON revocation_entry_tags(tag_key_id, tag);
+
         CREATE TABLE IF NOT EXISTS revoked_capabilities (
             capability_id TEXT PRIMARY KEY,
             revoked_at INTEGER NOT NULL,
@@ -1012,6 +1045,7 @@ pub(crate) fn initialize_revocation_schema(
             .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
     }
     verify_revocation_delta_invariants(transaction)?;
+    targets::verify_entry_tags(transaction)?;
     if shared_authority_sequence {
         verify_admission_authority_invariants(transaction)?;
     } else {
