@@ -53,10 +53,10 @@ impl SqliteRevocationStore {
         &self,
         target: &RevocationTarget,
         tags: &[KeyedIndexValue],
-        _active_key_id: Option<&Sha256Digest>,
+        active_key_id: Option<&Sha256Digest>,
         reason: RevocationReason,
     ) -> Result<TargetRevocation, RevocationStoreError> {
-        check_target_tags(target, tags)?;
+        check_target_tags(target, tags, active_key_id)?;
         if self.serving_owner.is_none() && target.kind() != RevocationTargetKind::CapabilityId {
             return Err(RevocationStoreError::TargetRequiresServingOwner {
                 kind: target.kind().as_str(),
@@ -192,18 +192,25 @@ impl MintRevocationCheck for SqliteRevocationStore {
 fn check_target_tags(
     target: &RevocationTarget,
     tags: &[KeyedIndexValue],
+    active_key_id: Option<&Sha256Digest>,
 ) -> Result<(), RevocationStoreError> {
     let invalid = |detail| Err(RevocationStoreError::InvalidTargetTags(detail));
     if !is_tag_kind(target.kind()) {
-        return if tags.is_empty() {
-            Ok(())
-        } else {
-            invalid("only a tag target carries tags")
+        return match (tags.is_empty(), active_key_id) {
+            (false, _) => invalid("only a tag target carries tags"),
+            (true, Some(_)) => invalid("only a tag target names an active generation"),
+            (true, None) => Ok(()),
         };
     }
+    let Some(active_key_id) = active_key_id else {
+        return invalid("a tag target names its active generation");
+    };
     let Some(active) = tags.first() else {
         return invalid("a tag target needs its tag under every loaded generation");
     };
+    if active.key_id != *active_key_id {
+        return invalid("the first tag is not under the active generation");
+    }
     if active.value.to_bare_hex() != target.value() {
         return invalid("the first tag is the target value under the active generation");
     }
