@@ -287,11 +287,11 @@ impl ChioKernel {
                     return Err(error);
                 }
 
-                let reason = error.to_string();
-                warn!(request_id = %request.request_id, reason = %redacted!(&reason), "caller execution reservation could not be confirmed");
+                let denial = Denial::from_error(&error);
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "caller execution reservation could not be confirmed");
                 return self.build_deny_response_with_metadata(
                     request,
-                    &reason,
+                    &denial,
                     now,
                     Some(matched_grant_index),
                     RefusalReceiptMetadata::new(

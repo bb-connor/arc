@@ -185,9 +185,12 @@ impl ChioKernel {
                             }
                             return self.prepare_deny_response_with_metadata(
                                 request,
-                                &format!(
-                                    "MustPrepay authorization could not be settled after execution: {}",
-                                    error.code()
+                                &Denial::new(
+                                    ClientDenialCode::PaymentUnavailable,
+                                    format!(
+                                        "MustPrepay authorization could not be settled after execution: {}",
+                                        error.code()
+                                    ),
                                 ),
                                 timestamp,
                                 Some(matched_grant_index),
@@ -219,7 +222,10 @@ impl ChioKernel {
                 if settlement.settlement_status != SettlementStatus::Settled {
                     return self.prepare_deny_response_with_metadata(
                         request,
-                        "MustPrepay authorization could not be settled after execution",
+                        &Denial::new(
+                            ClientDenialCode::PaymentUnavailable,
+                            "MustPrepay authorization could not be settled after execution",
+                        ),
                         timestamp,
                         Some(matched_grant_index),
                         RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Terminal),

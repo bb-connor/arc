@@ -88,6 +88,7 @@ impl ChioKernel {
                 },
                 receipt,
                 execution_nonce: None,
+                denial_code: None,
             },
             ReceiptRecordMode::WithFederation,
         ))
@@ -157,6 +158,7 @@ impl ChioKernel {
                 },
                 receipt,
                 execution_nonce: None,
+                denial_code: None,
             },
             ReceiptRecordMode::WithFederation,
         ))

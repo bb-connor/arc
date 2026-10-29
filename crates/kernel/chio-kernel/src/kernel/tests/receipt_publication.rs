@@ -83,7 +83,7 @@ fn signed_receipt() -> ChioReceipt {
     kernel
         .build_deny_response_with_metadata(
             &request,
-            "publication fixture",
+            &Denial::new(crate::ClientDenialCode::Denied, "publication fixture"),
             current_unix_timestamp(),
             None,
             RefusalReceiptMetadata::new(None, IdentityDisposition::Reusable),

@@ -38,12 +38,12 @@ impl ChioKernel {
         }) else {
             return NativeCaptureCheckpointOutcome::Continue(credentials);
         };
-        let reason = error.to_string();
+        let denial = Denial::new(ClientDenialCode::KernelUnavailable, error.to_string());
         NativeCaptureCheckpointOutcome::Break(self.build_durable_dispatch_failure_response(
             error,
             PreDispatchCleanupDeny {
                 request: context.request,
-                reason: &reason,
+                denial: &denial,
                 timestamp: context.timestamp,
                 matched_grant_index: context.matched_grant_index,
                 cap: &context.request.capability,

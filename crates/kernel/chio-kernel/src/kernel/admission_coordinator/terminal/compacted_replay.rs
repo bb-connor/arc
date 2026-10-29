@@ -308,6 +308,7 @@ impl ChioKernel {
             terminal_state,
             receipt,
             execution_nonce: None,
+            denial_code: None,
         })
     }
 }

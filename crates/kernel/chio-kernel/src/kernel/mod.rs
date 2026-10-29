@@ -26,6 +26,7 @@ mod admission_cleanup;
 mod admission_coordinator;
 mod admission_terminal_receipt;
 mod approval_cleanup;
+mod client_denial;
 mod credential_reservation;
 mod effect_obligation;
 pub use effect_obligation::evidence::PostEffectEvidenceBudget;
@@ -89,6 +90,8 @@ pub use active_response_policy::{
     ActiveResponseRequirementResolver,
 };
 
+pub(crate) use client_denial::Denial;
+pub use client_denial::{ClientDenialCode, CLIENT_DENIAL_CODES};
 pub use construction::KernelBuildError;
 pub use error::{
     HotPathStage, KernelError, OverloadResource, ReceiptDeliveryStep, ReplayClockDirection,

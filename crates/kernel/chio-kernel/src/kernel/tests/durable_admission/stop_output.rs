@@ -42,7 +42,12 @@ fn stopped_live_return_and_retry_retain_output_until_resume() -> TestResult {
         "{retried:?}"
     );
     assert_eq!(store.operation(), before);
-    let planned = kernel.sign_planned_deny_response(&request, EMERGENCY_STOP_DENY_REASON, None);
+    let planned = kernel.sign_planned_deny_response(
+        &request,
+        crate::ClientDenialCode::EmergencyStop,
+        EMERGENCY_STOP_DENY_REASON,
+        None,
+    );
     assert!(
         matches!(planned, Err(KernelError::OutputWithheld)),
         "{planned:?}"

@@ -27,12 +27,12 @@ impl ChioKernel {
         now: u64,
         metadata: Option<Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        let reason = error.to_string();
+        let denial = Denial::from_error(error);
         warn!(request_id = %request.request_id, rejection_code = %error.report().code,
-            reason = %redacted!(&reason), "admission rejected");
+            reason = %redacted!(denial.detail()), "admission rejected");
         self.build_deny_response_with_metadata(
             request,
-            &reason,
+            &denial,
             now,
             None,
             RefusalReceiptMetadata::new(

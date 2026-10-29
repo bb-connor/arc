@@ -1432,7 +1432,7 @@ fn remote_session_send_error(error: CliError) -> Response {
                     "jsonrpc": "2.0",
                     "error": {
                         "code": -32003,
-                        "message": "Governed transaction denied",
+                        "message": chio_kernel::ClientDenialCode::GovernedTransactionDenied.text(),
                         "data": { "reason": GOVERNED_DENIAL_REASON }
                     }
                 })),

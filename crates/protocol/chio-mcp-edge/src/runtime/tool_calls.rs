@@ -218,6 +218,7 @@ fn bridge_mcp_tool_call_from_response(
         output: response.output.clone(),
         reason: response.reason.clone(),
         verdict: response.verdict,
+        denial_code: response.denial_code,
         receipt: &response.receipt,
         terminal_state: &response.terminal_state,
         execution_nonce: response.execution_nonce.as_deref(),
@@ -253,6 +254,7 @@ pub(super) struct KernelToolResultArgs<'a> {
     pub(super) output: Option<ToolCallOutput>,
     pub(super) reason: Option<String>,
     pub(super) verdict: Verdict,
+    pub(super) denial_code: Option<chio_kernel::ClientDenialCode>,
     pub(super) receipt: &'a chio_core::receipt::body::ChioReceipt,
     pub(super) terminal_state: &'a OperationTerminalState,
     pub(super) execution_nonce: Option<Box<SignedExecutionNonce>>,
@@ -481,6 +483,7 @@ impl ChioMcpEdge {
                     output: response.output,
                     reason: response.reason,
                     verdict: response.verdict,
+                    denial_code: response.denial_code,
                     receipt: &response.receipt,
                     terminal_state: &response.terminal_state,
                     execution_nonce: response.execution_nonce,
@@ -590,6 +593,7 @@ impl ChioMcpEdge {
                 output: response.output,
                 reason: response.reason,
                 verdict: response.verdict,
+                denial_code: response.denial_code,
                 receipt: &response.receipt,
                 terminal_state: &response.terminal_state,
                 execution_nonce: response.execution_nonce,
@@ -679,6 +683,7 @@ impl ChioMcpEdge {
             output,
             reason,
             verdict,
+            denial_code,
             receipt,
             terminal_state,
             execution_nonce,
@@ -692,6 +697,7 @@ impl ChioMcpEdge {
             output,
             reason,
             verdict,
+            denial_code,
             receipt,
             terminal_state,
             execution_nonce: execution_nonce.as_deref(),
@@ -717,18 +723,13 @@ impl ChioMcpEdge {
         error: chio_kernel::KernelError,
         related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
-        let client_error = match &error {
-            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
-                GOVERNED_DENIAL_TEXT.to_owned()
-            }
-            other => other.to_string(),
-        };
+        let code = error.client_denial_code();
         self.emit_log_with_related_task(
             LogLevel::Error,
             "chio.mcp.tools",
             json!({
                 "event": "tool_failed",
-                "error": client_error,
+                "error": code.text(),
             }),
             related_task_id,
         );
@@ -761,13 +762,9 @@ impl ChioMcpEdge {
                     data: Some(json!({ "elicitations": elicitations })),
                 }
             }
-            chio_kernel::KernelError::GovernedTransactionDenied(_) => {
+            _ => {
                 record_receipt_write_error();
-                ToolCallEdgeOutcome::Result(governed_denial_tool_result())
-            }
-            other => {
-                record_receipt_write_error();
-                ToolCallEdgeOutcome::Result(tool_error_result(&other.to_string()))
+                ToolCallEdgeOutcome::Result(denial_tool_result(code))
             }
         }
     }

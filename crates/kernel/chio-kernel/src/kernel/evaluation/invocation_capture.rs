@@ -38,11 +38,14 @@ impl ChioKernel {
         match self.capture_invocation(cap, budget_mutation) {
             Ok(BudgetInvocationCaptureDecision::Captured(_)) => Ok(None),
             Ok(BudgetInvocationCaptureDecision::AlreadyCaptured(_)) => {
-                let reason = "monetary invocation was already dispatched";
+                let denial = Denial::new(
+                    ClientDenialCode::ReplayDenied,
+                    "monetary invocation was already dispatched",
+                );
                 self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_capture_replay_deny_response(
                         request,
-                        reason,
+                        &denial,
                         now,
                         matched_grant_index,
                         cap,
@@ -61,11 +64,14 @@ impl ChioKernel {
                     reason = %redacted!(&internal_reason),
                     "budget invocation capture could not be confirmed"
                 );
-                let reason = "budget invocation capture could not be confirmed";
+                let denial = Denial::new(
+                    ClientDenialCode::KernelUnavailable,
+                    "budget invocation capture could not be confirmed",
+                );
                 self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_deny_response_with_metadata(
                         request,
-                        reason,
+                        &denial,
                         now,
                         Some(matched_grant_index),
                         RefusalReceiptMetadata::new(

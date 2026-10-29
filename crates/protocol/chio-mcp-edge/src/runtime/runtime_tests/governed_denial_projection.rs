@@ -9,6 +9,14 @@ fn governed_error_result() -> Value {
     })
 }
 
+fn capability_invalid_result() -> Value {
+    json!({
+        "content": [{"type": "text", "text": "Capability is not valid for this request"}],
+        "structuredContent": {"code": "capability_invalid"},
+        "isError": true,
+    })
+}
+
 #[test]
 fn typed_governed_errors_project_a_fixed_client_code_and_text() {
     let _metrics_guard = metrics_test_guard();
@@ -37,13 +45,11 @@ fn non_governed_error_text_cannot_select_the_governed_projection() {
     let mut edge = make_edge(10);
     let error =
         KernelError::InvalidConstraint("governed transaction denied: arbitrary".to_string());
-    let expected = error.to_string();
     let outcome = edge.tool_call_error_outcome(&SessionId::new("other-projection"), error, None);
     let ToolCallEdgeOutcome::Result(result) = outcome else {
         panic!("constraint refusal did not produce a tool result");
     };
-    assert_eq!(result["content"][0]["text"], expected);
-    assert!(result.get("structuredContent").is_none());
+    assert_eq!(result, capability_invalid_result());
 }
 
 #[test]
@@ -133,19 +139,20 @@ fn typed_governed_failure_notifications_project_generic_text() {
 }
 
 #[test]
-fn other_failure_notifications_preserve_their_error_text() {
+fn other_failure_notifications_project_their_family_text() {
     let _metrics_guard = metrics_test_guard();
     let mut edge = make_edge_with_config(10, true);
     let error =
         KernelError::InvalidConstraint("governed transaction denied: arbitrary".to_string());
-    let expected = error.to_string();
     let outcome = edge.tool_call_error_outcome(&SessionId::new("other-notification"), error, None);
     let notifications = edge.take_pending_notifications();
     assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0]["params"]["data"]["error"], expected);
+    assert_eq!(
+        notifications[0]["params"]["data"]["error"],
+        "Capability is not valid for this request"
+    );
     let ToolCallEdgeOutcome::Result(result) = outcome else {
         panic!("constraint refusal did not produce a tool result");
     };
-    assert_eq!(result["content"][0]["text"], expected);
-    assert!(result.get("structuredContent").is_none());
+    assert_eq!(result, capability_invalid_result());
 }

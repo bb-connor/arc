@@ -13,6 +13,7 @@ use tracing::warn;
 
 use crate::admission_operation::{AdmissionOperationV1, LOCAL_SYSTEM_TENANT_ID};
 use crate::kernel::admission_coordinator::DurableRefusalResponse;
+use crate::kernel::{ClientDenialCode, Denial};
 use crate::receipt_support::{
     next_receipt_id, receipt_attribution_metadata, request_receipt_metadata_with_payee_binding,
 };
@@ -276,7 +277,10 @@ impl<'a> PostAdmissionDropGuard<'a> {
                                 self.payment_authorization,
                                 None,
                                 DurableRefusalResponse {
-                                    reason: "evaluation cancelled before dispatch",
+                                    denial: &Denial::new(
+                                        ClientDenialCode::Denied,
+                                        "evaluation cancelled before dispatch",
+                                    ),
                                     cancelled: true,
                                     matched_grant_index: self.matched_grant_index,
                                     metadata: self.receipt_context.extra_metadata.clone(),
