@@ -82,3 +82,20 @@ fn followed_returns_when_the_client_never_reaches_the_venue() {
         Ok(false)
     );
 }
+
+#[test]
+fn followed_returns_when_a_client_stalls_inside_its_request() {
+    let probe = RedirectProbe::start("302 Found");
+    let venue = probe.venue_url.trim_start_matches("http://").to_string();
+    let mut stalled = TcpStream::connect(venue).unwrap();
+    stalled.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(probe.followed());
+    });
+    assert_eq!(
+        receiver.recv_timeout(std::time::Duration::from_secs(30)),
+        Ok(false)
+    );
+    drop(stalled);
+}
