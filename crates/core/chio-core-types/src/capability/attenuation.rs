@@ -280,8 +280,13 @@ pub fn validate_delegation_chain(
                 &prev.delegatee
             }
             None => {
-                let _ = root_delegator;
-                &link.delegator
+                if link.delegator != *root_delegator {
+                    return Err(Error::DelegationChainBroken {
+                        reason: "link 0 delegator does not match the parent capability subject"
+                            .to_string(),
+                    });
+                }
+                root_delegator
             }
         };
         if !link.verify_signature(delegator)? {
