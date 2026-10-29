@@ -1682,3 +1682,52 @@ fn sign_transport_deny_receipt_rejects_non_deny_verdict() {
         .to_string()
         .contains("sign_transport_deny_receipt requires a Deny verdict"));
 }
+
+/// The projection guard's `Err` text quotes the projected arguments, so it
+/// declares `UNSAFE`.
+#[test]
+fn http_projection_guard_err_quotes_arguments_so_it_declares_unsafe() {
+    let marker = "chio-http-projection-marker-41d2";
+    let keypair = Keypair::generate();
+    let scope = ChioScope::default();
+    let capability = chio_core_types::capability::token::CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-http-projection".to_string(),
+            issuer: keypair.public_key(),
+            subject: keypair.public_key(),
+            scope: scope.clone(),
+            issued_at: 0,
+            expires_at: u64::MAX,
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &keypair,
+    )
+    .test_unwrap();
+    let request = chio_kernel::ToolCallRequest {
+        request_id: "req-http-projection".to_string(),
+        capability,
+        tool_name: HTTP_AUTHORITY_TOOL_NAME.to_string(),
+        server_id: HTTP_AUTHORITY_SERVER_ID.to_string(),
+        agent_id: keypair.public_key().to_hex(),
+        arguments: serde_json::json!(marker),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    };
+    let ctx = chio_kernel::GuardContext::new(&request, &scope);
+
+    let error = HttpProjectionGuard.evaluate(&ctx).test_unwrap_err();
+    assert!(error.to_string().contains(marker), "{error}");
+    assert_eq!(
+        HttpProjectionGuard.evidence_declaration(),
+        GuardEvidenceDeclaration::UNSAFE
+    );
+}
