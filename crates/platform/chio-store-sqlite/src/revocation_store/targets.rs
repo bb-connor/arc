@@ -193,9 +193,7 @@ impl MintRevocationCheck for SqliteRevocationStore {
 
 /// The refusal for a mint check the store could not answer.
 pub(super) fn unavailable(error: RevocationStoreError) -> MintRevocationRefusal {
-    MintRevocationRefusal::Unavailable(RevocationCheckError::new(RevocationStoreError::Sync(
-        error.to_string(),
-    )))
+    MintRevocationRefusal::Unavailable(RevocationCheckError::new(error))
 }
 
 fn check_target_tags(
