@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -297,7 +297,7 @@ class SupportBoundary55(BaseModel):
     underwritingDecisionsAuthoritative: bool
 
 
-class Body85(BaseModel):
+class Body96(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -315,7 +315,7 @@ class Exposure17(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body85
+    body: Body96
     signature: str
     signerKey: str
 
@@ -480,7 +480,7 @@ class SupportBoundary57(BaseModel):
     subjectScopedOnly: bool
 
 
-class Body86(BaseModel):
+class Body97(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -499,7 +499,7 @@ class Scorecard22(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body86
+    body: Body97
     signature: str
     signerKey: str
 
@@ -517,7 +517,7 @@ class SupportBoundary58(BaseModel):
     signedScorecardAuthoritative: bool
 
 
-class Body84(BaseModel):
+class Body95(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -539,12 +539,12 @@ class RiskPackage(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body84
+    body: Body95
     signature: str
     signerKey: str
 
 
-class Body83(BaseModel):
+class Body94(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -563,7 +563,7 @@ class QuoteRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body83
+    body: Body94
     signature: str
     signerKey: str
 
@@ -602,7 +602,7 @@ class QuotedTerms(BaseModel):
     quotedPremiumAmount: QuotedPremiumAmount
 
 
-class Body82(BaseModel):
+class Body93(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -619,7 +619,7 @@ class QuoteResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body82
+    body: Body93
     signature: str
     signerKey: str
 
@@ -640,7 +640,7 @@ class SelectedPremiumAmount(BaseModel):
     units: int
 
 
-class Body81(BaseModel):
+class Body92(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -660,7 +660,7 @@ class Placement(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body81
+    body: Body92
     signature: str
     signerKey: str
 
@@ -673,7 +673,7 @@ class PremiumAmount(BaseModel):
     units: int
 
 
-class Body80(BaseModel):
+class Body91(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -694,7 +694,7 @@ class BoundCoverage(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body80
+    body: Body91
     signature: str
     signerKey: str
 
@@ -738,7 +738,7 @@ class SupportBoundary59(BaseModel):
     underwritingDecisionsAuthoritative: bool
 
 
-class Body87(BaseModel):
+class Body98(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -756,7 +756,7 @@ class Exposure18(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body87
+    body: Body98
     signature: str
     signerKey: str
 
@@ -843,7 +843,7 @@ class Report12(BaseModel):
     supportBoundary: SupportBoundary60
 
 
-class Body88(BaseModel):
+class Body99(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -861,12 +861,12 @@ class LossEvent(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body88
+    body: Body99
     signature: str
     signerKey: str
 
 
-class Body78(BaseModel):
+class Body89(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -889,7 +889,7 @@ class Claim(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body78
+    body: Body89
     signature: str
     signerKey: str
 
@@ -902,7 +902,7 @@ class CoveredAmount(BaseModel):
     units: int
 
 
-class Body77(BaseModel):
+class Body88(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -921,12 +921,12 @@ class ProviderResponse(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body77
+    body: Body88
     signature: str
     signerKey: str
 
 
-class Body76(BaseModel):
+class Body87(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -943,12 +943,12 @@ class Dispute(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body76
+    body: Body87
     signature: str
     signerKey: str
 
 
-class Body75(BaseModel):
+class Body86(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -968,12 +968,12 @@ class Adjudication(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body75
+    body: Body86
     signature: str
     signerKey: str
 
 
-class Body90(BaseModel):
+class Body101(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -988,7 +988,7 @@ class AuthorityProof(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body90
+    body: Body101
     signature: str
     signerKey: str
 
@@ -1046,7 +1046,7 @@ class SupportBoundary61(BaseModel):
     externalExecutionAuthoritative: bool
 
 
-class Body89(BaseModel):
+class Body100(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -1077,7 +1077,7 @@ class CapitalInstruction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body89
+    body: Body100
     signature: str
     signerKey: str
 
@@ -1090,7 +1090,7 @@ class PayoutAmount(BaseModel):
     units: int
 
 
-class Body74(BaseModel):
+class Body85(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -1107,7 +1107,7 @@ class PayoutInstruction(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body74
+    body: Body85
     signature: str
     signerKey: str
 

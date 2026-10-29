@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -320,7 +320,7 @@ class SupportBoundary112(BaseModel):
     subjectScopedOnly: bool
 
 
-class Body175(BaseModel):
+class Body195(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -339,7 +339,7 @@ class Scorecard44(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body175
+    body: Body195
     signature: str
     signerKey: str
 
@@ -357,7 +357,7 @@ class SupportBoundary113(BaseModel):
     signedScorecardAuthoritative: bool
 
 
-class Body173(BaseModel):
+class Body193(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -379,12 +379,12 @@ class RiskPackage(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body173
+    body: Body193
     signature: str
     signerKey: str
 
 
-class Body172(BaseModel):
+class Body192(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -403,7 +403,7 @@ class QuoteRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body172
+    body: Body192
     signature: str
     signerKey: str
 

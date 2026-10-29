@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -72,7 +72,7 @@ class Artifact(BaseModel):
     subdivision: DelegationRecord
 
 
-class Artifact4(BaseModel):
+class Artifact9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -258,7 +258,7 @@ class Recovery(BaseModel):
     kind: Literal["not_applicable"]
 
 
-class Recovery3(BaseModel):
+class Recovery4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -273,7 +273,7 @@ class Settlement(BaseModel):
     kind: Literal["not_applicable"]
 
 
-class Settlement5(BaseModel):
+class Settlement7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -368,7 +368,7 @@ class CommandRef(BaseModel):
     command_digest: WorkDigest
 
 
-class Result8(BaseModel):
+class Result13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -376,7 +376,7 @@ class Result8(BaseModel):
     slot: DelegationRecord
 
 
-class Result9(BaseModel):
+class Result14(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -384,7 +384,7 @@ class Result9(BaseModel):
     revision: SafeInteger
 
 
-class Result10(BaseModel):
+class Result15(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -392,7 +392,7 @@ class Result10(BaseModel):
     permit: DelegationRecord
 
 
-class Result11(BaseModel):
+class Result16(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -400,7 +400,7 @@ class Result11(BaseModel):
     bundle_sha256: WorkDigest
 
 
-class Result14(BaseModel):
+class Result19(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -453,7 +453,7 @@ class PreparationRef(BaseModel):
     command_digest: WorkDigest
 
 
-class Artifact3(BaseModel):
+class Artifact8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -462,7 +462,7 @@ class Artifact3(BaseModel):
     invocation_ref: WorkDigest
 
 
-class Artifact5(BaseModel):
+class Artifact10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -470,7 +470,7 @@ class Artifact5(BaseModel):
     draft_ref: DraftRef
 
 
-class Artifact6(BaseModel):
+class Artifact11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -478,7 +478,7 @@ class Artifact6(BaseModel):
     draft_ref: DraftRef
 
 
-class Artifact7(BaseModel):
+class Artifact12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -492,7 +492,7 @@ class Prepared1(BaseModel):
     )
     kind: Literal["prepared"]
     preparation_ref: PreparationRef
-    artifact: Artifact | Artifact3 | Artifact4 | Artifact5 | Artifact6 | Artifact7
+    artifact: Artifact | Artifact8 | Artifact9 | Artifact10 | Artifact11 | Artifact12
 
 
 class Prepared2(BaseModel):
@@ -658,7 +658,7 @@ class ResultReference2(BaseModel):
     value: Value
 
 
-class Recovery1(BaseModel):
+class Recovery2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -666,7 +666,7 @@ class Recovery1(BaseModel):
     owner_ref: OwnerOperationRef
 
 
-class Recovery2(BaseModel):
+class Recovery3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -677,7 +677,7 @@ class Recovery2(BaseModel):
     value: RecoveryLink
 
 
-class Settlement3(BaseModel):
+class Settlement5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -685,7 +685,7 @@ class Settlement3(BaseModel):
     owner_ref: OwnerOperationRef
 
 
-class Value4(BaseModel):
+class Value11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -693,7 +693,7 @@ class Value4(BaseModel):
     agreement_digest: WorkDigest
 
 
-class Settlement4(BaseModel):
+class Settlement6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -701,7 +701,7 @@ class Settlement4(BaseModel):
     source: WorkId
     revision: SafeInteger
     observed_at: SafeInteger
-    value: Value4
+    value: Value11
 
 
 class BilateralDelivery1(BaseModel):
@@ -712,7 +712,7 @@ class BilateralDelivery1(BaseModel):
     owner_ref: OwnerOperationRef
 
 
-class Value5(BaseModel):
+class Value12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -728,7 +728,7 @@ class BilateralDelivery2(BaseModel):
     source: WorkId
     revision: SafeInteger
     observed_at: SafeInteger
-    value: Value5
+    value: Value12
 
 
 class Acceptance(BaseModel):
@@ -755,7 +755,7 @@ class CatalogPage(BaseModel):
     next: CatalogCursor | None = None
 
 
-class Result12(BaseModel):
+class Result17(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -771,7 +771,7 @@ class Outcome(BaseModel):
     owner_operation_ref: OwnerOperationRef
 
 
-class Outcome11(BaseModel):
+class Outcome12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -870,8 +870,8 @@ class View(BaseModel):
     result_reference: (
         ResultReference | ResultReference1 | ResultReference2 | ResultReference3
     )
-    recovery: Recovery | Recovery1 | Recovery2 | Recovery3
-    settlement: Settlement | Settlement3 | Settlement4 | Settlement5
+    recovery: Recovery | Recovery2 | Recovery3 | Recovery4
+    settlement: Settlement | Settlement5 | Settlement6 | Settlement7
     bilateral_delivery: (
         BilateralDelivery | BilateralDelivery1 | BilateralDelivery2 | BilateralDelivery3
     )
@@ -885,7 +885,7 @@ class Body(BaseModel):
     prepared: Prepared
 
 
-class Result2(BaseModel):
+class Result7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -893,7 +893,7 @@ class Result2(BaseModel):
     view: View
 
 
-class Result4(BaseModel):
+class Result9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -901,7 +901,7 @@ class Result4(BaseModel):
     prepared: Prepared
 
 
-class Result5(BaseModel):
+class Result10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -909,7 +909,7 @@ class Result5(BaseModel):
     page: CatalogPage
 
 
-class Result6(BaseModel):
+class Result11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -917,7 +917,7 @@ class Result6(BaseModel):
     profile: Profile
 
 
-class Result13(BaseModel):
+class Result18(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -925,13 +925,13 @@ class Result13(BaseModel):
     view: View
 
 
-class Outcome9(BaseModel):
+class Outcome10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     kind: Literal["applied"]
     revision: SafeInteger
-    result: Result8 | Result9 | Result10 | Result11 | Result12 | Result13 | Result14
+    result: Result13 | Result14 | Result15 | Result16 | Result17 | Result18 | Result19
 
 
 class CommandResult(BaseModel):
@@ -939,10 +939,10 @@ class CommandResult(BaseModel):
         extra="forbid",
     )
     command_ref: CommandRef
-    outcome: Outcome9 | Outcome | Outcome11
+    outcome: Outcome10 | Outcome | Outcome12
 
 
-class Body180(BaseModel):
+class Body208(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -950,7 +950,7 @@ class Body180(BaseModel):
     result: CommandResult
 
 
-class Result3(BaseModel):
+class Result8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -958,12 +958,12 @@ class Result3(BaseModel):
     result: CommandResult
 
 
-class Body181(BaseModel):
+class Body209(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
     kind: Literal["query"]
-    result: Result2 | Result3 | Result4 | Result5 | Result6 | Result
+    result: Result7 | Result8 | Result9 | Result10 | Result11 | Result
 
 
 class WorkResponseV1(BaseModel):
@@ -972,4 +972,4 @@ class WorkResponseV1(BaseModel):
     )
     schema_: Literal["chio.work.response.v1"] = Field(..., alias="schema")
     version: Literal[1]
-    body: Body | Body180 | Body181
+    body: Body | Body208 | Body209

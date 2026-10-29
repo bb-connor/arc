@@ -5308,6 +5308,7 @@ dependencies = [
 name = "chio-spec-codegen"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "jsonschema",
  "prettyplease",
  "schemars 0.8.22",

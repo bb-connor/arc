@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from .bilateral_signature_slice_envelope_schema import ChioBilateralDsseSignatureSliceEnvelope, Signature
 from .bilateral_signature_slice_schema import CapabilityLeaseRef, ChioBilateralDsseSignatureSliceStatement, CoSign, CrossOrgVisibility, Digest, GovernanceReceiptRef, HashRecord, JointDisposition, KernelIdentity, PolicyEvaluationSummary, PolicyVerdict, Predicate, SubjectItem, Verdict
+from .capability_lease_body_schema import ChioCapabilityLeaseV1SignedBody
 from .cross_issuer_migration_schema import ChioCrossIssuerMigrationSignedBody
 from .enterprise_migration_transition_schema import ChioEnterpriseMigrationTransitionSignedBody, Key
 from .federated_delegation_policy_schema import ChioFederatedDelegationPolicySignedBody
@@ -22,6 +23,7 @@ from .federation_policy_schema import ChioFederationPolicySignedBody
 from .federation_qualification_matrix_schema import Case, ChioFederationQualificationMatrixSignedBody
 from .federation_quorum_report_schema import AntiEclipsePolicy, ChioFederationQuorumReportSignedBody, Freshness, Publisher, Publisher1, ReportRef
 from .federation_reputation_clearing_schema import ArtifactRef, ChioFederationReputationClearingSignedBody, Continuity, Input, SybilControl
+from .governance_receipt_body_schema import ChioGovernanceReceiptV1SignedBody
 from .transport_iroh_peer_directory_bundle_schema import ChioFederationTransportIrohPeerDirectoryBundleSignedBody
 
 __all__ = [
@@ -33,6 +35,7 @@ __all__ = [
     "Case",
     "ChioBilateralDsseSignatureSliceEnvelope",
     "ChioBilateralDsseSignatureSliceStatement",
+    "ChioCapabilityLeaseV1SignedBody",
     "ChioCrossIssuerMigrationSignedBody",
     "ChioEnterpriseMigrationTransitionSignedBody",
     "ChioFederatedDelegationPolicySignedBody",
@@ -44,6 +47,7 @@ __all__ = [
     "ChioFederationQuorumReportSignedBody",
     "ChioFederationReputationClearingSignedBody",
     "ChioFederationTransportIrohPeerDirectoryBundleSignedBody",
+    "ChioGovernanceReceiptV1SignedBody",
     "CoSign",
     "Continuity",
     "CrossOrgVisibility",

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -74,7 +74,7 @@ class RequireApprovalAboveConstraint(BaseModel):
     value: Value
 
 
-class Value7(BaseModel):
+class Value14(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -89,7 +89,7 @@ class CumulativeApprovalDirectConstraint(BaseModel):
         extra="forbid",
     )
     type: Literal["require_cumulative_approval_above"]
-    value: Value7
+    value: Value14
 
 
 class Kind(Enum):
@@ -195,7 +195,7 @@ class PromptGrant(BaseModel):
     operations: list[Operation] = Field(..., min_length=1)
 
 
-class Value8(BaseModel):
+class Value15(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -212,7 +212,7 @@ class CumulativeApprovalDelegableConstraint(BaseModel):
         extra="forbid",
     )
     type: Literal["require_cumulative_approval_above"]
-    value: Value8
+    value: Value15
 
 
 class AttenuationWitness(BaseModel):

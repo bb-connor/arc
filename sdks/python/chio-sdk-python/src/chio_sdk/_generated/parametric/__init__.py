@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,7 +12,8 @@ from __future__ import annotations
 
 from .contest_schema import ChioParametricContestSignedBody
 from .evidence_source_checkpoint_schema import ChioParametricEvidenceSourceCheckpointSignedBody
-from .payout_intent_schema import AdmissionHandoff, Amount, AuthorityChainItem, AuthorityProof, Binding, Body, Body153, CapitalInstruction, ChioParametricPayoutIntentSignedBody, EffectSlot, ExecutionWindow, PayoutRail, Query, Rail, Request, ResourceKey, StoreFence, SupportBoundary, Target
+from .parametric_policy_body_schema import Amount, ChioParametricPolicyV1SignedBody, CoverageAmount, EvaluatorAuthority, PayoutMode, PayoutRail, PayoutSchedule, Predicate
+from .payout_intent_schema import AdmissionHandoff, Amount, AuthorityChainItem, AuthorityProof, Binding, Body, Body173, CapitalInstruction, ChioParametricPayoutIntentSignedBody, EffectSlot, ExecutionWindow, PayoutRail, Query, Rail, Request, ResourceKey, StoreFence, SupportBoundary, Target
 
 __all__ = [
     "AdmissionHandoff",
@@ -21,14 +22,20 @@ __all__ = [
     "AuthorityProof",
     "Binding",
     "Body",
-    "Body153",
+    "Body173",
     "CapitalInstruction",
     "ChioParametricContestSignedBody",
     "ChioParametricEvidenceSourceCheckpointSignedBody",
     "ChioParametricPayoutIntentSignedBody",
+    "ChioParametricPolicyV1SignedBody",
+    "CoverageAmount",
     "EffectSlot",
+    "EvaluatorAuthority",
     "ExecutionWindow",
+    "PayoutMode",
     "PayoutRail",
+    "PayoutSchedule",
+    "Predicate",
     "Query",
     "Rail",
     "Request",

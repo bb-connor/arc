@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -150,7 +150,7 @@ class Influence(BaseModel):
     kind: Literal["observed"]
 
 
-class State4(BaseModel):
+class State6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -160,7 +160,7 @@ class State4(BaseModel):
     version: conint(ge=1, le=9007199254740991)
 
 
-class State6(BaseModel):
+class State8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -177,7 +177,7 @@ class Target(BaseModel):
     kind: Literal["intent"]
 
 
-class Target8(BaseModel):
+class Target11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -185,7 +185,7 @@ class Target8(BaseModel):
     kind: Literal["destination"]
 
 
-class Target9(BaseModel):
+class Target12(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -193,7 +193,7 @@ class Target9(BaseModel):
     scope: RecoveryDigest32
 
 
-class Target10(BaseModel):
+class Target13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -291,8 +291,8 @@ class Observation(BaseModel):
     observed_at_unix_ms: SafeInteger
     scope: Scope
     source: Source
-    state: State4 | State | State6
-    target: Target | Target8 | Target9 | Target10
+    state: State6 | State | State8
+    target: Target | Target11 | Target12 | Target13
 
 
 class RecoveryExplanationSnapshotV1(BaseModel):

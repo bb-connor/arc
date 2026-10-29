@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 00c2f2db972caacda6bf18ce18a1760ad79f6045e1d7e2c5d93154cbe43106ce
+// Schema content SHA-256: 9d6fd2e6c535f43b77f687ee211486c833d164dc6f3bfafd49a1d8837555a5ca
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -61,6 +61,16 @@ const (
 // Defines values for AgentListCapabilitiesType.
 const (
 	AgentListCapabilitiesTypeListCapabilities AgentListCapabilitiesType = "list_capabilities"
+)
+
+// Defines values for AgentWebAgentWebProofEnvelopeBodySchema.
+const (
+	AgentWebAgentWebProofEnvelopeBodySchemaChioAgentWebProofEnvelopeV1 AgentWebAgentWebProofEnvelopeBodySchema = "chio.agent-web-proof-envelope.v1"
+)
+
+// Defines values for AnchorAnchorBatchBodySchema.
+const (
+	AnchorAnchorBatchBodySchemaChioAnchorBatchV1 AnchorAnchorBatchBodySchema = "chio.anchor_batch.v1"
 )
 
 // Defines values for AnchorBatchBodySchema.
@@ -122,6 +132,11 @@ const (
 	CapabilityCapabilitiesSchemaChioCapabilitiesV1 CapabilityCapabilitiesSchema = "chio.capabilities.v1"
 )
 
+// Defines values for CapabilityCapabilityBodySchema.
+const (
+	CapabilityCapabilityBodySchemaChioCapabilityV1 CapabilityCapabilityBodySchema = "chio.capability.v1"
+)
+
 // Defines values for CapabilityCumulativeApprovalRootBodySchema.
 const (
 	CapabilityCumulativeApprovalRootBodySchemaChioCumulativeApprovalRootV1 CapabilityCumulativeApprovalRootBodySchema = "chio.cumulative-approval-root.v1"
@@ -156,6 +171,11 @@ const (
 // Defines values for CapabilityThresholdApprovalProposalSchema.
 const (
 	CapabilityThresholdApprovalProposalSchemaChioThresholdApprovalProposalV1 CapabilityThresholdApprovalProposalSchema = "chio.threshold-approval-proposal.v1"
+)
+
+// Defines values for CapabilityThresholdApprovalProposalBodySchema.
+const (
+	CapabilityThresholdApprovalProposalBodySchemaChioThresholdApprovalProposalV1 CapabilityThresholdApprovalProposalBodySchema = "chio.threshold-approval-proposal.v1"
 )
 
 // Defines values for CapabilityTokenSchema.
@@ -208,6 +228,46 @@ const (
 // Defines values for CertifyCheckSchema.
 const (
 	CertifyCheckSchemaChioCertifyCheckV1 CertifyCheckSchema = "chio.certify.check.v1"
+)
+
+// Defines values for CommerceCommerceFederationTrustBundleBodySchema.
+const (
+	CommerceCommerceFederationTrustBundleBodySchemaChioCommerceFederationTrustBundleV1 CommerceCommerceFederationTrustBundleBodySchema = "chio.commerce.federation-trust-bundle.v1"
+)
+
+// Defines values for CommerceCommercePaymentLifecycleBodySchema.
+const (
+	CommerceCommercePaymentLifecycleBodySchemaChioCommercePaymentLifecycleV1 CommerceCommercePaymentLifecycleBodySchema = "chio.commerce.payment-lifecycle.v1"
+)
+
+// Defines values for CommerceCommerceProviderDiscoverySnapshotBodySchema.
+const (
+	CommerceCommerceProviderDiscoverySnapshotBodySchemaChioCommerceProviderDiscoverySnapshotV1 CommerceCommerceProviderDiscoverySnapshotBodySchema = "chio.commerce.provider-discovery-snapshot.v1"
+)
+
+// Defines values for CommerceCommerceProviderPassportBodySchema.
+const (
+	CommerceCommerceProviderPassportBodySchemaChioCommerceProviderPassportV1 CommerceCommerceProviderPassportBodySchema = "chio.commerce.provider-passport.v1"
+)
+
+// Defines values for CommerceCommerceProviderSelectionReportBodySchema.
+const (
+	CommerceCommerceProviderSelectionReportBodySchemaChioCommerceProviderSelectionReportV1 CommerceCommerceProviderSelectionReportBodySchema = "chio.commerce.provider-selection-report.v1"
+)
+
+// Defines values for CommerceCommerceReputationSnapshotBodySchema.
+const (
+	CommerceCommerceReputationSnapshotBodySchemaChioCommerceReputationSnapshotV1 CommerceCommerceReputationSnapshotBodySchema = "chio.commerce.reputation-snapshot.v1"
+)
+
+// Defines values for CommerceCommerceSlaCommitmentBodySchema.
+const (
+	CommerceCommerceSlaCommitmentBodySchemaChioCommerceSlaCommitmentV1 CommerceCommerceSlaCommitmentBodySchema = "chio.commerce.sla-commitment.v1"
+)
+
+// Defines values for CommerceCommerceSlaPerformanceReportBodySchema.
+const (
+	CommerceCommerceSlaPerformanceReportBodySchemaChioCommerceSlaPerformanceReportV1 CommerceCommerceSlaPerformanceReportBodySchema = "chio.commerce.sla-performance-report.v1"
 )
 
 // Defines values for ComplianceCertificateSchema.
@@ -270,6 +330,11 @@ const (
 	CreditScorecardSchemaChioCreditScorecardV1 CreditScorecardSchema = "chio.credit.scorecard.v1"
 )
 
+// Defines values for DisclosureDisclosureCryptoContextReportBodySchema.
+const (
+	DisclosureDisclosureCryptoContextReportBodySchemaChioDisclosureCryptoContextReportV1 DisclosureDisclosureCryptoContextReportBodySchema = "chio.disclosure.crypto-context-report.v1"
+)
+
 // Defines values for EconomyAutonomousComparisonReportSchema.
 const (
 	EconomyAutonomousComparisonReportSchemaChioAutonomousComparisonReportV1 EconomyAutonomousComparisonReportSchema = "chio.autonomous-comparison-report.v1"
@@ -313,6 +378,141 @@ const (
 // Defines values for EconomyCapitalPoolSimulationReportSchema.
 const (
 	EconomyCapitalPoolSimulationReportSchemaChioCapitalPoolSimulationReportV1 EconomyCapitalPoolSimulationReportSchema = "chio.capital-pool-simulation-report.v1"
+)
+
+// Defines values for EconomyChannelTerminalOutcomeCommitmentBodySchema.
+const (
+	EconomyChannelTerminalOutcomeCommitmentBodySchemaChioChannelTerminalOutcomeCommitmentV1 EconomyChannelTerminalOutcomeCommitmentBodySchema = "chio.channel.terminal-outcome-commitment.v1"
+)
+
+// Defines values for EconomyClearingAtomTransformationBodySchema.
+const (
+	EconomyClearingAtomTransformationBodySchemaChioClearingAtomTransformationV1 EconomyClearingAtomTransformationBodySchema = "chio.clearing.atom-transformation.v1"
+)
+
+// Defines values for EconomyClearingInputManifestBodySchema.
+const (
+	EconomyClearingInputManifestBodySchemaChioClearingInputManifestV1 EconomyClearingInputManifestBodySchema = "chio.clearing.input-manifest.v1"
+)
+
+// Defines values for EconomyClearingNettingRoundCoreBodySchema.
+const (
+	EconomyClearingNettingRoundCoreBodySchemaChioClearingNettingRoundCoreV1 EconomyClearingNettingRoundCoreBodySchema = "chio.clearing.netting-round-core.v1"
+)
+
+// Defines values for EconomyClearingOutputManifestBodySchema.
+const (
+	EconomyClearingOutputManifestBodySchemaChioClearingOutputManifestV1 EconomyClearingOutputManifestBodySchema = "chio.clearing.output-manifest.v1"
+)
+
+// Defines values for EconomyClearingParticipantAcceptanceBodySchema.
+const (
+	EconomyClearingParticipantAcceptanceBodySchemaChioClearingParticipantAcceptanceV1 EconomyClearingParticipantAcceptanceBodySchema = "chio.clearing.participant-acceptance.v1"
+)
+
+// Defines values for EconomyClearingParticipantSnapshotAcknowledgementBodySchema.
+const (
+	EconomyClearingParticipantSnapshotAcknowledgementBodySchemaChioClearingParticipantSnapshotAcknowledgementV1 EconomyClearingParticipantSnapshotAcknowledgementBodySchema = "chio.clearing.participant-snapshot-acknowledgement.v1"
+)
+
+// Defines values for EconomyClearingParticipantSnapshotBodySchema.
+const (
+	EconomyClearingParticipantSnapshotBodySchemaChioClearingParticipantSnapshotV1 EconomyClearingParticipantSnapshotBodySchema = "chio.clearing.participant-snapshot.v1"
+)
+
+// Defines values for EconomyClearingParticipantStatementBodySchema.
+const (
+	EconomyClearingParticipantStatementBodySchemaChioClearingParticipantStatementV1 EconomyClearingParticipantStatementBodySchema = "chio.clearing.participant-statement.v1"
+)
+
+// Defines values for EconomyClearingRoundAbortBodySchema.
+const (
+	EconomyClearingRoundAbortBodySchemaChioClearingRoundAbortV1 EconomyClearingRoundAbortBodySchema = "chio.clearing.round-abort.v1"
+)
+
+// Defines values for EconomyClearingRoundFinalizationBodySchema.
+const (
+	EconomyClearingRoundFinalizationBodySchemaChioClearingRoundFinalizationV1 EconomyClearingRoundFinalizationBodySchema = "chio.clearing.round-finalization.v1"
+)
+
+// Defines values for EconomyClearingRoundSatisfactionBodySchema.
+const (
+	EconomyClearingRoundSatisfactionBodySchemaChioClearingRoundSatisfactionV1 EconomyClearingRoundSatisfactionBodySchema = "chio.clearing.round-satisfaction.v1"
+)
+
+// Defines values for EconomyClearingSettlementIntentBodySchema.
+const (
+	EconomyClearingSettlementIntentBodySchemaChioClearingSettlementIntentV1 EconomyClearingSettlementIntentBodySchema = "chio.clearing.settlement-intent.v1"
+)
+
+// Defines values for EconomyClearingSettlementReconciliationBodySchema.
+const (
+	EconomyClearingSettlementReconciliationBodySchemaChioClearingSettlementReconciliationV1 EconomyClearingSettlementReconciliationBodySchema = "chio.clearing.settlement-reconciliation.v1"
+)
+
+// Defines values for EconomyClearingZeroDispatchProofBodySchema.
+const (
+	EconomyClearingZeroDispatchProofBodySchemaChioClearingZeroDispatchProofV1 EconomyClearingZeroDispatchProofBodySchema = "chio.clearing.zero-dispatch-proof.v1"
+)
+
+// Defines values for EconomyClearingZeroIntentReconciliationBodySchema.
+const (
+	EconomyClearingZeroIntentReconciliationBodySchemaChioClearingZeroIntentReconciliationV1 EconomyClearingZeroIntentReconciliationBodySchema = "chio.clearing.zero-intent-reconciliation.v1"
+)
+
+// Defines values for EconomyCreditFacilityBindBodySchema.
+const (
+	EconomyCreditFacilityBindBodySchemaChioCreditFacilityBindV1 EconomyCreditFacilityBindBodySchema = "chio.credit.facility-bind.v1"
+)
+
+// Defines values for EconomyCreditReceivableIouEnvelopeBodySchema.
+const (
+	EconomyCreditReceivableIouEnvelopeBodySchemaChioCreditReceivableIouEnvelopeV1 EconomyCreditReceivableIouEnvelopeBodySchema = "chio.credit.receivable-iou-envelope.v1"
+)
+
+// Defines values for EconomyEconomyAnchorViewBodySchema.
+const (
+	EconomyEconomyAnchorViewBodySchemaChioEconomyAnchorViewV1 EconomyEconomyAnchorViewBodySchema = "chio.economy.anchor-view.v1"
+)
+
+// Defines values for EconomyEconomyEffectDispatchCommitBodySchema.
+const (
+	EconomyEconomyEffectDispatchCommitBodySchemaChioEconomyEffectDispatchCommitV1 EconomyEconomyEffectDispatchCommitBodySchema = "chio.economy.effect-dispatch-commit.v1"
+)
+
+// Defines values for EconomyEconomyStateBatchBodySchema.
+const (
+	EconomyEconomyStateBatchBodySchemaChioEconomyStateBatchV1 EconomyEconomyStateBatchBodySchema = "chio.economy.state-batch.v1"
+)
+
+// Defines values for EconomyFactorAssignmentAcknowledgementBodySchema.
+const (
+	EconomyFactorAssignmentAcknowledgementBodySchemaChioFactorAssignmentAcknowledgementV1 EconomyFactorAssignmentAcknowledgementBodySchema = "chio.factor.assignment-acknowledgement.v1"
+)
+
+// Defines values for EconomyFactorAssignmentAgreementBodySchema.
+const (
+	EconomyFactorAssignmentAgreementBodySchemaChioFactorAssignmentAgreementV1 EconomyFactorAssignmentAgreementBodySchema = "chio.factor.assignment-agreement.v1"
+)
+
+// Defines values for EconomyFactorAssignmentBindAuthorizationBodySchema.
+const (
+	EconomyFactorAssignmentBindAuthorizationBodySchemaChioFactorAssignmentBindAuthorizationV1 EconomyFactorAssignmentBindAuthorizationBodySchema = "chio.factor.assignment-bind-authorization.v1"
+)
+
+// Defines values for EconomyFactorAssignmentNotAppliedBodySchema.
+const (
+	EconomyFactorAssignmentNotAppliedBodySchemaChioFactorAssignmentNotAppliedV1 EconomyFactorAssignmentNotAppliedBodySchema = "chio.factor.assignment-not-applied.v1"
+)
+
+// Defines values for EconomyObligationStatusProofBodySchema.
+const (
+	EconomyObligationStatusProofBodySchemaChioObligationStatusProofV1 EconomyObligationStatusProofBodySchema = "chio.obligation.status-proof.v1"
+)
+
+// Defines values for EnterpriseEnterpriseApprovalCaseBodySchema.
+const (
+	EnterpriseEnterpriseApprovalCaseBodySchemaChioEnterpriseApprovalCaseV1 EnterpriseEnterpriseApprovalCaseBodySchema = "chio.enterprise.approval-case.v1"
 )
 
 // Defines values for ErrorCapabilityDeniedCode.
@@ -406,6 +606,11 @@ const (
 	FederationBilateralSignatureSlicePolicyVerdictVerdictDeny  FederationBilateralSignatureSlicePolicyVerdictVerdict = "deny"
 )
 
+// Defines values for FederationCapabilityLeaseBodySchema.
+const (
+	FederationCapabilityLeaseBodySchemaChioCapabilityLeaseV1 FederationCapabilityLeaseBodySchema = "chio.capability-lease.v1"
+)
+
 // Defines values for FederationCrossIssuerMigrationSchema.
 const (
 	FederationCrossIssuerMigrationSchemaChioCrossIssuerMigrationV1 FederationCrossIssuerMigrationSchema = "chio.cross-issuer-migration.v1"
@@ -449,6 +654,11 @@ const (
 // Defines values for FederationFederationReputationClearingSchema.
 const (
 	FederationFederationReputationClearingSchemaChioFederationReputationClearingV1 FederationFederationReputationClearingSchema = "chio.federation-reputation-clearing.v1"
+)
+
+// Defines values for FederationGovernanceReceiptBodySchema.
+const (
+	FederationGovernanceReceiptBodySchemaChioGovernanceReceiptV1 FederationGovernanceReceiptBodySchema = "chio.governance-receipt.v1"
 )
 
 // Defines values for FederationTransportIrohPeerDirectoryBundleSchema.
@@ -504,6 +714,131 @@ const (
 // Defines values for FindingCurrentListingAssertionSchema.
 const (
 	FindingCurrentListingAssertionSchemaChioFindingCurrentListingAssertionV1 FindingCurrentListingAssertionSchema = "chio.finding.current-listing-assertion.v1"
+)
+
+// Defines values for FindingFindingAdmissionBodySchema.
+const (
+	FindingFindingAdmissionBodySchemaChioFindingAdmissionV1 FindingFindingAdmissionBodySchema = "chio.finding.admission.v1"
+)
+
+// Defines values for FindingFindingAuditEpochBodySchema.
+const (
+	FindingFindingAuditEpochBodySchemaChioFindingAuditEpochV1 FindingFindingAuditEpochBodySchema = "chio.finding.audit-epoch.v1"
+)
+
+// Defines values for FindingFindingAuditReportBodySchema.
+const (
+	FindingFindingAuditReportBodySchemaChioFindingAuditReportV1 FindingFindingAuditReportBodySchema = "chio.finding.audit-report.v1"
+)
+
+// Defines values for FindingFindingAuditRoundAuthorizationBodySchema.
+const (
+	FindingFindingAuditRoundAuthorizationBodySchemaChioFindingAuditRoundAuthorizationV1 FindingFindingAuditRoundAuthorizationBodySchema = "chio.finding.audit-round-authorization.v1"
+)
+
+// Defines values for FindingFindingAuthorityStatusBodySchema.
+const (
+	FindingFindingAuthorityStatusBodySchemaChioFindingAuthorityStatusV1 FindingFindingAuthorityStatusBodySchema = "chio.finding.authority-status.v1"
+)
+
+// Defines values for FindingFindingBodySchema.
+const (
+	FindingFindingBodySchemaChioFindingV1 FindingFindingBodySchema = "chio.finding.v1"
+)
+
+// Defines values for FindingFindingBondBackingBodySchema.
+const (
+	FindingFindingBondBackingBodySchemaChioFindingBondBackingV1 FindingFindingBondBackingBodySchema = "chio.finding.bond-backing.v1"
+)
+
+// Defines values for FindingFindingChallengeBodySchema.
+const (
+	FindingFindingChallengeBodySchemaChioFindingChallengeV1 FindingFindingChallengeBodySchema = "chio.finding.challenge.v1"
+)
+
+// Defines values for FindingFindingChallengeEnforcementBodySchema.
+const (
+	FindingFindingChallengeEnforcementBodySchemaChioFindingChallengeEnforcementV1 FindingFindingChallengeEnforcementBodySchema = "chio.finding.challenge-enforcement.v1"
+)
+
+// Defines values for FindingFindingChallengeOutcomeBodySchema.
+const (
+	FindingFindingChallengeOutcomeBodySchemaChioFindingChallengeOutcomeV1 FindingFindingChallengeOutcomeBodySchema = "chio.finding.challenge-outcome.v1"
+)
+
+// Defines values for FindingFindingChallengeVerifierProfileBodySchema.
+const (
+	FindingFindingChallengeVerifierProfileBodySchemaChioFindingChallengeVerifierProfileV1 FindingFindingChallengeVerifierProfileBodySchema = "chio.finding.challenge-verifier-profile.v1"
+)
+
+// Defines values for FindingFindingClaimAllocationBodySchema.
+const (
+	FindingFindingClaimAllocationBodySchemaChioFindingClaimAllocationV1 FindingFindingClaimAllocationBodySchema = "chio.finding.claim-allocation.v1"
+)
+
+// Defines values for FindingFindingFailedDeliveryBodySchema.
+const (
+	FindingFindingFailedDeliveryBodySchemaChioFindingFailedDeliveryV1 FindingFindingFailedDeliveryBodySchema = "chio.finding.failed-delivery.v1"
+)
+
+// Defines values for FindingFindingFinalizedBondSnapshotBodySchema.
+const (
+	FindingFindingFinalizedBondSnapshotBodySchemaChioFindingFinalizedBondSnapshotV1 FindingFindingFinalizedBondSnapshotBodySchema = "chio.finding.finalized-bond-snapshot.v1"
+)
+
+// Defines values for FindingFindingKeyRevocationBodySchema.
+const (
+	FindingFindingKeyRevocationBodySchemaChioFindingKeyRevocationV1 FindingFindingKeyRevocationBodySchema = "chio.finding.key-revocation.v1"
+)
+
+// Defines values for FindingFindingLiabilityBodySchema.
+const (
+	FindingFindingLiabilityBodySchemaChioFindingLiabilityV1 FindingFindingLiabilityBodySchema = "chio.finding.liability.v1"
+)
+
+// Defines values for FindingFindingMarketTermsBodySchema.
+const (
+	FindingFindingMarketTermsBodySchemaChioFindingMarketTermsV1 FindingFindingMarketTermsBodySchema = "chio.finding.market-terms.v1"
+)
+
+// Defines values for FindingFindingPoolAllocationBodySchema.
+const (
+	FindingFindingPoolAllocationBodySchemaChioFindingPoolAllocationV1 FindingFindingPoolAllocationBodySchema = "chio.finding.pool-allocation.v1"
+)
+
+// Defines values for FindingFindingPurchaseRecordBodySchema.
+const (
+	FindingFindingPurchaseRecordBodySchemaChioFindingPurchaseRecordV1 FindingFindingPurchaseRecordBodySchema = "chio.finding.purchase-record.v1"
+)
+
+// Defines values for FindingFindingPurchaseResultBodySchema.
+const (
+	FindingFindingPurchaseResultBodySchemaChioFindingPurchaseResultV1 FindingFindingPurchaseResultBodySchema = "chio.finding.purchase-result.v1"
+)
+
+// Defines values for FindingFindingSellerAuthorizationBodySchema.
+const (
+	FindingFindingSellerAuthorizationBodySchemaChioFindingSellerAuthorizationV1 FindingFindingSellerAuthorizationBodySchema = "chio.finding.seller-authorization.v1"
+)
+
+// Defines values for FindingFindingStatusEpochBodySchema.
+const (
+	FindingFindingStatusEpochBodySchemaChioFindingStatusEpochV1 FindingFindingStatusEpochBodySchema = "chio.finding.status-epoch.v1"
+)
+
+// Defines values for FindingFindingVerifiedFixSubmissionBodySchema.
+const (
+	FindingFindingVerifiedFixSubmissionBodySchemaChioFindingVerifiedFixSubmissionV1 FindingFindingVerifiedFixSubmissionBodySchema = "chio.finding.verified-fix-submission.v1"
+)
+
+// Defines values for FindingFindingVerifierReportBodySchema.
+const (
+	FindingFindingVerifierReportBodySchemaChioFindingVerifierReportV1 FindingFindingVerifierReportBodySchema = "chio.finding.verifier-report.v1"
+)
+
+// Defines values for FindingFindingVoluntaryRetractionBodySchema.
+const (
+	FindingFindingVoluntaryRetractionBodySchemaChioFindingVoluntaryRetractionV1 FindingFindingVoluntaryRetractionBodySchema = "chio.finding.voluntary-retraction.v1"
 )
 
 // Defines values for FindingHostedAggregateCheckpointSchema.
@@ -586,6 +921,11 @@ const (
 	FindingPoolDebitAuthorizationSchemaChioFindingPoolDebitAuthorizationV1 FindingPoolDebitAuthorizationSchema = "chio.finding.pool-debit-authorization.v1"
 )
 
+// Defines values for FindingRegistryMarketPenaltyBodySchema.
+const (
+	FindingRegistryMarketPenaltyBodySchemaChioRegistryMarketPenaltyV1 FindingRegistryMarketPenaltyBodySchema = "chio.registry.market-penalty.v1"
+)
+
 // Defines values for FindingStatusIntentSubmissionSchema.
 const (
 	FindingStatusIntentSubmissionSchemaChioFindingStatusIntentSubmissionV1 FindingStatusIntentSubmissionSchema = "chio.finding.status-intent-submission.v1"
@@ -611,9 +951,64 @@ const (
 	FindingWorkerCapabilitySchemaChioFindingWorkerCapabilityV1 FindingWorkerCapabilitySchema = "chio.finding.worker-capability.v1"
 )
 
+// Defines values for FiscalFiscalActivationBodySchema.
+const (
+	FiscalFiscalActivationBodySchemaChioFiscalActivationV1 FiscalFiscalActivationBodySchema = "chio.fiscal.activation.v1"
+)
+
+// Defines values for FiscalFiscalApprovalBodySchema.
+const (
+	FiscalFiscalApprovalBodySchemaChioFiscalApprovalV1 FiscalFiscalApprovalBodySchema = "chio.fiscal.approval.v1"
+)
+
+// Defines values for FiscalFiscalCharterBodySchema.
+const (
+	FiscalFiscalCharterBodySchemaChioFiscalCharterV1 FiscalFiscalCharterBodySchema = "chio.fiscal.charter.v1"
+)
+
+// Defines values for FiscalFiscalConsumerReadinessBodySchema.
+const (
+	FiscalFiscalConsumerReadinessBodySchemaChioFiscalConsumerReadinessV1 FiscalFiscalConsumerReadinessBodySchema = "chio.fiscal.consumer-readiness.v1"
+)
+
+// Defines values for FiscalFiscalContinuityCheckpointBodySchema.
+const (
+	FiscalFiscalContinuityCheckpointBodySchemaChioFiscalContinuityCheckpointV1 FiscalFiscalContinuityCheckpointBodySchema = "chio.fiscal.continuity-checkpoint.v1"
+)
+
+// Defines values for FiscalFiscalProposalAdmissionBodySchema.
+const (
+	FiscalFiscalProposalAdmissionBodySchemaChioFiscalProposalAdmissionV1 FiscalFiscalProposalAdmissionBodySchema = "chio.fiscal.proposal-admission.v1"
+)
+
+// Defines values for FiscalFiscalProposalBodySchema.
+const (
+	FiscalFiscalProposalBodySchemaChioFiscalProposalV1 FiscalFiscalProposalBodySchema = "chio.fiscal.proposal.v1"
+)
+
+// Defines values for FiscalFiscalScheduleBodySchema.
+const (
+	FiscalFiscalScheduleBodySchemaChioFiscalScheduleV1 FiscalFiscalScheduleBodySchema = "chio.fiscal.schedule.v1"
+)
+
 // Defines values for FrostDkgPackageSchema.
 const (
 	FrostDkgPackageSchemaChioFrostDkgPackageV1 FrostDkgPackageSchema = "chio.frost.dkg-package.v1"
+)
+
+// Defines values for FrostFrostAuthorizationSlotCheckpointBodySchema.
+const (
+	FrostFrostAuthorizationSlotCheckpointBodySchemaChioFrostAuthorizationSlotCheckpointV1 FrostFrostAuthorizationSlotCheckpointBodySchema = "chio.frost.authorization-slot-checkpoint.v1"
+)
+
+// Defines values for FrostFrostEpochCheckpointBodySchema.
+const (
+	FrostFrostEpochCheckpointBodySchemaChioFrostEpochCheckpointV1 FrostFrostEpochCheckpointBodySchema = "chio.frost.epoch-checkpoint.v1"
+)
+
+// Defines values for FrostFrostRosterBodySchema.
+const (
+	FrostFrostRosterBodySchemaChioFrostRosterV1 FrostFrostRosterBodySchema = "chio.frost.roster.v1"
 )
 
 // Defines values for JsonrpcNotificationJsonrpc.
@@ -676,9 +1071,19 @@ const (
 	KernelCallerDeliveryReportReportSchemaChioCallerDeliveryReportV1 KernelCallerDeliveryReportReportSchema = "chio.caller-delivery-report.v1"
 )
 
+// Defines values for KernelCallerDeliveryReportBodySchema.
+const (
+	KernelCallerDeliveryReportBodySchemaChioCallerDeliveryReportV1 KernelCallerDeliveryReportBodySchema = "chio.caller-delivery-report.v1"
+)
+
 // Defines values for KernelCallerDispatchAuthorizationAuthorizationSchema.
 const (
 	KernelCallerDispatchAuthorizationAuthorizationSchemaChioCallerDispatchAuthorizationV1 KernelCallerDispatchAuthorizationAuthorizationSchema = "chio.caller-dispatch-authorization.v1"
+)
+
+// Defines values for KernelCallerDispatchAuthorizationBodySchema.
+const (
+	KernelCallerDispatchAuthorizationBodySchemaChioCallerDispatchAuthorizationV1 KernelCallerDispatchAuthorizationBodySchema = "chio.caller-dispatch-authorization.v1"
 )
 
 // Defines values for KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind.
@@ -937,6 +1342,51 @@ const (
 	McpSessionCredentialCallSchemaChioMcpSessionCredentialCallV1 McpSessionCredentialCallSchema = "chio.mcp.session-credential-call.v1"
 )
 
+// Defines values for OutcomeOutcomeContractualZeroBodySchema.
+const (
+	OutcomeOutcomeContractualZeroBodySchemaChioOutcomeContractualZeroV1 OutcomeOutcomeContractualZeroBodySchema = "chio.outcome.contractual-zero.v1"
+)
+
+// Defines values for OutcomeOutcomeDeliveryAcknowledgementBodySchema.
+const (
+	OutcomeOutcomeDeliveryAcknowledgementBodySchemaChioOutcomeDeliveryAcknowledgementV1 OutcomeOutcomeDeliveryAcknowledgementBodySchema = "chio.outcome.delivery-acknowledgement.v1"
+)
+
+// Defines values for OutcomeOutcomeDeliveryCheckpointBodySchema.
+const (
+	OutcomeOutcomeDeliveryCheckpointBodySchemaChioOutcomeDeliveryCheckpointV1 OutcomeOutcomeDeliveryCheckpointBodySchema = "chio.outcome.delivery-checkpoint.v1"
+)
+
+// Defines values for OutcomeOutcomeDeliveryNonacceptanceBodySchema.
+const (
+	OutcomeOutcomeDeliveryNonacceptanceBodySchemaChioOutcomeDeliveryNonacceptanceV1 OutcomeOutcomeDeliveryNonacceptanceBodySchema = "chio.outcome.delivery-nonacceptance.v1"
+)
+
+// Defines values for OutcomeOutcomeEligibilityBodySchema.
+const (
+	OutcomeOutcomeEligibilityBodySchemaChioOutcomeEligibilityV1 OutcomeOutcomeEligibilityBodySchema = "chio.outcome.eligibility.v1"
+)
+
+// Defines values for OutcomeOutcomeOutputProvenanceBodySchema.
+const (
+	OutcomeOutcomeOutputProvenanceBodySchemaChioOutcomeOutputProvenanceV1 OutcomeOutcomeOutputProvenanceBodySchema = "chio.outcome.output-provenance.v1"
+)
+
+// Defines values for OutcomeOutcomePredicateBodySchema.
+const (
+	OutcomeOutcomePredicateBodySchemaChioOutcomePredicateV1 OutcomeOutcomePredicateBodySchema = "chio.outcome.predicate.v1"
+)
+
+// Defines values for OutcomeOutcomePricingBodySchema.
+const (
+	OutcomeOutcomePricingBodySchemaChioOutcomePricingV1 OutcomeOutcomePricingBodySchema = "chio.outcome.pricing.v1"
+)
+
+// Defines values for OutcomeOutcomeSlaBodySchema.
+const (
+	OutcomeOutcomeSlaBodySchemaChioOutcomeSlaV1 OutcomeOutcomeSlaBodySchema = "chio.outcome.sla.v1"
+)
+
 // Defines values for ParametricContestSchema.
 const (
 	ParametricContestSchemaChioParametricContestV1 ParametricContestSchema = "chio.parametric.contest.v1"
@@ -947,9 +1397,54 @@ const (
 	ParametricEvidenceSourceCheckpointSchemaChioParametricEvidenceSourceCheckpointV1 ParametricEvidenceSourceCheckpointSchema = "chio.parametric.evidence-source-checkpoint.v1"
 )
 
+// Defines values for ParametricParametricPolicyBodySchema.
+const (
+	ParametricParametricPolicyBodySchemaChioParametricPolicyV1 ParametricParametricPolicyBodySchema = "chio.parametric.policy.v1"
+)
+
 // Defines values for ParametricPayoutIntentSchema.
 const (
 	ParametricPayoutIntentSchemaChioParametricPayoutIntentV1 ParametricPayoutIntentSchema = "chio.parametric.payout-intent.v1"
+)
+
+// Defines values for PheromonePheromoneDepositBodySchema.
+const (
+	PheromonePheromoneDepositBodySchemaChioPheromoneDepositV1 PheromonePheromoneDepositBodySchema = "chio.pheromone-deposit.v1"
+)
+
+// Defines values for PheromonePheromoneObservationCostVerifierRootBodySchema.
+const (
+	PheromonePheromoneObservationCostVerifierRootBodySchemaChioPheromoneObservationCostVerifierRootV1 PheromonePheromoneObservationCostVerifierRootBodySchema = "chio.pheromone-observation-cost-verifier-root.v1"
+)
+
+// Defines values for PheromonePheromonePeerDirectoryBundleBodySchema.
+const (
+	PheromonePheromonePeerDirectoryBundleBodySchemaChioPheromonePeerDirectoryBundleV1 PheromonePheromonePeerDirectoryBundleBodySchema = "chio.pheromone.peer-directory-bundle.v1"
+)
+
+// Defines values for PheromonePheromoneQueryReportBodySchema.
+const (
+	PheromonePheromoneQueryReportBodySchemaChioPheromoneQueryReportV1 PheromonePheromoneQueryReportBodySchema = "chio.pheromone.query-report.v1"
+)
+
+// Defines values for PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchema.
+const (
+	PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchemaChioPheromoneRelayAlertAssuranceArchivePackageManifestV1 PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchema = "chio.pheromone.relay-alert-assurance-archive-package-manifest.v1"
+)
+
+// Defines values for PheromonePheromoneRelayAlertAssuranceExportManifestBodySchema.
+const (
+	PheromonePheromoneRelayAlertAssuranceExportManifestBodySchemaChioPheromoneRelayAlertAssuranceExportManifestV1 PheromonePheromoneRelayAlertAssuranceExportManifestBodySchema = "chio.pheromone.relay-alert-assurance-export-manifest.v1"
+)
+
+// Defines values for PheromonePheromoneRelayHttpRequestBodySchema.
+const (
+	PheromonePheromoneRelayHttpRequestBodySchemaChioPheromoneRelayHttpRequestV1 PheromonePheromoneRelayHttpRequestBodySchema = "chio.pheromone.relay-http-request.v1"
+)
+
+// Defines values for PheromonePheromoneTransitPolicyBodySchema.
+const (
+	PheromonePheromoneTransitPolicyBodySchemaChioPheromoneTransitPolicyV1 PheromonePheromoneTransitPolicyBodySchema = "chio.pheromone-transit-policy.v1"
 )
 
 // Defines values for PolicyActivationReceiptSignatureSchema.
@@ -1149,6 +1644,11 @@ const (
 // Defines values for ReceiptLineageStatementSchema.
 const (
 	ReceiptLineageStatementSchemaChioReceiptLineageStatementV1 ReceiptLineageStatementSchema = "chio.receipt_lineage_statement.v1"
+)
+
+// Defines values for ReceiptReceiptLineageStatementBodySchema.
+const (
+	ReceiptReceiptLineageStatementBodySchemaChioReceiptLineageStatementV1 ReceiptReceiptLineageStatementBodySchema = "chio.receipt_lineage_statement.v1"
 )
 
 // Defines values for ReceiptRecordBbsProjectionVersion.
@@ -2554,6 +3054,11 @@ const (
 	RecoveryProviderFinalityVersionN1 RecoveryProviderFinalityVersion = 1
 )
 
+// Defines values for RecoveryRecoveryGrantBodySchema.
+const (
+	RecoveryRecoveryGrantBodySchemaChioRecoveryGrantV1 RecoveryRecoveryGrantBodySchema = "chio.recovery.grant.v1"
+)
+
 // Defines values for RecoveryRecoverySetupProbeDomainVersion.
 const (
 	RecoveryRecoverySetupProbeDomainVersionN1 RecoveryRecoverySetupProbeDomainVersion = 1
@@ -3531,6 +4036,21 @@ const (
 	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
 )
 
+// Defines values for RiskRiskAdjudicationJurisdictionReceiptBodySchema.
+const (
+	RiskRiskAdjudicationJurisdictionReceiptBodySchemaChioRiskAdjudicationJurisdictionReceiptV1 RiskRiskAdjudicationJurisdictionReceiptBodySchema = "chio.risk.adjudication-jurisdiction-receipt.v1"
+)
+
+// Defines values for RiskRiskCollateralPositionReportBodySchema.
+const (
+	RiskRiskCollateralPositionReportBodySchemaChioRiskCollateralPositionReportV1 RiskRiskCollateralPositionReportBodySchema = "chio.risk.collateral-position-report.v1"
+)
+
+// Defines values for RiskRiskGuaranteeDecisionBodySchema.
+const (
+	RiskRiskGuaranteeDecisionBodySchemaChioRiskGuaranteeDecisionV1 RiskRiskGuaranteeDecisionBodySchema = "chio.risk.guarantee-decision.v1"
+)
+
 // Defines values for RootAuthorityDelegationContextSchema.
 const (
 	RootAuthorityDelegationContextSchemaChioDelegationContextV1 RootAuthorityDelegationContextSchema = "chio.delegation-context.v1"
@@ -3560,6 +4080,11 @@ const (
 // Defines values for RootAuthorityIdpKeySnapshotSchema.
 const (
 	RootAuthorityIdpKeySnapshotSchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotSchema = "chio.idp-key-snapshot.v1"
+)
+
+// Defines values for RootAuthorityIdpKeySnapshotBodySchema.
+const (
+	RootAuthorityIdpKeySnapshotBodySchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotBodySchema = "chio.idp-key-snapshot.v1"
 )
 
 // Defines values for RootAuthorityRevocationRequestSchema.
@@ -3622,6 +4147,11 @@ const (
 // Defines values for RootAuthorityRootPolicySchema.
 const (
 	RootAuthorityRootPolicySchemaChioRootPolicyV1 RootAuthorityRootPolicySchema = "chio.root-policy.v1"
+)
+
+// Defines values for RootAuthorityRootPolicyBodySchema.
+const (
+	RootAuthorityRootPolicyBodySchemaChioRootPolicyV1 RootAuthorityRootPolicyBodySchema = "chio.root-policy.v1"
 )
 
 // Defines values for RootAuthorityRootPolicyClaimMode.
@@ -3692,6 +4222,21 @@ const (
 // Defines values for RuntimeRevocationFreshnessProofSignatureSchema.
 const (
 	RuntimeRevocationFreshnessProofSignatureSchemaChioRuntimeRevocationFreshnessProofSignatureV1 RuntimeRevocationFreshnessProofSignatureSchema = "chio.runtime.revocation-freshness-proof-signature.v1"
+)
+
+// Defines values for RuntimeRuntimePeerWeightsBodySchema.
+const (
+	RuntimeRuntimePeerWeightsBodySchemaChioRuntimePeerWeightsV1 RuntimeRuntimePeerWeightsBodySchema = "chio.runtime.peer-weights.v1"
+)
+
+// Defines values for RuntimeRuntimePheromonePolicyBodySchema.
+const (
+	RuntimeRuntimePheromonePolicyBodySchemaChioRuntimePheromonePolicyV1 RuntimeRuntimePheromonePolicyBodySchema = "chio.runtime.pheromone-policy.v1"
+)
+
+// Defines values for RuntimeRuntimeVerifierTrustBundleBodySchema.
+const (
+	RuntimeRuntimeVerifierTrustBundleBodySchemaChioRuntimeVerifierTrustBundleV1 RuntimeRuntimeVerifierTrustBundleBodySchema = "chio.runtime.verifier-trust-bundle.v1"
 )
 
 // Defines values for RuntimeSandboxAttestationSignatureSchema.
@@ -3971,6 +4516,11 @@ const (
 // Defines values for SecurityBrokerPrepareDispatchAcknowledgementV1Schema.
 const (
 	SecurityBrokerPrepareDispatchAcknowledgementV1SchemaChioBrokerPrepareDispatchAcknowledgementV1 SecurityBrokerPrepareDispatchAcknowledgementV1Schema = "chio.broker-prepare-dispatch-acknowledgement.v1"
+)
+
+// Defines values for SecurityBrokerPrivilegedAuditChallengeBodySchema.
+const (
+	SecurityBrokerPrivilegedAuditChallengeBodySchemaChioBrokerPrivilegedAuditChallengeV1 SecurityBrokerPrivilegedAuditChallengeBodySchema = "chio.broker-privileged-audit-challenge.v1"
 )
 
 // Defines values for SecurityBrokerPrivilegedAuditChallengeV1ChallengeBodySchema.
@@ -4606,6 +5156,11 @@ const (
 	SecurityKeyLogAuditReadinessBodyV1SchemaChioKeyLogAuditReadinessV1 SecurityKeyLogAuditReadinessBodyV1Schema = "chio.key-log.audit-readiness.v1"
 )
 
+// Defines values for SecurityKeyLogCheckpointBodySchema.
+const (
+	SecurityKeyLogCheckpointBodySchemaChioKeyLogCheckpointV1 SecurityKeyLogCheckpointBodySchema = "chio.key-log.checkpoint.v1"
+)
+
 // Defines values for SecurityKeyLogCheckpointBodyV1Schema.
 const (
 	SecurityKeyLogCheckpointBodyV1SchemaChioKeyLogCheckpointV1 SecurityKeyLogCheckpointBodyV1Schema = "chio.key-log.checkpoint.v1"
@@ -4732,6 +5287,11 @@ const (
 	SecurityKeyLogWitnessReadinessBodyV1SchemaChioKeyLogWitnessReadinessV1 SecurityKeyLogWitnessReadinessBodyV1Schema = "chio.key-log.witness-readiness.v1"
 )
 
+// Defines values for SecurityKeyringArtifactSignatureBodySchema.
+const (
+	SecurityKeyringArtifactSignatureBodySchemaChioKeyringArtifactSignatureV1 SecurityKeyringArtifactSignatureBodySchema = "chio.keyring.artifact-signature.v1"
+)
+
 // Defines values for SecurityKeyringArtifactSignatureV1Schema.
 const (
 	SecurityKeyringArtifactSignatureV1SchemaChioKeyringArtifactSignatureV1 SecurityKeyringArtifactSignatureV1Schema = "chio.keyring.artifact-signature.v1"
@@ -4771,6 +5331,11 @@ const (
 // Defines values for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State.
 const (
 	SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4StateNoRollbackRequired SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State = "no_rollback_required"
+)
+
+// Defines values for SecurityMcpCageLaunchPolicyBodySchema.
+const (
+	SecurityMcpCageLaunchPolicyBodySchemaChioMcpCageLaunchPolicyV1 SecurityMcpCageLaunchPolicyBodySchema = "chio.mcp.cage-launch-policy.v1"
 )
 
 // Defines values for SecurityMcpCageLaunchPolicyV1LimitsNofileHard.
@@ -5039,6 +5604,51 @@ const (
 	SwarmRoutePlanReceiptSignatureSchemaChioSwarmRoutePlanReceiptSignatureV1 SwarmRoutePlanReceiptSignatureSchema = "chio.swarm.route-plan-receipt-signature.v1"
 )
 
+// Defines values for SwarmSwarmContinuationTokenBodySchema.
+const (
+	SwarmSwarmContinuationTokenBodySchemaChioSwarmContinuationTokenV1 SwarmSwarmContinuationTokenBodySchema = "chio.swarm.continuation-token.v1"
+)
+
+// Defines values for SwarmSwarmJoinReceiptBodySchema.
+const (
+	SwarmSwarmJoinReceiptBodySchemaChioSwarmJoinReceiptV1 SwarmSwarmJoinReceiptBodySchema = "chio.swarm.join-receipt.v1"
+)
+
+// Defines values for SwarmSwarmRevocationEpochBodySchema.
+const (
+	SwarmSwarmRevocationEpochBodySchemaChioSwarmRevocationEpochV1 SwarmSwarmRevocationEpochBodySchema = "chio.swarm.revocation-epoch.v1"
+)
+
+// Defines values for SwarmSwarmRoutePlanReceiptBodySchema.
+const (
+	SwarmSwarmRoutePlanReceiptBodySchemaChioSwarmRoutePlanReceiptV1 SwarmSwarmRoutePlanReceiptBodySchema = "chio.swarm.route-plan-receipt.v1"
+)
+
+// Defines values for SwarmSwarmTaskGraphBodySchema.
+const (
+	SwarmSwarmTaskGraphBodySchemaChioSwarmTaskGraphV1 SwarmSwarmTaskGraphBodySchema = "chio.swarm.task-graph.v1"
+)
+
+// Defines values for SwarmSwarmTerminalGraphReceiptBodySchema.
+const (
+	SwarmSwarmTerminalGraphReceiptBodySchemaChioSwarmTerminalGraphReceiptV1 SwarmSwarmTerminalGraphReceiptBodySchema = "chio.swarm.terminal-graph-receipt.v1"
+)
+
+// Defines values for TransactionCapabilityProofBodySchema.
+const (
+	TransactionCapabilityProofBodySchemaChioCapabilityProofV1 TransactionCapabilityProofBodySchema = "chio.capability.proof.v1"
+)
+
+// Defines values for TransactionGuardDecisionBodySchema.
+const (
+	TransactionGuardDecisionBodySchemaChioGuardDecisionV1 TransactionGuardDecisionBodySchema = "chio.guard.decision.v1"
+)
+
+// Defines values for TransactionTransactionPassportBodySchema.
+const (
+	TransactionTransactionPassportBodySchemaChioTransactionPassportV1 TransactionTransactionPassportBodySchema = "chio.transaction-passport.v1"
+)
+
 // Defines values for TrustAgentPassportPresentationResponseSchema.
 const (
 	TrustAgentPassportPresentationResponseSchemaChioAgentPassportPresentationResponseV1 TrustAgentPassportPresentationResponseSchema = "chio.agent-passport-presentation-response.v1"
@@ -5082,9 +5692,113 @@ const (
 	TrustControlTerminateReasonTermAdvanced     TrustControlTerminateReason = "term_advanced"
 )
 
+// Defines values for TrustFinancialAgentPassportPresentationChallengeBodySchema.
+const (
+	TrustFinancialAgentPassportPresentationChallengeBodySchemaChioFinancialAgentPassportPresentationChallengeV1 TrustFinancialAgentPassportPresentationChallengeBodySchema = "chio.financial-agent-passport-presentation-challenge.v1"
+)
+
 // Defines values for TrustFinancialAgentPassportPresentationResponseSchema.
 const (
 	TrustFinancialAgentPassportPresentationResponseSchemaChioFinancialAgentPassportPresentationResponseV1 TrustFinancialAgentPassportPresentationResponseSchema = "chio.financial-agent-passport-presentation-response.v1"
+)
+
+// Defines values for TrustFinancialAgentPassportSourceManifestBodySchema.
+const (
+	TrustFinancialAgentPassportSourceManifestBodySchemaChioFinancialAgentPassportSourceManifestV1 TrustFinancialAgentPassportSourceManifestBodySchema = "chio.financial-agent-passport.source-manifest.v1"
+)
+
+// Defines values for TrustFincredPremiumHistoryBodySchema.
+const (
+	TrustFincredPremiumHistoryBodySchemaChioFincredPremiumHistoryV1 TrustFincredPremiumHistoryBodySchema = "chio.fincred.premium-history.v1"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamilyCreditScorecard       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily = "credit_scorecard"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamilyExposureHistory       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily = "exposure_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamilyLossHistory           TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily = "loss_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamilyPremiumHistory        TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily = "premium_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamilySettlementReliability TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily = "settlement_reliability"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0Kind.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0KindSourceEdge TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0Kind = "source_edge"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1Kind.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1KindAdjacent TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1Kind = "adjacent"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamilyCreditScorecard       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily = "credit_scorecard"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamilyExposureHistory       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily = "exposure_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamilyLossHistory           TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily = "loss_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamilyPremiumHistory        TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily = "premium_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamilySettlementReliability TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily = "settlement_reliability"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchema.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchemaChioFincredSourceCompletenessAttestationV1 TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchema = "chio.fincred.source-completeness-attestation.v1"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClassAsserted TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass = "asserted"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClassObserved TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass = "observed"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClassVerified TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass = "verified"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamilyCreditScorecard       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily = "credit_scorecard"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamilyExposureHistory       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily = "exposure_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamilyLossHistory           TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily = "loss_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamilyPremiumHistory        TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily = "premium_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamilySettlementReliability TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily = "settlement_reliability"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0Kind.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0KindSourceEdge TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0Kind = "source_edge"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1Kind.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1KindAdjacent TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1Kind = "adjacent"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamilyCreditScorecard       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily = "credit_scorecard"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamilyExposureHistory       TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily = "exposure_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamilyLossHistory           TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily = "loss_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamilyPremiumHistory        TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily = "premium_history"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamilySettlementReliability TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily = "settlement_reliability"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole.
+const (
+	TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRoleClaim  TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole = "claim"
+	TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRoleMember TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole = "member"
+)
+
+// Defines values for TrustFincredSettlementReliabilityBodySchema.
+const (
+	TrustFincredSettlementReliabilityBodySchemaChioFincredSettlementReliabilityV1 TrustFincredSettlementReliabilityBodySchema = "chio.fincred.settlement-reliability.v1"
+)
+
+// Defines values for TrustFincredSourceCheckpointBodySchema.
+const (
+	TrustFincredSourceCheckpointBodySchemaChioFincredSourceCheckpointV1 TrustFincredSourceCheckpointBodySchema = "chio.fincred.source-checkpoint.v1"
+)
+
+// Defines values for TrustFincredSourceCompletenessAttestationBodySchema.
+const (
+	TrustFincredSourceCompletenessAttestationBodySchemaChioFincredSourceCompletenessAttestationV1 TrustFincredSourceCompletenessAttestationBodySchema = "chio.fincred.source-completeness-attestation.v1"
 )
 
 // Defines values for TrustKeyBindingCertificateSchema.
@@ -5127,6 +5841,21 @@ const (
 	TrustPublicVerifierDiscoverySchemaChioPublicVerifierDiscoveryV1 TrustPublicVerifierDiscoverySchema = "chio.public-verifier-discovery.v1"
 )
 
+// Defines values for TrustTrustReputationImportReportBodySchema.
+const (
+	TrustTrustReputationImportReportBodySchemaChioTrustReputationImportReportV1 TrustTrustReputationImportReportBodySchema = "chio.trust.reputation-import-report.v1"
+)
+
+// Defines values for TrustTrustRootBodySchema.
+const (
+	TrustTrustRootBodySchemaChioTrustRootV1 TrustTrustRootBodySchema = "chio.trust.root.v1"
+)
+
+// Defines values for TrustTrustScorecardSnapshotBodySchema.
+const (
+	TrustTrustScorecardSnapshotBodySchemaChioTrustScorecardSnapshotV1 TrustTrustScorecardSnapshotBodySchema = "chio.trust.scorecard-snapshot.v1"
+)
+
 // Defines values for UnderwritingDecisionSchema.
 const (
 	UnderwritingDecisionSchemaChioUnderwritingDecisionV1 UnderwritingDecisionSchema = "chio.underwriting.decision.v1"
@@ -5135,6 +5864,11 @@ const (
 // Defines values for UnderwritingPolicyInputSchema.
 const (
 	UnderwritingPolicyInputSchemaChioUnderwritingPolicyInputV1 UnderwritingPolicyInputSchema = "chio.underwriting.policy-input.v1"
+)
+
+// Defines values for Web3Web3SettlementProofBundleBodySchema.
+const (
+	Web3Web3SettlementProofBundleBodySchemaChioWeb3SettlementProofBundleV1 Web3Web3SettlementProofBundleBodySchema = "chio.web3-settlement-proof-bundle.v1"
 )
 
 // Defines values for WorkJoinInputsSchema.
@@ -5847,6 +6581,72 @@ type AgentListCapabilitiesType string
 // AgentToolCallRequest defines model for AgentToolCallRequest.
 type AgentToolCallRequest = interface{}
 
+// AgentWebAgentWebProofEnvelopeBody defines model for AgentWebAgentWebProofEnvelopeBody.
+type AgentWebAgentWebProofEnvelopeBody struct {
+	AgentWebPassportScopeSha256 *string                                 `json:"agent_web_passport_scope_sha256,omitempty"`
+	ChioClaimRefs               []string                                `json:"chio_claim_refs"`
+	DisclosureCapsuleRefs       []string                                `json:"disclosure_capsule_refs"`
+	EnvelopeId                  string                                  `json:"envelope_id"`
+	ExternalSubject             string                                  `json:"external_subject"`
+	ExternalSubjectDigest       string                                  `json:"external_subject_digest"`
+	ExternalSubjectPath         string                                  `json:"external_subject_path"`
+	ExternalSubjectSignatureRef string                                  `json:"external_subject_signature_ref"`
+	Limitations                 []string                                `json:"limitations"`
+	ProjectionManifestRef       string                                  `json:"projection_manifest_ref"`
+	ProjectionManifestSha256    string                                  `json:"projection_manifest_sha256"`
+	ReceiptRefs                 []string                                `json:"receipt_refs"`
+	RiskRefs                    []string                                `json:"risk_refs"`
+	Schema                      AgentWebAgentWebProofEnvelopeBodySchema `json:"schema"`
+	SettlementRefs              []string                                `json:"settlement_refs"`
+	SourceProtocol              string                                  `json:"source_protocol"`
+	SourceProtocolVersion       string                                  `json:"source_protocol_version"`
+	TransactionPassportRef      string                                  `json:"transaction_passport_ref"`
+}
+
+// AgentWebAgentWebProofEnvelopeBodySchema defines model for AgentWebAgentWebProofEnvelopeBody.Schema.
+type AgentWebAgentWebProofEnvelopeBodySchema string
+
+// AnchorAnchorBatchBody defines model for AnchorAnchorBatchBody.
+type AnchorAnchorBatchBody struct {
+	CheckpointIds []string `json:"checkpointIds"`
+	Inclusions    []struct {
+		CheckpointId string `json:"checkpointId"`
+		LeafHash     string `json:"leafHash"`
+		Proof        struct {
+			AuditPath []string `json:"audit_path"`
+			LeafIndex int64    `json:"leaf_index"`
+			TreeSize  int64    `json:"tree_size"`
+		} `json:"proof"`
+	} `json:"inclusions"`
+	IssuedAt  int64                       `json:"issuedAt"`
+	Schema    AnchorAnchorBatchBodySchema `json:"schema"`
+	SignerKey string                      `json:"signerKey"`
+	TreeRoot  string                      `json:"treeRoot"`
+	Witness   struct {
+		Kind       string `json:"kind"`
+		ObservedAt int64  `json:"observedAt"`
+		Root       string `json:"root"`
+		WitnessId  string `json:"witnessId"`
+	} `json:"witness"`
+	WitnessState struct {
+		Error        *string `json:"error,omitempty"`
+		Kind         string  `json:"kind"`
+		LastVerified *int64  `json:"last_verified,omitempty"`
+		ObservedAt   *int64  `json:"observed_at,omitempty"`
+		Receipt      *struct {
+			BodyHash       string `json:"bodyHash"`
+			ExternalUuid   string `json:"externalUuid"`
+			InclusionProof string `json:"inclusionProof"`
+			Kind           string `json:"kind"`
+			PublishedAt    int64  `json:"publishedAt"`
+			WitnessRoot    string `json:"witnessRoot"`
+		} `json:"receipt,omitempty"`
+	} `json:"witnessState"`
+}
+
+// AnchorAnchorBatchBodySchema defines model for AnchorAnchorBatchBody.Schema.
+type AnchorAnchorBatchBodySchema string
+
 // AnchorBatch Signed additive Merkle batch over receipts or checkpoints. Local receipt signatures remain authoritative; the batch adds continuity and public-witness timestamping.
 type AnchorBatch struct {
 	Body      AnchorBatchBody `json:"body"`
@@ -5960,6 +6760,18 @@ type CapabilityAggregateBudgetRootAggregateRootPublicKey = string
 // CapabilityAggregateBudgetRootAggregateRootSignature defines model for CapabilityAggregateBudgetRootAggregateRootSignature.
 type CapabilityAggregateBudgetRootAggregateRootSignature = string
 
+// CapabilityAggregateBudgetRootBody defines model for CapabilityAggregateBudgetRootBody.
+type CapabilityAggregateBudgetRootBody struct {
+	MaxInvocations     int64                                   `json:"max_invocations"`
+	RootCapabilityHash string                                  `json:"root_capability_hash"`
+	RootCapabilityId   string                                  `json:"root_capability_id"`
+	RootExpiresAt      int64                                   `json:"root_expires_at"`
+	RootIssuer         string                                  `json:"root_issuer"`
+	RootScopeHash      string                                  `json:"root_scope_hash"`
+	RootSubject        string                                  `json:"root_subject"`
+	Schema             CapabilityAggregateBudgetRootBodySchema `json:"schema"`
+}
+
 // CapabilityAggregateInvocationBudget defines model for CapabilityAggregateInvocationBudget.
 type CapabilityAggregateInvocationBudget struct {
 	union json.RawMessage
@@ -6027,6 +6839,181 @@ type CapabilityCapabilities struct {
 // CapabilityCapabilitiesSchema defines model for CapabilityCapabilities.Schema.
 type CapabilityCapabilitiesSchema string
 
+// CapabilityCapabilityBody defines model for CapabilityCapabilityBody.
+type CapabilityCapabilityBody struct {
+	AggregateInvocationBudget *struct {
+		MaxInvocations int64 `json:"max_invocations"`
+		RootBinding    struct {
+			Body struct {
+				MaxInvocations     int64  `json:"max_invocations"`
+				RootCapabilityHash string `json:"root_capability_hash"`
+				RootCapabilityId   string `json:"root_capability_id"`
+				RootExpiresAt      int64  `json:"root_expires_at"`
+				RootIssuer         string `json:"root_issuer"`
+				RootScopeHash      string `json:"root_scope_hash"`
+				RootSubject        string `json:"root_subject"`
+				Schema             string `json:"schema"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+		} `json:"root_binding"`
+		Scope string `json:"scope"`
+	} `json:"aggregate_invocation_budget,omitempty"`
+	AttenuationProof *struct {
+		ChildScopeHash        string `json:"childScopeHash"`
+		NormalizedSubsetProof struct {
+			CumulativeApproval *struct {
+				Bindings []struct {
+					ApprovalBudgetEpoch int64  `json:"approval_budget_epoch"`
+					ApprovalBudgetId    string `json:"approval_budget_id"`
+					Currency            string `json:"currency"`
+					RootBindingDigest   string `json:"root_binding_digest"`
+				} `json:"bindings"`
+			} `json:"cumulativeApproval,omitempty"`
+			NormalizedChildScope  string   `json:"normalizedChildScope"`
+			NormalizedParentScope string   `json:"normalizedParentScope"`
+			RestrictedPredicates  []string `json:"restrictedPredicates"`
+			SubsetRelations       []struct {
+				ChildIndex  int64  `json:"childIndex"`
+				GrantKind   string `json:"grantKind"`
+				ParentIndex int64  `json:"parentIndex"`
+				Subset      bool   `json:"subset"`
+			} `json:"subsetRelations"`
+		} `json:"normalizedSubsetProof"`
+		ParentScopeHash string `json:"parentScopeHash"`
+	} `json:"attenuation_proof,omitempty"`
+	BudgetShareBps  *int64 `json:"budget_share_bps,omitempty"`
+	DelegationChain *[]struct {
+		AggregateBudget *struct {
+			MaxInvocations    int64  `json:"max_invocations"`
+			RootBindingDigest string `json:"root_binding_digest"`
+		} `json:"aggregate_budget,omitempty"`
+		Attenuations *[]struct {
+			Constraint *struct {
+				Type  string `json:"type"`
+				Value int64  `json:"value"`
+			} `json:"constraint,omitempty"`
+			MaxInvocations *int64 `json:"max_invocations,omitempty"`
+			ServerId       string `json:"server_id"`
+			ToolName       string `json:"tool_name"`
+			Type           string `json:"type"`
+		} `json:"attenuations,omitempty"`
+		CapabilityId       string `json:"capability_id"`
+		CumulativeApproval *struct {
+			Bindings []struct {
+				ApprovalBudgetEpoch int64  `json:"approval_budget_epoch"`
+				ApprovalBudgetId    string `json:"approval_budget_id"`
+				Currency            string `json:"currency"`
+				RootBindingDigest   string `json:"root_binding_digest"`
+			} `json:"bindings"`
+		} `json:"cumulative_approval,omitempty"`
+		Delegatee string  `json:"delegatee"`
+		Delegator string  `json:"delegator"`
+		ScopeHash *string `json:"scope_hash,omitempty"`
+		Signature string  `json:"signature"`
+		Timestamp int64   `json:"timestamp"`
+	} `json:"delegation_chain,omitempty"`
+	ExpiresAt *int64                          `json:"expires_at,omitempty"`
+	Fixture   *string                         `json:"fixture,omitempty"`
+	Id        *string                         `json:"id,omitempty"`
+	IssuedAt  *int64                          `json:"issued_at,omitempty"`
+	Issuer    *string                         `json:"issuer,omitempty"`
+	N         *int64                          `json:"n,omitempty"`
+	Schema    *CapabilityCapabilityBodySchema `json:"schema,omitempty"`
+	Scope     *struct {
+		Grants *[]struct {
+			Constraints *[]struct {
+				Type  string                                                   `json:"type"`
+				Value *CapabilityCapabilityBody_Scope_Grants_Constraints_Value `json:"value,omitempty"`
+			} `json:"constraints,omitempty"`
+			DpopRequired         *bool `json:"dpop_required,omitempty"`
+			MaxCostPerInvocation *struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"max_cost_per_invocation,omitempty"`
+			MaxInvocations *int64 `json:"max_invocations,omitempty"`
+			MaxTotalCost   *struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"max_total_cost,omitempty"`
+			Operations []string `json:"operations"`
+			ServerId   string   `json:"server_id"`
+			ToolName   string   `json:"tool_name"`
+		} `json:"grants,omitempty"`
+		PromptGrants *[]struct {
+			Operations []string `json:"operations"`
+			PromptName string   `json:"prompt_name"`
+		} `json:"prompt_grants,omitempty"`
+		ResourceGrants *[]struct {
+			Operations []string `json:"operations"`
+			UriPattern string   `json:"uri_pattern"`
+		} `json:"resource_grants,omitempty"`
+	} `json:"scope,omitempty"`
+	ScopeAttenuations *[]struct {
+		Operation string `json:"operation"`
+		ServerId  string `json:"server_id"`
+		ToolName  string `json:"tool_name"`
+		Type      string `json:"type"`
+	} `json:"scope_attenuations,omitempty"`
+	Subject *string `json:"subject,omitempty"`
+}
+
+// CapabilityCapabilityBodySchema defines model for CapabilityCapabilityBody.Schema.
+type CapabilityCapabilityBodySchema string
+
+// CapabilityCapabilityBodyScopeGrantsConstraintsValue0 defines model for .
+type CapabilityCapabilityBodyScopeGrantsConstraintsValue0 = int64
+
+// CapabilityCapabilityBodyScopeGrantsConstraintsValue1 defines model for .
+type CapabilityCapabilityBodyScopeGrantsConstraintsValue1 = string
+
+// CapabilityCapabilityBodyScopeGrantsConstraintsValue2 defines model for .
+type CapabilityCapabilityBodyScopeGrantsConstraintsValue2 struct {
+	AllowedModelIds               *[]string `json:"allowed_model_ids,omitempty"`
+	ApprovalBudgetEpoch           *int64    `json:"approval_budget_epoch,omitempty"`
+	ApprovalBudgetId              *string   `json:"approval_budget_id,omitempty"`
+	CumulativeApprovalRootBinding *struct {
+		Body struct {
+			ApprovalBudgetEpoch int64  `json:"approval_budget_epoch"`
+			ApprovalBudgetId    string `json:"approval_budget_id"`
+			RootCapabilityHash  string `json:"root_capability_hash"`
+			RootCapabilityId    string `json:"root_capability_id"`
+			RootExpiresAt       int64  `json:"root_expires_at"`
+			RootGrantHash       string `json:"root_grant_hash"`
+			RootIssuer          string `json:"root_issuer"`
+			RootScopeHash       string `json:"root_scope_hash"`
+			RootSubject         string `json:"root_subject"`
+			Schema              string `json:"schema"`
+			SignerKeyEpoch      int64  `json:"signer_key_epoch"`
+			Threshold           struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"threshold"`
+		} `json:"body"`
+		Signature string `json:"signature"`
+	} `json:"cumulative_approval_root_binding,omitempty"`
+	FindingId                 *string `json:"finding_id,omitempty"`
+	ListingId                 *string `json:"listing_id,omitempty"`
+	MaxRecoveries             *int64  `json:"max_recoveries,omitempty"`
+	MinSafetyTier             *string `json:"min_safety_tier,omitempty"`
+	OriginalCapabilityId      *string `json:"original_capability_id,omitempty"`
+	OriginalDeliveryReceiptId *string `json:"original_delivery_receipt_id,omitempty"`
+	PurchaseKey               *string `json:"purchase_key,omitempty"`
+	RecoveryId                *string `json:"recovery_id,omitempty"`
+	Settlement                *struct {
+		Mode string `json:"mode"`
+	} `json:"settlement,omitempty"`
+	Threshold *struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"threshold,omitempty"`
+	ThresholdUnits *int64 `json:"threshold_units,omitempty"`
+}
+
+// CapabilityCapabilityBody_Scope_Grants_Constraints_Value defines model for CapabilityCapabilityBody.Scope.Grants.Constraints.Value.
+type CapabilityCapabilityBody_Scope_Grants_Constraints_Value struct {
+	union json.RawMessage
+}
+
 // CapabilityCumulativeApprovalRoot defines model for CapabilityCumulativeApprovalRoot.
 type CapabilityCumulativeApprovalRoot struct {
 	Body struct {
@@ -6048,6 +7035,25 @@ type CapabilityCumulativeApprovalRoot struct {
 
 // CapabilityCumulativeApprovalRootBodySchema defines model for CapabilityCumulativeApprovalRoot.Body.Schema.
 type CapabilityCumulativeApprovalRootBodySchema string
+
+// CapabilityCumulativeApprovalRootBody defines model for CapabilityCumulativeApprovalRootBody.
+type CapabilityCumulativeApprovalRootBody struct {
+	ApprovalBudgetEpoch int64                                      `json:"approval_budget_epoch"`
+	ApprovalBudgetId    string                                     `json:"approval_budget_id"`
+	RootCapabilityHash  string                                     `json:"root_capability_hash"`
+	RootCapabilityId    string                                     `json:"root_capability_id"`
+	RootExpiresAt       int64                                      `json:"root_expires_at"`
+	RootGrantHash       string                                     `json:"root_grant_hash"`
+	RootIssuer          string                                     `json:"root_issuer"`
+	RootScopeHash       string                                     `json:"root_scope_hash"`
+	RootSubject         string                                     `json:"root_subject"`
+	Schema              CapabilityCumulativeApprovalRootBodySchema `json:"schema"`
+	SignerKeyEpoch      int64                                      `json:"signer_key_epoch"`
+	Threshold           struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"threshold"`
+}
 
 // CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount defines model for CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount.
 type CapabilityCumulativeApprovalRootCumulativeRootMonetaryAmount struct {
@@ -6270,6 +7276,25 @@ type CapabilityThresholdApprovalProposal struct {
 
 // CapabilityThresholdApprovalProposalSchema defines model for CapabilityThresholdApprovalProposal.Schema.
 type CapabilityThresholdApprovalProposalSchema string
+
+// CapabilityThresholdApprovalProposalBody defines model for CapabilityThresholdApprovalProposalBody.
+type CapabilityThresholdApprovalProposalBody struct {
+	AuthorizingCapabilityDigest string                                        `json:"authorizing_capability_digest"`
+	EligibleSetDigest           string                                        `json:"eligible_set_digest"`
+	GovernedIntentHash          string                                        `json:"governed_intent_hash"`
+	PolicyAuthority             string                                        `json:"policy_authority"`
+	PolicyHash                  string                                        `json:"policy_hash"`
+	ProposalCreatedAt           int64                                         `json:"proposal_created_at"`
+	ProposalDeadline            int64                                         `json:"proposal_deadline"`
+	ProposalId                  string                                        `json:"proposal_id"`
+	RequestId                   string                                        `json:"request_id"`
+	Schema                      CapabilityThresholdApprovalProposalBodySchema `json:"schema"`
+	Subject                     string                                        `json:"subject"`
+	Threshold                   int64                                         `json:"threshold"`
+}
+
+// CapabilityThresholdApprovalProposalBodySchema defines model for CapabilityThresholdApprovalProposalBody.Schema.
+type CapabilityThresholdApprovalProposalBodySchema string
 
 // CapabilityThresholdApprovalProposalThresholdProposalPublicKey defines model for CapabilityThresholdApprovalProposalThresholdProposalPublicKey.
 type CapabilityThresholdApprovalProposalThresholdProposalPublicKey = string
@@ -6527,6 +7552,191 @@ type CertifyCheck struct {
 
 // CertifyCheckSchema defines model for CertifyCheck.Schema.
 type CertifyCheckSchema string
+
+// CommerceCommerceFederationTrustBundleBody defines model for CommerceCommerceFederationTrustBundleBody.
+type CommerceCommerceFederationTrustBundleBody struct {
+	Id              string                                          `json:"id"`
+	IssuedAt        string                                          `json:"issued_at"`
+	ProviderSubject string                                          `json:"provider_subject"`
+	Schema          CommerceCommerceFederationTrustBundleBodySchema `json:"schema"`
+	Status          string                                          `json:"status"`
+	TrustDomain     string                                          `json:"trust_domain"`
+	TrustRootRef    string                                          `json:"trust_root_ref"`
+}
+
+// CommerceCommerceFederationTrustBundleBodySchema defines model for CommerceCommerceFederationTrustBundleBody.Schema.
+type CommerceCommerceFederationTrustBundleBodySchema string
+
+// CommerceCommercePaymentLifecycleBody defines model for CommerceCommercePaymentLifecycleBody.
+type CommerceCommercePaymentLifecycleBody struct {
+	AmountMinor            int64                                      `json:"amount_minor"`
+	AuthorizationRef       string                                     `json:"authorization_ref"`
+	BalanceTransactionRef  string                                     `json:"balance_transaction_ref"`
+	CaptureBefore          string                                     `json:"capture_before"`
+	CaptureMode            string                                     `json:"capture_mode"`
+	CaptureRef             string                                     `json:"capture_ref"`
+	CapturedAt             string                                     `json:"captured_at"`
+	ChargeRef              string                                     `json:"charge_ref"`
+	ChargebackStatus       string                                     `json:"chargeback_status"`
+	Currency               string                                     `json:"currency"`
+	DisputeStatus          string                                     `json:"dispute_status"`
+	FraudOutcome           string                                     `json:"fraud_outcome"`
+	Id                     string                                     `json:"id"`
+	IssuedAt               string                                     `json:"issued_at"`
+	Issuer                 string                                     `json:"issuer"`
+	MerchantSubject        string                                     `json:"merchant_subject"`
+	OrderId                string                                     `json:"order_id"`
+	PaymentIntentId        string                                     `json:"payment_intent_id"`
+	PaymentStatus          string                                     `json:"payment_status"`
+	Psp                    string                                     `json:"psp"`
+	QuoteSha256            string                                     `json:"quote_sha256"`
+	RefundStatus           string                                     `json:"refund_status"`
+	Schema                 CommerceCommercePaymentLifecycleBodySchema `json:"schema"`
+	TransferGroup          string                                     `json:"transfer_group"`
+	TransferReversalStatus string                                     `json:"transfer_reversal_status"`
+}
+
+// CommerceCommercePaymentLifecycleBodySchema defines model for CommerceCommercePaymentLifecycleBody.Schema.
+type CommerceCommercePaymentLifecycleBodySchema string
+
+// CommerceCommerceProviderDiscoverySnapshotBody defines model for CommerceCommerceProviderDiscoverySnapshotBody.
+type CommerceCommerceProviderDiscoverySnapshotBody struct {
+	DiscoveryAuthorityRef string `json:"discovery_authority_ref"`
+	FreshnessWindow       struct {
+		ValidFrom  string `json:"valid_from"`
+		ValidUntil string `json:"valid_until"`
+	} `json:"freshness_window"`
+	Id                 string `json:"id"`
+	IssuedAt           string `json:"issued_at"`
+	MarketScope        string `json:"market_scope"`
+	OrderId            string `json:"order_id"`
+	OrderIntentRef     string `json:"order_intent_ref"`
+	PassportId         string `json:"passport_id"`
+	ProviderCandidates []struct {
+		AvailabilityRef     string `json:"availability_ref"`
+		Excluded            bool   `json:"excluded"`
+		JurisdictionRef     string `json:"jurisdiction_ref"`
+		PricingSurfaceRef   string `json:"pricing_surface_ref"`
+		ProviderPassportRef string `json:"provider_passport_ref"`
+		ServiceManifestRef  string `json:"service_manifest_ref"`
+		Subject             string `json:"subject"`
+	} `json:"provider_candidates"`
+	Schema CommerceCommerceProviderDiscoverySnapshotBodySchema `json:"schema"`
+}
+
+// CommerceCommerceProviderDiscoverySnapshotBodySchema defines model for CommerceCommerceProviderDiscoverySnapshotBody.Schema.
+type CommerceCommerceProviderDiscoverySnapshotBodySchema string
+
+// CommerceCommerceProviderPassportBody defines model for CommerceCommerceProviderPassportBody.
+type CommerceCommerceProviderPassportBody struct {
+	Id              string                                     `json:"id"`
+	IssuedAt        string                                     `json:"issued_at"`
+	ProviderSubject string                                     `json:"provider_subject"`
+	Schema          CommerceCommerceProviderPassportBodySchema `json:"schema"`
+	ServiceFamilies []string                                   `json:"service_families"`
+	Status          string                                     `json:"status"`
+}
+
+// CommerceCommerceProviderPassportBodySchema defines model for CommerceCommerceProviderPassportBody.Schema.
+type CommerceCommerceProviderPassportBodySchema string
+
+// CommerceCommerceProviderSelectionReportBody defines model for CommerceCommerceProviderSelectionReportBody.
+type CommerceCommerceProviderSelectionReportBody struct {
+	DiscoverySnapshotRef string `json:"discovery_snapshot_ref"`
+	Id                   string `json:"id"`
+	IssuedAt             string `json:"issued_at"`
+	OrderId              string `json:"order_id"`
+	OverrideReceiptRef   string `json:"override_receipt_ref"`
+	PassportId           string `json:"passport_id"`
+	PriceQuoteRef        string `json:"price_quote_ref"`
+	RankingPolicyRef     string `json:"ranking_policy_ref"`
+	RankingResults       []struct {
+		ProviderSubject string `json:"provider_subject"`
+		Rank            int64  `json:"rank"`
+		TotalScore      int64  `json:"total_score"`
+	} `json:"ranking_results"`
+	RejectedCandidateSummaries []struct {
+		ProviderSubject string   `json:"provider_subject"`
+		ReasonCodes     []string `json:"reason_codes"`
+		RedactedFields  []string `json:"redacted_fields"`
+	} `json:"rejected_candidate_summaries"`
+	RiskReportRef           string                                            `json:"risk_report_ref"`
+	Schema                  CommerceCommerceProviderSelectionReportBodySchema `json:"schema"`
+	ScorecardRef            string                                            `json:"scorecard_ref"`
+	SelectedProviderSubject string                                            `json:"selected_provider_subject"`
+	SelectionReasonCodes    []string                                          `json:"selection_reason_codes"`
+	SlaCommitmentRef        string                                            `json:"sla_commitment_ref"`
+}
+
+// CommerceCommerceProviderSelectionReportBodySchema defines model for CommerceCommerceProviderSelectionReportBody.Schema.
+type CommerceCommerceProviderSelectionReportBodySchema string
+
+// CommerceCommerceReputationSnapshotBody defines model for CommerceCommerceReputationSnapshotBody.
+type CommerceCommerceReputationSnapshotBody struct {
+	Id              string                                       `json:"id"`
+	IssuedAt        string                                       `json:"issued_at"`
+	ProviderSubject string                                       `json:"provider_subject"`
+	Schema          CommerceCommerceReputationSnapshotBodySchema `json:"schema"`
+	ScoreBps        int64                                        `json:"score_bps"`
+	Status          string                                       `json:"status"`
+}
+
+// CommerceCommerceReputationSnapshotBodySchema defines model for CommerceCommerceReputationSnapshotBody.Schema.
+type CommerceCommerceReputationSnapshotBodySchema string
+
+// CommerceCommerceSlaCommitmentBody defines model for CommerceCommerceSlaCommitmentBody.
+type CommerceCommerceSlaCommitmentBody struct {
+	BuyerSubject          string `json:"buyer_subject"`
+	CollateralPositionRef string `json:"collateral_position_ref"`
+	EffectiveWindow       struct {
+		End   string `json:"end"`
+		Start string `json:"start"`
+	} `json:"effective_window"`
+	ExclusionsRef        string `json:"exclusions_ref"`
+	GuaranteeDecisionRef string `json:"guarantee_decision_ref"`
+	Id                   string `json:"id"`
+	IssuedAt             string `json:"issued_at"`
+	MeasurementPolicyRef string `json:"measurement_policy_ref"`
+	MetricDefinitions    []struct {
+		Metric string `json:"metric"`
+		Target int64  `json:"target"`
+		Unit   string `json:"unit"`
+	} `json:"metric_definitions"`
+	OrderId         string                                  `json:"order_id"`
+	ProviderSubject string                                  `json:"provider_subject"`
+	RemedyPolicyRef string                                  `json:"remedy_policy_ref"`
+	Schema          CommerceCommerceSlaCommitmentBodySchema `json:"schema"`
+	ServiceScope    string                                  `json:"service_scope"`
+}
+
+// CommerceCommerceSlaCommitmentBodySchema defines model for CommerceCommerceSlaCommitmentBody.Schema.
+type CommerceCommerceSlaCommitmentBodySchema string
+
+// CommerceCommerceSlaPerformanceReportBody defines model for CommerceCommerceSlaPerformanceReportBody.
+type CommerceCommerceSlaPerformanceReportBody struct {
+	BreachVerdict         string `json:"breach_verdict"`
+	ComputedMetricResults []struct {
+		Metric string `json:"metric"`
+		Passed bool   `json:"passed"`
+		Unit   string `json:"unit"`
+		Value  int64  `json:"value"`
+	} `json:"computed_metric_results"`
+	DisputeRef              string                                         `json:"dispute_ref"`
+	Id                      string                                         `json:"id"`
+	IssuedAt                string                                         `json:"issued_at"`
+	MeasuredAt              string                                         `json:"measured_at"`
+	MeasurementEvidenceRefs []string                                       `json:"measurement_evidence_refs"`
+	MeasurementPolicyRef    string                                         `json:"measurement_policy_ref"`
+	OrderId                 string                                         `json:"order_id"`
+	PerformanceId           string                                         `json:"performance_id"`
+	ProviderSubject         string                                         `json:"provider_subject"`
+	RemedyRef               string                                         `json:"remedy_ref"`
+	Schema                  CommerceCommerceSlaPerformanceReportBodySchema `json:"schema"`
+	SlaRef                  string                                         `json:"sla_ref"`
+}
+
+// CommerceCommerceSlaPerformanceReportBodySchema defines model for CommerceCommerceSlaPerformanceReportBody.Schema.
+type CommerceCommerceSlaPerformanceReportBodySchema string
 
 // ComplianceCertificate defines model for ComplianceCertificate.
 type ComplianceCertificate struct {
@@ -7466,6 +8676,27 @@ type CreditScorecard struct {
 // CreditScorecardSchema defines model for CreditScorecard.Schema.
 type CreditScorecardSchema string
 
+// DisclosureDisclosureCryptoContextReportBody defines model for DisclosureDisclosureCryptoContextReportBody.
+type DisclosureDisclosureCryptoContextReportBody struct {
+	ArtifactRef                string   `json:"artifact_ref"`
+	ContextId                  string   `json:"context_id"`
+	CryptographicProofVerified bool     `json:"cryptographic_proof_verified"`
+	DisclosedFields            []string `json:"disclosed_fields"`
+	EvidenceClass              string   `json:"evidence_class"`
+	Id                         string   `json:"id"`
+	ProjectionManifestRef      string   `json:"projection_manifest_ref"`
+	RejectedChecks             []struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"rejected_checks"`
+	Schema         DisclosureDisclosureCryptoContextReportBodySchema `json:"schema"`
+	Verdict        string                                            `json:"verdict"`
+	VerifiedClaims []string                                          `json:"verified_claims"`
+}
+
+// DisclosureDisclosureCryptoContextReportBodySchema defines model for DisclosureDisclosureCryptoContextReportBody.Schema.
+type DisclosureDisclosureCryptoContextReportBodySchema string
+
 // EconomyAutonomousComparisonReport defines model for EconomyAutonomousComparisonReport.
 type EconomyAutonomousComparisonReport struct {
 	ComparisonId string `json:"comparison_id"`
@@ -7909,6 +9140,1796 @@ type EconomyCapitalPoolSimulationReport struct {
 // EconomyCapitalPoolSimulationReportSchema defines model for EconomyCapitalPoolSimulationReport.Schema.
 type EconomyCapitalPoolSimulationReportSchema string
 
+// EconomyChannelCloseBody defines model for EconomyChannelCloseBody.
+type EconomyChannelCloseBody struct {
+	Body struct {
+		ChannelId                                string `json:"channelId"`
+		ChannelStateVersion                      int64  `json:"channelStateVersion"`
+		CloseKind                                string `json:"closeKind"`
+		CloseSubmissionCutoffUnixSecs            int64  `json:"closeSubmissionCutoffUnixSecs"`
+		DisputeDeadlineUnixMs                    int64  `json:"disputeDeadlineUnixMs"`
+		DisputeWindowSecs                        int64  `json:"disputeWindowSecs"`
+		EscrowReservationVersion                 int64  `json:"escrowReservationVersion"`
+		ExpectedRefundAfterReleaseTokenBaseUnits string `json:"expectedRefundAfterReleaseTokenBaseUnits"`
+		ExpectedReleaseTokenBaseUnits            string `json:"expectedReleaseTokenBaseUnits"`
+		FinalCumulativeOwed                      struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"finalCumulativeOwed"`
+		FinalStateDigest   string `json:"finalStateDigest"`
+		FinalStateSequence int64  `json:"finalStateSequence"`
+		LifecycleFence     int64  `json:"lifecycleFence"`
+		OpenDigest         string `json:"openDigest"`
+		ProposedAtUnixMs   int64  `json:"proposedAtUnixMs"`
+		Schema             string `json:"schema"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelDisputeBody defines model for EconomyChannelDisputeBody.
+type EconomyChannelDisputeBody struct {
+	Body struct {
+		ChannelId              string `json:"channelId"`
+		CloseDigest            string `json:"closeDigest"`
+		CloseStateDigest       string `json:"closeStateDigest"`
+		CloseStateSequence     int64  `json:"closeStateSequence"`
+		CompetingStateDigest   string `json:"competingStateDigest"`
+		CompetingStateSequence int64  `json:"competingStateSequence"`
+		DisputeId              string `json:"disputeId"`
+		Reason                 string `json:"reason"`
+		Schema                 string `json:"schema"`
+		StateChainProofDigest  string `json:"stateChainProofDigest"`
+		SubmittedAtUnixMs      int64  `json:"submittedAtUnixMs"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelFundingAcknowledgementBody defines model for EconomyChannelFundingAcknowledgementBody.
+type EconomyChannelFundingAcknowledgementBody struct {
+	Body struct {
+		AnchoredHeadDigest string `json:"anchoredHeadDigest"`
+		EscrowReference    struct {
+			ChainId        string `json:"chainId"`
+			EscrowContract string `json:"escrowContract"`
+			EscrowId       string `json:"escrowId"`
+		} `json:"escrowReference"`
+		ExpiresAtUnixMs  int64  `json:"expiresAtUnixMs"`
+		NewState         string `json:"newState"`
+		NewVersion       int64  `json:"newVersion"`
+		OpenIntentDigest string `json:"openIntentDigest"`
+		PriorHeadDigest  string `json:"priorHeadDigest"`
+		PriorState       string `json:"priorState"`
+		PriorVersion     int64  `json:"priorVersion"`
+		ReservedAtUnixMs int64  `json:"reservedAtUnixMs"`
+		Schema           string `json:"schema"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelFundingEvidenceBody defines model for EconomyChannelFundingEvidenceBody.
+type EconomyChannelFundingEvidenceBody struct {
+	Body struct {
+		AssetBinding struct {
+			ChainId                   string `json:"chainId"`
+			Currency                  string `json:"currency"`
+			ProtocolMinorUnitDecimals int64  `json:"protocolMinorUnitDecimals"`
+			Schema                    string `json:"schema"`
+			SettlementPolicyDigest    string `json:"settlementPolicyDigest"`
+			TokenAddress              string `json:"tokenAddress"`
+			TokenDecimals             int64  `json:"tokenDecimals"`
+			TokenSymbol               string `json:"tokenSymbol"`
+		} `json:"assetBinding"`
+		BlockPin struct {
+			BlockHash              string `json:"blockHash"`
+			BlockNumber            int64  `json:"blockNumber"`
+			BlockTimestampUnixSecs int64  `json:"blockTimestampUnixSecs"`
+			FinalityMode           string `json:"finalityMode"`
+			FinalityStatus         string `json:"finalityStatus"`
+			FinalizedHeadHash      string `json:"finalizedHeadHash"`
+			FinalizedHeadNumber    int64  `json:"finalizedHeadNumber"`
+			ObservedAtUnixMs       int64  `json:"observedAtUnixMs"`
+			ObservedConfirmations  int64  `json:"observedConfirmations"`
+			RequiredConfirmations  int64  `json:"requiredConfirmations"`
+		} `json:"blockPin"`
+		CreationEvent struct {
+			Beneficiary          string `json:"beneficiary"`
+			CapabilityId         string `json:"capabilityId"`
+			DeadlineUnixSecs     int64  `json:"deadlineUnixSecs"`
+			Depositor            string `json:"depositor"`
+			EscrowId             string `json:"escrowId"`
+			EventSignature       string `json:"eventSignature"`
+			LogEmitter           string `json:"logEmitter"`
+			LogIndex             int64  `json:"logIndex"`
+			MaxTokenBaseUnits    string `json:"maxTokenBaseUnits"`
+			Operator             string `json:"operator"`
+			ReceiptBlockHash     string `json:"receiptBlockHash"`
+			ReceiptBlockNumber   int64  `json:"receiptBlockNumber"`
+			TokenAddress         string `json:"tokenAddress"`
+			TransactionHash      string `json:"transactionHash"`
+			TransactionSucceeded bool   `json:"transactionSucceeded"`
+			TransactionTo        string `json:"transactionTo"`
+		} `json:"creationEvent"`
+		EscrowReference struct {
+			ChainId        string `json:"chainId"`
+			EscrowContract string `json:"escrowContract"`
+			EscrowId       string `json:"escrowId"`
+		} `json:"escrowReference"`
+		EscrowState struct {
+			DepositedTokenBaseUnits string `json:"depositedTokenBaseUnits"`
+			Refunded                bool   `json:"refunded"`
+			RefundedTokenBaseUnits  string `json:"refundedTokenBaseUnits"`
+			ReleasedTokenBaseUnits  string `json:"releasedTokenBaseUnits"`
+		} `json:"escrowState"`
+		EscrowStateRead struct {
+			BlockHash        string `json:"blockHash"`
+			BlockNumber      int64  `json:"blockNumber"`
+			CallDataDigest   string `json:"callDataDigest"`
+			Contract         string `json:"contract"`
+			ReturnDataDigest string `json:"returnDataDigest"`
+		} `json:"escrowStateRead"`
+		EscrowTerms struct {
+			Beneficiary       string `json:"beneficiary"`
+			CapabilityId      string `json:"capabilityId"`
+			DeadlineUnixSecs  int64  `json:"deadlineUnixSecs"`
+			Depositor         string `json:"depositor"`
+			MaxTokenBaseUnits string `json:"maxTokenBaseUnits"`
+			Operator          string `json:"operator"`
+			OperatorKeyHash   string `json:"operatorKeyHash"`
+			TokenAddress      string `json:"tokenAddress"`
+		} `json:"escrowTerms"`
+		EvidenceExpiresAtUnixMs int64 `json:"evidenceExpiresAtUnixMs"`
+		IdentityObservation     struct {
+			Active           bool   `json:"active"`
+			BlockHash        string `json:"blockHash"`
+			BlockNumber      int64  `json:"blockNumber"`
+			Operator         string `json:"operator"`
+			OperatorKeyHash  string `json:"operatorKeyHash"`
+			RegistryContract string `json:"registryContract"`
+		} `json:"identityObservation"`
+		Schema           string `json:"schema"`
+		TokenObservation struct {
+			Allowed        bool   `json:"allowed"`
+			BlockHash      string `json:"blockHash"`
+			BlockNumber    int64  `json:"blockNumber"`
+			EscrowContract string `json:"escrowContract"`
+			TokenAddress   string `json:"tokenAddress"`
+			TokenDecimals  int64  `json:"tokenDecimals"`
+			TokenSymbol    string `json:"tokenSymbol"`
+		} `json:"tokenObservation"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelOpenBody defines model for EconomyChannelOpenBody.
+type EconomyChannelOpenBody struct {
+	Body struct {
+		ChannelId                    string `json:"channelId"`
+		FundingAcknowledgementDigest string `json:"fundingAcknowledgementDigest"`
+		InitialStateDigest           string `json:"initialStateDigest"`
+		OpenIntentDigest             string `json:"openIntentDigest"`
+		OpenedAtUnixMs               int64  `json:"openedAtUnixMs"`
+		Schema                       string `json:"schema"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelOpenIntentBody defines model for EconomyChannelOpenIntentBody.
+type EconomyChannelOpenIntentBody struct {
+	Body struct {
+		AssetBinding struct {
+			ChainId                   string `json:"chainId"`
+			Currency                  string `json:"currency"`
+			ProtocolMinorUnitDecimals int64  `json:"protocolMinorUnitDecimals"`
+			Schema                    string `json:"schema"`
+			SettlementPolicyDigest    string `json:"settlementPolicyDigest"`
+			TokenAddress              string `json:"tokenAddress"`
+			TokenDecimals             int64  `json:"tokenDecimals"`
+			TokenSymbol               string `json:"tokenSymbol"`
+		} `json:"assetBinding"`
+		Bound struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"bound"`
+		BoundTokenBaseUnits           string `json:"boundTokenBaseUnits"`
+		ChannelExpiryUnixSecs         int64  `json:"channelExpiryUnixSecs"`
+		CloseSubmissionCutoffUnixSecs int64  `json:"closeSubmissionCutoffUnixSecs"`
+		Currency                      string `json:"currency"`
+		DisputeTierUpperBoundUnits    int64  `json:"disputeTierUpperBoundUnits"`
+		DisputeWindowSecs             int64  `json:"disputeWindowSecs"`
+		EscrowReference               struct {
+			ChainId        string `json:"chainId"`
+			EscrowContract string `json:"escrowContract"`
+			EscrowId       string `json:"escrowId"`
+		} `json:"escrowReference"`
+		FinalityMode                     string `json:"finalityMode"`
+		FixedFinalityBroadcastMarginSecs int64  `json:"fixedFinalityBroadcastMarginSecs"`
+		FundingEvidenceDigest            string `json:"fundingEvidenceDigest"`
+		OpenIntentId                     string `json:"openIntentId"`
+		OriginalOperator                 string `json:"originalOperator"`
+		OriginalOperatorKeyHash          string `json:"originalOperatorKeyHash"`
+		OriginalWeb3DispatchDigest       string `json:"originalWeb3DispatchDigest"`
+		ParticipantSnapshotDigest        string `json:"participantSnapshotDigest"`
+		PayeeBeneficiaryAddress          string `json:"payeeBeneficiaryAddress"`
+		PayeeId                          string `json:"payeeId"`
+		PayeeKey                         string `json:"payeeKey"`
+		PayeeKeyEpoch                    int64  `json:"payeeKeyEpoch"`
+		PayerId                          string `json:"payerId"`
+		PayerKey                         string `json:"payerKey"`
+		PayerKeyEpoch                    int64  `json:"payerKeyEpoch"`
+		PayerRefundAddress               string `json:"payerRefundAddress"`
+		RequiredConfirmations            int64  `json:"requiredConfirmations"`
+		Schema                           string `json:"schema"`
+		SettlementAuthorityScopeId       string `json:"settlementAuthorityScopeId"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelReleaseAuthorizationBody defines model for EconomyChannelReleaseAuthorizationBody.
+type EconomyChannelReleaseAuthorizationBody struct {
+	Body struct {
+		Authority struct {
+			AssetBindingDigest          string `json:"assetBindingDigest"`
+			AuthorizedAtUnixMs          int64  `json:"authorizedAtUnixMs"`
+			BoundTokenBaseUnits         string `json:"boundTokenBaseUnits"`
+			ChannelExpiryUnixMs         int64  `json:"channelExpiryUnixMs"`
+			ChannelId                   string `json:"channelId"`
+			ChannelStateVersion         int64  `json:"channelStateVersion"`
+			CloseBodyDigest             string `json:"closeBodyDigest"`
+			CloseDigest                 string `json:"closeDigest"`
+			CloseSubmissionCutoffUnixMs int64  `json:"closeSubmissionCutoffUnixMs"`
+			DisputeDeadlineUnixMs       int64  `json:"disputeDeadlineUnixMs"`
+			EffectiveCloseDigest        string `json:"effectiveCloseDigest"`
+			EscrowDeadlineUnixMs        int64  `json:"escrowDeadlineUnixMs"`
+			EscrowReference             struct {
+				ChainId        string `json:"chainId"`
+				EscrowContract string `json:"escrowContract"`
+				EscrowId       string `json:"escrowId"`
+			} `json:"escrowReference"`
+			EscrowReservationVersion      int64  `json:"escrowReservationVersion"`
+			ExpectedRefundTokenBaseUnits  string `json:"expectedRefundTokenBaseUnits"`
+			ExpectedReleaseTokenBaseUnits string `json:"expectedReleaseTokenBaseUnits"`
+			FinalCumulativeOwed           struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"finalCumulativeOwed"`
+			FinalStateDigest   string `json:"finalStateDigest"`
+			FinalStateSequence int64  `json:"finalStateSequence"`
+			Frost              struct {
+				ActionDigest         string `json:"actionDigest"`
+				AuthorizationId      string `json:"authorizationId"`
+				AuthorizationSlotId  string `json:"authorizationSlotId"`
+				SignedEnvelopeDigest string `json:"signedEnvelopeDigest"`
+			} `json:"frost"`
+			FrostIssuedAtUnixMs        int64  `json:"frostIssuedAtUnixMs"`
+			FrostKeyEpoch              int64  `json:"frostKeyEpoch"`
+			FrostResourceFence         int64  `json:"frostResourceFence"`
+			FrostResourceId            string `json:"frostResourceId"`
+			FrostResourceVersion       int64  `json:"frostResourceVersion"`
+			FrostRosterDigest          string `json:"frostRosterDigest"`
+			FrostScopeId               string `json:"frostScopeId"`
+			LifecycleFence             int64  `json:"lifecycleFence"`
+			OpenDigest                 string `json:"openDigest"`
+			OriginalOperator           string `json:"originalOperator"`
+			OriginalOperatorKeyHash    string `json:"originalOperatorKeyHash"`
+			OriginalWeb3DispatchDigest string `json:"originalWeb3DispatchDigest"`
+			PayeeBeneficiaryAddress    string `json:"payeeBeneficiaryAddress"`
+			PublisherFence             int64  `json:"publisherFence"`
+		} `json:"authority"`
+		PublicationRoot  string `json:"publicationRoot"`
+		ReleaseBroadcast struct {
+			CallDigest         string `json:"callDigest"`
+			EffectKind         string `json:"effectKind"`
+			EffectSlotId       string `json:"effectSlotId"`
+			IdempotencyKey     string `json:"idempotencyKey"`
+			OperationId        string `json:"operationId"`
+			ResourceHeadDigest string `json:"resourceHeadDigest"`
+			ScopeId            string `json:"scopeId"`
+		} `json:"releaseBroadcast"`
+		RootPublication struct {
+			CallDigest         string `json:"callDigest"`
+			EffectKind         string `json:"effectKind"`
+			EffectSlotId       string `json:"effectSlotId"`
+			IdempotencyKey     string `json:"idempotencyKey"`
+			OperationId        string `json:"operationId"`
+			ResourceHeadDigest string `json:"resourceHeadDigest"`
+			ScopeId            string `json:"scopeId"`
+		} `json:"rootPublication"`
+		Schema string `json:"schema"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelReservationBody defines model for EconomyChannelReservationBody.
+type EconomyChannelReservationBody struct {
+	Body struct {
+		ChannelId                   string `json:"channelId"`
+		ChannelStateExpectedVersion int64  `json:"channelStateExpectedVersion"`
+		DispositionExpectedVersion  int64  `json:"dispositionExpectedVersion"`
+		ExpiresAtUnixMs             int64  `json:"expiresAtUnixMs"`
+		LifecycleFence              int64  `json:"lifecycleFence"`
+		MaximumCharge               struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"maximumCharge"`
+		MaximumTokenBaseUnits  string `json:"maximumTokenBaseUnits"`
+		NextSequence           int64  `json:"nextSequence"`
+		OpenDigest             string `json:"openDigest"`
+		OperationId            string `json:"operationId"`
+		PriorStateDigest       string `json:"priorStateDigest"`
+		ReceiptAuthorityDigest string `json:"receiptAuthorityDigest"`
+		RequestId              string `json:"requestId"`
+		ReservationId          string `json:"reservationId"`
+		Schema                 string `json:"schema"`
+		ServiceBindingDigest   string `json:"serviceBindingDigest"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelStateBody defines model for EconomyChannelStateBody.
+type EconomyChannelStateBody struct {
+	Body struct {
+		ActualCharge struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"actualCharge"`
+		AssetBindingDigest string `json:"assetBindingDigest"`
+		ChannelId          string `json:"channelId"`
+		CumulativeOwed     struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"cumulativeOwed"`
+		CumulativeTokenBaseUnits string  `json:"cumulativeTokenBaseUnits"`
+		ObligationAtomDigest     *string `json:"obligationAtomDigest,omitempty"`
+		PrevStateDigest          string  `json:"prevStateDigest"`
+		ReceiptAuthorityDigest   string  `json:"receiptAuthorityDigest"`
+		ReceiptCount             int64   `json:"receiptCount"`
+		ReceiptDigest            string  `json:"receiptDigest"`
+		ReceiptId                string  `json:"receiptId"`
+		ReceiptIdRoot            string  `json:"receiptIdRoot"`
+		ReservationDigest        string  `json:"reservationDigest"`
+		Schema                   string  `json:"schema"`
+		Seq                      int64   `json:"seq"`
+	} `json:"body"`
+	KeyEpoch  int64  `json:"keyEpoch"`
+	SignerId  string `json:"signerId"`
+	SignerKey string `json:"signerKey"`
+}
+
+// EconomyChannelTerminalOutcomeCommitmentBody defines model for EconomyChannelTerminalOutcomeCommitmentBody.
+type EconomyChannelTerminalOutcomeCommitmentBody struct {
+	OperationId             string                                            `json:"operationId"`
+	OutcomeRecordedAtUnixMs int64                                             `json:"outcomeRecordedAtUnixMs"`
+	ReceiptDigest           string                                            `json:"receiptDigest"`
+	ReceiptId               string                                            `json:"receiptId"`
+	ReservationDigest       string                                            `json:"reservationDigest"`
+	ReservationId           string                                            `json:"reservationId"`
+	Schema                  EconomyChannelTerminalOutcomeCommitmentBodySchema `json:"schema"`
+	TerminalResult          struct {
+		Result struct {
+			Storage string      `json:"storage"`
+			Value   interface{} `json:"value"`
+		} `json:"result"`
+		ResultDigest string `json:"resultDigest"`
+		ResultId     string `json:"resultId"`
+	} `json:"terminalResult"`
+	TerminalizedAtUnixMs int64 `json:"terminalizedAtUnixMs"`
+}
+
+// EconomyChannelTerminalOutcomeCommitmentBodySchema defines model for EconomyChannelTerminalOutcomeCommitmentBody.Schema.
+type EconomyChannelTerminalOutcomeCommitmentBodySchema string
+
+// EconomyClearingAtomTransformationBody defines model for EconomyClearingAtomTransformationBody.
+type EconomyClearingAtomTransformationBody struct {
+	Amount struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"amount"`
+	AtomDigest            string                                      `json:"atomDigest"`
+	CreditorIdentity      string                                      `json:"creditorIdentity"`
+	CreditorParticipantId string                                      `json:"creditorParticipantId"`
+	DebtorIdentity        string                                      `json:"debtorIdentity"`
+	DebtorParticipantId   string                                      `json:"debtorParticipantId"`
+	ObligationId          string                                      `json:"obligationId"`
+	RoundCoreDigest       string                                      `json:"roundCoreDigest"`
+	Schema                EconomyClearingAtomTransformationBodySchema `json:"schema"`
+	SourceSequence        int64                                       `json:"sourceSequence"`
+}
+
+// EconomyClearingAtomTransformationBodySchema defines model for EconomyClearingAtomTransformationBody.Schema.
+type EconomyClearingAtomTransformationBodySchema string
+
+// EconomyClearingInputManifestBody defines model for EconomyClearingInputManifestBody.
+type EconomyClearingInputManifestBody struct {
+	AuthorityId         string `json:"authorityId"`
+	EndCheckpointDigest string `json:"endCheckpointDigest"`
+	Entries             []struct {
+		AtomDigest         string `json:"atomDigest"`
+		DispositionDigest  string `json:"dispositionDigest"`
+		DispositionVersion int64  `json:"dispositionVersion"`
+		LifecycleFence     int64  `json:"lifecycleFence"`
+		ObligationId       string `json:"obligationId"`
+		RoundId            string `json:"roundId"`
+		SourceSequence     int64  `json:"sourceSequence"`
+	} `json:"entries"`
+	Epoch                 int64                                  `json:"epoch"`
+	ExpiresAtUnixMs       int64                                  `json:"expiresAtUnixMs"`
+	HasMore               bool                                   `json:"hasMore"`
+	IssuedAtUnixMs        int64                                  `json:"issuedAtUnixMs"`
+	KeyEpoch              int64                                  `json:"keyEpoch"`
+	RangeEndSequence      int64                                  `json:"rangeEndSequence"`
+	RangeStartSequence    int64                                  `json:"rangeStartSequence"`
+	Schema                EconomyClearingInputManifestBodySchema `json:"schema"`
+	SourceId              string                                 `json:"sourceId"`
+	StartCheckpointDigest string                                 `json:"startCheckpointDigest"`
+}
+
+// EconomyClearingInputManifestBodySchema defines model for EconomyClearingInputManifestBody.Schema.
+type EconomyClearingInputManifestBodySchema string
+
+// EconomyClearingNettingRoundCoreBody defines model for EconomyClearingNettingRoundCoreBody.
+type EconomyClearingNettingRoundCoreBody struct {
+	AlgorithmVersion          string                                    `json:"algorithmVersion"`
+	ClearingAuthorityId       string                                    `json:"clearingAuthorityId"`
+	ClearingAuthorityKeyEpoch int64                                     `json:"clearingAuthorityKeyEpoch"`
+	Currency                  string                                    `json:"currency"`
+	DisputeWindowEndsAtUnixMs int64                                     `json:"disputeWindowEndsAtUnixMs"`
+	Epoch                     int64                                     `json:"epoch"`
+	GeneratedAtUnixMs         int64                                     `json:"generatedAtUnixMs"`
+	GovernanceScopeId         string                                    `json:"governanceScopeId"`
+	InputCount                int64                                     `json:"inputCount"`
+	InputManifestDigest       string                                    `json:"inputManifestDigest"`
+	ParticipantSnapshotDigest string                                    `json:"participantSnapshotDigest"`
+	ReservationRoot           string                                    `json:"reservationRoot"`
+	RoundId                   string                                    `json:"roundId"`
+	Schema                    EconomyClearingNettingRoundCoreBodySchema `json:"schema"`
+}
+
+// EconomyClearingNettingRoundCoreBodySchema defines model for EconomyClearingNettingRoundCoreBody.Schema.
+type EconomyClearingNettingRoundCoreBodySchema string
+
+// EconomyClearingOutputManifestBody defines model for EconomyClearingOutputManifestBody.
+type EconomyClearingOutputManifestBody struct {
+	AtomTransformationCount   int64                                   `json:"atomTransformationCount"`
+	AtomTransformationRoot    string                                  `json:"atomTransformationRoot"`
+	ParticipantStatementCount int64                                   `json:"participantStatementCount"`
+	ParticipantStatementRoot  string                                  `json:"participantStatementRoot"`
+	RoundCoreDigest           string                                  `json:"roundCoreDigest"`
+	Schema                    EconomyClearingOutputManifestBodySchema `json:"schema"`
+	SettlementIntentCount     int64                                   `json:"settlementIntentCount"`
+	SettlementIntentRoot      string                                  `json:"settlementIntentRoot"`
+}
+
+// EconomyClearingOutputManifestBodySchema defines model for EconomyClearingOutputManifestBody.Schema.
+type EconomyClearingOutputManifestBodySchema string
+
+// EconomyClearingParticipantAcceptanceBody defines model for EconomyClearingParticipantAcceptanceBody.
+type EconomyClearingParticipantAcceptanceBody struct {
+	AcceptedAtUnixMs           int64                                          `json:"acceptedAtUnixMs"`
+	ExpiresAtUnixMs            int64                                          `json:"expiresAtUnixMs"`
+	KeyEpoch                   int64                                          `json:"keyEpoch"`
+	OutputManifestDigest       string                                         `json:"outputManifestDigest"`
+	ParticipantId              string                                         `json:"participantId"`
+	ParticipantStatementDigest string                                         `json:"participantStatementDigest"`
+	RoundCoreDigest            string                                         `json:"roundCoreDigest"`
+	RoundId                    string                                         `json:"roundId"`
+	Schema                     EconomyClearingParticipantAcceptanceBodySchema `json:"schema"`
+}
+
+// EconomyClearingParticipantAcceptanceBodySchema defines model for EconomyClearingParticipantAcceptanceBody.Schema.
+type EconomyClearingParticipantAcceptanceBodySchema string
+
+// EconomyClearingParticipantSnapshotAcknowledgementBody defines model for EconomyClearingParticipantSnapshotAcknowledgementBody.
+type EconomyClearingParticipantSnapshotAcknowledgementBody struct {
+	AcceptedAtUnixMs          int64                                                       `json:"acceptedAtUnixMs"`
+	AlgorithmVersion          string                                                      `json:"algorithmVersion"`
+	ExpiresAtUnixMs           int64                                                       `json:"expiresAtUnixMs"`
+	KeyEpoch                  int64                                                       `json:"keyEpoch"`
+	ParticipantId             string                                                      `json:"participantId"`
+	ParticipantSnapshotDigest string                                                      `json:"participantSnapshotDigest"`
+	Schema                    EconomyClearingParticipantSnapshotAcknowledgementBodySchema `json:"schema"`
+}
+
+// EconomyClearingParticipantSnapshotAcknowledgementBodySchema defines model for EconomyClearingParticipantSnapshotAcknowledgementBody.Schema.
+type EconomyClearingParticipantSnapshotAcknowledgementBodySchema string
+
+// EconomyClearingParticipantSnapshotBody defines model for EconomyClearingParticipantSnapshotBody.
+type EconomyClearingParticipantSnapshotBody struct {
+	AlgorithmVersion string `json:"algorithmVersion"`
+	AuthorityId      string `json:"authorityId"`
+	ExpiresAtUnixMs  int64  `json:"expiresAtUnixMs"`
+	KeyEpoch         int64  `json:"keyEpoch"`
+	Participants     []struct {
+		AcknowledgementKey      string   `json:"acknowledgementKey"`
+		AcknowledgementKeyEpoch int64    `json:"acknowledgementKeyEpoch"`
+		Identities              []string `json:"identities"`
+		ParticipantId           string   `json:"participantId"`
+		SettlementDestination   string   `json:"settlementDestination"`
+	} `json:"participants"`
+	Schema          EconomyClearingParticipantSnapshotBodySchema `json:"schema"`
+	ValidFromUnixMs int64                                        `json:"validFromUnixMs"`
+}
+
+// EconomyClearingParticipantSnapshotBodySchema defines model for EconomyClearingParticipantSnapshotBody.Schema.
+type EconomyClearingParticipantSnapshotBodySchema string
+
+// EconomyClearingParticipantStatementBody defines model for EconomyClearingParticipantStatementBody.
+type EconomyClearingParticipantStatementBody struct {
+	BilateralCreditCancelledUnits int64    `json:"bilateralCreditCancelledUnits"`
+	BilateralDebitCancelledUnits  int64    `json:"bilateralDebitCancelledUnits"`
+	ContributingAtomDigests       []string `json:"contributingAtomDigests"`
+	GrossCreditUnits              int64    `json:"grossCreditUnits"`
+	GrossDebitUnits               int64    `json:"grossDebitUnits"`
+	NetBalance                    struct {
+		Direction string `json:"direction"`
+		Units     int64  `json:"units"`
+	} `json:"netBalance"`
+	ParticipantId   string                                        `json:"participantId"`
+	RoundCoreDigest string                                        `json:"roundCoreDigest"`
+	Schema          EconomyClearingParticipantStatementBodySchema `json:"schema"`
+}
+
+// EconomyClearingParticipantStatementBodySchema defines model for EconomyClearingParticipantStatementBody.Schema.
+type EconomyClearingParticipantStatementBodySchema string
+
+// EconomyClearingRoundAbortBody defines model for EconomyClearingRoundAbortBody.
+type EconomyClearingRoundAbortBody struct {
+	AuthorityDigest              string                              `json:"authorityDigest"`
+	AuthorizedAtUnixMs           int64                               `json:"authorizedAtUnixMs"`
+	DispositionAuthorityId       string                              `json:"dispositionAuthorityId"`
+	DispositionAuthorityKeyEpoch int64                               `json:"dispositionAuthorityKeyEpoch"`
+	GovernanceScopeId            string                              `json:"governanceScopeId"`
+	NextLifecycleFence           int64                               `json:"nextLifecycleFence"`
+	NextLifecycleVersion         int64                               `json:"nextLifecycleVersion"`
+	OutputManifestDigest         string                              `json:"outputManifestDigest"`
+	Reason                       string                              `json:"reason"`
+	ReservationCount             int64                               `json:"reservationCount"`
+	ReservationRoot              string                              `json:"reservationRoot"`
+	RoundCoreDigest              string                              `json:"roundCoreDigest"`
+	RoundId                      string                              `json:"roundId"`
+	Schema                       EconomyClearingRoundAbortBodySchema `json:"schema"`
+	SourceLifecycleFence         int64                               `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest    string                              `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion       int64                               `json:"sourceLifecycleVersion"`
+	ZeroDispatchProofDigest      string                              `json:"zeroDispatchProofDigest"`
+}
+
+// EconomyClearingRoundAbortBodySchema defines model for EconomyClearingRoundAbortBody.Schema.
+type EconomyClearingRoundAbortBodySchema string
+
+// EconomyClearingRoundFinalizationBody defines model for EconomyClearingRoundFinalizationBody.
+type EconomyClearingRoundFinalizationBody struct {
+	ClearingAuthorityId        string                                     `json:"clearingAuthorityId"`
+	ClearingAuthorityKeyEpoch  int64                                      `json:"clearingAuthorityKeyEpoch"`
+	FinalizedAtUnixMs          int64                                      `json:"finalizedAtUnixMs"`
+	GovernanceScopeId          string                                     `json:"governanceScopeId"`
+	OutputManifestDigest       string                                     `json:"outputManifestDigest"`
+	ParticipantAcceptanceCount int64                                      `json:"participantAcceptanceCount"`
+	ParticipantAcceptanceRoot  string                                     `json:"participantAcceptanceRoot"`
+	RoundCoreDigest            string                                     `json:"roundCoreDigest"`
+	RoundId                    string                                     `json:"roundId"`
+	Schema                     EconomyClearingRoundFinalizationBodySchema `json:"schema"`
+	SourceLifecycleFence       int64                                      `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest  string                                     `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion     int64                                      `json:"sourceLifecycleVersion"`
+}
+
+// EconomyClearingRoundFinalizationBodySchema defines model for EconomyClearingRoundFinalizationBody.Schema.
+type EconomyClearingRoundFinalizationBodySchema string
+
+// EconomyClearingRoundSatisfactionBody defines model for EconomyClearingRoundSatisfactionBody.
+type EconomyClearingRoundSatisfactionBody struct {
+	AuthorityDigest              string                                     `json:"authorityDigest"`
+	DispositionAuthorityId       string                                     `json:"dispositionAuthorityId"`
+	DispositionAuthorityKeyEpoch int64                                      `json:"dispositionAuthorityKeyEpoch"`
+	FinalizationDigest           string                                     `json:"finalizationDigest"`
+	IntentProgressRoot           string                                     `json:"intentProgressRoot"`
+	NextLifecycleFence           int64                                      `json:"nextLifecycleFence"`
+	NextLifecycleVersion         int64                                      `json:"nextLifecycleVersion"`
+	OutputManifestDigest         string                                     `json:"outputManifestDigest"`
+	ReservationCount             int64                                      `json:"reservationCount"`
+	ReservationHeadRoot          string                                     `json:"reservationHeadRoot"`
+	ReservationRoot              string                                     `json:"reservationRoot"`
+	RoundCoreDigest              string                                     `json:"roundCoreDigest"`
+	RoundId                      string                                     `json:"roundId"`
+	SatisfiedAtUnixMs            int64                                      `json:"satisfiedAtUnixMs"`
+	Schema                       EconomyClearingRoundSatisfactionBodySchema `json:"schema"`
+	SettlementIntentCount        int64                                      `json:"settlementIntentCount"`
+	SettlementIntentRoot         string                                     `json:"settlementIntentRoot"`
+	SourceLifecycleFence         int64                                      `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest    string                                     `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion       int64                                      `json:"sourceLifecycleVersion"`
+}
+
+// EconomyClearingRoundSatisfactionBodySchema defines model for EconomyClearingRoundSatisfactionBody.Schema.
+type EconomyClearingRoundSatisfactionBodySchema string
+
+// EconomyClearingSettlementIntentBody defines model for EconomyClearingSettlementIntentBody.
+type EconomyClearingSettlementIntentBody struct {
+	Amount struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"amount"`
+	ContributingReservationRoot   string                                    `json:"contributingReservationRoot"`
+	CreditorParticipantId         string                                    `json:"creditorParticipantId"`
+	CreditorSettlementDestination string                                    `json:"creditorSettlementDestination"`
+	DebtorParticipantId           string                                    `json:"debtorParticipantId"`
+	DispatchIdempotencyKey        string                                    `json:"dispatchIdempotencyKey"`
+	IntentId                      string                                    `json:"intentId"`
+	Ordinal                       int64                                     `json:"ordinal"`
+	RoundCoreDigest               string                                    `json:"roundCoreDigest"`
+	Schema                        EconomyClearingSettlementIntentBodySchema `json:"schema"`
+}
+
+// EconomyClearingSettlementIntentBodySchema defines model for EconomyClearingSettlementIntentBody.Schema.
+type EconomyClearingSettlementIntentBodySchema string
+
+// EconomyClearingSettlementReconciliationBody defines model for EconomyClearingSettlementReconciliationBody.
+type EconomyClearingSettlementReconciliationBody struct {
+	AttemptNumber                int64                                             `json:"attemptNumber"`
+	AuthorityDigest              string                                            `json:"authorityDigest"`
+	DispositionAuthorityId       string                                            `json:"dispositionAuthorityId"`
+	DispositionAuthorityKeyEpoch int64                                             `json:"dispositionAuthorityKeyEpoch"`
+	EffectSlotId                 string                                            `json:"effectSlotId"`
+	ExternalReferences           []string                                          `json:"externalReferences"`
+	IntentDigest                 string                                            `json:"intentDigest"`
+	IntentId                     string                                            `json:"intentId"`
+	NextLifecycleFence           int64                                             `json:"nextLifecycleFence"`
+	NextLifecycleVersion         int64                                             `json:"nextLifecycleVersion"`
+	ObservedAtUnixMs             int64                                             `json:"observedAtUnixMs"`
+	ObservedStatus               string                                            `json:"observedStatus"`
+	OutputManifestDigest         string                                            `json:"outputManifestDigest"`
+	RoundCoreDigest              string                                            `json:"roundCoreDigest"`
+	RoundId                      string                                            `json:"roundId"`
+	Schema                       EconomyClearingSettlementReconciliationBodySchema `json:"schema"`
+	SettlementOutcomeDigest      string                                            `json:"settlementOutcomeDigest"`
+	SourceEffectSlotDigest       string                                            `json:"sourceEffectSlotDigest"`
+	SourceLifecycleFence         int64                                             `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest    string                                            `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion       int64                                             `json:"sourceLifecycleVersion"`
+}
+
+// EconomyClearingSettlementReconciliationBodySchema defines model for EconomyClearingSettlementReconciliationBody.Schema.
+type EconomyClearingSettlementReconciliationBodySchema string
+
+// EconomyClearingZeroDispatchProofBody defines model for EconomyClearingZeroDispatchProofBody.
+type EconomyClearingZeroDispatchProofBody struct {
+	AdmissionCommitDigest   string `json:"admissionCommitDigest"`
+	AdmissionCommitSequence int64  `json:"admissionCommitSequence"`
+	AdmissionStoreId        string `json:"admissionStoreId"`
+	AuthorityId             string `json:"authorityId"`
+	AuthorityKeyEpoch       int64  `json:"authorityKeyEpoch"`
+	DispatchStatusCount     int64  `json:"dispatchStatusCount"`
+	DispatchStatusRoot      string `json:"dispatchStatusRoot"`
+	DispatchStatuses        []struct {
+		DispatchIdempotencyKey string `json:"dispatchIdempotencyKey"`
+		Disposition            struct {
+			Kind string `json:"kind"`
+		} `json:"disposition"`
+		IntentDigest string `json:"intentDigest"`
+		IntentId     string `json:"intentId"`
+	} `json:"dispatchStatuses"`
+	ExpiresAtUnixMs           int64                                      `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs            int64                                      `json:"issuedAtUnixMs"`
+	OutputManifestDigest      string                                     `json:"outputManifestDigest"`
+	RoundCoreDigest           string                                     `json:"roundCoreDigest"`
+	RoundId                   string                                     `json:"roundId"`
+	Schema                    EconomyClearingZeroDispatchProofBodySchema `json:"schema"`
+	SettlementIntentCount     int64                                      `json:"settlementIntentCount"`
+	SettlementIntentRoot      string                                     `json:"settlementIntentRoot"`
+	SourceLifecycleFence      int64                                      `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest string                                     `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion    int64                                      `json:"sourceLifecycleVersion"`
+}
+
+// EconomyClearingZeroDispatchProofBodySchema defines model for EconomyClearingZeroDispatchProofBody.Schema.
+type EconomyClearingZeroDispatchProofBodySchema string
+
+// EconomyClearingZeroIntentReconciliationBody defines model for EconomyClearingZeroIntentReconciliationBody.
+type EconomyClearingZeroIntentReconciliationBody struct {
+	AtomBindings []struct {
+		ExpectedHeadDigest      string `json:"expectedHeadDigest"`
+		ExpectedLifecycleFence  int64  `json:"expectedLifecycleFence"`
+		ExpectedResourceVersion int64  `json:"expectedResourceVersion"`
+		ObligationId            string `json:"obligationId"`
+		SourceSequence          int64  `json:"sourceSequence"`
+	} `json:"atomBindings"`
+	AuthorityDigest              string                                            `json:"authorityDigest"`
+	DispositionAuthorityId       string                                            `json:"dispositionAuthorityId"`
+	DispositionAuthorityKeyEpoch int64                                             `json:"dispositionAuthorityKeyEpoch"`
+	EmptyIntentRoot              string                                            `json:"emptyIntentRoot"`
+	FinalizationDigest           string                                            `json:"finalizationDigest"`
+	NextLifecycleFence           int64                                             `json:"nextLifecycleFence"`
+	NextLifecycleVersion         int64                                             `json:"nextLifecycleVersion"`
+	Outcome                      string                                            `json:"outcome"`
+	OutputManifestDigest         string                                            `json:"outputManifestDigest"`
+	ReconciledAtUnixMs           int64                                             `json:"reconciledAtUnixMs"`
+	ReservationCount             int64                                             `json:"reservationCount"`
+	ReservationRoot              string                                            `json:"reservationRoot"`
+	RoundCoreDigest              string                                            `json:"roundCoreDigest"`
+	RoundId                      string                                            `json:"roundId"`
+	Schema                       EconomyClearingZeroIntentReconciliationBodySchema `json:"schema"`
+	SettlementIntentCount        int64                                             `json:"settlementIntentCount"`
+	SourceLifecycleFence         int64                                             `json:"sourceLifecycleFence"`
+	SourceLifecycleHeadDigest    string                                            `json:"sourceLifecycleHeadDigest"`
+	SourceLifecycleVersion       int64                                             `json:"sourceLifecycleVersion"`
+}
+
+// EconomyClearingZeroIntentReconciliationBodySchema defines model for EconomyClearingZeroIntentReconciliationBody.Schema.
+type EconomyClearingZeroIntentReconciliationBodySchema string
+
+// EconomyCreditFacilityBindBody defines model for EconomyCreditFacilityBindBody.
+type EconomyCreditFacilityBindBody struct {
+	ActionNonce string `json:"actionNonce"`
+	Amount      struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"amount"`
+	AuthorityId          string `json:"authorityId"`
+	AuthorityKeyEpoch    int64  `json:"authorityKeyEpoch"`
+	AuthoritySetDigest   string `json:"authoritySetDigest"`
+	BindId               string `json:"bindId"`
+	CapabilityId         string `json:"capabilityId"`
+	CreditorKeyEpoch     int64  `json:"creditorKeyEpoch"`
+	DebtorId             string `json:"debtorId"`
+	DebtorKeyEpoch       int64  `json:"debtorKeyEpoch"`
+	DueAtUnixMs          int64  `json:"dueAtUnixMs"`
+	EconomicIntentDigest string `json:"economicIntentDigest"`
+	EffectiveCeiling     struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"effectiveCeiling"`
+	ExpectedExposureFence            int64                               `json:"expectedExposureFence"`
+	ExpectedExposureVersion          int64                               `json:"expectedExposureVersion"`
+	ExpiresAtUnixMs                  int64                               `json:"expiresAtUnixMs"`
+	FacilityArtifactDigest           string                              `json:"facilityArtifactDigest"`
+	FacilityId                       string                              `json:"facilityId"`
+	IssuedAtUnixMs                   int64                               `json:"issuedAtUnixMs"`
+	OperationId                      string                              `json:"operationId"`
+	OriginalCreditorId               string                              `json:"originalCreditorId"`
+	OriginalSettlementDestinationRef string                              `json:"originalSettlementDestinationRef"`
+	PayeeBindingDigest               string                              `json:"payeeBindingDigest"`
+	RequestId                        string                              `json:"requestId"`
+	Schema                           EconomyCreditFacilityBindBodySchema `json:"schema"`
+	ScopeDigest                      string                              `json:"scopeDigest"`
+	ToolName                         string                              `json:"toolName"`
+	ToolServer                       string                              `json:"toolServer"`
+}
+
+// EconomyCreditFacilityBindBodySchema defines model for EconomyCreditFacilityBindBody.Schema.
+type EconomyCreditFacilityBindBodySchema string
+
+// EconomyCreditReceivableIouEnvelopeBody defines model for EconomyCreditReceivableIouEnvelopeBody.
+type EconomyCreditReceivableIouEnvelopeBody struct {
+	Amount struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"amount"`
+	CapabilityId          string `json:"capabilityId"`
+	CreditAuthorityDigest string `json:"creditAuthorityDigest"`
+	CreditFacilityBind    struct {
+		AuthoritySignature struct {
+			PartyId       string `json:"partyId"`
+			PartyKeyEpoch int64  `json:"partyKeyEpoch"`
+			Signature     string `json:"signature"`
+			SignerKey     string `json:"signerKey"`
+		} `json:"authoritySignature"`
+		Body struct {
+			ActionNonce string `json:"actionNonce"`
+			Amount      struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"amount"`
+			AuthorityId          string `json:"authorityId"`
+			AuthorityKeyEpoch    int64  `json:"authorityKeyEpoch"`
+			AuthoritySetDigest   string `json:"authoritySetDigest"`
+			BindId               string `json:"bindId"`
+			CapabilityId         string `json:"capabilityId"`
+			CreditorKeyEpoch     int64  `json:"creditorKeyEpoch"`
+			DebtorId             string `json:"debtorId"`
+			DebtorKeyEpoch       int64  `json:"debtorKeyEpoch"`
+			DueAtUnixMs          int64  `json:"dueAtUnixMs"`
+			EconomicIntentDigest string `json:"economicIntentDigest"`
+			EffectiveCeiling     struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"effectiveCeiling"`
+			ExpectedExposureFence            int64  `json:"expectedExposureFence"`
+			ExpectedExposureVersion          int64  `json:"expectedExposureVersion"`
+			ExpiresAtUnixMs                  int64  `json:"expiresAtUnixMs"`
+			FacilityArtifactDigest           string `json:"facilityArtifactDigest"`
+			FacilityId                       string `json:"facilityId"`
+			IssuedAtUnixMs                   int64  `json:"issuedAtUnixMs"`
+			OperationId                      string `json:"operationId"`
+			OriginalCreditorId               string `json:"originalCreditorId"`
+			OriginalSettlementDestinationRef string `json:"originalSettlementDestinationRef"`
+			PayeeBindingDigest               string `json:"payeeBindingDigest"`
+			RequestId                        string `json:"requestId"`
+			Schema                           string `json:"schema"`
+			ScopeDigest                      string `json:"scopeDigest"`
+			ToolName                         string `json:"toolName"`
+			ToolServer                       string `json:"toolServer"`
+		} `json:"body"`
+		CreditorSignature struct {
+			PartyId       string `json:"partyId"`
+			PartyKeyEpoch int64  `json:"partyKeyEpoch"`
+			Signature     string `json:"signature"`
+			SignerKey     string `json:"signerKey"`
+		} `json:"creditorSignature"`
+		DebtorSignature struct {
+			PartyId       string `json:"partyId"`
+			PartyKeyEpoch int64  `json:"partyKeyEpoch"`
+			Signature     string `json:"signature"`
+			SignerKey     string `json:"signerKey"`
+		} `json:"debtorSignature"`
+	} `json:"creditFacilityBind"`
+	CurrentDispositionDigest         string                                       `json:"currentDispositionDigest"`
+	DebtorId                         string                                       `json:"debtorId"`
+	DueAtUnixMs                      int64                                        `json:"dueAtUnixMs"`
+	FacilityId                       string                                       `json:"facilityId"`
+	IouId                            string                                       `json:"iouId"`
+	IssuedAtUnixMs                   int64                                        `json:"issuedAtUnixMs"`
+	IssuerId                         string                                       `json:"issuerId"`
+	IssuerKeyEpoch                   int64                                        `json:"issuerKeyEpoch"`
+	ObligationAtomDigest             string                                       `json:"obligationAtomDigest"`
+	ObligationId                     string                                       `json:"obligationId"`
+	OperationId                      string                                       `json:"operationId"`
+	OriginalCreditorId               string                                       `json:"originalCreditorId"`
+	OriginalSettlementDestinationRef string                                       `json:"originalSettlementDestinationRef"`
+	PayeeBindingDigest               string                                       `json:"payeeBindingDigest"`
+	ReceiptContentHash               string                                       `json:"receiptContentHash"`
+	ReceiptDigest                    string                                       `json:"receiptDigest"`
+	ReceiptId                        string                                       `json:"receiptId"`
+	ReceiptPolicyHash                string                                       `json:"receiptPolicyHash"`
+	ReceiptTimestampUnixSeconds      int64                                        `json:"receiptTimestampUnixSeconds"`
+	Schema                           EconomyCreditReceivableIouEnvelopeBodySchema `json:"schema"`
+	TenantId                         *string                                      `json:"tenantId,omitempty"`
+	ToolName                         string                                       `json:"toolName"`
+	ToolServer                       string                                       `json:"toolServer"`
+}
+
+// EconomyCreditReceivableIouEnvelopeBodySchema defines model for EconomyCreditReceivableIouEnvelopeBody.Schema.
+type EconomyCreditReceivableIouEnvelopeBodySchema string
+
+// EconomyEconomyAnchorViewBody defines model for EconomyEconomyAnchorViewBody.
+type EconomyEconomyAnchorViewBody struct {
+	AbsentRequestKeys []struct {
+		RequestId              string `json:"requestId"`
+		RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+	} `json:"absentRequestKeys"`
+	AbsentResourceKeys []struct {
+		ResourceFamily string `json:"resourceFamily"`
+		ResourceId     string `json:"resourceId"`
+		ScopeId        string `json:"scopeId"`
+	} `json:"absentResourceKeys"`
+	AnchorId           string `json:"anchorId"`
+	CheckpointDigest   string `json:"checkpointDigest"`
+	CheckpointSequence int64  `json:"checkpointSequence"`
+	Heads              []struct {
+		AnchorId             string  `json:"anchorId"`
+		EffectIdempotencyKey *string `json:"effectIdempotencyKey,omitempty"`
+		Frost                *struct {
+			ActionDigest         string `json:"actionDigest"`
+			AuthorizationId      string `json:"authorizationId"`
+			AuthorizationSlotId  string `json:"authorizationSlotId"`
+			SignedEnvelopeDigest string `json:"signedEnvelopeDigest"`
+		} `json:"frost,omitempty"`
+		HeadVersion       int64   `json:"headVersion"`
+		LifecycleFence    int64   `json:"lifecycleFence"`
+		LifecycleState    string  `json:"lifecycleState"`
+		Namespace         string  `json:"namespace"`
+		OperationId       *string `json:"operationId,omitempty"`
+		PredecessorDigest *string `json:"predecessorDigest,omitempty"`
+		ResourceKey       struct {
+			ResourceFamily string `json:"resourceFamily"`
+			ResourceId     string `json:"resourceId"`
+			ScopeId        string `json:"scopeId"`
+		} `json:"resourceKey"`
+		ResourceVersion int64  `json:"resourceVersion"`
+		Schema          string `json:"schema"`
+		State           struct {
+			Storage string `json:"storage"`
+			Value   struct {
+				ActionDigest     *string `json:"actionDigest,omitempty"`
+				AdmissionHandoff *struct {
+					LifecycleFence   int64  `json:"lifecycleFence"`
+					OperationVersion int64  `json:"operationVersion"`
+					State            string `json:"state"`
+					StoreFence       struct {
+						LeaseId    string `json:"lease_id"`
+						OwnerEpoch int64  `json:"owner_epoch"`
+						StoreUuid  string `json:"store_uuid"`
+					} `json:"storeFence"`
+				} `json:"admissionHandoff,omitempty"`
+				AdmittedDisputeDigest *string `json:"admittedDisputeDigest,omitempty"`
+				AnchorId              *string `json:"anchorId,omitempty"`
+				AtomDigest            *string `json:"atomDigest,omitempty"`
+				ChannelId             *string `json:"channelId,omitempty"`
+				Claim                 *struct {
+					BeneficiaryId       string  `json:"beneficiaryId"`
+					ContestDeadline     int64   `json:"contestDeadline"`
+					ContestDigest       *string `json:"contestDigest,omitempty"`
+					CoverageAuthorityId string  `json:"coverageAuthorityId"`
+					FundingFacilityId   string  `json:"fundingFacilityId"`
+					Identity            struct {
+						ClaimId string `json:"claimId"`
+						Key     struct {
+							BoundCoverageBodyDigest    string `json:"boundCoverageBodyDigest"`
+							EvidenceRangeDigest        string `json:"evidenceRangeDigest"`
+							ParametricPolicyBodyDigest string `json:"parametricPolicyBodyDigest"`
+							SubjectKey                 string `json:"subjectKey"`
+							TriggerPredicateBodyDigest string `json:"triggerPredicateBodyDigest"`
+							WindowEnd                  int64  `json:"windowEnd"`
+							WindowStart                int64  `json:"windowStart"`
+						} `json:"key"`
+						TriggerInstanceId string `json:"triggerInstanceId"`
+					} `json:"identity"`
+					LifecycleFence int64  `json:"lifecycleFence"`
+					OpenedAt       int64  `json:"openedAt"`
+					PayerId        string `json:"payerId"`
+					PayoutAmount   struct {
+						Currency string `json:"currency"`
+						Units    int64  `json:"units"`
+					} `json:"payoutAmount"`
+					PayoutMode struct {
+						Kind          string `json:"kind"`
+						WindowSeconds int64  `json:"windowSeconds"`
+					} `json:"payoutMode"`
+					PayoutRail struct {
+						DestinationAccountDigest string `json:"destinationAccountDigest"`
+						Kind                     string `json:"kind"`
+						RailId                   string `json:"railId"`
+					} `json:"payoutRail"`
+					Schema           string `json:"schema"`
+					State            string `json:"state"`
+					TriggerMagnitude struct {
+						Kind  string `json:"kind"`
+						Value int64  `json:"value"`
+					} `json:"triggerMagnitude"`
+					Version int64 `json:"version"`
+				} `json:"claim,omitempty"`
+				Disposition *struct {
+					Kind    string `json:"kind"`
+					RoundId string `json:"round_id"`
+				} `json:"disposition,omitempty"`
+				EffectKind      *string `json:"effectKind,omitempty"`
+				EscrowReference *struct {
+					ChainId        string `json:"chainId"`
+					EscrowContract string `json:"escrowContract"`
+					EscrowId       string `json:"escrowId"`
+				} `json:"escrowReference,omitempty"`
+				Fence                    *int64  `json:"fence,omitempty"`
+				FinalizationDigest       *string `json:"finalizationDigest,omitempty"`
+				FirstDispatchOperationId *string `json:"firstDispatchOperationId,omitempty"`
+				GovernanceScopeId        *string `json:"governanceScopeId,omitempty"`
+				IdempotencyKey           *string `json:"idempotencyKey,omitempty"`
+				InputManifestDigest      *string `json:"inputManifestDigest,omitempty"`
+				IntentProgress           *[]struct {
+					AmbiguityCount            int64  `json:"ambiguityCount"`
+					AttemptCount              int64  `json:"attemptCount"`
+					CompletedEffectSlotId     string `json:"completedEffectSlotId"`
+					IntentDigest              string `json:"intentDigest"`
+					IntentId                  string `json:"intentId"`
+					NoEffectCount             int64  `json:"noEffectCount"`
+					ReconciliationChainDigest string `json:"reconciliationChainDigest"`
+					ReconciliationCount       int64  `json:"reconciliationCount"`
+				} `json:"intentProgress,omitempty"`
+				LastTransition *struct {
+					AuthorityDigest string `json:"authority_digest"`
+					Kind            string `json:"kind"`
+					RoundId         string `json:"round_id"`
+				} `json:"lastTransition,omitempty"`
+				LastTransitionDigest       *string `json:"lastTransitionDigest,omitempty"`
+				LatestSequence             *int64  `json:"latestSequence,omitempty"`
+				LatestStateDigest          *string `json:"latestStateDigest,omitempty"`
+				LifecycleFence             *int64  `json:"lifecycleFence,omitempty"`
+				Namespace                  *string `json:"namespace,omitempty"`
+				ObligationId               *string `json:"obligationId,omitempty"`
+				OpenDigest                 *string `json:"openDigest,omitempty"`
+				OperationId                *string `json:"operationId,omitempty"`
+				OutputManifestDigest       *string `json:"outputManifestDigest,omitempty"`
+				ParametersDigest           *string `json:"parametersDigest,omitempty"`
+				ParticipantAcceptanceCount *int64  `json:"participantAcceptanceCount,omitempty"`
+				ParticipantAcceptanceRoot  *string `json:"participantAcceptanceRoot,omitempty"`
+				PendingCloseBodyDigest     *string `json:"pendingCloseBodyDigest,omitempty"`
+				Request                    *struct {
+					RequestBindingDigest   string `json:"requestBindingDigest"`
+					RequestId              string `json:"requestId"`
+					RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+				} `json:"request,omitempty"`
+				ReservationCount   *int64  `json:"reservationCount,omitempty"`
+				ReservationRoot    *string `json:"reservationRoot,omitempty"`
+				ResourceHeadDigest *string `json:"resourceHeadDigest,omitempty"`
+				ResourceId         *string `json:"resourceId,omitempty"`
+				ResourceKey        *struct {
+					ResourceFamily string `json:"resourceFamily"`
+					ResourceId     string `json:"resourceId"`
+					ScopeId        string `json:"scopeId"`
+				} `json:"resourceKey,omitempty"`
+				ResourceVersion *int64  `json:"resourceVersion,omitempty"`
+				RoundCoreDigest *string `json:"roundCoreDigest,omitempty"`
+				RoundId         *string `json:"roundId,omitempty"`
+				RowVersion      *int64  `json:"rowVersion,omitempty"`
+				Schema          *string `json:"schema,omitempty"`
+				SlotId          *string `json:"slotId,omitempty"`
+				State           *string `json:"state,omitempty"`
+				StateVersion    *int64  `json:"stateVersion,omitempty"`
+				Status          *string `json:"status,omitempty"`
+				Target          *struct {
+					QualificationDigest string `json:"qualificationDigest"`
+					TargetId            string `json:"targetId"`
+					TargetKeyEpoch      int64  `json:"targetKeyEpoch"`
+				} `json:"target,omitempty"`
+				Terminal *struct {
+					Kind    *string `json:"kind,omitempty"`
+					Outcome string  `json:"outcome"`
+					Proof   *struct {
+						Storage string `json:"storage"`
+						Value   struct {
+							Cancellation string `json:"cancellation"`
+						} `json:"value"`
+					} `json:"proof,omitempty"`
+					ProofDigest *string `json:"proof_digest,omitempty"`
+					ProofId     *string `json:"proof_id,omitempty"`
+					Result      *struct {
+						Storage string      `json:"storage"`
+						Value   interface{} `json:"value"`
+					} `json:"result,omitempty"`
+					ResultDigest *string `json:"result_digest,omitempty"`
+					ResultId     *string `json:"result_id,omitempty"`
+				} `json:"terminal,omitempty"`
+				Trigger *struct {
+					EvidenceManifest struct {
+						Ranges []struct {
+							AnchorEpoch        int64  `json:"anchorEpoch"`
+							CheckpointAt       int64  `json:"checkpointAt"`
+							CheckpointId       string `json:"checkpointId"`
+							CheckpointRoot     string `json:"checkpointRoot"`
+							ExpectedCount      int64  `json:"expectedCount"`
+							IndexNamespace     string `json:"indexNamespace"`
+							QueryIndexRoot     string `json:"queryIndexRoot"`
+							RangeProofDigest   string `json:"rangeProofDigest"`
+							SelectedMemberRoot string `json:"selectedMemberRoot"`
+							SequenceRange      struct {
+								First int64 `json:"first"`
+								Last  int64 `json:"last"`
+							} `json:"sequenceRange"`
+							SignerKeyEpoch     int64  `json:"signerKeyEpoch"`
+							SourceId           string `json:"sourceId"`
+							SourceKind         string `json:"sourceKind"`
+							SourcePrefixCutoff int64  `json:"sourcePrefixCutoff"`
+							SubjectKey         string `json:"subjectKey"`
+							Window             struct {
+								EndAt   int64 `json:"endAt"`
+								StartAt int64 `json:"startAt"`
+							} `json:"window"`
+						} `json:"ranges"`
+					} `json:"evidenceManifest"`
+					Identity struct {
+						ClaimId string `json:"claimId"`
+						Key     struct {
+							BoundCoverageBodyDigest    string `json:"boundCoverageBodyDigest"`
+							EvidenceRangeDigest        string `json:"evidenceRangeDigest"`
+							ParametricPolicyBodyDigest string `json:"parametricPolicyBodyDigest"`
+							SubjectKey                 string `json:"subjectKey"`
+							TriggerPredicateBodyDigest string `json:"triggerPredicateBodyDigest"`
+							WindowEnd                  int64  `json:"windowEnd"`
+							WindowStart                int64  `json:"windowStart"`
+						} `json:"key"`
+						TriggerInstanceId string `json:"triggerInstanceId"`
+					} `json:"identity"`
+					Magnitude struct {
+						Kind  string `json:"kind"`
+						Value int64  `json:"value"`
+					} `json:"magnitude"`
+					Schema       string `json:"schema"`
+					SignedPolicy struct {
+						Body struct {
+							BeneficiaryId               string `json:"beneficiaryId"`
+							BoundCoverageBodyDigest     string `json:"boundCoverageBodyDigest"`
+							BoundCoverageEnvelopeDigest string `json:"boundCoverageEnvelopeDigest"`
+							CoverageAmount              struct {
+								Currency string `json:"currency"`
+								Units    int64  `json:"units"`
+							} `json:"coverageAmount"`
+							CoverageAuthorityId string `json:"coverageAuthorityId"`
+							EffectiveFrom       int64  `json:"effectiveFrom"`
+							EffectiveUntil      int64  `json:"effectiveUntil"`
+							EvaluatorAuthority  struct {
+								AuthorityId string `json:"authorityId"`
+								KeyEpoch    int64  `json:"keyEpoch"`
+								KeyId       string `json:"keyId"`
+							} `json:"evaluatorAuthority"`
+							FundingFacilityId       string `json:"fundingFacilityId"`
+							IssuedAt                int64  `json:"issuedAt"`
+							MaxCheckpointLagSeconds int64  `json:"maxCheckpointLagSeconds"`
+							PayerId                 string `json:"payerId"`
+							PayoutMode              struct {
+								Kind          string `json:"kind"`
+								WindowSeconds int64  `json:"windowSeconds"`
+							} `json:"payoutMode"`
+							PayoutRail struct {
+								DestinationAccountDigest string `json:"destinationAccountDigest"`
+								Kind                     string `json:"kind"`
+								RailId                   string `json:"railId"`
+							} `json:"payoutRail"`
+							PayoutSchedule struct {
+								Amount struct {
+									Currency string `json:"currency"`
+									Units    int64  `json:"units"`
+								} `json:"amount"`
+								Kind string `json:"kind"`
+							} `json:"payoutSchedule"`
+							PreActionAuthorityDigest string `json:"preActionAuthorityDigest"`
+							Predicate                struct {
+								Kind         string `json:"kind"`
+								MinEvents    int64  `json:"minEvents"`
+								ThresholdBps int64  `json:"thresholdBps"`
+							} `json:"predicate"`
+							Schema        string `json:"schema"`
+							SubjectKey    string `json:"subjectKey"`
+							WindowAnchor  int64  `json:"windowAnchor"`
+							WindowSeconds int64  `json:"windowSeconds"`
+						} `json:"body"`
+						Signature string `json:"signature"`
+						SignerKey string `json:"signerKey"`
+					} `json:"signedPolicy"`
+				} `json:"trigger,omitempty"`
+				TrustedOpenedAt *int64 `json:"trustedOpenedAt,omitempty"`
+				Version         *int64 `json:"version,omitempty"`
+			} `json:"value"`
+		} `json:"state"`
+		StateDigest    string `json:"stateDigest"`
+		TerminalResult *struct {
+			Result struct {
+				Storage string      `json:"storage"`
+				Value   interface{} `json:"value"`
+			} `json:"result"`
+			ResultDigest string `json:"resultDigest"`
+			ResultId     string `json:"resultId"`
+		} `json:"terminalResult,omitempty"`
+		TrustedClockHighWater int64 `json:"trustedClockHighWater"`
+	} `json:"heads"`
+	HeadsRoot      string `json:"headsRoot"`
+	Namespace      string `json:"namespace"`
+	ObservedAt     int64  `json:"observedAt"`
+	RequestReplays []struct {
+		EffectSlotIds []string `json:"effectSlotIds"`
+		OperationId   string   `json:"operationId"`
+		Request       struct {
+			RequestBindingDigest   string `json:"requestBindingDigest"`
+			RequestId              string `json:"requestId"`
+			RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+		} `json:"request"`
+	} `json:"requestReplays"`
+	RequestReplaysRoot string                             `json:"requestReplaysRoot"`
+	Schema             EconomyEconomyAnchorViewBodySchema `json:"schema"`
+	SignerKeyEpoch     int64                              `json:"signerKeyEpoch"`
+	SignerKeyId        string                             `json:"signerKeyId"`
+}
+
+// EconomyEconomyAnchorViewBodySchema defines model for EconomyEconomyAnchorViewBody.Schema.
+type EconomyEconomyAnchorViewBodySchema string
+
+// EconomyEconomyEffectDispatchCommitBody defines model for EconomyEconomyEffectDispatchCommitBody.
+type EconomyEconomyEffectDispatchCommitBody struct {
+	AnchorId                  string                                       `json:"anchorId"`
+	CasNonceDigest            string                                       `json:"casNonceDigest"`
+	CommitId                  string                                       `json:"commitId"`
+	CommittedAt               int64                                        `json:"committedAt"`
+	CommittedCheckpointDigest string                                       `json:"committedCheckpointDigest"`
+	EffectHeadDigest          string                                       `json:"effectHeadDigest"`
+	EffectSlotId              string                                       `json:"effectSlotId"`
+	Namespace                 string                                       `json:"namespace"`
+	PreviousCheckpointDigest  string                                       `json:"previousCheckpointDigest"`
+	Schema                    EconomyEconomyEffectDispatchCommitBodySchema `json:"schema"`
+	SignerKeyEpoch            int64                                        `json:"signerKeyEpoch"`
+	SignerKeyId               string                                       `json:"signerKeyId"`
+}
+
+// EconomyEconomyEffectDispatchCommitBodySchema defines model for EconomyEconomyEffectDispatchCommitBody.Schema.
+type EconomyEconomyEffectDispatchCommitBodySchema string
+
+// EconomyEconomyStateBatchBody defines model for EconomyEconomyStateBatchBody.
+type EconomyEconomyStateBatchBody struct {
+	AnchorId           string `json:"anchorId"`
+	BatchId            string `json:"batchId"`
+	CheckpointSequence int64  `json:"checkpointSequence"`
+	EffectSlots        []struct {
+		ActionDigest     string `json:"actionDigest"`
+		AdmissionHandoff struct {
+			LifecycleFence   int64  `json:"lifecycleFence"`
+			OperationVersion int64  `json:"operationVersion"`
+			State            string `json:"state"`
+			StoreFence       struct {
+				LeaseId    string `json:"lease_id"`
+				OwnerEpoch int64  `json:"owner_epoch"`
+				StoreUuid  string `json:"store_uuid"`
+			} `json:"storeFence"`
+		} `json:"admissionHandoff"`
+		AnchorId         string `json:"anchorId"`
+		EffectKind       string `json:"effectKind"`
+		IdempotencyKey   string `json:"idempotencyKey"`
+		Namespace        string `json:"namespace"`
+		OperationId      string `json:"operationId"`
+		ParametersDigest string `json:"parametersDigest"`
+		Request          struct {
+			RequestBindingDigest   string `json:"requestBindingDigest"`
+			RequestId              string `json:"requestId"`
+			RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+		} `json:"request"`
+		ResourceHeadDigest string `json:"resourceHeadDigest"`
+		ResourceKey        struct {
+			ResourceFamily string `json:"resourceFamily"`
+			ResourceId     string `json:"resourceId"`
+			ScopeId        string `json:"scopeId"`
+		} `json:"resourceKey"`
+		Schema string `json:"schema"`
+		SlotId string `json:"slotId"`
+		State  string `json:"state"`
+		Target struct {
+			QualificationDigest string `json:"qualificationDigest"`
+			TargetId            string `json:"targetId"`
+			TargetKeyEpoch      int64  `json:"targetKeyEpoch"`
+		} `json:"target"`
+	} `json:"effectSlots"`
+	ExpectedHeadsRoot        string  `json:"expectedHeadsRoot"`
+	IssuedAt                 int64   `json:"issuedAt"`
+	Namespace                string  `json:"namespace"`
+	NextHeadsRoot            string  `json:"nextHeadsRoot"`
+	OperationId              *string `json:"operationId,omitempty"`
+	PreviousCheckpointDigest string  `json:"previousCheckpointDigest"`
+	RequestReplays           []struct {
+		EffectSlotIds []string `json:"effectSlotIds"`
+		OperationId   string   `json:"operationId"`
+		Request       struct {
+			RequestBindingDigest   string `json:"requestBindingDigest"`
+			RequestId              string `json:"requestId"`
+			RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+		} `json:"request"`
+	} `json:"requestReplays"`
+	Schema         EconomyEconomyStateBatchBodySchema `json:"schema"`
+	SignerKeyEpoch int64                              `json:"signerKeyEpoch"`
+	SignerKeyId    string                             `json:"signerKeyId"`
+	Transitions    []struct {
+		ExpectedHeadDigest *string `json:"expectedHeadDigest,omitempty"`
+		NextHead           struct {
+			AnchorId             string  `json:"anchorId"`
+			EffectIdempotencyKey *string `json:"effectIdempotencyKey,omitempty"`
+			Frost                *struct {
+				ActionDigest         string `json:"actionDigest"`
+				AuthorizationId      string `json:"authorizationId"`
+				AuthorizationSlotId  string `json:"authorizationSlotId"`
+				SignedEnvelopeDigest string `json:"signedEnvelopeDigest"`
+			} `json:"frost,omitempty"`
+			HeadVersion       int64   `json:"headVersion"`
+			LifecycleFence    int64   `json:"lifecycleFence"`
+			LifecycleState    string  `json:"lifecycleState"`
+			Namespace         string  `json:"namespace"`
+			OperationId       *string `json:"operationId,omitempty"`
+			PredecessorDigest *string `json:"predecessorDigest,omitempty"`
+			ResourceKey       struct {
+				ResourceFamily string `json:"resourceFamily"`
+				ResourceId     string `json:"resourceId"`
+				ScopeId        string `json:"scopeId"`
+			} `json:"resourceKey"`
+			ResourceVersion int64  `json:"resourceVersion"`
+			Schema          string `json:"schema"`
+			State           struct {
+				Storage string `json:"storage"`
+				Value   struct {
+					ActionDigest     *string `json:"actionDigest,omitempty"`
+					AdmissionHandoff *struct {
+						LifecycleFence   int64  `json:"lifecycleFence"`
+						OperationVersion int64  `json:"operationVersion"`
+						State            string `json:"state"`
+						StoreFence       struct {
+							LeaseId    string `json:"lease_id"`
+							OwnerEpoch int64  `json:"owner_epoch"`
+							StoreUuid  string `json:"store_uuid"`
+						} `json:"storeFence"`
+					} `json:"admissionHandoff,omitempty"`
+					AnchorId   *string `json:"anchorId,omitempty"`
+					AtomDigest *string `json:"atomDigest,omitempty"`
+					ChannelId  *string `json:"channelId,omitempty"`
+					Claim      *struct {
+						BeneficiaryId       string `json:"beneficiaryId"`
+						ContestDeadline     int64  `json:"contestDeadline"`
+						CoverageAuthorityId string `json:"coverageAuthorityId"`
+						FundingFacilityId   string `json:"fundingFacilityId"`
+						Identity            struct {
+							ClaimId string `json:"claimId"`
+							Key     struct {
+								BoundCoverageBodyDigest    string `json:"boundCoverageBodyDigest"`
+								EvidenceRangeDigest        string `json:"evidenceRangeDigest"`
+								ParametricPolicyBodyDigest string `json:"parametricPolicyBodyDigest"`
+								SubjectKey                 string `json:"subjectKey"`
+								TriggerPredicateBodyDigest string `json:"triggerPredicateBodyDigest"`
+								WindowEnd                  int64  `json:"windowEnd"`
+								WindowStart                int64  `json:"windowStart"`
+							} `json:"key"`
+							TriggerInstanceId string `json:"triggerInstanceId"`
+						} `json:"identity"`
+						LifecycleFence int64  `json:"lifecycleFence"`
+						OpenedAt       int64  `json:"openedAt"`
+						PayerId        string `json:"payerId"`
+						PayoutAmount   struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"payoutAmount"`
+						PayoutMode struct {
+							Kind          string `json:"kind"`
+							WindowSeconds int64  `json:"windowSeconds"`
+						} `json:"payoutMode"`
+						PayoutRail struct {
+							DestinationAccountDigest string `json:"destinationAccountDigest"`
+							Kind                     string `json:"kind"`
+							RailId                   string `json:"railId"`
+						} `json:"payoutRail"`
+						Schema           string `json:"schema"`
+						State            string `json:"state"`
+						TriggerMagnitude struct {
+							Kind  string `json:"kind"`
+							Value int64  `json:"value"`
+						} `json:"triggerMagnitude"`
+						Version int64 `json:"version"`
+					} `json:"claim,omitempty"`
+					Disposition *struct {
+						Kind               string  `json:"kind"`
+						RoundId            string  `json:"round_id"`
+						SatisfactionDigest *string `json:"satisfaction_digest,omitempty"`
+					} `json:"disposition,omitempty"`
+					EffectKind      *string `json:"effectKind,omitempty"`
+					EscrowReference *struct {
+						ChainId        string `json:"chainId"`
+						EscrowContract string `json:"escrowContract"`
+						EscrowId       string `json:"escrowId"`
+					} `json:"escrowReference,omitempty"`
+					Fence                    *int64  `json:"fence,omitempty"`
+					FinalizationDigest       *string `json:"finalizationDigest,omitempty"`
+					FirstDispatchOperationId *string `json:"firstDispatchOperationId,omitempty"`
+					GovernanceScopeId        *string `json:"governanceScopeId,omitempty"`
+					IdempotencyKey           *string `json:"idempotencyKey,omitempty"`
+					InputManifestDigest      *string `json:"inputManifestDigest,omitempty"`
+					IntentProgress           *[]struct {
+						ActiveEffectSlotId        *string `json:"activeEffectSlotId,omitempty"`
+						AmbiguityCount            int64   `json:"ambiguityCount"`
+						AttemptCount              int64   `json:"attemptCount"`
+						CompletedEffectSlotId     *string `json:"completedEffectSlotId,omitempty"`
+						IntentDigest              string  `json:"intentDigest"`
+						IntentId                  string  `json:"intentId"`
+						NoEffectCount             int64   `json:"noEffectCount"`
+						ReconciliationChainDigest *string `json:"reconciliationChainDigest,omitempty"`
+						ReconciliationCount       int64   `json:"reconciliationCount"`
+					} `json:"intentProgress,omitempty"`
+					LastTransition *struct {
+						AuthorityDigest    string  `json:"authority_digest"`
+						Kind               string  `json:"kind"`
+						RoundId            string  `json:"round_id"`
+						SatisfactionDigest *string `json:"satisfaction_digest,omitempty"`
+					} `json:"lastTransition,omitempty"`
+					LastTransitionDigest       *string `json:"lastTransitionDigest,omitempty"`
+					LatestSequence             *int64  `json:"latestSequence,omitempty"`
+					LatestStateDigest          *string `json:"latestStateDigest,omitempty"`
+					LifecycleFence             *int64  `json:"lifecycleFence,omitempty"`
+					Namespace                  *string `json:"namespace,omitempty"`
+					ObligationId               *string `json:"obligationId,omitempty"`
+					OpenDigest                 *string `json:"openDigest,omitempty"`
+					OperationId                *string `json:"operationId,omitempty"`
+					OutputManifestDigest       *string `json:"outputManifestDigest,omitempty"`
+					ParametersDigest           *string `json:"parametersDigest,omitempty"`
+					ParticipantAcceptanceCount *int64  `json:"participantAcceptanceCount,omitempty"`
+					ParticipantAcceptanceRoot  *string `json:"participantAcceptanceRoot,omitempty"`
+					Request                    *struct {
+						RequestBindingDigest   string `json:"requestBindingDigest"`
+						RequestId              string `json:"requestId"`
+						RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+					} `json:"request,omitempty"`
+					ReservationCount   *int64  `json:"reservationCount,omitempty"`
+					ReservationRoot    *string `json:"reservationRoot,omitempty"`
+					ResourceHeadDigest *string `json:"resourceHeadDigest,omitempty"`
+					ResourceId         *string `json:"resourceId,omitempty"`
+					ResourceKey        *struct {
+						ResourceFamily string `json:"resourceFamily"`
+						ResourceId     string `json:"resourceId"`
+						ScopeId        string `json:"scopeId"`
+					} `json:"resourceKey,omitempty"`
+					ResourceVersion *int64  `json:"resourceVersion,omitempty"`
+					RoundCoreDigest *string `json:"roundCoreDigest,omitempty"`
+					RoundId         *string `json:"roundId,omitempty"`
+					RowVersion      *int64  `json:"rowVersion,omitempty"`
+					Schema          *string `json:"schema,omitempty"`
+					SlotId          *string `json:"slotId,omitempty"`
+					State           *string `json:"state,omitempty"`
+					StateVersion    *int64  `json:"stateVersion,omitempty"`
+					Status          *string `json:"status,omitempty"`
+					Target          *struct {
+						QualificationDigest string `json:"qualificationDigest"`
+						TargetId            string `json:"targetId"`
+						TargetKeyEpoch      int64  `json:"targetKeyEpoch"`
+					} `json:"target,omitempty"`
+					Terminal *struct {
+						Kind    *string `json:"kind,omitempty"`
+						Outcome string  `json:"outcome"`
+						Proof   *struct {
+							Storage string `json:"storage"`
+							Value   struct {
+								ActionDigest     *string `json:"actionDigest,omitempty"`
+								AdmissionHandoff *struct {
+									LifecycleFence   int64  `json:"lifecycleFence"`
+									OperationVersion int64  `json:"operationVersion"`
+									State            string `json:"state"`
+									StoreFence       struct {
+										LeaseId    string `json:"lease_id"`
+										OwnerEpoch int64  `json:"owner_epoch"`
+										StoreUuid  string `json:"store_uuid"`
+									} `json:"storeFence"`
+								} `json:"admissionHandoff,omitempty"`
+								AuthenticatedClockUnixMs *int64  `json:"authenticatedClockUnixMs,omitempty"`
+								Cancellation             *string `json:"cancellation,omitempty"`
+								ChannelId                *string `json:"channelId,omitempty"`
+								IdempotencyKey           *string `json:"idempotencyKey,omitempty"`
+								IssuedAt                 *int64  `json:"issuedAt,omitempty"`
+								OperationId              *string `json:"operationId,omitempty"`
+								ParametersDigest         *string `json:"parametersDigest,omitempty"`
+								Provider                 *struct {
+									QualificationDigest string `json:"qualificationDigest"`
+									TargetId            string `json:"targetId"`
+									TargetKeyEpoch      int64  `json:"targetKeyEpoch"`
+								} `json:"provider,omitempty"`
+								Request *struct {
+									RequestBindingDigest   string `json:"requestBindingDigest"`
+									RequestId              string `json:"requestId"`
+									RequestNamespaceDigest string `json:"requestNamespaceDigest"`
+								} `json:"request,omitempty"`
+								ReservationDigest         *string `json:"reservationDigest,omitempty"`
+								ReservationId             *string `json:"reservationId,omitempty"`
+								ReservationProposalDigest *string `json:"reservationProposalDigest,omitempty"`
+								Schema                    *string `json:"schema,omitempty"`
+								ServiceBindingDigest      *string `json:"serviceBindingDigest,omitempty"`
+								SourceChannelHeadDigest   *string `json:"sourceChannelHeadDigest,omitempty"`
+								SourceCheckpointDigest    *string `json:"sourceCheckpointDigest,omitempty"`
+								SourceCheckpointSequence  *int64  `json:"sourceCheckpointSequence,omitempty"`
+								SourceEffectHeadDigest    *string `json:"sourceEffectHeadDigest,omitempty"`
+								SourceEscrowHeadDigest    *string `json:"sourceEscrowHeadDigest,omitempty"`
+							} `json:"value"`
+						} `json:"proof,omitempty"`
+						ProofDigest *string `json:"proof_digest,omitempty"`
+						ProofId     *string `json:"proof_id,omitempty"`
+						Result      *struct {
+							Storage string      `json:"storage"`
+							Value   interface{} `json:"value"`
+						} `json:"result,omitempty"`
+						ResultDigest *string `json:"result_digest,omitempty"`
+						ResultId     *string `json:"result_id,omitempty"`
+					} `json:"terminal,omitempty"`
+					Trigger *struct {
+						EvidenceManifest struct {
+							Ranges []struct {
+								AnchorEpoch        int64  `json:"anchorEpoch"`
+								CheckpointAt       int64  `json:"checkpointAt"`
+								CheckpointId       string `json:"checkpointId"`
+								CheckpointRoot     string `json:"checkpointRoot"`
+								ExpectedCount      int64  `json:"expectedCount"`
+								IndexNamespace     string `json:"indexNamespace"`
+								QueryIndexRoot     string `json:"queryIndexRoot"`
+								RangeProofDigest   string `json:"rangeProofDigest"`
+								SelectedMemberRoot string `json:"selectedMemberRoot"`
+								SequenceRange      struct {
+									First int64 `json:"first"`
+									Last  int64 `json:"last"`
+								} `json:"sequenceRange"`
+								SignerKeyEpoch     int64  `json:"signerKeyEpoch"`
+								SourceId           string `json:"sourceId"`
+								SourceKind         string `json:"sourceKind"`
+								SourcePrefixCutoff int64  `json:"sourcePrefixCutoff"`
+								SubjectKey         string `json:"subjectKey"`
+								Window             struct {
+									EndAt   int64 `json:"endAt"`
+									StartAt int64 `json:"startAt"`
+								} `json:"window"`
+							} `json:"ranges"`
+						} `json:"evidenceManifest"`
+						Identity struct {
+							ClaimId string `json:"claimId"`
+							Key     struct {
+								BoundCoverageBodyDigest    string `json:"boundCoverageBodyDigest"`
+								EvidenceRangeDigest        string `json:"evidenceRangeDigest"`
+								ParametricPolicyBodyDigest string `json:"parametricPolicyBodyDigest"`
+								SubjectKey                 string `json:"subjectKey"`
+								TriggerPredicateBodyDigest string `json:"triggerPredicateBodyDigest"`
+								WindowEnd                  int64  `json:"windowEnd"`
+								WindowStart                int64  `json:"windowStart"`
+							} `json:"key"`
+							TriggerInstanceId string `json:"triggerInstanceId"`
+						} `json:"identity"`
+						Magnitude struct {
+							Kind  string `json:"kind"`
+							Value int64  `json:"value"`
+						} `json:"magnitude"`
+						Schema       string `json:"schema"`
+						SignedPolicy struct {
+							Body struct {
+								BeneficiaryId               string `json:"beneficiaryId"`
+								BoundCoverageBodyDigest     string `json:"boundCoverageBodyDigest"`
+								BoundCoverageEnvelopeDigest string `json:"boundCoverageEnvelopeDigest"`
+								CoverageAmount              struct {
+									Currency string `json:"currency"`
+									Units    int64  `json:"units"`
+								} `json:"coverageAmount"`
+								CoverageAuthorityId string `json:"coverageAuthorityId"`
+								EffectiveFrom       int64  `json:"effectiveFrom"`
+								EffectiveUntil      int64  `json:"effectiveUntil"`
+								EvaluatorAuthority  struct {
+									AuthorityId string `json:"authorityId"`
+									KeyEpoch    int64  `json:"keyEpoch"`
+									KeyId       string `json:"keyId"`
+								} `json:"evaluatorAuthority"`
+								FundingFacilityId       string `json:"fundingFacilityId"`
+								IssuedAt                int64  `json:"issuedAt"`
+								MaxCheckpointLagSeconds int64  `json:"maxCheckpointLagSeconds"`
+								PayerId                 string `json:"payerId"`
+								PayoutMode              struct {
+									Kind          string `json:"kind"`
+									WindowSeconds int64  `json:"windowSeconds"`
+								} `json:"payoutMode"`
+								PayoutRail struct {
+									DestinationAccountDigest string `json:"destinationAccountDigest"`
+									Kind                     string `json:"kind"`
+									RailId                   string `json:"railId"`
+								} `json:"payoutRail"`
+								PayoutSchedule struct {
+									Amount struct {
+										Currency string `json:"currency"`
+										Units    int64  `json:"units"`
+									} `json:"amount"`
+									Kind string `json:"kind"`
+								} `json:"payoutSchedule"`
+								PreActionAuthorityDigest string `json:"preActionAuthorityDigest"`
+								Predicate                struct {
+									Kind         string `json:"kind"`
+									MinEvents    int64  `json:"minEvents"`
+									ThresholdBps int64  `json:"thresholdBps"`
+								} `json:"predicate"`
+								Schema        string `json:"schema"`
+								SubjectKey    string `json:"subjectKey"`
+								WindowAnchor  int64  `json:"windowAnchor"`
+								WindowSeconds int64  `json:"windowSeconds"`
+							} `json:"body"`
+							Signature string `json:"signature"`
+							SignerKey string `json:"signerKey"`
+						} `json:"signedPolicy"`
+					} `json:"trigger,omitempty"`
+					TrustedOpenedAt *int64 `json:"trustedOpenedAt,omitempty"`
+					Version         *int64 `json:"version,omitempty"`
+				} `json:"value"`
+			} `json:"state"`
+			StateDigest    string `json:"stateDigest"`
+			TerminalResult *struct {
+				Result struct {
+					Storage string      `json:"storage"`
+					Value   interface{} `json:"value"`
+				} `json:"result"`
+				ResultDigest string `json:"resultDigest"`
+				ResultId     string `json:"resultId"`
+			} `json:"terminalResult,omitempty"`
+			TrustedClockHighWater int64 `json:"trustedClockHighWater"`
+		} `json:"nextHead"`
+		PreparedEffect *struct {
+			ActionDigest  string `json:"actionDigest"`
+			Authorization struct {
+				Mode string `json:"mode"`
+			} `json:"authorization"`
+			EffectSlotDigest string `json:"effectSlotDigest"`
+			EffectSlotId     string `json:"effectSlotId"`
+			OperationId      string `json:"operationId"`
+		} `json:"preparedEffect,omitempty"`
+		ResourceKey struct {
+			ResourceFamily string `json:"resourceFamily"`
+			ResourceId     string `json:"resourceId"`
+			ScopeId        string `json:"scopeId"`
+		} `json:"resourceKey"`
+		TransitionProofDigest string `json:"transitionProofDigest"`
+	} `json:"transitions"`
+}
+
+// EconomyEconomyStateBatchBodySchema defines model for EconomyEconomyStateBatchBody.Schema.
+type EconomyEconomyStateBatchBodySchema string
+
+// EconomyFactorAssignmentAcknowledgementBody defines model for EconomyFactorAssignmentAcknowledgementBody.
+type EconomyFactorAssignmentAcknowledgementBody struct {
+	AcknowledgedAtUnixMs               int64                                            `json:"acknowledgedAtUnixMs"`
+	AcknowledgementId                  string                                           `json:"acknowledgementId"`
+	AgreementBodyDigest                string                                           `json:"agreementBodyDigest"`
+	AgreementId                        string                                           `json:"agreementId"`
+	AssignmentAuthorizationSetDigest   string                                           `json:"assignmentAuthorizationSetDigest"`
+	AuthorityId                        string                                           `json:"authorityId"`
+	AuthorityKeyEpoch                  int64                                            `json:"authorityKeyEpoch"`
+	BuyerId                            string                                           `json:"buyerId"`
+	BuyerSettlementDestinationRef      string                                           `json:"buyerSettlementDestinationRef"`
+	DueAtUnixMs                        int64                                            `json:"dueAtUnixMs"`
+	EffectiveAtUnixMs                  int64                                            `json:"effectiveAtUnixMs"`
+	ExpectedResourceFence              int64                                            `json:"expectedResourceFence"`
+	ExpectedSnapshotVersion            int64                                            `json:"expectedSnapshotVersion"`
+	NormalizedRequestDigest            string                                           `json:"normalizedRequestDigest"`
+	ObligationAtomDigest               string                                           `json:"obligationAtomDigest"`
+	ObligationId                       string                                           `json:"obligationId"`
+	OperationId                        string                                           `json:"operationId"`
+	PriorDispositionDigest             string                                           `json:"priorDispositionDigest"`
+	PriorDispositionKind               string                                           `json:"priorDispositionKind"`
+	PriorDispositionLifecycleFence     int64                                            `json:"priorDispositionLifecycleFence"`
+	PriorDispositionVersion            int64                                            `json:"priorDispositionVersion"`
+	ResultingDispositionDigest         string                                           `json:"resultingDispositionDigest"`
+	ResultingDispositionLifecycleFence int64                                            `json:"resultingDispositionLifecycleFence"`
+	ResultingDispositionVersion        int64                                            `json:"resultingDispositionVersion"`
+	ResultingResourceFence             int64                                            `json:"resultingResourceFence"`
+	ResultingSnapshotVersion           int64                                            `json:"resultingSnapshotVersion"`
+	Schema                             EconomyFactorAssignmentAcknowledgementBodySchema `json:"schema"`
+	StatusProofDigest                  string                                           `json:"statusProofDigest"`
+}
+
+// EconomyFactorAssignmentAcknowledgementBodySchema defines model for EconomyFactorAssignmentAcknowledgementBody.Schema.
+type EconomyFactorAssignmentAcknowledgementBodySchema string
+
+// EconomyFactorAssignmentAgreementBody defines model for EconomyFactorAssignmentAgreementBody.
+type EconomyFactorAssignmentAgreementBody struct {
+	AgreedDiscountBps int64 `json:"agreedDiscountBps"`
+	AgreedPrice       struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"agreedPrice"`
+	AgreementId                        string                                     `json:"agreementId"`
+	AssignmentAuthorityDigest          string                                     `json:"assignmentAuthorityDigest"`
+	BuyerId                            string                                     `json:"buyerId"`
+	BuyerSettlementDestinationRef      string                                     `json:"buyerSettlementDestinationRef"`
+	ClaimDigest                        string                                     `json:"claimDigest"`
+	ClaimId                            string                                     `json:"claimId"`
+	DueAtUnixMs                        int64                                      `json:"dueAtUnixMs"`
+	EffectiveAtUnixMs                  int64                                      `json:"effectiveAtUnixMs"`
+	ExpectedDispositionLifecycleFence  int64                                      `json:"expectedDispositionLifecycleFence"`
+	ExpectedDispositionVersion         int64                                      `json:"expectedDispositionVersion"`
+	ExpectedSettlementLifecycleFence   int64                                      `json:"expectedSettlementLifecycleFence"`
+	ExpectedSettlementLifecycleVersion int64                                      `json:"expectedSettlementLifecycleVersion"`
+	NormalizedRequestDigest            string                                     `json:"normalizedRequestDigest"`
+	ObligationAtomDigest               string                                     `json:"obligationAtomDigest"`
+	ObligationId                       string                                     `json:"obligationId"`
+	OfferDigest                        string                                     `json:"offerDigest"`
+	OfferId                            string                                     `json:"offerId"`
+	OperationId                        string                                     `json:"operationId"`
+	Schema                             EconomyFactorAssignmentAgreementBodySchema `json:"schema"`
+	SellerId                           string                                     `json:"sellerId"`
+}
+
+// EconomyFactorAssignmentAgreementBodySchema defines model for EconomyFactorAssignmentAgreementBody.Schema.
+type EconomyFactorAssignmentAgreementBodySchema string
+
+// EconomyFactorAssignmentBindAuthorizationBody defines model for EconomyFactorAssignmentBindAuthorizationBody.
+type EconomyFactorAssignmentBindAuthorizationBody struct {
+	Action                        string                                             `json:"action"`
+	ActionNonce                   string                                             `json:"actionNonce"`
+	AgreementId                   string                                             `json:"agreementId"`
+	AuthorityId                   string                                             `json:"authorityId"`
+	AuthorityKeyEpoch             int64                                              `json:"authorityKeyEpoch"`
+	BuyerId                       string                                             `json:"buyerId"`
+	BuyerSettlementDestinationRef string                                             `json:"buyerSettlementDestinationRef"`
+	EffectiveAtUnixMs             int64                                              `json:"effectiveAtUnixMs"`
+	ExpiresAtUnixMs               int64                                              `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs                int64                                              `json:"issuedAtUnixMs"`
+	NormalizedRequestDigest       string                                             `json:"normalizedRequestDigest"`
+	ObligationAtomDigest          string                                             `json:"obligationAtomDigest"`
+	OperationId                   string                                             `json:"operationId"`
+	Schema                        EconomyFactorAssignmentBindAuthorizationBodySchema `json:"schema"`
+	SellerId                      string                                             `json:"sellerId"`
+}
+
+// EconomyFactorAssignmentBindAuthorizationBodySchema defines model for EconomyFactorAssignmentBindAuthorizationBody.Schema.
+type EconomyFactorAssignmentBindAuthorizationBodySchema string
+
+// EconomyFactorAssignmentNotAppliedBody defines model for EconomyFactorAssignmentNotAppliedBody.
+type EconomyFactorAssignmentNotAppliedBody struct {
+	AgreementBodyDigest                string                                      `json:"agreementBodyDigest"`
+	AgreementId                        string                                      `json:"agreementId"`
+	AssignmentAuthorizationSetDigest   string                                      `json:"assignmentAuthorizationSetDigest"`
+	AuthorityId                        string                                      `json:"authorityId"`
+	AuthorityKeyEpoch                  int64                                       `json:"authorityKeyEpoch"`
+	DecidedAtUnixMs                    int64                                       `json:"decidedAtUnixMs"`
+	ExpectedDispositionLifecycleFence  int64                                       `json:"expectedDispositionLifecycleFence"`
+	ExpectedDispositionVersion         int64                                       `json:"expectedDispositionVersion"`
+	ExpectedResourceFence              int64                                       `json:"expectedResourceFence"`
+	ExpectedSettlementLifecycleFence   int64                                       `json:"expectedSettlementLifecycleFence"`
+	ExpectedSettlementLifecycleVersion int64                                       `json:"expectedSettlementLifecycleVersion"`
+	ExpectedSnapshotVersion            int64                                       `json:"expectedSnapshotVersion"`
+	NoMutationProofDigest              string                                      `json:"noMutationProofDigest"`
+	NormalizedRequestDigest            string                                      `json:"normalizedRequestDigest"`
+	ObligationAtomDigest               string                                      `json:"obligationAtomDigest"`
+	ObligationId                       string                                      `json:"obligationId"`
+	ObservedDispositionDigest          string                                      `json:"observedDispositionDigest"`
+	ObservedDispositionLifecycleFence  int64                                       `json:"observedDispositionLifecycleFence"`
+	ObservedDispositionVersion         int64                                       `json:"observedDispositionVersion"`
+	ObservedSettlementLifecycleDigest  string                                      `json:"observedSettlementLifecycleDigest"`
+	ObservedSettlementLifecycleFence   int64                                       `json:"observedSettlementLifecycleFence"`
+	ObservedSettlementLifecycleVersion int64                                       `json:"observedSettlementLifecycleVersion"`
+	ObservedSnapshotVersion            int64                                       `json:"observedSnapshotVersion"`
+	OperationId                        string                                      `json:"operationId"`
+	Reason                             string                                      `json:"reason"`
+	ResourceFence                      int64                                       `json:"resourceFence"`
+	ResultId                           string                                      `json:"resultId"`
+	Schema                             EconomyFactorAssignmentNotAppliedBodySchema `json:"schema"`
+	StatusProofDigest                  string                                      `json:"statusProofDigest"`
+}
+
+// EconomyFactorAssignmentNotAppliedBodySchema defines model for EconomyFactorAssignmentNotAppliedBody.Schema.
+type EconomyFactorAssignmentNotAppliedBodySchema string
+
+// EconomyObligationStatusProofBody defines model for EconomyObligationStatusProofBody.
+type EconomyObligationStatusProofBody struct {
+	AuthorityId                     string `json:"authorityId"`
+	AuthorityKeyEpoch               int64  `json:"authorityKeyEpoch"`
+	CurrentCreditorId               string `json:"currentCreditorId"`
+	CurrentSettlementDestinationRef string `json:"currentSettlementDestinationRef"`
+	DebtorId                        string `json:"debtorId"`
+	Disposition                     struct {
+		Kind string `json:"kind"`
+	} `json:"disposition"`
+	DispositionDigest          string                                 `json:"dispositionDigest"`
+	DispositionLifecycleFence  int64                                  `json:"dispositionLifecycleFence"`
+	DispositionVersion         int64                                  `json:"dispositionVersion"`
+	DueAtUnixMs                int64                                  `json:"dueAtUnixMs"`
+	ExpiresAtUnixMs            int64                                  `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs             int64                                  `json:"issuedAtUnixMs"`
+	ObligationAtomDigest       string                                 `json:"obligationAtomDigest"`
+	ObligationId               string                                 `json:"obligationId"`
+	OriginalCreditorId         string                                 `json:"originalCreditorId"`
+	ProofId                    string                                 `json:"proofId"`
+	ResourceFence              int64                                  `json:"resourceFence"`
+	Schema                     EconomyObligationStatusProofBodySchema `json:"schema"`
+	SettlementLifecycleDigest  string                                 `json:"settlementLifecycleDigest"`
+	SettlementLifecycleFence   int64                                  `json:"settlementLifecycleFence"`
+	SettlementLifecycleVersion int64                                  `json:"settlementLifecycleVersion"`
+	SettlementState            struct {
+		EvidenceDigest *string `json:"evidence_digest,omitempty"`
+		Kind           string  `json:"kind"`
+		SettlementId   *string `json:"settlement_id,omitempty"`
+	} `json:"settlementState"`
+	SnapshotVersion int64 `json:"snapshotVersion"`
+}
+
+// EconomyObligationStatusProofBodySchema defines model for EconomyObligationStatusProofBody.Schema.
+type EconomyObligationStatusProofBodySchema string
+
+// EnterpriseEnterpriseApprovalCaseBody defines model for EnterpriseEnterpriseApprovalCaseBody.
+type EnterpriseEnterpriseApprovalCaseBody struct {
+	Approvers                  []string                                   `json:"approvers"`
+	Decision                   string                                     `json:"decision"`
+	DecisionSubject            string                                     `json:"decision_subject"`
+	EvidenceExportBundleDigest string                                     `json:"evidence_export_bundle_digest"`
+	ExpiresAt                  string                                     `json:"expires_at"`
+	Id                         string                                     `json:"id"`
+	IssuedAt                   string                                     `json:"issued_at"`
+	PassportId                 string                                     `json:"passport_id"`
+	RequiredQuorum             int64                                      `json:"required_quorum"`
+	RiskComptrollerReportRef   string                                     `json:"risk_comptroller_report_ref"`
+	Schema                     EnterpriseEnterpriseApprovalCaseBodySchema `json:"schema"`
+}
+
+// EnterpriseEnterpriseApprovalCaseBodySchema defines model for EnterpriseEnterpriseApprovalCaseBody.Schema.
+type EnterpriseEnterpriseApprovalCaseBodySchema string
+
 // ErrorCapabilityDenied defines model for ErrorCapabilityDenied.
 type ErrorCapabilityDenied struct {
 	Code   ErrorCapabilityDeniedCode `json:"code"`
@@ -8077,6 +11098,21 @@ type FederationBilateralSignatureSlicePolicyVerdict struct {
 
 // FederationBilateralSignatureSlicePolicyVerdictVerdict defines model for FederationBilateralSignatureSlicePolicyVerdict.Verdict.
 type FederationBilateralSignatureSlicePolicyVerdictVerdict string
+
+// FederationCapabilityLeaseBody defines model for FederationCapabilityLeaseBody.
+type FederationCapabilityLeaseBody struct {
+	ActionClass     string                              `json:"actionClass"`
+	ExpiresAtUnixMs int64                               `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs  int64                               `json:"issuedAtUnixMs"`
+	Issuer          string                              `json:"issuer"`
+	LeaseId         string                              `json:"leaseId"`
+	Schema          FederationCapabilityLeaseBodySchema `json:"schema"`
+	ScopeDigest     string                              `json:"scopeDigest"`
+	Subject         string                              `json:"subject"`
+}
+
+// FederationCapabilityLeaseBodySchema defines model for FederationCapabilityLeaseBody.Schema.
+type FederationCapabilityLeaseBodySchema string
 
 // FederationCrossIssuerMigration defines model for FederationCrossIssuerMigration.
 type FederationCrossIssuerMigration struct {
@@ -8399,6 +11435,22 @@ type FederationFederationReputationClearing struct {
 // FederationFederationReputationClearingSchema defines model for FederationFederationReputationClearing.Schema.
 type FederationFederationReputationClearingSchema string
 
+// FederationGovernanceReceiptBody defines model for FederationGovernanceReceiptBody.
+type FederationGovernanceReceiptBody struct {
+	AuthorizedLeaseId string                                `json:"authorizedLeaseId"`
+	AuthorizingKernel string                                `json:"authorizingKernel"`
+	CaseKind          string                                `json:"caseKind"`
+	ExpiresAtUnixMs   int64                                 `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs    int64                                 `json:"issuedAtUnixMs"`
+	ReceiptId         string                                `json:"receiptId"`
+	Schema            FederationGovernanceReceiptBodySchema `json:"schema"`
+	StepSha256        string                                `json:"stepSha256"`
+	WorkflowId        string                                `json:"workflowId"`
+}
+
+// FederationGovernanceReceiptBodySchema defines model for FederationGovernanceReceiptBody.Schema.
+type FederationGovernanceReceiptBodySchema string
+
 // FederationTransportIrohPeerDirectoryBundle defines model for FederationTransportIrohPeerDirectoryBundle.
 type FederationTransportIrohPeerDirectoryBundle struct {
 	DirectorySha256       string                                           `json:"directorySha256"`
@@ -8654,6 +11706,907 @@ type FindingCurrentListingAssertion struct {
 
 // FindingCurrentListingAssertionSchema defines model for FindingCurrentListingAssertion.Schema.
 type FindingCurrentListingAssertionSchema string
+
+// FindingFindingAdmissionBody defines model for FindingFindingAdmissionBody.
+type FindingFindingAdmissionBody struct {
+	AdmissionId string `json:"admission_id"`
+	AuditPool   struct {
+		AuthorityEpoch  int64  `json:"authority_epoch"`
+		Currency        string `json:"currency"`
+		PrincipalId     string `json:"principal_id"`
+		RailDestination string `json:"rail_destination"`
+	} `json:"audit_pool"`
+	BackingAllocationId         string `json:"backing_allocation_id"`
+	BackingEnvelopeSha256       string `json:"backing_envelope_sha256"`
+	CapabilityScope             string `json:"capability_scope"`
+	ChallengeAdministrationPool struct {
+		AuthorityEpoch  int64  `json:"authority_epoch"`
+		Currency        string `json:"currency"`
+		PrincipalId     string `json:"principal_id"`
+		RailDestination string `json:"rail_destination"`
+	} `json:"challenge_administration_pool"`
+	CommunityFundDestination string `json:"community_fund_destination"`
+	ExpiresAt                int64  `json:"expires_at"`
+	FailedDeliveryAuthority  struct {
+		AuthorityId         string `json:"authority_id"`
+		Key                 string `json:"key"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		RotationPolicyRef   string `json:"rotation_policy_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"failed_delivery_authority"`
+	FeeScheduleEnvelopeSha256 string `json:"fee_schedule_envelope_sha256"`
+	FeeTerminals              []struct {
+		Amount struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"amount"`
+		Event                     FindingFindingAdmissionBody_FeeTerminals_Event `json:"event"`
+		FeeScheduleEnvelopeSha256 string                                         `json:"fee_schedule_envelope_sha256"`
+		InstructionSha256         string                                         `json:"instruction_sha256"`
+		ObservationSha256         string                                         `json:"observation_sha256"`
+		Payer                     string                                         `json:"payer"`
+		PoolPrincipalId           string                                         `json:"pool_principal_id"`
+		RailDestination           string                                         `json:"rail_destination"`
+	} `json:"fee_terminals"`
+	FindingArtifactSha256     string `json:"finding_artifact_sha256"`
+	FindingId                 string `json:"finding_id"`
+	IssuedAt                  int64  `json:"issued_at"`
+	ListingEnvelopeSha256     string `json:"listing_envelope_sha256"`
+	ListingId                 string `json:"listing_id"`
+	MetadataUrl               string `json:"metadata_url"`
+	PayeeDestination          string `json:"payee_destination"`
+	PricingHintEnvelopeSha256 string `json:"pricing_hint_envelope_sha256"`
+	ProfileEnvelopeSha256     string `json:"profile_envelope_sha256"`
+	PublisherOperatorId       string `json:"publisher_operator_id"`
+	PurchaseAuthority         struct {
+		AuthorityId         string `json:"authority_id"`
+		Key                 string `json:"key"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		RotationPolicyRef   string `json:"rotation_policy_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"purchase_authority"`
+	Schema                            FindingFindingAdmissionBodySchema `json:"schema"`
+	SellerAuthorizationEnvelopeSha256 string                            `json:"seller_authorization_envelope_sha256"`
+	ServerId                          string                            `json:"server_id"`
+	StatusFeedOperatorRef             string                            `json:"status_feed_operator_ref"`
+	TermsEnvelopeSha256               string                            `json:"terms_envelope_sha256"`
+	Venue                             string                            `json:"venue"`
+	VenueId                           string                            `json:"venue_id"`
+	VerifierReportEnvelopeSha256      string                            `json:"verifier_report_envelope_sha256"`
+	VerifierReportId                  string                            `json:"verifier_report_id"`
+}
+
+// FindingFindingAdmissionBodyFeeTerminalsEvent0 defines model for .
+type FindingFindingAdmissionBodyFeeTerminalsEvent0 = string
+
+// FindingFindingAdmissionBodyFeeTerminalsEvent1 defines model for .
+type FindingFindingAdmissionBodyFeeTerminalsEvent1 struct {
+	ParticipationEpoch struct {
+		EpochIndex int64 `json:"epoch_index"`
+	} `json:"participation_epoch"`
+}
+
+// FindingFindingAdmissionBody_FeeTerminals_Event defines model for FindingFindingAdmissionBody.FeeTerminals.Event.
+type FindingFindingAdmissionBody_FeeTerminals_Event struct {
+	union json.RawMessage
+}
+
+// FindingFindingAdmissionBodySchema defines model for FindingFindingAdmissionBody.Schema.
+type FindingFindingAdmissionBodySchema string
+
+// FindingFindingAuditEpochBody defines model for FindingFindingAuditEpochBody.
+type FindingFindingAuditEpochBody struct {
+	AuditAuthority      string `json:"audit_authority"`
+	AuditEpochId        string `json:"audit_epoch_id"`
+	AuthorizationDigest string `json:"authorization_digest"`
+	AvailableBudget     struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"available_budget"`
+	CommittedAt               int64                              `json:"committed_at"`
+	EligibleListingCount      int64                              `json:"eligible_listing_count"`
+	EligibleSnapshotAt        int64                              `json:"eligible_snapshot_at"`
+	EligibleSnapshotDigest    string                             `json:"eligible_snapshot_digest"`
+	EpochIndex                int64                              `json:"epoch_index"`
+	FeeScheduleEnvelopeSha256 string                             `json:"fee_schedule_envelope_sha256"`
+	PublishedRateBps          int64                              `json:"published_rate_bps"`
+	Schema                    FindingFindingAuditEpochBodySchema `json:"schema"`
+	SeedCommitment            string                             `json:"seed_commitment"`
+	SeedWitness               string                             `json:"seed_witness"`
+	SeedWitnessSignature      string                             `json:"seed_witness_signature"`
+	SeedWitnessedAt           int64                              `json:"seed_witnessed_at"`
+	SelectionAlgorithmId      string                             `json:"selection_algorithm_id"`
+}
+
+// FindingFindingAuditEpochBodySchema defines model for FindingFindingAuditEpochBody.Schema.
+type FindingFindingAuditEpochBodySchema string
+
+// FindingFindingAuditReportBody defines model for FindingFindingAuditReportBody.
+type FindingFindingAuditReportBody struct {
+	AttemptEnvelopeSha256s   []string `json:"attempt_envelope_sha256s"`
+	AuditEpochEnvelopeSha256 string   `json:"audit_epoch_envelope_sha256"`
+	AuditReportId            string   `json:"audit_report_id"`
+	MissedAttempts           []struct {
+		FindingId string `json:"finding_id"`
+		Reason    string `json:"reason"`
+	} `json:"missed_attempts"`
+	OutcomeEnvelopeDigests []string                            `json:"outcome_envelope_digests"`
+	ReportedAt             int64                               `json:"reported_at"`
+	RevealedSeed           string                              `json:"revealed_seed"`
+	Schema                 FindingFindingAuditReportBodySchema `json:"schema"`
+	SelectedFindingIds     []string                            `json:"selected_finding_ids"`
+}
+
+// FindingFindingAuditReportBodySchema defines model for FindingFindingAuditReportBody.Schema.
+type FindingFindingAuditReportBodySchema string
+
+// FindingFindingAuditRoundAuthorizationBody defines model for FindingFindingAuditRoundAuthorizationBody.
+type FindingFindingAuditRoundAuthorizationBody struct {
+	AuthorizedAt             int64                                           `json:"authorized_at"`
+	EpochPrecommitmentSha256 string                                          `json:"epoch_precommitment_sha256"`
+	ExpiresAt                int64                                           `json:"expires_at"`
+	Schema                   FindingFindingAuditRoundAuthorizationBodySchema `json:"schema"`
+}
+
+// FindingFindingAuditRoundAuthorizationBodySchema defines model for FindingFindingAuditRoundAuthorizationBody.Schema.
+type FindingFindingAuditRoundAuthorizationBodySchema string
+
+// FindingFindingAuthorityStatusBody defines model for FindingFindingAuthorityStatusBody.
+type FindingFindingAuthorityStatusBody struct {
+	AuthorityId string                                  `json:"authority_id"`
+	Key         string                                  `json:"key"`
+	KeyEpoch    int64                                   `json:"key_epoch"`
+	ObservedAt  int64                                   `json:"observed_at"`
+	RevokedFrom *int64                                  `json:"revoked_from"`
+	Schema      FindingFindingAuthorityStatusBodySchema `json:"schema"`
+	StatusRef   string                                  `json:"status_ref"`
+}
+
+// FindingFindingAuthorityStatusBodySchema defines model for FindingFindingAuthorityStatusBody.Schema.
+type FindingFindingAuthorityStatusBodySchema string
+
+// FindingFindingBody defines model for FindingFindingBody.
+type FindingFindingBody struct {
+	BondRef    string `json:"bond_ref"`
+	Descriptor struct {
+		ContextSha256 string `json:"context_sha256"`
+		OutcomeClass  string `json:"outcome_class"`
+		Topic         string `json:"topic"`
+	} `json:"descriptor"`
+	EvidenceCheckpointRef string `json:"evidence_checkpoint_ref"`
+	EvidenceClass         string `json:"evidence_class"`
+	EvidenceCost          struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"evidence_cost"`
+	EvidenceReceiptIds   []string                 `json:"evidence_receipt_ids"`
+	ExpiresAt            int64                    `json:"expires_at"`
+	FindingId            string                   `json:"finding_id"`
+	GuaranteeClass       string                   `json:"guarantee_class"`
+	IssuedAt             int64                    `json:"issued_at"`
+	Issuer               string                   `json:"issuer"`
+	PayloadMediaType     string                   `json:"payload_media_type"`
+	PayloadSha256        string                   `json:"payload_sha256"`
+	PriceHintRef         *string                  `json:"price_hint_ref,omitempty"`
+	ReplayRecipeSha256   *string                  `json:"replay_recipe_sha256,omitempty"`
+	RuntimeAssuranceTier *string                  `json:"runtime_assurance_tier,omitempty"`
+	Schema               FindingFindingBodySchema `json:"schema"`
+	Signature            string                   `json:"signature"`
+	StatusFeedRef        string                   `json:"status_feed_ref"`
+}
+
+// FindingFindingBodySchema defines model for FindingFindingBody.Schema.
+type FindingFindingBodySchema string
+
+// FindingFindingBondBackingBody defines model for FindingFindingBondBackingBody.
+type FindingFindingBondBackingBody struct {
+	AllocationId                string `json:"allocation_id"`
+	AppealHorizonSecs           int64  `json:"appeal_horizon_secs"`
+	AuditHorizonSecs            int64  `json:"audit_horizon_secs"`
+	AuthorizationEnvelopeSha256 string `json:"authorization_envelope_sha256"`
+	BondClass                   string `json:"bond_class"`
+	ClaimHorizonSecs            int64  `json:"claim_horizon_secs"`
+	CollateralAuthority         string `json:"collateral_authority"`
+	ExpiresAt                   int64  `json:"expires_at"`
+	FeeRequirementSha256        string `json:"fee_requirement_sha256"`
+	FeeScheduleEnvelopeSha256   string `json:"fee_schedule_envelope_sha256"`
+	FindingId                   string `json:"finding_id"`
+	IssuedAt                    int64  `json:"issued_at"`
+	ListingId                   string `json:"listing_id"`
+	LockedAmount                struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"locked_amount"`
+	MaximumSaleExposure struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"maximum_sale_exposure"`
+	ProfileEnvelopeSha256 string                              `json:"profile_envelope_sha256"`
+	Schema                FindingFindingBondBackingBodySchema `json:"schema"`
+	Seller                string                              `json:"seller"`
+	SettlementBufferSecs  int64                               `json:"settlement_buffer_secs"`
+	TermsEnvelopeSha256   string                              `json:"terms_envelope_sha256"`
+	Vault                 struct {
+		VenueLedger struct {
+			LedgerAccount string `json:"ledger_account"`
+			OperatorEpoch int64  `json:"operator_epoch"`
+		} `json:"venue_ledger"`
+	} `json:"vault"`
+}
+
+// FindingFindingBondBackingBodySchema defines model for FindingFindingBondBackingBody.Schema.
+type FindingFindingBondBackingBodySchema string
+
+// FindingFindingChallengeBody defines model for FindingFindingChallengeBody.
+type FindingFindingChallengeBody struct {
+	AffectedDeliveries []struct {
+		CheckpointRef    string `json:"checkpoint_ref"`
+		CheckpointSha256 string `json:"checkpoint_sha256"`
+		ReceiptId        string `json:"receipt_id"`
+		ReceiptSha256    string `json:"receipt_sha256"`
+	} `json:"affected_deliveries"`
+	Authorization struct {
+		BuyerSubmission *struct {
+			Challenger         string `json:"challenger"`
+			DisputeFeeTerminal struct {
+				Amount struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"amount"`
+				BeneficiaryPoolPrincipalId string `json:"beneficiary_pool_principal_id"`
+				Event                      string `json:"event"`
+				FeeScheduleEnvelopeSha256  string `json:"fee_schedule_envelope_sha256"`
+				Payer                      string `json:"payer"`
+				RailDestination            string `json:"rail_destination"`
+			} `json:"dispute_fee_terminal"`
+			DisputeLockRef struct {
+				Amount struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"amount"`
+				Class                     string `json:"class"`
+				Expiry                    int64  `json:"expiry"`
+				FeeScheduleEnvelopeSha256 string `json:"fee_schedule_envelope_sha256"`
+				LockId                    string `json:"lock_id"`
+			} `json:"dispute_lock_ref"`
+			Standing struct {
+				FailedDelivery struct {
+					FailedDeliveryEnvelopeSha256 string `json:"failed_delivery_envelope_sha256"`
+					FailedDeliveryId             string `json:"failed_delivery_id"`
+				} `json:"failed_delivery"`
+			} `json:"standing"`
+		} `json:"buyer_submission,omitempty"`
+		VenueAudit *struct {
+			AuditEpochEnvelopeSha256 string `json:"audit_epoch_envelope_sha256"`
+			AuthorizationDigest      string `json:"authorization_digest"`
+			SelectionDigest          string `json:"selection_digest"`
+		} `json:"venue_audit,omitempty"`
+	} `json:"authorization"`
+	BackingEnvelopeSha256 string `json:"backing_envelope_sha256"`
+	ChallengeId           string `json:"challenge_id"`
+	Evidence              struct {
+		DigestMismatch *struct {
+			DenyCheckpointRef struct {
+				CheckpointRef    string `json:"checkpoint_ref"`
+				CheckpointSha256 string `json:"checkpoint_sha256"`
+			} `json:"deny_checkpoint_ref"`
+			DenyReceiptRef struct {
+				ReceiptId     string `json:"receipt_id"`
+				ReceiptSha256 string `json:"receipt_sha256"`
+			} `json:"deny_receipt_ref"`
+			FailedDeliveryEnvelopeSha256 string `json:"failed_delivery_envelope_sha256"`
+		} `json:"digest_mismatch,omitempty"`
+		EvidenceInvalid *struct {
+			ChallengedCheckpointRef struct {
+				CheckpointRef    string `json:"checkpoint_ref"`
+				CheckpointSha256 string `json:"checkpoint_sha256"`
+			} `json:"challenged_checkpoint_ref"`
+			ChallengedEvidenceReceiptRefs []struct {
+				ReceiptId     string `json:"receipt_id"`
+				ReceiptSha256 string `json:"receipt_sha256"`
+			} `json:"challenged_evidence_receipt_refs"`
+			PurchaseRecordEnvelopeSha256 string `json:"purchase_record_envelope_sha256"`
+		} `json:"evidence_invalid,omitempty"`
+	} `json:"evidence"`
+	FiledAt                      int64                             `json:"filed_at"`
+	FindingArtifactSha256        string                            `json:"finding_artifact_sha256"`
+	FindingId                    string                            `json:"finding_id"`
+	ListingId                    string                            `json:"listing_id"`
+	ProfileEnvelopeSha256        string                            `json:"profile_envelope_sha256"`
+	Schema                       FindingFindingChallengeBodySchema `json:"schema"`
+	TermsEnvelopeSha256          string                            `json:"terms_envelope_sha256"`
+	VenueAdmissionEnvelopeSha256 string                            `json:"venue_admission_envelope_sha256"`
+}
+
+// FindingFindingChallengeBodySchema defines model for FindingFindingChallengeBody.Schema.
+type FindingFindingChallengeBodySchema string
+
+// FindingFindingChallengeEnforcementBody defines model for FindingFindingChallengeEnforcementBody.
+type FindingFindingChallengeEnforcementBody struct {
+	Amount struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"amount"`
+	BondSnapshotEnvelopeSha256 string `json:"bond_snapshot_envelope_sha256"`
+	Destinations               []struct {
+		Amount struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"amount"`
+		Destination string `json:"destination"`
+	} `json:"destinations"`
+	DeterministicAllocationDigest string `json:"deterministic_allocation_digest"`
+	EffectIntents                 []struct {
+		IntentId string `json:"intent_id"`
+		Kind     string `json:"kind"`
+	} `json:"effect_intents"`
+	EnforcementId                   string                                       `json:"enforcement_id"`
+	FinalizationAuthorityId         string                                       `json:"finalization_authority_id"`
+	FinalizationKey                 string                                       `json:"finalization_key"`
+	FinalizationKeyEpoch            int64                                        `json:"finalization_key_epoch"`
+	FinalizationRevocationStatusRef string                                       `json:"finalization_revocation_status_ref"`
+	FinalizationValidFrom           int64                                        `json:"finalization_valid_from"`
+	FinalizationValidUntil          int64                                        `json:"finalization_valid_until"`
+	FinalizedAt                     int64                                        `json:"finalized_at"`
+	FindingId                       string                                       `json:"finding_id"`
+	LiabilityKey                    string                                       `json:"liability_key"`
+	ListingId                       string                                       `json:"listing_id"`
+	OutcomeEnvelopeSha256           string                                       `json:"outcome_envelope_sha256"`
+	OutcomeId                       string                                       `json:"outcome_id"`
+	PenaltyAuthorityId              string                                       `json:"penalty_authority_id"`
+	PenaltyEnvelopeSha256           string                                       `json:"penalty_envelope_sha256"`
+	PenaltyKey                      string                                       `json:"penalty_key"`
+	PenaltyKeyEpoch                 int64                                        `json:"penalty_key_epoch"`
+	PenaltyRevocationStatusRef      string                                       `json:"penalty_revocation_status_ref"`
+	PenaltyValidFrom                int64                                        `json:"penalty_valid_from"`
+	PenaltyValidUntil               int64                                        `json:"penalty_valid_until"`
+	PurchaseSnapshotDigest          string                                       `json:"purchase_snapshot_digest"`
+	Schema                          FindingFindingChallengeEnforcementBodySchema `json:"schema"`
+	SellerAllocationId              string                                       `json:"seller_allocation_id"`
+	Vault                           struct {
+		ChainId       string `json:"chain_id"`
+		VaultContract string `json:"vault_contract"`
+		VaultId       string `json:"vault_id"`
+	} `json:"vault"`
+}
+
+// FindingFindingChallengeEnforcementBodySchema defines model for FindingFindingChallengeEnforcementBody.Schema.
+type FindingFindingChallengeEnforcementBodySchema string
+
+// FindingFindingChallengeOutcomeBody defines model for FindingFindingChallengeOutcomeBody.
+type FindingFindingChallengeOutcomeBody struct {
+	AuditEpochEnvelopeSha256     *string `json:"audit_epoch_envelope_sha256,omitempty"`
+	Authorization                string  `json:"authorization"`
+	BackingAllocationId          string  `json:"backing_allocation_id"`
+	ChallengeEnvelopeSha256      string  `json:"challenge_envelope_sha256"`
+	EvaluatedAt                  int64   `json:"evaluated_at"`
+	EvaluatorAuthorityId         string  `json:"evaluator_authority_id"`
+	EvaluatorKey                 string  `json:"evaluator_key"`
+	EvaluatorKeyEpoch            int64   `json:"evaluator_key_epoch"`
+	EvaluatorRevocationStatusRef string  `json:"evaluator_revocation_status_ref"`
+	EvaluatorValidFrom           int64   `json:"evaluator_valid_from"`
+	EvaluatorValidUntil          int64   `json:"evaluator_valid_until"`
+	EvidenceBundleDigest         string  `json:"evidence_bundle_digest"`
+	EvidenceKind                 string  `json:"evidence_kind"`
+	Facet                        struct {
+		DigestMismatch *struct {
+			CommittedPayloadSha256 string `json:"committed_payload_sha256"`
+			DeliveredOutputSha256  string `json:"delivered_output_sha256"`
+			RealizedSpendUnits     int64  `json:"realized_spend_units"`
+			TransformProfile       string `json:"transform_profile"`
+		} `json:"digest_mismatch,omitempty"`
+		EvidenceInvalid *struct {
+			ChallengedReceiptIds []string `json:"challenged_receipt_ids"`
+			Invalidity           string   `json:"invalidity"`
+		} `json:"evidence_invalid,omitempty"`
+		ReplayContradiction *struct {
+			ObservationDigests []string `json:"observation_digests"`
+			Predicate          string   `json:"predicate"`
+			PredicateResult    string   `json:"predicate_result"`
+			RecipeSha256       string   `json:"recipe_sha256"`
+			ReplayRunId        string   `json:"replay_run_id"`
+		} `json:"replay_contradiction,omitempty"`
+	} `json:"facet"`
+	FindingId          string `json:"finding_id"`
+	ListingId          string `json:"listing_id"`
+	OutcomeId          string `json:"outcome_id"`
+	PenaltyCalculation *struct {
+		BaseFindingStakeUnits        int64 `json:"base_finding_stake_units"`
+		ComputedExposureUnits        int64 `json:"computed_exposure_units"`
+		ListingRequiredAmountUnits   int64 `json:"listing_required_amount_units"`
+		LiveAllocatedCollateralUnits int64 `json:"live_allocated_collateral_units"`
+		OpenPerSaleEncumbranceUnits  int64 `json:"open_per_sale_encumbrance_units"`
+		PenaltyAmount                struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"penalty_amount"`
+	} `json:"penalty_calculation,omitempty"`
+	Reason                        string                                   `json:"reason"`
+	RetryDeadline                 *int64                                   `json:"retry_deadline,omitempty"`
+	Schema                        FindingFindingChallengeOutcomeBodySchema `json:"schema"`
+	TriggerDigest                 string                                   `json:"trigger_digest"`
+	Verdict                       string                                   `json:"verdict"`
+	VerifierProfileEnvelopeSha256 string                                   `json:"verifier_profile_envelope_sha256"`
+}
+
+// FindingFindingChallengeOutcomeBodySchema defines model for FindingFindingChallengeOutcomeBody.Schema.
+type FindingFindingChallengeOutcomeBodySchema string
+
+// FindingFindingChallengeVerifierProfileBody defines model for FindingFindingChallengeVerifierProfileBody.
+type FindingFindingChallengeVerifierProfileBody struct {
+	AllowedPredicates      []string `json:"allowed_predicates"`
+	AllowedRunnerManifests []string `json:"allowed_runner_manifests"`
+	BbsProjectionIssuer    struct {
+		IssuerFingerprint   string `json:"issuer_fingerprint"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		KeyHex              string `json:"key_hex"`
+		RegistryRef         string `json:"registry_ref"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"bbs_projection_issuer"`
+	CheckpointLogs []struct {
+		LogId  string `json:"log_id"`
+		Signer struct {
+			AuthorityId         string `json:"authority_id"`
+			Key                 string `json:"key"`
+			KeyEpoch            int64  `json:"key_epoch"`
+			RevocationStatusRef string `json:"revocation_status_ref"`
+			RotationPolicyRef   string `json:"rotation_policy_ref"`
+			ValidFrom           int64  `json:"valid_from"`
+			ValidUntil          int64  `json:"valid_until"`
+		} `json:"signer"`
+	} `json:"checkpoint_logs"`
+	ExpiresAt               int64 `json:"expires_at"`
+	FailedDeliveryAuthority struct {
+		AuthorityId         string `json:"authority_id"`
+		Key                 string `json:"key"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		RotationPolicyRef   string `json:"rotation_policy_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"failed_delivery_authority"`
+	GovernanceAuthority string `json:"governance_authority"`
+	IssuedAt            int64  `json:"issued_at"`
+	Operator            string `json:"operator"`
+	PredicateEngine     string `json:"predicate_engine"`
+	ProfileId           string `json:"profile_id"`
+	PurchaseAuthority   struct {
+		AuthorityId         string `json:"authority_id"`
+		Key                 string `json:"key"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		RotationPolicyRef   string `json:"rotation_policy_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"purchase_authority"`
+	ReceiptSigners []struct {
+		Policy struct {
+			AuthorityId         string `json:"authority_id"`
+			Key                 string `json:"key"`
+			KeyEpoch            int64  `json:"key_epoch"`
+			RevocationStatusRef string `json:"revocation_status_ref"`
+			RotationPolicyRef   string `json:"rotation_policy_ref"`
+			ValidFrom           int64  `json:"valid_from"`
+			ValidUntil          int64  `json:"valid_until"`
+		} `json:"policy"`
+		Role string `json:"role"`
+	} `json:"receipt_signers"`
+	RequiredFacets           []string `json:"required_facets"`
+	RequiredReceiptSemantics string   `json:"required_receipt_semantics"`
+	ResolverPolicyRef        string   `json:"resolver_policy_ref"`
+	ResourceCaps             struct {
+		MaxEvidenceReceipts int64 `json:"max_evidence_receipts"`
+		MaxMemoryBytes      int64 `json:"max_memory_bytes"`
+		MaxRecipeBytes      int64 `json:"max_recipe_bytes"`
+		MaxRuntimeSecs      int64 `json:"max_runtime_secs"`
+	} `json:"resource_caps"`
+	RetentionPolicyRef   string                                           `json:"retention_policy_ref"`
+	Schema               FindingFindingChallengeVerifierProfileBodySchema `json:"schema"`
+	VerifierReportSigner struct {
+		AuthorityId         string `json:"authority_id"`
+		Key                 string `json:"key"`
+		KeyEpoch            int64  `json:"key_epoch"`
+		RevocationStatusRef string `json:"revocation_status_ref"`
+		RotationPolicyRef   string `json:"rotation_policy_ref"`
+		ValidFrom           int64  `json:"valid_from"`
+		ValidUntil          int64  `json:"valid_until"`
+	} `json:"verifier_report_signer"`
+}
+
+// FindingFindingChallengeVerifierProfileBodySchema defines model for FindingFindingChallengeVerifierProfileBody.Schema.
+type FindingFindingChallengeVerifierProfileBodySchema string
+
+// FindingFindingClaimAllocationBody defines model for FindingFindingClaimAllocationBody.
+type FindingFindingClaimAllocationBody struct {
+	AllocationId                  string `json:"allocation_id"`
+	BuyerPoolUnits                int64  `json:"buyer_pool_units"`
+	CommunityFundUnits            int64  `json:"community_fund_units"`
+	CutoffSlot                    int64  `json:"cutoff_slot"`
+	DeterministicAllocationSha256 string `json:"deterministic_allocation_sha256"`
+	Entries                       []struct {
+		AmountUnits     int64  `json:"amount_units"`
+		BeneficiaryKind string `json:"beneficiary_kind"`
+		Destination     string `json:"destination"`
+	} `json:"entries"`
+	LiabilityKey           string                                  `json:"liability_key"`
+	PurchaseSnapshotSha256 string                                  `json:"purchase_snapshot_sha256"`
+	RecordedAt             int64                                   `json:"recorded_at"`
+	Schema                 FindingFindingClaimAllocationBodySchema `json:"schema"`
+	Slash                  struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"slash"`
+	TotalRealizedSpendUnits int64 `json:"total_realized_spend_units"`
+}
+
+// FindingFindingClaimAllocationBodySchema defines model for FindingFindingClaimAllocationBody.Schema.
+type FindingFindingClaimAllocationBodySchema string
+
+// FindingFindingFailedDeliveryBody defines model for FindingFindingFailedDeliveryBody.
+type FindingFindingFailedDeliveryBody struct {
+	AcceptedBidEnvelopeSha256       string                                 `json:"accepted_bid_envelope_sha256"`
+	AuthoritativePaymentOperationId string                                 `json:"authoritative_payment_operation_id"`
+	Buyer                           string                                 `json:"buyer"`
+	Currency                        string                                 `json:"currency"`
+	DenyCheckpointRef               string                                 `json:"deny_checkpoint_ref"`
+	DenyCheckpointSha256            string                                 `json:"deny_checkpoint_sha256"`
+	DenyReceiptId                   string                                 `json:"deny_receipt_id"`
+	DenyReceiptSha256               string                                 `json:"deny_receipt_sha256"`
+	FailedDeliveryId                string                                 `json:"failed_delivery_id"`
+	FindingId                       string                                 `json:"finding_id"`
+	HoldAttemptReference            string                                 `json:"hold_attempt_reference"`
+	ListingId                       string                                 `json:"listing_id"`
+	PayoutEligible                  bool                                   `json:"payout_eligible"`
+	PurchaseIntentId                string                                 `json:"purchase_intent_id"`
+	RealizedSpendUnits              int64                                  `json:"realized_spend_units"`
+	RecordedAt                      int64                                  `json:"recorded_at"`
+	ReleaseTerminal                 string                                 `json:"release_terminal"`
+	ReservationId                   string                                 `json:"reservation_id"`
+	Schema                          FindingFindingFailedDeliveryBodySchema `json:"schema"`
+	SellerBackingEnvelopeSha256     string                                 `json:"seller_backing_envelope_sha256"`
+	VenueAdmissionEnvelopeSha256    string                                 `json:"venue_admission_envelope_sha256"`
+}
+
+// FindingFindingFailedDeliveryBodySchema defines model for FindingFindingFailedDeliveryBody.Schema.
+type FindingFindingFailedDeliveryBodySchema string
+
+// FindingFindingFinalizedBondSnapshotBody defines model for FindingFindingFinalizedBondSnapshotBody.
+type FindingFindingFinalizedBondSnapshotBody struct {
+	AllocationId           string                                                   `json:"allocation_id"`
+	BlockHash              string                                                   `json:"block_hash"`
+	BlockNumber            int64                                                    `json:"block_number"`
+	ChainId                string                                                   `json:"chain_id"`
+	Currency               string                                                   `json:"currency"`
+	FinalityPolicy         string                                                   `json:"finality_policy"`
+	HeldAmount             int64                                                    `json:"held_amount"`
+	IdentityRegistryRecord string                                                   `json:"identity_registry_record"`
+	LockedAmount           int64                                                    `json:"locked_amount"`
+	ObservedAt             int64                                                    `json:"observed_at"`
+	ObservedFinality       FindingFindingFinalizedBondSnapshotBody_ObservedFinality `json:"observed_finality"`
+	OperatorKeyEpoch       int64                                                    `json:"operator_key_epoch"`
+	OperatorKeyHash        string                                                   `json:"operator_key_hash"`
+	Schema                 FindingFindingFinalizedBondSnapshotBodySchema            `json:"schema"`
+	Seller                 string                                                   `json:"seller"`
+	SlashedAmount          int64                                                    `json:"slashed_amount"`
+	SnapshotId             string                                                   `json:"snapshot_id"`
+	VaultContract          string                                                   `json:"vault_contract"`
+	VaultId                string                                                   `json:"vault_id"`
+}
+
+// FindingFindingFinalizedBondSnapshotBodyObservedFinality0 defines model for .
+type FindingFindingFinalizedBondSnapshotBodyObservedFinality0 = string
+
+// FindingFindingFinalizedBondSnapshotBodyObservedFinality1 defines model for .
+type FindingFindingFinalizedBondSnapshotBodyObservedFinality1 struct {
+	Confirmations struct {
+		Depth int64 `json:"depth"`
+	} `json:"confirmations"`
+}
+
+// FindingFindingFinalizedBondSnapshotBody_ObservedFinality defines model for FindingFindingFinalizedBondSnapshotBody.ObservedFinality.
+type FindingFindingFinalizedBondSnapshotBody_ObservedFinality struct {
+	union json.RawMessage
+}
+
+// FindingFindingFinalizedBondSnapshotBodySchema defines model for FindingFindingFinalizedBondSnapshotBody.Schema.
+type FindingFindingFinalizedBondSnapshotBodySchema string
+
+// FindingFindingKeyRevocationBody defines model for FindingFindingKeyRevocationBody.
+type FindingFindingKeyRevocationBody struct {
+	AuthorityId         string                                `json:"authority_id"`
+	Key                 string                                `json:"key"`
+	KeyEpoch            int64                                 `json:"key_epoch"`
+	RecordedAt          int64                                 `json:"recorded_at"`
+	RevocationStatusRef string                                `json:"revocation_status_ref"`
+	RevokedFrom         int64                                 `json:"revoked_from"`
+	Schema              FindingFindingKeyRevocationBodySchema `json:"schema"`
+}
+
+// FindingFindingKeyRevocationBodySchema defines model for FindingFindingKeyRevocationBody.Schema.
+type FindingFindingKeyRevocationBodySchema string
+
+// FindingFindingLiabilityBody defines model for FindingFindingLiabilityBody.
+type FindingFindingLiabilityBody struct {
+	BackingAllocationId string                            `json:"backing_allocation_id"`
+	ChainId             string                            `json:"chain_id"`
+	DefectKey           string                            `json:"defect_key"`
+	FindingId           string                            `json:"finding_id"`
+	LiabilityKey        string                            `json:"liability_key"`
+	ListingId           string                            `json:"listing_id"`
+	OpenedAt            int64                             `json:"opened_at"`
+	Schema              FindingFindingLiabilityBodySchema `json:"schema"`
+	Seller              string                            `json:"seller"`
+	State               string                            `json:"state"`
+	UpdatedAt           int64                             `json:"updated_at"`
+	VaultContract       string                            `json:"vault_contract"`
+	VaultId             string                            `json:"vault_id"`
+	VenueId             string                            `json:"venue_id"`
+}
+
+// FindingFindingLiabilityBodySchema defines model for FindingFindingLiabilityBody.Schema.
+type FindingFindingLiabilityBodySchema string
+
+// FindingFindingMarketTermsBody defines model for FindingFindingMarketTermsBody.
+type FindingFindingMarketTermsBody struct {
+	AppealWindowSecs     int64 `json:"appeal_window_secs"`
+	AuditEligible        bool  `json:"audit_eligible"`
+	AuditEpochLengthSecs int64 `json:"audit_epoch_length_secs"`
+	BackingRequirement   struct {
+		BaseFindingStake struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"base_finding_stake"`
+		CollateralPolicy    string `json:"collateral_policy"`
+		MaximumSaleExposure struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"maximum_sale_exposure"`
+	} `json:"backing_requirement"`
+	ChallengeBondLimits []struct {
+		GuaranteeClass string `json:"guarantee_class"`
+		MaxBond        struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"max_bond"`
+		MinBond struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"min_bond"`
+	} `json:"challenge_bond_limits"`
+	ClaimWindowSecs               int64                               `json:"claim_window_secs"`
+	DecisionRuleRefs              []string                            `json:"decision_rule_refs"`
+	ExpiresAt                     int64                               `json:"expires_at"`
+	FilingWindowSecs              int64                               `json:"filing_window_secs"`
+	FindingArtifactSha256         string                              `json:"finding_artifact_sha256"`
+	FindingId                     string                              `json:"finding_id"`
+	IssuedAt                      int64                               `json:"issued_at"`
+	ListingId                     string                              `json:"listing_id"`
+	PayoutPolicy                  string                              `json:"payout_policy"`
+	Schema                        FindingFindingMarketTermsBodySchema `json:"schema"`
+	Seller                        string                              `json:"seller"`
+	TermsId                       string                              `json:"terms_id"`
+	VerifierProfileEnvelopeSha256 string                              `json:"verifier_profile_envelope_sha256"`
+}
+
+// FindingFindingMarketTermsBodySchema defines model for FindingFindingMarketTermsBody.Schema.
+type FindingFindingMarketTermsBodySchema string
+
+// FindingFindingPoolAllocationBody defines model for FindingFindingPoolAllocationBody.
+type FindingFindingPoolAllocationBody struct {
+	AllocationId             string                                 `json:"allocation_id"`
+	AmountUnits              string                                 `json:"amount_units"`
+	Authority                string                                 `json:"authority"`
+	Currency                 string                                 `json:"currency"`
+	ExpiresAtUnixMs          int64                                  `json:"expires_at_unix_ms"`
+	GraphId                  string                                 `json:"graph_id"`
+	IssuedAtUnixMs           int64                                  `json:"issued_at_unix_ms"`
+	LedgerDomain             string                                 `json:"ledger_domain"`
+	LedgerStoreBindingSha256 string                                 `json:"ledger_store_binding_sha256"`
+	Nonce                    string                                 `json:"nonce"`
+	PoolId                   string                                 `json:"pool_id"`
+	PoolSha256               string                                 `json:"pool_sha256"`
+	PurchaserId              string                                 `json:"purchaser_id"`
+	PurchaserKey             string                                 `json:"purchaser_key"`
+	Purpose                  string                                 `json:"purpose"`
+	Schema                   FindingFindingPoolAllocationBodySchema `json:"schema"`
+}
+
+// FindingFindingPoolAllocationBodySchema defines model for FindingFindingPoolAllocationBody.Schema.
+type FindingFindingPoolAllocationBodySchema string
+
+// FindingFindingPurchaseRecordBody defines model for FindingFindingPurchaseRecordBody.
+type FindingFindingPurchaseRecordBody struct {
+	AcceptedBidEnvelopeSha256 string `json:"accepted_bid_envelope_sha256"`
+	AcceptedPrice             struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"accepted_price"`
+	AuthoritativePaymentOperationId string `json:"authoritative_payment_operation_id"`
+	Buyer                           string `json:"buyer"`
+	DeliveryReceiptId               string `json:"delivery_receipt_id"`
+	EncumbranceId                   string `json:"encumbrance_id"`
+	FindingId                       string `json:"finding_id"`
+	ListingId                       string `json:"listing_id"`
+	Payer                           string `json:"payer"`
+	PaymentReference                string `json:"payment_reference"`
+	PayoutDestination               string `json:"payout_destination"`
+	PurchaseIntentId                string `json:"purchase_intent_id"`
+	PurchaseKey                     string `json:"purchase_key"`
+	RealizedSpend                   struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"realized_spend"`
+	RecordedAt                   int64                                  `json:"recorded_at"`
+	Schema                       FindingFindingPurchaseRecordBodySchema `json:"schema"`
+	SellerBackingEnvelopeSha256  string                                 `json:"seller_backing_envelope_sha256"`
+	VenueAdmissionEnvelopeSha256 string                                 `json:"venue_admission_envelope_sha256"`
+}
+
+// FindingFindingPurchaseRecordBodySchema defines model for FindingFindingPurchaseRecordBody.Schema.
+type FindingFindingPurchaseRecordBodySchema string
+
+// FindingFindingPurchaseResultBody defines model for FindingFindingPurchaseResultBody.
+type FindingFindingPurchaseResultBody struct {
+	AcceptedPrice struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"accepted_price"`
+	AuthoritativePaymentOperationId string  `json:"authoritative_payment_operation_id"`
+	DeliveryReceiptSha256           string  `json:"delivery_receipt_sha256"`
+	FailedDeliverySha256            *string `json:"failed_delivery_sha256,omitempty"`
+	FindingId                       string  `json:"finding_id"`
+	OutputSha256                    *string `json:"output_sha256,omitempty"`
+	Payer                           string  `json:"payer"`
+	PurchaseIntentId                string  `json:"purchase_intent_id"`
+	PurchaseRecordSha256            *string `json:"purchase_record_sha256,omitempty"`
+	RealizedSpend                   struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"realized_spend"`
+	RecordedAt    int64                                  `json:"recorded_at"`
+	RequestId     string                                 `json:"request_id"`
+	ReservationId string                                 `json:"reservation_id"`
+	ResultId      string                                 `json:"result_id"`
+	Schema        FindingFindingPurchaseResultBodySchema `json:"schema"`
+	Settlement    string                                 `json:"settlement"`
+	Verdict       string                                 `json:"verdict"`
+}
+
+// FindingFindingPurchaseResultBodySchema defines model for FindingFindingPurchaseResultBody.Schema.
+type FindingFindingPurchaseResultBodySchema string
+
+// FindingFindingSellerAuthorizationBody defines model for FindingFindingSellerAuthorizationBody.
+type FindingFindingSellerAuthorizationBody struct {
+	AuthorizationId       string `json:"authorization_id"`
+	ExpiresAt             int64  `json:"expires_at"`
+	FindingArtifactSha256 string `json:"finding_artifact_sha256"`
+	FindingId             string `json:"finding_id"`
+	IssuedAt              int64  `json:"issued_at"`
+	Issuer                string `json:"issuer"`
+	ListingId             string `json:"listing_id"`
+	Payee                 struct {
+		Beneficiary struct {
+			Currency    string `json:"currency"`
+			Destination string `json:"destination"`
+		} `json:"beneficiary"`
+	} `json:"payee"`
+	ProviderServerId    string                                      `json:"provider_server_id"`
+	ProviderTool        string                                      `json:"provider_tool"`
+	RevocationStatusRef string                                      `json:"revocation_status_ref"`
+	Schema              FindingFindingSellerAuthorizationBodySchema `json:"schema"`
+	Seller              string                                      `json:"seller"`
+}
+
+// FindingFindingSellerAuthorizationBodySchema defines model for FindingFindingSellerAuthorizationBody.Schema.
+type FindingFindingSellerAuthorizationBodySchema string
+
+// FindingFindingStatusEpochBody defines model for FindingFindingStatusEpochBody.
+type FindingFindingStatusEpochBody struct {
+	AnchorRefs         []string                            `json:"anchor_refs"`
+	BranchDomain       string                              `json:"branch_domain"`
+	EmptyLeafDomain    string                              `json:"empty_leaf_domain"`
+	EmptyLeafHash      string                              `json:"empty_leaf_hash"`
+	FeedId             string                              `json:"feed_id"`
+	GeneratedAt        int64                               `json:"generated_at"`
+	HashAlgorithm      string                              `json:"hash_algorithm"`
+	KeyDomainNonce     int64                               `json:"key_domain_nonce"`
+	KeyHashDomain      string                              `json:"key_hash_domain"`
+	MapEpoch           int64                               `json:"map_epoch"`
+	OccupiedLeafDomain string                              `json:"occupied_leaf_domain"`
+	OperatorId         string                              `json:"operator_id"`
+	OperatorKey        string                              `json:"operator_key"`
+	OperatorKeyEpoch   int64                               `json:"operator_key_epoch"`
+	ProofSemantics     string                              `json:"proof_semantics"`
+	RootHash           string                              `json:"root_hash"`
+	Schema             FindingFindingStatusEpochBodySchema `json:"schema"`
+	StatusEpochId      string                              `json:"status_epoch_id"`
+	StatusMapVersion   string                              `json:"status_map_version"`
+	TreeDepth          int64                               `json:"tree_depth"`
+	ValidFrom          int64                               `json:"valid_from"`
+	ValidUntil         int64                               `json:"valid_until"`
+}
+
+// FindingFindingStatusEpochBodySchema defines model for FindingFindingStatusEpochBody.Schema.
+type FindingFindingStatusEpochBodySchema string
+
+// FindingFindingVerifiedFixSubmissionBody defines model for FindingFindingVerifiedFixSubmissionBody.
+type FindingFindingVerifiedFixSubmissionBody struct {
+	ActivationSha256  string                                        `json:"activation_sha256"`
+	FindingId         string                                        `json:"finding_id"`
+	ProofBundleSha256 string                                        `json:"proof_bundle_sha256"`
+	Schema            FindingFindingVerifiedFixSubmissionBodySchema `json:"schema"`
+	Seller            string                                        `json:"seller"`
+	SubmissionId      string                                        `json:"submission_id"`
+	SubmittedAt       int64                                         `json:"submitted_at"`
+}
+
+// FindingFindingVerifiedFixSubmissionBodySchema defines model for FindingFindingVerifiedFixSubmissionBody.Schema.
+type FindingFindingVerifiedFixSubmissionBodySchema string
+
+// FindingFindingVerifierReportBody defines model for FindingFindingVerifierReportBody.
+type FindingFindingVerifierReportBody struct {
+	BackingAllocationId *string `json:"backing_allocation_id,omitempty"`
+	EvaluationTime      int64   `json:"evaluation_time"`
+	Facets              []struct {
+		Facet   string `json:"facet"`
+		Outcome string `json:"outcome"`
+		Reason  string `json:"reason"`
+	} `json:"facets"`
+	FindingArtifactSha256 string `json:"finding_artifact_sha256"`
+	FindingDelivery       *struct {
+		AcceptedBidEnvelopeSha256       string `json:"accepted_bid_envelope_sha256"`
+		AuthoritativePaymentOperationId string `json:"authoritative_payment_operation_id"`
+		DigestCheck                     string `json:"digest_check"`
+		FindingId                       string `json:"finding_id"`
+		ListingId                       string `json:"listing_id"`
+		MediaTypeCheck                  string `json:"media_type_check"`
+		PurchaseIntentId                string `json:"purchase_intent_id"`
+		ReservationId                   string `json:"reservation_id"`
+		Schema                          string `json:"schema"`
+		SettlementMode                  string `json:"settlement_mode"`
+		TransformProfile                string `json:"transform_profile"`
+		VenueAdmissionEnvelopeSha256    string `json:"venue_admission_envelope_sha256"`
+	} `json:"finding_delivery,omitempty"`
+	FindingDeliveryReceiptId      *string                                `json:"finding_delivery_receipt_id,omitempty"`
+	FindingId                     string                                 `json:"finding_id"`
+	ReplayRecipeInputSha256       *string                                `json:"replay_recipe_input_sha256,omitempty"`
+	ReportId                      string                                 `json:"report_id"`
+	ResolvedEvidenceBundleSha256  string                                 `json:"resolved_evidence_bundle_sha256"`
+	ResolverPolicySha256          string                                 `json:"resolver_policy_sha256"`
+	Schema                        FindingFindingVerifierReportBodySchema `json:"schema"`
+	StatusProofInputSha256        *string                                `json:"status_proof_input_sha256,omitempty"`
+	TrustRootSnapshotSha256       string                                 `json:"trust_root_snapshot_sha256"`
+	TrustedTimeInputSha256        string                                 `json:"trusted_time_input_sha256"`
+	VerifierAuthority             string                                 `json:"verifier_authority"`
+	VerifierImplementationId      string                                 `json:"verifier_implementation_id"`
+	VerifierKeyEpoch              int64                                  `json:"verifier_key_epoch"`
+	VerifierProfileEnvelopeSha256 string                                 `json:"verifier_profile_envelope_sha256"`
+	VerifierProfileId             string                                 `json:"verifier_profile_id"`
+}
+
+// FindingFindingVerifierReportBodySchema defines model for FindingFindingVerifierReportBody.Schema.
+type FindingFindingVerifierReportBodySchema string
+
+// FindingFindingVoluntaryRetractionBody defines model for FindingFindingVoluntaryRetractionBody.
+type FindingFindingVoluntaryRetractionBody struct {
+	FindingId         string                                      `json:"finding_id"`
+	InclusionDeadline int64                                       `json:"inclusion_deadline"`
+	IntentId          string                                      `json:"intent_id"`
+	IssuedAt          int64                                       `json:"issued_at"`
+	Reason            string                                      `json:"reason"`
+	Schema            FindingFindingVoluntaryRetractionBodySchema `json:"schema"`
+	Seller            string                                      `json:"seller"`
+	StatusFeedRef     string                                      `json:"status_feed_ref"`
+}
+
+// FindingFindingVoluntaryRetractionBodySchema defines model for FindingFindingVoluntaryRetractionBody.Schema.
+type FindingFindingVoluntaryRetractionBodySchema string
 
 // FindingHostedAggregateCheckpoint defines model for FindingHostedAggregateCheckpoint.
 type FindingHostedAggregateCheckpoint struct {
@@ -9066,6 +13019,41 @@ type FindingPoolDebitAuthorization struct {
 // FindingPoolDebitAuthorizationSchema defines model for FindingPoolDebitAuthorization.Schema.
 type FindingPoolDebitAuthorizationSchema string
 
+// FindingRegistryMarketPenaltyBody defines model for FindingRegistryMarketPenaltyBody.
+type FindingRegistryMarketPenaltyBody struct {
+	AbuseClass   string  `json:"abuseClass"`
+	Action       string  `json:"action"`
+	ActivationId *string `json:"activationId,omitempty"`
+	BondClass    string  `json:"bondClass"`
+	CaseId       string  `json:"caseId"`
+	CharterId    string  `json:"charterId"`
+	EvidenceRefs []struct {
+		Kind        string  `json:"kind"`
+		ReferenceId string  `json:"referenceId"`
+		Sha256      *string `json:"sha256,omitempty"`
+	} `json:"evidenceRefs"`
+	ExpiresAt           *int64 `json:"expiresAt,omitempty"`
+	FeeScheduleId       string `json:"feeScheduleId"`
+	GoverningOperatorId string `json:"governingOperatorId"`
+	IssuedBy            string `json:"issuedBy"`
+	ListingId           string `json:"listingId"`
+	Namespace           string `json:"namespace"`
+	OpenedAt            int64  `json:"openedAt"`
+	PenaltyAmount       struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"penaltyAmount"`
+	PenaltyId           string                                 `json:"penaltyId"`
+	Schema              FindingRegistryMarketPenaltyBodySchema `json:"schema"`
+	State               string                                 `json:"state"`
+	SubjectOperatorId   *string                                `json:"subjectOperatorId,omitempty"`
+	SupersedesPenaltyId *string                                `json:"supersedesPenaltyId,omitempty"`
+	UpdatedAt           int64                                  `json:"updatedAt"`
+}
+
+// FindingRegistryMarketPenaltyBodySchema defines model for FindingRegistryMarketPenaltyBody.Schema.
+type FindingRegistryMarketPenaltyBodySchema string
+
 // FindingStatusIntentSubmission defines model for FindingStatusIntentSubmission.
 type FindingStatusIntentSubmission struct {
 	FeedId            string                              `json:"feed_id"`
@@ -9205,6 +13193,350 @@ type FindingWorkerCapability struct {
 // FindingWorkerCapabilitySchema defines model for FindingWorkerCapability.Schema.
 type FindingWorkerCapabilitySchema string
 
+// FiscalFiscalActivationBody defines model for FiscalFiscalActivationBody.
+type FiscalFiscalActivationBody struct {
+	ActivatedAt         int64  `json:"activatedAt"`
+	ActivationId        string `json:"activationId"`
+	ActivationNotBefore int64  `json:"activationNotBefore"`
+	AdmissionDigest     string `json:"admissionDigest"`
+	AdmissionId         string `json:"admissionId"`
+	ApprovalSetDigest   string `json:"approvalSetDigest"`
+	Approvals           []struct {
+		Body struct {
+			AdmissionDigest   string `json:"admissionDigest"`
+			AdmissionId       string `json:"admissionId"`
+			ApprovalExpiresAt int64  `json:"approvalExpiresAt"`
+			ApprovalId        string `json:"approvalId"`
+			ApprovedAt        int64  `json:"approvedAt"`
+			ProposalDigest    string `json:"proposalDigest"`
+			ProposalId        string `json:"proposalId"`
+			Schema            string `json:"schema"`
+			SignerKeyId       string `json:"signerKeyId"`
+		} `json:"body"`
+		Signature string `json:"signature"`
+		SignerKey string `json:"signerKey"`
+	} `json:"approvals"`
+	CharterDigest  string                           `json:"charterDigest"`
+	CharterId      string                           `json:"charterId"`
+	IssuedBy       string                           `json:"issuedBy"`
+	ProposalDigest string                           `json:"proposalDigest"`
+	ProposalId     string                           `json:"proposalId"`
+	Schema         FiscalFiscalActivationBodySchema `json:"schema"`
+	Target         struct {
+		Kind                     string  `json:"kind"`
+		PredecessorCharterDigest *string `json:"predecessorCharterDigest,omitempty"`
+		ScheduleId               *string `json:"scheduleId,omitempty"`
+		SuccessorCharterDigest   *string `json:"successorCharterDigest,omitempty"`
+		SuccessorSchedules       *[]struct {
+			Body struct {
+				CharterDigest string `json:"charterDigest"`
+				CharterId     string `json:"charterId"`
+				Domain        string `json:"domain"`
+				IssuedAt      int64  `json:"issuedAt"`
+				IssuedBy      string `json:"issuedBy"`
+				Params        struct {
+					Ceilings []struct {
+						Currency string `json:"currency"`
+						Units    int64  `json:"units"`
+					} `json:"ceilings"`
+					Kind string `json:"kind"`
+				} `json:"params"`
+				ScheduleId           string `json:"scheduleId"`
+				Schema               string `json:"schema"`
+				Sequence             int64  `json:"sequence"`
+				SupersedesScheduleId string `json:"supersedesScheduleId"`
+				ValidFrom            int64  `json:"validFrom"`
+				ValidUntil           int64  `json:"validUntil"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+			SignerKey string `json:"signerKey"`
+		} `json:"successorSchedules,omitempty"`
+		SupersedesScheduleId *string `json:"supersedesScheduleId,omitempty"`
+	} `json:"target"`
+}
+
+// FiscalFiscalActivationBodySchema defines model for FiscalFiscalActivationBody.Schema.
+type FiscalFiscalActivationBodySchema string
+
+// FiscalFiscalApprovalBody defines model for FiscalFiscalApprovalBody.
+type FiscalFiscalApprovalBody struct {
+	AdmissionDigest   string                         `json:"admissionDigest"`
+	AdmissionId       string                         `json:"admissionId"`
+	ApprovalExpiresAt int64                          `json:"approvalExpiresAt"`
+	ApprovalId        string                         `json:"approvalId"`
+	ApprovedAt        int64                          `json:"approvedAt"`
+	ProposalDigest    string                         `json:"proposalDigest"`
+	ProposalId        string                         `json:"proposalId"`
+	Schema            FiscalFiscalApprovalBodySchema `json:"schema"`
+	SignerKeyId       string                         `json:"signerKeyId"`
+}
+
+// FiscalFiscalApprovalBodySchema defines model for FiscalFiscalApprovalBody.Schema.
+type FiscalFiscalApprovalBodySchema string
+
+// FiscalFiscalCharterBody defines model for FiscalFiscalCharterBody.
+type FiscalFiscalCharterBody struct {
+	ApprovalThreshold        int64                         `json:"approvalThreshold"`
+	ApprovalTtlSeconds       int64                         `json:"approvalTtlSeconds"`
+	CharterId                string                        `json:"charterId"`
+	ExpiresAt                int64                         `json:"expiresAt"`
+	GovernedDomains          []string                      `json:"governedDomains"`
+	GoverningOperatorId      string                        `json:"governingOperatorId"`
+	IssuedAt                 int64                         `json:"issuedAt"`
+	IssuedBy                 string                        `json:"issuedBy"`
+	PredecessorCharterDigest *string                       `json:"predecessorCharterDigest,omitempty"`
+	ProposalTtlSeconds       int64                         `json:"proposalTtlSeconds"`
+	Schema                   FiscalFiscalCharterBodySchema `json:"schema"`
+	Sequence                 int64                         `json:"sequence"`
+	SignerSet                []struct {
+		KeyId     string `json:"keyId"`
+		PublicKey string `json:"publicKey"`
+	} `json:"signerSet"`
+	TimelockSeconds int64 `json:"timelockSeconds"`
+}
+
+// FiscalFiscalCharterBodySchema defines model for FiscalFiscalCharterBody.Schema.
+type FiscalFiscalCharterBodySchema string
+
+// FiscalFiscalConsumerReadinessBody defines model for FiscalFiscalConsumerReadinessBody.
+type FiscalFiscalConsumerReadinessBody struct {
+	AttestedAt            int64                                   `json:"attestedAt"`
+	GenesisPolicyDigest   string                                  `json:"genesisPolicyDigest"`
+	GenesisPolicyId       string                                  `json:"genesisPolicyId"`
+	GoverningOperatorId   string                                  `json:"governingOperatorId"`
+	ReadinessId           string                                  `json:"readinessId"`
+	ReadinessSequence     int64                                   `json:"readinessSequence"`
+	ReadyDomains          []string                                `json:"readyDomains"`
+	RuntimeRegistryDigest string                                  `json:"runtimeRegistryDigest"`
+	Schema                FiscalFiscalConsumerReadinessBodySchema `json:"schema"`
+	SignerKeyEpoch        int64                                   `json:"signerKeyEpoch"`
+	SignerKeyId           string                                  `json:"signerKeyId"`
+}
+
+// FiscalFiscalConsumerReadinessBodySchema defines model for FiscalFiscalConsumerReadinessBody.Schema.
+type FiscalFiscalConsumerReadinessBodySchema string
+
+// FiscalFiscalContinuityCheckpointBody defines model for FiscalFiscalContinuityCheckpointBody.
+type FiscalFiscalContinuityCheckpointBody struct {
+	AnchorId           string `json:"anchorId"`
+	AnchorNamespace    string `json:"anchorNamespace"`
+	CheckpointId       string `json:"checkpointId"`
+	ContinuitySequence int64  `json:"continuitySequence"`
+	Domains            []struct {
+		Active *struct {
+			ScheduleDigest string `json:"scheduleDigest"`
+			ScheduleId     string `json:"scheduleId"`
+			Sequence       int64  `json:"sequence"`
+		} `json:"active,omitempty"`
+		Domain        string `json:"domain"`
+		EverActivated bool   `json:"everActivated"`
+		LastKnownGood *struct {
+			ScheduleDigest string `json:"scheduleDigest"`
+			ScheduleId     string `json:"scheduleId"`
+			Sequence       int64  `json:"sequence"`
+		} `json:"lastKnownGood,omitempty"`
+	} `json:"domains"`
+	GenesisPolicyDigest      string                                     `json:"genesisPolicyDigest"`
+	GenesisPolicyId          string                                     `json:"genesisPolicyId"`
+	GoverningOperatorId      string                                     `json:"governingOperatorId"`
+	PinnedCharterDigest      string                                     `json:"pinnedCharterDigest"`
+	PinnedCharterId          string                                     `json:"pinnedCharterId"`
+	PinnedCharterSequence    int64                                      `json:"pinnedCharterSequence"`
+	PreviousCheckpointDigest *string                                    `json:"previousCheckpointDigest,omitempty"`
+	RuntimeReadinessDigest   string                                     `json:"runtimeReadinessDigest"`
+	Schema                   FiscalFiscalContinuityCheckpointBodySchema `json:"schema"`
+	SignerKeyEpoch           int64                                      `json:"signerKeyEpoch"`
+	SignerKeyId              string                                     `json:"signerKeyId"`
+	StagedTransition         *struct {
+		TransitionDigest string `json:"transitionDigest"`
+		TransitionId     string `json:"transitionId"`
+	} `json:"stagedTransition,omitempty"`
+	TrustedClockHighWater int64 `json:"trustedClockHighWater"`
+}
+
+// FiscalFiscalContinuityCheckpointBodySchema defines model for FiscalFiscalContinuityCheckpointBody.Schema.
+type FiscalFiscalContinuityCheckpointBodySchema string
+
+// FiscalFiscalProposalAdmissionBody defines model for FiscalFiscalProposalAdmissionBody.
+type FiscalFiscalProposalAdmissionBody struct {
+	AdmissionAuthorityId       string                                  `json:"admissionAuthorityId"`
+	AdmissionId                string                                  `json:"admissionId"`
+	AdmissionSequence          int64                                   `json:"admissionSequence"`
+	AdmittedAt                 int64                                   `json:"admittedAt"`
+	GoverningOperatorId        string                                  `json:"governingOperatorId"`
+	PredecessorCharterDigest   string                                  `json:"predecessorCharterDigest"`
+	PredecessorCharterId       string                                  `json:"predecessorCharterId"`
+	PredecessorCharterSequence int64                                   `json:"predecessorCharterSequence"`
+	ProposalDigest             string                                  `json:"proposalDigest"`
+	ProposalExpiresAt          int64                                   `json:"proposalExpiresAt"`
+	ProposalId                 string                                  `json:"proposalId"`
+	Schema                     FiscalFiscalProposalAdmissionBodySchema `json:"schema"`
+	SignerKeyEpoch             int64                                   `json:"signerKeyEpoch"`
+	SignerKeyId                string                                  `json:"signerKeyId"`
+}
+
+// FiscalFiscalProposalAdmissionBodySchema defines model for FiscalFiscalProposalAdmissionBody.Schema.
+type FiscalFiscalProposalAdmissionBodySchema string
+
+// FiscalFiscalProposalBody defines model for FiscalFiscalProposalBody.
+type FiscalFiscalProposalBody struct {
+	ProposalId      string                         `json:"proposalId"`
+	ProposedAt      int64                          `json:"proposedAt"`
+	ProposedBy      string                         `json:"proposedBy"`
+	RationaleDigest string                         `json:"rationaleDigest"`
+	Schema          FiscalFiscalProposalBodySchema `json:"schema"`
+	Target          struct {
+		Candidate *struct {
+			Body struct {
+				CharterDigest string `json:"charterDigest"`
+				CharterId     string `json:"charterId"`
+				Domain        string `json:"domain"`
+				IssuedAt      int64  `json:"issuedAt"`
+				IssuedBy      string `json:"issuedBy"`
+				Params        struct {
+					Ceilings *[]struct {
+						Currency string `json:"currency"`
+						Units    int64  `json:"units"`
+					} `json:"ceilings,omitempty"`
+					FeeSchedule *struct {
+						BondRequirements []struct {
+							BondClass               string `json:"bondClass"`
+							CollateralReferenceKind string `json:"collateralReferenceKind"`
+							RequiredAmount          struct {
+								Currency string `json:"currency"`
+								Units    int64  `json:"units"`
+							} `json:"requiredAmount"`
+							Slashable bool `json:"slashable"`
+						} `json:"bondRequirements"`
+						DisputeFee struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"disputeFee"`
+						ExpiresAt              int64  `json:"expiresAt"`
+						FeeScheduleId          string `json:"feeScheduleId"`
+						GoverningOperatorId    string `json:"governingOperatorId"`
+						IssuedAt               int64  `json:"issuedAt"`
+						IssuedBy               string `json:"issuedBy"`
+						MarketParticipationFee struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"marketParticipationFee"`
+						Namespace      string `json:"namespace"`
+						PublicationFee struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"publicationFee"`
+						Schema string `json:"schema"`
+						Scope  struct {
+							AllowedActorKinds         []string `json:"allowedActorKinds"`
+							AllowedAdmissionClasses   []string `json:"allowedAdmissionClasses"`
+							AllowedListingOperatorIds []string `json:"allowedListingOperatorIds"`
+							Namespace                 string   `json:"namespace"`
+						} `json:"scope"`
+					} `json:"feeSchedule,omitempty"`
+					Kind string `json:"kind"`
+				} `json:"params"`
+				ScheduleId           string  `json:"scheduleId"`
+				Schema               string  `json:"schema"`
+				Sequence             int64   `json:"sequence"`
+				SupersedesScheduleId *string `json:"supersedesScheduleId,omitempty"`
+				ValidFrom            int64   `json:"validFrom"`
+				ValidUntil           int64   `json:"validUntil"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+			SignerKey string `json:"signerKey"`
+		} `json:"candidate,omitempty"`
+		Kind      string `json:"kind"`
+		Successor *struct {
+			Body struct {
+				ApprovalThreshold        int64    `json:"approvalThreshold"`
+				ApprovalTtlSeconds       int64    `json:"approvalTtlSeconds"`
+				CharterId                string   `json:"charterId"`
+				ExpiresAt                int64    `json:"expiresAt"`
+				GovernedDomains          []string `json:"governedDomains"`
+				GoverningOperatorId      string   `json:"governingOperatorId"`
+				IssuedAt                 int64    `json:"issuedAt"`
+				IssuedBy                 string   `json:"issuedBy"`
+				PredecessorCharterDigest string   `json:"predecessorCharterDigest"`
+				ProposalTtlSeconds       int64    `json:"proposalTtlSeconds"`
+				Schema                   string   `json:"schema"`
+				Sequence                 int64    `json:"sequence"`
+				SignerSet                []struct {
+					KeyId     string `json:"keyId"`
+					PublicKey string `json:"publicKey"`
+				} `json:"signerSet"`
+				TimelockSeconds int64 `json:"timelockSeconds"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+			SignerKey string `json:"signerKey"`
+		} `json:"successor,omitempty"`
+	} `json:"target"`
+}
+
+// FiscalFiscalProposalBodySchema defines model for FiscalFiscalProposalBody.Schema.
+type FiscalFiscalProposalBodySchema string
+
+// FiscalFiscalScheduleBody defines model for FiscalFiscalScheduleBody.
+type FiscalFiscalScheduleBody struct {
+	CharterDigest string `json:"charterDigest"`
+	CharterId     string `json:"charterId"`
+	Domain        string `json:"domain"`
+	IssuedAt      int64  `json:"issuedAt"`
+	IssuedBy      string `json:"issuedBy"`
+	Params        struct {
+		Ceilings *[]struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"ceilings,omitempty"`
+		FeeSchedule *struct {
+			BondRequirements []struct {
+				BondClass               string `json:"bondClass"`
+				CollateralReferenceKind string `json:"collateralReferenceKind"`
+				RequiredAmount          struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"requiredAmount"`
+				Slashable bool `json:"slashable"`
+			} `json:"bondRequirements"`
+			DisputeFee struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"disputeFee"`
+			ExpiresAt              int64  `json:"expiresAt"`
+			FeeScheduleId          string `json:"feeScheduleId"`
+			GoverningOperatorId    string `json:"governingOperatorId"`
+			IssuedAt               int64  `json:"issuedAt"`
+			IssuedBy               string `json:"issuedBy"`
+			MarketParticipationFee struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"marketParticipationFee"`
+			Namespace      string `json:"namespace"`
+			PublicationFee struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"publicationFee"`
+			Schema string `json:"schema"`
+			Scope  struct {
+				AllowedActorKinds         []string `json:"allowedActorKinds"`
+				AllowedAdmissionClasses   []string `json:"allowedAdmissionClasses"`
+				AllowedListingOperatorIds []string `json:"allowedListingOperatorIds"`
+				Namespace                 string   `json:"namespace"`
+			} `json:"scope"`
+		} `json:"feeSchedule,omitempty"`
+		Kind string `json:"kind"`
+	} `json:"params"`
+	ScheduleId           string                         `json:"scheduleId"`
+	Schema               FiscalFiscalScheduleBodySchema `json:"schema"`
+	Sequence             int64                          `json:"sequence"`
+	SupersedesScheduleId *string                        `json:"supersedesScheduleId,omitempty"`
+	ValidFrom            int64                          `json:"validFrom"`
+	ValidUntil           int64                          `json:"validUntil"`
+}
+
+// FiscalFiscalScheduleBodySchema defines model for FiscalFiscalScheduleBody.Schema.
+type FiscalFiscalScheduleBodySchema string
+
 // FrostDkgPackage defines model for FrostDkgPackage.
 type FrostDkgPackage struct {
 	CeremonyId           string                `json:"ceremonyId"`
@@ -9219,6 +13551,101 @@ type FrostDkgPackage struct {
 
 // FrostDkgPackageSchema defines model for FrostDkgPackage.Schema.
 type FrostDkgPackageSchema string
+
+// FrostFrostAuthorizationSlotCheckpointBody defines model for FrostFrostAuthorizationSlotCheckpointBody.
+type FrostFrostAuthorizationSlotCheckpointBody struct {
+	ActionDigest             string                                          `json:"actionDigest"`
+	AggregateSignatureDigest *string                                         `json:"aggregateSignatureDigest,omitempty"`
+	AnchorId                 string                                          `json:"anchorId"`
+	AnchorKeyId              string                                          `json:"anchorKeyId"`
+	AuthorizationBlobDigest  *string                                         `json:"authorizationBlobDigest,omitempty"`
+	AuthorizationId          string                                          `json:"authorizationId"`
+	AvailabilityReceipt      *string                                         `json:"availabilityReceipt,omitempty"`
+	ClockHighWater           int64                                           `json:"clockHighWater"`
+	Domain                   string                                          `json:"domain"`
+	KeyEpoch                 int64                                           `json:"keyEpoch"`
+	LadderActionClass        string                                          `json:"ladderActionClass"`
+	PredecessorDigest        *string                                         `json:"predecessorDigest,omitempty"`
+	ResourceFence            int64                                           `json:"resourceFence"`
+	ResourceId               string                                          `json:"resourceId"`
+	ResourceVersion          int64                                           `json:"resourceVersion"`
+	RosterDigest             string                                          `json:"rosterDigest"`
+	Schema                   FrostFrostAuthorizationSlotCheckpointBodySchema `json:"schema"`
+	ScopeId                  string                                          `json:"scopeId"`
+	SessionId                string                                          `json:"sessionId"`
+	SigningMessageDigest     string                                          `json:"signingMessageDigest"`
+	SlotId                   string                                          `json:"slotId"`
+	SlotVersion              int64                                           `json:"slotVersion"`
+	State                    string                                          `json:"state"`
+}
+
+// FrostFrostAuthorizationSlotCheckpointBodySchema defines model for FrostFrostAuthorizationSlotCheckpointBody.Schema.
+type FrostFrostAuthorizationSlotCheckpointBodySchema string
+
+// FrostFrostDkgRound2SealedBody defines model for FrostFrostDkgRound2SealedBody.
+type FrostFrostDkgRound2SealedBody struct {
+	Ciphertext string `json:"ciphertext"`
+	Metadata   struct {
+		CeremonyId               string  `json:"ceremonyId"`
+		KeyEpoch                 int64   `json:"keyEpoch"`
+		ParticipantSetDigest     string  `json:"participantSetDigest"`
+		RecipientParticipantId   string  `json:"recipientParticipantId"`
+		RecipientSealingKeyId    string  `json:"recipientSealingKeyId"`
+		Round                    int64   `json:"round"`
+		Schema                   string  `json:"schema"`
+		SenderEphemeralPublicKey []int64 `json:"senderEphemeralPublicKey"`
+		SenderParticipantId      string  `json:"senderParticipantId"`
+		Suite                    string  `json:"suite"`
+		TransportKeyId           string  `json:"transportKeyId"`
+	} `json:"metadata"`
+}
+
+// FrostFrostEpochCheckpointBody defines model for FrostFrostEpochCheckpointBody.
+type FrostFrostEpochCheckpointBody struct {
+	ActivationFence             int64                               `json:"activationFence"`
+	ActiveRosterDigest          string                              `json:"activeRosterDigest"`
+	ActiveRosterId              string                              `json:"activeRosterId"`
+	AnchorId                    string                              `json:"anchorId"`
+	AnchorKeyId                 string                              `json:"anchorKeyId"`
+	CheckpointSequence          int64                               `json:"checkpointSequence"`
+	ClockHighWater              int64                               `json:"clockHighWater"`
+	GroupPublicKeyDigest        string                              `json:"groupPublicKeyDigest"`
+	KeyEpoch                    int64                               `json:"keyEpoch"`
+	PredecessorDigest           *string                             `json:"predecessorDigest,omitempty"`
+	RotationAuthorizationDigest *string                             `json:"rotationAuthorizationDigest,omitempty"`
+	Schema                      FrostFrostEpochCheckpointBodySchema `json:"schema"`
+	ScopeId                     string                              `json:"scopeId"`
+}
+
+// FrostFrostEpochCheckpointBodySchema defines model for FrostFrostEpochCheckpointBody.Schema.
+type FrostFrostEpochCheckpointBodySchema string
+
+// FrostFrostRosterBody defines model for FrostFrostRosterBody.
+type FrostFrostRosterBody struct {
+	AllowedDomains           []string `json:"allowedDomains"`
+	AuthorityScope           string   `json:"authorityScope"`
+	CeremonyTranscriptDigest string   `json:"ceremonyTranscriptDigest"`
+	GroupPublicKey           string   `json:"groupPublicKey"`
+	KeyEpoch                 int64    `json:"keyEpoch"`
+	KeyOrigin                string   `json:"keyOrigin"`
+	ParticipantCount         int64    `json:"participantCount"`
+	Participants             []struct {
+		ParticipantId     string `json:"participantId"`
+		VerificationShare string `json:"verificationShare"`
+	} `json:"participants"`
+	PredecessorRosterDigest *string                    `json:"predecessorRosterDigest,omitempty"`
+	RosterAuthorityKeyId    string                     `json:"rosterAuthorityKeyId"`
+	RosterId                string                     `json:"rosterId"`
+	Schema                  FrostFrostRosterBodySchema `json:"schema"`
+	ScopeId                 string                     `json:"scopeId"`
+	SuiteId                 string                     `json:"suiteId"`
+	Threshold               int64                      `json:"threshold"`
+	ValidFrom               int64                      `json:"validFrom"`
+	ValidUntil              int64                      `json:"validUntil"`
+}
+
+// FrostFrostRosterBodySchema defines model for FrostFrostRosterBody.Schema.
+type FrostFrostRosterBodySchema string
 
 // IrohRevocationSignerEndorsement defines model for IrohRevocationSignerEndorsement.
 type IrohRevocationSignerEndorsement struct {
@@ -9599,6 +14026,50 @@ type KernelCallerDeliveryReport_Report_RealizedCost struct {
 // KernelCallerDeliveryReportReportSchema defines model for KernelCallerDeliveryReport.Report.Schema.
 type KernelCallerDeliveryReportReportSchema string
 
+// KernelCallerDeliveryReportBody defines model for KernelCallerDeliveryReportBody.
+type KernelCallerDeliveryReportBody struct {
+	AuthorizationDigest      string `json:"authorization_digest"`
+	ClaimId                  string `json:"claim_id"`
+	CompletedAtUnixMs        int64  `json:"completed_at_unix_ms"`
+	ExecutionStartedAtUnixMs int64  `json:"execution_started_at_unix_ms"`
+	Executor                 struct {
+		ExecutorId string `json:"executor_id"`
+		KeyEpoch   int64  `json:"key_epoch"`
+		PublicKey  string `json:"public_key"`
+	} `json:"executor"`
+	Output struct {
+		Closed               *bool   `json:"closed,omitempty"`
+		Effect               *string `json:"effect,omitempty"`
+		External             *bool   `json:"external,omitempty"`
+		Historical           *bool   `json:"historical,omitempty"`
+		OriginalNativeEffect *bool   `json:"original_native_effect,omitempty"`
+		Outcome              *string `json:"outcome,omitempty"`
+		PrivateResult        *string `json:"private_result,omitempty"`
+		ResultSha256         *string `json:"result_sha256,omitempty"`
+		Returned             *bool   `json:"returned,omitempty"`
+		Safe                 *bool   `json:"safe,omitempty"`
+	} `json:"output"`
+	RealizedCost KernelCallerDeliveryReportBody_RealizedCost `json:"realized_cost"`
+	Schema       KernelCallerDeliveryReportBodySchema        `json:"schema"`
+}
+
+// KernelCallerDeliveryReportBodyRealizedCost0 defines model for .
+type KernelCallerDeliveryReportBodyRealizedCost0 = interface{}
+
+// KernelCallerDeliveryReportBodyRealizedCost1 defines model for .
+type KernelCallerDeliveryReportBodyRealizedCost1 struct {
+	Currency string `json:"currency"`
+	Units    int64  `json:"units"`
+}
+
+// KernelCallerDeliveryReportBody_RealizedCost defines model for KernelCallerDeliveryReportBody.RealizedCost.
+type KernelCallerDeliveryReportBody_RealizedCost struct {
+	union json.RawMessage
+}
+
+// KernelCallerDeliveryReportBodySchema defines model for KernelCallerDeliveryReportBody.Schema.
+type KernelCallerDeliveryReportBodySchema string
+
 // KernelCallerDispatchAuthorization A committed kernel statement, not an executor claim. Canonical encoding is bounded to 32768 bytes. The executor must independently authenticate pins and durably claim the original operation before effect.
 type KernelCallerDispatchAuthorization struct {
 	Authorization struct {
@@ -9662,6 +14133,57 @@ type KernelCallerDispatchAuthorization struct {
 
 // KernelCallerDispatchAuthorizationAuthorizationSchema defines model for KernelCallerDispatchAuthorization.Authorization.Schema.
 type KernelCallerDispatchAuthorizationAuthorizationSchema string
+
+// KernelCallerDispatchAuthorizationBody defines model for KernelCallerDispatchAuthorizationBody.
+type KernelCallerDispatchAuthorizationBody struct {
+	Committed struct {
+		BudgetHoldId   string `json:"budget_hold_id"`
+		DispatchCommit struct {
+			CommittedVersion      int64  `json:"committed_version"`
+			CoordinatorLeaseEpoch int64  `json:"coordinator_lease_epoch"`
+			CoordinatorLeaseId    string `json:"coordinator_lease_id"`
+			DispatchLaunch        struct {
+				NativeLaunch  *interface{} `json:"native_launch"`
+				WorkerProfile *interface{} `json:"worker_profile"`
+			} `json:"dispatch_launch"`
+			ProviderAttempt struct {
+				AttemptId         string `json:"attempt_id"`
+				OperationId       string `json:"operation_id"`
+				TransportId       string `json:"transport_id"`
+				TransportKeyEpoch int64  `json:"transport_key_epoch"`
+			} `json:"provider_attempt"`
+			StoreFence struct {
+				LeaseId    string `json:"lease_id"`
+				OwnerEpoch int64  `json:"owner_epoch"`
+				StoreUuid  string `json:"store_uuid"`
+			} `json:"store_fence"`
+		} `json:"dispatch_commit"`
+		ExecutionNonceId    string `json:"execution_nonce_id"`
+		FrozenContextDigest string `json:"frozen_context_digest"`
+	} `json:"committed"`
+	Executor struct {
+		ExecutorId string `json:"executor_id"`
+		KeyEpoch   int64  `json:"key_epoch"`
+		PublicKey  string `json:"public_key"`
+	} `json:"executor"`
+	ExpiresAtUnixMs int64 `json:"expires_at_unix_ms"`
+	Invocation      struct {
+		CapabilityDigest   string `json:"capability_digest"`
+		CapabilityId       string `json:"capability_id"`
+		OperationId        string `json:"operation_id"`
+		ParametersDigest   string `json:"parameters_digest"`
+		RequestBindingHash string `json:"request_binding_hash"`
+		RequestId          string `json:"request_id"`
+		ServerId           string `json:"server_id"`
+		ToolName           string `json:"tool_name"`
+	} `json:"invocation"`
+	KernelPublicKey string                                      `json:"kernel_public_key"`
+	NotBeforeUnixMs int64                                       `json:"not_before_unix_ms"`
+	Schema          KernelCallerDispatchAuthorizationBodySchema `json:"schema"`
+}
+
+// KernelCallerDispatchAuthorizationBodySchema defines model for KernelCallerDispatchAuthorizationBody.Schema.
+type KernelCallerDispatchAuthorizationBodySchema string
 
 // KernelCallerDispatchAuthorizationCallerDigest defines model for KernelCallerDispatchAuthorizationCallerDigest.
 type KernelCallerDispatchAuthorizationCallerDigest = string
@@ -9784,6 +14306,25 @@ type KernelDpopProof struct {
 
 // KernelDpopProofBodySchema defines model for KernelDpopProof.Body.Schema.
 type KernelDpopProofBodySchema string
+
+// KernelDpopProofBody defines model for KernelDpopProofBody.
+type KernelDpopProofBody struct {
+	ActionHash      string `json:"action_hash"`
+	AgentKey        string `json:"agent_key"`
+	CapabilityId    string `json:"capability_id"`
+	IssuedAt        int64  `json:"issued_at"`
+	Nonce           string `json:"nonce"`
+	ReplayAuthority struct {
+		DestinationStoreUuid string `json:"destination_store_uuid"`
+		DpopAuthorityId      string `json:"dpop_authority_id"`
+		ExpectationId        string `json:"expectation_id"`
+		MaxClockSkewSecs     int64  `json:"max_clock_skew_secs"`
+		ProofTtlSecs         int64  `json:"proof_ttl_secs"`
+	} `json:"replay_authority"`
+	Schema     KernelDpopProofBodySchema `json:"schema"`
+	ToolName   string                    `json:"tool_name"`
+	ToolServer string                    `json:"tool_server"`
+}
 
 // KernelEvidenceExportCommitment defines model for KernelEvidenceExportCommitment.
 type KernelEvidenceExportCommitment struct {
@@ -10427,6 +14968,55 @@ type KernelToolCallResponseType string
 // LineageFrontierSignature defines model for LineageFrontierSignature.
 type LineageFrontierSignature struct {
 	Frontier string `json:"frontier"`
+}
+
+// LineageLineageSignedSubgraphBody defines model for LineageLineageSignedSubgraphBody.
+type LineageLineageSignedSubgraphBody struct {
+	Audience                  string `json:"audience"`
+	ChallengeNonce            string `json:"challenge_nonce"`
+	CheckpointInclusionSha256 string `json:"checkpoint_inclusion_sha256"`
+	CheckpointRef             string `json:"checkpoint_ref"`
+	Edges                     []struct {
+		DisclosureState      string `json:"disclosure_state"`
+		EdgeId               string `json:"edge_id"`
+		EvidenceClass        string `json:"evidence_class"`
+		From                 string `json:"from"`
+		Kind                 string `json:"kind"`
+		Relation             string `json:"relation"`
+		SourceArtifactSha256 string `json:"source_artifact_sha256"`
+		StatementSha256      string `json:"statement_sha256"`
+		To                   string `json:"to"`
+	} `json:"edges"`
+	FrontierSha256      string `json:"frontier_sha256"`
+	GeneratedAt         string `json:"generated_at"`
+	Id                  string `json:"id"`
+	LeakageLedgerSha256 string `json:"leakage_ledger_sha256"`
+	LineageAnchorRef    string `json:"lineage_anchor_ref"`
+	MaxDepth            int64  `json:"max_depth"`
+	Nodes               []struct {
+		ArtifactSchema  string   `json:"artifact_schema"`
+		ArtifactSha256  string   `json:"artifact_sha256"`
+		Depth           int64    `json:"depth"`
+		DisclosureState string   `json:"disclosure_state"`
+		EvidenceClass   string   `json:"evidence_class"`
+		Id              string   `json:"id"`
+		Kind            string   `json:"kind"`
+		ParentIds       []string `json:"parent_ids"`
+		ReceiptRef      string   `json:"receipt_ref"`
+		SourceIdHash    string   `json:"source_id_hash"`
+		SourceTable     string   `json:"source_table"`
+		TenantHash      string   `json:"tenant_hash"`
+	} `json:"nodes"`
+	PolicyProfileId          string `json:"policy_profile_id"`
+	ProjectionManifestSha256 string `json:"projection_manifest_sha256"`
+	RedactionMapSha256       string `json:"redaction_map_sha256"`
+	Redactions               []struct {
+		NodeId string `json:"node_id"`
+		Reason string `json:"reason"`
+	} `json:"redactions"`
+	RequiredEvidenceClass  string   `json:"required_evidence_class"`
+	RootReceiptIds         []string `json:"root_receipt_ids"`
+	TransactionPassportRef string   `json:"transaction_passport_ref"`
 }
 
 // MarketAutoBind defines model for MarketAutoBind.
@@ -18534,6 +23124,236 @@ type McpSessionCredentialCall_Response struct {
 // McpSessionCredentialCallSchema defines model for McpSessionCredentialCall.Schema.
 type McpSessionCredentialCallSchema string
 
+// OutcomeOutcomeContractualZeroBody defines model for OutcomeOutcomeContractualZeroBody.
+type OutcomeOutcomeContractualZeroBody struct {
+	AuthorityId               string                                  `json:"authorityId"`
+	AuthorityKeyEpoch         int64                                   `json:"authorityKeyEpoch"`
+	ContractualZeroId         string                                  `json:"contractualZeroId"`
+	EligibilityDigest         string                                  `json:"eligibilityDigest"`
+	ExpiresAtUnixMs           int64                                   `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs            int64                                   `json:"issuedAtUnixMs"`
+	NoDeliverySlotProofDigest string                                  `json:"noDeliverySlotProofDigest"`
+	PostGuardEvidenceDigest   string                                  `json:"postGuardEvidenceDigest"`
+	PostGuardPolicyDigest     string                                  `json:"postGuardPolicyDigest"`
+	ProviderAcceptanceDigest  string                                  `json:"providerAcceptanceDigest"`
+	Reason                    string                                  `json:"reason"`
+	RequestId                 string                                  `json:"requestId"`
+	Schema                    OutcomeOutcomeContractualZeroBodySchema `json:"schema"`
+	TerminalToolOutcomeDigest string                                  `json:"terminalToolOutcomeDigest"`
+}
+
+// OutcomeOutcomeContractualZeroBodySchema defines model for OutcomeOutcomeContractualZeroBody.Schema.
+type OutcomeOutcomeContractualZeroBodySchema string
+
+// OutcomeOutcomeDeliveryAcknowledgementBody defines model for OutcomeOutcomeDeliveryAcknowledgementBody.
+type OutcomeOutcomeDeliveryAcknowledgementBody struct {
+	AcknowledgementId          string                                          `json:"acknowledgementId"`
+	DeliveryAcceptedAtUnixMs   int64                                           `json:"deliveryAcceptedAtUnixMs"`
+	DeliveryCheckpointDigest   string                                          `json:"deliveryCheckpointDigest"`
+	DeliveryCheckpointSequence int64                                           `json:"deliveryCheckpointSequence"`
+	DeliveryId                 string                                          `json:"deliveryId"`
+	DurableBlobDigest          string                                          `json:"durableBlobDigest"`
+	DurableBlobReference       string                                          `json:"durableBlobReference"`
+	EligibilityDigest          string                                          `json:"eligibilityDigest"`
+	FinalOutputDigest          string                                          `json:"finalOutputDigest"`
+	IdempotencyKey             string                                          `json:"idempotencyKey"`
+	ProviderAcceptanceDigest   string                                          `json:"providerAcceptanceDigest"`
+	ReceiverBindingDigest      string                                          `json:"receiverBindingDigest"`
+	ReceiverKeyEpoch           int64                                           `json:"receiverKeyEpoch"`
+	ReceiverKeyId              string                                          `json:"receiverKeyId"`
+	ReceiverQueueId            string                                          `json:"receiverQueueId"`
+	RequestId                  string                                          `json:"requestId"`
+	Schema                     OutcomeOutcomeDeliveryAcknowledgementBodySchema `json:"schema"`
+}
+
+// OutcomeOutcomeDeliveryAcknowledgementBodySchema defines model for OutcomeOutcomeDeliveryAcknowledgementBody.Schema.
+type OutcomeOutcomeDeliveryAcknowledgementBodySchema string
+
+// OutcomeOutcomeDeliveryCheckpointBody defines model for OutcomeOutcomeDeliveryCheckpointBody.
+type OutcomeOutcomeDeliveryCheckpointBody struct {
+	AnchorId                    string                                     `json:"anchorId"`
+	AnchorKeyEpoch              int64                                      `json:"anchorKeyEpoch"`
+	BlobAbsenceProofDigest      *string                                    `json:"blobAbsenceProofDigest,omitempty"`
+	BlobDigest                  *string                                    `json:"blobDigest,omitempty"`
+	BlobReference               *string                                    `json:"blobReference,omitempty"`
+	CancellationFenceDigest     *string                                    `json:"cancellationFenceDigest,omitempty"`
+	DeliveryId                  string                                     `json:"deliveryId"`
+	EligibilityDigest           string                                     `json:"eligibilityDigest"`
+	IdempotencyKey              string                                     `json:"idempotencyKey"`
+	OutputDigest                string                                     `json:"outputDigest"`
+	PredecessorDigest           *string                                    `json:"predecessorDigest,omitempty"`
+	ProviderAcceptanceDigest    string                                     `json:"providerAcceptanceDigest"`
+	ReceiverBindingDigest       string                                     `json:"receiverBindingDigest"`
+	ReceiverId                  string                                     `json:"receiverId"`
+	ReceiverKeyEpoch            int64                                      `json:"receiverKeyEpoch"`
+	ReceiverNamespace           string                                     `json:"receiverNamespace"`
+	ReceiverQueueId             string                                     `json:"receiverQueueId"`
+	RequestId                   string                                     `json:"requestId"`
+	Schema                      OutcomeOutcomeDeliveryCheckpointBodySchema `json:"schema"`
+	Sequence                    int64                                      `json:"sequence"`
+	State                       string                                     `json:"state"`
+	TrustedClockHighWaterUnixMs int64                                      `json:"trustedClockHighWaterUnixMs"`
+}
+
+// OutcomeOutcomeDeliveryCheckpointBodySchema defines model for OutcomeOutcomeDeliveryCheckpointBody.Schema.
+type OutcomeOutcomeDeliveryCheckpointBodySchema string
+
+// OutcomeOutcomeDeliveryNonacceptanceBody defines model for OutcomeOutcomeDeliveryNonacceptanceBody.
+type OutcomeOutcomeDeliveryNonacceptanceBody struct {
+	BlobAbsenceProofDigest     string                                        `json:"blobAbsenceProofDigest"`
+	CancellationFenceDigest    string                                        `json:"cancellationFenceDigest"`
+	CancelledAtUnixMs          int64                                         `json:"cancelledAtUnixMs"`
+	DeliveryCheckpointDigest   string                                        `json:"deliveryCheckpointDigest"`
+	DeliveryCheckpointSequence int64                                         `json:"deliveryCheckpointSequence"`
+	DeliveryId                 string                                        `json:"deliveryId"`
+	EligibilityDigest          string                                        `json:"eligibilityDigest"`
+	IdempotencyKey             string                                        `json:"idempotencyKey"`
+	NonacceptanceId            string                                        `json:"nonacceptanceId"`
+	OutputDigest               string                                        `json:"outputDigest"`
+	ProviderAcceptanceDigest   string                                        `json:"providerAcceptanceDigest"`
+	ReceiverBindingDigest      string                                        `json:"receiverBindingDigest"`
+	ReceiverKeyEpoch           int64                                         `json:"receiverKeyEpoch"`
+	ReceiverKeyId              string                                        `json:"receiverKeyId"`
+	ReceiverQueueId            string                                        `json:"receiverQueueId"`
+	RequestId                  string                                        `json:"requestId"`
+	Schema                     OutcomeOutcomeDeliveryNonacceptanceBodySchema `json:"schema"`
+}
+
+// OutcomeOutcomeDeliveryNonacceptanceBodySchema defines model for OutcomeOutcomeDeliveryNonacceptanceBody.Schema.
+type OutcomeOutcomeDeliveryNonacceptanceBodySchema string
+
+// OutcomeOutcomeEligibilityBody defines model for OutcomeOutcomeEligibilityBody.
+type OutcomeOutcomeEligibilityBody struct {
+	CapabilityId              string `json:"capabilityId"`
+	DeliveryAckDeadlineUnixMs int64  `json:"deliveryAckDeadlineUnixMs"`
+	EligibilityId             string `json:"eligibilityId"`
+	ExpiresAtUnixMs           int64  `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs            int64  `json:"issuedAtUnixMs"`
+	KernelAuthorityId         string `json:"kernelAuthorityId"`
+	KernelKeyEpoch            int64  `json:"kernelKeyEpoch"`
+	ListingDigest             string `json:"listingDigest"`
+	ListingId                 string `json:"listingId"`
+	OutcomePrice              struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"outcomePrice"`
+	PostGuardPolicyDigest         string                              `json:"postGuardPolicyDigest"`
+	PreActionAuthorityDigest      string                              `json:"preActionAuthorityDigest"`
+	PredicateDigest               string                              `json:"predicateDigest"`
+	PredicateId                   string                              `json:"predicateId"`
+	PricingDigest                 string                              `json:"pricingDigest"`
+	PricingId                     string                              `json:"pricingId"`
+	ProviderBindingDigest         string                              `json:"providerBindingDigest"`
+	ProviderId                    string                              `json:"providerId"`
+	QualifiedRailCapabilityDigest string                              `json:"qualifiedRailCapabilityDigest"`
+	QualifiedRailId               string                              `json:"qualifiedRailId"`
+	QuoteDigest                   string                              `json:"quoteDigest"`
+	RailCaptureDeadlineUnixMs     int64                               `json:"railCaptureDeadlineUnixMs"`
+	ReceiverBindingDigest         string                              `json:"receiverBindingDigest"`
+	RequestExtensionDigest        string                              `json:"requestExtensionDigest"`
+	RequestId                     string                              `json:"requestId"`
+	Schema                        OutcomeOutcomeEligibilityBodySchema `json:"schema"`
+	SettlementMode                string                              `json:"settlementMode"`
+	SlaDigest                     string                              `json:"slaDigest"`
+	ToolName                      string                              `json:"toolName"`
+	ToolServer                    string                              `json:"toolServer"`
+}
+
+// OutcomeOutcomeEligibilityBodySchema defines model for OutcomeOutcomeEligibilityBody.Schema.
+type OutcomeOutcomeEligibilityBodySchema string
+
+// OutcomeOutcomeOutputProvenanceBody defines model for OutcomeOutcomeOutputProvenanceBody.
+type OutcomeOutcomeOutputProvenanceBody struct {
+	AuthorityId              string                                   `json:"authorityId"`
+	AuthorityKeyEpoch        int64                                    `json:"authorityKeyEpoch"`
+	EligibilityDigest        string                                   `json:"eligibilityDigest"`
+	ExpiresAtUnixMs          int64                                    `json:"expiresAtUnixMs"`
+	FinalOutputDigest        string                                   `json:"finalOutputDigest"`
+	IssuedAtUnixMs           int64                                    `json:"issuedAtUnixMs"`
+	PostGuardEvidenceDigest  string                                   `json:"postGuardEvidenceDigest"`
+	PostGuardPolicyDigest    string                                   `json:"postGuardPolicyDigest"`
+	ProvenanceClass          string                                   `json:"provenanceClass"`
+	ProvenanceId             string                                   `json:"provenanceId"`
+	ProviderAcceptanceDigest string                                   `json:"providerAcceptanceDigest"`
+	ProviderOutputDigest     string                                   `json:"providerOutputDigest"`
+	RedactionProofDigest     *string                                  `json:"redactionProofDigest,omitempty"`
+	RequestId                string                                   `json:"requestId"`
+	Schema                   OutcomeOutcomeOutputProvenanceBodySchema `json:"schema"`
+}
+
+// OutcomeOutcomeOutputProvenanceBodySchema defines model for OutcomeOutcomeOutputProvenanceBody.Schema.
+type OutcomeOutcomeOutputProvenanceBodySchema string
+
+// OutcomeOutcomePredicateBody defines model for OutcomeOutcomePredicateBody.
+type OutcomeOutcomePredicateBody struct {
+	Assertions []struct {
+		Comparator struct {
+			Kind  string                                                   `json:"kind"`
+			Value *OutcomeOutcomePredicateBody_Assertions_Comparator_Value `json:"value,omitempty"`
+		} `json:"comparator"`
+		Pointer string `json:"pointer"`
+	} `json:"assertions"`
+	ExpiresAtUnixMs int64                             `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs  int64                             `json:"issuedAtUnixMs"`
+	PredicateId     string                            `json:"predicateId"`
+	ProviderId      string                            `json:"providerId"`
+	Schema          OutcomeOutcomePredicateBodySchema `json:"schema"`
+}
+
+// OutcomeOutcomePredicateBodyAssertionsComparatorValue0 defines model for .
+type OutcomeOutcomePredicateBodyAssertionsComparatorValue0 = int64
+
+// OutcomeOutcomePredicateBodyAssertionsComparatorValue1 defines model for .
+type OutcomeOutcomePredicateBodyAssertionsComparatorValue1 struct {
+	X int64 `json:"x"`
+	Y int64 `json:"y"`
+}
+
+// OutcomeOutcomePredicateBody_Assertions_Comparator_Value defines model for OutcomeOutcomePredicateBody.Assertions.Comparator.Value.
+type OutcomeOutcomePredicateBody_Assertions_Comparator_Value struct {
+	union json.RawMessage
+}
+
+// OutcomeOutcomePredicateBodySchema defines model for OutcomeOutcomePredicateBody.Schema.
+type OutcomeOutcomePredicateBodySchema string
+
+// OutcomeOutcomePricingBody defines model for OutcomeOutcomePricingBody.
+type OutcomeOutcomePricingBody struct {
+	ExpiresAtUnixMs int64  `json:"expiresAtUnixMs"`
+	FailureMode     string `json:"failureMode"`
+	IssuedAtUnixMs  int64  `json:"issuedAtUnixMs"`
+	OutcomePrice    struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"outcomePrice"`
+	PredicateDigest string                          `json:"predicateDigest"`
+	PredicateId     string                          `json:"predicateId"`
+	PricingId       string                          `json:"pricingId"`
+	ProviderId      string                          `json:"providerId"`
+	Schema          OutcomeOutcomePricingBodySchema `json:"schema"`
+	SlaDigest       string                          `json:"slaDigest"`
+}
+
+// OutcomeOutcomePricingBodySchema defines model for OutcomeOutcomePricingBody.Schema.
+type OutcomeOutcomePricingBodySchema string
+
+// OutcomeOutcomeSlaBody defines model for OutcomeOutcomeSlaBody.
+type OutcomeOutcomeSlaBody struct {
+	EffectiveAtUnixMs  int64                       `json:"effectiveAtUnixMs"`
+	ExpiresAtUnixMs    int64                       `json:"expiresAtUnixMs"`
+	ListingDigest      string                      `json:"listingDigest"`
+	MaxFailureBps      int64                       `json:"maxFailureBps"`
+	MinimumSampleCount int64                       `json:"minimumSampleCount"`
+	ProviderId         string                      `json:"providerId"`
+	Schema             OutcomeOutcomeSlaBodySchema `json:"schema"`
+	SlaId              string                      `json:"slaId"`
+	WindowAnchorUnixMs int64                       `json:"windowAnchorUnixMs"`
+	WindowSeconds      int64                       `json:"windowSeconds"`
+}
+
+// OutcomeOutcomeSlaBodySchema defines model for OutcomeOutcomeSlaBody.Schema.
+type OutcomeOutcomeSlaBodySchema string
+
 // ParametricContest defines model for ParametricContest.
 type ParametricContest struct {
 	ClaimId                    string                  `json:"claimId"`
@@ -18570,6 +23390,58 @@ type ParametricEvidenceSourceCheckpoint struct {
 
 // ParametricEvidenceSourceCheckpointSchema defines model for ParametricEvidenceSourceCheckpoint.Schema.
 type ParametricEvidenceSourceCheckpointSchema string
+
+// ParametricParametricPolicyBody defines model for ParametricParametricPolicyBody.
+type ParametricParametricPolicyBody struct {
+	BeneficiaryId               string `json:"beneficiaryId"`
+	BoundCoverageBodyDigest     string `json:"boundCoverageBodyDigest"`
+	BoundCoverageEnvelopeDigest string `json:"boundCoverageEnvelopeDigest"`
+	CoverageAmount              struct {
+		Currency string `json:"currency"`
+		Units    int64  `json:"units"`
+	} `json:"coverageAmount"`
+	CoverageAuthorityId string `json:"coverageAuthorityId"`
+	EffectiveFrom       int64  `json:"effectiveFrom"`
+	EffectiveUntil      int64  `json:"effectiveUntil"`
+	EvaluatorAuthority  struct {
+		AuthorityId string `json:"authorityId"`
+		KeyEpoch    int64  `json:"keyEpoch"`
+		KeyId       string `json:"keyId"`
+	} `json:"evaluatorAuthority"`
+	FundingFacilityId       string `json:"fundingFacilityId"`
+	IssuedAt                int64  `json:"issuedAt"`
+	MaxCheckpointLagSeconds int64  `json:"maxCheckpointLagSeconds"`
+	PayerId                 string `json:"payerId"`
+	PayoutMode              struct {
+		Kind          string `json:"kind"`
+		WindowSeconds *int64 `json:"windowSeconds,omitempty"`
+	} `json:"payoutMode"`
+	PayoutRail struct {
+		DestinationAccountDigest string `json:"destinationAccountDigest"`
+		Kind                     string `json:"kind"`
+		RailId                   string `json:"railId"`
+	} `json:"payoutRail"`
+	PayoutSchedule struct {
+		Amount struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"amount"`
+		Kind string `json:"kind"`
+	} `json:"payoutSchedule"`
+	PreActionAuthorityDigest string `json:"preActionAuthorityDigest"`
+	Predicate                struct {
+		Kind         string `json:"kind"`
+		MinEvents    int64  `json:"minEvents"`
+		ThresholdBps int64  `json:"thresholdBps"`
+	} `json:"predicate"`
+	Schema        ParametricParametricPolicyBodySchema `json:"schema"`
+	SubjectKey    string                               `json:"subjectKey"`
+	WindowAnchor  int64                                `json:"windowAnchor"`
+	WindowSeconds int64                                `json:"windowSeconds"`
+}
+
+// ParametricParametricPolicyBodySchema defines model for ParametricParametricPolicyBody.Schema.
+type ParametricParametricPolicyBodySchema string
 
 // ParametricPayoutIntent defines model for ParametricPayoutIntent.
 type ParametricPayoutIntent struct {
@@ -18728,6 +23600,271 @@ type ParametricPayoutIntent struct {
 // ParametricPayoutIntentSchema defines model for ParametricPayoutIntent.Schema.
 type ParametricPayoutIntentSchema string
 
+// PheromonePheromoneDepositBody defines model for PheromonePheromoneDepositBody.
+type PheromonePheromoneDepositBody struct {
+	AgentPassportJwkThumbprint string   `json:"agent_passport_jwk_thumbprint"`
+	AgentPassportKeyHash       string   `json:"agent_passport_key_hash"`
+	Confidence                 float32  `json:"confidence"`
+	DecayHalfLifeSecs          int64    `json:"decay_half_life_secs"`
+	EvaporationFloor           *float32 `json:"evaporation_floor,omitempty"`
+	Indicator                  struct {
+		AdmissionEnvelopeSha256 *string `json:"admission_envelope_sha256,omitempty"`
+		Blob                    *string `json:"blob,omitempty"`
+		CapabilityScope         *string `json:"capability_scope,omitempty"`
+		Digest                  *string `json:"digest,omitempty"`
+		FindingId               *string `json:"finding_id,omitempty"`
+		IndicatorDigest         *string `json:"indicatorDigest,omitempty"`
+		Kind                    *string `json:"kind,omitempty"`
+		ListingEnvelopeSha256   *string `json:"listing_envelope_sha256,omitempty"`
+		ListingId               *string `json:"listing_id,omitempty"`
+		Schema                  *string `json:"schema,omitempty"`
+		WorkflowId              *string `json:"workflowId,omitempty"`
+	} `json:"indicator"`
+	KernelId              string                              `json:"kernel_id"`
+	Nonce                 string                              `json:"nonce"`
+	Schema                PheromonePheromoneDepositBodySchema `json:"schema"`
+	Severity              string                              `json:"severity"`
+	SubjectClass          string                              `json:"subject_class"`
+	SubjectClassNamespace string                              `json:"subject_class_namespace"`
+	TimestampUnixMs       int64                               `json:"timestamp_unix_ms"`
+	TreatyScope           []string                            `json:"treaty_scope"`
+	WorkflowContext       *struct {
+		BilateralDsseSha256        string `json:"bilateral_dsse_sha256"`
+		ConsistencyAnchor          string `json:"consistency_anchor"`
+		Schema                     string `json:"schema"`
+		StepIndex                  int64  `json:"step_index"`
+		ToolReceiptId              string `json:"tool_receipt_id"`
+		WorkflowId                 string `json:"workflow_id"`
+		WorkflowIntersectionId     string `json:"workflow_intersection_id"`
+		WorkflowIntersectionSha256 string `json:"workflow_intersection_sha256"`
+		WorkflowReceiptId          string `json:"workflow_receipt_id"`
+		WorkflowReceiptSha256      string `json:"workflow_receipt_sha256"`
+	} `json:"workflow_context,omitempty"`
+}
+
+// PheromonePheromoneDepositBodySchema defines model for PheromonePheromoneDepositBody.Schema.
+type PheromonePheromoneDepositBodySchema string
+
+// PheromonePheromoneObservationCostVerifierRootBody defines model for PheromonePheromoneObservationCostVerifierRootBody.
+type PheromonePheromoneObservationCostVerifierRootBody struct {
+	AllowedSubjectClassNamespaces []string                                                `json:"allowedSubjectClassNamespaces"`
+	AllowedSubjectClasses         []string                                                `json:"allowedSubjectClasses"`
+	AllowedTreaties               []string                                                `json:"allowedTreaties"`
+	IssuerKernelId                string                                                  `json:"issuerKernelId"`
+	PublicKey                     string                                                  `json:"publicKey"`
+	RuntimePolicySha256           string                                                  `json:"runtimePolicySha256"`
+	Schema                        PheromonePheromoneObservationCostVerifierRootBodySchema `json:"schema"`
+	ValidFromUnixMs               int64                                                   `json:"validFromUnixMs"`
+	ValidUntilUnixMs              int64                                                   `json:"validUntilUnixMs"`
+	VerifierId                    string                                                  `json:"verifierId"`
+	VerifierKeyId                 string                                                  `json:"verifierKeyId"`
+}
+
+// PheromonePheromoneObservationCostVerifierRootBodySchema defines model for PheromonePheromoneObservationCostVerifierRootBody.Schema.
+type PheromonePheromoneObservationCostVerifierRootBodySchema string
+
+// PheromonePheromonePeerDirectoryBundleBody defines model for PheromonePheromonePeerDirectoryBundleBody.
+type PheromonePheromonePeerDirectoryBundleBody struct {
+	DirectorySha256       string                                          `json:"directorySha256"`
+	ExpiresAtUnixMs       int64                                           `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs        int64                                           `json:"issuedAtUnixMs"`
+	Issuer                string                                          `json:"issuer"`
+	KeyId                 string                                          `json:"keyId"`
+	PreviousVersionSha256 *string                                         `json:"previousVersionSha256"`
+	Schema                PheromonePheromonePeerDirectoryBundleBodySchema `json:"schema"`
+	Version               int64                                           `json:"version"`
+}
+
+// PheromonePheromonePeerDirectoryBundleBodySchema defines model for PheromonePheromonePeerDirectoryBundleBody.Schema.
+type PheromonePheromonePeerDirectoryBundleBodySchema string
+
+// PheromonePheromoneQueryReportBody defines model for PheromonePheromoneQueryReportBody.
+type PheromonePheromoneQueryReportBody struct {
+	Accepted      bool `json:"accepted"`
+	Concentration struct {
+		DistinctOriginPairs   int64   `json:"distinctOriginPairs"`
+		EvaluatedAtUnixMs     int64   `json:"evaluatedAtUnixMs"`
+		ReputationEpoch       int64   `json:"reputationEpoch"`
+		SubjectClass          string  `json:"subjectClass"`
+		SubjectClassNamespace string  `json:"subjectClassNamespace"`
+		TotalStrength         float32 `json:"totalStrength"`
+	} `json:"concentration"`
+	Schema PheromonePheromoneQueryReportBodySchema `json:"schema"`
+}
+
+// PheromonePheromoneQueryReportBodySchema defines model for PheromonePheromoneQueryReportBody.Schema.
+type PheromonePheromoneQueryReportBodySchema string
+
+// PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBody defines model for PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBody.
+type PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBody struct {
+	BundleCount int64 `json:"bundleCount"`
+	Bundles     []struct {
+		ArtifactCount        int64  `json:"artifactCount"`
+		BundleId             string `json:"bundleId"`
+		BundlePath           string `json:"bundlePath"`
+		ExportManifestSha256 string `json:"exportManifestSha256"`
+		ExportReportSha256   string `json:"exportReportSha256"`
+		SourcePackageSha256  string `json:"sourcePackageSha256"`
+	} `json:"bundles"`
+	CompressionFormat string `json:"compressionFormat"`
+	CreatedAtUnixMs   int64  `json:"createdAtUnixMs"`
+	LocalKernelId     string `json:"localKernelId"`
+	MemberCount       int64  `json:"memberCount"`
+	Members           []struct {
+		ArtifactRole   string `json:"artifactRole"`
+		BundleId       string `json:"bundleId"`
+		ByteCount      int64  `json:"byteCount"`
+		Kind           string `json:"kind"`
+		Path           string `json:"path"`
+		RetentionClass string `json:"retentionClass"`
+		Schema         string `json:"schema"`
+		Sha256         string `json:"sha256"`
+	} `json:"members"`
+	PackageGeneration          int64                                                                 `json:"packageGeneration"`
+	PackageId                  string                                                                `json:"packageId"`
+	PackagerId                 string                                                                `json:"packagerId"`
+	PackagerKeyId              string                                                                `json:"packagerKeyId"`
+	SafetyClaims               []string                                                              `json:"safetyClaims"`
+	Schema                     PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchema `json:"schema"`
+	SourceArchiveReportSha256  string                                                                `json:"sourceArchiveReportSha256"`
+	SourceCloseoutReportSha256 string                                                                `json:"sourceCloseoutReportSha256"`
+	TotalByteCount             int64                                                                 `json:"totalByteCount"`
+}
+
+// PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchema defines model for PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBody.Schema.
+type PheromonePheromoneRelayAlertAssuranceArchivePackageManifestBodySchema string
+
+// PheromonePheromoneRelayAlertAssuranceExportManifestBody defines model for PheromonePheromoneRelayAlertAssuranceExportManifestBody.
+type PheromonePheromoneRelayAlertAssuranceExportManifestBody struct {
+	Artifacts []struct {
+		ByteCount      int64  `json:"byteCount"`
+		Path           string `json:"path"`
+		RetentionClass string `json:"retentionClass"`
+		Role           string `json:"role"`
+		Schema         string `json:"schema"`
+		Sha256         string `json:"sha256"`
+	} `json:"artifacts"`
+	BundleId            string                                                        `json:"bundleId"`
+	ExportedAtUnixMs    int64                                                         `json:"exportedAtUnixMs"`
+	ExporterId          string                                                        `json:"exporterId"`
+	ExporterKeyId       string                                                        `json:"exporterKeyId"`
+	LocalKernelId       string                                                        `json:"localKernelId"`
+	SafetyClaims        []string                                                      `json:"safetyClaims"`
+	Schema              PheromonePheromoneRelayAlertAssuranceExportManifestBodySchema `json:"schema"`
+	SourcePackageSha256 string                                                        `json:"sourcePackageSha256"`
+}
+
+// PheromonePheromoneRelayAlertAssuranceExportManifestBodySchema defines model for PheromonePheromoneRelayAlertAssuranceExportManifestBody.Schema.
+type PheromonePheromoneRelayAlertAssuranceExportManifestBodySchema string
+
+// PheromonePheromoneRelayHttpRequestBody defines model for PheromonePheromoneRelayHttpRequestBody.
+type PheromonePheromoneRelayHttpRequestBody struct {
+	BodySha256        string                                       `json:"bodySha256"`
+	Method            string                                       `json:"method"`
+	Nonce             string                                       `json:"nonce"`
+	Path              string                                       `json:"path"`
+	RecipientKernelId string                                       `json:"recipientKernelId"`
+	Schema            PheromonePheromoneRelayHttpRequestBodySchema `json:"schema"`
+	SenderKernelId    string                                       `json:"senderKernelId"`
+	SentAtUnixMs      int64                                        `json:"sentAtUnixMs"`
+}
+
+// PheromonePheromoneRelayHttpRequestBodySchema defines model for PheromonePheromoneRelayHttpRequestBody.Schema.
+type PheromonePheromoneRelayHttpRequestBodySchema string
+
+// PheromonePheromoneTransitPolicyBody defines model for PheromonePheromoneTransitPolicyBody.
+type PheromonePheromoneTransitPolicyBody struct {
+	AcceptedHubs []string `json:"accepted_hubs"`
+	Admission    struct {
+		ActivePeersInTreaty          int64    `json:"activePeersInTreaty"`
+		ActiveReputationEpoch        *int64   `json:"activeReputationEpoch,omitempty"`
+		AuthenticatedSenderKernelId  string   `json:"authenticatedSenderKernelId"`
+		ImplicitCompatibilityDefault *bool    `json:"implicitCompatibilityDefault,omitempty"`
+		KernelPublicKeys             []string `json:"kernelPublicKeys"`
+		KnownReputationEpochs        []int64  `json:"knownReputationEpochs"`
+		MaxDepositsPerPair           int64    `json:"maxDepositsPerPair"`
+		ObservationCostVerifierRoots []struct {
+			AllowedSubjectClassNamespaces []string `json:"allowedSubjectClassNamespaces"`
+			AllowedSubjectClasses         []string `json:"allowedSubjectClasses"`
+			AllowedTreaties               []string `json:"allowedTreaties"`
+			IssuerKernelId                string   `json:"issuerKernelId"`
+			IssuerSignature               string   `json:"issuerSignature"`
+			PublicKey                     string   `json:"publicKey"`
+			RuntimePolicySha256           string   `json:"runtimePolicySha256"`
+			Schema                        string   `json:"schema"`
+			ValidFromUnixMs               int64    `json:"validFromUnixMs"`
+			ValidUntilUnixMs              int64    `json:"validUntilUnixMs"`
+			VerifierId                    string   `json:"verifierId"`
+			VerifierKeyId                 string   `json:"verifierKeyId"`
+		} `json:"observationCostVerifierRoots"`
+		Passports []struct {
+			FirstSeenEpoch   int64  `json:"firstSeenEpoch"`
+			KernelId         string `json:"kernelId"`
+			PublicKey        string `json:"publicKey"`
+			Revoked          bool   `json:"revoked"`
+			ValidFromUnixMs  int64  `json:"validFromUnixMs"`
+			ValidUntilUnixMs int64  `json:"validUntilUnixMs"`
+		} `json:"passports"`
+		RecipientKernelId             string   `json:"recipientKernelId"`
+		ReplayWindowMs                int64    `json:"replayWindowMs"`
+		RuntimePolicyIssuerPublicKeys []string `json:"runtimePolicyIssuerPublicKeys"`
+		RuntimeTrustFloorState        struct {
+			Entries []struct {
+				HighestVersion                   *int64  `json:"highestVersion,omitempty"`
+				KeyId                            string  `json:"keyId"`
+				LatestBundleSha256               *string `json:"latestBundleSha256,omitempty"`
+				LatestRevocationCheckpointSha256 *string `json:"latestRevocationCheckpointSha256,omitempty"`
+				Revoked                          *bool   `json:"revoked,omitempty"`
+				VerifierId                       string  `json:"verifierId"`
+			} `json:"entries"`
+			Schema string `json:"schema"`
+		} `json:"runtimeTrustFloorState"`
+		ScarcityPolicies *[]struct {
+			ActivePeersEpoch            int64    `json:"activePeersEpoch"`
+			NewcomerHorizonEpochs       *int64   `json:"newcomerHorizonEpochs,omitempty"`
+			ObservationCostVerification string   `json:"observationCostVerification"`
+			PolicyId                    string   `json:"policyId"`
+			PolicySha256                *string  `json:"policySha256,omitempty"`
+			ReputationEpoch             int64    `json:"reputationEpoch"`
+			RuntimePolicySha256         string   `json:"runtimePolicySha256"`
+			Schema                      string   `json:"schema"`
+			SubjectClass                string   `json:"subjectClass"`
+			SubjectClassNamespace       string   `json:"subjectClassNamespace"`
+			TokenCapacity               int64    `json:"tokenCapacity"`
+			TreatyScope                 []string `json:"treatyScope"`
+			VerifierId                  string   `json:"verifierId"`
+			WindowEndUnixMs             int64    `json:"windowEndUnixMs"`
+			WindowId                    string   `json:"windowId"`
+			WindowStartUnixMs           int64    `json:"windowStartUnixMs"`
+		} `json:"scarcityPolicies,omitempty"`
+		SubjectClasses []struct {
+			AllowedTreaties       []string `json:"allowedTreaties"`
+			CostCommitment        string   `json:"costCommitment"`
+			Destructive           bool     `json:"destructive"`
+			SubjectClass          string   `json:"subjectClass"`
+			SubjectClassNamespace string   `json:"subjectClassNamespace"`
+		} `json:"subjectClasses"`
+	} `json:"admission"`
+	AllowedEgressTreaties         []string `json:"allowed_egress_treaties"`
+	AllowedIngressTreaties        []string `json:"allowed_ingress_treaties"`
+	AllowedSubjectClassNamespaces []string `json:"allowed_subject_class_namespaces"`
+	MaxHops                       int64    `json:"max_hops"`
+	PinnedLadderRefs              []struct {
+		LadderIntersectionId          string `json:"ladder_intersection_id"`
+		LadderIntersectionSha256      string `json:"ladder_intersection_sha256"`
+		LadderManifestExpiresAtUnixMs int64  `json:"ladder_manifest_expires_at_unix_ms"`
+		LadderManifestId              string `json:"ladder_manifest_id"`
+		LadderManifestSha256          string `json:"ladder_manifest_sha256"`
+	} `json:"pinned_ladder_refs"`
+	RequiredActionClassId string                                    `json:"required_action_class_id"`
+	Schema                PheromonePheromoneTransitPolicyBodySchema `json:"schema"`
+	ValidFromUnixMs       int64                                     `json:"valid_from_unix_ms"`
+	ValidUntilUnixMs      int64                                     `json:"valid_until_unix_ms"`
+}
+
+// PheromonePheromoneTransitPolicyBodySchema defines model for PheromonePheromoneTransitPolicyBody.Schema.
+type PheromonePheromoneTransitPolicyBodySchema string
+
 // PolicyActivationReceiptSignature defines model for PolicyActivationReceiptSignature.
 type PolicyActivationReceiptSignature struct {
 	ActivatedAt          string                                 `json:"activatedAt"`
@@ -18792,6 +23929,35 @@ type ProcessSwarmProfile struct {
 
 // ProcessSwarmProfileSchema defines model for ProcessSwarmProfile.Schema.
 type ProcessSwarmProfileSchema string
+
+// ProofRoomProofFirstRunTrustRootsBody defines model for ProofRoomProofFirstRunTrustRootsBody.
+type ProofRoomProofFirstRunTrustRootsBody struct {
+	Authority *string `json:"authority,omitempty"`
+	Id        string  `json:"id"`
+	RootId    *string `json:"root_id,omitempty"`
+	Roots     []struct {
+		KeyDigest *string `json:"key_digest,omitempty"`
+		KeyId     *string `json:"key_id,omitempty"`
+		Subject   string  `json:"subject"`
+	} `json:"roots"`
+	Schema      string  `json:"schema"`
+	TrustDomain *string `json:"trust_domain,omitempty"`
+}
+
+// ProofRoomProofRoomReceiptEvidenceBody defines model for ProofRoomProofRoomReceiptEvidenceBody.
+type ProofRoomProofRoomReceiptEvidenceBody struct {
+	AmbientAuthority  *bool   `json:"ambient_authority,omitempty"`
+	CapabilityId      *string `json:"capability_id,omitempty"`
+	ExecutionLeaseRef *string `json:"execution_lease_ref,omitempty"`
+	GuardDecisionId   *string `json:"guard_decision_id,omitempty"`
+	KernelKey         string  `json:"kernel_key"`
+	PolicyDigest      string  `json:"policy_digest"`
+	ReceiptId         string  `json:"receipt_id"`
+	RequestDigest     *string `json:"request_digest,omitempty"`
+	ResponseDigest    *string `json:"response_digest,omitempty"`
+	Schema            string  `json:"schema"`
+	TerminalStatus    string  `json:"terminal_status"`
+}
 
 // ProvenanceAttestationBundle One bundle of corroborating runtime attestation evidence statements that anchor a governed call-chain context to a verified runtime. Names the `chainId` it binds to (matching `provenance/context.schema.json`), the canonical evidence-class Chio resolved across the bundle, the unix-second `assembledAt` timestamp, and the ordered list of normalized statements. Each statement mirrors the `RuntimeAttestationEvidence` shape and is structurally identical to `chio-wire/v1/trust-control/attestation.schema.json`; the family is inlined rather than `$ref`'d. Field names are camelCase to match `GovernedCallChainContext`.
 type ProvenanceAttestationBundle struct {
@@ -19426,6 +24592,1208 @@ type ReceiptLineageStatementSessionAnchorReference struct {
 	SessionAnchorId   string `json:"sessionAnchorId"`
 }
 
+// ReceiptReceiptBody defines model for ReceiptReceiptBody.
+type ReceiptReceiptBody struct {
+	Body struct {
+		Action struct {
+			ParameterHash string `json:"parameter_hash"`
+			Parameters    struct {
+				Bootstrap *struct {
+					Action struct {
+						ParameterHash string `json:"parameter_hash"`
+						Parameters    struct {
+							Capabilities struct {
+								Alice struct {
+									AggregateInvocationBudget struct {
+										MaxInvocations int64 `json:"max_invocations"`
+										RootBinding    struct {
+											Body struct {
+												MaxInvocations     int64  `json:"max_invocations"`
+												RootCapabilityHash string `json:"root_capability_hash"`
+												RootCapabilityId   string `json:"root_capability_id"`
+												RootExpiresAt      int64  `json:"root_expires_at"`
+												RootIssuer         string `json:"root_issuer"`
+												RootScopeHash      string `json:"root_scope_hash"`
+												RootSubject        string `json:"root_subject"`
+												Schema             string `json:"schema"`
+											} `json:"body"`
+											Signature string `json:"signature"`
+										} `json:"root_binding"`
+										Scope string `json:"scope"`
+									} `json:"aggregate_invocation_budget"`
+									AttenuationProof struct {
+										ChildScopeHash        string `json:"childScopeHash"`
+										NormalizedSubsetProof struct {
+											AggregateBudget struct {
+												MaxInvocations    int64  `json:"max_invocations"`
+												RootBindingDigest string `json:"root_binding_digest"`
+											} `json:"aggregateBudget"`
+											NormalizedChildScope  string `json:"normalizedChildScope"`
+											NormalizedParentScope string `json:"normalizedParentScope"`
+											SubsetRelations       []struct {
+												ChildIndex  int64  `json:"childIndex"`
+												GrantKind   string `json:"grantKind"`
+												ParentIndex int64  `json:"parentIndex"`
+												Subset      bool   `json:"subset"`
+											} `json:"subsetRelations"`
+										} `json:"normalizedSubsetProof"`
+										ParentScopeHash string `json:"parentScopeHash"`
+									} `json:"attenuation_proof"`
+									BudgetShareBps  int64 `json:"budget_share_bps"`
+									DelegationChain []struct {
+										AggregateBudget struct {
+											MaxInvocations    int64  `json:"max_invocations"`
+											RootBindingDigest string `json:"root_binding_digest"`
+										} `json:"aggregate_budget"`
+										CapabilityId string `json:"capability_id"`
+										Delegatee    string `json:"delegatee"`
+										Delegator    string `json:"delegator"`
+										ScopeHash    string `json:"scope_hash"`
+										Signature    string `json:"signature"`
+										Timestamp    int64  `json:"timestamp"`
+									} `json:"delegation_chain"`
+									ExpiresAt int64  `json:"expires_at"`
+									Id        string `json:"id"`
+									IssuedAt  int64  `json:"issued_at"`
+									Issuer    string `json:"issuer"`
+									Schema    string `json:"schema"`
+									Scope     struct {
+										Grants []struct {
+											Operations []string `json:"operations"`
+											ServerId   string   `json:"server_id"`
+											ToolName   string   `json:"tool_name"`
+										} `json:"grants"`
+									} `json:"scope"`
+									Signature string `json:"signature"`
+									Subject   string `json:"subject"`
+								} `json:"alice"`
+								Bob struct {
+									AggregateInvocationBudget struct {
+										MaxInvocations int64 `json:"max_invocations"`
+										RootBinding    struct {
+											Body struct {
+												MaxInvocations     int64  `json:"max_invocations"`
+												RootCapabilityHash string `json:"root_capability_hash"`
+												RootCapabilityId   string `json:"root_capability_id"`
+												RootExpiresAt      int64  `json:"root_expires_at"`
+												RootIssuer         string `json:"root_issuer"`
+												RootScopeHash      string `json:"root_scope_hash"`
+												RootSubject        string `json:"root_subject"`
+												Schema             string `json:"schema"`
+											} `json:"body"`
+											Signature string `json:"signature"`
+										} `json:"root_binding"`
+										Scope string `json:"scope"`
+									} `json:"aggregate_invocation_budget"`
+									AttenuationProof struct {
+										ChildScopeHash        string `json:"childScopeHash"`
+										NormalizedSubsetProof struct {
+											AggregateBudget struct {
+												MaxInvocations    int64  `json:"max_invocations"`
+												RootBindingDigest string `json:"root_binding_digest"`
+											} `json:"aggregateBudget"`
+											NormalizedChildScope  string `json:"normalizedChildScope"`
+											NormalizedParentScope string `json:"normalizedParentScope"`
+											SubsetRelations       []struct {
+												ChildIndex  int64  `json:"childIndex"`
+												GrantKind   string `json:"grantKind"`
+												ParentIndex int64  `json:"parentIndex"`
+												Subset      bool   `json:"subset"`
+											} `json:"subsetRelations"`
+										} `json:"normalizedSubsetProof"`
+										ParentScopeHash string `json:"parentScopeHash"`
+									} `json:"attenuation_proof"`
+									BudgetShareBps  int64 `json:"budget_share_bps"`
+									DelegationChain []struct {
+										AggregateBudget struct {
+											MaxInvocations    int64  `json:"max_invocations"`
+											RootBindingDigest string `json:"root_binding_digest"`
+										} `json:"aggregate_budget"`
+										CapabilityId string `json:"capability_id"`
+										Delegatee    string `json:"delegatee"`
+										Delegator    string `json:"delegator"`
+										ScopeHash    string `json:"scope_hash"`
+										Signature    string `json:"signature"`
+										Timestamp    int64  `json:"timestamp"`
+									} `json:"delegation_chain"`
+									ExpiresAt int64  `json:"expires_at"`
+									Id        string `json:"id"`
+									IssuedAt  int64  `json:"issued_at"`
+									Issuer    string `json:"issuer"`
+									Schema    string `json:"schema"`
+									Scope     struct {
+										Grants []struct {
+											Operations []string `json:"operations"`
+											ServerId   string   `json:"server_id"`
+											ToolName   string   `json:"tool_name"`
+										} `json:"grants"`
+									} `json:"scope"`
+									Signature string `json:"signature"`
+									Subject   string `json:"subject"`
+								} `json:"bob"`
+								Carol struct {
+									AggregateInvocationBudget struct {
+										MaxInvocations int64 `json:"max_invocations"`
+										RootBinding    struct {
+											Body struct {
+												MaxInvocations     int64  `json:"max_invocations"`
+												RootCapabilityHash string `json:"root_capability_hash"`
+												RootCapabilityId   string `json:"root_capability_id"`
+												RootExpiresAt      int64  `json:"root_expires_at"`
+												RootIssuer         string `json:"root_issuer"`
+												RootScopeHash      string `json:"root_scope_hash"`
+												RootSubject        string `json:"root_subject"`
+												Schema             string `json:"schema"`
+											} `json:"body"`
+											Signature string `json:"signature"`
+										} `json:"root_binding"`
+										Scope string `json:"scope"`
+									} `json:"aggregate_invocation_budget"`
+									AttenuationProof struct {
+										ChildScopeHash        string `json:"childScopeHash"`
+										NormalizedSubsetProof struct {
+											AggregateBudget struct {
+												MaxInvocations    int64  `json:"max_invocations"`
+												RootBindingDigest string `json:"root_binding_digest"`
+											} `json:"aggregateBudget"`
+											NormalizedChildScope  string `json:"normalizedChildScope"`
+											NormalizedParentScope string `json:"normalizedParentScope"`
+											SubsetRelations       []struct {
+												ChildIndex  int64  `json:"childIndex"`
+												GrantKind   string `json:"grantKind"`
+												ParentIndex int64  `json:"parentIndex"`
+												Subset      bool   `json:"subset"`
+											} `json:"subsetRelations"`
+										} `json:"normalizedSubsetProof"`
+										ParentScopeHash string `json:"parentScopeHash"`
+									} `json:"attenuation_proof"`
+									BudgetShareBps  int64 `json:"budget_share_bps"`
+									DelegationChain []struct {
+										AggregateBudget struct {
+											MaxInvocations    int64  `json:"max_invocations"`
+											RootBindingDigest string `json:"root_binding_digest"`
+										} `json:"aggregate_budget"`
+										CapabilityId string `json:"capability_id"`
+										Delegatee    string `json:"delegatee"`
+										Delegator    string `json:"delegator"`
+										ScopeHash    string `json:"scope_hash"`
+										Signature    string `json:"signature"`
+										Timestamp    int64  `json:"timestamp"`
+									} `json:"delegation_chain"`
+									ExpiresAt int64  `json:"expires_at"`
+									Id        string `json:"id"`
+									IssuedAt  int64  `json:"issued_at"`
+									Issuer    string `json:"issuer"`
+									Schema    string `json:"schema"`
+									Scope     struct {
+										Grants []struct {
+											Operations []string `json:"operations"`
+											ServerId   string   `json:"server_id"`
+											ToolName   string   `json:"tool_name"`
+										} `json:"grants"`
+									} `json:"scope"`
+									Signature string `json:"signature"`
+									Subject   string `json:"subject"`
+								} `json:"carol"`
+								Dave struct {
+									AggregateInvocationBudget struct {
+										MaxInvocations int64 `json:"max_invocations"`
+										RootBinding    struct {
+											Body struct {
+												MaxInvocations     int64  `json:"max_invocations"`
+												RootCapabilityHash string `json:"root_capability_hash"`
+												RootCapabilityId   string `json:"root_capability_id"`
+												RootExpiresAt      int64  `json:"root_expires_at"`
+												RootIssuer         string `json:"root_issuer"`
+												RootScopeHash      string `json:"root_scope_hash"`
+												RootSubject        string `json:"root_subject"`
+												Schema             string `json:"schema"`
+											} `json:"body"`
+											Signature string `json:"signature"`
+										} `json:"root_binding"`
+										Scope string `json:"scope"`
+									} `json:"aggregate_invocation_budget"`
+									AttenuationProof struct {
+										ChildScopeHash        string `json:"childScopeHash"`
+										NormalizedSubsetProof struct {
+											AggregateBudget struct {
+												MaxInvocations    int64  `json:"max_invocations"`
+												RootBindingDigest string `json:"root_binding_digest"`
+											} `json:"aggregateBudget"`
+											NormalizedChildScope  string `json:"normalizedChildScope"`
+											NormalizedParentScope string `json:"normalizedParentScope"`
+											SubsetRelations       []struct {
+												ChildIndex  int64  `json:"childIndex"`
+												GrantKind   string `json:"grantKind"`
+												ParentIndex int64  `json:"parentIndex"`
+												Subset      bool   `json:"subset"`
+											} `json:"subsetRelations"`
+										} `json:"normalizedSubsetProof"`
+										ParentScopeHash string `json:"parentScopeHash"`
+									} `json:"attenuation_proof"`
+									BudgetShareBps  int64 `json:"budget_share_bps"`
+									DelegationChain []struct {
+										AggregateBudget struct {
+											MaxInvocations    int64  `json:"max_invocations"`
+											RootBindingDigest string `json:"root_binding_digest"`
+										} `json:"aggregate_budget"`
+										CapabilityId string `json:"capability_id"`
+										Delegatee    string `json:"delegatee"`
+										Delegator    string `json:"delegator"`
+										ScopeHash    string `json:"scope_hash"`
+										Signature    string `json:"signature"`
+										Timestamp    int64  `json:"timestamp"`
+									} `json:"delegation_chain"`
+									ExpiresAt int64  `json:"expires_at"`
+									Id        string `json:"id"`
+									IssuedAt  int64  `json:"issued_at"`
+									Issuer    string `json:"issuer"`
+									Schema    string `json:"schema"`
+									Scope     struct {
+										Grants []struct {
+											Operations []string `json:"operations"`
+											ServerId   string   `json:"server_id"`
+											ToolName   string   `json:"tool_name"`
+										} `json:"grants"`
+									} `json:"scope"`
+									Signature string `json:"signature"`
+									Subject   string `json:"subject"`
+								} `json:"dave"`
+								Root struct {
+									AggregateInvocationBudget struct {
+										MaxInvocations int64 `json:"max_invocations"`
+										RootBinding    struct {
+											Body struct {
+												MaxInvocations     int64  `json:"max_invocations"`
+												RootCapabilityHash string `json:"root_capability_hash"`
+												RootCapabilityId   string `json:"root_capability_id"`
+												RootExpiresAt      int64  `json:"root_expires_at"`
+												RootIssuer         string `json:"root_issuer"`
+												RootScopeHash      string `json:"root_scope_hash"`
+												RootSubject        string `json:"root_subject"`
+												Schema             string `json:"schema"`
+											} `json:"body"`
+											Signature string `json:"signature"`
+										} `json:"root_binding"`
+										Scope string `json:"scope"`
+									} `json:"aggregate_invocation_budget"`
+									ExpiresAt int64  `json:"expires_at"`
+									Id        string `json:"id"`
+									IssuedAt  int64  `json:"issued_at"`
+									Issuer    string `json:"issuer"`
+									Schema    string `json:"schema"`
+									Scope     struct {
+										Grants []struct {
+											Operations []string `json:"operations"`
+											ServerId   string   `json:"server_id"`
+											ToolName   string   `json:"tool_name"`
+										} `json:"grants"`
+									} `json:"scope"`
+									Signature string `json:"signature"`
+									Subject   string `json:"subject"`
+								} `json:"root"`
+							} `json:"capabilities"`
+							RecordSha256 string `json:"record_sha256"`
+							RuntimeId    string `json:"runtime_id"`
+						} `json:"parameters"`
+					} `json:"action"`
+					BoundaryClass      string `json:"boundary_class"`
+					CapabilityId       string `json:"capability_id"`
+					ContentHash        string `json:"content_hash"`
+					Id                 string `json:"id"`
+					KernelKey          string `json:"kernel_key"`
+					ObservationOutcome string `json:"observation_outcome"`
+					PolicyHash         string `json:"policy_hash"`
+					ReceiptKind        string `json:"receipt_kind"`
+					RedactionMode      string `json:"redaction_mode"`
+					Signature          string `json:"signature"`
+					Timestamp          int64  `json:"timestamp"`
+					ToolName           string `json:"tool_name"`
+					ToolOrigin         string `json:"tool_origin"`
+					ToolServer         string `json:"tool_server"`
+					TrustLevel         string `json:"trust_level"`
+				} `json:"bootstrap,omitempty"`
+				Context *struct {
+					CapabilityId string `json:"capability_id"`
+					ProcessId    string `json:"process_id"`
+					RuntimeId    string `json:"runtime_id"`
+				} `json:"context,omitempty"`
+				EvidenceId *string `json:"evidence_id,omitempty"`
+				FindingId  *string `json:"finding_id,omitempty"`
+				Kind       *string `json:"kind,omitempty"`
+				Nonce      *struct {
+					Operation struct {
+						Attachments []struct {
+							BrokerAttempt *struct {
+								AttemptId         string `json:"attempt_id"`
+								OperationId       string `json:"operation_id"`
+								TransportId       string `json:"transport_id"`
+								TransportKeyEpoch int64  `json:"transport_key_epoch"`
+							} `json:"BrokerAttempt,omitempty"`
+							BudgetHoldId                   *string `json:"BudgetHoldId,omitempty"`
+							ExecutionNonceId               *string `json:"ExecutionNonceId,omitempty"`
+							ExecutionNonceIssuanceDigest   *string `json:"ExecutionNonceIssuanceDigest,omitempty"`
+							ExecutionNoncePreflightDigest  *string `json:"ExecutionNoncePreflightDigest,omitempty"`
+							RuntimeParticipantLedgerDigest *string `json:"RuntimeParticipantLedgerDigest,omitempty"`
+							ToolOutcomeId                  *string `json:"ToolOutcomeId,omitempty"`
+						} `json:"attachments"`
+						Binding struct {
+							AuthenticatedTenantId       string `json:"authenticated_tenant_id"`
+							AuthorizationCapabilityHash string `json:"authorization_capability_hash"`
+							CapabilityId                string `json:"capability_id"`
+							CoordinatorAuthorityId      string `json:"coordinator_authority_id"`
+							EffectClass                 string `json:"effect_class"`
+							Kind                        string `json:"kind"`
+							OperationId                 string `json:"operation_id"`
+							PolicyHash                  string `json:"policy_hash"`
+							RequestBinding              struct {
+								ActionParameterHash     string `json:"action_parameter_hash"`
+								ImmutableRequestHash    string `json:"immutable_request_hash"`
+								ParticipantRequirements struct {
+									Approval                 bool `json:"approval"`
+									AuthorizationConsumption bool `json:"authorization_consumption"`
+									BrokerAttempt            bool `json:"broker_attempt"`
+									BudgetCapture            bool `json:"budget_capture"`
+									ExecutionNonce           bool `json:"execution_nonce"`
+									Obligation               bool `json:"obligation"`
+									ObservationAttemptZero   bool `json:"observation_attempt_zero"`
+									OutcomeEligibility       bool `json:"outcome_eligibility"`
+									Payment                  bool `json:"payment"`
+								} `json:"participant_requirements"`
+								RequestBindingHash string `json:"request_binding_hash"`
+							} `json:"request_binding"`
+							RequestId              string `json:"request_id"`
+							RequestNamespaceDigest string `json:"request_namespace_digest"`
+						} `json:"binding"`
+						CoordinatorLeaseEpoch int64 `json:"coordinator_lease_epoch"`
+						DispatchCommit        struct {
+							CommittedVersion      int64  `json:"committed_version"`
+							CoordinatorLeaseEpoch int64  `json:"coordinator_lease_epoch"`
+							CoordinatorLeaseId    string `json:"coordinator_lease_id"`
+							DispatchLaunch        struct {
+								NativeLaunch  *interface{} `json:"native_launch"`
+								WorkerProfile *interface{} `json:"worker_profile"`
+							} `json:"dispatch_launch"`
+							ProviderAttempt struct {
+								AttemptId         string `json:"attempt_id"`
+								OperationId       string `json:"operation_id"`
+								TransportId       string `json:"transport_id"`
+								TransportKeyEpoch int64  `json:"transport_key_epoch"`
+							} `json:"provider_attempt"`
+							StoreFence struct {
+								LeaseId    string `json:"lease_id"`
+								OwnerEpoch int64  `json:"owner_epoch"`
+								StoreUuid  string `json:"store_uuid"`
+							} `json:"store_fence"`
+						} `json:"dispatch_commit"`
+						DispatchState  string       `json:"dispatch_state"`
+						LastError      *interface{} `json:"last_error"`
+						Schema         string       `json:"schema"`
+						State          string       `json:"state"`
+						TerminalReplay struct {
+							Receipt struct {
+								ProjectionDigest string `json:"projection_digest"`
+								ReceiptId        string `json:"receipt_id"`
+							} `json:"receipt"`
+						} `json:"terminal_replay"`
+						Version int64 `json:"version"`
+					} `json:"operation"`
+					ReservedAtUnixMs int64 `json:"reserved_at_unix_ms"`
+					SignedNonce      struct {
+						Nonce struct {
+							BoundTo struct {
+								CapabilityId  string `json:"capability_id"`
+								ParameterHash string `json:"parameter_hash"`
+								RequestId     string `json:"request_id"`
+								SubjectId     string `json:"subject_id"`
+								ToolName      string `json:"tool_name"`
+								ToolServer    string `json:"tool_server"`
+							} `json:"bound_to"`
+							ExpiresAt int64  `json:"expires_at"`
+							IssuedAt  int64  `json:"issued_at"`
+							NonceId   string `json:"nonce_id"`
+							Schema    string `json:"schema"`
+						} `json:"nonce"`
+						Signature string `json:"signature"`
+					} `json:"signed_nonce"`
+					VerifiedAtUnixMs int64 `json:"verified_at_unix_ms"`
+				} `json:"nonce,omitempty"`
+				ObservedAtUnixMs *int64 `json:"observed_at_unix_ms,omitempty"`
+				Operation        *struct {
+					Binding struct {
+						AuthenticatedTenantId       string `json:"authenticated_tenant_id"`
+						AuthorizationCapabilityHash string `json:"authorization_capability_hash"`
+						CapabilityId                string `json:"capability_id"`
+						CoordinatorAuthorityId      string `json:"coordinator_authority_id"`
+						EffectClass                 string `json:"effect_class"`
+						Kind                        string `json:"kind"`
+						OperationId                 string `json:"operation_id"`
+						PolicyHash                  string `json:"policy_hash"`
+						RequestBinding              struct {
+							ActionParameterHash     string `json:"action_parameter_hash"`
+							ImmutableRequestHash    string `json:"immutable_request_hash"`
+							ParticipantRequirements struct {
+								Approval                 bool `json:"approval"`
+								AuthorizationConsumption bool `json:"authorization_consumption"`
+								BrokerAttempt            bool `json:"broker_attempt"`
+								BudgetCapture            bool `json:"budget_capture"`
+								ExecutionNonce           bool `json:"execution_nonce"`
+								Obligation               bool `json:"obligation"`
+								ObservationAttemptZero   bool `json:"observation_attempt_zero"`
+								OutcomeEligibility       bool `json:"outcome_eligibility"`
+								Payment                  bool `json:"payment"`
+							} `json:"participant_requirements"`
+							RequestBindingHash string `json:"request_binding_hash"`
+						} `json:"request_binding"`
+						RequestId              string `json:"request_id"`
+						RequestNamespaceDigest string `json:"request_namespace_digest"`
+					} `json:"binding"`
+					DispatchCommit struct {
+						CommittedVersion      int64  `json:"committed_version"`
+						CoordinatorLeaseEpoch int64  `json:"coordinator_lease_epoch"`
+						CoordinatorLeaseId    string `json:"coordinator_lease_id"`
+						DispatchLaunch        struct {
+							NativeLaunch  *interface{} `json:"native_launch"`
+							WorkerProfile *interface{} `json:"worker_profile"`
+						} `json:"dispatch_launch"`
+						ProviderAttempt struct {
+							AttemptId         string `json:"attempt_id"`
+							OperationId       string `json:"operation_id"`
+							TransportId       string `json:"transport_id"`
+							TransportKeyEpoch int64  `json:"transport_key_epoch"`
+						} `json:"provider_attempt"`
+						StoreFence struct {
+							LeaseId    string `json:"lease_id"`
+							OwnerEpoch int64  `json:"owner_epoch"`
+							StoreUuid  string `json:"store_uuid"`
+						} `json:"store_fence"`
+					} `json:"dispatch_commit"`
+					DispatchState                string `json:"dispatch_state"`
+					ExecutionNonceIssuanceDigest string `json:"execution_nonce_issuance_digest"`
+					History                      []struct {
+						Claim struct {
+							Intent struct {
+								EpisodeId          string `json:"episodeId"`
+								ExpectationId      string `json:"expectationId"`
+								GrantIndex         int64  `json:"grantIndex"`
+								Phase              string `json:"phase"`
+								PlanDigest         string `json:"planDigest"`
+								RequestBindingHash string `json:"requestBindingHash"`
+								Resources          []struct {
+									ArtifactDigest string `json:"artifactDigest"`
+									Kind           string `json:"kind"`
+									ResourceId     string `json:"resourceId"`
+								} `json:"resources"`
+								RuntimeAuthorityId string `json:"runtimeAuthorityId"`
+							} `json:"intent"`
+							LedgerDigest     string `json:"ledgerDigest"`
+							OperationId      string `json:"operationId"`
+							RecordedAtUnixMs int64  `json:"recordedAtUnixMs"`
+							Schema           string `json:"schema"`
+						} `json:"claim"`
+						History struct {
+							Disposition string `json:"disposition"`
+							Intent      struct {
+								EpisodeId          string `json:"episodeId"`
+								ExpectationId      string `json:"expectationId"`
+								GrantIndex         int64  `json:"grantIndex"`
+								Phase              string `json:"phase"`
+								PlanDigest         string `json:"planDigest"`
+								RequestBindingHash string `json:"requestBindingHash"`
+								Resources          []struct {
+									ArtifactDigest string `json:"artifactDigest"`
+									Kind           string `json:"kind"`
+									ResourceId     string `json:"resourceId"`
+								} `json:"resources"`
+								RuntimeAuthorityId string `json:"runtimeAuthorityId"`
+							} `json:"intent"`
+							Reference struct {
+								ClaimDigest string `json:"claimDigest"`
+								EpisodeId   string `json:"episodeId"`
+								OperationId string `json:"operationId"`
+							} `json:"reference"`
+						} `json:"history"`
+						Operation struct {
+							Attachments []struct {
+								BrokerAttempt *struct {
+									AttemptId         string `json:"attempt_id"`
+									OperationId       string `json:"operation_id"`
+									TransportId       string `json:"transport_id"`
+									TransportKeyEpoch int64  `json:"transport_key_epoch"`
+								} `json:"BrokerAttempt,omitempty"`
+								ExecutionNonceIssuanceDigest   *string `json:"ExecutionNonceIssuanceDigest,omitempty"`
+								ExecutionNoncePreflightDigest  *string `json:"ExecutionNoncePreflightDigest,omitempty"`
+								RuntimeParticipantLedgerDigest *string `json:"RuntimeParticipantLedgerDigest,omitempty"`
+							} `json:"attachments"`
+							Binding struct {
+								AuthenticatedTenantId       string `json:"authenticated_tenant_id"`
+								AuthorizationCapabilityHash string `json:"authorization_capability_hash"`
+								CapabilityId                string `json:"capability_id"`
+								CoordinatorAuthorityId      string `json:"coordinator_authority_id"`
+								EffectClass                 string `json:"effect_class"`
+								Kind                        string `json:"kind"`
+								OperationId                 string `json:"operation_id"`
+								PolicyHash                  string `json:"policy_hash"`
+								RequestBinding              struct {
+									ActionParameterHash     string `json:"action_parameter_hash"`
+									ImmutableRequestHash    string `json:"immutable_request_hash"`
+									ParticipantRequirements struct {
+										Approval                 bool `json:"approval"`
+										AuthorizationConsumption bool `json:"authorization_consumption"`
+										BrokerAttempt            bool `json:"broker_attempt"`
+										BudgetCapture            bool `json:"budget_capture"`
+										ExecutionNonce           bool `json:"execution_nonce"`
+										Obligation               bool `json:"obligation"`
+										ObservationAttemptZero   bool `json:"observation_attempt_zero"`
+										OutcomeEligibility       bool `json:"outcome_eligibility"`
+										Payment                  bool `json:"payment"`
+									} `json:"participant_requirements"`
+									RequestBindingHash string `json:"request_binding_hash"`
+								} `json:"request_binding"`
+								RequestId              string `json:"request_id"`
+								RequestNamespaceDigest string `json:"request_namespace_digest"`
+							} `json:"binding"`
+							CoordinatorLeaseEpoch int64        `json:"coordinator_lease_epoch"`
+							DispatchCommit        *interface{} `json:"dispatch_commit"`
+							DispatchState         string       `json:"dispatch_state"`
+							LastError             *interface{} `json:"last_error"`
+							Schema                string       `json:"schema"`
+							State                 string       `json:"state"`
+							TerminalReplay        *interface{} `json:"terminal_replay"`
+							Version               int64        `json:"version"`
+						} `json:"operation"`
+					} `json:"history"`
+					State          string `json:"state"`
+					TerminalReplay struct {
+						Receipt struct {
+							ProjectionDigest string `json:"projection_digest"`
+							ReceiptId        string `json:"receipt_id"`
+						} `json:"receipt"`
+					} `json:"terminal_replay"`
+					Version int64 `json:"version"`
+				} `json:"operation,omitempty"`
+				Path       *string `json:"path,omitempty"`
+				ReceiptLog *struct {
+					Checkpoint struct {
+						Body struct {
+							BatchEndSeq   int64  `json:"batch_end_seq"`
+							BatchStartSeq int64  `json:"batch_start_seq"`
+							ChainRoot     string `json:"chain_root"`
+							CheckpointSeq int64  `json:"checkpoint_seq"`
+							IssuedAt      int64  `json:"issued_at"`
+							KernelKey     string `json:"kernel_key"`
+							MerkleRoot    string `json:"merkle_root"`
+							Schema        string `json:"schema"`
+							TreeSize      int64  `json:"tree_size"`
+						} `json:"body"`
+						Signature string `json:"signature"`
+					} `json:"checkpoint"`
+					Inclusion struct {
+						CheckpointSeq int64  `json:"checkpoint_seq"`
+						LeafIndex     int64  `json:"leaf_index"`
+						MerkleRoot    string `json:"merkle_root"`
+						Proof         struct {
+							AuditPath []string `json:"audit_path"`
+							LeafIndex int64    `json:"leaf_index"`
+							TreeSize  int64    `json:"tree_size"`
+						} `json:"proof"`
+						ReceiptSeq int64 `json:"receipt_seq"`
+					} `json:"inclusion"`
+				} `json:"receipt_log,omitempty"`
+				Record  *string `json:"record,omitempty"`
+				Request *struct {
+					Arguments struct {
+						MessageKey string `json:"message_key"`
+						Payload    struct {
+							From string `json:"from"`
+						} `json:"payload"`
+					} `json:"arguments"`
+					KnownOutcomeOnly bool   `json:"known_outcome_only"`
+					OperationKey     string `json:"operation_key"`
+					ServerId         string `json:"server_id"`
+					ToolName         string `json:"tool_name"`
+				} `json:"request,omitempty"`
+				Response *struct {
+					ExecutionNonceJson *interface{} `json:"execution_nonce_json"`
+					Output             struct {
+						Kind  string `json:"kind"`
+						Value struct {
+							Sequence string `json:"sequence"`
+							Status   string `json:"status"`
+						} `json:"value"`
+					} `json:"output"`
+					Reason        *interface{} `json:"reason"`
+					ReceiptJson   string       `json:"receipt_json"`
+					RequestId     string       `json:"request_id"`
+					TerminalState struct {
+						State string `json:"state"`
+					} `json:"terminal_state"`
+					Verdict string `json:"verdict"`
+				} `json:"response,omitempty"`
+				RuntimeId    *string `json:"runtime_id,omitempty"`
+				Schema       *string `json:"schema,omitempty"`
+				TransitionId *string `json:"transition_id,omitempty"`
+				Value        *string `json:"value,omitempty"`
+			} `json:"parameters"`
+		} `json:"action"`
+		BoundaryClass string `json:"boundary_class"`
+		CapabilityId  string `json:"capability_id"`
+		ContentHash   string `json:"content_hash"`
+		Decision      *struct {
+			Reason  *string `json:"reason,omitempty"`
+			Verdict string  `json:"verdict"`
+		} `json:"decision,omitempty"`
+		Evidence *[]struct {
+			Details   *string `json:"details,omitempty"`
+			GuardName string  `json:"guard_name"`
+			Verdict   bool    `json:"verdict"`
+		} `json:"evidence,omitempty"`
+		KernelKey string `json:"kernel_key"`
+		Metadata  *struct {
+			ActiveDefenseBody *struct {
+				Body struct {
+					DispatchAuthorizationHash []int64 `json:"dispatch_authorization_hash"`
+					Effects                   []struct {
+						Effect struct {
+							ContributionHash        []int64 `json:"contribution_hash"`
+							EffectId                string  `json:"effect_id"`
+							Kind                    string  `json:"kind"`
+							ObservedBaseVersionHash []int64 `json:"observed_base_version_hash"`
+							Ordinal                 int64   `json:"ordinal"`
+							Target                  struct {
+								SessionId  string `json:"session_id"`
+								TargetType string `json:"target_type"`
+							} `json:"target"`
+						} `json:"effect"`
+						Outcome struct {
+							ResultingVersionHash []int64 `json:"resulting_version_hash"`
+							State                string  `json:"state"`
+						} `json:"outcome"`
+					} `json:"effects"`
+					ErrorCode         *interface{} `json:"error_code"`
+					ExecutionDispatch struct {
+						ActionId                     string  `json:"action_id"`
+						AdmissionArtifactFingerprint []int64 `json:"admission_artifact_fingerprint"`
+						Approval                     struct {
+							AdmissionOperationId      string  `json:"admission_operation_id"`
+							AdmissionOperationVersion int64   `json:"admission_operation_version"`
+							ApprovalMode              string  `json:"approval_mode"`
+							ApprovalSetHash           []int64 `json:"approval_set_hash"`
+						} `json:"approval"`
+						AuthorizationCapabilityHash []int64 `json:"authorization_capability_hash"`
+						AuthorizedAtUnixMs          int64   `json:"authorized_at_unix_ms"`
+						DispatchId                  string  `json:"dispatch_id"`
+						ExecutorAuthorityGeneration int64   `json:"executor_authority_generation"`
+						ExecutorAuthorityId         string  `json:"executor_authority_id"`
+						GovernedIntentHash          []int64 `json:"governed_intent_hash"`
+						PlanHash                    []int64 `json:"plan_hash"`
+						PolicyDecisionHash          []int64 `json:"policy_decision_hash"`
+						SchemaVersion               int64   `json:"schema_version"`
+						TenantId                    string  `json:"tenant_id"`
+					} `json:"execution_dispatch"`
+					FinalState string `json:"final_state"`
+					Header     struct {
+						OccurredAtUnixMs int64    `json:"occurred_at_unix_ms"`
+						PriorReceiptIds  []string `json:"prior_receipt_ids"`
+						SchemaVersion    int64    `json:"schema_version"`
+						TenantId         string   `json:"tenant_id"`
+						TransitionId     string   `json:"transition_id"`
+					} `json:"header"`
+					Response struct {
+						ActionId            string  `json:"action_id"`
+						AffectedSetHash     []int64 `json:"affected_set_hash"`
+						PlanExpiresAtUnixMs int64   `json:"plan_expires_at_unix_ms"`
+						PlanHash            []int64 `json:"plan_hash"`
+						Policy              struct {
+							PolicyHash    []int64 `json:"policy_hash"`
+							PolicyVersion string  `json:"policy_version"`
+						} `json:"policy"`
+						TriggerFindingHash      []int64 `json:"trigger_finding_hash"`
+						TriggerFindingId        string  `json:"trigger_finding_id"`
+						TriggerFindingReceiptId string  `json:"trigger_finding_receipt_id"`
+					} `json:"response"`
+					ResponseBodyHash   []int64 `json:"response_body_hash"`
+					ResponseGeneration int64   `json:"response_generation"`
+				} `json:"body"`
+				Kind string `json:"kind"`
+			} `json:"active_defense_body,omitempty"`
+			ActiveDefenseEvidenceId *string `json:"active_defense_evidence_id,omitempty"`
+			AdmissionOperation      *struct {
+				CompensationStatus        string `json:"compensation_status"`
+				CoordinatorLeaseEpoch     int64  `json:"coordinator_lease_epoch"`
+				CoordinatorLeaseId        string `json:"coordinator_lease_id"`
+				OperationId               string `json:"operation_id"`
+				ProjectedDispatchState    string `json:"projected_dispatch_state"`
+				ProjectedOperationVersion int64  `json:"projected_operation_version"`
+				ProjectedState            string `json:"projected_state"`
+				RequestBindingHash        string `json:"request_binding_hash"`
+				RequestId                 string `json:"request_id"`
+				RequestNamespaceDigest    string `json:"request_namespace_digest"`
+				RetainedDispatchCommit    struct {
+					CommittedVersion      int64  `json:"committed_version"`
+					CoordinatorLeaseEpoch int64  `json:"coordinator_lease_epoch"`
+					CoordinatorLeaseId    string `json:"coordinator_lease_id"`
+					DispatchLaunch        struct {
+						NativeLaunch  *interface{} `json:"native_launch"`
+						WorkerProfile *interface{} `json:"worker_profile"`
+					} `json:"dispatch_launch"`
+					ProviderAttempt struct {
+						AttemptId         string `json:"attempt_id"`
+						OperationId       string `json:"operation_id"`
+						TransportId       string `json:"transport_id"`
+						TransportKeyEpoch int64  `json:"transport_key_epoch"`
+					} `json:"provider_attempt"`
+					StoreFence struct {
+						LeaseId    string `json:"lease_id"`
+						OwnerEpoch int64  `json:"owner_epoch"`
+						StoreUuid  string `json:"store_uuid"`
+					} `json:"store_fence"`
+				} `json:"retained_dispatch_commit"`
+				Schema     string `json:"schema"`
+				StoreFence struct {
+					LeaseId    string `json:"lease_id"`
+					OwnerEpoch int64  `json:"owner_epoch"`
+					StoreUuid  string `json:"store_uuid"`
+				} `json:"store_fence"`
+				ToolOutcomeId      string `json:"tool_outcome_id"`
+				ToolOutcomeVersion int64  `json:"tool_outcome_version"`
+				TrustedTimeUnixMs  int64  `json:"trusted_time_unix_ms"`
+			} `json:"admission_operation,omitempty"`
+			Attribution *struct {
+				DelegationDepth int64  `json:"delegation_depth"`
+				GrantIndex      int64  `json:"grant_index"`
+				IssuerKey       string `json:"issuer_key"`
+				SubjectKey      string `json:"subject_key"`
+			} `json:"attribution,omitempty"`
+			BudgetAuthority *struct {
+				Authority struct {
+					AuthorityId string `json:"authority_id"`
+					LeaseEpoch  int64  `json:"lease_epoch"`
+					LeaseId     string `json:"lease_id"`
+				} `json:"authority"`
+				AuthorityProfile string `json:"authority_profile"`
+				Authorize        struct {
+					BudgetCommitIndex       int64  `json:"budget_commit_index"`
+					CommittedCostUnitsAfter int64  `json:"committed_cost_units_after"`
+					EventId                 string `json:"event_id"`
+					ExposureUnits           int64  `json:"exposure_units"`
+				} `json:"authorize"`
+				BudgetTerm      string `json:"budget_term"`
+				CleanupCustody  string `json:"cleanup_custody"`
+				GuaranteeLevel  string `json:"guarantee_level"`
+				HoldId          string `json:"hold_id"`
+				MeteringProfile string `json:"metering_profile"`
+				Terminal        struct {
+					BudgetCommitIndex       int64  `json:"budget_commit_index"`
+					CommittedCostUnitsAfter int64  `json:"committed_cost_units_after"`
+					Disposition             string `json:"disposition"`
+					EventId                 string `json:"event_id"`
+					ExposureUnits           int64  `json:"exposure_units"`
+					RealizedSpendUnits      int64  `json:"realized_spend_units"`
+				} `json:"terminal"`
+			} `json:"budget_authority,omitempty"`
+			ChioReceiptSigningNonce *string `json:"chio_receipt_signing_nonce,omitempty"`
+			ChioRuntime             *struct {
+				Accepted             *bool        `json:"accepted,omitempty"`
+				AdmissionId          *string      `json:"admission_id,omitempty"`
+				Destructive          *bool        `json:"destructive,omitempty"`
+				FailureCode          *interface{} `json:"failure_code"`
+				FederationTreatyDsse *struct {
+					CapabilityLeaseRef struct {
+						ExpiresAtUnixMs int64  `json:"expires_at_unix_ms"`
+						Issuer          string `json:"issuer"`
+						LeaseId         string `json:"lease_id"`
+					} `json:"capability_lease_ref"`
+					ConsistencyAnchor    string `json:"consistency_anchor"`
+					ConsistencyModel     string `json:"consistency_model"`
+					CrossOrgVisibility   string `json:"cross_org_visibility"`
+					GovernanceReceiptRef struct {
+						Digest struct {
+							Alg   string `json:"alg"`
+							Value string `json:"value"`
+						} `json:"digest"`
+						KernelId  string `json:"kernel_id"`
+						ReceiptId string `json:"receipt_id"`
+					} `json:"governance_receipt_ref"`
+					PolicyEvaluationSummary struct {
+						JointDisposition string `json:"joint_disposition"`
+						ServerAVerdict   struct {
+							PolicyId      string `json:"policy_id"`
+							PolicyVersion string `json:"policy_version"`
+							Verdict       string `json:"verdict"`
+						} `json:"server_a_verdict"`
+						ServerBVerdict struct {
+							PolicyId      string `json:"policy_id"`
+							PolicyVersion string `json:"policy_version"`
+							Verdict       string `json:"verdict"`
+						} `json:"server_b_verdict"`
+					} `json:"policy_evaluation_summary"`
+					TreatyBindingRef struct {
+						ActionClassId            string   `json:"action_class_id"`
+						AdmissionReportSha256    string   `json:"admission_report_sha256"`
+						ConsistencyModel         string   `json:"consistency_model"`
+						ContinuationSha256       string   `json:"continuation_sha256"`
+						GovernanceRefs           []string `json:"governance_refs"`
+						LadderIntersectionSha256 string   `json:"ladder_intersection_sha256"`
+						LeaseRefs                []string `json:"lease_refs"`
+						LineageBundleSha256      string   `json:"lineage_bundle_sha256"`
+						LocalReceiptSha256       string   `json:"local_receipt_sha256"`
+						OutcomeSha256            string   `json:"outcome_sha256"`
+						RemoteReceiptSha256      string   `json:"remote_receipt_sha256"`
+						RequestSha256            string   `json:"request_sha256"`
+						SignerKernelIds          []string `json:"signer_kernel_ids"`
+						TreatyId                 string   `json:"treaty_id"`
+						TreatyScopeSha256        string   `json:"treaty_scope_sha256"`
+					} `json:"treaty_binding_ref"`
+				} `json:"federation_treaty_dsse,omitempty"`
+				GovernanceReceiptId  *string `json:"governance_receipt_id,omitempty"`
+				IdentityDisposition  *string `json:"identity_disposition,omitempty"`
+				LeaseId              *string `json:"lease_id,omitempty"`
+				OperationOwnedReplay *struct {
+					BundleSha256 string `json:"bundle_sha256"`
+					PlanSha256   string `json:"plan_sha256"`
+					Reference    struct {
+						ClaimDigest string `json:"claimDigest"`
+						EpisodeId   string `json:"episodeId"`
+						OperationId string `json:"operationId"`
+					} `json:"reference"`
+					ResourcesSha256      string `json:"resources_sha256"`
+					SwarmEvidenceSha256  string `json:"swarm_evidence_sha256"`
+					TreatyEvidenceSha256 string `json:"treaty_evidence_sha256"`
+				} `json:"operation_owned_replay,omitempty"`
+				PheromoneAdvisory *struct {
+					Accepted              bool    `json:"accepted"`
+					DistinctOriginPairs   int64   `json:"distinctOriginPairs"`
+					EvaluatedAtUnixMs     int64   `json:"evaluatedAtUnixMs"`
+					ObserveOnly           bool    `json:"observeOnly"`
+					ReputationEpoch       int64   `json:"reputationEpoch"`
+					SourceReportSha256    string  `json:"sourceReportSha256"`
+					SubjectClass          string  `json:"subjectClass"`
+					SubjectClassNamespace string  `json:"subjectClassNamespace"`
+					TotalStrength         float32 `json:"totalStrength"`
+				} `json:"pheromone_advisory,omitempty"`
+				PheromonePolicyDecision *struct {
+					Decision          string `json:"decision"`
+					Enforced          bool   `json:"enforced"`
+					PeerWeightsSha256 string `json:"peerWeightsSha256"`
+					PolicyId          string `json:"policyId"`
+					PolicySha256      string `json:"policySha256"`
+					QueryReportSha256 string `json:"queryReportSha256"`
+					ReasonCode        string `json:"reasonCode"`
+					ReputationEpoch   int64  `json:"reputationEpoch"`
+					Schema            string `json:"schema"`
+				} `json:"pheromone_policy_decision,omitempty"`
+				StepIndex                   *int64  `json:"step_index,omitempty"`
+				TrustBundleSha256           *string `json:"trust_bundle_sha256,omitempty"`
+				VerificationContextSha256   *string `json:"verification_context_sha256,omitempty"`
+				VerifiedSwarmRequestBinding *struct {
+					CapabilitySha256   string `json:"capability_sha256"`
+					EvidenceRefsSha256 string `json:"evidence_refs_sha256"`
+					GraphId            string `json:"graph_id"`
+					ScopeSha256        string `json:"scope_sha256"`
+					TaskId             string `json:"task_id"`
+				} `json:"verified_swarm_request_binding,omitempty"`
+				VerifiedSwarmRouteMetadata *struct {
+					Route struct {
+						Bridge         string `json:"bridge"`
+						ProtocolTarget string `json:"protocolTarget"`
+						SelectedRoute  string `json:"selectedRoute"`
+					} `json:"route"`
+				} `json:"verified_swarm_route_metadata,omitempty"`
+				WorkflowGrantId *string `json:"workflow_grant_id,omitempty"`
+				WorkflowId      *string `json:"workflow_id,omitempty"`
+			} `json:"chio_runtime,omitempty"`
+			DeliveryContract *struct {
+				ExpectedDigest string `json:"expected_digest"`
+				ObservedDigest string `json:"observed_digest"`
+				Result         string `json:"result"`
+				Schema         string `json:"schema"`
+			} `json:"delivery_contract,omitempty"`
+			ExecutionNonce *struct {
+				Stage          string `json:"stage"`
+				ToolDispatched bool   `json:"tool_dispatched"`
+			} `json:"execution_nonce,omitempty"`
+			Financial *struct {
+				BudgetRemaining int64 `json:"budget_remaining"`
+				BudgetTotal     int64 `json:"budget_total"`
+				CostBreakdown   struct {
+					Payment struct {
+						AuthorizationId     string       `json:"authorization_id"`
+						BudgetExposureUnits int64        `json:"budget_exposure_units"`
+						PreauthorizedUnits  int64        `json:"preauthorized_units"`
+						PricingFailure      *interface{} `json:"pricing_failure"`
+						Rail                string       `json:"rail"`
+						RailMode            string       `json:"rail_mode"`
+						RecordedUnits       int64        `json:"recorded_units"`
+						ReportedCost        struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"reported_cost"`
+						TransactionId string `json:"transaction_id"`
+					} `json:"payment"`
+				} `json:"cost_breakdown"`
+				CostCharged      int64  `json:"cost_charged"`
+				Currency         string `json:"currency"`
+				DelegationDepth  int64  `json:"delegation_depth"`
+				GrantIndex       int64  `json:"grant_index"`
+				PaymentReference string `json:"payment_reference"`
+				RootBudgetHolder string `json:"root_budget_holder"`
+				SettlementStatus string `json:"settlement_status"`
+			} `json:"financial,omitempty"`
+			FindingDelivery *struct {
+				AcceptedBidEnvelopeSha256       string `json:"accepted_bid_envelope_sha256"`
+				AuthoritativePaymentOperationId string `json:"authoritative_payment_operation_id"`
+				DigestCheck                     string `json:"digest_check"`
+				FindingId                       string `json:"finding_id"`
+				ListingId                       string `json:"listing_id"`
+				MediaTypeCheck                  string `json:"media_type_check"`
+				PurchaseIntentId                string `json:"purchase_intent_id"`
+				ReservationId                   string `json:"reservation_id"`
+				Schema                          string `json:"schema"`
+				SettlementMode                  string `json:"settlement_mode"`
+				StatusProof                     struct {
+					FeedId                    string `json:"feed_id"`
+					KeyDomainNonce            int64  `json:"key_domain_nonce"`
+					MapEpoch                  int64  `json:"map_epoch"`
+					NonInclusionCheckedAt     int64  `json:"non_inclusion_checked_at"`
+					ProofSha256               string `json:"proof_sha256"`
+					RootHash                  string `json:"root_hash"`
+					StatusEpochArtifactSha256 string `json:"status_epoch_artifact_sha256"`
+				} `json:"status_proof"`
+				TransformProfile             string `json:"transform_profile"`
+				VenueAdmissionEnvelopeSha256 string `json:"venue_admission_envelope_sha256"`
+			} `json:"finding_delivery,omitempty"`
+			FindingPurchaseReplaySnapshot *struct {
+				Purchase struct {
+					AcceptedBidEnvelopeSha256 string `json:"accepted_bid_envelope_sha256"`
+					AcceptedPrice             struct {
+						Currency string `json:"currency"`
+						Units    int64  `json:"units"`
+					} `json:"accepted_price"`
+					AuthoritativePaymentOperationId string `json:"authoritative_payment_operation_id"`
+					ExpectedStatusFeedId            string `json:"expected_status_feed_id"`
+					FindingId                       string `json:"finding_id"`
+					ListingId                       string `json:"listing_id"`
+					PayerKeyHex                     string `json:"payer_key_hex"`
+					PayloadMediaType                string `json:"payload_media_type"`
+					PayloadSha256                   string `json:"payload_sha256"`
+					PurchaseIntentId                string `json:"purchase_intent_id"`
+					ReservationId                   string `json:"reservation_id"`
+					StatusProof                     struct {
+						FeedId                      string `json:"feed_id"`
+						KeyDomainNonce              int64  `json:"key_domain_nonce"`
+						MapEpoch                    int64  `json:"map_epoch"`
+						NonInclusionCheckedAt       int64  `json:"non_inclusion_checked_at"`
+						OperatorAuthorizationSha256 string `json:"operator_authorization_sha256"`
+						ProofSha256                 string `json:"proof_sha256"`
+						RootHash                    string `json:"root_hash"`
+						ServiceBondEvidenceSha256   string `json:"service_bond_evidence_sha256"`
+						StatusEpochArtifactSha256   string `json:"status_epoch_artifact_sha256"`
+						StatusEpochId               string `json:"status_epoch_id"`
+					} `json:"status_proof"`
+					VenueAdmissionEnvelopeSha256 string `json:"venue_admission_envelope_sha256"`
+				} `json:"purchase"`
+				Schema string `json:"schema"`
+			} `json:"finding_purchase_replay_snapshot,omitempty"`
+			GovernedTransaction *struct {
+				Approval *struct {
+					ApprovalArtifactDigest string `json:"approval_artifact_digest"`
+					Approved               bool   `json:"approved"`
+					ApproverKey            string `json:"approver_key"`
+					TokenId                string `json:"token_id"`
+				} `json:"approval,omitempty"`
+				Autonomy *struct {
+					DelegationBondId string `json:"delegationBondId"`
+					Tier             string `json:"tier"`
+				} `json:"autonomy,omitempty"`
+				CallChain *struct {
+					ChainId          string   `json:"chainId"`
+					DelegatorSubject string   `json:"delegatorSubject"`
+					EvidenceClass    string   `json:"evidenceClass"`
+					EvidenceSources  []string `json:"evidenceSources"`
+					OriginSubject    string   `json:"originSubject"`
+					ParentReceiptId  string   `json:"parentReceiptId"`
+					ParentRequestId  string   `json:"parentRequestId"`
+					UpstreamProof    struct {
+						ChainId          string `json:"chainId"`
+						DelegatorSubject string `json:"delegatorSubject"`
+						ExpiresAt        int64  `json:"expiresAt"`
+						IssuedAt         int64  `json:"issuedAt"`
+						OriginSubject    string `json:"originSubject"`
+						ParentReceiptId  string `json:"parentReceiptId"`
+						ParentRequestId  string `json:"parentRequestId"`
+						Signature        string `json:"signature"`
+						Signer           string `json:"signer"`
+						Subject          string `json:"subject"`
+					} `json:"upstreamProof"`
+				} `json:"call_chain,omitempty"`
+				Commerce *struct {
+					Seller                   string `json:"seller"`
+					SettlementDestinationRef string `json:"settlement_destination_ref"`
+					SharedPaymentTokenId     string `json:"shared_payment_token_id"`
+				} `json:"commerce,omitempty"`
+				EconomicAuthorization *struct {
+					AmountBounds struct {
+						ApprovedMax struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"approved_max"`
+						HoldAmount struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"hold_amount"`
+						SettlementCap struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"settlement_cap"`
+					} `json:"amount_bounds"`
+					Budget struct {
+						BudgetRemaining  int64  `json:"budget_remaining"`
+						BudgetTotal      int64  `json:"budget_total"`
+						CostCharged      int64  `json:"cost_charged"`
+						Currency         string `json:"currency"`
+						DelegationDepth  int64  `json:"delegation_depth"`
+						GrantIndex       int64  `json:"grant_index"`
+						RootBudgetHolder string `json:"root_budget_holder"`
+					} `json:"budget"`
+					CreditAuthorityDigest string `json:"credit_authority_digest"`
+					EconomicIntentDigest  string `json:"economic_intent_digest"`
+					EconomicMode          string `json:"economic_mode"`
+					LiabilityRefs         struct {
+						BondId           string `json:"bond_id"`
+						DisputePolicyRef string `json:"dispute_policy_ref"`
+						PolicyId         string `json:"policy_id"`
+					} `json:"liability_refs"`
+					Merchant struct {
+						MerchantId       string `json:"merchant_id"`
+						MerchantOfRecord string `json:"merchant_of_record"`
+						OrderRef         string `json:"order_ref"`
+					} `json:"merchant"`
+					Metering struct {
+						BillingUnit      string `json:"billing_unit"`
+						MaxBillableUnits int64  `json:"max_billable_units"`
+						MeterProfileHash string `json:"meter_profile_hash"`
+						Provider         string `json:"provider"`
+					} `json:"metering"`
+					Payee struct {
+						BeneficiaryId            string `json:"beneficiary_id"`
+						SettlementDestinationRef string `json:"settlement_destination_ref"`
+					} `json:"payee"`
+					PayeeBindingDigest string `json:"payee_binding_digest"`
+					Payer              struct {
+						CustodyProvider  string `json:"custody_provider"`
+						FundingSourceRef string `json:"funding_source_ref"`
+						ObligorRef       string `json:"obligor_ref"`
+						PartyId          string `json:"party_id"`
+					} `json:"payer"`
+					PreActionAuthorityDigest string `json:"pre_action_authority_digest"`
+					PricingBasis             struct {
+						QuoteExpiry int64  `json:"quote_expiry"`
+						QuoteHash   string `json:"quote_hash"`
+						TariffHash  string `json:"tariff_hash"`
+					} `json:"pricing_basis"`
+					Rail struct {
+						Asset                string `json:"asset"`
+						ContractOrAccountRef string `json:"contract_or_account_ref"`
+						Facilitator          string `json:"facilitator"`
+						Kind                 string `json:"kind"`
+						Network              string `json:"network"`
+					} `json:"rail"`
+					Settlement struct {
+						SettlementStatus string `json:"settlement_status"`
+					} `json:"settlement"`
+					Version string `json:"version"`
+				} `json:"economic_authorization,omitempty"`
+				IntentHash string `json:"intent_hash"`
+				IntentId   string `json:"intent_id"`
+				MaxAmount  *struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"max_amount,omitempty"`
+				MeteredBilling *struct {
+					MaxBilledUnits int64 `json:"maxBilledUnits"`
+					Quote          struct {
+						BillingUnit string `json:"billingUnit"`
+						ExpiresAt   int64  `json:"expiresAt"`
+						IssuedAt    int64  `json:"issuedAt"`
+						Provider    string `json:"provider"`
+						QuoteId     string `json:"quoteId"`
+						QuotedCost  struct {
+							Currency string `json:"currency"`
+							Units    int64  `json:"units"`
+						} `json:"quotedCost"`
+						QuotedUnits int64 `json:"quotedUnits"`
+					} `json:"quote"`
+					SettlementMode string `json:"settlementMode"`
+					UsageEvidence  struct {
+						EvidenceId     string `json:"evidenceId"`
+						EvidenceKind   string `json:"evidenceKind"`
+						EvidenceSha256 string `json:"evidenceSha256"`
+						ObservedUnits  int64  `json:"observedUnits"`
+					} `json:"usageEvidence"`
+				} `json:"metered_billing,omitempty"`
+				Purpose          string `json:"purpose"`
+				RuntimeAssurance *struct {
+					EvidenceSha256 string `json:"evidenceSha256"`
+					Schema         string `json:"schema"`
+					Tier           string `json:"tier"`
+					Verifier       string `json:"verifier"`
+					VerifierFamily string `json:"verifierFamily"`
+				} `json:"runtime_assurance,omitempty"`
+				ServerId string `json:"server_id"`
+				ToolName string `json:"tool_name"`
+			} `json:"governed_transaction,omitempty"`
+			OccurredAtUnixMs *int64 `json:"occurred_at_unix_ms,omitempty"`
+			ReceiptContext   *struct {
+				RequestId              string  `json:"request_id"`
+				RequestNamespaceDigest *string `json:"request_namespace_digest,omitempty"`
+			} `json:"receipt_context,omitempty"`
+			Route *struct {
+				Bridge         string `json:"bridge"`
+				ProtocolTarget string `json:"protocolTarget"`
+				SelectedRoute  string `json:"selectedRoute"`
+			} `json:"route,omitempty"`
+		} `json:"metadata,omitempty"`
+		ObservationOutcome *string `json:"observation_outcome,omitempty"`
+		PolicyHash         string  `json:"policy_hash"`
+		ReceiptKind        string  `json:"receipt_kind"`
+		RedactionMode      string  `json:"redaction_mode"`
+		TenantId           *string `json:"tenant_id,omitempty"`
+		Timestamp          int64   `json:"timestamp"`
+		ToolName           string  `json:"tool_name"`
+		ToolOrigin         string  `json:"tool_origin"`
+		ToolServer         string  `json:"tool_server"`
+		TrustLevel         string  `json:"trust_level"`
+	} `json:"body"`
+	Id string `json:"id"`
+}
+
+// ReceiptReceiptLineageStatementBody defines model for ReceiptReceiptLineageStatementBody.
+type ReceiptReceiptLineageStatementBody struct {
+	ChildReceiptId     string `json:"childReceiptId"`
+	ChildRequestId     string `json:"childRequestId"`
+	ChildSessionAnchor struct {
+		SessionAnchorHash string `json:"sessionAnchorHash"`
+		SessionAnchorId   string `json:"sessionAnchorId"`
+	} `json:"childSessionAnchor"`
+	ContinuationTokenId *string `json:"continuationTokenId,omitempty"`
+	EvidenceClass       string  `json:"evidenceClass"`
+	Id                  string  `json:"id"`
+	IssuedAt            int64   `json:"issuedAt"`
+	KernelKey           string  `json:"kernelKey"`
+	ParentReceiptId     string  `json:"parentReceiptId"`
+	ParentRequestId     string  `json:"parentRequestId"`
+	ParentSessionAnchor struct {
+		SessionAnchorHash string `json:"sessionAnchorHash"`
+		SessionAnchorId   string `json:"sessionAnchorId"`
+	} `json:"parentSessionAnchor"`
+	RelationKind string                                   `json:"relationKind"`
+	Schema       ReceiptReceiptLineageStatementBodySchema `json:"schema"`
+}
+
+// ReceiptReceiptLineageStatementBodySchema defines model for ReceiptReceiptLineageStatementBody.Schema.
+type ReceiptReceiptLineageStatementBodySchema string
+
 // ReceiptRecord A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput.
 type ReceiptRecord struct {
 	// Action Describes the tool call that was evaluated. Mirrors `ToolCallAction`.
@@ -19649,6 +26017,12 @@ type ReceiptSettlementClosureSchema string
 
 // ReceiptSettlementClosureAsset Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
 type ReceiptSettlementClosureAsset = string
+
+// ReceiptSettlementClosureBody defines model for ReceiptSettlementClosureBody.
+type ReceiptSettlementClosureBody struct {
+	Fixture string `json:"fixture"`
+	N       int64  `json:"n"`
+}
 
 // ReceiptSettlementClosureRailRef defines model for ReceiptSettlementClosureRailRef.
 type ReceiptSettlementClosureRailRef struct {
@@ -22951,6 +29325,63 @@ type RecoveryProviderFinalityScope struct {
 	TenantId        RecoveryProviderFinalityOpaqueId `json:"tenant_id"`
 }
 
+// RecoveryRecoveryGrantBody defines model for RecoveryRecoveryGrantBody.
+type RecoveryRecoveryGrantBody struct {
+	Claims struct {
+		AgentId              string  `json:"agent_id"`
+		AuthorityKeyId       string  `json:"authority_key_id"`
+		CapabilityId         string  `json:"capability_id"`
+		DestinationId        string  `json:"destination_id"`
+		DomainVersion        int64   `json:"domain_version"`
+		ExpiresAtUnixSeconds int64   `json:"expires_at_unix_seconds"`
+		GrantId              string  `json:"grant_id"`
+		IssuedAtUnixSeconds  int64   `json:"issued_at_unix_seconds"`
+		Purpose              string  `json:"purpose"`
+		RequestHash          []int64 `json:"request_hash"`
+		SessionId            string  `json:"session_id"`
+		SourceLabelHash      []int64 `json:"source_label_hash"`
+		SubjectId            string  `json:"subject_id"`
+		TargetLabel          struct {
+			Compartments []string `json:"compartments"`
+			Kind         string   `json:"kind"`
+			Owners       struct {
+				Bob *[]string `json:"bob,omitempty"`
+			} `json:"owners"`
+		} `json:"target_label"`
+		TenantId string `json:"tenant_id"`
+		ToolName string `json:"tool_name"`
+	} `json:"claims"`
+	Recovery struct {
+		ActionIntent              []int64 `json:"action_intent"`
+		ApprovalIntent            string  `json:"approval_intent"`
+		ApprovedPlan              []int64 `json:"approved_plan"`
+		AuthorityDomain           string  `json:"authority_domain"`
+		AuthorityScope            []int64 `json:"authority_scope"`
+		AuthorizationRequirements []int64 `json:"authorization_requirements"`
+		Challenge                 string  `json:"challenge"`
+		ContinuationId            string  `json:"continuation_id"`
+		ContractDigest            []int64 `json:"contract_digest"`
+		CoverageDigest            []int64 `json:"coverage_digest"`
+		IsolationEpoch            int64   `json:"isolation_epoch"`
+		IsolationLineage          string  `json:"isolation_lineage"`
+		OutputDisposition         []int64 `json:"output_disposition"`
+		PolicyDigest              []int64 `json:"policy_digest"`
+		ProcessId                 string  `json:"process_id"`
+		RequestId                 string  `json:"request_id"`
+		RequestNamespace          []int64 `json:"request_namespace"`
+		Schema                    string  `json:"schema"`
+		SelectedOffer             []int64 `json:"selected_offer"`
+		StepId                    string  `json:"step_id"`
+		Version                   int64   `json:"version"`
+		WorkflowId                string  `json:"workflow_id"`
+	} `json:"recovery"`
+	Schema  RecoveryRecoveryGrantBodySchema `json:"schema"`
+	Version int64                           `json:"version"`
+}
+
+// RecoveryRecoveryGrantBodySchema defines model for RecoveryRecoveryGrantBody.Schema.
+type RecoveryRecoveryGrantBodySchema string
+
 // RecoveryRecoverySetupProbe defines model for RecoveryRecoverySetupProbe.
 type RecoveryRecoverySetupProbe struct {
 	BenignWorkflow   RecoveryRecoverySetupProbeOpaqueId         `json:"benign_workflow"`
@@ -23014,6 +29445,167 @@ type RecoveryRecoverySetupReportScope struct {
 	AuthorityDomain RecoveryRecoverySetupReportOpaqueId `json:"authority_domain"`
 	ProcessId       RecoveryRecoverySetupReportOpaqueId `json:"process_id"`
 	TenantId        RecoveryRecoverySetupReportOpaqueId `json:"tenant_id"`
+}
+
+// RecoveryRecoverySignedConfinedDisclosureBody defines model for RecoveryRecoverySignedConfinedDisclosureBody.
+type RecoveryRecoverySignedConfinedDisclosureBody struct {
+	Artifact struct {
+		Artifact   string  `json:"artifact"`
+		Provenance []int64 `json:"provenance"`
+		Scope      struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Version string `json:"version"`
+	} `json:"artifact"`
+	Boundary        []int64 `json:"boundary"`
+	Content         []int64 `json:"content"`
+	Contract        []int64 `json:"contract"`
+	DomainVersion   int64   `json:"domain_version"`
+	Evidence        string  `json:"evidence"`
+	ExpiresAtUnixMs int64   `json:"expires_at_unix_ms"`
+	Implementation  []int64 `json:"implementation"`
+	Influence       struct {
+		Commitment           []int64 `json:"commitment"`
+		ExternallyInfluenced bool    `json:"externally_influenced"`
+		Unknown              bool    `json:"unknown"`
+	} `json:"influence"`
+	IssuedAtUnixMs int64   `json:"issued_at_unix_ms"`
+	Launch         []int64 `json:"launch"`
+	Observation    struct {
+		Artifact   string  `json:"artifact"`
+		Provenance []int64 `json:"provenance"`
+		Scope      struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Version string `json:"version"`
+	} `json:"observation"`
+	Parent struct {
+		Clearance struct {
+			Compartments []string               `json:"compartments"`
+			Kind         string                 `json:"kind"`
+			Owners       map[string]interface{} `json:"owners"`
+		} `json:"clearance"`
+		ContextGeneration int64  `json:"context_generation"`
+		IsolationEpoch    string `json:"isolation_epoch"`
+		Lineage           string `json:"lineage"`
+		Principal         string `json:"principal"`
+		Recipient         string `json:"recipient"`
+		Runtime           string `json:"runtime"`
+		Scope             struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Sink struct {
+			Kind string `json:"kind"`
+		} `json:"sink"`
+	} `json:"parent"`
+	Policy    []int64 `json:"policy"`
+	SizeBytes int64   `json:"size_bytes"`
+	Source    struct {
+		Compartments []string               `json:"compartments"`
+		Kind         string                 `json:"kind"`
+		Owners       map[string]interface{} `json:"owners"`
+	} `json:"source"`
+	Target struct {
+		Compartments []string               `json:"compartments"`
+		Kind         string                 `json:"kind"`
+		Owners       map[string]interface{} `json:"owners"`
+	} `json:"target"`
+}
+
+// RecoveryRecoverySignedConfinedEndorsementBody defines model for RecoveryRecoverySignedConfinedEndorsementBody.
+type RecoveryRecoverySignedConfinedEndorsementBody struct {
+	Artifact struct {
+		Artifact   string  `json:"artifact"`
+		Provenance []int64 `json:"provenance"`
+		Scope      struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Version string `json:"version"`
+	} `json:"artifact"`
+	Boundary        []int64 `json:"boundary"`
+	Content         []int64 `json:"content"`
+	Contract        []int64 `json:"contract"`
+	DomainVersion   int64   `json:"domain_version"`
+	Evidence        string  `json:"evidence"`
+	ExpiresAtUnixMs int64   `json:"expires_at_unix_ms"`
+	Implementation  []int64 `json:"implementation"`
+	Influence       struct {
+		Commitment           []int64 `json:"commitment"`
+		ExternallyInfluenced bool    `json:"externally_influenced"`
+		Unknown              bool    `json:"unknown"`
+	} `json:"influence"`
+	IssuedAtUnixMs int64   `json:"issued_at_unix_ms"`
+	Launch         []int64 `json:"launch"`
+	Observation    struct {
+		Artifact   string  `json:"artifact"`
+		Provenance []int64 `json:"provenance"`
+		Scope      struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Version string `json:"version"`
+	} `json:"observation"`
+	Parent struct {
+		Clearance struct {
+			Compartments []string               `json:"compartments"`
+			Kind         string                 `json:"kind"`
+			Owners       map[string]interface{} `json:"owners"`
+		} `json:"clearance"`
+		ContextGeneration int64  `json:"context_generation"`
+		IsolationEpoch    string `json:"isolation_epoch"`
+		Lineage           string `json:"lineage"`
+		Principal         string `json:"principal"`
+		Recipient         string `json:"recipient"`
+		Runtime           string `json:"runtime"`
+		Scope             struct {
+			AuthorityDomain string `json:"authority_domain"`
+			ProcessId       string `json:"process_id"`
+			TenantId        string `json:"tenant_id"`
+		} `json:"scope"`
+		Sink struct {
+			Kind string `json:"kind"`
+		} `json:"sink"`
+	} `json:"parent"`
+	Policy    []int64 `json:"policy"`
+	SizeBytes int64   `json:"size_bytes"`
+	Source    struct {
+		Compartments []string               `json:"compartments"`
+		Kind         string                 `json:"kind"`
+		Owners       map[string]interface{} `json:"owners"`
+	} `json:"source"`
+	Target struct {
+		Compartments []string               `json:"compartments"`
+		Kind         string                 `json:"kind"`
+		Owners       map[string]interface{} `json:"owners"`
+	} `json:"target"`
+}
+
+// RecoveryRecoverySignedPolicyDeploymentChangeBody defines model for RecoveryRecoverySignedPolicyDeploymentChangeBody.
+type RecoveryRecoverySignedPolicyDeploymentChangeBody struct {
+	BaseDeployment []int64 `json:"base_deployment"`
+	BaseGeneration int64   `json:"base_generation"`
+	BasePolicy     []int64 `json:"base_policy"`
+	DomainVersion  int64   `json:"domain_version"`
+	ProposalDigest []int64 `json:"proposal_digest"`
+	ProposalId     string  `json:"proposal_id"`
+	Scope          struct {
+		AuthorityDomain string `json:"authority_domain"`
+		ProcessId       string `json:"process_id"`
+		TenantId        string `json:"tenant_id"`
+	} `json:"scope"`
+	TargetDeployment []int64 `json:"target_deployment"`
+	TargetGeneration int64   `json:"target_generation"`
+	TargetPolicy     []int64 `json:"target_policy"`
+	WriterFence      []int64 `json:"writer_fence"`
 }
 
 // RecoveryRemedyRegistry defines model for RecoveryRemedyRegistry.
@@ -25870,6 +32462,83 @@ type ResultStreamComplete struct {
 // ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
 type ResultStreamCompleteStatus string
 
+// RiskRiskAdjudicationJurisdictionReceiptBody defines model for RiskRiskAdjudicationJurisdictionReceiptBody.
+type RiskRiskAdjudicationJurisdictionReceiptBody struct {
+	AdjudicatorSubjects []string `json:"adjudicator_subjects"`
+	AppealAuthorityRefs []string `json:"appeal_authority_refs"`
+	CoveredDisputeTypes []string `json:"covered_dispute_types"`
+	EffectiveWindow     struct {
+		End   string `json:"end"`
+		Start string `json:"start"`
+	} `json:"effective_window"`
+	EvidenceRulesRef string `json:"evidence_rules_ref"`
+	Id               string `json:"id"`
+	IssuedAt         string `json:"issued_at"`
+	JurisdictionId   string `json:"jurisdiction_id"`
+	OrderId          string `json:"order_id"`
+	PolicyRef        string `json:"policy_ref"`
+	RemedyLimits     []struct {
+		Currency      string `json:"currency"`
+		MaximumRemedy int64  `json:"maximum_remedy"`
+	} `json:"remedy_limits"`
+	Schema             RiskRiskAdjudicationJurisdictionReceiptBodySchema `json:"schema"`
+	SlashAuthorityRefs []string                                          `json:"slash_authority_refs"`
+}
+
+// RiskRiskAdjudicationJurisdictionReceiptBodySchema defines model for RiskRiskAdjudicationJurisdictionReceiptBody.Schema.
+type RiskRiskAdjudicationJurisdictionReceiptBodySchema string
+
+// RiskRiskCollateralPositionReportBody defines model for RiskRiskCollateralPositionReportBody.
+type RiskRiskCollateralPositionReportBody struct {
+	Amount             int64                                      `json:"amount"`
+	AvailableAmount    int64                                      `json:"available_amount"`
+	ClaimPriority      string                                     `json:"claim_priority"`
+	CollateralId       string                                     `json:"collateral_id"`
+	ConsumedAmountRefs []map[string]interface{}                   `json:"consumed_amount_refs"`
+	CurrencyOrAsset    string                                     `json:"currency_or_asset"`
+	Id                 string                                     `json:"id"`
+	IssuedAt           string                                     `json:"issued_at"`
+	LockExpiry         string                                     `json:"lock_expiry"`
+	LockStart          string                                     `json:"lock_start"`
+	OrderId            string                                     `json:"order_id"`
+	ReleasePolicyRef   string                                     `json:"release_policy_ref"`
+	Schema             RiskRiskCollateralPositionReportBodySchema `json:"schema"`
+	SlashAuthorityRef  string                                     `json:"slash_authority_ref"`
+	SourceRef          string                                     `json:"source_ref"`
+	SourceType         string                                     `json:"source_type"`
+	Subject            string                                     `json:"subject"`
+}
+
+// RiskRiskCollateralPositionReportBodySchema defines model for RiskRiskCollateralPositionReportBody.Schema.
+type RiskRiskCollateralPositionReportBodySchema string
+
+// RiskRiskGuaranteeDecisionBody defines model for RiskRiskGuaranteeDecisionBody.
+type RiskRiskGuaranteeDecisionBody struct {
+	AdjudicationJurisdictionRef string   `json:"adjudication_jurisdiction_ref"`
+	BackingRefs                 []string `json:"backing_refs"`
+	BeneficiarySubject          string   `json:"beneficiary_subject"`
+	ClaimWindow                 struct {
+		End   string `json:"end"`
+		Start string `json:"start"`
+	} `json:"claim_window"`
+	CoverageDecisionRef string                              `json:"coverage_decision_ref"`
+	Currency            string                              `json:"currency"`
+	ExclusionsRef       string                              `json:"exclusions_ref"`
+	GuaranteeId         string                              `json:"guarantee_id"`
+	GuaranteeType       string                              `json:"guarantee_type"`
+	Id                  string                              `json:"id"`
+	IssuedAt            string                              `json:"issued_at"`
+	MaximumRemedy       int64                               `json:"maximum_remedy"`
+	OrderId             string                              `json:"order_id"`
+	ProviderSubject     string                              `json:"provider_subject"`
+	Schema              RiskRiskGuaranteeDecisionBodySchema `json:"schema"`
+	SlaCommitmentRef    string                              `json:"sla_commitment_ref"`
+	Verdict             string                              `json:"verdict"`
+}
+
+// RiskRiskGuaranteeDecisionBodySchema defines model for RiskRiskGuaranteeDecisionBody.Schema.
+type RiskRiskGuaranteeDecisionBodySchema string
+
 // RootAuthorityDelegationContext `chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.
 type RootAuthorityDelegationContext struct {
 	Anchor RootAuthorityDelegationContextDelegationAnchor `json:"anchor"`
@@ -26035,6 +32704,31 @@ type RootAuthorityIdpKeySnapshot_Source struct {
 	union json.RawMessage
 }
 
+// RootAuthorityIdpKeySnapshotBody defines model for RootAuthorityIdpKeySnapshotBody.
+type RootAuthorityIdpKeySnapshotBody struct {
+	ExchangeKey *string `json:"exchange_key,omitempty"`
+	Fixture     *string `json:"fixture,omitempty"`
+	Issuer      *string `json:"issuer,omitempty"`
+	Keys        *[]struct {
+		Alg *string `json:"alg,omitempty"`
+		Crv *string `json:"crv,omitempty"`
+		E   *string `json:"e,omitempty"`
+		Kid string  `json:"kid"`
+		Kty string  `json:"kty"`
+		N   *string `json:"n,omitempty"`
+		Use *string `json:"use,omitempty"`
+		X   *string `json:"x,omitempty"`
+		Y   *string `json:"y,omitempty"`
+	} `json:"keys,omitempty"`
+	N          *int64                                 `json:"n,omitempty"`
+	ObservedAt *int64                                 `json:"observed_at,omitempty"`
+	Schema     *RootAuthorityIdpKeySnapshotBodySchema `json:"schema,omitempty"`
+	Source     *string                                `json:"source,omitempty"`
+}
+
+// RootAuthorityIdpKeySnapshotBodySchema defines model for RootAuthorityIdpKeySnapshotBody.Schema.
+type RootAuthorityIdpKeySnapshotBodySchema string
+
 // RootAuthorityRevocationRequest `chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
 type RootAuthorityRevocationRequest struct {
 	IssuedAt int64 `json:"issued_at"`
@@ -26056,6 +32750,12 @@ type RootAuthorityRevocationRequest struct {
 
 // RootAuthorityRevocationRequestSchema defines model for RootAuthorityRevocationRequest.Schema.
 type RootAuthorityRevocationRequestSchema string
+
+// RootAuthorityRevocationRequestBody defines model for RootAuthorityRevocationRequestBody.
+type RootAuthorityRevocationRequestBody struct {
+	Fixture string `json:"fixture"`
+	N       int64  `json:"n"`
+}
 
 // RootAuthorityRootAnchor The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
 type RootAuthorityRootAnchor struct {
@@ -26211,6 +32911,76 @@ type RootAuthorityRootPolicy struct {
 
 // RootAuthorityRootPolicySchema defines model for RootAuthorityRootPolicy.Schema.
 type RootAuthorityRootPolicySchema string
+
+// RootAuthorityRootPolicyBody defines model for RootAuthorityRootPolicyBody.
+type RootAuthorityRootPolicyBody struct {
+	Disclosure *struct {
+		Default string `json:"default"`
+		Tools   *struct {
+			Crmsearch struct {
+				Parameters struct {
+					InlineFields []string `json:"inline_fields"`
+				} `json:"parameters"`
+				Result struct {
+					InlineFields []map[string]interface{} `json:"inline_fields"`
+				} `json:"result"`
+			} `json:"crm/search"`
+		} `json:"tools,omitempty"`
+	} `json:"disclosure,omitempty"`
+	ExchangeKeys *[]string `json:"exchange_keys,omitempty"`
+	Fixture      *string   `json:"fixture,omitempty"`
+	N            *int64    `json:"n,omitempty"`
+	PolicyId     *string   `json:"policy_id,omitempty"`
+	PolicyKey    *string   `json:"policy_key,omitempty"`
+	Rules        *[]struct {
+		CapabilityTtlSecs *int64 `json:"capability_ttl_secs,omitempty"`
+		CeilingScope      struct {
+			Grants []struct {
+				DpopRequired *bool    `json:"dpop_required,omitempty"`
+				Operations   []string `json:"operations"`
+				ServerId     string   `json:"server_id"`
+				ToolName     string   `json:"tool_name"`
+			} `json:"grants"`
+			ResourceGrants *[]struct {
+				Operations []string `json:"operations"`
+				UriPattern string   `json:"uri_pattern"`
+			} `json:"resource_grants,omitempty"`
+		} `json:"ceiling_scope"`
+		CeilingScopeHash   string   `json:"ceiling_scope_hash"`
+		HolderClasses      []string `json:"holder_classes"`
+		IdpScopeProjection *struct {
+			CrmAdmin *[]string `json:"crm.admin,omitempty"`
+			CrmRead  []string  `json:"crm.read"`
+			CrmWrite *[]string `json:"crm.write,omitempty"`
+		} `json:"idp_scope_projection,omitempty"`
+		Match struct {
+			AllowedAlgs *[]string `json:"allowed_algs,omitempty"`
+			AnchorKind  string    `json:"anchor_kind"`
+			Claims      *struct {
+				ClientId *[]string `json:"client_id,omitempty"`
+				Scope    *[]string `json:"scope,omitempty"`
+			} `json:"claims,omitempty"`
+			ProviderIdentityDigest *string `json:"provider_identity_digest,omitempty"`
+			ProviderRecordId       *string `json:"provider_record_id,omitempty"`
+		} `json:"match"`
+		MaxAssertionLifetimeSecs *int64  `json:"max_assertion_lifetime_secs,omitempty"`
+		MaxClockSkewSecs         *int64  `json:"max_clock_skew_secs,omitempty"`
+		Principal                *string `json:"principal,omitempty"`
+		RecordedClaims           struct {
+			ClientId *string `json:"client_id,omitempty"`
+			Scope    *string `json:"scope,omitempty"`
+		} `json:"recorded_claims"`
+		RetainIdpArtifact *bool   `json:"retain_idp_artifact,omitempty"`
+		RuleId            string  `json:"rule_id"`
+		TenantValue       *string `json:"tenant_value,omitempty"`
+	} `json:"rules,omitempty"`
+	Schema     *RootAuthorityRootPolicyBodySchema `json:"schema,omitempty"`
+	ValidFrom  *int64                             `json:"valid_from,omitempty"`
+	ValidUntil *int64                             `json:"valid_until,omitempty"`
+}
+
+// RootAuthorityRootPolicyBodySchema defines model for RootAuthorityRootPolicyBody.Schema.
+type RootAuthorityRootPolicyBodySchema string
 
 // RootAuthorityRootPolicyClaimMode defines model for RootAuthorityRootPolicyClaimMode.
 type RootAuthorityRootPolicyClaimMode string
@@ -26731,6 +33501,70 @@ type RuntimeRevocationFreshnessProofSignature struct {
 
 // RuntimeRevocationFreshnessProofSignatureSchema defines model for RuntimeRevocationFreshnessProofSignature.Schema.
 type RuntimeRevocationFreshnessProofSignatureSchema string
+
+// RuntimeRuntimePeerWeightsBody defines model for RuntimeRuntimePeerWeightsBody.
+type RuntimeRuntimePeerWeightsBody struct {
+	ExpiresAtUnixMs int64                               `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs  int64                               `json:"issuedAtUnixMs"`
+	KeyId           string                              `json:"keyId"`
+	ReputationEpoch int64                               `json:"reputationEpoch"`
+	Schema          RuntimeRuntimePeerWeightsBodySchema `json:"schema"`
+	VerifierId      string                              `json:"verifierId"`
+	Weights         []struct {
+		PeerKernelId string `json:"peerKernelId"`
+		Weight       int64  `json:"weight"`
+	} `json:"weights"`
+}
+
+// RuntimeRuntimePeerWeightsBodySchema defines model for RuntimeRuntimePeerWeightsBody.Schema.
+type RuntimeRuntimePeerWeightsBodySchema string
+
+// RuntimeRuntimePheromonePolicyBody defines model for RuntimeRuntimePheromonePolicyBody.
+type RuntimeRuntimePheromonePolicyBody struct {
+	AllowedReputationEpochs []int64 `json:"allowedReputationEpochs"`
+	ExpiresAtUnixMs         int64   `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs          int64   `json:"issuedAtUnixMs"`
+	KeyId                   string  `json:"keyId"`
+	MaxQueryReportAgeMs     int64   `json:"maxQueryReportAgeMs"`
+	MinDistinctOriginPairs  int64   `json:"minDistinctOriginPairs"`
+	Mode                    string  `json:"mode"`
+	PeerWeightsSha256       string  `json:"peerWeightsSha256"`
+	PolicyId                string  `json:"policyId"`
+	PolicyVersion           int64   `json:"policyVersion"`
+	Rules                   []struct {
+		ActionClassId          string  `json:"actionClassId"`
+		Direction              string  `json:"direction"`
+		Effect                 string  `json:"effect"`
+		RuleId                 string  `json:"ruleId"`
+		SubjectClass           string  `json:"subjectClass"`
+		SubjectClassNamespace  string  `json:"subjectClassNamespace"`
+		ThresholdTotalStrength float32 `json:"thresholdTotalStrength"`
+	} `json:"rules"`
+	RuntimeTrustBundleSha256 string                                  `json:"runtimeTrustBundleSha256"`
+	Schema                   RuntimeRuntimePheromonePolicyBodySchema `json:"schema"`
+	VerifierId               string                                  `json:"verifierId"`
+}
+
+// RuntimeRuntimePheromonePolicyBodySchema defines model for RuntimeRuntimePheromonePolicyBody.Schema.
+type RuntimeRuntimePheromonePolicyBodySchema string
+
+// RuntimeRuntimeVerifierTrustBundleBody defines model for RuntimeRuntimeVerifierTrustBundleBody.
+type RuntimeRuntimeVerifierTrustBundleBody struct {
+	ExpiresAtUnixMs            int64                                       `json:"expiresAtUnixMs"`
+	IssuedAtUnixMs             int64                                       `json:"issuedAtUnixMs"`
+	KeyId                      string                                      `json:"keyId"`
+	PreviousHashSha256         *string                                     `json:"previousHashSha256,omitempty"`
+	RevocationAuthorityRoots   []string                                    `json:"revocationAuthorityRoots"`
+	RevocationCheckpointSha256 string                                      `json:"revocationCheckpointSha256"`
+	Schema                     RuntimeRuntimeVerifierTrustBundleBodySchema `json:"schema"`
+	TrustBundleSha256          string                                      `json:"trustBundleSha256"`
+	VerificationContextSha256  string                                      `json:"verificationContextSha256"`
+	VerifierId                 string                                      `json:"verifierId"`
+	Version                    int64                                       `json:"version"`
+}
+
+// RuntimeRuntimeVerifierTrustBundleBodySchema defines model for RuntimeRuntimeVerifierTrustBundleBody.Schema.
+type RuntimeRuntimeVerifierTrustBundleBodySchema string
 
 // RuntimeSandboxAttestationSignature defines model for RuntimeSandboxAttestationSignature.
 type RuntimeSandboxAttestationSignature struct {
@@ -27771,6 +34605,37 @@ type SecurityBrokerPrepareDispatchAcknowledgementV1Schema string
 
 // SecurityBrokerPrepareDispatchAcknowledgementV1Identifier defines model for SecurityBrokerPrepareDispatchAcknowledgementV1Identifier.
 type SecurityBrokerPrepareDispatchAcknowledgementV1Identifier = string
+
+// SecurityBrokerPrivilegedAuditChallengeBody defines model for SecurityBrokerPrivilegedAuditChallengeBody.
+type SecurityBrokerPrivilegedAuditChallengeBody struct {
+	ExpiresAtUnixSeconds    int64 `json:"expiresAtUnixSeconds"`
+	IssuedAtUnixSeconds     int64 `json:"issuedAtUnixSeconds"`
+	RunnerAuthorizationBody struct {
+		AuditId                   string `json:"auditId"`
+		BrokerInstanceId          string `json:"brokerInstanceId"`
+		CanonicalRequestSha256    string `json:"canonicalRequestSha256"`
+		CapabilitySha256          string `json:"capabilitySha256"`
+		CredentialProvider        string `json:"credentialProvider"`
+		DeploymentId              string `json:"deploymentId"`
+		ExpiresAtUnixSeconds      int64  `json:"expiresAtUnixSeconds"`
+		IssuedAtUnixSeconds       int64  `json:"issuedAtUnixSeconds"`
+		ProofSha256               string `json:"proofSha256"`
+		ProviderAdapterId         string `json:"providerAdapterId"`
+		ProviderAdapterVersion    int64  `json:"providerAdapterVersion"`
+		ReferenceCommitmentSha256 string `json:"referenceCommitmentSha256"`
+		ReferenceSource           string `json:"referenceSource"`
+		RevocationAuthorityDomain string `json:"revocationAuthorityDomain"`
+		RunnerId                  string `json:"runnerId"`
+		Schema                    string `json:"schema"`
+		TenantScope               string `json:"tenantScope"`
+	} `json:"runnerAuthorizationBody"`
+	Schema                  SecurityBrokerPrivilegedAuditChallengeBodySchema `json:"schema"`
+	SessionCommitmentSha256 string                                           `json:"sessionCommitmentSha256"`
+	SessionNonce            string                                           `json:"sessionNonce"`
+}
+
+// SecurityBrokerPrivilegedAuditChallengeBodySchema defines model for SecurityBrokerPrivilegedAuditChallengeBody.Schema.
+type SecurityBrokerPrivilegedAuditChallengeBodySchema string
 
 // SecurityBrokerPrivilegedAuditChallengeV1 Broker-signed challenge binding one privileged audit session to an exact runner authorization body.
 type SecurityBrokerPrivilegedAuditChallengeV1 struct {
@@ -28831,6 +35696,32 @@ type SecurityDeclassificationGrant_Body_TargetLabel struct {
 	union json.RawMessage
 }
 
+// SecurityDeclassificationGrantBody defines model for SecurityDeclassificationGrantBody.
+type SecurityDeclassificationGrantBody struct {
+	AgentId              string  `json:"agent_id"`
+	AuthorityKeyId       string  `json:"authority_key_id"`
+	CapabilityId         string  `json:"capability_id"`
+	DestinationId        string  `json:"destination_id"`
+	DomainVersion        int64   `json:"domain_version"`
+	ExpiresAtUnixSeconds int64   `json:"expires_at_unix_seconds"`
+	GrantId              string  `json:"grant_id"`
+	IssuedAtUnixSeconds  int64   `json:"issued_at_unix_seconds"`
+	Purpose              string  `json:"purpose"`
+	RequestHash          []int64 `json:"request_hash"`
+	SessionId            string  `json:"session_id"`
+	SourceLabelHash      []int64 `json:"source_label_hash"`
+	SubjectId            string  `json:"subject_id"`
+	TargetLabel          struct {
+		Compartments []string `json:"compartments"`
+		Kind         string   `json:"kind"`
+		Owners       struct {
+			OwnerA []string `json:"owner-a"`
+		} `json:"owners"`
+	} `json:"target_label"`
+	TenantId string `json:"tenant_id"`
+	ToolName string `json:"tool_name"`
+}
+
 // SecurityDeclassificationGrantDigest32 defines model for SecurityDeclassificationGrantDigest32.
 type SecurityDeclassificationGrantDigest32 = []int64
 
@@ -29356,6 +36247,20 @@ type SecurityKeyLogAuditReadinessProofV1 struct {
 // SecurityKeyLogAuditReadinessProofV1Signature defines model for SecurityKeyLogAuditReadinessProofV1Signature.
 type SecurityKeyLogAuditReadinessProofV1Signature = string
 
+// SecurityKeyLogCheckpointBody defines model for SecurityKeyLogCheckpointBody.
+type SecurityKeyLogCheckpointBody struct {
+	CheckpointSequence     int64                              `json:"checkpoint_sequence"`
+	IssuedAt               int64                              `json:"issued_at"`
+	LogId                  string                             `json:"log_id"`
+	PreviousCheckpointHash string                             `json:"previous_checkpoint_hash"`
+	RootHash               string                             `json:"root_hash"`
+	Schema                 SecurityKeyLogCheckpointBodySchema `json:"schema"`
+	TreeSize               int64                              `json:"tree_size"`
+}
+
+// SecurityKeyLogCheckpointBodySchema defines model for SecurityKeyLogCheckpointBody.Schema.
+type SecurityKeyLogCheckpointBodySchema string
+
 // SecurityKeyLogCheckpointBodyV1 defines model for SecurityKeyLogCheckpointBodyV1.
 type SecurityKeyLogCheckpointBodyV1 struct {
 	CheckpointSequence     int64                                `json:"checkpoint_sequence"`
@@ -29714,6 +36619,18 @@ type SecurityKeyLogWitnessSignatureV1 struct {
 	WitnessId string `json:"witness_id"`
 }
 
+// SecurityKeyringArtifactSignatureBody defines model for SecurityKeyringArtifactSignatureBody.
+type SecurityKeyringArtifactSignatureBody struct {
+	ArtifactHash      string                                     `json:"artifact_hash"`
+	ArtifactSignature string                                     `json:"artifact_signature"`
+	KeyId             string                                     `json:"key_id"`
+	Schema            SecurityKeyringArtifactSignatureBodySchema `json:"schema"`
+	SigningEpoch      int64                                      `json:"signing_epoch"`
+}
+
+// SecurityKeyringArtifactSignatureBodySchema defines model for SecurityKeyringArtifactSignatureBody.Schema.
+type SecurityKeyringArtifactSignatureBodySchema string
+
 // SecurityKeyringArtifactSignatureV1 defines model for SecurityKeyringArtifactSignatureV1.
 type SecurityKeyringArtifactSignatureV1 struct {
 	ArtifactHash      SecurityKeyringArtifactSignatureV1Hash      `json:"artifact_hash"`
@@ -29810,6 +36727,95 @@ type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4 struct {
 
 // SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State defines model for SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome.4.State.
 type SecurityLiftRollbackCompletionReceiptBodyV1LiftOutcome4State string
+
+// SecurityMcpCageLaunchPolicyBody defines model for SecurityMcpCageLaunchPolicyBody.
+type SecurityMcpCageLaunchPolicyBody struct {
+	EnterpriseMigration struct {
+		DeploymentId string `json:"deployment_id"`
+		Head         struct {
+			Key struct {
+				Control      string `json:"control"`
+				DeploymentId string `json:"deployment_id"`
+				ScopeId      string `json:"scope_id"`
+				ScopeKind    string `json:"scope_kind"`
+			} `json:"key"`
+			TransitionDigest []int64 `json:"transition_digest"`
+		} `json:"head"`
+		StateDatabasePath        string   `json:"state_database_path"`
+		TrustedTransitionSigners []string `json:"trusted_transition_signers"`
+	} `json:"enterprise_migration"`
+	Limits struct {
+		LaunchTimeoutMs  int64 `json:"launch_timeout_ms"`
+		MaxArtifactBytes int64 `json:"max_artifact_bytes"`
+		NofileHard       int64 `json:"nofile_hard"`
+		NofileSoft       int64 `json:"nofile_soft"`
+	} `json:"limits"`
+	OperatorCeilings struct {
+		EnvironmentVariables  []string `json:"environment_variables"`
+		ForbiddenPaths        []string `json:"forbidden_paths"`
+		NativeSyscallProfiles []string `json:"native_syscall_profiles"`
+		NetworkDestinations   []struct {
+			Host string `json:"host"`
+			Port int64  `json:"port"`
+		} `json:"network_destinations"`
+		ReadPaths  []string `json:"read_paths"`
+		WritePaths []string `json:"write_paths"`
+	} `json:"operator_ceilings"`
+	Receipt struct {
+		CapabilityId           string `json:"capability_id"`
+		DatabasePath           string `json:"database_path"`
+		SignerSeedPath         string `json:"signer_seed_path"`
+		TenantId               string `json:"tenant_id"`
+		TrustedSignerPublicKey string `json:"trusted_signer_public_key"`
+	} `json:"receipt"`
+	RegisteredPublicKey string `json:"registered_public_key"`
+	Runtime             struct {
+		CageInitBindingDigest string `json:"cage_init_binding_digest"`
+		CageInitPath          string `json:"cage_init_path"`
+		ExecutionIdentity     struct {
+			Gid               int64   `json:"gid"`
+			SupplementaryGids []int64 `json:"supplementary_gids"`
+			Uid               int64   `json:"uid"`
+		} `json:"execution_identity"`
+		RuntimeFiles        []string `json:"runtime_files"`
+		TargetArgv          []string `json:"target_argv"`
+		TargetBindingDigest string   `json:"target_binding_digest"`
+		TargetPath          string   `json:"target_path"`
+		WorkingDirectory    string   `json:"working_directory"`
+	} `json:"runtime"`
+	Schema         SecurityMcpCageLaunchPolicyBodySchema `json:"schema"`
+	SignedManifest struct {
+		Manifest struct {
+			Name                string `json:"name"`
+			PublicKey           string `json:"public_key"`
+			RequiredPermissions struct {
+				NativeSyscallProfile string `json:"native_syscall_profile"`
+			} `json:"required_permissions"`
+			Schema   string `json:"schema"`
+			ServerId string `json:"server_id"`
+			Tools    []struct {
+				Annotations struct {
+					Destructive      bool `json:"destructive"`
+					Idempotent       bool `json:"idempotent"`
+					ReadOnly         bool `json:"read_only"`
+					RequiresApproval bool `json:"requires_approval"`
+				} `json:"annotations"`
+				Description string `json:"description"`
+				InputSchema struct {
+					Type string `json:"type"`
+				} `json:"input_schema"`
+				LatencyHint string `json:"latency_hint"`
+				Name        string `json:"name"`
+			} `json:"tools"`
+			Version string `json:"version"`
+		} `json:"manifest"`
+		Signature string `json:"signature"`
+		SignerKey string `json:"signer_key"`
+	} `json:"signed_manifest"`
+}
+
+// SecurityMcpCageLaunchPolicyBodySchema defines model for SecurityMcpCageLaunchPolicyBody.Schema.
+type SecurityMcpCageLaunchPolicyBodySchema string
 
 // SecurityMcpCageLaunchPolicyV1 Canonical signed operator policy for a migration-enforced MCP stdio cage launch.
 type SecurityMcpCageLaunchPolicyV1 struct {
@@ -30539,6 +37545,213 @@ type SwarmRoutePlanReceiptSignature struct {
 // SwarmRoutePlanReceiptSignatureSchema defines model for SwarmRoutePlanReceiptSignature.Schema.
 type SwarmRoutePlanReceiptSignatureSchema string
 
+// SwarmSwarmContinuationTokenBody defines model for SwarmSwarmContinuationTokenBody.
+type SwarmSwarmContinuationTokenBody struct {
+	BudgetAllocationId      string                                `json:"budgetAllocationId"`
+	ChildTaskId             string                                `json:"childTaskId"`
+	ExpiresAtUnixMs         int64                                 `json:"expiresAtUnixMs"`
+	GraphId                 string                                `json:"graphId"`
+	GraphSha256             string                                `json:"graphSha256"`
+	IssuedAtUnixMs          int64                                 `json:"issuedAtUnixMs"`
+	Issuer                  string                                `json:"issuer"`
+	JoinReceiptId           *string                               `json:"joinReceiptId,omitempty"`
+	Mode                    string                                `json:"mode"`
+	Nonce                   string                                `json:"nonce"`
+	ParentReceiptIds        []string                              `json:"parentReceiptIds"`
+	ParentTaskId            *string                               `json:"parentTaskId,omitempty"`
+	RevocationEpochRef      string                                `json:"revocationEpochRef"`
+	RevocationEpochRootHash string                                `json:"revocationEpochRootHash"`
+	RoutePlanReceiptId      string                                `json:"routePlanReceiptId"`
+	Schema                  SwarmSwarmContinuationTokenBodySchema `json:"schema"`
+	SessionAnchorRef        string                                `json:"sessionAnchorRef"`
+	TokenId                 string                                `json:"tokenId"`
+	WitnessChainRef         *string                               `json:"witnessChainRef,omitempty"`
+	WitnessChainSha256      *string                               `json:"witnessChainSha256,omitempty"`
+}
+
+// SwarmSwarmContinuationTokenBodySchema defines model for SwarmSwarmContinuationTokenBody.Schema.
+type SwarmSwarmContinuationTokenBodySchema string
+
+// SwarmSwarmJoinReceiptBody defines model for SwarmSwarmJoinReceiptBody.
+type SwarmSwarmJoinReceiptBody struct {
+	ActualParentReceiptIds   []string `json:"actualParentReceiptIds"`
+	ChainId                  string   `json:"chainId"`
+	DagOrdinal               int64    `json:"dagOrdinal"`
+	ExpectedParentReceiptIds []string `json:"expectedParentReceiptIds"`
+	GraphId                  string   `json:"graphId"`
+	HlcUnixMs                int64    `json:"hlcUnixMs"`
+	Issuer                   string   `json:"issuer"`
+	JoinId                   string   `json:"joinId"`
+	JoinPredicate            string   `json:"joinPredicate"`
+	NextTaskId               string   `json:"nextTaskId"`
+	ParentSetHash            string   `json:"parentSetHash"`
+	ParentTaskReceipts       []struct {
+		ReceiptId string `json:"receiptId"`
+		TaskId    string `json:"taskId"`
+	} `json:"parentTaskReceipts"`
+	ResultDigest string                          `json:"resultDigest"`
+	Schema       SwarmSwarmJoinReceiptBodySchema `json:"schema"`
+}
+
+// SwarmSwarmJoinReceiptBodySchema defines model for SwarmSwarmJoinReceiptBody.Schema.
+type SwarmSwarmJoinReceiptBodySchema string
+
+// SwarmSwarmRevocationEpochBody defines model for SwarmSwarmRevocationEpochBody.
+type SwarmSwarmRevocationEpochBody struct {
+	EpochId          string                              `json:"epochId"`
+	IssuedAtUnixMs   int64                               `json:"issuedAtUnixMs"`
+	Issuer           string                              `json:"issuer"`
+	RevokedSubjects  []string                            `json:"revokedSubjects"`
+	RevokedTaskIds   []string                            `json:"revokedTaskIds"`
+	RootHash         string                              `json:"rootHash"`
+	Schema           SwarmSwarmRevocationEpochBodySchema `json:"schema"`
+	ValidUntilUnixMs int64                               `json:"validUntilUnixMs"`
+}
+
+// SwarmSwarmRevocationEpochBodySchema defines model for SwarmSwarmRevocationEpochBody.Schema.
+type SwarmSwarmRevocationEpochBodySchema string
+
+// SwarmSwarmRoutePlanReceiptBody defines model for SwarmSwarmRoutePlanReceiptBody.
+type SwarmSwarmRoutePlanReceiptBody struct {
+	AttenuationDecision  string                               `json:"attenuationDecision"`
+	BridgeId             string                               `json:"bridgeId"`
+	CandidateSetDigest   string                               `json:"candidateSetDigest"`
+	EgressConstraints    []string                             `json:"egressConstraints"`
+	EgressContractId     string                               `json:"egressContractId"`
+	ExpiresAtUnixMs      int64                                `json:"expiresAtUnixMs"`
+	GraphId              string                               `json:"graphId"`
+	Issuer               string                               `json:"issuer"`
+	PolicyDigest         string                               `json:"policyDigest"`
+	ProtocolTarget       string                               `json:"protocolTarget"`
+	RegistrySnapshotHash string                               `json:"registrySnapshotHash"`
+	RoutePlanId          string                               `json:"routePlanId"`
+	Schema               SwarmSwarmRoutePlanReceiptBodySchema `json:"schema"`
+	SelectedRoute        string                               `json:"selectedRoute"`
+	TaskId               string                               `json:"taskId"`
+}
+
+// SwarmSwarmRoutePlanReceiptBodySchema defines model for SwarmSwarmRoutePlanReceiptBody.Schema.
+type SwarmSwarmRoutePlanReceiptBodySchema string
+
+// SwarmSwarmTaskGraphBody defines model for SwarmSwarmTaskGraphBody.
+type SwarmSwarmTaskGraphBody struct {
+	BudgetPoolRef   string `json:"budgetPoolRef"`
+	CreatedAtUnixMs int64  `json:"createdAtUnixMs"`
+	Edges           []struct {
+		EdgeType   string `json:"edgeType"`
+		FromTaskId string `json:"fromTaskId"`
+		ToTaskId   string `json:"toTaskId"`
+	} `json:"edges"`
+	ExpiresAtUnixMs int64  `json:"expiresAtUnixMs"`
+	GraphId         string `json:"graphId"`
+	Issuer          string `json:"issuer"`
+	Joins           []struct {
+		JoinId        string   `json:"joinId"`
+		NextTaskId    string   `json:"nextTaskId"`
+		ParentTaskIds []string `json:"parentTaskIds"`
+	} `json:"joins"`
+	MaxDepth              int64 `json:"maxDepth"`
+	MaxFanout             int64 `json:"maxFanout"`
+	MultiHopWitnessChains *bool `json:"multiHopWitnessChains,omitempty"`
+	Nodes                 []struct {
+		BudgetAllocationRef  *string `json:"budgetAllocationRef,omitempty"`
+		ContinuationTokenRef *string `json:"continuationTokenRef,omitempty"`
+		Depth                int64   `json:"depth"`
+		ParentTaskId         *string `json:"parentTaskId,omitempty"`
+		RoutePlanRef         *string `json:"routePlanRef,omitempty"`
+		ScopeHash            string  `json:"scopeHash"`
+		TaskId               string  `json:"taskId"`
+	} `json:"nodes"`
+	PlannerSubject     string                        `json:"plannerSubject"`
+	RevocationEpochRef string                        `json:"revocationEpochRef"`
+	RootTransactionRef string                        `json:"rootTransactionRef"`
+	RoutePlanRefs      []string                      `json:"routePlanRefs"`
+	Schema             SwarmSwarmTaskGraphBodySchema `json:"schema"`
+}
+
+// SwarmSwarmTaskGraphBodySchema defines model for SwarmSwarmTaskGraphBody.Schema.
+type SwarmSwarmTaskGraphBodySchema string
+
+// SwarmSwarmTerminalGraphReceiptBody defines model for SwarmSwarmTerminalGraphReceiptBody.
+type SwarmSwarmTerminalGraphReceiptBody struct {
+	BudgetPoolId  string `json:"budgetPoolId"`
+	BudgetRollups []struct {
+		ActiveUnits   int64  `json:"activeUnits"`
+		ConsumedUnits int64  `json:"consumedUnits"`
+		DimensionId   string `json:"dimensionId"`
+		ReleasedUnits int64  `json:"releasedUnits"`
+		ReservedUnits int64  `json:"reservedUnits"`
+		ReversedUnits int64  `json:"reversedUnits"`
+		TotalUnits    int64  `json:"totalUnits"`
+	} `json:"budgetRollups"`
+	ChainId             string                                   `json:"chainId"`
+	CompletedAtUnixMs   int64                                    `json:"completedAtUnixMs"`
+	CompletedTaskIds    []string                                 `json:"completedTaskIds"`
+	GraphId             string                                   `json:"graphId"`
+	Issuer              string                                   `json:"issuer"`
+	JoinReceiptIds      []string                                 `json:"joinReceiptIds"`
+	ReceiptId           string                                   `json:"receiptId"`
+	ResultDigest        string                                   `json:"resultDigest"`
+	RevocationEpochRef  string                                   `json:"revocationEpochRef"`
+	RoutePlanReceiptIds []string                                 `json:"routePlanReceiptIds"`
+	Schema              SwarmSwarmTerminalGraphReceiptBodySchema `json:"schema"`
+	TerminalTaskIds     []string                                 `json:"terminalTaskIds"`
+}
+
+// SwarmSwarmTerminalGraphReceiptBodySchema defines model for SwarmSwarmTerminalGraphReceiptBody.Schema.
+type SwarmSwarmTerminalGraphReceiptBodySchema string
+
+// TransactionCapabilityProofBody defines model for TransactionCapabilityProofBody.
+type TransactionCapabilityProofBody struct {
+	CapabilityId string                               `json:"capability_id"`
+	ExpiresAt    string                               `json:"expires_at"`
+	Id           string                               `json:"id"`
+	Issuer       string                               `json:"issuer"`
+	Schema       TransactionCapabilityProofBodySchema `json:"schema"`
+	Scope        string                               `json:"scope"`
+	Subject      string                               `json:"subject"`
+}
+
+// TransactionCapabilityProofBodySchema defines model for TransactionCapabilityProofBody.Schema.
+type TransactionCapabilityProofBodySchema string
+
+// TransactionGuardDecisionBody defines model for TransactionGuardDecisionBody.
+type TransactionGuardDecisionBody struct {
+	CapabilityId   string                             `json:"capability_id"`
+	Decision       string                             `json:"decision"`
+	GuardKey       string                             `json:"guard_key"`
+	Id             string                             `json:"id"`
+	PolicySha256   string                             `json:"policy_sha256"`
+	RequestSha256  string                             `json:"request_sha256"`
+	ResponseSha256 string                             `json:"response_sha256"`
+	Schema         TransactionGuardDecisionBodySchema `json:"schema"`
+}
+
+// TransactionGuardDecisionBodySchema defines model for TransactionGuardDecisionBody.Schema.
+type TransactionGuardDecisionBodySchema string
+
+// TransactionTransactionPassportBody defines model for TransactionTransactionPassportBody.
+type TransactionTransactionPassportBody struct {
+	ClaimSetPath        string `json:"claim_set_path"`
+	ClaimSetSha256      string `json:"claim_set_sha256"`
+	EvidenceGraphPath   string `json:"evidence_graph_path"`
+	EvidenceGraphSha256 string `json:"evidence_graph_sha256"`
+	Id                  string `json:"id"`
+	IssuedAt            string `json:"issued_at"`
+	Issuer              string `json:"issuer"`
+	OmissionPolicy      *[]struct {
+		ClaimId string `json:"claim_id"`
+		Reason  string `json:"reason"`
+		Status  string `json:"status"`
+	} `json:"omission_policy,omitempty"`
+	Schema               TransactionTransactionPassportBodySchema `json:"schema"`
+	VerifierPolicyPath   string                                   `json:"verifier_policy_path"`
+	VerifierPolicySha256 string                                   `json:"verifier_policy_sha256"`
+}
+
+// TransactionTransactionPassportBodySchema defines model for TransactionTransactionPassportBody.Schema.
+type TransactionTransactionPassportBodySchema string
+
 // TrustAgentPassportPresentationResponse defines model for TrustAgentPassportPresentationResponse.
 type TrustAgentPassportPresentationResponse struct {
 	Challenge struct {
@@ -30868,6 +38081,26 @@ type TrustControlTerminate struct {
 // TrustControlTerminateReason Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.
 type TrustControlTerminateReason string
 
+// TrustFinancialAgentPassportPresentationChallengeBody defines model for TrustFinancialAgentPassportPresentationChallengeBody.
+type TrustFinancialAgentPassportPresentationChallengeBody struct {
+	ChallengeDigest string                                                     `json:"challengeDigest"`
+	ChallengeId     string                                                     `json:"challengeId"`
+	ExpiresAt       string                                                     `json:"expiresAt"`
+	IssuedAt        string                                                     `json:"issuedAt"`
+	Nonce           string                                                     `json:"nonce"`
+	Schema          TrustFinancialAgentPassportPresentationChallengeBodySchema `json:"schema"`
+	Selectors       []struct {
+		CredentialRefDigest string `json:"credentialRefDigest"`
+		Family              string `json:"family"`
+	} `json:"selectors"`
+	SourcePassportId string `json:"sourcePassportId"`
+	Verifier         string `json:"verifier"`
+	VerifierKeyEpoch int64  `json:"verifierKeyEpoch"`
+}
+
+// TrustFinancialAgentPassportPresentationChallengeBodySchema defines model for TrustFinancialAgentPassportPresentationChallengeBody.Schema.
+type TrustFinancialAgentPassportPresentationChallengeBodySchema string
+
 // TrustFinancialAgentPassportPresentationResponse defines model for TrustFinancialAgentPassportPresentationResponse.
 type TrustFinancialAgentPassportPresentationResponse struct {
 	Challenge struct {
@@ -31058,6 +38291,400 @@ type TrustFinancialAgentPassportPresentationResponse struct {
 
 // TrustFinancialAgentPassportPresentationResponseSchema defines model for TrustFinancialAgentPassportPresentationResponse.Schema.
 type TrustFinancialAgentPassportPresentationResponseSchema string
+
+// TrustFinancialAgentPassportSourceManifestBody defines model for TrustFinancialAgentPassportSourceManifestBody.
+type TrustFinancialAgentPassportSourceManifestBody struct {
+	CredentialCount  int64                                               `json:"credentialCount"`
+	CredentialRoot   string                                              `json:"credentialRoot"`
+	ExpiresAt        int64                                               `json:"expiresAt"`
+	IssuedAt         int64                                               `json:"issuedAt"`
+	Issuer           string                                              `json:"issuer"`
+	MerkleRoots      []string                                            `json:"merkleRoots"`
+	Schema           TrustFinancialAgentPassportSourceManifestBodySchema `json:"schema"`
+	SourcePassportId string                                              `json:"sourcePassportId"`
+	Subject          string                                              `json:"subject"`
+}
+
+// TrustFinancialAgentPassportSourceManifestBodySchema defines model for TrustFinancialAgentPassportSourceManifestBody.Schema.
+type TrustFinancialAgentPassportSourceManifestBodySchema string
+
+// TrustFincredPremiumHistoryBody defines model for TrustFincredPremiumHistoryBody.
+type TrustFincredPremiumHistoryBody struct {
+	Context           []string `json:"@context"`
+	CredentialId      string   `json:"credentialId"`
+	CredentialSubject struct {
+		Claims struct {
+			Id            string `json:"id"`
+			QuotedAmounts []struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"quotedAmounts"`
+			QuotedCount int64 `json:"quotedCount"`
+		} `json:"claims"`
+		Family string `json:"family"`
+	} `json:"credentialSubject"`
+	Evidence struct {
+		SourceCompletenessAttestations []struct {
+			Body struct {
+				AttestationReference     string `json:"attestationReference"`
+				CheckpointAuthorityEpoch int64  `json:"checkpointAuthorityEpoch"`
+				CheckpointAuthorityKey   string `json:"checkpointAuthorityKey"`
+				CheckpointDigest         string `json:"checkpointDigest"`
+				CheckpointSequence       int64  `json:"checkpointSequence"`
+				CommittedLeaves          []struct {
+					IndexProof struct {
+						AuditPath []string `json:"auditPath"`
+						LeafIndex int64    `json:"leafIndex"`
+						TreeSize  int64    `json:"treeSize"`
+					} `json:"indexProof"`
+					Leaf struct {
+						Index    int64 `json:"index"`
+						QueryKey struct {
+							ArtifactId   string `json:"artifactId"`
+							OccurredAt   int64  `json:"occurredAt"`
+							SourceFamily string `json:"sourceFamily"`
+							Subject      string `json:"subject"`
+						} `json:"queryKey"`
+						SourceArtifactDigest string `json:"sourceArtifactDigest"`
+					} `json:"leaf"`
+				} `json:"committedLeaves"`
+				Cutoff           int64  `json:"cutoff"`
+				DisclosureDigest string `json:"disclosureDigest"`
+				ExpiresAt        int64  `json:"expiresAt"`
+				IndexRoot        string `json:"indexRoot"`
+				IssuedAt         int64  `json:"issuedAt"`
+				LowerBoundary    struct {
+					Kind string `json:"kind"`
+				} `json:"lowerBoundary"`
+				RangeRoot             string   `json:"rangeRoot"`
+				Schema                string   `json:"schema"`
+				SourceArtifactDigests []string `json:"sourceArtifactDigests"`
+				SourceEvidenceClass   string   `json:"sourceEvidenceClass"`
+				SourceFamily          string   `json:"sourceFamily"`
+				SourceId              string   `json:"sourceId"`
+				SourceSignerKey       string   `json:"sourceSignerKey"`
+				StoreGeneration       int64    `json:"storeGeneration"`
+				Subject               string   `json:"subject"`
+				UpperBoundary         struct {
+					Kind string `json:"kind"`
+				} `json:"upperBoundary"`
+				Window struct {
+					EndsAt   int64 `json:"endsAt"`
+					StartsAt int64 `json:"startsAt"`
+				} `json:"window"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+			SignerKey string `json:"signerKey"`
+		} `json:"sourceCompletenessAttestations"`
+		SourceDisclosure struct {
+			Artifacts []struct {
+				ArtifactDigest    string `json:"artifactDigest"`
+				ArtifactSchema    string `json:"artifactSchema"`
+				CanonicalArtifact string `json:"canonicalArtifact"`
+				Role              string `json:"role"`
+			} `json:"artifacts"`
+			Kind string `json:"kind"`
+		} `json:"sourceDisclosure"`
+		Window struct {
+			EndsAt   int64 `json:"endsAt"`
+			StartsAt int64 `json:"startsAt"`
+		} `json:"window"`
+	} `json:"evidence"`
+	ExpirationDate            string                               `json:"expirationDate"`
+	Family                    string                               `json:"family"`
+	IssuanceDate              string                               `json:"issuanceDate"`
+	Issuer                    string                               `json:"issuer"`
+	IssuerKeyEpoch            int64                                `json:"issuerKeyEpoch"`
+	PresentationEvidenceClass string                               `json:"presentationEvidenceClass"`
+	Schema                    TrustFincredPremiumHistoryBodySchema `json:"schema"`
+	SourceEvidenceClass       string                               `json:"sourceEvidenceClass"`
+	Type                      []string                             `json:"type"`
+}
+
+// TrustFincredPremiumHistoryBodySchema defines model for TrustFincredPremiumHistoryBody.Schema.
+type TrustFincredPremiumHistoryBodySchema string
+
+// TrustFincredSettlementReliabilityBody defines model for TrustFincredSettlementReliabilityBody.
+type TrustFincredSettlementReliabilityBody struct {
+	Context           []string `json:"@context"`
+	CredentialId      string   `json:"credentialId"`
+	CredentialSubject struct {
+		Claims struct {
+			Id              string `json:"id"`
+			ObligationCount int64  `json:"obligationCount"`
+			OnTimeCount     int64  `json:"onTimeCount"`
+			OnTimeRatioBps  int64  `json:"onTimeRatioBps"`
+		} `json:"claims"`
+		Family string `json:"family"`
+	} `json:"credentialSubject"`
+	Evidence struct {
+		SourceCompletenessAttestations []struct {
+			Body struct {
+				AttestationReference     string `json:"attestationReference"`
+				CheckpointAuthorityEpoch int64  `json:"checkpointAuthorityEpoch"`
+				CheckpointAuthorityKey   string `json:"checkpointAuthorityKey"`
+				CheckpointDigest         string `json:"checkpointDigest"`
+				CheckpointSequence       int64  `json:"checkpointSequence"`
+				CommittedLeaves          []struct {
+					IndexProof struct {
+						AuditPath []string `json:"auditPath"`
+						LeafIndex int64    `json:"leafIndex"`
+						TreeSize  int64    `json:"treeSize"`
+					} `json:"indexProof"`
+					Leaf struct {
+						Index    int64 `json:"index"`
+						QueryKey struct {
+							ArtifactId   string                                                                                                                 `json:"artifactId"`
+							OccurredAt   int64                                                                                                                  `json:"occurredAt"`
+							SourceFamily TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily `json:"sourceFamily"`
+							Subject      string                                                                                                                 `json:"subject"`
+						} `json:"queryKey"`
+						SourceArtifactDigest string `json:"sourceArtifactDigest"`
+					} `json:"leaf"`
+				} `json:"committedLeaves"`
+				Cutoff                int64                                                                                              `json:"cutoff"`
+				DisclosureDigest      string                                                                                             `json:"disclosureDigest"`
+				ExpiresAt             int64                                                                                              `json:"expiresAt"`
+				IndexRoot             string                                                                                             `json:"indexRoot"`
+				IssuedAt              int64                                                                                              `json:"issuedAt"`
+				LowerBoundary         TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary   `json:"lowerBoundary"`
+				RangeRoot             string                                                                                             `json:"rangeRoot"`
+				Schema                TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchema              `json:"schema"`
+				SourceArtifactDigests []string                                                                                           `json:"sourceArtifactDigests"`
+				SourceEvidenceClass   TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass `json:"sourceEvidenceClass"`
+				SourceFamily          TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily        `json:"sourceFamily"`
+				SourceId              string                                                                                             `json:"sourceId"`
+				SourceSignerKey       string                                                                                             `json:"sourceSignerKey"`
+				StoreGeneration       int64                                                                                              `json:"storeGeneration"`
+				Subject               string                                                                                             `json:"subject"`
+				UpperBoundary         TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary   `json:"upperBoundary"`
+				Window                struct {
+					EndsAt   int64 `json:"endsAt"`
+					StartsAt int64 `json:"startsAt"`
+				} `json:"window"`
+			} `json:"body"`
+			Signature string `json:"signature"`
+			SignerKey string `json:"signerKey"`
+		} `json:"sourceCompletenessAttestations"`
+		SourceDisclosure struct {
+			Artifacts []struct {
+				ArtifactDigest    string                                                                     `json:"artifactDigest"`
+				ArtifactSchema    string                                                                     `json:"artifactSchema"`
+				CanonicalArtifact string                                                                     `json:"canonicalArtifact"`
+				Role              TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole `json:"role"`
+			} `json:"artifacts"`
+			Kind string `json:"kind"`
+		} `json:"sourceDisclosure"`
+		Window struct {
+			EndsAt   int64 `json:"endsAt"`
+			StartsAt int64 `json:"startsAt"`
+		} `json:"window"`
+	} `json:"evidence"`
+	ExpirationDate            string                                      `json:"expirationDate"`
+	Family                    string                                      `json:"family"`
+	IssuanceDate              string                                      `json:"issuanceDate"`
+	Issuer                    string                                      `json:"issuer"`
+	IssuerKeyEpoch            int64                                       `json:"issuerKeyEpoch"`
+	PresentationEvidenceClass string                                      `json:"presentationEvidenceClass"`
+	Schema                    TrustFincredSettlementReliabilityBodySchema `json:"schema"`
+	SourceEvidenceClass       string                                      `json:"sourceEvidenceClass"`
+	Type                      []string                                    `json:"type"`
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.CommittedLeaves.Leaf.QueryKey.SourceFamily.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyCommittedLeavesLeafQueryKeySourceFamily string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0 defines model for .
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0 struct {
+	Kind TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0Kind `json:"kind"`
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0Kind defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.LowerBoundary.0.Kind.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0Kind string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1 defines model for .
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1 struct {
+	Kind      TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1Kind `json:"kind"`
+	LeafProof struct {
+		IndexProof struct {
+			AuditPath []string `json:"auditPath"`
+			LeafIndex int64    `json:"leafIndex"`
+			TreeSize  int64    `json:"treeSize"`
+		} `json:"indexProof"`
+		Leaf struct {
+			Index    int64 `json:"index"`
+			QueryKey struct {
+				ArtifactId   string                                                                                                                         `json:"artifactId"`
+				OccurredAt   int64                                                                                                                          `json:"occurredAt"`
+				SourceFamily TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily `json:"sourceFamily"`
+				Subject      string                                                                                                                         `json:"subject"`
+			} `json:"queryKey"`
+			SourceArtifactDigest string `json:"sourceArtifactDigest"`
+		} `json:"leaf"`
+	} `json:"leafProof"`
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1Kind defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.LowerBoundary.1.Kind.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1Kind string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.LowerBoundary.1.LeafProof.Leaf.QueryKey.SourceFamily.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1LeafProofLeafQueryKeySourceFamily string
+
+// TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.LowerBoundary.
+type TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary struct {
+	union json.RawMessage
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchema defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.Schema.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySchema string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.SourceEvidenceClass.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceEvidenceClass string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.SourceFamily.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodySourceFamily string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0 defines model for .
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0 struct {
+	Kind TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0Kind `json:"kind"`
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0Kind defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.UpperBoundary.0.Kind.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0Kind string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1 defines model for .
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1 struct {
+	Kind      TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1Kind `json:"kind"`
+	LeafProof struct {
+		IndexProof struct {
+			AuditPath []string `json:"auditPath"`
+			LeafIndex int64    `json:"leafIndex"`
+			TreeSize  int64    `json:"treeSize"`
+		} `json:"indexProof"`
+		Leaf struct {
+			Index    int64 `json:"index"`
+			QueryKey struct {
+				ArtifactId   string                                                                                                                         `json:"artifactId"`
+				OccurredAt   int64                                                                                                                          `json:"occurredAt"`
+				SourceFamily TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily `json:"sourceFamily"`
+				Subject      string                                                                                                                         `json:"subject"`
+			} `json:"queryKey"`
+			SourceArtifactDigest string `json:"sourceArtifactDigest"`
+		} `json:"leaf"`
+	} `json:"leafProof"`
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1Kind defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.UpperBoundary.1.Kind.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1Kind string
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.UpperBoundary.1.LeafProof.Leaf.QueryKey.SourceFamily.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1LeafProofLeafQueryKeySourceFamily string
+
+// TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceCompletenessAttestations.Body.UpperBoundary.
+type TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary struct {
+	union json.RawMessage
+}
+
+// TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole defines model for TrustFincredSettlementReliabilityBody.Evidence.SourceDisclosure.Artifacts.Role.
+type TrustFincredSettlementReliabilityBodyEvidenceSourceDisclosureArtifactsRole string
+
+// TrustFincredSettlementReliabilityBodySchema defines model for TrustFincredSettlementReliabilityBody.Schema.
+type TrustFincredSettlementReliabilityBodySchema string
+
+// TrustFincredSourceCheckpointBody defines model for TrustFincredSourceCheckpointBody.
+type TrustFincredSourceCheckpointBody struct {
+	CheckpointAuthorityEpoch int64  `json:"checkpointAuthorityEpoch"`
+	CheckpointAuthorityKey   string `json:"checkpointAuthorityKey"`
+	CheckpointSequence       int64  `json:"checkpointSequence"`
+	Cutoff                   int64  `json:"cutoff"`
+	ExpiresAt                int64  `json:"expiresAt"`
+	IndexRoot                string `json:"indexRoot"`
+	IndexSize                int64  `json:"indexSize"`
+	IssuedAt                 int64  `json:"issuedAt"`
+	LowerBoundary            struct {
+		Kind string `json:"kind"`
+	} `json:"lowerBoundary"`
+	RangeRoot       string                                 `json:"rangeRoot"`
+	Schema          TrustFincredSourceCheckpointBodySchema `json:"schema"`
+	SourceId        string                                 `json:"sourceId"`
+	StoreGeneration int64                                  `json:"storeGeneration"`
+	UpperBoundary   struct {
+		Kind string `json:"kind"`
+	} `json:"upperBoundary"`
+	Window struct {
+		EndsAt   int64 `json:"endsAt"`
+		StartsAt int64 `json:"startsAt"`
+	} `json:"window"`
+}
+
+// TrustFincredSourceCheckpointBodySchema defines model for TrustFincredSourceCheckpointBody.Schema.
+type TrustFincredSourceCheckpointBodySchema string
+
+// TrustFincredSourceCompletenessAttestationBody defines model for TrustFincredSourceCompletenessAttestationBody.
+type TrustFincredSourceCompletenessAttestationBody struct {
+	AttestationReference     string `json:"attestationReference"`
+	CheckpointAuthorityEpoch int64  `json:"checkpointAuthorityEpoch"`
+	CheckpointAuthorityKey   string `json:"checkpointAuthorityKey"`
+	CheckpointDigest         string `json:"checkpointDigest"`
+	CheckpointSequence       int64  `json:"checkpointSequence"`
+	CommittedLeaves          []struct {
+		IndexProof struct {
+			AuditPath []string `json:"auditPath"`
+			LeafIndex int64    `json:"leafIndex"`
+			TreeSize  int64    `json:"treeSize"`
+		} `json:"indexProof"`
+		Leaf struct {
+			Index    int64 `json:"index"`
+			QueryKey struct {
+				ArtifactId   string `json:"artifactId"`
+				OccurredAt   int64  `json:"occurredAt"`
+				SourceFamily string `json:"sourceFamily"`
+				Subject      string `json:"subject"`
+			} `json:"queryKey"`
+			SourceArtifactDigest string `json:"sourceArtifactDigest"`
+		} `json:"leaf"`
+	} `json:"committedLeaves"`
+	Cutoff           int64  `json:"cutoff"`
+	DisclosureDigest string `json:"disclosureDigest"`
+	ExpiresAt        int64  `json:"expiresAt"`
+	IndexRoot        string `json:"indexRoot"`
+	IssuedAt         int64  `json:"issuedAt"`
+	LowerBoundary    struct {
+		Kind string `json:"kind"`
+	} `json:"lowerBoundary"`
+	RangeRoot             string                                              `json:"rangeRoot"`
+	Schema                TrustFincredSourceCompletenessAttestationBodySchema `json:"schema"`
+	SourceArtifactDigests []string                                            `json:"sourceArtifactDigests"`
+	SourceEvidenceClass   string                                              `json:"sourceEvidenceClass"`
+	SourceFamily          string                                              `json:"sourceFamily"`
+	SourceId              string                                              `json:"sourceId"`
+	SourceSignerKey       string                                              `json:"sourceSignerKey"`
+	StoreGeneration       int64                                               `json:"storeGeneration"`
+	Subject               string                                              `json:"subject"`
+	UpperBoundary         struct {
+		Kind string `json:"kind"`
+	} `json:"upperBoundary"`
+	Window struct {
+		EndsAt   int64 `json:"endsAt"`
+		StartsAt int64 `json:"startsAt"`
+	} `json:"window"`
+}
+
+// TrustFincredSourceCompletenessAttestationBodySchema defines model for TrustFincredSourceCompletenessAttestationBody.Schema.
+type TrustFincredSourceCompletenessAttestationBodySchema string
+
+// TrustFincredSourceMemberBody defines model for TrustFincredSourceMemberBody.
+type TrustFincredSourceMemberBody struct {
+	ArtifactSchema    string `json:"artifactSchema"`
+	CanonicalArtifact string `json:"canonicalArtifact"`
+	QueryKey          struct {
+		ArtifactId   string `json:"artifactId"`
+		OccurredAt   int64  `json:"occurredAt"`
+		SourceFamily string `json:"sourceFamily"`
+		Subject      string `json:"subject"`
+	} `json:"queryKey"`
+	Schema string `json:"schema"`
+}
 
 // TrustKeyBindingCertificate defines model for TrustKeyBindingCertificate.
 type TrustKeyBindingCertificate struct {
@@ -31487,6 +39114,83 @@ type TrustReputationCredential struct {
 	Type           []string `json:"type"`
 }
 
+// TrustTrustPassportRevocationRootBody defines model for TrustTrustPassportRevocationRootBody.
+type TrustTrustPassportRevocationRootBody struct {
+	Epoch          int64   `json:"epoch"`
+	IssuedAtUnixMs int64   `json:"issued_at_unix_ms"`
+	LeafCount      int64   `json:"leaf_count"`
+	RootHash       []int64 `json:"root_hash"`
+}
+
+// TrustTrustReputationImportReportBody defines model for TrustTrustReputationImportReportBody.
+type TrustTrustReputationImportReportBody struct {
+	DecayPolicyRef      string                                     `json:"decay_policy_ref"`
+	Id                  string                                     `json:"id"`
+	ImportVerdict       string                                     `json:"import_verdict"`
+	IssuedAt            string                                     `json:"issued_at"`
+	Issuer              string                                     `json:"issuer"`
+	IssuerTrustRef      string                                     `json:"issuer_trust_ref"`
+	LocalWeight         int64                                      `json:"local_weight"`
+	NegativeEventRefs   []map[string]interface{}                   `json:"negative_event_refs"`
+	PrivacyProfileRef   string                                     `json:"privacy_profile_ref"`
+	Schema              TrustTrustReputationImportReportBodySchema `json:"schema"`
+	SourceNetwork       string                                     `json:"source_network"`
+	SourceReputationRef string                                     `json:"source_reputation_ref"`
+	Subject             string                                     `json:"subject"`
+	SubjectBindingRef   string                                     `json:"subject_binding_ref"`
+	Usage               string                                     `json:"usage"`
+}
+
+// TrustTrustReputationImportReportBodySchema defines model for TrustTrustReputationImportReportBody.Schema.
+type TrustTrustReputationImportReportBodySchema string
+
+// TrustTrustRootBody defines model for TrustTrustRootBody.
+type TrustTrustRootBody struct {
+	Authority string  `json:"authority"`
+	Id        string  `json:"id"`
+	RootId    *string `json:"root_id,omitempty"`
+	Roots     []struct {
+		Subject string `json:"subject"`
+	} `json:"roots"`
+	Schema TrustTrustRootBodySchema `json:"schema"`
+}
+
+// TrustTrustRootBodySchema defines model for TrustTrustRootBody.Schema.
+type TrustTrustRootBodySchema string
+
+// TrustTrustScorecardSnapshotBody defines model for TrustTrustScorecardSnapshotBody.
+type TrustTrustScorecardSnapshotBody struct {
+	ComponentScores []struct {
+		Component   string `json:"component"`
+		EvidenceRef string `json:"evidence_ref"`
+		Score       int64  `json:"score"`
+		Stale       bool   `json:"stale"`
+		Weight      int64  `json:"weight"`
+	} `json:"component_scores"`
+	ComputedScore    int64                    `json:"computed_score"`
+	DowngradeReasons []map[string]interface{} `json:"downgrade_reasons"`
+	FreshnessWindow  struct {
+		ValidFrom  string `json:"valid_from"`
+		ValidUntil string `json:"valid_until"`
+	} `json:"freshness_window"`
+	Id                           string                                `json:"id"`
+	IssuedAt                     string                                `json:"issued_at"`
+	IssuerTrustRoots             []string                              `json:"issuer_trust_roots"`
+	NegativeEventRefs            []map[string]interface{}              `json:"negative_event_refs"`
+	PortableReputationImportRefs []string                              `json:"portable_reputation_import_refs"`
+	ReputationSnapshotRefs       []string                              `json:"reputation_snapshot_refs"`
+	Schema                       TrustTrustScorecardSnapshotBodySchema `json:"schema"`
+	Scope                        string                                `json:"scope"`
+	ScoreCeiling                 int64                                 `json:"score_ceiling"`
+	ScoreFloor                   int64                                 `json:"score_floor"`
+	SlaPerformanceRefs           []string                              `json:"sla_performance_refs"`
+	Subject                      string                                `json:"subject"`
+	VerifierPolicyRef            string                                `json:"verifier_policy_ref"`
+}
+
+// TrustTrustScorecardSnapshotBodySchema defines model for TrustTrustScorecardSnapshotBody.Schema.
+type TrustTrustScorecardSnapshotBodySchema string
+
 // UnderwritingDecision defines model for UnderwritingDecision.
 type UnderwritingDecision struct {
 	Budget struct {
@@ -31660,6 +39364,531 @@ type UnderwritingPolicyInput struct {
 
 // UnderwritingPolicyInputSchema defines model for UnderwritingPolicyInput.Schema.
 type UnderwritingPolicyInputSchema string
+
+// Web3Web3SettlementProofBundleBody defines model for Web3Web3SettlementProofBundleBody.
+type Web3Web3SettlementProofBundleBody struct {
+	BundleId      string `json:"bundle_id"`
+	ChainId       string `json:"chain_id"`
+	ChainSnapshot struct {
+		BeneficiaryIdentityBinding struct {
+			Certificate struct {
+				ChainScope        []string `json:"chain_scope"`
+				ChioIdentity      string   `json:"chio_identity"`
+				ChioPublicKey     string   `json:"chio_public_key"`
+				ExpiresAt         int64    `json:"expires_at"`
+				IssuedAt          int64    `json:"issued_at"`
+				Nonce             string   `json:"nonce"`
+				Purpose           []string `json:"purpose"`
+				Schema            string   `json:"schema"`
+				SettlementAddress string   `json:"settlement_address"`
+			} `json:"certificate"`
+			Signature string `json:"signature"`
+		} `json:"beneficiary_identity_binding"`
+		Block struct {
+			BlockHash         string   `json:"block_hash"`
+			BlockNumber       int64    `json:"block_number"`
+			TransactionHashes []string `json:"transaction_hashes"`
+		} `json:"block"`
+		Bond struct {
+			BondVaultContract        string `json:"bond_vault_contract"`
+			BondVaultRuntimeCodehash string `json:"bond_vault_runtime_codehash"`
+			MinimumRequiredAmount    struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"minimum_required_amount"`
+			PostedAmount struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"posted_amount"`
+		} `json:"bond"`
+		ChainId string `json:"chain_id"`
+		Escrow  struct {
+			BeneficiaryAddress    string `json:"beneficiary_address"`
+			EscrowContract        string `json:"escrow_contract"`
+			EscrowId              string `json:"escrow_id"`
+			EscrowRuntimeCodehash string `json:"escrow_runtime_codehash"`
+			LockedAmount          struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"locked_amount"`
+			RefundEvent *struct {
+				Amount struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"amount"`
+				Block struct {
+					BlockHash         string   `json:"block_hash"`
+					BlockNumber       int64    `json:"block_number"`
+					TransactionHashes []string `json:"transaction_hashes"`
+				} `json:"block"`
+				EscrowId     string `json:"escrow_id"`
+				RefundTxHash string `json:"refund_tx_hash"`
+			} `json:"refund_event,omitempty"`
+			Refunded     bool `json:"refunded"`
+			ReleaseEvent *struct {
+				Amount struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"amount"`
+				Block struct {
+					BlockHash         string   `json:"block_hash"`
+					BlockNumber       int64    `json:"block_number"`
+					TransactionHashes []string `json:"transaction_hashes"`
+				} `json:"block"`
+				EscrowId        string `json:"escrow_id"`
+				Partial         bool   `json:"partial"`
+				ReceiptHash     string `json:"receipt_hash"`
+				ReleaseTxHash   string `json:"release_tx_hash"`
+				RemainingAmount struct {
+					Currency string `json:"currency"`
+					Units    int64  `json:"units"`
+				} `json:"remaining_amount"`
+			} `json:"release_event,omitempty"`
+			ReleasedAmount struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"released_amount"`
+			SettlementTokenAddress string `json:"settlement_token_address"`
+		} `json:"escrow"`
+		IdentityRegistryAddress  string `json:"identity_registry_address"`
+		IdentityRegistryOperator *struct {
+			Active                   bool   `json:"active"`
+			BlockHash                string `json:"block_hash"`
+			BlockNumber              int64  `json:"block_number"`
+			IdentityRegistryContract string `json:"identity_registry_contract"`
+			OperatorAddress          string `json:"operator_address"`
+			OperatorEpoch            int64  `json:"operator_epoch"`
+			OperatorKeyHash          string `json:"operator_key_hash"`
+			SettlementKey            string `json:"settlement_key"`
+		} `json:"identity_registry_operator,omitempty"`
+		IdentityRegistryRuntimeCodehash string `json:"identity_registry_runtime_codehash"`
+		LatestBlockNumber               int64  `json:"latest_block_number"`
+		MaxBlockLag                     int64  `json:"max_block_lag"`
+		ObservedBlockNumber             int64  `json:"observed_block_number"`
+		RegistryRoot                    string `json:"registry_root"`
+		RootRegistryAddress             string `json:"root_registry_address"`
+		RootRegistryRuntimeCodehash     string `json:"root_registry_runtime_codehash"`
+	} `json:"chain_snapshot"`
+	CollateralPositionRef *string `json:"collateral_position_ref,omitempty"`
+	CommerceOrderId       string  `json:"commerce_order_id"`
+	DeploymentProvenance  struct {
+		ApprovalHash                    string `json:"approval_hash"`
+		BondVaultContract               string `json:"bond_vault_contract"`
+		BondVaultRuntimeCodehash        string `json:"bond_vault_runtime_codehash"`
+		ChainId                         string `json:"chain_id"`
+		ContractPackageId               string `json:"contract_package_id"`
+		Create2Factory                  string `json:"create2_factory"`
+		EscrowContract                  string `json:"escrow_contract"`
+		EscrowRuntimeCodehash           string `json:"escrow_runtime_codehash"`
+		IdentityRegistryAddress         string `json:"identity_registry_address"`
+		IdentityRegistryRuntimeCodehash string `json:"identity_registry_runtime_codehash"`
+		ProvenanceId                    string `json:"provenance_id"`
+		ReviewedManifestHash            string `json:"reviewed_manifest_hash"`
+		RootRegistryAddress             string `json:"root_registry_address"`
+		RootRegistryRuntimeCodehash     string `json:"root_registry_runtime_codehash"`
+		SaltNamespace                   string `json:"salt_namespace"`
+		SettlementTokenAddress          string `json:"settlement_token_address"`
+	} `json:"deployment_provenance"`
+	DisputePosture  string `json:"dispute_posture"`
+	DisputeSnapshot struct {
+		ChainEventBlocks *[]struct {
+			BlockHash         string   `json:"block_hash"`
+			BlockNumber       int64    `json:"block_number"`
+			TransactionHashes []string `json:"transaction_hashes"`
+		} `json:"chain_event_blocks,omitempty"`
+		ChainEventTxHashes  []string `json:"chain_event_tx_hashes"`
+		ChallengeWindowSecs int64    `json:"challenge_window_secs"`
+		DisputeId           string   `json:"dispute_id"`
+		LinkedReceiptIds    []string `json:"linked_receipt_ids"`
+		ObservedAt          int64    `json:"observed_at"`
+		OpenDisputeCount    int64    `json:"open_dispute_count"`
+		Posture             string   `json:"posture"`
+		Schema              string   `json:"schema"`
+		WindowClosedAt      int64    `json:"window_closed_at"`
+	} `json:"dispute_snapshot"`
+	GuaranteeDecisionRef  *string `json:"guarantee_decision_ref,omitempty"`
+	ObservedConfirmations int64   `json:"observed_confirmations"`
+	OrderBinding          struct {
+		BeneficiaryAddress string `json:"beneficiary_address"`
+		ChainId            string `json:"chain_id"`
+		CommerceOrderId    string `json:"commerce_order_id"`
+		CustodyProviderId  string `json:"custody_provider_id"`
+		EscrowId           string `json:"escrow_id"`
+		SettlementAmount   struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"settlement_amount"`
+		SettlementRailId      string `json:"settlement_rail_id"`
+		SettlementReference   string `json:"settlement_reference"`
+		SettlementTxHash      string `json:"settlement_tx_hash"`
+		TransactionPassportId string `json:"transaction_passport_id"`
+	} `json:"order_binding"`
+	PublicWitness *struct {
+		AnchorTxHash             string `json:"anchor_tx_hash"`
+		AnchoredCheckpointSeq    int64  `json:"anchored_checkpoint_seq"`
+		AnchoredMerkleRoot       string `json:"anchored_merkle_root"`
+		BodyHash                 string `json:"body_hash"`
+		BondVaultContract        string `json:"bond_vault_contract"`
+		BondVaultRuntimeCodehash string `json:"bond_vault_runtime_codehash"`
+		ChainId                  string `json:"chain_id"`
+		EscrowContract           string `json:"escrow_contract"`
+		EscrowRuntimeCodehash    string `json:"escrow_runtime_codehash"`
+		IdentityRegistryAddress  string `json:"identity_registry_address"`
+		IdentityRegistryOperator *struct {
+			Active                   bool   `json:"active"`
+			BlockHash                string `json:"block_hash"`
+			BlockNumber              int64  `json:"block_number"`
+			IdentityRegistryContract string `json:"identity_registry_contract"`
+			OperatorAddress          string `json:"operator_address"`
+			OperatorEpoch            int64  `json:"operator_epoch"`
+			OperatorKeyHash          string `json:"operator_key_hash"`
+			SettlementKey            string `json:"settlement_key"`
+		} `json:"identity_registry_operator,omitempty"`
+		IdentityRegistryRuntimeCodehash string `json:"identity_registry_runtime_codehash"`
+		Mode                            string `json:"mode"`
+		ObservedAt                      int64  `json:"observed_at"`
+		RegistryRoot                    string `json:"registry_root"`
+		RootRegistryAddress             string `json:"root_registry_address"`
+		RootRegistryRuntimeCodehash     string `json:"root_registry_runtime_codehash"`
+		SettlementTokenAddress          string `json:"settlement_token_address"`
+		WitnessId                       string `json:"witness_id"`
+	} `json:"public_witness,omitempty"`
+	RequiredConfirmations int64                                   `json:"required_confirmations"`
+	Schema                Web3Web3SettlementProofBundleBodySchema `json:"schema"`
+	SettlementReceipt     struct {
+		Dispatch struct {
+			BeneficiaryAddress string `json:"beneficiary_address"`
+			Bond               *struct {
+				Body struct {
+					BondId         string `json:"bondId"`
+					ExpiresAt      int64  `json:"expiresAt"`
+					IssuedAt       int64  `json:"issuedAt"`
+					LifecycleState string `json:"lifecycleState"`
+					Report         struct {
+						Disposition string `json:"disposition"`
+						Exposure    struct {
+							ActionableReceipts        int64    `json:"actionableReceipts"`
+							ActiveDecisions           int64    `json:"activeDecisions"`
+							Currencies                []string `json:"currencies"`
+							FailedSettlementReceipts  int64    `json:"failedSettlementReceipts"`
+							MatchingDecisions         int64    `json:"matchingDecisions"`
+							MatchingReceipts          int64    `json:"matchingReceipts"`
+							MixedCurrencyBook         bool     `json:"mixedCurrencyBook"`
+							PendingSettlementReceipts int64    `json:"pendingSettlementReceipts"`
+							ReturnedDecisions         int64    `json:"returnedDecisions"`
+							ReturnedReceipts          int64    `json:"returnedReceipts"`
+							SupersededDecisions       int64    `json:"supersededDecisions"`
+							TruncatedDecisions        bool     `json:"truncatedDecisions"`
+							TruncatedReceipts         bool     `json:"truncatedReceipts"`
+						} `json:"exposure"`
+						Filters struct {
+							AgentSubject  string `json:"agentSubject"`
+							DecisionLimit int64  `json:"decisionLimit"`
+							ReceiptLimit  int64  `json:"receiptLimit"`
+						} `json:"filters"`
+						GeneratedAt      int64  `json:"generatedAt"`
+						LatestFacilityId string `json:"latestFacilityId"`
+						Prerequisites    struct {
+							ActiveFacilityMet      bool `json:"activeFacilityMet"`
+							ActiveFacilityRequired bool `json:"activeFacilityRequired"`
+							CertificationMet       bool `json:"certificationMet"`
+							CertificationRequired  bool `json:"certificationRequired"`
+							CurrencyCoherent       bool `json:"currencyCoherent"`
+							RuntimeAssuranceMet    bool `json:"runtimeAssuranceMet"`
+						} `json:"prerequisites"`
+						Schema    string `json:"schema"`
+						Scorecard struct {
+							AnomalyCount      int64    `json:"anomalyCount"`
+							Band              string   `json:"band"`
+							Confidence        string   `json:"confidence"`
+							Currencies        []string `json:"currencies"`
+							MatchingDecisions int64    `json:"matchingDecisions"`
+							MatchingReceipts  int64    `json:"matchingReceipts"`
+							MixedCurrencyBook bool     `json:"mixedCurrencyBook"`
+							OverallScore      float32  `json:"overallScore"`
+							Probationary      bool     `json:"probationary"`
+							ReturnedDecisions int64    `json:"returnedDecisions"`
+							ReturnedReceipts  int64    `json:"returnedReceipts"`
+						} `json:"scorecard"`
+						SupportBoundary struct {
+							AutonomyGatingSupported          bool `json:"autonomyGatingSupported"`
+							ExternalEscrowExecutionSupported bool `json:"externalEscrowExecutionSupported"`
+							ReserveAccountingAuthoritative   bool `json:"reserveAccountingAuthoritative"`
+						} `json:"supportBoundary"`
+					} `json:"report"`
+					Schema string `json:"schema"`
+				} `json:"body"`
+				Signature string `json:"signature"`
+				SignerKey string `json:"signerKey"`
+			} `json:"bond,omitempty"`
+			BondVaultContract  string `json:"bond_vault_contract"`
+			CapitalInstruction struct {
+				Body struct {
+					Action string `json:"action"`
+					Amount struct {
+						Currency string `json:"currency"`
+						Units    int64  `json:"units"`
+					} `json:"amount"`
+					AuthorityChain []struct {
+						ApprovedAt     int64 `json:"approvedAt"`
+						AuthorityProof struct {
+							Body struct {
+								ApprovedAt  int64  `json:"approvedAt"`
+								ExpiresAt   int64  `json:"expiresAt"`
+								PrincipalId string `json:"principalId"`
+								Role        string `json:"role"`
+								Schema      string `json:"schema"`
+							} `json:"body"`
+							Signature string `json:"signature"`
+							SignerKey string `json:"signerKey"`
+						} `json:"authorityProof"`
+						ExpiresAt   int64  `json:"expiresAt"`
+						Note        string `json:"note"`
+						PrincipalId string `json:"principalId"`
+						Role        string `json:"role"`
+					} `json:"authorityChain"`
+					CompletionFlowRowId string `json:"completionFlowRowId"`
+					CounterpartyId      string `json:"counterpartyId"`
+					CounterpartyRole    string `json:"counterpartyRole"`
+					Description         string `json:"description"`
+					EvidenceRefs        []struct {
+						Kind        string `json:"kind"`
+						Locator     string `json:"locator"`
+						ObservedAt  int64  `json:"observedAt"`
+						ReferenceId string `json:"referenceId"`
+					} `json:"evidenceRefs"`
+					ExecutionWindow struct {
+						NotAfter  int64 `json:"notAfter"`
+						NotBefore int64 `json:"notBefore"`
+					} `json:"executionWindow"`
+					GovernedReceiptId string `json:"governedReceiptId"`
+					InstructionId     string `json:"instructionId"`
+					IntendedState     string `json:"intendedState"`
+					IssuedAt          int64  `json:"issuedAt"`
+					OwnerRole         string `json:"ownerRole"`
+					Query             struct {
+						AgentSubject   string `json:"agentSubject"`
+						BondLimit      int64  `json:"bondLimit"`
+						FacilityLimit  int64  `json:"facilityLimit"`
+						LossEventLimit int64  `json:"lossEventLimit"`
+						ReceiptLimit   int64  `json:"receiptLimit"`
+					} `json:"query"`
+					Rail struct {
+						CustodyProviderId     string `json:"custodyProviderId"`
+						DestinationAccountRef string `json:"destinationAccountRef"`
+						Jurisdiction          string `json:"jurisdiction"`
+						Kind                  string `json:"kind"`
+						RailId                string `json:"railId"`
+						SourceAccountRef      string `json:"sourceAccountRef"`
+					} `json:"rail"`
+					ReconciledState string `json:"reconciledState"`
+					Schema          string `json:"schema"`
+					SourceId        string `json:"sourceId"`
+					SourceKind      string `json:"sourceKind"`
+					SubjectKey      string `json:"subjectKey"`
+					SupportBoundary struct {
+						AutomaticDispatchSupported         bool `json:"automaticDispatchSupported"`
+						CapitalBookAuthoritative           bool `json:"capitalBookAuthoritative"`
+						CustodyNeutralInstructionSupported bool `json:"custodyNeutralInstructionSupported"`
+						ExternalExecutionAuthoritative     bool `json:"externalExecutionAuthoritative"`
+					} `json:"supportBoundary"`
+				} `json:"body"`
+				Signature string `json:"signature"`
+				SignerKey string `json:"signerKey"`
+			} `json:"capital_instruction"`
+			ChainId           string `json:"chain_id"`
+			ContractPackageId string `json:"contract_package_id"`
+			DispatchId        string `json:"dispatch_id"`
+			EscrowContract    string `json:"escrow_contract"`
+			EscrowId          string `json:"escrow_id"`
+			IssuedAt          int64  `json:"issued_at"`
+			Note              string `json:"note"`
+			OperatorKeyHash   string `json:"operator_key_hash"`
+			Schema            string `json:"schema"`
+			SettlementAmount  struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"settlement_amount"`
+			SettlementPath         string `json:"settlement_path"`
+			SettlementTokenAddress string `json:"settlement_token_address"`
+			SupportBoundary        struct {
+				AnchorProofRequired         bool `json:"anchor_proof_required"`
+				CustodyBoundaryExplicit     bool `json:"custody_boundary_explicit"`
+				OracleEvidenceRequiredForFx bool `json:"oracle_evidence_required_for_fx"`
+				RealDispatchSupported       bool `json:"real_dispatch_supported"`
+				ReversalSupported           bool `json:"reversal_supported"`
+			} `json:"support_boundary"`
+			TrustProfileId string `json:"trust_profile_id"`
+		} `json:"dispatch"`
+		ExecutionReceiptId       string  `json:"execution_receipt_id"`
+		FailureReason            *string `json:"failure_reason,omitempty"`
+		IdentityRegistryEvidence *struct {
+			Active                   bool   `json:"active"`
+			BlockHash                string `json:"block_hash"`
+			BlockNumber              int64  `json:"block_number"`
+			ChainId                  string `json:"chain_id"`
+			IdentityRegistryContract string `json:"identity_registry_contract"`
+			ObservedAt               int64  `json:"observed_at"`
+			OperatorAddress          string `json:"operator_address"`
+			OperatorEpoch            int64  `json:"operator_epoch"`
+			OperatorKeyHash          string `json:"operator_key_hash"`
+			RegisteredAt             int64  `json:"registered_at"`
+			SettlementKey            string `json:"settlement_key"`
+		} `json:"identity_registry_evidence,omitempty"`
+		IssuedAt          int64  `json:"issued_at"`
+		LifecycleState    string `json:"lifecycle_state"`
+		Note              string `json:"note"`
+		ObservedExecution struct {
+			Amount struct {
+				Currency string `json:"currency"`
+				Units    int64  `json:"units"`
+			} `json:"amount"`
+			ExternalReferenceId string `json:"externalReferenceId"`
+			ObservedAt          int64  `json:"observedAt"`
+		} `json:"observed_execution"`
+		OracleEvidence *struct {
+			Authority          string `json:"authority"`
+			Base               string `json:"base"`
+			CacheAgeSeconds    int64  `json:"cache_age_seconds"`
+			ConvertedCostUnits int64  `json:"converted_cost_units"`
+			FeedAddress        string `json:"feed_address"`
+			GrantCurrency      string `json:"grant_currency"`
+			MaxAgeSeconds      int64  `json:"max_age_seconds"`
+			OraclePublicKey    string `json:"oracle_public_key"`
+			OriginalCostUnits  int64  `json:"original_cost_units"`
+			OriginalCurrency   string `json:"original_currency"`
+			Quote              string `json:"quote"`
+			RateDenominator    int64  `json:"rate_denominator"`
+			RateNumerator      int64  `json:"rate_numerator"`
+			Schema             string `json:"schema"`
+			Signature          string `json:"signature"`
+			Source             string `json:"source"`
+			UpdatedAt          int64  `json:"updated_at"`
+		} `json:"oracle_evidence,omitempty"`
+		ReconciledAnchorProof *struct {
+			ChainAnchor struct {
+				AnchoredCheckpointSeq int64  `json:"anchored_checkpoint_seq"`
+				AnchoredMerkleRoot    string `json:"anchored_merkle_root"`
+				BlockHash             string `json:"block_hash"`
+				BlockNumber           int64  `json:"block_number"`
+				ChainId               string `json:"chain_id"`
+				ContractAddress       string `json:"contract_address"`
+				OperatorAddress       string `json:"operator_address"`
+				OperatorEpoch         int64  `json:"operator_epoch"`
+				OperatorKeyHash       string `json:"operator_key_hash"`
+				TxHash                string `json:"tx_hash"`
+			} `json:"chain_anchor"`
+			CheckpointStatement struct {
+				BatchEndSeq   int64  `json:"batch_end_seq"`
+				BatchStartSeq int64  `json:"batch_start_seq"`
+				CheckpointSeq int64  `json:"checkpoint_seq"`
+				IssuedAt      int64  `json:"issued_at"`
+				KernelKey     string `json:"kernel_key"`
+				MerkleRoot    string `json:"merkle_root"`
+				Schema        string `json:"schema"`
+				Signature     string `json:"signature"`
+				TreeSize      int64  `json:"tree_size"`
+			} `json:"checkpoint_statement"`
+			KeyBindingCertificate struct {
+				Certificate struct {
+					ChainScope        []string `json:"chain_scope"`
+					ChioIdentity      string   `json:"chio_identity"`
+					ChioPublicKey     string   `json:"chio_public_key"`
+					ExpiresAt         int64    `json:"expires_at"`
+					IssuedAt          int64    `json:"issued_at"`
+					Nonce             string   `json:"nonce"`
+					Purpose           []string `json:"purpose"`
+					Schema            string   `json:"schema"`
+					SettlementAddress string   `json:"settlement_address"`
+				} `json:"certificate"`
+				Signature string `json:"signature"`
+			} `json:"key_binding_certificate"`
+			Receipt struct {
+				Action struct {
+					ParameterHash string `json:"parameter_hash"`
+					Parameters    struct {
+						Amount   int64  `json:"amount"`
+						Currency string `json:"currency"`
+						To       string `json:"to"`
+					} `json:"parameters"`
+				} `json:"action"`
+				BoundaryClass string `json:"boundary_class"`
+				CapabilityId  string `json:"capability_id"`
+				ContentHash   string `json:"content_hash"`
+				Decision      struct {
+					Verdict string `json:"verdict"`
+				} `json:"decision"`
+				Id        string `json:"id"`
+				KernelKey string `json:"kernel_key"`
+				Metadata  struct {
+					ChioReceiptSigningNonce string `json:"chio_receipt_signing_nonce"`
+					Financial               struct {
+						BudgetRemaining int64  `json:"budget_remaining"`
+						BudgetTotal     int64  `json:"budget_total"`
+						CostCharged     int64  `json:"cost_charged"`
+						Currency        string `json:"currency"`
+						DelegationDepth int64  `json:"delegation_depth"`
+						GrantIndex      int64  `json:"grant_index"`
+						OracleEvidence  struct {
+							Authority          string  `json:"authority"`
+							Base               string  `json:"base"`
+							CacheAgeSeconds    int64   `json:"cache_age_seconds"`
+							ConvertedCostUnits int64   `json:"converted_cost_units"`
+							FeedAddress        string  `json:"feed_address"`
+							GrantCurrency      string  `json:"grant_currency"`
+							MaxAgeSeconds      int64   `json:"max_age_seconds"`
+							OraclePublicKey    *string `json:"oracle_public_key,omitempty"`
+							OriginalCostUnits  int64   `json:"original_cost_units"`
+							OriginalCurrency   string  `json:"original_currency"`
+							Quote              string  `json:"quote"`
+							RateDenominator    int64   `json:"rate_denominator"`
+							RateNumerator      int64   `json:"rate_numerator"`
+							Schema             string  `json:"schema"`
+							Signature          *string `json:"signature,omitempty"`
+							Source             string  `json:"source"`
+							UpdatedAt          int64   `json:"updated_at"`
+						} `json:"oracle_evidence"`
+						PaymentReference string `json:"payment_reference"`
+						RootBudgetHolder string `json:"root_budget_holder"`
+						SettlementStatus string `json:"settlement_status"`
+					} `json:"financial"`
+				} `json:"metadata"`
+				PolicyHash    string `json:"policy_hash"`
+				ReceiptKind   string `json:"receipt_kind"`
+				RedactionMode string `json:"redaction_mode"`
+				Signature     string `json:"signature"`
+				Timestamp     int64  `json:"timestamp"`
+				ToolName      string `json:"tool_name"`
+				ToolOrigin    string `json:"tool_origin"`
+				ToolServer    string `json:"tool_server"`
+				TrustLevel    string `json:"trust_level"`
+			} `json:"receipt"`
+			ReceiptInclusion struct {
+				CheckpointSeq int64  `json:"checkpoint_seq"`
+				MerkleRoot    string `json:"merkle_root"`
+				Proof         struct {
+					AuditPath []map[string]interface{} `json:"audit_path"`
+					LeafIndex int64                    `json:"leaf_index"`
+					TreeSize  int64                    `json:"tree_size"`
+				} `json:"proof"`
+			} `json:"receipt_inclusion"`
+			Schema string `json:"schema"`
+		} `json:"reconciled_anchor_proof,omitempty"`
+		ReversalOf    *string `json:"reversal_of,omitempty"`
+		Schema        string  `json:"schema"`
+		SettledAmount struct {
+			Currency string `json:"currency"`
+			Units    int64  `json:"units"`
+		} `json:"settled_amount"`
+		SettlementReference string `json:"settlement_reference"`
+	} `json:"settlement_receipt"`
+	SlaRemedyRef          *string `json:"sla_remedy_ref,omitempty"`
+	SlashAuthorityRef     *string `json:"slash_authority_ref,omitempty"`
+	TransactionPassportId string  `json:"transaction_passport_id"`
+}
+
+// Web3Web3SettlementProofBundleBodySchema defines model for Web3Web3SettlementProofBundleBody.Schema.
+type Web3Web3SettlementProofBundleBodySchema string
 
 // WorkJoinInputs defines model for WorkJoinInputs.
 type WorkJoinInputs struct {
@@ -33580,6 +41809,94 @@ func (t *CapabilityAggregateInvocationBudget) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsCapabilityCapabilityBodyScopeGrantsConstraintsValue0 returns the union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as a CapabilityCapabilityBodyScopeGrantsConstraintsValue0
+func (t CapabilityCapabilityBody_Scope_Grants_Constraints_Value) AsCapabilityCapabilityBodyScopeGrantsConstraintsValue0() (CapabilityCapabilityBodyScopeGrantsConstraintsValue0, error) {
+	var body CapabilityCapabilityBodyScopeGrantsConstraintsValue0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityCapabilityBodyScopeGrantsConstraintsValue0 overwrites any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue0
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) FromCapabilityCapabilityBodyScopeGrantsConstraintsValue0(v CapabilityCapabilityBodyScopeGrantsConstraintsValue0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue0 performs a merge with any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value, using the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue0
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue0(v CapabilityCapabilityBodyScopeGrantsConstraintsValue0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCapabilityCapabilityBodyScopeGrantsConstraintsValue1 returns the union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as a CapabilityCapabilityBodyScopeGrantsConstraintsValue1
+func (t CapabilityCapabilityBody_Scope_Grants_Constraints_Value) AsCapabilityCapabilityBodyScopeGrantsConstraintsValue1() (CapabilityCapabilityBodyScopeGrantsConstraintsValue1, error) {
+	var body CapabilityCapabilityBodyScopeGrantsConstraintsValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityCapabilityBodyScopeGrantsConstraintsValue1 overwrites any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue1
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) FromCapabilityCapabilityBodyScopeGrantsConstraintsValue1(v CapabilityCapabilityBodyScopeGrantsConstraintsValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue1 performs a merge with any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value, using the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue1
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue1(v CapabilityCapabilityBodyScopeGrantsConstraintsValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCapabilityCapabilityBodyScopeGrantsConstraintsValue2 returns the union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as a CapabilityCapabilityBodyScopeGrantsConstraintsValue2
+func (t CapabilityCapabilityBody_Scope_Grants_Constraints_Value) AsCapabilityCapabilityBodyScopeGrantsConstraintsValue2() (CapabilityCapabilityBodyScopeGrantsConstraintsValue2, error) {
+	var body CapabilityCapabilityBodyScopeGrantsConstraintsValue2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCapabilityCapabilityBodyScopeGrantsConstraintsValue2 overwrites any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value as the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue2
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) FromCapabilityCapabilityBodyScopeGrantsConstraintsValue2(v CapabilityCapabilityBodyScopeGrantsConstraintsValue2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue2 performs a merge with any union data inside the CapabilityCapabilityBody_Scope_Grants_Constraints_Value, using the provided CapabilityCapabilityBodyScopeGrantsConstraintsValue2
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) MergeCapabilityCapabilityBodyScopeGrantsConstraintsValue2(v CapabilityCapabilityBodyScopeGrantsConstraintsValue2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t CapabilityCapabilityBody_Scope_Grants_Constraints_Value) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *CapabilityCapabilityBody_Scope_Grants_Constraints_Value) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsCapabilityGrantToolGrant returns the union data inside the CapabilityGrant as a CapabilityGrantToolGrant
 func (t CapabilityGrant) AsCapabilityGrantToolGrant() (CapabilityGrantToolGrant, error) {
 	var body CapabilityGrantToolGrant
@@ -33778,6 +42095,130 @@ func (t CapabilityTokenConstraint) MarshalJSON() ([]byte, error) {
 }
 
 func (t *CapabilityTokenConstraint) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsFindingFindingAdmissionBodyFeeTerminalsEvent0 returns the union data inside the FindingFindingAdmissionBody_FeeTerminals_Event as a FindingFindingAdmissionBodyFeeTerminalsEvent0
+func (t FindingFindingAdmissionBody_FeeTerminals_Event) AsFindingFindingAdmissionBodyFeeTerminalsEvent0() (FindingFindingAdmissionBodyFeeTerminalsEvent0, error) {
+	var body FindingFindingAdmissionBodyFeeTerminalsEvent0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFindingFindingAdmissionBodyFeeTerminalsEvent0 overwrites any union data inside the FindingFindingAdmissionBody_FeeTerminals_Event as the provided FindingFindingAdmissionBodyFeeTerminalsEvent0
+func (t *FindingFindingAdmissionBody_FeeTerminals_Event) FromFindingFindingAdmissionBodyFeeTerminalsEvent0(v FindingFindingAdmissionBodyFeeTerminalsEvent0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFindingFindingAdmissionBodyFeeTerminalsEvent0 performs a merge with any union data inside the FindingFindingAdmissionBody_FeeTerminals_Event, using the provided FindingFindingAdmissionBodyFeeTerminalsEvent0
+func (t *FindingFindingAdmissionBody_FeeTerminals_Event) MergeFindingFindingAdmissionBodyFeeTerminalsEvent0(v FindingFindingAdmissionBodyFeeTerminalsEvent0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsFindingFindingAdmissionBodyFeeTerminalsEvent1 returns the union data inside the FindingFindingAdmissionBody_FeeTerminals_Event as a FindingFindingAdmissionBodyFeeTerminalsEvent1
+func (t FindingFindingAdmissionBody_FeeTerminals_Event) AsFindingFindingAdmissionBodyFeeTerminalsEvent1() (FindingFindingAdmissionBodyFeeTerminalsEvent1, error) {
+	var body FindingFindingAdmissionBodyFeeTerminalsEvent1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFindingFindingAdmissionBodyFeeTerminalsEvent1 overwrites any union data inside the FindingFindingAdmissionBody_FeeTerminals_Event as the provided FindingFindingAdmissionBodyFeeTerminalsEvent1
+func (t *FindingFindingAdmissionBody_FeeTerminals_Event) FromFindingFindingAdmissionBodyFeeTerminalsEvent1(v FindingFindingAdmissionBodyFeeTerminalsEvent1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFindingFindingAdmissionBodyFeeTerminalsEvent1 performs a merge with any union data inside the FindingFindingAdmissionBody_FeeTerminals_Event, using the provided FindingFindingAdmissionBodyFeeTerminalsEvent1
+func (t *FindingFindingAdmissionBody_FeeTerminals_Event) MergeFindingFindingAdmissionBodyFeeTerminalsEvent1(v FindingFindingAdmissionBodyFeeTerminalsEvent1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t FindingFindingAdmissionBody_FeeTerminals_Event) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *FindingFindingAdmissionBody_FeeTerminals_Event) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsFindingFindingFinalizedBondSnapshotBodyObservedFinality0 returns the union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality as a FindingFindingFinalizedBondSnapshotBodyObservedFinality0
+func (t FindingFindingFinalizedBondSnapshotBody_ObservedFinality) AsFindingFindingFinalizedBondSnapshotBodyObservedFinality0() (FindingFindingFinalizedBondSnapshotBodyObservedFinality0, error) {
+	var body FindingFindingFinalizedBondSnapshotBodyObservedFinality0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFindingFindingFinalizedBondSnapshotBodyObservedFinality0 overwrites any union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality as the provided FindingFindingFinalizedBondSnapshotBodyObservedFinality0
+func (t *FindingFindingFinalizedBondSnapshotBody_ObservedFinality) FromFindingFindingFinalizedBondSnapshotBodyObservedFinality0(v FindingFindingFinalizedBondSnapshotBodyObservedFinality0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFindingFindingFinalizedBondSnapshotBodyObservedFinality0 performs a merge with any union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality, using the provided FindingFindingFinalizedBondSnapshotBodyObservedFinality0
+func (t *FindingFindingFinalizedBondSnapshotBody_ObservedFinality) MergeFindingFindingFinalizedBondSnapshotBodyObservedFinality0(v FindingFindingFinalizedBondSnapshotBodyObservedFinality0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsFindingFindingFinalizedBondSnapshotBodyObservedFinality1 returns the union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality as a FindingFindingFinalizedBondSnapshotBodyObservedFinality1
+func (t FindingFindingFinalizedBondSnapshotBody_ObservedFinality) AsFindingFindingFinalizedBondSnapshotBodyObservedFinality1() (FindingFindingFinalizedBondSnapshotBodyObservedFinality1, error) {
+	var body FindingFindingFinalizedBondSnapshotBodyObservedFinality1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromFindingFindingFinalizedBondSnapshotBodyObservedFinality1 overwrites any union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality as the provided FindingFindingFinalizedBondSnapshotBodyObservedFinality1
+func (t *FindingFindingFinalizedBondSnapshotBody_ObservedFinality) FromFindingFindingFinalizedBondSnapshotBodyObservedFinality1(v FindingFindingFinalizedBondSnapshotBodyObservedFinality1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeFindingFindingFinalizedBondSnapshotBodyObservedFinality1 performs a merge with any union data inside the FindingFindingFinalizedBondSnapshotBody_ObservedFinality, using the provided FindingFindingFinalizedBondSnapshotBodyObservedFinality1
+func (t *FindingFindingFinalizedBondSnapshotBody_ObservedFinality) MergeFindingFindingFinalizedBondSnapshotBodyObservedFinality1(v FindingFindingFinalizedBondSnapshotBodyObservedFinality1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t FindingFindingFinalizedBondSnapshotBody_ObservedFinality) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *FindingFindingFinalizedBondSnapshotBody_ObservedFinality) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -34491,6 +42932,68 @@ func (t KernelCallerDeliveryReport_Report_RealizedCost) MarshalJSON() ([]byte, e
 }
 
 func (t *KernelCallerDeliveryReport_Report_RealizedCost) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsKernelCallerDeliveryReportBodyRealizedCost0 returns the union data inside the KernelCallerDeliveryReportBody_RealizedCost as a KernelCallerDeliveryReportBodyRealizedCost0
+func (t KernelCallerDeliveryReportBody_RealizedCost) AsKernelCallerDeliveryReportBodyRealizedCost0() (KernelCallerDeliveryReportBodyRealizedCost0, error) {
+	var body KernelCallerDeliveryReportBodyRealizedCost0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromKernelCallerDeliveryReportBodyRealizedCost0 overwrites any union data inside the KernelCallerDeliveryReportBody_RealizedCost as the provided KernelCallerDeliveryReportBodyRealizedCost0
+func (t *KernelCallerDeliveryReportBody_RealizedCost) FromKernelCallerDeliveryReportBodyRealizedCost0(v KernelCallerDeliveryReportBodyRealizedCost0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeKernelCallerDeliveryReportBodyRealizedCost0 performs a merge with any union data inside the KernelCallerDeliveryReportBody_RealizedCost, using the provided KernelCallerDeliveryReportBodyRealizedCost0
+func (t *KernelCallerDeliveryReportBody_RealizedCost) MergeKernelCallerDeliveryReportBodyRealizedCost0(v KernelCallerDeliveryReportBodyRealizedCost0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsKernelCallerDeliveryReportBodyRealizedCost1 returns the union data inside the KernelCallerDeliveryReportBody_RealizedCost as a KernelCallerDeliveryReportBodyRealizedCost1
+func (t KernelCallerDeliveryReportBody_RealizedCost) AsKernelCallerDeliveryReportBodyRealizedCost1() (KernelCallerDeliveryReportBodyRealizedCost1, error) {
+	var body KernelCallerDeliveryReportBodyRealizedCost1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromKernelCallerDeliveryReportBodyRealizedCost1 overwrites any union data inside the KernelCallerDeliveryReportBody_RealizedCost as the provided KernelCallerDeliveryReportBodyRealizedCost1
+func (t *KernelCallerDeliveryReportBody_RealizedCost) FromKernelCallerDeliveryReportBodyRealizedCost1(v KernelCallerDeliveryReportBodyRealizedCost1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeKernelCallerDeliveryReportBodyRealizedCost1 performs a merge with any union data inside the KernelCallerDeliveryReportBody_RealizedCost, using the provided KernelCallerDeliveryReportBodyRealizedCost1
+func (t *KernelCallerDeliveryReportBody_RealizedCost) MergeKernelCallerDeliveryReportBodyRealizedCost1(v KernelCallerDeliveryReportBodyRealizedCost1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t KernelCallerDeliveryReportBody_RealizedCost) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *KernelCallerDeliveryReportBody_RealizedCost) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -35319,6 +43822,68 @@ func (t McpSessionCredentialCall_Response) MarshalJSON() ([]byte, error) {
 }
 
 func (t *McpSessionCredentialCall_Response) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsOutcomeOutcomePredicateBodyAssertionsComparatorValue0 returns the union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value as a OutcomeOutcomePredicateBodyAssertionsComparatorValue0
+func (t OutcomeOutcomePredicateBody_Assertions_Comparator_Value) AsOutcomeOutcomePredicateBodyAssertionsComparatorValue0() (OutcomeOutcomePredicateBodyAssertionsComparatorValue0, error) {
+	var body OutcomeOutcomePredicateBodyAssertionsComparatorValue0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOutcomeOutcomePredicateBodyAssertionsComparatorValue0 overwrites any union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value as the provided OutcomeOutcomePredicateBodyAssertionsComparatorValue0
+func (t *OutcomeOutcomePredicateBody_Assertions_Comparator_Value) FromOutcomeOutcomePredicateBodyAssertionsComparatorValue0(v OutcomeOutcomePredicateBodyAssertionsComparatorValue0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOutcomeOutcomePredicateBodyAssertionsComparatorValue0 performs a merge with any union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value, using the provided OutcomeOutcomePredicateBodyAssertionsComparatorValue0
+func (t *OutcomeOutcomePredicateBody_Assertions_Comparator_Value) MergeOutcomeOutcomePredicateBodyAssertionsComparatorValue0(v OutcomeOutcomePredicateBodyAssertionsComparatorValue0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsOutcomeOutcomePredicateBodyAssertionsComparatorValue1 returns the union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value as a OutcomeOutcomePredicateBodyAssertionsComparatorValue1
+func (t OutcomeOutcomePredicateBody_Assertions_Comparator_Value) AsOutcomeOutcomePredicateBodyAssertionsComparatorValue1() (OutcomeOutcomePredicateBodyAssertionsComparatorValue1, error) {
+	var body OutcomeOutcomePredicateBodyAssertionsComparatorValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromOutcomeOutcomePredicateBodyAssertionsComparatorValue1 overwrites any union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value as the provided OutcomeOutcomePredicateBodyAssertionsComparatorValue1
+func (t *OutcomeOutcomePredicateBody_Assertions_Comparator_Value) FromOutcomeOutcomePredicateBodyAssertionsComparatorValue1(v OutcomeOutcomePredicateBodyAssertionsComparatorValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeOutcomeOutcomePredicateBodyAssertionsComparatorValue1 performs a merge with any union data inside the OutcomeOutcomePredicateBody_Assertions_Comparator_Value, using the provided OutcomeOutcomePredicateBodyAssertionsComparatorValue1
+func (t *OutcomeOutcomePredicateBody_Assertions_Comparator_Value) MergeOutcomeOutcomePredicateBodyAssertionsComparatorValue1(v OutcomeOutcomePredicateBodyAssertionsComparatorValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t OutcomeOutcomePredicateBody_Assertions_Comparator_Value) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *OutcomeOutcomePredicateBody_Assertions_Comparator_Value) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -43340,6 +51905,130 @@ func (t SecurityResponsePlanV1ApprovalRequirement) MarshalJSON() ([]byte, error)
 }
 
 func (t *SecurityResponsePlanV1ApprovalRequirement) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0 returns the union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary as a TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0() (TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0, error) {
+	var body TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0 overwrites any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary as the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0 performs a merge with any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary, using the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1 returns the union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary as a TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1() (TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1, error) {
+	var body TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1 overwrites any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary as the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1 performs a merge with any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary, using the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyLowerBoundary1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_LowerBoundary) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0 returns the union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary as a TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0() (TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0, error) {
+	var body TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0 overwrites any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary as the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0 performs a merge with any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary, using the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1 returns the union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary as a TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) AsTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1() (TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1, error) {
+	var body TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1 overwrites any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary as the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) FromTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1 performs a merge with any union data inside the TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary, using the provided TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) MergeTrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1(v TrustFincredSettlementReliabilityBodyEvidenceSourceCompletenessAttestationsBodyUpperBoundary1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *TrustFincredSettlementReliabilityBody_Evidence_SourceCompletenessAttestations_Body_UpperBoundary) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

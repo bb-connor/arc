@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,6 +14,9 @@ from .attack_simulation_report_signature_schema import ChioRuntimeAttackSimulati
 from .chaos_run_report_signature_schema import ChioRuntimeChaosRunReportSignatureSignedBody
 from .execution_lease_signature_schema import ChioRuntimeExecutionLeaseSignatureSignedBody
 from .revocation_freshness_proof_signature_schema import ChioRuntimeRevocationFreshnessProofSignatureSignedBody
+from .runtime_peer_weights_body_schema import ChioRuntimePeerWeightsV1SignedBody, Weight
+from .runtime_pheromone_policy_body_schema import ChioRuntimePheromonePolicyV1SignedBody, Rule
+from .runtime_verifier_trust_bundle_body_schema import ChioRuntimeVerifierTrustBundleV1SignedBody
 from .sandbox_attestation_signature_schema import ChioRuntimeSandboxAttestationSignatureSignedBody
 from .tee_bless_audit_schema import Capture, ChioTeeBlessAuditSignedBody, Fixture, Operator
 from .tee_capture_frame_schema import ChioTeeCaptureFrameSignedBody, Invocation, Otel, Provenance, Upstream
@@ -27,11 +30,14 @@ __all__ = [
     "ChioRuntimeAttackSimulationReportSignatureSignedBody",
     "ChioRuntimeChaosRunReportSignatureSignedBody",
     "ChioRuntimeExecutionLeaseSignatureSignedBody",
+    "ChioRuntimePeerWeightsV1SignedBody",
+    "ChioRuntimePheromonePolicyV1SignedBody",
     "ChioRuntimeRevocationFreshnessProofSignatureSignedBody",
     "ChioRuntimeSandboxAttestationSignatureSignedBody",
     "ChioRuntimeTerminalReceiptSignatureSignedBody",
     "ChioRuntimeToolServerAckSignatureSignedBody",
     "ChioRuntimeTrustedTimeProofSignatureSignedBody",
+    "ChioRuntimeVerifierTrustBundleV1SignedBody",
     "ChioTeeBlessAuditSignedBody",
     "ChioTeeCaptureFrameSignedBody",
     "ChioWasmModuleSignedBody",
@@ -40,5 +46,7 @@ __all__ = [
     "Operator",
     "Otel",
     "Provenance",
+    "Rule",
     "Upstream",
+    "Weight",
 ]

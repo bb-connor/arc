@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -124,7 +124,7 @@ class Action(BaseModel):
     subdivision: DelegationRecord
 
 
-class Action3(BaseModel):
+class Action5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -132,7 +132,7 @@ class Action3(BaseModel):
     selection: DelegationRecord
 
 
-class Action4(BaseModel):
+class Action6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -257,7 +257,7 @@ class Proposal4(BaseModel):
     parents: list[Handle] = Field(..., max_length=16)
 
 
-class Action5(BaseModel):
+class Action7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -266,7 +266,7 @@ class Action5(BaseModel):
     draft_ref: DraftRef
 
 
-class Action7(BaseModel):
+class Action9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -274,7 +274,7 @@ class Action7(BaseModel):
     handle: Handle
 
 
-class Action8(BaseModel):
+class Action10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -363,7 +363,7 @@ class Preparation(BaseModel):
     proposal: Proposal | Proposal1 | Proposal2 | Proposal3 | Proposal4 | Proposal5
 
 
-class Body176(BaseModel):
+class Body204(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -371,7 +371,7 @@ class Body176(BaseModel):
     preparation: Preparation
 
 
-class Action6(BaseModel):
+class Action8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -387,10 +387,10 @@ class Command(BaseModel):
     version: Literal[1]
     program_id: WorkId
     command_id: WorkId
-    action: Action | Action3 | Action4 | Action5 | Action6 | Action7 | Action8
+    action: Action | Action5 | Action6 | Action7 | Action8 | Action9 | Action10
 
 
-class Body177(BaseModel):
+class Body205(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -404,4 +404,4 @@ class WorkRequestV1(BaseModel):
     )
     schema_: Literal["chio.work.request.v1"] = Field(..., alias="schema")
     version: Literal[1]
-    body: Body176 | Body177 | Body
+    body: Body204 | Body205 | Body

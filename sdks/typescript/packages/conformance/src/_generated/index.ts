@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: d53df1a65503287b282f102daa1e0a7c9e12cda2465763e90eea975fa11fa492
+// Schema SHA: 936f01fbaf15ccab5bca50203cf95936a2749b0ba2b385cfb06c969d36078471
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -613,6 +613,72 @@ export namespace Agent_ToolCallRequest {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/agent-web/agent-web-proof-envelope-body.schema.json
+export namespace AgentWeb_AgentWebProofEnvelopeBody {
+  export interface ChioAgentWebProofEnvelopeV1SignedBody {
+    agent_web_passport_scope_sha256?: string;
+    chio_claim_refs: string[];
+    disclosure_capsule_refs: string[];
+    envelope_id: string;
+    external_subject: string;
+    external_subject_digest: string;
+    external_subject_path: string;
+    external_subject_signature_ref: string;
+    limitations: string[];
+    projection_manifest_ref: string;
+    projection_manifest_sha256: string;
+    receipt_refs: string[];
+    risk_refs: string[];
+    schema: "chio.agent-web-proof-envelope.v1";
+    settlement_refs: string[];
+    source_protocol: string;
+    source_protocol_version: string;
+    transaction_passport_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/anchor/anchor-batch-body.schema.json
+export namespace Anchor_AnchorBatchBody {
+  export interface ChioAnchorBatchV1SignedBody {
+    checkpointIds: string[];
+    inclusions: {
+      checkpointId: string;
+      leafHash: string;
+      proof: {
+        audit_path: string[];
+        leaf_index: number;
+        tree_size: number;
+      };
+    }[];
+    issuedAt: number;
+    schema: "chio.anchor_batch.v1";
+    signerKey: string;
+    treeRoot: string;
+    witness: {
+      kind: string;
+      observedAt: number;
+      root: string;
+      witnessId: string;
+    };
+    witnessState: {
+      error?: string;
+      kind: string;
+      last_verified?: number;
+      observed_at?: number;
+      receipt?: {
+        bodyHash: string;
+        externalUuid: string;
+        inclusionProof: string;
+        kind: string;
+        publishedAt: number;
+        witnessRoot: string;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/anchor/batch.schema.json
 export namespace Anchor_Batch {
   /**
@@ -679,6 +745,21 @@ export namespace Anchor_Batch {
     inclusionProof: string;
     witnessRoot: string;
     bodyHash: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/aggregate-budget-root-body.schema.json
+export namespace Capability_AggregateBudgetRootBody {
+  export interface ChioAggregateBudgetRootV1SignedBody {
+    max_invocations: number;
+    root_capability_hash: string;
+    root_capability_id: string;
+    root_expires_at: number;
+    root_issuer: string;
+    root_scope_hash: string;
+    root_subject: string;
+    schema: "chio.aggregate-budget-root.v1";
   }
 }
 
@@ -778,6 +859,192 @@ export namespace Capability_Capabilities {
      */
     features?: {
       [k: string]: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/capability-body.schema.json
+export namespace Capability_CapabilityBody {
+  export interface ChioCapabilityV1SignedBody {
+    aggregate_invocation_budget?: {
+      max_invocations: number;
+      root_binding: {
+        body: {
+          max_invocations: number;
+          root_capability_hash: string;
+          root_capability_id: string;
+          root_expires_at: number;
+          root_issuer: string;
+          root_scope_hash: string;
+          root_subject: string;
+          schema: string;
+        };
+        signature: string;
+      };
+      scope: string;
+    };
+    attenuation_proof?: {
+      childScopeHash: string;
+      normalizedSubsetProof: {
+        cumulativeApproval?: {
+          bindings: {
+            approval_budget_epoch: number;
+            approval_budget_id: string;
+            currency: string;
+            root_binding_digest: string;
+          }[];
+        };
+        normalizedChildScope: string;
+        normalizedParentScope: string;
+        restrictedPredicates: string[];
+        subsetRelations: {
+          childIndex: number;
+          grantKind: string;
+          parentIndex: number;
+          subset: boolean;
+        }[];
+      };
+      parentScopeHash: string;
+    };
+    budget_share_bps?: number;
+    delegation_chain?: {
+      aggregate_budget?: {
+        max_invocations: number;
+        root_binding_digest: string;
+      };
+      attenuations?: {
+        constraint?: {
+          type: string;
+          value: number;
+        };
+        max_invocations?: number;
+        server_id: string;
+        tool_name: string;
+        type: string;
+      }[];
+      capability_id: string;
+      cumulative_approval?: {
+        bindings: {
+          approval_budget_epoch: number;
+          approval_budget_id: string;
+          currency: string;
+          root_binding_digest: string;
+        }[];
+      };
+      delegatee: string;
+      delegator: string;
+      scope_hash?: string;
+      signature: string;
+      timestamp: number;
+    }[];
+    expires_at?: number;
+    fixture?: string;
+    id?: string;
+    issued_at?: number;
+    issuer?: string;
+    n?: number;
+    schema?: "chio.capability.v1";
+    scope?: {
+      grants?: {
+        constraints?: {
+          type: string;
+          value?:
+            | number
+            | string
+            | {
+                allowed_model_ids?: string[];
+                approval_budget_epoch?: number;
+                approval_budget_id?: string;
+                cumulative_approval_root_binding?: {
+                  body: {
+                    approval_budget_epoch: number;
+                    approval_budget_id: string;
+                    root_capability_hash: string;
+                    root_capability_id: string;
+                    root_expires_at: number;
+                    root_grant_hash: string;
+                    root_issuer: string;
+                    root_scope_hash: string;
+                    root_subject: string;
+                    schema: string;
+                    signer_key_epoch: number;
+                    threshold: {
+                      currency: string;
+                      units: number;
+                    };
+                  };
+                  signature: string;
+                };
+                finding_id?: string;
+                listing_id?: string;
+                max_recoveries?: number;
+                min_safety_tier?: string;
+                original_capability_id?: string;
+                original_delivery_receipt_id?: string;
+                purchase_key?: string;
+                recovery_id?: string;
+                settlement?: {
+                  mode: string;
+                };
+                threshold?: {
+                  currency: string;
+                  units: number;
+                };
+                threshold_units?: number;
+              };
+        }[];
+        dpop_required?: boolean;
+        max_cost_per_invocation?: {
+          currency: string;
+          units: number;
+        };
+        max_invocations?: number;
+        max_total_cost?: {
+          currency: string;
+          units: number;
+        };
+        operations: string[];
+        server_id: string;
+        tool_name: string;
+      }[];
+      prompt_grants?: {
+        operations: string[];
+        prompt_name: string;
+      }[];
+      resource_grants?: {
+        operations: string[];
+        uri_pattern: string;
+      }[];
+    };
+    scope_attenuations?: {
+      operation: string;
+      server_id: string;
+      tool_name: string;
+      type: string;
+    }[];
+    subject?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/cumulative-approval-root-body.schema.json
+export namespace Capability_CumulativeApprovalRootBody {
+  export interface ChioCumulativeApprovalRootV1SignedBody {
+    approval_budget_epoch: number;
+    approval_budget_id: string;
+    root_capability_hash: string;
+    root_capability_id: string;
+    root_expires_at: number;
+    root_grant_hash: string;
+    root_issuer: string;
+    root_scope_hash: string;
+    root_subject: string;
+    schema: "chio.cumulative-approval-root.v1";
+    signer_key_epoch: number;
+    threshold: {
+      currency: string;
+      units: number;
     };
   }
 }
@@ -1577,6 +1844,25 @@ export namespace Capability_SupplementalAuthorization {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json
+export namespace Capability_ThresholdApprovalProposalBody {
+  export interface ChioThresholdApprovalProposalV1SignedBody {
+    authorizing_capability_digest: string;
+    eligible_set_digest: string;
+    governed_intent_hash: string;
+    policy_authority: string;
+    policy_hash: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    proposal_id: string;
+    request_id: string;
+    schema: "chio.threshold-approval-proposal.v1";
+    subject: string;
+    threshold: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/threshold-approval-proposal.schema.json
 export namespace Capability_ThresholdApprovalProposal {
   export type ThresholdProposalPublicKey = string;
@@ -1888,6 +2174,191 @@ export namespace Certify_Check {
       toolServerName?: string;
     };
     verdict: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-federation-trust-bundle-body.schema.json
+export namespace Commerce_CommerceFederationTrustBundleBody {
+  export interface ChioCommerceFederationTrustBundleV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.federation-trust-bundle.v1";
+    status: string;
+    trust_domain: string;
+    trust_root_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-payment-lifecycle-body.schema.json
+export namespace Commerce_CommercePaymentLifecycleBody {
+  export interface ChioCommercePaymentLifecycleV1SignedBody {
+    amount_minor: number;
+    authorization_ref: string;
+    balance_transaction_ref: string;
+    capture_before: string;
+    capture_mode: string;
+    capture_ref: string;
+    captured_at: string;
+    charge_ref: string;
+    chargeback_status: string;
+    currency: string;
+    dispute_status: string;
+    fraud_outcome: string;
+    id: string;
+    issued_at: string;
+    issuer: string;
+    merchant_subject: string;
+    order_id: string;
+    payment_intent_id: string;
+    payment_status: string;
+    psp: string;
+    quote_sha256: string;
+    refund_status: string;
+    schema: "chio.commerce.payment-lifecycle.v1";
+    transfer_group: string;
+    transfer_reversal_status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-discovery-snapshot-body.schema.json
+export namespace Commerce_CommerceProviderDiscoverySnapshotBody {
+  export interface ChioCommerceProviderDiscoverySnapshotV1SignedBody {
+    discovery_authority_ref: string;
+    freshness_window: {
+      valid_from: string;
+      valid_until: string;
+    };
+    id: string;
+    issued_at: string;
+    market_scope: string;
+    order_id: string;
+    order_intent_ref: string;
+    passport_id: string;
+    provider_candidates: {
+      availability_ref: string;
+      excluded: boolean;
+      jurisdiction_ref: string;
+      pricing_surface_ref: string;
+      provider_passport_ref: string;
+      service_manifest_ref: string;
+      subject: string;
+    }[];
+    schema: "chio.commerce.provider-discovery-snapshot.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-passport-body.schema.json
+export namespace Commerce_CommerceProviderPassportBody {
+  export interface ChioCommerceProviderPassportV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.provider-passport.v1";
+    service_families: string[];
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-selection-report-body.schema.json
+export namespace Commerce_CommerceProviderSelectionReportBody {
+  export interface ChioCommerceProviderSelectionReportV1SignedBody {
+    discovery_snapshot_ref: string;
+    id: string;
+    issued_at: string;
+    order_id: string;
+    override_receipt_ref: string;
+    passport_id: string;
+    price_quote_ref: string;
+    ranking_policy_ref: string;
+    ranking_results: {
+      provider_subject: string;
+      rank: number;
+      total_score: number;
+    }[];
+    rejected_candidate_summaries: {
+      provider_subject: string;
+      reason_codes: string[];
+      redacted_fields: string[];
+    }[];
+    risk_report_ref: string;
+    schema: "chio.commerce.provider-selection-report.v1";
+    scorecard_ref: string;
+    selected_provider_subject: string;
+    selection_reason_codes: string[];
+    sla_commitment_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-reputation-snapshot-body.schema.json
+export namespace Commerce_CommerceReputationSnapshotBody {
+  export interface ChioCommerceReputationSnapshotV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.reputation-snapshot.v1";
+    score_bps: number;
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-sla-commitment-body.schema.json
+export namespace Commerce_CommerceSlaCommitmentBody {
+  export interface ChioCommerceSlaCommitmentV1SignedBody {
+    buyer_subject: string;
+    collateral_position_ref: string;
+    effective_window: {
+      end: string;
+      start: string;
+    };
+    exclusions_ref: string;
+    guarantee_decision_ref: string;
+    id: string;
+    issued_at: string;
+    measurement_policy_ref: string;
+    metric_definitions: {
+      metric: string;
+      target: number;
+      unit: string;
+    }[];
+    order_id: string;
+    provider_subject: string;
+    remedy_policy_ref: string;
+    schema: "chio.commerce.sla-commitment.v1";
+    service_scope: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-sla-performance-report-body.schema.json
+export namespace Commerce_CommerceSlaPerformanceReportBody {
+  export interface ChioCommerceSlaPerformanceReportV1SignedBody {
+    breach_verdict: string;
+    computed_metric_results: {
+      metric: string;
+      passed: boolean;
+      unit: string;
+      value: number;
+    }[];
+    dispute_ref: string;
+    id: string;
+    issued_at: string;
+    measured_at: string;
+    measurement_evidence_refs: string[];
+    measurement_policy_ref: string;
+    order_id: string;
+    performance_id: string;
+    provider_subject: string;
+    remedy_ref: string;
+    schema: "chio.commerce.sla-performance-report.v1";
+    sla_ref: string;
   }
 }
 
@@ -2830,6 +3301,27 @@ export namespace Credit_Scorecard {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/disclosure/disclosure-crypto-context-report-body.schema.json
+export namespace Disclosure_DisclosureCryptoContextReportBody {
+  export interface ChioDisclosureCryptoContextReportV1SignedBody {
+    artifact_ref: string;
+    context_id: string;
+    cryptographic_proof_verified: boolean;
+    disclosed_fields: string[];
+    evidence_class: string;
+    id: string;
+    projection_manifest_ref: string;
+    rejected_checks: {
+      code: string;
+      message: string;
+    }[];
+    schema: "chio.disclosure.crypto-context-report.v1";
+    verdict: string;
+    verified_claims: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/economy/autonomous-comparison-report.schema.json
 export namespace Economy_AutonomousComparisonReport {
   export interface ChioAutonomousComparisonReportSignedBody {
@@ -3273,6 +3765,1823 @@ export namespace Economy_CapitalPoolSimulationReport {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-close-body.schema.json
+export namespace Economy_ChannelCloseBody {
+  export interface ChioChannelCloseV1SignedBody {
+    body: {
+      channelId: string;
+      channelStateVersion: number;
+      closeKind: string;
+      closeSubmissionCutoffUnixSecs: number;
+      disputeDeadlineUnixMs: number;
+      disputeWindowSecs: number;
+      escrowReservationVersion: number;
+      expectedRefundAfterReleaseTokenBaseUnits: string;
+      expectedReleaseTokenBaseUnits: string;
+      finalCumulativeOwed: {
+        currency: string;
+        units: number;
+      };
+      finalStateDigest: string;
+      finalStateSequence: number;
+      lifecycleFence: number;
+      openDigest: string;
+      proposedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-dispute-body.schema.json
+export namespace Economy_ChannelDisputeBody {
+  export interface ChioChannelDisputeV1SignedBody {
+    body: {
+      channelId: string;
+      closeDigest: string;
+      closeStateDigest: string;
+      closeStateSequence: number;
+      competingStateDigest: string;
+      competingStateSequence: number;
+      disputeId: string;
+      reason: string;
+      schema: string;
+      stateChainProofDigest: string;
+      submittedAtUnixMs: number;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-funding-acknowledgement-body.schema.json
+export namespace Economy_ChannelFundingAcknowledgementBody {
+  export interface ChioChannelFundingAcknowledgementV1SignedBody {
+    body: {
+      anchoredHeadDigest: string;
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      expiresAtUnixMs: number;
+      newState: string;
+      newVersion: number;
+      openIntentDigest: string;
+      priorHeadDigest: string;
+      priorState: string;
+      priorVersion: number;
+      reservedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-funding-evidence-body.schema.json
+export namespace Economy_ChannelFundingEvidenceBody {
+  export interface ChioChannelFundingEvidenceV1SignedBody {
+    body: {
+      assetBinding: {
+        chainId: string;
+        currency: string;
+        protocolMinorUnitDecimals: number;
+        schema: string;
+        settlementPolicyDigest: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+      blockPin: {
+        blockHash: string;
+        blockNumber: number;
+        blockTimestampUnixSecs: number;
+        finalityMode: string;
+        finalityStatus: string;
+        finalizedHeadHash: string;
+        finalizedHeadNumber: number;
+        observedAtUnixMs: number;
+        observedConfirmations: number;
+        requiredConfirmations: number;
+      };
+      creationEvent: {
+        beneficiary: string;
+        capabilityId: string;
+        deadlineUnixSecs: number;
+        depositor: string;
+        escrowId: string;
+        eventSignature: string;
+        logEmitter: string;
+        logIndex: number;
+        maxTokenBaseUnits: string;
+        operator: string;
+        receiptBlockHash: string;
+        receiptBlockNumber: number;
+        tokenAddress: string;
+        transactionHash: string;
+        transactionSucceeded: boolean;
+        transactionTo: string;
+      };
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      escrowState: {
+        depositedTokenBaseUnits: string;
+        refunded: boolean;
+        refundedTokenBaseUnits: string;
+        releasedTokenBaseUnits: string;
+      };
+      escrowStateRead: {
+        blockHash: string;
+        blockNumber: number;
+        callDataDigest: string;
+        contract: string;
+        returnDataDigest: string;
+      };
+      escrowTerms: {
+        beneficiary: string;
+        capabilityId: string;
+        deadlineUnixSecs: number;
+        depositor: string;
+        maxTokenBaseUnits: string;
+        operator: string;
+        operatorKeyHash: string;
+        tokenAddress: string;
+      };
+      evidenceExpiresAtUnixMs: number;
+      identityObservation: {
+        active: boolean;
+        blockHash: string;
+        blockNumber: number;
+        operator: string;
+        operatorKeyHash: string;
+        registryContract: string;
+      };
+      schema: string;
+      tokenObservation: {
+        allowed: boolean;
+        blockHash: string;
+        blockNumber: number;
+        escrowContract: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-open-body.schema.json
+export namespace Economy_ChannelOpenBody {
+  export interface ChioChannelOpenV1SignedBody {
+    body: {
+      channelId: string;
+      fundingAcknowledgementDigest: string;
+      initialStateDigest: string;
+      openIntentDigest: string;
+      openedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-open-intent-body.schema.json
+export namespace Economy_ChannelOpenIntentBody {
+  export interface ChioChannelOpenIntentV1SignedBody {
+    body: {
+      assetBinding: {
+        chainId: string;
+        currency: string;
+        protocolMinorUnitDecimals: number;
+        schema: string;
+        settlementPolicyDigest: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+      bound: {
+        currency: string;
+        units: number;
+      };
+      boundTokenBaseUnits: string;
+      channelExpiryUnixSecs: number;
+      closeSubmissionCutoffUnixSecs: number;
+      currency: string;
+      disputeTierUpperBoundUnits: number;
+      disputeWindowSecs: number;
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      finalityMode: string;
+      fixedFinalityBroadcastMarginSecs: number;
+      fundingEvidenceDigest: string;
+      openIntentId: string;
+      originalOperator: string;
+      originalOperatorKeyHash: string;
+      originalWeb3DispatchDigest: string;
+      participantSnapshotDigest: string;
+      payeeBeneficiaryAddress: string;
+      payeeId: string;
+      payeeKey: string;
+      payeeKeyEpoch: number;
+      payerId: string;
+      payerKey: string;
+      payerKeyEpoch: number;
+      payerRefundAddress: string;
+      requiredConfirmations: number;
+      schema: string;
+      settlementAuthorityScopeId: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-release-authorization-body.schema.json
+export namespace Economy_ChannelReleaseAuthorizationBody {
+  export interface ChioChannelReleaseAuthorizationV1SignedBody {
+    body: {
+      authority: {
+        assetBindingDigest: string;
+        authorizedAtUnixMs: number;
+        boundTokenBaseUnits: string;
+        channelExpiryUnixMs: number;
+        channelId: string;
+        channelStateVersion: number;
+        closeBodyDigest: string;
+        closeDigest: string;
+        closeSubmissionCutoffUnixMs: number;
+        disputeDeadlineUnixMs: number;
+        effectiveCloseDigest: string;
+        escrowDeadlineUnixMs: number;
+        escrowReference: {
+          chainId: string;
+          escrowContract: string;
+          escrowId: string;
+        };
+        escrowReservationVersion: number;
+        expectedRefundTokenBaseUnits: string;
+        expectedReleaseTokenBaseUnits: string;
+        finalCumulativeOwed: {
+          currency: string;
+          units: number;
+        };
+        finalStateDigest: string;
+        finalStateSequence: number;
+        frost: {
+          actionDigest: string;
+          authorizationId: string;
+          authorizationSlotId: string;
+          signedEnvelopeDigest: string;
+        };
+        frostIssuedAtUnixMs: number;
+        frostKeyEpoch: number;
+        frostResourceFence: number;
+        frostResourceId: string;
+        frostResourceVersion: number;
+        frostRosterDigest: string;
+        frostScopeId: string;
+        lifecycleFence: number;
+        openDigest: string;
+        originalOperator: string;
+        originalOperatorKeyHash: string;
+        originalWeb3DispatchDigest: string;
+        payeeBeneficiaryAddress: string;
+        publisherFence: number;
+      };
+      publicationRoot: string;
+      releaseBroadcast: {
+        callDigest: string;
+        effectKind: string;
+        effectSlotId: string;
+        idempotencyKey: string;
+        operationId: string;
+        resourceHeadDigest: string;
+        scopeId: string;
+      };
+      rootPublication: {
+        callDigest: string;
+        effectKind: string;
+        effectSlotId: string;
+        idempotencyKey: string;
+        operationId: string;
+        resourceHeadDigest: string;
+        scopeId: string;
+      };
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-reservation-body.schema.json
+export namespace Economy_ChannelReservationBody {
+  export interface ChioChannelReservationV1SignedBody {
+    body: {
+      channelId: string;
+      channelStateExpectedVersion: number;
+      dispositionExpectedVersion: number;
+      expiresAtUnixMs: number;
+      lifecycleFence: number;
+      maximumCharge: {
+        currency: string;
+        units: number;
+      };
+      maximumTokenBaseUnits: string;
+      nextSequence: number;
+      openDigest: string;
+      operationId: string;
+      priorStateDigest: string;
+      receiptAuthorityDigest: string;
+      requestId: string;
+      reservationId: string;
+      schema: string;
+      serviceBindingDigest: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-state-body.schema.json
+export namespace Economy_ChannelStateBody {
+  export interface ChioChannelStateV1SignedBody {
+    body: {
+      actualCharge: {
+        currency: string;
+        units: number;
+      };
+      assetBindingDigest: string;
+      channelId: string;
+      cumulativeOwed: {
+        currency: string;
+        units: number;
+      };
+      cumulativeTokenBaseUnits: string;
+      obligationAtomDigest?: string;
+      prevStateDigest: string;
+      receiptAuthorityDigest: string;
+      receiptCount: number;
+      receiptDigest: string;
+      receiptId: string;
+      receiptIdRoot: string;
+      reservationDigest: string;
+      schema: string;
+      seq: number;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-terminal-outcome-commitment-body.schema.json
+export namespace Economy_ChannelTerminalOutcomeCommitmentBody {
+  export interface ChioChannelTerminalOutcomeCommitmentV1SignedBody {
+    operationId: string;
+    outcomeRecordedAtUnixMs: number;
+    receiptDigest: string;
+    receiptId: string;
+    reservationDigest: string;
+    reservationId: string;
+    schema: "chio.channel.terminal-outcome-commitment.v1";
+    terminalResult: {
+      result: {
+        storage: string;
+        value: unknown;
+      };
+      resultDigest: string;
+      resultId: string;
+    };
+    terminalizedAtUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-atom-transformation-body.schema.json
+export namespace Economy_ClearingAtomTransformationBody {
+  export interface ChioClearingAtomTransformationV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    atomDigest: string;
+    creditorIdentity: string;
+    creditorParticipantId: string;
+    debtorIdentity: string;
+    debtorParticipantId: string;
+    obligationId: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.atom-transformation.v1";
+    sourceSequence: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-input-manifest-body.schema.json
+export namespace Economy_ClearingInputManifestBody {
+  export interface ChioClearingInputManifestV1SignedBody {
+    authorityId: string;
+    endCheckpointDigest: string;
+    entries: {
+      atomDigest: string;
+      dispositionDigest: string;
+      dispositionVersion: number;
+      lifecycleFence: number;
+      obligationId: string;
+      roundId: string;
+      sourceSequence: number;
+    }[];
+    epoch: number;
+    expiresAtUnixMs: number;
+    hasMore: boolean;
+    issuedAtUnixMs: number;
+    keyEpoch: number;
+    rangeEndSequence: number;
+    rangeStartSequence: number;
+    schema: "chio.clearing.input-manifest.v1";
+    sourceId: string;
+    startCheckpointDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-netting-round-core-body.schema.json
+export namespace Economy_ClearingNettingRoundCoreBody {
+  export interface ChioClearingNettingRoundCoreV1SignedBody {
+    algorithmVersion: string;
+    clearingAuthorityId: string;
+    clearingAuthorityKeyEpoch: number;
+    currency: string;
+    disputeWindowEndsAtUnixMs: number;
+    epoch: number;
+    generatedAtUnixMs: number;
+    governanceScopeId: string;
+    inputCount: number;
+    inputManifestDigest: string;
+    participantSnapshotDigest: string;
+    reservationRoot: string;
+    roundId: string;
+    schema: "chio.clearing.netting-round-core.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-output-manifest-body.schema.json
+export namespace Economy_ClearingOutputManifestBody {
+  export interface ChioClearingOutputManifestV1SignedBody {
+    atomTransformationCount: number;
+    atomTransformationRoot: string;
+    participantStatementCount: number;
+    participantStatementRoot: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.output-manifest.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-acceptance-body.schema.json
+export namespace Economy_ClearingParticipantAcceptanceBody {
+  export interface ChioClearingParticipantAcceptanceV1SignedBody {
+    acceptedAtUnixMs: number;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    outputManifestDigest: string;
+    participantId: string;
+    participantStatementDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.participant-acceptance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-snapshot-acknowledgement-body.schema.json
+export namespace Economy_ClearingParticipantSnapshotAcknowledgementBody {
+  export interface ChioClearingParticipantSnapshotAcknowledgementV1SignedBody {
+    acceptedAtUnixMs: number;
+    algorithmVersion: string;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    participantId: string;
+    participantSnapshotDigest: string;
+    schema: "chio.clearing.participant-snapshot-acknowledgement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-snapshot-body.schema.json
+export namespace Economy_ClearingParticipantSnapshotBody {
+  export interface ChioClearingParticipantSnapshotV1SignedBody {
+    algorithmVersion: string;
+    authorityId: string;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    participants: {
+      acknowledgementKey: string;
+      acknowledgementKeyEpoch: number;
+      identities: string[];
+      participantId: string;
+      settlementDestination: string;
+    }[];
+    schema: "chio.clearing.participant-snapshot.v1";
+    validFromUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-statement-body.schema.json
+export namespace Economy_ClearingParticipantStatementBody {
+  export interface ChioClearingParticipantStatementV1SignedBody {
+    bilateralCreditCancelledUnits: number;
+    bilateralDebitCancelledUnits: number;
+    contributingAtomDigests: string[];
+    grossCreditUnits: number;
+    grossDebitUnits: number;
+    netBalance: {
+      direction: string;
+      units: number;
+    };
+    participantId: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.participant-statement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-abort-body.schema.json
+export namespace Economy_ClearingRoundAbortBody {
+  export interface ChioClearingRoundAbortV1SignedBody {
+    authorityDigest: string;
+    authorizedAtUnixMs: number;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    governanceScopeId: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outputManifestDigest: string;
+    reason: string;
+    reservationCount: number;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.round-abort.v1";
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+    zeroDispatchProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-finalization-body.schema.json
+export namespace Economy_ClearingRoundFinalizationBody {
+  export interface ChioClearingRoundFinalizationV1SignedBody {
+    clearingAuthorityId: string;
+    clearingAuthorityKeyEpoch: number;
+    finalizedAtUnixMs: number;
+    governanceScopeId: string;
+    outputManifestDigest: string;
+    participantAcceptanceCount: number;
+    participantAcceptanceRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.round-finalization.v1";
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-satisfaction-body.schema.json
+export namespace Economy_ClearingRoundSatisfactionBody {
+  export interface ChioClearingRoundSatisfactionV1SignedBody {
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    finalizationDigest: string;
+    intentProgressRoot: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outputManifestDigest: string;
+    reservationCount: number;
+    reservationHeadRoot: string;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    satisfiedAtUnixMs: number;
+    schema: "chio.clearing.round-satisfaction.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-settlement-intent-body.schema.json
+export namespace Economy_ClearingSettlementIntentBody {
+  export interface ChioClearingSettlementIntentV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    contributingReservationRoot: string;
+    creditorParticipantId: string;
+    creditorSettlementDestination: string;
+    debtorParticipantId: string;
+    dispatchIdempotencyKey: string;
+    intentId: string;
+    ordinal: number;
+    roundCoreDigest: string;
+    schema: "chio.clearing.settlement-intent.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-settlement-reconciliation-body.schema.json
+export namespace Economy_ClearingSettlementReconciliationBody {
+  export interface ChioClearingSettlementReconciliationV1SignedBody {
+    attemptNumber: number;
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    effectSlotId: string;
+    externalReferences: string[];
+    intentDigest: string;
+    intentId: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    observedAtUnixMs: number;
+    observedStatus: string;
+    outputManifestDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.settlement-reconciliation.v1";
+    settlementOutcomeDigest: string;
+    sourceEffectSlotDigest: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-zero-dispatch-proof-body.schema.json
+export namespace Economy_ClearingZeroDispatchProofBody {
+  export interface ChioClearingZeroDispatchProofV1SignedBody {
+    admissionCommitDigest: string;
+    admissionCommitSequence: number;
+    admissionStoreId: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    dispatchStatusCount: number;
+    dispatchStatusRoot: string;
+    dispatchStatuses: {
+      dispatchIdempotencyKey: string;
+      disposition: {
+        kind: string;
+      };
+      intentDigest: string;
+      intentId: string;
+    }[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    outputManifestDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.zero-dispatch-proof.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-zero-intent-reconciliation-body.schema.json
+export namespace Economy_ClearingZeroIntentReconciliationBody {
+  export interface ChioClearingZeroIntentReconciliationV1SignedBody {
+    atomBindings: {
+      expectedHeadDigest: string;
+      expectedLifecycleFence: number;
+      expectedResourceVersion: number;
+      obligationId: string;
+      sourceSequence: number;
+    }[];
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    emptyIntentRoot: string;
+    finalizationDigest: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outcome: string;
+    outputManifestDigest: string;
+    reconciledAtUnixMs: number;
+    reservationCount: number;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.zero-intent-reconciliation.v1";
+    settlementIntentCount: number;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/credit-facility-bind-body.schema.json
+export namespace Economy_CreditFacilityBindBody {
+  export interface ChioCreditFacilityBindV1SignedBody {
+    actionNonce: string;
+    amount: {
+      currency: string;
+      units: number;
+    };
+    authorityId: string;
+    authorityKeyEpoch: number;
+    authoritySetDigest: string;
+    bindId: string;
+    capabilityId: string;
+    creditorKeyEpoch: number;
+    debtorId: string;
+    debtorKeyEpoch: number;
+    dueAtUnixMs: number;
+    economicIntentDigest: string;
+    effectiveCeiling: {
+      currency: string;
+      units: number;
+    };
+    expectedExposureFence: number;
+    expectedExposureVersion: number;
+    expiresAtUnixMs: number;
+    facilityArtifactDigest: string;
+    facilityId: string;
+    issuedAtUnixMs: number;
+    operationId: string;
+    originalCreditorId: string;
+    originalSettlementDestinationRef: string;
+    payeeBindingDigest: string;
+    requestId: string;
+    schema: "chio.credit.facility-bind.v1";
+    scopeDigest: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/credit-receivable-iou-envelope-body.schema.json
+export namespace Economy_CreditReceivableIouEnvelopeBody {
+  export interface ChioCreditReceivableIouEnvelopeV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    capabilityId: string;
+    creditAuthorityDigest: string;
+    creditFacilityBind: {
+      authoritySignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+      body: {
+        actionNonce: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        authorityId: string;
+        authorityKeyEpoch: number;
+        authoritySetDigest: string;
+        bindId: string;
+        capabilityId: string;
+        creditorKeyEpoch: number;
+        debtorId: string;
+        debtorKeyEpoch: number;
+        dueAtUnixMs: number;
+        economicIntentDigest: string;
+        effectiveCeiling: {
+          currency: string;
+          units: number;
+        };
+        expectedExposureFence: number;
+        expectedExposureVersion: number;
+        expiresAtUnixMs: number;
+        facilityArtifactDigest: string;
+        facilityId: string;
+        issuedAtUnixMs: number;
+        operationId: string;
+        originalCreditorId: string;
+        originalSettlementDestinationRef: string;
+        payeeBindingDigest: string;
+        requestId: string;
+        schema: string;
+        scopeDigest: string;
+        toolName: string;
+        toolServer: string;
+      };
+      creditorSignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+      debtorSignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+    };
+    currentDispositionDigest: string;
+    debtorId: string;
+    dueAtUnixMs: number;
+    facilityId: string;
+    iouId: string;
+    issuedAtUnixMs: number;
+    issuerId: string;
+    issuerKeyEpoch: number;
+    obligationAtomDigest: string;
+    obligationId: string;
+    operationId: string;
+    originalCreditorId: string;
+    originalSettlementDestinationRef: string;
+    payeeBindingDigest: string;
+    receiptContentHash: string;
+    receiptDigest: string;
+    receiptId: string;
+    receiptPolicyHash: string;
+    receiptTimestampUnixSeconds: number;
+    schema: "chio.credit.receivable-iou-envelope.v1";
+    tenantId?: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-anchor-view-body.schema.json
+export namespace Economy_EconomyAnchorViewBody {
+  export interface ChioEconomyAnchorViewV1SignedBody {
+    absentRequestKeys: {
+      requestId: string;
+      requestNamespaceDigest: string;
+    }[];
+    absentResourceKeys: {
+      resourceFamily: string;
+      resourceId: string;
+      scopeId: string;
+    }[];
+    anchorId: string;
+    checkpointDigest: string;
+    checkpointSequence: number;
+    heads: {
+      anchorId: string;
+      effectIdempotencyKey?: string;
+      frost?: {
+        actionDigest: string;
+        authorizationId: string;
+        authorizationSlotId: string;
+        signedEnvelopeDigest: string;
+      };
+      headVersion: number;
+      lifecycleFence: number;
+      lifecycleState: string;
+      namespace: string;
+      operationId?: string;
+      predecessorDigest?: string;
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      resourceVersion: number;
+      schema: string;
+      state: {
+        storage: string;
+        value: {
+          actionDigest?: string;
+          admissionHandoff?: {
+            lifecycleFence: number;
+            operationVersion: number;
+            state: string;
+            storeFence: {
+              lease_id: string;
+              owner_epoch: number;
+              store_uuid: string;
+            };
+          };
+          admittedDisputeDigest?: string;
+          anchorId?: string;
+          atomDigest?: string;
+          channelId?: string;
+          claim?: {
+            beneficiaryId: string;
+            contestDeadline: number;
+            contestDigest?: string;
+            coverageAuthorityId: string;
+            fundingFacilityId: string;
+            identity: {
+              claimId: string;
+              key: {
+                boundCoverageBodyDigest: string;
+                evidenceRangeDigest: string;
+                parametricPolicyBodyDigest: string;
+                subjectKey: string;
+                triggerPredicateBodyDigest: string;
+                windowEnd: number;
+                windowStart: number;
+              };
+              triggerInstanceId: string;
+            };
+            lifecycleFence: number;
+            openedAt: number;
+            payerId: string;
+            payoutAmount: {
+              currency: string;
+              units: number;
+            };
+            payoutMode: {
+              kind: string;
+              windowSeconds: number;
+            };
+            payoutRail: {
+              destinationAccountDigest: string;
+              kind: string;
+              railId: string;
+            };
+            schema: string;
+            state: string;
+            triggerMagnitude: {
+              kind: string;
+              value: number;
+            };
+            version: number;
+          };
+          disposition?: {
+            kind: string;
+            round_id: string;
+          };
+          effectKind?: string;
+          escrowReference?: {
+            chainId: string;
+            escrowContract: string;
+            escrowId: string;
+          };
+          fence?: number;
+          finalizationDigest?: string;
+          firstDispatchOperationId?: string;
+          governanceScopeId?: string;
+          idempotencyKey?: string;
+          inputManifestDigest?: string;
+          intentProgress?: {
+            ambiguityCount: number;
+            attemptCount: number;
+            completedEffectSlotId: string;
+            intentDigest: string;
+            intentId: string;
+            noEffectCount: number;
+            reconciliationChainDigest: string;
+            reconciliationCount: number;
+          }[];
+          lastTransition?: {
+            authority_digest: string;
+            kind: string;
+            round_id: string;
+          };
+          lastTransitionDigest?: string;
+          latestSequence?: number;
+          latestStateDigest?: string;
+          lifecycleFence?: number;
+          namespace?: string;
+          obligationId?: string;
+          openDigest?: string;
+          operationId?: string;
+          outputManifestDigest?: string;
+          parametersDigest?: string;
+          participantAcceptanceCount?: number;
+          participantAcceptanceRoot?: string;
+          pendingCloseBodyDigest?: string;
+          request?: {
+            requestBindingDigest: string;
+            requestId: string;
+            requestNamespaceDigest: string;
+          };
+          reservationCount?: number;
+          reservationRoot?: string;
+          resourceHeadDigest?: string;
+          resourceId?: string;
+          resourceKey?: {
+            resourceFamily: string;
+            resourceId: string;
+            scopeId: string;
+          };
+          resourceVersion?: number;
+          roundCoreDigest?: string;
+          roundId?: string;
+          rowVersion?: number;
+          schema?: string;
+          slotId?: string;
+          state?: string;
+          stateVersion?: number;
+          status?: string;
+          target?: {
+            qualificationDigest: string;
+            targetId: string;
+            targetKeyEpoch: number;
+          };
+          terminal?: {
+            kind?: string;
+            outcome: string;
+            proof?: {
+              storage: string;
+              value: {
+                cancellation: string;
+              };
+            };
+            proof_digest?: string;
+            proof_id?: string;
+            result?: {
+              storage: string;
+              value: unknown;
+            };
+            result_digest?: string;
+            result_id?: string;
+          };
+          trigger?: {
+            evidenceManifest: {
+              ranges: {
+                anchorEpoch: number;
+                checkpointAt: number;
+                checkpointId: string;
+                checkpointRoot: string;
+                expectedCount: number;
+                indexNamespace: string;
+                queryIndexRoot: string;
+                rangeProofDigest: string;
+                selectedMemberRoot: string;
+                sequenceRange: {
+                  first: number;
+                  last: number;
+                };
+                signerKeyEpoch: number;
+                sourceId: string;
+                sourceKind: string;
+                sourcePrefixCutoff: number;
+                subjectKey: string;
+                window: {
+                  endAt: number;
+                  startAt: number;
+                };
+              }[];
+            };
+            identity: {
+              claimId: string;
+              key: {
+                boundCoverageBodyDigest: string;
+                evidenceRangeDigest: string;
+                parametricPolicyBodyDigest: string;
+                subjectKey: string;
+                triggerPredicateBodyDigest: string;
+                windowEnd: number;
+                windowStart: number;
+              };
+              triggerInstanceId: string;
+            };
+            magnitude: {
+              kind: string;
+              value: number;
+            };
+            schema: string;
+            signedPolicy: {
+              body: {
+                beneficiaryId: string;
+                boundCoverageBodyDigest: string;
+                boundCoverageEnvelopeDigest: string;
+                coverageAmount: {
+                  currency: string;
+                  units: number;
+                };
+                coverageAuthorityId: string;
+                effectiveFrom: number;
+                effectiveUntil: number;
+                evaluatorAuthority: {
+                  authorityId: string;
+                  keyEpoch: number;
+                  keyId: string;
+                };
+                fundingFacilityId: string;
+                issuedAt: number;
+                maxCheckpointLagSeconds: number;
+                payerId: string;
+                payoutMode: {
+                  kind: string;
+                  windowSeconds: number;
+                };
+                payoutRail: {
+                  destinationAccountDigest: string;
+                  kind: string;
+                  railId: string;
+                };
+                payoutSchedule: {
+                  amount: {
+                    currency: string;
+                    units: number;
+                  };
+                  kind: string;
+                };
+                preActionAuthorityDigest: string;
+                predicate: {
+                  kind: string;
+                  minEvents: number;
+                  thresholdBps: number;
+                };
+                schema: string;
+                subjectKey: string;
+                windowAnchor: number;
+                windowSeconds: number;
+              };
+              signature: string;
+              signerKey: string;
+            };
+          };
+          trustedOpenedAt?: number;
+          version?: number;
+        };
+      };
+      stateDigest: string;
+      terminalResult?: {
+        result: {
+          storage: string;
+          value: unknown;
+        };
+        resultDigest: string;
+        resultId: string;
+      };
+      trustedClockHighWater: number;
+    }[];
+    headsRoot: string;
+    namespace: string;
+    observedAt: number;
+    requestReplays: {
+      effectSlotIds: string[];
+      operationId: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+    }[];
+    requestReplaysRoot: string;
+    schema: "chio.economy.anchor-view.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-effect-dispatch-commit-body.schema.json
+export namespace Economy_EconomyEffectDispatchCommitBody {
+  export interface ChioEconomyEffectDispatchCommitV1SignedBody {
+    anchorId: string;
+    casNonceDigest: string;
+    commitId: string;
+    committedAt: number;
+    committedCheckpointDigest: string;
+    effectHeadDigest: string;
+    effectSlotId: string;
+    namespace: string;
+    previousCheckpointDigest: string;
+    schema: "chio.economy.effect-dispatch-commit.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-state-batch-body.schema.json
+export namespace Economy_EconomyStateBatchBody {
+  export interface ChioEconomyStateBatchV1SignedBody {
+    anchorId: string;
+    batchId: string;
+    checkpointSequence: number;
+    effectSlots: {
+      actionDigest: string;
+      admissionHandoff: {
+        lifecycleFence: number;
+        operationVersion: number;
+        state: string;
+        storeFence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      anchorId: string;
+      effectKind: string;
+      idempotencyKey: string;
+      namespace: string;
+      operationId: string;
+      parametersDigest: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+      resourceHeadDigest: string;
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      schema: string;
+      slotId: string;
+      state: string;
+      target: {
+        qualificationDigest: string;
+        targetId: string;
+        targetKeyEpoch: number;
+      };
+    }[];
+    expectedHeadsRoot: string;
+    issuedAt: number;
+    namespace: string;
+    nextHeadsRoot: string;
+    operationId?: string;
+    previousCheckpointDigest: string;
+    requestReplays: {
+      effectSlotIds: string[];
+      operationId: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+    }[];
+    schema: "chio.economy.state-batch.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    transitions: {
+      expectedHeadDigest?: string;
+      nextHead: {
+        anchorId: string;
+        effectIdempotencyKey?: string;
+        frost?: {
+          actionDigest: string;
+          authorizationId: string;
+          authorizationSlotId: string;
+          signedEnvelopeDigest: string;
+        };
+        headVersion: number;
+        lifecycleFence: number;
+        lifecycleState: string;
+        namespace: string;
+        operationId?: string;
+        predecessorDigest?: string;
+        resourceKey: {
+          resourceFamily: string;
+          resourceId: string;
+          scopeId: string;
+        };
+        resourceVersion: number;
+        schema: string;
+        state: {
+          storage: string;
+          value: {
+            actionDigest?: string;
+            admissionHandoff?: {
+              lifecycleFence: number;
+              operationVersion: number;
+              state: string;
+              storeFence: {
+                lease_id: string;
+                owner_epoch: number;
+                store_uuid: string;
+              };
+            };
+            anchorId?: string;
+            atomDigest?: string;
+            channelId?: string;
+            claim?: {
+              beneficiaryId: string;
+              contestDeadline: number;
+              coverageAuthorityId: string;
+              fundingFacilityId: string;
+              identity: {
+                claimId: string;
+                key: {
+                  boundCoverageBodyDigest: string;
+                  evidenceRangeDigest: string;
+                  parametricPolicyBodyDigest: string;
+                  subjectKey: string;
+                  triggerPredicateBodyDigest: string;
+                  windowEnd: number;
+                  windowStart: number;
+                };
+                triggerInstanceId: string;
+              };
+              lifecycleFence: number;
+              openedAt: number;
+              payerId: string;
+              payoutAmount: {
+                currency: string;
+                units: number;
+              };
+              payoutMode: {
+                kind: string;
+                windowSeconds: number;
+              };
+              payoutRail: {
+                destinationAccountDigest: string;
+                kind: string;
+                railId: string;
+              };
+              schema: string;
+              state: string;
+              triggerMagnitude: {
+                kind: string;
+                value: number;
+              };
+              version: number;
+            };
+            disposition?: {
+              kind: string;
+              round_id: string;
+              satisfaction_digest?: string;
+            };
+            effectKind?: string;
+            escrowReference?: {
+              chainId: string;
+              escrowContract: string;
+              escrowId: string;
+            };
+            fence?: number;
+            finalizationDigest?: string;
+            firstDispatchOperationId?: string;
+            governanceScopeId?: string;
+            idempotencyKey?: string;
+            inputManifestDigest?: string;
+            intentProgress?: {
+              activeEffectSlotId?: string;
+              ambiguityCount: number;
+              attemptCount: number;
+              completedEffectSlotId?: string;
+              intentDigest: string;
+              intentId: string;
+              noEffectCount: number;
+              reconciliationChainDigest?: string;
+              reconciliationCount: number;
+            }[];
+            lastTransition?: {
+              authority_digest: string;
+              kind: string;
+              round_id: string;
+              satisfaction_digest?: string;
+            };
+            lastTransitionDigest?: string;
+            latestSequence?: number;
+            latestStateDigest?: string;
+            lifecycleFence?: number;
+            namespace?: string;
+            obligationId?: string;
+            openDigest?: string;
+            operationId?: string;
+            outputManifestDigest?: string;
+            parametersDigest?: string;
+            participantAcceptanceCount?: number;
+            participantAcceptanceRoot?: string;
+            request?: {
+              requestBindingDigest: string;
+              requestId: string;
+              requestNamespaceDigest: string;
+            };
+            reservationCount?: number;
+            reservationRoot?: string;
+            resourceHeadDigest?: string;
+            resourceId?: string;
+            resourceKey?: {
+              resourceFamily: string;
+              resourceId: string;
+              scopeId: string;
+            };
+            resourceVersion?: number;
+            roundCoreDigest?: string;
+            roundId?: string;
+            rowVersion?: number;
+            schema?: string;
+            slotId?: string;
+            state?: string;
+            stateVersion?: number;
+            status?: string;
+            target?: {
+              qualificationDigest: string;
+              targetId: string;
+              targetKeyEpoch: number;
+            };
+            terminal?: {
+              kind?: string;
+              outcome: string;
+              proof?: {
+                storage: string;
+                value: {
+                  actionDigest?: string;
+                  admissionHandoff?: {
+                    lifecycleFence: number;
+                    operationVersion: number;
+                    state: string;
+                    storeFence: {
+                      lease_id: string;
+                      owner_epoch: number;
+                      store_uuid: string;
+                    };
+                  };
+                  authenticatedClockUnixMs?: number;
+                  cancellation?: string;
+                  channelId?: string;
+                  idempotencyKey?: string;
+                  issuedAt?: number;
+                  operationId?: string;
+                  parametersDigest?: string;
+                  provider?: {
+                    qualificationDigest: string;
+                    targetId: string;
+                    targetKeyEpoch: number;
+                  };
+                  request?: {
+                    requestBindingDigest: string;
+                    requestId: string;
+                    requestNamespaceDigest: string;
+                  };
+                  reservationDigest?: string;
+                  reservationId?: string;
+                  reservationProposalDigest?: string;
+                  schema?: string;
+                  serviceBindingDigest?: string;
+                  sourceChannelHeadDigest?: string;
+                  sourceCheckpointDigest?: string;
+                  sourceCheckpointSequence?: number;
+                  sourceEffectHeadDigest?: string;
+                  sourceEscrowHeadDigest?: string;
+                };
+              };
+              proof_digest?: string;
+              proof_id?: string;
+              result?: {
+                storage: string;
+                value: unknown;
+              };
+              result_digest?: string;
+              result_id?: string;
+            };
+            trigger?: {
+              evidenceManifest: {
+                ranges: {
+                  anchorEpoch: number;
+                  checkpointAt: number;
+                  checkpointId: string;
+                  checkpointRoot: string;
+                  expectedCount: number;
+                  indexNamespace: string;
+                  queryIndexRoot: string;
+                  rangeProofDigest: string;
+                  selectedMemberRoot: string;
+                  sequenceRange: {
+                    first: number;
+                    last: number;
+                  };
+                  signerKeyEpoch: number;
+                  sourceId: string;
+                  sourceKind: string;
+                  sourcePrefixCutoff: number;
+                  subjectKey: string;
+                  window: {
+                    endAt: number;
+                    startAt: number;
+                  };
+                }[];
+              };
+              identity: {
+                claimId: string;
+                key: {
+                  boundCoverageBodyDigest: string;
+                  evidenceRangeDigest: string;
+                  parametricPolicyBodyDigest: string;
+                  subjectKey: string;
+                  triggerPredicateBodyDigest: string;
+                  windowEnd: number;
+                  windowStart: number;
+                };
+                triggerInstanceId: string;
+              };
+              magnitude: {
+                kind: string;
+                value: number;
+              };
+              schema: string;
+              signedPolicy: {
+                body: {
+                  beneficiaryId: string;
+                  boundCoverageBodyDigest: string;
+                  boundCoverageEnvelopeDigest: string;
+                  coverageAmount: {
+                    currency: string;
+                    units: number;
+                  };
+                  coverageAuthorityId: string;
+                  effectiveFrom: number;
+                  effectiveUntil: number;
+                  evaluatorAuthority: {
+                    authorityId: string;
+                    keyEpoch: number;
+                    keyId: string;
+                  };
+                  fundingFacilityId: string;
+                  issuedAt: number;
+                  maxCheckpointLagSeconds: number;
+                  payerId: string;
+                  payoutMode: {
+                    kind: string;
+                    windowSeconds: number;
+                  };
+                  payoutRail: {
+                    destinationAccountDigest: string;
+                    kind: string;
+                    railId: string;
+                  };
+                  payoutSchedule: {
+                    amount: {
+                      currency: string;
+                      units: number;
+                    };
+                    kind: string;
+                  };
+                  preActionAuthorityDigest: string;
+                  predicate: {
+                    kind: string;
+                    minEvents: number;
+                    thresholdBps: number;
+                  };
+                  schema: string;
+                  subjectKey: string;
+                  windowAnchor: number;
+                  windowSeconds: number;
+                };
+                signature: string;
+                signerKey: string;
+              };
+            };
+            trustedOpenedAt?: number;
+            version?: number;
+          };
+        };
+        stateDigest: string;
+        terminalResult?: {
+          result: {
+            storage: string;
+            value: unknown;
+          };
+          resultDigest: string;
+          resultId: string;
+        };
+        trustedClockHighWater: number;
+      };
+      preparedEffect?: {
+        actionDigest: string;
+        authorization: {
+          mode: string;
+        };
+        effectSlotDigest: string;
+        effectSlotId: string;
+        operationId: string;
+      };
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      transitionProofDigest: string;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-acknowledgement-body.schema.json
+export namespace Economy_FactorAssignmentAcknowledgementBody {
+  export interface ChioFactorAssignmentAcknowledgementV1SignedBody {
+    acknowledgedAtUnixMs: number;
+    acknowledgementId: string;
+    agreementBodyDigest: string;
+    agreementId: string;
+    assignmentAuthorizationSetDigest: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    dueAtUnixMs: number;
+    effectiveAtUnixMs: number;
+    expectedResourceFence: number;
+    expectedSnapshotVersion: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    operationId: string;
+    priorDispositionDigest: string;
+    priorDispositionKind: string;
+    priorDispositionLifecycleFence: number;
+    priorDispositionVersion: number;
+    resultingDispositionDigest: string;
+    resultingDispositionLifecycleFence: number;
+    resultingDispositionVersion: number;
+    resultingResourceFence: number;
+    resultingSnapshotVersion: number;
+    schema: "chio.factor.assignment-acknowledgement.v1";
+    statusProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-agreement-body.schema.json
+export namespace Economy_FactorAssignmentAgreementBody {
+  export interface ChioFactorAssignmentAgreementV1SignedBody {
+    agreedDiscountBps: number;
+    agreedPrice: {
+      currency: string;
+      units: number;
+    };
+    agreementId: string;
+    assignmentAuthorityDigest: string;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    claimDigest: string;
+    claimId: string;
+    dueAtUnixMs: number;
+    effectiveAtUnixMs: number;
+    expectedDispositionLifecycleFence: number;
+    expectedDispositionVersion: number;
+    expectedSettlementLifecycleFence: number;
+    expectedSettlementLifecycleVersion: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    offerDigest: string;
+    offerId: string;
+    operationId: string;
+    schema: "chio.factor.assignment-agreement.v1";
+    sellerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-bind-authorization-body.schema.json
+export namespace Economy_FactorAssignmentBindAuthorizationBody {
+  export interface ChioFactorAssignmentBindAuthorizationV1SignedBody {
+    action: string;
+    actionNonce: string;
+    agreementId: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    effectiveAtUnixMs: number;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    operationId: string;
+    schema: "chio.factor.assignment-bind-authorization.v1";
+    sellerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-not-applied-body.schema.json
+export namespace Economy_FactorAssignmentNotAppliedBody {
+  export interface ChioFactorAssignmentNotAppliedV1SignedBody {
+    agreementBodyDigest: string;
+    agreementId: string;
+    assignmentAuthorizationSetDigest: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    decidedAtUnixMs: number;
+    expectedDispositionLifecycleFence: number;
+    expectedDispositionVersion: number;
+    expectedResourceFence: number;
+    expectedSettlementLifecycleFence: number;
+    expectedSettlementLifecycleVersion: number;
+    expectedSnapshotVersion: number;
+    noMutationProofDigest: string;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    observedDispositionDigest: string;
+    observedDispositionLifecycleFence: number;
+    observedDispositionVersion: number;
+    observedSettlementLifecycleDigest: string;
+    observedSettlementLifecycleFence: number;
+    observedSettlementLifecycleVersion: number;
+    observedSnapshotVersion: number;
+    operationId: string;
+    reason: string;
+    resourceFence: number;
+    resultId: string;
+    schema: "chio.factor.assignment-not-applied.v1";
+    statusProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/obligation-status-proof-body.schema.json
+export namespace Economy_ObligationStatusProofBody {
+  export interface ChioObligationStatusProofV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    currentCreditorId: string;
+    currentSettlementDestinationRef: string;
+    debtorId: string;
+    disposition: {
+      kind: string;
+    };
+    dispositionDigest: string;
+    dispositionLifecycleFence: number;
+    dispositionVersion: number;
+    dueAtUnixMs: number;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    obligationAtomDigest: string;
+    obligationId: string;
+    originalCreditorId: string;
+    proofId: string;
+    resourceFence: number;
+    schema: "chio.obligation.status-proof.v1";
+    settlementLifecycleDigest: string;
+    settlementLifecycleFence: number;
+    settlementLifecycleVersion: number;
+    settlementState: {
+      evidence_digest?: string;
+      kind: string;
+      settlement_id?: string;
+    };
+    snapshotVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/enterprise/enterprise-approval-case-body.schema.json
+export namespace Enterprise_EnterpriseApprovalCaseBody {
+  export interface ChioEnterpriseApprovalCaseV1SignedBody {
+    approvers: string[];
+    decision: string;
+    decision_subject: string;
+    evidence_export_bundle_digest: string;
+    expires_at: string;
+    id: string;
+    issued_at: string;
+    passport_id: string;
+    required_quorum: number;
+    risk_comptroller_report_ref: string;
+    schema: "chio.enterprise.approval-case.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/error/capability_denied.schema.json
 export namespace Error_CapabilityDenied {
   export interface ChioToolCallErrorCapabilityDenied {
@@ -3421,6 +5730,21 @@ export namespace Federation_BilateralSignatureSlice {
     receipt_id: string;
     kernel_id: string;
     digest: HashRecord;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/capability-lease-body.schema.json
+export namespace Federation_CapabilityLeaseBody {
+  export interface ChioCapabilityLeaseV1SignedBody {
+    actionClass: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    issuer: string;
+    leaseId: string;
+    schema: "chio.capability-lease.v1";
+    scopeDigest: string;
+    subject: string;
   }
 }
 
@@ -3749,6 +6073,22 @@ export namespace Federation_FederationReputationClearing {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/governance-receipt-body.schema.json
+export namespace Federation_GovernanceReceiptBody {
+  export interface ChioGovernanceReceiptV1SignedBody {
+    authorizedLeaseId: string;
+    authorizingKernel: string;
+    caseKind: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    receiptId: string;
+    schema: "chio.governance-receipt.v1";
+    stepSha256: string;
+    workflowId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/federation/transport-iroh-peer-directory-bundle.schema.json
 export namespace Federation_TransportIrohPeerDirectoryBundle {
   export interface ChioFederationTransportIrohPeerDirectoryBundleSignedBody {
@@ -4004,6 +6344,889 @@ export namespace Finding_CurrentListingAssertion {
     registry_operator_id: string;
     schema: "chio.finding.current-listing-assertion.v1";
     valid_until: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-admission-body.schema.json
+export namespace Finding_FindingAdmissionBody {
+  export interface ChioFindingAdmissionV1SignedBody {
+    admission_id: string;
+    audit_pool: {
+      authority_epoch: number;
+      currency: string;
+      principal_id: string;
+      rail_destination: string;
+    };
+    backing_allocation_id: string;
+    backing_envelope_sha256: string;
+    capability_scope: string;
+    challenge_administration_pool: {
+      authority_epoch: number;
+      currency: string;
+      principal_id: string;
+      rail_destination: string;
+    };
+    community_fund_destination: string;
+    expires_at: number;
+    failed_delivery_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    fee_schedule_envelope_sha256: string;
+    fee_terminals: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      event:
+        | string
+        | {
+            participation_epoch: {
+              epoch_index: number;
+            };
+          };
+      fee_schedule_envelope_sha256: string;
+      instruction_sha256: string;
+      observation_sha256: string;
+      payer: string;
+      pool_principal_id: string;
+      rail_destination: string;
+    }[];
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_envelope_sha256: string;
+    listing_id: string;
+    metadata_url: string;
+    payee_destination: string;
+    pricing_hint_envelope_sha256: string;
+    profile_envelope_sha256: string;
+    publisher_operator_id: string;
+    purchase_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    schema: "chio.finding.admission.v1";
+    seller_authorization_envelope_sha256: string;
+    server_id: string;
+    status_feed_operator_ref: string;
+    terms_envelope_sha256: string;
+    venue: string;
+    venue_id: string;
+    verifier_report_envelope_sha256: string;
+    verifier_report_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-epoch-body.schema.json
+export namespace Finding_FindingAuditEpochBody {
+  export interface ChioFindingAuditEpochV1SignedBody {
+    audit_authority: string;
+    audit_epoch_id: string;
+    authorization_digest: string;
+    available_budget: {
+      currency: string;
+      units: number;
+    };
+    committed_at: number;
+    eligible_listing_count: number;
+    eligible_snapshot_at: number;
+    eligible_snapshot_digest: string;
+    epoch_index: number;
+    fee_schedule_envelope_sha256: string;
+    published_rate_bps: number;
+    schema: "chio.finding.audit-epoch.v1";
+    seed_commitment: string;
+    seed_witness: string;
+    seed_witness_signature: string;
+    seed_witnessed_at: number;
+    selection_algorithm_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-report-body.schema.json
+export namespace Finding_FindingAuditReportBody {
+  export interface ChioFindingAuditReportV1SignedBody {
+    attempt_envelope_sha256s: string[];
+    audit_epoch_envelope_sha256: string;
+    audit_report_id: string;
+    missed_attempts: {
+      finding_id: string;
+      reason: string;
+    }[];
+    outcome_envelope_digests: string[];
+    reported_at: number;
+    revealed_seed: string;
+    schema: "chio.finding.audit-report.v1";
+    selected_finding_ids: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-round-authorization-body.schema.json
+export namespace Finding_FindingAuditRoundAuthorizationBody {
+  export interface ChioFindingAuditRoundAuthorizationV1SignedBody {
+    authorized_at: number;
+    epoch_precommitment_sha256: string;
+    expires_at: number;
+    schema: "chio.finding.audit-round-authorization.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-authority-status-body.schema.json
+export namespace Finding_FindingAuthorityStatusBody {
+  export interface ChioFindingAuthorityStatusV1SignedBody {
+    authority_id: string;
+    key: string;
+    key_epoch: number;
+    observed_at: number;
+    revoked_from: number | null;
+    schema: "chio.finding.authority-status.v1";
+    status_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-body.schema.json
+export namespace Finding_FindingBody {
+  export interface ChioFindingV1SignedBody {
+    bond_ref: string;
+    descriptor: {
+      context_sha256: string;
+      outcome_class: string;
+      topic: string;
+    };
+    evidence_checkpoint_ref: string;
+    evidence_class: string;
+    evidence_cost: {
+      currency: string;
+      units: number;
+    };
+    evidence_receipt_ids: string[];
+    expires_at: number;
+    finding_id: string;
+    guarantee_class: string;
+    issued_at: number;
+    issuer: string;
+    payload_media_type: string;
+    payload_sha256: string;
+    price_hint_ref?: string;
+    replay_recipe_sha256?: string;
+    runtime_assurance_tier?: string;
+    schema: "chio.finding.v1";
+    signature: string;
+    status_feed_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-bond-backing-body.schema.json
+export namespace Finding_FindingBondBackingBody {
+  export interface ChioFindingBondBackingV1SignedBody {
+    allocation_id: string;
+    appeal_horizon_secs: number;
+    audit_horizon_secs: number;
+    authorization_envelope_sha256: string;
+    bond_class: string;
+    claim_horizon_secs: number;
+    collateral_authority: string;
+    expires_at: number;
+    fee_requirement_sha256: string;
+    fee_schedule_envelope_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_id: string;
+    locked_amount: {
+      currency: string;
+      units: number;
+    };
+    maximum_sale_exposure: {
+      currency: string;
+      units: number;
+    };
+    profile_envelope_sha256: string;
+    schema: "chio.finding.bond-backing.v1";
+    seller: string;
+    settlement_buffer_secs: number;
+    terms_envelope_sha256: string;
+    vault: {
+      venue_ledger: {
+        ledger_account: string;
+        operator_epoch: number;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-body.schema.json
+export namespace Finding_FindingChallengeBody {
+  export interface ChioFindingChallengeV1SignedBody {
+    affected_deliveries: {
+      checkpoint_ref: string;
+      checkpoint_sha256: string;
+      receipt_id: string;
+      receipt_sha256: string;
+    }[];
+    authorization: {
+      buyer_submission?: {
+        challenger: string;
+        dispute_fee_terminal: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          beneficiary_pool_principal_id: string;
+          event: string;
+          fee_schedule_envelope_sha256: string;
+          payer: string;
+          rail_destination: string;
+        };
+        dispute_lock_ref: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          class: string;
+          expiry: number;
+          fee_schedule_envelope_sha256: string;
+          lock_id: string;
+        };
+        standing: {
+          failed_delivery: {
+            failed_delivery_envelope_sha256: string;
+            failed_delivery_id: string;
+          };
+        };
+      };
+      venue_audit?: {
+        audit_epoch_envelope_sha256: string;
+        authorization_digest: string;
+        selection_digest: string;
+      };
+    };
+    backing_envelope_sha256: string;
+    challenge_id: string;
+    evidence: {
+      digest_mismatch?: {
+        deny_checkpoint_ref: {
+          checkpoint_ref: string;
+          checkpoint_sha256: string;
+        };
+        deny_receipt_ref: {
+          receipt_id: string;
+          receipt_sha256: string;
+        };
+        failed_delivery_envelope_sha256: string;
+      };
+      evidence_invalid?: {
+        challenged_checkpoint_ref: {
+          checkpoint_ref: string;
+          checkpoint_sha256: string;
+        };
+        challenged_evidence_receipt_refs: {
+          receipt_id: string;
+          receipt_sha256: string;
+        }[];
+        purchase_record_envelope_sha256: string;
+      };
+    };
+    filed_at: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    listing_id: string;
+    profile_envelope_sha256: string;
+    schema: "chio.finding.challenge.v1";
+    terms_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-enforcement-body.schema.json
+export namespace Finding_FindingChallengeEnforcementBody {
+  export interface ChioFindingChallengeEnforcementV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    bond_snapshot_envelope_sha256: string;
+    destinations: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      destination: string;
+    }[];
+    deterministic_allocation_digest: string;
+    effect_intents: {
+      intent_id: string;
+      kind: string;
+    }[];
+    enforcement_id: string;
+    finalization_authority_id: string;
+    finalization_key: string;
+    finalization_key_epoch: number;
+    finalization_revocation_status_ref: string;
+    finalization_valid_from: number;
+    finalization_valid_until: number;
+    finalized_at: number;
+    finding_id: string;
+    liability_key: string;
+    listing_id: string;
+    outcome_envelope_sha256: string;
+    outcome_id: string;
+    penalty_authority_id: string;
+    penalty_envelope_sha256: string;
+    penalty_key: string;
+    penalty_key_epoch: number;
+    penalty_revocation_status_ref: string;
+    penalty_valid_from: number;
+    penalty_valid_until: number;
+    purchase_snapshot_digest: string;
+    schema: "chio.finding.challenge-enforcement.v1";
+    seller_allocation_id: string;
+    vault: {
+      chain_id: string;
+      vault_contract: string;
+      vault_id: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-outcome-body.schema.json
+export namespace Finding_FindingChallengeOutcomeBody {
+  export interface ChioFindingChallengeOutcomeV1SignedBody {
+    audit_epoch_envelope_sha256?: string;
+    authorization: string;
+    backing_allocation_id: string;
+    challenge_envelope_sha256: string;
+    evaluated_at: number;
+    evaluator_authority_id: string;
+    evaluator_key: string;
+    evaluator_key_epoch: number;
+    evaluator_revocation_status_ref: string;
+    evaluator_valid_from: number;
+    evaluator_valid_until: number;
+    evidence_bundle_digest: string;
+    evidence_kind: string;
+    facet: {
+      digest_mismatch?: {
+        committed_payload_sha256: string;
+        delivered_output_sha256: string;
+        realized_spend_units: number;
+        transform_profile: string;
+      };
+      evidence_invalid?: {
+        challenged_receipt_ids: string[];
+        invalidity: string;
+      };
+      replay_contradiction?: {
+        observation_digests: string[];
+        predicate: string;
+        predicate_result: string;
+        recipe_sha256: string;
+        replay_run_id: string;
+      };
+    };
+    finding_id: string;
+    listing_id: string;
+    outcome_id: string;
+    penalty_calculation?: {
+      base_finding_stake_units: number;
+      computed_exposure_units: number;
+      listing_required_amount_units: number;
+      live_allocated_collateral_units: number;
+      open_per_sale_encumbrance_units: number;
+      penalty_amount: {
+        currency: string;
+        units: number;
+      };
+    };
+    reason: string;
+    retry_deadline?: number;
+    schema: "chio.finding.challenge-outcome.v1";
+    trigger_digest: string;
+    verdict: string;
+    verifier_profile_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-verifier-profile-body.schema.json
+export namespace Finding_FindingChallengeVerifierProfileBody {
+  export interface ChioFindingChallengeVerifierProfileV1SignedBody {
+    allowed_predicates: string[];
+    allowed_runner_manifests: string[];
+    bbs_projection_issuer: {
+      issuer_fingerprint: string;
+      key_epoch: number;
+      key_hex: string;
+      registry_ref: string;
+      revocation_status_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    checkpoint_logs: {
+      log_id: string;
+      signer: {
+        authority_id: string;
+        key: string;
+        key_epoch: number;
+        revocation_status_ref: string;
+        rotation_policy_ref: string;
+        valid_from: number;
+        valid_until: number;
+      };
+    }[];
+    expires_at: number;
+    failed_delivery_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    governance_authority: string;
+    issued_at: number;
+    operator: string;
+    predicate_engine: string;
+    profile_id: string;
+    purchase_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    receipt_signers: {
+      policy: {
+        authority_id: string;
+        key: string;
+        key_epoch: number;
+        revocation_status_ref: string;
+        rotation_policy_ref: string;
+        valid_from: number;
+        valid_until: number;
+      };
+      role: string;
+    }[];
+    required_facets: string[];
+    required_receipt_semantics: string;
+    resolver_policy_ref: string;
+    resource_caps: {
+      max_evidence_receipts: number;
+      max_memory_bytes: number;
+      max_recipe_bytes: number;
+      max_runtime_secs: number;
+    };
+    retention_policy_ref: string;
+    schema: "chio.finding.challenge-verifier-profile.v1";
+    verifier_report_signer: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-claim-allocation-body.schema.json
+export namespace Finding_FindingClaimAllocationBody {
+  export interface ChioFindingClaimAllocationV1SignedBody {
+    allocation_id: string;
+    buyer_pool_units: number;
+    community_fund_units: number;
+    cutoff_slot: number;
+    deterministic_allocation_sha256: string;
+    entries: {
+      amount_units: number;
+      beneficiary_kind: string;
+      destination: string;
+    }[];
+    liability_key: string;
+    purchase_snapshot_sha256: string;
+    recorded_at: number;
+    schema: "chio.finding.claim-allocation.v1";
+    slash: {
+      currency: string;
+      units: number;
+    };
+    total_realized_spend_units: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-failed-delivery-body.schema.json
+export namespace Finding_FindingFailedDeliveryBody {
+  export interface ChioFindingFailedDeliveryV1SignedBody {
+    accepted_bid_envelope_sha256: string;
+    authoritative_payment_operation_id: string;
+    buyer: string;
+    currency: string;
+    deny_checkpoint_ref: string;
+    deny_checkpoint_sha256: string;
+    deny_receipt_id: string;
+    deny_receipt_sha256: string;
+    failed_delivery_id: string;
+    finding_id: string;
+    hold_attempt_reference: string;
+    listing_id: string;
+    payout_eligible: boolean;
+    purchase_intent_id: string;
+    realized_spend_units: number;
+    recorded_at: number;
+    release_terminal: string;
+    reservation_id: string;
+    schema: "chio.finding.failed-delivery.v1";
+    seller_backing_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-finalized-bond-snapshot-body.schema.json
+export namespace Finding_FindingFinalizedBondSnapshotBody {
+  export interface ChioFindingFinalizedBondSnapshotV1SignedBody {
+    allocation_id: string;
+    block_hash: string;
+    block_number: number;
+    chain_id: string;
+    currency: string;
+    finality_policy: string;
+    held_amount: number;
+    identity_registry_record: string;
+    locked_amount: number;
+    observed_at: number;
+    observed_finality:
+      | string
+      | {
+          confirmations: {
+            depth: number;
+          };
+        };
+    operator_key_epoch: number;
+    operator_key_hash: string;
+    schema: "chio.finding.finalized-bond-snapshot.v1";
+    seller: string;
+    slashed_amount: number;
+    snapshot_id: string;
+    vault_contract: string;
+    vault_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-key-revocation-body.schema.json
+export namespace Finding_FindingKeyRevocationBody {
+  export interface ChioFindingKeyRevocationV1SignedBody {
+    authority_id: string;
+    key: string;
+    key_epoch: number;
+    recorded_at: number;
+    revocation_status_ref: string;
+    revoked_from: number;
+    schema: "chio.finding.key-revocation.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-liability-body.schema.json
+export namespace Finding_FindingLiabilityBody {
+  export interface ChioFindingLiabilityV1SignedBody {
+    backing_allocation_id: string;
+    chain_id: string;
+    defect_key: string;
+    finding_id: string;
+    liability_key: string;
+    listing_id: string;
+    opened_at: number;
+    schema: "chio.finding.liability.v1";
+    seller: string;
+    state: string;
+    updated_at: number;
+    vault_contract: string;
+    vault_id: string;
+    venue_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-market-terms-body.schema.json
+export namespace Finding_FindingMarketTermsBody {
+  export interface ChioFindingMarketTermsV1SignedBody {
+    appeal_window_secs: number;
+    audit_eligible: boolean;
+    audit_epoch_length_secs: number;
+    backing_requirement: {
+      base_finding_stake: {
+        currency: string;
+        units: number;
+      };
+      collateral_policy: string;
+      maximum_sale_exposure: {
+        currency: string;
+        units: number;
+      };
+    };
+    challenge_bond_limits: {
+      guarantee_class: string;
+      max_bond: {
+        currency: string;
+        units: number;
+      };
+      min_bond: {
+        currency: string;
+        units: number;
+      };
+    }[];
+    claim_window_secs: number;
+    decision_rule_refs: string[];
+    expires_at: number;
+    filing_window_secs: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_id: string;
+    payout_policy: string;
+    schema: "chio.finding.market-terms.v1";
+    seller: string;
+    terms_id: string;
+    verifier_profile_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-pool-allocation-body.schema.json
+export namespace Finding_FindingPoolAllocationBody {
+  export interface ChioFindingPoolAllocationV1SignedBody {
+    allocation_id: string;
+    amount_units: string;
+    authority: string;
+    currency: string;
+    expires_at_unix_ms: number;
+    graph_id: string;
+    issued_at_unix_ms: number;
+    ledger_domain: string;
+    ledger_store_binding_sha256: string;
+    nonce: string;
+    pool_id: string;
+    pool_sha256: string;
+    purchaser_id: string;
+    purchaser_key: string;
+    purpose: string;
+    schema: "chio.finding.pool-allocation.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-purchase-record-body.schema.json
+export namespace Finding_FindingPurchaseRecordBody {
+  export interface ChioFindingPurchaseRecordV1SignedBody {
+    accepted_bid_envelope_sha256: string;
+    accepted_price: {
+      currency: string;
+      units: number;
+    };
+    authoritative_payment_operation_id: string;
+    buyer: string;
+    delivery_receipt_id: string;
+    encumbrance_id: string;
+    finding_id: string;
+    listing_id: string;
+    payer: string;
+    payment_reference: string;
+    payout_destination: string;
+    purchase_intent_id: string;
+    purchase_key: string;
+    realized_spend: {
+      currency: string;
+      units: number;
+    };
+    recorded_at: number;
+    schema: "chio.finding.purchase-record.v1";
+    seller_backing_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-purchase-result-body.schema.json
+export namespace Finding_FindingPurchaseResultBody {
+  export interface ChioFindingPurchaseResultV1SignedBody {
+    accepted_price: {
+      currency: string;
+      units: number;
+    };
+    authoritative_payment_operation_id: string;
+    delivery_receipt_sha256: string;
+    failed_delivery_sha256?: string;
+    finding_id: string;
+    output_sha256?: string;
+    payer: string;
+    purchase_intent_id: string;
+    purchase_record_sha256?: string;
+    realized_spend: {
+      currency: string;
+      units: number;
+    };
+    recorded_at: number;
+    request_id: string;
+    reservation_id: string;
+    result_id: string;
+    schema: "chio.finding.purchase-result.v1";
+    settlement: string;
+    verdict: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-seller-authorization-body.schema.json
+export namespace Finding_FindingSellerAuthorizationBody {
+  export interface ChioFindingSellerAuthorizationV1SignedBody {
+    authorization_id: string;
+    expires_at: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    issuer: string;
+    listing_id: string;
+    payee: {
+      beneficiary: {
+        currency: string;
+        destination: string;
+      };
+    };
+    provider_server_id: string;
+    provider_tool: string;
+    revocation_status_ref: string;
+    schema: "chio.finding.seller-authorization.v1";
+    seller: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-status-epoch-body.schema.json
+export namespace Finding_FindingStatusEpochBody {
+  export interface ChioFindingStatusEpochV1SignedBody {
+    anchor_refs: string[];
+    branch_domain: string;
+    empty_leaf_domain: string;
+    empty_leaf_hash: string;
+    feed_id: string;
+    generated_at: number;
+    hash_algorithm: string;
+    key_domain_nonce: number;
+    key_hash_domain: string;
+    map_epoch: number;
+    occupied_leaf_domain: string;
+    operator_id: string;
+    operator_key: string;
+    operator_key_epoch: number;
+    proof_semantics: string;
+    root_hash: string;
+    schema: "chio.finding.status-epoch.v1";
+    status_epoch_id: string;
+    status_map_version: string;
+    tree_depth: number;
+    valid_from: number;
+    valid_until: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-verified-fix-submission-body.schema.json
+export namespace Finding_FindingVerifiedFixSubmissionBody {
+  export interface ChioFindingVerifiedFixSubmissionV1SignedBody {
+    activation_sha256: string;
+    finding_id: string;
+    proof_bundle_sha256: string;
+    schema: "chio.finding.verified-fix-submission.v1";
+    seller: string;
+    submission_id: string;
+    submitted_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-verifier-report-body.schema.json
+export namespace Finding_FindingVerifierReportBody {
+  export interface ChioFindingVerifierReportV1SignedBody {
+    backing_allocation_id?: string;
+    evaluation_time: number;
+    facets: {
+      facet: string;
+      outcome: string;
+      reason: string;
+    }[];
+    finding_artifact_sha256: string;
+    finding_delivery?: {
+      accepted_bid_envelope_sha256: string;
+      authoritative_payment_operation_id: string;
+      digest_check: string;
+      finding_id: string;
+      listing_id: string;
+      media_type_check: string;
+      purchase_intent_id: string;
+      reservation_id: string;
+      schema: string;
+      settlement_mode: string;
+      transform_profile: string;
+      venue_admission_envelope_sha256: string;
+    };
+    finding_delivery_receipt_id?: string;
+    finding_id: string;
+    replay_recipe_input_sha256?: string;
+    report_id: string;
+    resolved_evidence_bundle_sha256: string;
+    resolver_policy_sha256: string;
+    schema: "chio.finding.verifier-report.v1";
+    status_proof_input_sha256?: string;
+    trust_root_snapshot_sha256: string;
+    trusted_time_input_sha256: string;
+    verifier_authority: string;
+    verifier_implementation_id: string;
+    verifier_key_epoch: number;
+    verifier_profile_envelope_sha256: string;
+    verifier_profile_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-voluntary-retraction-body.schema.json
+export namespace Finding_FindingVoluntaryRetractionBody {
+  export interface ChioFindingVoluntaryRetractionV1SignedBody {
+    finding_id: string;
+    inclusion_deadline: number;
+    intent_id: string;
+    issued_at: number;
+    reason: string;
+    schema: "chio.finding.voluntary-retraction.v1";
+    seller: string;
+    status_feed_ref: string;
   }
 }
 
@@ -4413,6 +7636,41 @@ export namespace Finding_PoolDebitAuthorization {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/registry-market-penalty-body.schema.json
+export namespace Finding_RegistryMarketPenaltyBody {
+  export interface ChioRegistryMarketPenaltyV1SignedBody {
+    abuseClass: string;
+    action: string;
+    activationId?: string;
+    bondClass: string;
+    caseId: string;
+    charterId: string;
+    evidenceRefs: {
+      kind: string;
+      referenceId: string;
+      sha256?: string;
+    }[];
+    expiresAt?: number;
+    feeScheduleId: string;
+    governingOperatorId: string;
+    issuedBy: string;
+    listingId: string;
+    namespace: string;
+    openedAt: number;
+    penaltyAmount: {
+      currency: string;
+      units: number;
+    };
+    penaltyId: string;
+    schema: "chio.registry.market-penalty.v1";
+    state: string;
+    subjectOperatorId?: string;
+    supersedesPenaltyId?: string;
+    updatedAt: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/finding/status-intent-submission.schema.json
 export namespace Finding_StatusIntentSubmission {
   export interface ChioFindingStatusIntentSubmissionSignedBody {
@@ -4555,6 +7813,350 @@ export namespace Finding_WorkerCapability {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-activation-body.schema.json
+export namespace Fiscal_FiscalActivationBody {
+  export interface ChioFiscalActivationV1SignedBody {
+    activatedAt: number;
+    activationId: string;
+    activationNotBefore: number;
+    admissionDigest: string;
+    admissionId: string;
+    approvalSetDigest: string;
+    approvals: {
+      body: {
+        admissionDigest: string;
+        admissionId: string;
+        approvalExpiresAt: number;
+        approvalId: string;
+        approvedAt: number;
+        proposalDigest: string;
+        proposalId: string;
+        schema: string;
+        signerKeyId: string;
+      };
+      signature: string;
+      signerKey: string;
+    }[];
+    charterDigest: string;
+    charterId: string;
+    issuedBy: string;
+    proposalDigest: string;
+    proposalId: string;
+    schema: "chio.fiscal.activation.v1";
+    target: {
+      kind: string;
+      predecessorCharterDigest?: string;
+      scheduleId?: string;
+      successorCharterDigest?: string;
+      successorSchedules?: {
+        body: {
+          charterDigest: string;
+          charterId: string;
+          domain: string;
+          issuedAt: number;
+          issuedBy: string;
+          params: {
+            ceilings: {
+              currency: string;
+              units: number;
+            }[];
+            kind: string;
+          };
+          scheduleId: string;
+          schema: string;
+          sequence: number;
+          supersedesScheduleId: string;
+          validFrom: number;
+          validUntil: number;
+        };
+        signature: string;
+        signerKey: string;
+      }[];
+      supersedesScheduleId?: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-approval-body.schema.json
+export namespace Fiscal_FiscalApprovalBody {
+  export interface ChioFiscalApprovalV1SignedBody {
+    admissionDigest: string;
+    admissionId: string;
+    approvalExpiresAt: number;
+    approvalId: string;
+    approvedAt: number;
+    proposalDigest: string;
+    proposalId: string;
+    schema: "chio.fiscal.approval.v1";
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-charter-body.schema.json
+export namespace Fiscal_FiscalCharterBody {
+  export interface ChioFiscalCharterV1SignedBody {
+    approvalThreshold: number;
+    approvalTtlSeconds: number;
+    charterId: string;
+    expiresAt: number;
+    governedDomains: string[];
+    governingOperatorId: string;
+    issuedAt: number;
+    issuedBy: string;
+    predecessorCharterDigest?: string;
+    proposalTtlSeconds: number;
+    schema: "chio.fiscal.charter.v1";
+    sequence: number;
+    signerSet: {
+      keyId: string;
+      publicKey: string;
+    }[];
+    timelockSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-consumer-readiness-body.schema.json
+export namespace Fiscal_FiscalConsumerReadinessBody {
+  export interface ChioFiscalConsumerReadinessV1SignedBody {
+    attestedAt: number;
+    genesisPolicyDigest: string;
+    genesisPolicyId: string;
+    governingOperatorId: string;
+    readinessId: string;
+    readinessSequence: number;
+    readyDomains: string[];
+    runtimeRegistryDigest: string;
+    schema: "chio.fiscal.consumer-readiness.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-continuity-checkpoint-body.schema.json
+export namespace Fiscal_FiscalContinuityCheckpointBody {
+  export interface ChioFiscalContinuityCheckpointV1SignedBody {
+    anchorId: string;
+    anchorNamespace: string;
+    checkpointId: string;
+    continuitySequence: number;
+    domains: {
+      active?: {
+        scheduleDigest: string;
+        scheduleId: string;
+        sequence: number;
+      };
+      domain: string;
+      everActivated: boolean;
+      lastKnownGood?: {
+        scheduleDigest: string;
+        scheduleId: string;
+        sequence: number;
+      };
+    }[];
+    genesisPolicyDigest: string;
+    genesisPolicyId: string;
+    governingOperatorId: string;
+    pinnedCharterDigest: string;
+    pinnedCharterId: string;
+    pinnedCharterSequence: number;
+    previousCheckpointDigest?: string;
+    runtimeReadinessDigest: string;
+    schema: "chio.fiscal.continuity-checkpoint.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    stagedTransition?: {
+      transitionDigest: string;
+      transitionId: string;
+    };
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-proposal-admission-body.schema.json
+export namespace Fiscal_FiscalProposalAdmissionBody {
+  export interface ChioFiscalProposalAdmissionV1SignedBody {
+    admissionAuthorityId: string;
+    admissionId: string;
+    admissionSequence: number;
+    admittedAt: number;
+    governingOperatorId: string;
+    predecessorCharterDigest: string;
+    predecessorCharterId: string;
+    predecessorCharterSequence: number;
+    proposalDigest: string;
+    proposalExpiresAt: number;
+    proposalId: string;
+    schema: "chio.fiscal.proposal-admission.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-proposal-body.schema.json
+export namespace Fiscal_FiscalProposalBody {
+  export interface ChioFiscalProposalV1SignedBody {
+    proposalId: string;
+    proposedAt: number;
+    proposedBy: string;
+    rationaleDigest: string;
+    schema: "chio.fiscal.proposal.v1";
+    target: {
+      candidate?: {
+        body: {
+          charterDigest: string;
+          charterId: string;
+          domain: string;
+          issuedAt: number;
+          issuedBy: string;
+          params: {
+            ceilings?: {
+              currency: string;
+              units: number;
+            }[];
+            feeSchedule?: {
+              bondRequirements: {
+                bondClass: string;
+                collateralReferenceKind: string;
+                requiredAmount: {
+                  currency: string;
+                  units: number;
+                };
+                slashable: boolean;
+              }[];
+              disputeFee: {
+                currency: string;
+                units: number;
+              };
+              expiresAt: number;
+              feeScheduleId: string;
+              governingOperatorId: string;
+              issuedAt: number;
+              issuedBy: string;
+              marketParticipationFee: {
+                currency: string;
+                units: number;
+              };
+              namespace: string;
+              publicationFee: {
+                currency: string;
+                units: number;
+              };
+              schema: string;
+              scope: {
+                allowedActorKinds: string[];
+                allowedAdmissionClasses: string[];
+                allowedListingOperatorIds: string[];
+                namespace: string;
+              };
+            };
+            kind: string;
+          };
+          scheduleId: string;
+          schema: string;
+          sequence: number;
+          supersedesScheduleId?: string;
+          validFrom: number;
+          validUntil: number;
+        };
+        signature: string;
+        signerKey: string;
+      };
+      kind: string;
+      successor?: {
+        body: {
+          approvalThreshold: number;
+          approvalTtlSeconds: number;
+          charterId: string;
+          expiresAt: number;
+          governedDomains: string[];
+          governingOperatorId: string;
+          issuedAt: number;
+          issuedBy: string;
+          predecessorCharterDigest: string;
+          proposalTtlSeconds: number;
+          schema: string;
+          sequence: number;
+          signerSet: {
+            keyId: string;
+            publicKey: string;
+          }[];
+          timelockSeconds: number;
+        };
+        signature: string;
+        signerKey: string;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-schedule-body.schema.json
+export namespace Fiscal_FiscalScheduleBody {
+  export interface ChioFiscalScheduleV1SignedBody {
+    charterDigest: string;
+    charterId: string;
+    domain: string;
+    issuedAt: number;
+    issuedBy: string;
+    params: {
+      ceilings?: {
+        currency: string;
+        units: number;
+      }[];
+      feeSchedule?: {
+        bondRequirements: {
+          bondClass: string;
+          collateralReferenceKind: string;
+          requiredAmount: {
+            currency: string;
+            units: number;
+          };
+          slashable: boolean;
+        }[];
+        disputeFee: {
+          currency: string;
+          units: number;
+        };
+        expiresAt: number;
+        feeScheduleId: string;
+        governingOperatorId: string;
+        issuedAt: number;
+        issuedBy: string;
+        marketParticipationFee: {
+          currency: string;
+          units: number;
+        };
+        namespace: string;
+        publicationFee: {
+          currency: string;
+          units: number;
+        };
+        schema: string;
+        scope: {
+          allowedActorKinds: string[];
+          allowedAdmissionClasses: string[];
+          allowedListingOperatorIds: string[];
+          namespace: string;
+        };
+      };
+      kind: string;
+    };
+    scheduleId: string;
+    schema: "chio.fiscal.schedule.v1";
+    sequence: number;
+    supersedesScheduleId?: string;
+    validFrom: number;
+    validUntil: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/frost/dkg-package.schema.json
 export namespace Frost_DkgPackage {
   export interface ChioFrostDkgPackageSignedBody {
@@ -4566,6 +8168,104 @@ export namespace Frost_DkgPackage {
     schema: "chio.frost.dkg-package.v1";
     senderParticipantId: string;
     transportKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-authorization-slot-checkpoint-body.schema.json
+export namespace Frost_FrostAuthorizationSlotCheckpointBody {
+  export interface ChioFrostAuthorizationSlotCheckpointV1SignedBody {
+    actionDigest: string;
+    aggregateSignatureDigest?: string;
+    anchorId: string;
+    anchorKeyId: string;
+    authorizationBlobDigest?: string;
+    authorizationId: string;
+    availabilityReceipt?: string;
+    clockHighWater: number;
+    domain: string;
+    keyEpoch: number;
+    ladderActionClass: string;
+    predecessorDigest?: string;
+    resourceFence: number;
+    resourceId: string;
+    resourceVersion: number;
+    rosterDigest: string;
+    schema: "chio.frost.authorization-slot-checkpoint.v1";
+    scopeId: string;
+    sessionId: string;
+    signingMessageDigest: string;
+    slotId: string;
+    slotVersion: number;
+    state: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-dkg-round2-sealed-body.schema.json
+export namespace Frost_FrostDkgRound2SealedBody {
+  export interface ChioFrostDkgRound2SealedV1SignedBody {
+    ciphertext: string;
+    metadata: {
+      ceremonyId: string;
+      keyEpoch: number;
+      participantSetDigest: string;
+      recipientParticipantId: string;
+      recipientSealingKeyId: string;
+      round: number;
+      schema: string;
+      senderEphemeralPublicKey: number[];
+      senderParticipantId: string;
+      suite: string;
+      transportKeyId: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-epoch-checkpoint-body.schema.json
+export namespace Frost_FrostEpochCheckpointBody {
+  export interface ChioFrostEpochCheckpointV1SignedBody {
+    activationFence: number;
+    activeRosterDigest: string;
+    activeRosterId: string;
+    anchorId: string;
+    anchorKeyId: string;
+    checkpointSequence: number;
+    clockHighWater: number;
+    groupPublicKeyDigest: string;
+    keyEpoch: number;
+    predecessorDigest?: string;
+    rotationAuthorizationDigest?: string;
+    schema: "chio.frost.epoch-checkpoint.v1";
+    scopeId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-roster-body.schema.json
+export namespace Frost_FrostRosterBody {
+  export interface ChioFrostRosterV1SignedBody {
+    allowedDomains: string[];
+    authorityScope: string;
+    ceremonyTranscriptDigest: string;
+    groupPublicKey: string;
+    keyEpoch: number;
+    keyOrigin: string;
+    participantCount: number;
+    participants: {
+      participantId: string;
+      verificationShare: string;
+    }[];
+    predecessorRosterDigest?: string;
+    rosterAuthorityKeyId: string;
+    rosterId: string;
+    schema: "chio.frost.roster.v1";
+    scopeId: string;
+    suiteId: string;
+    threshold: number;
+    validFrom: number;
+    validUntil: number;
   }
 }
 
@@ -4884,6 +8584,90 @@ export namespace Kernel_BudgetSnapshotAnchorCommitment {
     previousChainDigest: string;
     schema: "chio.budget-snapshot-anchor-commitment.v1";
     signerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller-delivery-report-body.schema.json
+export namespace Kernel_CallerDeliveryReportBody {
+  export interface ChioCallerDeliveryReportV1SignedBody {
+    authorization_digest: string;
+    claim_id: string;
+    completed_at_unix_ms: number;
+    execution_started_at_unix_ms: number;
+    executor: {
+      executor_id: string;
+      key_epoch: number;
+      public_key: string;
+    };
+    output: {
+      closed?: boolean;
+      effect?: string;
+      external?: boolean;
+      historical?: boolean;
+      original_native_effect?: boolean;
+      outcome?: string;
+      private_result?: string;
+      result_sha256?: string;
+      returned?: boolean;
+      safe?: boolean;
+    };
+    realized_cost: null | {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.caller-delivery-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller-dispatch-authorization-body.schema.json
+export namespace Kernel_CallerDispatchAuthorizationBody {
+  export interface ChioCallerDispatchAuthorizationV1SignedBody {
+    committed: {
+      budget_hold_id: string;
+      dispatch_commit: {
+        committed_version: number;
+        coordinator_lease_epoch: number;
+        coordinator_lease_id: string;
+        dispatch_launch: {
+          native_launch: null;
+          worker_profile: null;
+        };
+        provider_attempt: {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        store_fence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      execution_nonce_id: string;
+      frozen_context_digest: string;
+    };
+    executor: {
+      executor_id: string;
+      key_epoch: number;
+      public_key: string;
+    };
+    expires_at_unix_ms: number;
+    invocation: {
+      capability_digest: string;
+      capability_id: string;
+      operation_id: string;
+      parameters_digest: string;
+      request_binding_hash: string;
+      request_id: string;
+      server_id: string;
+      tool_name: string;
+    };
+    kernel_public_key: string;
+    not_before_unix_ms: number;
+    schema: "chio.caller-dispatch-authorization.v1";
   }
 }
 
@@ -5473,6 +9257,28 @@ export namespace Kernel_CombinedCaptureMetadata {
     budget_commit_index: number;
     revocation_commit_index: number;
     leader_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/dpop-proof-body.schema.json
+export namespace Kernel_DpopProofBody {
+  export interface ChioDpopProofV1SignedBody {
+    action_hash: string;
+    agent_key: string;
+    capability_id: string;
+    issued_at: number;
+    nonce: string;
+    replay_authority: {
+      destination_store_uuid: string;
+      dpop_authority_id: string;
+      expectation_id: string;
+      max_clock_skew_secs: number;
+      proof_ttl_secs: number;
+    };
+    schema: "chio.dpop_proof.v1";
+    tool_name: string;
+    tool_server: string;
   }
 }
 
@@ -6240,6 +10046,58 @@ export namespace Kernel_ToolCallResponse {
 export namespace Lineage_FrontierSignature {
   export interface ChioLineageFrontierSignatureSignedBody {
     frontier: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/lineage/lineage-signed-subgraph-body.schema.json
+export namespace Lineage_LineageSignedSubgraphBody {
+  export interface ChioLineageSignedSubgraphV1SignedBody {
+    audience: string;
+    challenge_nonce: string;
+    checkpoint_inclusion_sha256: string;
+    checkpoint_ref: string;
+    edges: {
+      disclosure_state: string;
+      edge_id: string;
+      evidence_class: string;
+      from: string;
+      kind: string;
+      relation: string;
+      source_artifact_sha256: string;
+      statement_sha256: string;
+      to: string;
+    }[];
+    frontier_sha256: string;
+    generated_at: string;
+    id: string;
+    leakage_ledger_sha256: string;
+    lineage_anchor_ref: string;
+    max_depth: number;
+    nodes: {
+      artifact_schema: string;
+      artifact_sha256: string;
+      depth: number;
+      disclosure_state: string;
+      evidence_class: string;
+      id: string;
+      kind: string;
+      parent_ids: string[];
+      receipt_ref: string;
+      source_id_hash: string;
+      source_table: string;
+      tenant_hash: string;
+    }[];
+    policy_profile_id: string;
+    projection_manifest_sha256: string;
+    redaction_map_sha256: string;
+    redactions: {
+      node_id: string;
+      reason: string;
+    }[];
+    required_evidence_class: string;
+    root_receipt_ids: string[];
+    transaction_passport_ref: string;
   }
 }
 
@@ -14329,6 +18187,227 @@ export namespace Mcp_SessionCredential {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-contractual-zero-body.schema.json
+export namespace Outcome_OutcomeContractualZeroBody {
+  export interface ChioOutcomeContractualZeroV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    contractualZeroId: string;
+    eligibilityDigest: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    noDeliverySlotProofDigest: string;
+    postGuardEvidenceDigest: string;
+    postGuardPolicyDigest: string;
+    providerAcceptanceDigest: string;
+    reason: string;
+    requestId: string;
+    schema: "chio.outcome.contractual-zero.v1";
+    terminalToolOutcomeDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-acknowledgement-body.schema.json
+export namespace Outcome_OutcomeDeliveryAcknowledgementBody {
+  export interface ChioOutcomeDeliveryAcknowledgementV1SignedBody {
+    acknowledgementId: string;
+    deliveryAcceptedAtUnixMs: number;
+    deliveryCheckpointDigest: string;
+    deliveryCheckpointSequence: number;
+    deliveryId: string;
+    durableBlobDigest: string;
+    durableBlobReference: string;
+    eligibilityDigest: string;
+    finalOutputDigest: string;
+    idempotencyKey: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverKeyEpoch: number;
+    receiverKeyId: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-acknowledgement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-checkpoint-body.schema.json
+export namespace Outcome_OutcomeDeliveryCheckpointBody {
+  export interface ChioOutcomeDeliveryCheckpointV1SignedBody {
+    anchorId: string;
+    anchorKeyEpoch: number;
+    blobAbsenceProofDigest?: string;
+    blobDigest?: string;
+    blobReference?: string;
+    cancellationFenceDigest?: string;
+    deliveryId: string;
+    eligibilityDigest: string;
+    idempotencyKey: string;
+    outputDigest: string;
+    predecessorDigest?: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverId: string;
+    receiverKeyEpoch: number;
+    receiverNamespace: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-checkpoint.v1";
+    sequence: number;
+    state: string;
+    trustedClockHighWaterUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-nonacceptance-body.schema.json
+export namespace Outcome_OutcomeDeliveryNonacceptanceBody {
+  export interface ChioOutcomeDeliveryNonacceptanceV1SignedBody {
+    blobAbsenceProofDigest: string;
+    cancellationFenceDigest: string;
+    cancelledAtUnixMs: number;
+    deliveryCheckpointDigest: string;
+    deliveryCheckpointSequence: number;
+    deliveryId: string;
+    eligibilityDigest: string;
+    idempotencyKey: string;
+    nonacceptanceId: string;
+    outputDigest: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverKeyEpoch: number;
+    receiverKeyId: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-nonacceptance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-eligibility-body.schema.json
+export namespace Outcome_OutcomeEligibilityBody {
+  export interface ChioOutcomeEligibilityV1SignedBody {
+    capabilityId: string;
+    deliveryAckDeadlineUnixMs: number;
+    eligibilityId: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    kernelAuthorityId: string;
+    kernelKeyEpoch: number;
+    listingDigest: string;
+    listingId: string;
+    outcomePrice: {
+      currency: string;
+      units: number;
+    };
+    postGuardPolicyDigest: string;
+    preActionAuthorityDigest: string;
+    predicateDigest: string;
+    predicateId: string;
+    pricingDigest: string;
+    pricingId: string;
+    providerBindingDigest: string;
+    providerId: string;
+    qualifiedRailCapabilityDigest: string;
+    qualifiedRailId: string;
+    quoteDigest: string;
+    railCaptureDeadlineUnixMs: number;
+    receiverBindingDigest: string;
+    requestExtensionDigest: string;
+    requestId: string;
+    schema: "chio.outcome.eligibility.v1";
+    settlementMode: string;
+    slaDigest: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-output-provenance-body.schema.json
+export namespace Outcome_OutcomeOutputProvenanceBody {
+  export interface ChioOutcomeOutputProvenanceV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    eligibilityDigest: string;
+    expiresAtUnixMs: number;
+    finalOutputDigest: string;
+    issuedAtUnixMs: number;
+    postGuardEvidenceDigest: string;
+    postGuardPolicyDigest: string;
+    provenanceClass: string;
+    provenanceId: string;
+    providerAcceptanceDigest: string;
+    providerOutputDigest: string;
+    redactionProofDigest?: string;
+    requestId: string;
+    schema: "chio.outcome.output-provenance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-predicate-body.schema.json
+export namespace Outcome_OutcomePredicateBody {
+  export interface ChioOutcomePredicateV1SignedBody {
+    assertions: {
+      comparator: {
+        kind: string;
+        value?:
+          | number
+          | {
+              x: number;
+              y: number;
+            };
+      };
+      pointer: string;
+    }[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    predicateId: string;
+    providerId: string;
+    schema: "chio.outcome.predicate.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-pricing-body.schema.json
+export namespace Outcome_OutcomePricingBody {
+  export interface ChioOutcomePricingV1SignedBody {
+    expiresAtUnixMs: number;
+    failureMode: string;
+    issuedAtUnixMs: number;
+    outcomePrice: {
+      currency: string;
+      units: number;
+    };
+    predicateDigest: string;
+    predicateId: string;
+    pricingId: string;
+    providerId: string;
+    schema: "chio.outcome.pricing.v1";
+    slaDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-sla-body.schema.json
+export namespace Outcome_OutcomeSlaBody {
+  export interface ChioOutcomeSlaV1SignedBody {
+    effectiveAtUnixMs: number;
+    expiresAtUnixMs: number;
+    listingDigest: string;
+    maxFailureBps: number;
+    minimumSampleCount: number;
+    providerId: string;
+    schema: "chio.outcome.sla.v1";
+    slaId: string;
+    windowAnchorUnixMs: number;
+    windowSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/parametric/contest.schema.json
 export namespace Parametric_Contest {
   export interface ChioParametricContestSignedBody {
@@ -14362,6 +18441,58 @@ export namespace Parametric_EvidenceSourceCheckpoint {
     sourceId: string;
     sourceKind: string;
     sourcePrefixCutoff: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/parametric/parametric-policy-body.schema.json
+export namespace Parametric_ParametricPolicyBody {
+  export interface ChioParametricPolicyV1SignedBody {
+    beneficiaryId: string;
+    boundCoverageBodyDigest: string;
+    boundCoverageEnvelopeDigest: string;
+    coverageAmount: {
+      currency: string;
+      units: number;
+    };
+    coverageAuthorityId: string;
+    effectiveFrom: number;
+    effectiveUntil: number;
+    evaluatorAuthority: {
+      authorityId: string;
+      keyEpoch: number;
+      keyId: string;
+    };
+    fundingFacilityId: string;
+    issuedAt: number;
+    maxCheckpointLagSeconds: number;
+    payerId: string;
+    payoutMode: {
+      kind: string;
+      windowSeconds?: number;
+    };
+    payoutRail: {
+      destinationAccountDigest: string;
+      kind: string;
+      railId: string;
+    };
+    payoutSchedule: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      kind: string;
+    };
+    preActionAuthorityDigest: string;
+    predicate: {
+      kind: string;
+      minEvents: number;
+      thresholdBps: number;
+    };
+    schema: "chio.parametric.policy.v1";
+    subjectKey: string;
+    windowAnchor: number;
+    windowSeconds: number;
   }
 }
 
@@ -14523,6 +18654,271 @@ export namespace Parametric_PayoutIntent {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-deposit-body.schema.json
+export namespace Pheromone_PheromoneDepositBody {
+  export interface ChioPheromoneDepositV1SignedBody {
+    agent_passport_jwk_thumbprint: string;
+    agent_passport_key_hash: string;
+    confidence: number;
+    decay_half_life_secs: number;
+    evaporation_floor?: number;
+    indicator: {
+      admission_envelope_sha256?: string;
+      blob?: string;
+      capability_scope?: string;
+      digest?: string;
+      finding_id?: string;
+      indicatorDigest?: string;
+      kind?: string;
+      listing_envelope_sha256?: string;
+      listing_id?: string;
+      schema?: string;
+      workflowId?: string;
+    };
+    kernel_id: string;
+    nonce: string;
+    schema: "chio.pheromone-deposit.v1";
+    severity: string;
+    subject_class: string;
+    subject_class_namespace: string;
+    timestamp_unix_ms: number;
+    treaty_scope: string[];
+    workflow_context?: {
+      bilateral_dsse_sha256: string;
+      consistency_anchor: string;
+      schema: string;
+      step_index: number;
+      tool_receipt_id: string;
+      workflow_id: string;
+      workflow_intersection_id: string;
+      workflow_intersection_sha256: string;
+      workflow_receipt_id: string;
+      workflow_receipt_sha256: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-observation-cost-verifier-root-body.schema.json
+export namespace Pheromone_PheromoneObservationCostVerifierRootBody {
+  export interface ChioPheromoneObservationCostVerifierRootV1SignedBody {
+    allowedSubjectClassNamespaces: string[];
+    allowedSubjectClasses: string[];
+    allowedTreaties: string[];
+    issuerKernelId: string;
+    publicKey: string;
+    runtimePolicySha256: string;
+    schema: "chio.pheromone-observation-cost-verifier-root.v1";
+    validFromUnixMs: number;
+    validUntilUnixMs: number;
+    verifierId: string;
+    verifierKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-peer-directory-bundle-body.schema.json
+export namespace Pheromone_PheromonePeerDirectoryBundleBody {
+  export interface ChioPheromonePeerDirectoryBundleV1SignedBody {
+    directorySha256: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    issuer: string;
+    keyId: string;
+    previousVersionSha256: null | string;
+    schema: "chio.pheromone.peer-directory-bundle.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-query-report-body.schema.json
+export namespace Pheromone_PheromoneQueryReportBody {
+  export interface ChioPheromoneQueryReportV1SignedBody {
+    accepted: boolean;
+    concentration: {
+      distinctOriginPairs: number;
+      evaluatedAtUnixMs: number;
+      reputationEpoch: number;
+      subjectClass: string;
+      subjectClassNamespace: string;
+      totalStrength: number;
+    };
+    schema: "chio.pheromone.query-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-archive-package-manifest-body.schema.json
+export namespace Pheromone_PheromoneRelayAlertAssuranceArchivePackageManifestBody {
+  export interface ChioPheromoneRelayAlertAssuranceArchivePackageManifestV1SignedBody {
+    bundleCount: number;
+    bundles: {
+      artifactCount: number;
+      bundleId: string;
+      bundlePath: string;
+      exportManifestSha256: string;
+      exportReportSha256: string;
+      sourcePackageSha256: string;
+    }[];
+    compressionFormat: string;
+    createdAtUnixMs: number;
+    localKernelId: string;
+    memberCount: number;
+    members: {
+      artifactRole: string;
+      bundleId: string;
+      byteCount: number;
+      kind: string;
+      path: string;
+      retentionClass: string;
+      schema: string;
+      sha256: string;
+    }[];
+    packageGeneration: number;
+    packageId: string;
+    packagerId: string;
+    packagerKeyId: string;
+    safetyClaims: string[];
+    schema: "chio.pheromone.relay-alert-assurance-archive-package-manifest.v1";
+    sourceArchiveReportSha256: string;
+    sourceCloseoutReportSha256: string;
+    totalByteCount: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-export-manifest-body.schema.json
+export namespace Pheromone_PheromoneRelayAlertAssuranceExportManifestBody {
+  export interface ChioPheromoneRelayAlertAssuranceExportManifestV1SignedBody {
+    artifacts: {
+      byteCount: number;
+      path: string;
+      retentionClass: string;
+      role: string;
+      schema: string;
+      sha256: string;
+    }[];
+    bundleId: string;
+    exportedAtUnixMs: number;
+    exporterId: string;
+    exporterKeyId: string;
+    localKernelId: string;
+    safetyClaims: string[];
+    schema: "chio.pheromone.relay-alert-assurance-export-manifest.v1";
+    sourcePackageSha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-http-request-body.schema.json
+export namespace Pheromone_PheromoneRelayHttpRequestBody {
+  export interface ChioPheromoneRelayHttpRequestV1SignedBody {
+    bodySha256: string;
+    method: string;
+    nonce: string;
+    path: string;
+    recipientKernelId: string;
+    schema: "chio.pheromone.relay-http-request.v1";
+    senderKernelId: string;
+    sentAtUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-transit-policy-body.schema.json
+export namespace Pheromone_PheromoneTransitPolicyBody {
+  export interface ChioPheromoneTransitPolicyV1SignedBody {
+    accepted_hubs: string[];
+    admission: {
+      activePeersInTreaty: number;
+      activeReputationEpoch?: number;
+      authenticatedSenderKernelId: string;
+      implicitCompatibilityDefault?: boolean;
+      kernelPublicKeys: string[];
+      knownReputationEpochs: number[];
+      maxDepositsPerPair: number;
+      observationCostVerifierRoots: {
+        allowedSubjectClassNamespaces: string[];
+        allowedSubjectClasses: string[];
+        allowedTreaties: string[];
+        issuerKernelId: string;
+        issuerSignature: string;
+        publicKey: string;
+        runtimePolicySha256: string;
+        schema: string;
+        validFromUnixMs: number;
+        validUntilUnixMs: number;
+        verifierId: string;
+        verifierKeyId: string;
+      }[];
+      passports: {
+        firstSeenEpoch: number;
+        kernelId: string;
+        publicKey: string;
+        revoked: boolean;
+        validFromUnixMs: number;
+        validUntilUnixMs: number;
+      }[];
+      recipientKernelId: string;
+      replayWindowMs: number;
+      runtimePolicyIssuerPublicKeys: string[];
+      runtimeTrustFloorState: {
+        entries: {
+          highestVersion?: number;
+          keyId: string;
+          latestBundleSha256?: string;
+          latestRevocationCheckpointSha256?: string;
+          revoked?: boolean;
+          verifierId: string;
+        }[];
+        schema: string;
+      };
+      scarcityPolicies?: {
+        activePeersEpoch: number;
+        newcomerHorizonEpochs?: number;
+        observationCostVerification: string;
+        policyId: string;
+        policySha256?: string;
+        reputationEpoch: number;
+        runtimePolicySha256: string;
+        schema: string;
+        subjectClass: string;
+        subjectClassNamespace: string;
+        tokenCapacity: number;
+        treatyScope: string[];
+        verifierId: string;
+        windowEndUnixMs: number;
+        windowId: string;
+        windowStartUnixMs: number;
+      }[];
+      subjectClasses: {
+        allowedTreaties: string[];
+        costCommitment: string;
+        destructive: boolean;
+        subjectClass: string;
+        subjectClassNamespace: string;
+      }[];
+    };
+    allowed_egress_treaties: string[];
+    allowed_ingress_treaties: string[];
+    allowed_subject_class_namespaces: string[];
+    max_hops: number;
+    pinned_ladder_refs: {
+      ladder_intersection_id: string;
+      ladder_intersection_sha256: string;
+      ladder_manifest_expires_at_unix_ms: number;
+      ladder_manifest_id: string;
+      ladder_manifest_sha256: string;
+    }[];
+    required_action_class_id: string;
+    schema: "chio.pheromone-transit-policy.v1";
+    valid_from_unix_ms: number;
+    valid_until_unix_ms: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/policy/activation-receipt-signature.schema.json
 export namespace Policy_ActivationReceiptSignature {
   export interface ChioPolicyActivationReceiptSignatureSignedBody {
@@ -14584,6 +18980,41 @@ export namespace Process_SwarmProfile {
     };
     runtime_id: string;
     schema: "chio.process.swarm-profile.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/proof-room/proof-first-run-trust-roots-body.schema.json
+export namespace ProofRoom_ProofFirstRunTrustRootsBody {
+  export interface ChioProofFirstRunTrustRootsV1SignedBody {
+    authority?: string;
+    id: string;
+    root_id?: string;
+    roots: {
+      key_digest?: string;
+      key_id?: string;
+      subject: string;
+    }[];
+    schema: string;
+    trust_domain?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/proof-room/proof-room-receipt-evidence-body.schema.json
+export namespace ProofRoom_ProofRoomReceiptEvidenceBody {
+  export interface ChioProofRoomReceiptEvidenceV1SignedBody {
+    ambient_authority?: boolean;
+    capability_id?: string;
+    execution_lease_ref?: string;
+    guard_decision_id?: string;
+    kernel_key: string;
+    policy_digest: string;
+    receipt_id: string;
+    request_digest?: string;
+    response_digest?: string;
+    schema: string;
+    terminal_status: string;
   }
 }
 
@@ -15311,6 +19742,1211 @@ export namespace Receipt_LineageStatement {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/receipt-body.schema.json
+export namespace Receipt_ReceiptBody {
+  export interface ChioReceiptV1SignedBody {
+    body: {
+      action: {
+        parameter_hash: string;
+        parameters: {
+          bootstrap?: {
+            action: {
+              parameter_hash: string;
+              parameters: {
+                capabilities: {
+                  alice: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  bob: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  carol: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  dave: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  root: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                };
+                record_sha256: string;
+                runtime_id: string;
+              };
+            };
+            boundary_class: string;
+            capability_id: string;
+            content_hash: string;
+            id: string;
+            kernel_key: string;
+            observation_outcome: string;
+            policy_hash: string;
+            receipt_kind: string;
+            redaction_mode: string;
+            signature: string;
+            timestamp: number;
+            tool_name: string;
+            tool_origin: string;
+            tool_server: string;
+            trust_level: string;
+          };
+          context?: {
+            capability_id: string;
+            process_id: string;
+            runtime_id: string;
+          };
+          evidence_id?: string;
+          finding_id?: string;
+          kind?: string;
+          nonce?: {
+            operation: {
+              attachments: {
+                BrokerAttempt?: {
+                  attempt_id: string;
+                  operation_id: string;
+                  transport_id: string;
+                  transport_key_epoch: number;
+                };
+                BudgetHoldId?: string;
+                ExecutionNonceId?: string;
+                ExecutionNonceIssuanceDigest?: string;
+                ExecutionNoncePreflightDigest?: string;
+                RuntimeParticipantLedgerDigest?: string;
+                ToolOutcomeId?: string;
+              }[];
+              binding: {
+                authenticated_tenant_id: string;
+                authorization_capability_hash: string;
+                capability_id: string;
+                coordinator_authority_id: string;
+                effect_class: string;
+                kind: string;
+                operation_id: string;
+                policy_hash: string;
+                request_binding: {
+                  action_parameter_hash: string;
+                  immutable_request_hash: string;
+                  participant_requirements: {
+                    approval: boolean;
+                    authorization_consumption: boolean;
+                    broker_attempt: boolean;
+                    budget_capture: boolean;
+                    execution_nonce: boolean;
+                    obligation: boolean;
+                    observation_attempt_zero: boolean;
+                    outcome_eligibility: boolean;
+                    payment: boolean;
+                  };
+                  request_binding_hash: string;
+                };
+                request_id: string;
+                request_namespace_digest: string;
+              };
+              coordinator_lease_epoch: number;
+              dispatch_commit: {
+                committed_version: number;
+                coordinator_lease_epoch: number;
+                coordinator_lease_id: string;
+                dispatch_launch: {
+                  native_launch: null;
+                  worker_profile: null;
+                };
+                provider_attempt: {
+                  attempt_id: string;
+                  operation_id: string;
+                  transport_id: string;
+                  transport_key_epoch: number;
+                };
+                store_fence: {
+                  lease_id: string;
+                  owner_epoch: number;
+                  store_uuid: string;
+                };
+              };
+              dispatch_state: string;
+              last_error: null;
+              schema: string;
+              state: string;
+              terminal_replay: {
+                receipt: {
+                  projection_digest: string;
+                  receipt_id: string;
+                };
+              };
+              version: number;
+            };
+            reserved_at_unix_ms: number;
+            signed_nonce: {
+              nonce: {
+                bound_to: {
+                  capability_id: string;
+                  parameter_hash: string;
+                  request_id: string;
+                  subject_id: string;
+                  tool_name: string;
+                  tool_server: string;
+                };
+                expires_at: number;
+                issued_at: number;
+                nonce_id: string;
+                schema: string;
+              };
+              signature: string;
+            };
+            verified_at_unix_ms: number;
+          };
+          observed_at_unix_ms?: number;
+          operation?: {
+            binding: {
+              authenticated_tenant_id: string;
+              authorization_capability_hash: string;
+              capability_id: string;
+              coordinator_authority_id: string;
+              effect_class: string;
+              kind: string;
+              operation_id: string;
+              policy_hash: string;
+              request_binding: {
+                action_parameter_hash: string;
+                immutable_request_hash: string;
+                participant_requirements: {
+                  approval: boolean;
+                  authorization_consumption: boolean;
+                  broker_attempt: boolean;
+                  budget_capture: boolean;
+                  execution_nonce: boolean;
+                  obligation: boolean;
+                  observation_attempt_zero: boolean;
+                  outcome_eligibility: boolean;
+                  payment: boolean;
+                };
+                request_binding_hash: string;
+              };
+              request_id: string;
+              request_namespace_digest: string;
+            };
+            dispatch_commit: {
+              committed_version: number;
+              coordinator_lease_epoch: number;
+              coordinator_lease_id: string;
+              dispatch_launch: {
+                native_launch: null;
+                worker_profile: null;
+              };
+              provider_attempt: {
+                attempt_id: string;
+                operation_id: string;
+                transport_id: string;
+                transport_key_epoch: number;
+              };
+              store_fence: {
+                lease_id: string;
+                owner_epoch: number;
+                store_uuid: string;
+              };
+            };
+            dispatch_state: string;
+            execution_nonce_issuance_digest: string;
+            history: {
+              claim: {
+                intent: {
+                  episodeId: string;
+                  expectationId: string;
+                  grantIndex: number;
+                  phase: string;
+                  planDigest: string;
+                  requestBindingHash: string;
+                  resources: {
+                    artifactDigest: string;
+                    kind: string;
+                    resourceId: string;
+                  }[];
+                  runtimeAuthorityId: string;
+                };
+                ledgerDigest: string;
+                operationId: string;
+                recordedAtUnixMs: number;
+                schema: string;
+              };
+              history: {
+                disposition: string;
+                intent: {
+                  episodeId: string;
+                  expectationId: string;
+                  grantIndex: number;
+                  phase: string;
+                  planDigest: string;
+                  requestBindingHash: string;
+                  resources: {
+                    artifactDigest: string;
+                    kind: string;
+                    resourceId: string;
+                  }[];
+                  runtimeAuthorityId: string;
+                };
+                reference: {
+                  claimDigest: string;
+                  episodeId: string;
+                  operationId: string;
+                };
+              };
+              operation: {
+                attachments: {
+                  BrokerAttempt?: {
+                    attempt_id: string;
+                    operation_id: string;
+                    transport_id: string;
+                    transport_key_epoch: number;
+                  };
+                  ExecutionNonceIssuanceDigest?: string;
+                  ExecutionNoncePreflightDigest?: string;
+                  RuntimeParticipantLedgerDigest?: string;
+                }[];
+                binding: {
+                  authenticated_tenant_id: string;
+                  authorization_capability_hash: string;
+                  capability_id: string;
+                  coordinator_authority_id: string;
+                  effect_class: string;
+                  kind: string;
+                  operation_id: string;
+                  policy_hash: string;
+                  request_binding: {
+                    action_parameter_hash: string;
+                    immutable_request_hash: string;
+                    participant_requirements: {
+                      approval: boolean;
+                      authorization_consumption: boolean;
+                      broker_attempt: boolean;
+                      budget_capture: boolean;
+                      execution_nonce: boolean;
+                      obligation: boolean;
+                      observation_attempt_zero: boolean;
+                      outcome_eligibility: boolean;
+                      payment: boolean;
+                    };
+                    request_binding_hash: string;
+                  };
+                  request_id: string;
+                  request_namespace_digest: string;
+                };
+                coordinator_lease_epoch: number;
+                dispatch_commit: null;
+                dispatch_state: string;
+                last_error: null;
+                schema: string;
+                state: string;
+                terminal_replay: null;
+                version: number;
+              };
+            }[];
+            state: string;
+            terminal_replay: {
+              receipt: {
+                projection_digest: string;
+                receipt_id: string;
+              };
+            };
+            version: number;
+          };
+          path?: string;
+          receipt_log?: {
+            checkpoint: {
+              body: {
+                batch_end_seq: number;
+                batch_start_seq: number;
+                chain_root: string;
+                checkpoint_seq: number;
+                issued_at: number;
+                kernel_key: string;
+                merkle_root: string;
+                schema: string;
+                tree_size: number;
+              };
+              signature: string;
+            };
+            inclusion: {
+              checkpoint_seq: number;
+              leaf_index: number;
+              merkle_root: string;
+              proof: {
+                audit_path: string[];
+                leaf_index: number;
+                tree_size: number;
+              };
+              receipt_seq: number;
+            };
+          };
+          record?: string;
+          request?: {
+            arguments: {
+              message_key: string;
+              payload: {
+                from: string;
+              };
+            };
+            known_outcome_only: boolean;
+            operation_key: string;
+            server_id: string;
+            tool_name: string;
+          };
+          response?: {
+            execution_nonce_json: null;
+            output: {
+              kind: string;
+              value: {
+                sequence: string;
+                status: string;
+              };
+            };
+            reason: null;
+            receipt_json: string;
+            request_id: string;
+            terminal_state: {
+              state: string;
+            };
+            verdict: string;
+          };
+          runtime_id?: string;
+          schema?: string;
+          transition_id?: string;
+          value?: string;
+        };
+      };
+      boundary_class: string;
+      capability_id: string;
+      content_hash: string;
+      decision?: {
+        reason?: string;
+        verdict: string;
+      };
+      evidence?: {
+        details?: string;
+        guard_name: string;
+        verdict: boolean;
+      }[];
+      kernel_key: string;
+      metadata?: {
+        active_defense_body?: {
+          body: {
+            dispatch_authorization_hash: number[];
+            effects: {
+              effect: {
+                contribution_hash: number[];
+                effect_id: string;
+                kind: string;
+                observed_base_version_hash: number[];
+                ordinal: number;
+                target: {
+                  session_id: string;
+                  target_type: string;
+                };
+              };
+              outcome: {
+                resulting_version_hash: number[];
+                state: string;
+              };
+            }[];
+            error_code: null;
+            execution_dispatch: {
+              action_id: string;
+              admission_artifact_fingerprint: number[];
+              approval: {
+                admission_operation_id: string;
+                admission_operation_version: number;
+                approval_mode: string;
+                approval_set_hash: number[];
+              };
+              authorization_capability_hash: number[];
+              authorized_at_unix_ms: number;
+              dispatch_id: string;
+              executor_authority_generation: number;
+              executor_authority_id: string;
+              governed_intent_hash: number[];
+              plan_hash: number[];
+              policy_decision_hash: number[];
+              schema_version: number;
+              tenant_id: string;
+            };
+            final_state: string;
+            header: {
+              occurred_at_unix_ms: number;
+              prior_receipt_ids: string[];
+              schema_version: number;
+              tenant_id: string;
+              transition_id: string;
+            };
+            response: {
+              action_id: string;
+              affected_set_hash: number[];
+              plan_expires_at_unix_ms: number;
+              plan_hash: number[];
+              policy: {
+                policy_hash: number[];
+                policy_version: string;
+              };
+              trigger_finding_hash: number[];
+              trigger_finding_id: string;
+              trigger_finding_receipt_id: string;
+            };
+            response_body_hash: number[];
+            response_generation: number;
+          };
+          kind: string;
+        };
+        active_defense_evidence_id?: string;
+        admission_operation?: {
+          compensation_status: string;
+          coordinator_lease_epoch: number;
+          coordinator_lease_id: string;
+          operation_id: string;
+          projected_dispatch_state: string;
+          projected_operation_version: number;
+          projected_state: string;
+          request_binding_hash: string;
+          request_id: string;
+          request_namespace_digest: string;
+          retained_dispatch_commit: {
+            committed_version: number;
+            coordinator_lease_epoch: number;
+            coordinator_lease_id: string;
+            dispatch_launch: {
+              native_launch: null;
+              worker_profile: null;
+            };
+            provider_attempt: {
+              attempt_id: string;
+              operation_id: string;
+              transport_id: string;
+              transport_key_epoch: number;
+            };
+            store_fence: {
+              lease_id: string;
+              owner_epoch: number;
+              store_uuid: string;
+            };
+          };
+          schema: string;
+          store_fence: {
+            lease_id: string;
+            owner_epoch: number;
+            store_uuid: string;
+          };
+          tool_outcome_id: string;
+          tool_outcome_version: number;
+          trusted_time_unix_ms: number;
+        };
+        attribution?: {
+          delegation_depth: number;
+          grant_index: number;
+          issuer_key: string;
+          subject_key: string;
+        };
+        budget_authority?: {
+          authority: {
+            authority_id: string;
+            lease_epoch: number;
+            lease_id: string;
+          };
+          authority_profile: string;
+          authorize: {
+            budget_commit_index: number;
+            committed_cost_units_after: number;
+            event_id: string;
+            exposure_units: number;
+          };
+          budget_term: string;
+          cleanup_custody: string;
+          guarantee_level: string;
+          hold_id: string;
+          metering_profile: string;
+          terminal: {
+            budget_commit_index: number;
+            committed_cost_units_after: number;
+            disposition: string;
+            event_id: string;
+            exposure_units: number;
+            realized_spend_units: number;
+          };
+        };
+        chio_receipt_signing_nonce?: string;
+        chio_runtime?: {
+          accepted?: boolean;
+          admission_id?: string;
+          destructive?: boolean;
+          failure_code?: null;
+          federation_treaty_dsse?: {
+            capability_lease_ref: {
+              expires_at_unix_ms: number;
+              issuer: string;
+              lease_id: string;
+            };
+            consistency_anchor: string;
+            consistency_model: string;
+            cross_org_visibility: string;
+            governance_receipt_ref: {
+              digest: {
+                alg: string;
+                value: string;
+              };
+              kernel_id: string;
+              receipt_id: string;
+            };
+            policy_evaluation_summary: {
+              joint_disposition: string;
+              server_a_verdict: {
+                policy_id: string;
+                policy_version: string;
+                verdict: string;
+              };
+              server_b_verdict: {
+                policy_id: string;
+                policy_version: string;
+                verdict: string;
+              };
+            };
+            treaty_binding_ref: {
+              action_class_id: string;
+              admission_report_sha256: string;
+              consistency_model: string;
+              continuation_sha256: string;
+              governance_refs: string[];
+              ladder_intersection_sha256: string;
+              lease_refs: string[];
+              lineage_bundle_sha256: string;
+              local_receipt_sha256: string;
+              outcome_sha256: string;
+              remote_receipt_sha256: string;
+              request_sha256: string;
+              signer_kernel_ids: string[];
+              treaty_id: string;
+              treaty_scope_sha256: string;
+            };
+          };
+          governance_receipt_id?: string;
+          identity_disposition?: string;
+          lease_id?: string;
+          operation_owned_replay?: {
+            bundle_sha256: string;
+            plan_sha256: string;
+            reference: {
+              claimDigest: string;
+              episodeId: string;
+              operationId: string;
+            };
+            resources_sha256: string;
+            swarm_evidence_sha256: string;
+            treaty_evidence_sha256: string;
+          };
+          pheromone_advisory?: {
+            accepted: boolean;
+            distinctOriginPairs: number;
+            evaluatedAtUnixMs: number;
+            observeOnly: boolean;
+            reputationEpoch: number;
+            sourceReportSha256: string;
+            subjectClass: string;
+            subjectClassNamespace: string;
+            totalStrength: number;
+          };
+          pheromone_policy_decision?: {
+            decision: string;
+            enforced: boolean;
+            peerWeightsSha256: string;
+            policyId: string;
+            policySha256: string;
+            queryReportSha256: string;
+            reasonCode: string;
+            reputationEpoch: number;
+            schema: string;
+          };
+          step_index?: number;
+          trust_bundle_sha256?: string;
+          verification_context_sha256?: string;
+          verified_swarm_request_binding?: {
+            capability_sha256: string;
+            evidence_refs_sha256: string;
+            graph_id: string;
+            scope_sha256: string;
+            task_id: string;
+          };
+          verified_swarm_route_metadata?: {
+            route: {
+              bridge: string;
+              protocolTarget: string;
+              selectedRoute: string;
+            };
+          };
+          workflow_grant_id?: string;
+          workflow_id?: string;
+        };
+        delivery_contract?: {
+          expected_digest: string;
+          observed_digest: string;
+          result: string;
+          schema: string;
+        };
+        execution_nonce?: {
+          stage: string;
+          tool_dispatched: boolean;
+        };
+        financial?: {
+          budget_remaining: number;
+          budget_total: number;
+          cost_breakdown: {
+            payment: {
+              authorization_id: string;
+              budget_exposure_units: number;
+              preauthorized_units: number;
+              pricing_failure: null;
+              rail: string;
+              rail_mode: string;
+              recorded_units: number;
+              reported_cost: {
+                currency: string;
+                units: number;
+              };
+              transaction_id: string;
+            };
+          };
+          cost_charged: number;
+          currency: string;
+          delegation_depth: number;
+          grant_index: number;
+          payment_reference: string;
+          root_budget_holder: string;
+          settlement_status: string;
+        };
+        finding_delivery?: {
+          accepted_bid_envelope_sha256: string;
+          authoritative_payment_operation_id: string;
+          digest_check: string;
+          finding_id: string;
+          listing_id: string;
+          media_type_check: string;
+          purchase_intent_id: string;
+          reservation_id: string;
+          schema: string;
+          settlement_mode: string;
+          status_proof: {
+            feed_id: string;
+            key_domain_nonce: number;
+            map_epoch: number;
+            non_inclusion_checked_at: number;
+            proof_sha256: string;
+            root_hash: string;
+            status_epoch_artifact_sha256: string;
+          };
+          transform_profile: string;
+          venue_admission_envelope_sha256: string;
+        };
+        finding_purchase_replay_snapshot?: {
+          purchase: {
+            accepted_bid_envelope_sha256: string;
+            accepted_price: {
+              currency: string;
+              units: number;
+            };
+            authoritative_payment_operation_id: string;
+            expected_status_feed_id: string;
+            finding_id: string;
+            listing_id: string;
+            payer_key_hex: string;
+            payload_media_type: string;
+            payload_sha256: string;
+            purchase_intent_id: string;
+            reservation_id: string;
+            status_proof: {
+              feed_id: string;
+              key_domain_nonce: number;
+              map_epoch: number;
+              non_inclusion_checked_at: number;
+              operator_authorization_sha256: string;
+              proof_sha256: string;
+              root_hash: string;
+              service_bond_evidence_sha256: string;
+              status_epoch_artifact_sha256: string;
+              status_epoch_id: string;
+            };
+            venue_admission_envelope_sha256: string;
+          };
+          schema: string;
+        };
+        governed_transaction?: {
+          approval?: {
+            approval_artifact_digest: string;
+            approved: boolean;
+            approver_key: string;
+            token_id: string;
+          };
+          autonomy?: {
+            delegationBondId: string;
+            tier: string;
+          };
+          call_chain?: {
+            chainId: string;
+            delegatorSubject: string;
+            evidenceClass: string;
+            evidenceSources: string[];
+            originSubject: string;
+            parentReceiptId: string;
+            parentRequestId: string;
+            upstreamProof: {
+              chainId: string;
+              delegatorSubject: string;
+              expiresAt: number;
+              issuedAt: number;
+              originSubject: string;
+              parentReceiptId: string;
+              parentRequestId: string;
+              signature: string;
+              signer: string;
+              subject: string;
+            };
+          };
+          commerce?: {
+            seller: string;
+            settlement_destination_ref: string;
+            shared_payment_token_id: string;
+          };
+          economic_authorization?: {
+            amount_bounds: {
+              approved_max: {
+                currency: string;
+                units: number;
+              };
+              hold_amount: {
+                currency: string;
+                units: number;
+              };
+              settlement_cap: {
+                currency: string;
+                units: number;
+              };
+            };
+            budget: {
+              budget_remaining: number;
+              budget_total: number;
+              cost_charged: number;
+              currency: string;
+              delegation_depth: number;
+              grant_index: number;
+              root_budget_holder: string;
+            };
+            credit_authority_digest: string;
+            economic_intent_digest: string;
+            economic_mode: string;
+            liability_refs: {
+              bond_id: string;
+              dispute_policy_ref: string;
+              policy_id: string;
+            };
+            merchant: {
+              merchant_id: string;
+              merchant_of_record: string;
+              order_ref: string;
+            };
+            metering: {
+              billing_unit: string;
+              max_billable_units: number;
+              meter_profile_hash: string;
+              provider: string;
+            };
+            payee: {
+              beneficiary_id: string;
+              settlement_destination_ref: string;
+            };
+            payee_binding_digest: string;
+            payer: {
+              custody_provider: string;
+              funding_source_ref: string;
+              obligor_ref: string;
+              party_id: string;
+            };
+            pre_action_authority_digest: string;
+            pricing_basis: {
+              quote_expiry: number;
+              quote_hash: string;
+              tariff_hash: string;
+            };
+            rail: {
+              asset: string;
+              contract_or_account_ref: string;
+              facilitator: string;
+              kind: string;
+              network: string;
+            };
+            settlement: {
+              settlement_status: string;
+            };
+            version: string;
+          };
+          intent_hash: string;
+          intent_id: string;
+          max_amount?: {
+            currency: string;
+            units: number;
+          };
+          metered_billing?: {
+            maxBilledUnits: number;
+            quote: {
+              billingUnit: string;
+              expiresAt: number;
+              issuedAt: number;
+              provider: string;
+              quoteId: string;
+              quotedCost: {
+                currency: string;
+                units: number;
+              };
+              quotedUnits: number;
+            };
+            settlementMode: string;
+            usageEvidence: {
+              evidenceId: string;
+              evidenceKind: string;
+              evidenceSha256: string;
+              observedUnits: number;
+            };
+          };
+          purpose: string;
+          runtime_assurance?: {
+            evidenceSha256: string;
+            schema: string;
+            tier: string;
+            verifier: string;
+            verifierFamily: string;
+          };
+          server_id: string;
+          tool_name: string;
+        };
+        occurred_at_unix_ms?: number;
+        receipt_context?: {
+          request_id: string;
+          request_namespace_digest?: string;
+        };
+        route?: {
+          bridge: string;
+          protocolTarget: string;
+          selectedRoute: string;
+        };
+      };
+      observation_outcome?: string;
+      policy_hash: string;
+      receipt_kind: string;
+      redaction_mode: string;
+      tenant_id?: string;
+      timestamp: number;
+      tool_name: string;
+      tool_origin: string;
+      tool_server: string;
+      trust_level: string;
+    };
+    id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/receipt-lineage-statement-body.schema.json
+export namespace Receipt_ReceiptLineageStatementBody {
+  export interface ChioReceiptLineageStatementV1SignedBody {
+    childReceiptId: string;
+    childRequestId: string;
+    childSessionAnchor: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    continuationTokenId?: string;
+    evidenceClass: string;
+    id: string;
+    issuedAt: number;
+    kernelKey: string;
+    parentReceiptId: string;
+    parentRequestId: string;
+    parentSessionAnchor: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    relationKind: string;
+    schema: "chio.receipt_lineage_statement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/receipt/record.schema.json
 export namespace Receipt_Record {
   /**
@@ -15486,6 +21122,15 @@ export namespace Receipt_Record {
     issuer_public_key_hex: string;
     message_count: 14;
     signature_hex: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/settlement-closure-body.schema.json
+export namespace Receipt_SettlementClosureBody {
+  export interface ChioSettlementClosureV1SignedBody {
+    fixture: string;
+    n: number;
   }
 }
 
@@ -35905,6 +41550,63 @@ export namespace Recovery_ProviderFinality {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-grant-body.schema.json
+export namespace Recovery_RecoveryGrantBody {
+  export interface ChioRecoveryGrantV1SignedBody {
+    claims: {
+      agent_id: string;
+      authority_key_id: string;
+      capability_id: string;
+      destination_id: string;
+      domain_version: number;
+      expires_at_unix_seconds: number;
+      grant_id: string;
+      issued_at_unix_seconds: number;
+      purpose: string;
+      request_hash: number[];
+      session_id: string;
+      source_label_hash: number[];
+      subject_id: string;
+      target_label: {
+        compartments: string[];
+        kind: string;
+        owners: {
+          bob?: string[];
+        };
+      };
+      tenant_id: string;
+      tool_name: string;
+    };
+    recovery: {
+      action_intent: number[];
+      approval_intent: string;
+      approved_plan: number[];
+      authority_domain: string;
+      authority_scope: number[];
+      authorization_requirements: number[];
+      challenge: string;
+      continuation_id: string;
+      contract_digest: number[];
+      coverage_digest: number[];
+      isolation_epoch: number;
+      isolation_lineage: string;
+      output_disposition: number[];
+      policy_digest: number[];
+      process_id: string;
+      request_id: string;
+      request_namespace: number[];
+      schema: string;
+      selected_offer: number[];
+      step_id: string;
+      version: number;
+      workflow_id: string;
+    };
+    schema: "chio.recovery.grant.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/recovery/recovery-setup-probe.schema.json
 export namespace Recovery_RecoverySetupProbe {
   export type OpaqueId = string;
@@ -36080,6 +41782,194 @@ export namespace Recovery_RecoverySetupReport {
     authority_domain: string;
     tenant_id: string;
     process_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-confined-disclosure-body.schema.json
+export namespace Recovery_RecoverySignedConfinedDisclosureBody {
+  export interface ChioRecoverySignedConfinedDisclosureV1SignedBody {
+    artifact: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    boundary: number[];
+    content: number[];
+    contract: number[];
+    domain_version: number;
+    evidence: string;
+    expires_at_unix_ms: number;
+    implementation: number[];
+    influence: {
+      commitment: number[];
+      externally_influenced: boolean;
+      unknown: boolean;
+    };
+    issued_at_unix_ms: number;
+    launch: number[];
+    observation: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    parent: {
+      clearance: {
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+        kind: string;
+        owners: {};
+      };
+      context_generation: number;
+      isolation_epoch: string;
+      lineage: string;
+      principal: string;
+      recipient: string;
+      runtime: string;
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      sink: {
+        kind: string;
+      };
+    };
+    policy: number[];
+    size_bytes: number;
+    source: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+    target: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-confined-endorsement-body.schema.json
+export namespace Recovery_RecoverySignedConfinedEndorsementBody {
+  export interface ChioRecoverySignedConfinedEndorsementV1SignedBody {
+    artifact: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    boundary: number[];
+    content: number[];
+    contract: number[];
+    domain_version: number;
+    evidence: string;
+    expires_at_unix_ms: number;
+    implementation: number[];
+    influence: {
+      commitment: number[];
+      externally_influenced: boolean;
+      unknown: boolean;
+    };
+    issued_at_unix_ms: number;
+    launch: number[];
+    observation: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    parent: {
+      clearance: {
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+        kind: string;
+        owners: {};
+      };
+      context_generation: number;
+      isolation_epoch: string;
+      lineage: string;
+      principal: string;
+      recipient: string;
+      runtime: string;
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      sink: {
+        kind: string;
+      };
+    };
+    policy: number[];
+    size_bytes: number;
+    source: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+    target: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-policy-deployment-change-body.schema.json
+export namespace Recovery_RecoverySignedPolicyDeploymentChangeBody {
+  export interface ChioRecoverySignedPolicyDeploymentChangeV1SignedBody {
+    base_deployment: number[];
+    base_generation: number;
+    base_policy: number[];
+    domain_version: number;
+    proposal_digest: number[];
+    proposal_id: string;
+    scope: {
+      authority_domain: string;
+      process_id: string;
+      tenant_id: string;
+    };
+    target_deployment: number[];
+    target_generation: number;
+    target_policy: number[];
+    writer_fence: number[];
   }
 }
 
@@ -59541,6 +65431,83 @@ export namespace Result_StreamComplete {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-adjudication-jurisdiction-receipt-body.schema.json
+export namespace Risk_RiskAdjudicationJurisdictionReceiptBody {
+  export interface ChioRiskAdjudicationJurisdictionReceiptV1SignedBody {
+    adjudicator_subjects: string[];
+    appeal_authority_refs: string[];
+    covered_dispute_types: string[];
+    effective_window: {
+      end: string;
+      start: string;
+    };
+    evidence_rules_ref: string;
+    id: string;
+    issued_at: string;
+    jurisdiction_id: string;
+    order_id: string;
+    policy_ref: string;
+    remedy_limits: {
+      currency: string;
+      maximum_remedy: number;
+    }[];
+    schema: "chio.risk.adjudication-jurisdiction-receipt.v1";
+    slash_authority_refs: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-collateral-position-report-body.schema.json
+export namespace Risk_RiskCollateralPositionReportBody {
+  export interface ChioRiskCollateralPositionReportV1SignedBody {
+    amount: number;
+    available_amount: number;
+    claim_priority: string;
+    collateral_id: string;
+    consumed_amount_refs: {}[];
+    currency_or_asset: string;
+    id: string;
+    issued_at: string;
+    lock_expiry: string;
+    lock_start: string;
+    order_id: string;
+    release_policy_ref: string;
+    schema: "chio.risk.collateral-position-report.v1";
+    slash_authority_ref: string;
+    source_ref: string;
+    source_type: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-guarantee-decision-body.schema.json
+export namespace Risk_RiskGuaranteeDecisionBody {
+  export interface ChioRiskGuaranteeDecisionV1SignedBody {
+    adjudication_jurisdiction_ref: string;
+    backing_refs: string[];
+    beneficiary_subject: string;
+    claim_window: {
+      end: string;
+      start: string;
+    };
+    coverage_decision_ref: string;
+    currency: string;
+    exclusions_ref: string;
+    guarantee_id: string;
+    guarantee_type: string;
+    id: string;
+    issued_at: string;
+    maximum_remedy: number;
+    order_id: string;
+    provider_subject: string;
+    schema: "chio.risk.guarantee-decision.v1";
+    sla_commitment_ref: string;
+    verdict: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/root_authority/delegation-context.schema.json
 export namespace RootAuthority_DelegationContext {
   export type DelegationAnchor = {
@@ -59851,6 +65818,31 @@ export namespace RootAuthority_EnterpriseProviderIdentity {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot-body.schema.json
+export namespace RootAuthority_IdpKeySnapshotBody {
+  export interface ChioIdpKeySnapshotV1SignedBody {
+    exchange_key?: string;
+    fixture?: string;
+    issuer?: string;
+    keys?: {
+      alg?: string;
+      crv?: string;
+      e?: string;
+      kid: string;
+      kty: string;
+      n?: string;
+      use?: string;
+      x?: string;
+      y?: string;
+    }[];
+    n?: number;
+    observed_at?: number;
+    schema?: "chio.idp-key-snapshot.v1";
+    source?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json
 export namespace RootAuthority_IdpKeySnapshot {
   /**
@@ -59929,6 +65921,15 @@ export namespace RootAuthority_IdpKeySnapshot {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/revocation-request-body.schema.json
+export namespace RootAuthority_RevocationRequestBody {
+  export interface ChioRevocationRequestV1SignedBody {
+    fixture: string;
+    n: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/root_authority/revocation-request.schema.json
 export namespace RootAuthority_RevocationRequest {
   /**
@@ -59994,6 +65995,76 @@ export namespace RootAuthority_RootAnchor {
      * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
      */
     assertion_exp: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/root-policy-body.schema.json
+export namespace RootAuthority_RootPolicyBody {
+  export interface ChioRootPolicyV1SignedBody {
+    disclosure?: {
+      default: string;
+      tools?: {
+        "crm/search": {
+          parameters: {
+            inline_fields: string[];
+          };
+          result: {
+            inline_fields: {}[];
+          };
+        };
+      };
+    };
+    exchange_keys?: string[];
+    fixture?: string;
+    n?: number;
+    policy_id?: string;
+    policy_key?: string;
+    rules?: {
+      capability_ttl_secs?: number;
+      ceiling_scope: {
+        grants: {
+          dpop_required?: boolean;
+          operations: string[];
+          server_id: string;
+          tool_name: string;
+        }[];
+        resource_grants?: {
+          operations: string[];
+          uri_pattern: string;
+        }[];
+      };
+      ceiling_scope_hash: string;
+      holder_classes: string[];
+      idp_scope_projection?: {
+        "crm.admin"?: string[];
+        "crm.read": string[];
+        "crm.write"?: string[];
+      };
+      match: {
+        allowed_algs?: string[];
+        anchor_kind: string;
+        claims?: {
+          client_id?: string[];
+          scope?: string[];
+        };
+        provider_identity_digest?: string;
+        provider_record_id?: string;
+      };
+      max_assertion_lifetime_secs?: number;
+      max_clock_skew_secs?: number;
+      principal?: string;
+      recorded_claims: {
+        client_id?: string;
+        scope?: string;
+      };
+      retain_idp_artifact?: boolean;
+      rule_id: string;
+      tenant_value?: string;
+    }[];
+    schema?: "chio.root-policy.v1";
+    valid_from?: number;
+    valid_until?: number;
   }
 }
 
@@ -60700,6 +66771,70 @@ export namespace Runtime_RevocationFreshnessProofSignature {
     schema: "chio.runtime.revocation-freshness-proof-signature.v1";
     sequence: number;
     subjectCapabilityDigest?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-peer-weights-body.schema.json
+export namespace Runtime_RuntimePeerWeightsBody {
+  export interface ChioRuntimePeerWeightsV1SignedBody {
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    reputationEpoch: number;
+    schema: "chio.runtime.peer-weights.v1";
+    verifierId: string;
+    weights: {
+      peerKernelId: string;
+      weight: number;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-pheromone-policy-body.schema.json
+export namespace Runtime_RuntimePheromonePolicyBody {
+  export interface ChioRuntimePheromonePolicyV1SignedBody {
+    allowedReputationEpochs: number[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    maxQueryReportAgeMs: number;
+    minDistinctOriginPairs: number;
+    mode: string;
+    peerWeightsSha256: string;
+    policyId: string;
+    policyVersion: number;
+    rules: {
+      actionClassId: string;
+      direction: string;
+      effect: string;
+      ruleId: string;
+      subjectClass: string;
+      subjectClassNamespace: string;
+      thresholdTotalStrength: number;
+    }[];
+    runtimeTrustBundleSha256: string;
+    schema: "chio.runtime.pheromone-policy.v1";
+    verifierId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-verifier-trust-bundle-body.schema.json
+export namespace Runtime_RuntimeVerifierTrustBundleBody {
+  export interface ChioRuntimeVerifierTrustBundleV1SignedBody {
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    previousHashSha256?: string;
+    revocationAuthorityRoots: string[];
+    revocationCheckpointSha256: string;
+    schema: "chio.runtime.verifier-trust-bundle.v1";
+    trustBundleSha256: string;
+    verificationContextSha256: string;
+    verifierId: string;
+    version: number;
   }
 }
 
@@ -62843,6 +68978,37 @@ export namespace Security_BrokerPrepareDispatchAcknowledgementV1 {
     attemptId: Identifier;
     preparedDispatchId: Identifier;
     preparedAtUnixSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-body.schema.json
+export namespace Security_BrokerPrivilegedAuditChallengeBody {
+  export interface ChioBrokerPrivilegedAuditChallengeV1SignedBody {
+    expiresAtUnixSeconds: number;
+    issuedAtUnixSeconds: number;
+    runnerAuthorizationBody: {
+      auditId: string;
+      brokerInstanceId: string;
+      canonicalRequestSha256: string;
+      capabilitySha256: string;
+      credentialProvider: string;
+      deploymentId: string;
+      expiresAtUnixSeconds: number;
+      issuedAtUnixSeconds: number;
+      proofSha256: string;
+      providerAdapterId: string;
+      providerAdapterVersion: number;
+      referenceCommitmentSha256: string;
+      referenceSource: string;
+      revocationAuthorityDomain: string;
+      runnerId: string;
+      schema: string;
+      tenantScope: string;
+    };
+    schema: "chio.broker-privileged-audit-challenge.v1";
+    sessionCommitmentSha256: string;
+    sessionNonce: string;
   }
 }
 
@@ -65892,6 +72058,35 @@ export namespace Security_DeclassificationConsumptionReceiptBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-grant-body.schema.json
+export namespace Security_DeclassificationGrantBody {
+  export interface ChioDeclassificationGrantV1SignedBody {
+    agent_id: string;
+    authority_key_id: string;
+    capability_id: string;
+    destination_id: string;
+    domain_version: number;
+    expires_at_unix_seconds: number;
+    grant_id: string;
+    issued_at_unix_seconds: number;
+    purpose: string;
+    request_hash: number[];
+    session_id: string;
+    source_label_hash: number[];
+    subject_id: string;
+    target_label: {
+      compartments: string[];
+      kind: string;
+      owners: {
+        "owner-a": string[];
+      };
+    };
+    tenant_id: string;
+    tool_name: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/declassification-grant.schema.json
 export namespace Security_DeclassificationGrant {
   export type FlowIdentifier = string;
@@ -66654,6 +72849,20 @@ export namespace Security_KeyLogCheckpointBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-body.schema.json
+export namespace Security_KeyLogCheckpointBody {
+  export interface ChioKeyLogCheckpointV1SignedBody {
+    checkpoint_sequence: number;
+    issued_at: number;
+    log_id: string;
+    previous_checkpoint_hash: string;
+    root_hash: string;
+    schema: "chio.key-log.checkpoint.v1";
+    tree_size: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json
 export namespace Security_KeyLogCheckpointEnvelopeV1 {
   export type Signature = string;
@@ -67220,6 +73429,18 @@ export namespace Security_KeyLogWitnessSignatureV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/keyring-artifact-signature-body.schema.json
+export namespace Security_KeyringArtifactSignatureBody {
+  export interface ChioKeyringArtifactSignatureV1SignedBody {
+    artifact_hash: string;
+    artifact_signature: string;
+    key_id: string;
+    schema: "chio.keyring.artifact-signature.v1";
+    signing_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/keyring-artifact-signature-v1.schema.json
 export namespace Security_KeyringArtifactSignatureV1 {
   export type Hash = string;
@@ -67402,6 +73623,101 @@ export namespace Security_LiftRollbackCompletionReceiptBodyV1 {
         };
     contribution_hash: Digest;
     observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-body.schema.json
+export namespace Security_McpCageLaunchPolicyBody {
+  export interface ChioMcpCageLaunchPolicyV1SignedBody {
+    enterprise_migration: {
+      deployment_id: string;
+      head: {
+        key: {
+          control: string;
+          deployment_id: string;
+          scope_id: string;
+          scope_kind: string;
+        };
+        transition_digest: number[];
+      };
+      state_database_path: string;
+      trusted_transition_signers: string[];
+    };
+    limits: {
+      launch_timeout_ms: number;
+      max_artifact_bytes: number;
+      nofile_hard: number;
+      nofile_soft: number;
+    };
+    operator_ceilings: {
+      environment_variables: string[];
+      forbidden_paths: string[];
+      native_syscall_profiles: string[];
+      network_destinations: {
+        host: string;
+        port: number;
+      }[];
+      read_paths: string[];
+      write_paths: string[];
+    };
+    receipt: {
+      capability_id: string;
+      database_path: string;
+      signer_seed_path: string;
+      tenant_id: string;
+      trusted_signer_public_key: string;
+    };
+    registered_public_key: string;
+    runtime: {
+      cage_init_binding_digest: string;
+      cage_init_path: string;
+      execution_identity: {
+        gid: number;
+        /**
+         * @maxItems 64
+         */
+        supplementary_gids: number[];
+        uid: number;
+      };
+      /**
+       * @maxItems 48
+       */
+      runtime_files: string[];
+      target_argv: string[];
+      target_binding_digest: string;
+      target_path: string;
+      working_directory: string;
+    };
+    schema: "chio.mcp.cage-launch-policy.v1";
+    signed_manifest: {
+      manifest: {
+        name: string;
+        public_key: string;
+        required_permissions: {
+          native_syscall_profile: string;
+        };
+        schema: string;
+        server_id: string;
+        tools: {
+          annotations: {
+            destructive: boolean;
+            idempotent: boolean;
+            read_only: boolean;
+            requires_approval: boolean;
+          };
+          description: string;
+          input_schema: {
+            type: string;
+          };
+          latency_hint: string;
+          name: string;
+        }[];
+        version: string;
+      };
+      signature: string;
+      signer_key: string;
+    };
   }
 }
 
@@ -68963,6 +75279,213 @@ export namespace Swarm_RoutePlanReceiptSignature {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-continuation-token-body.schema.json
+export namespace Swarm_SwarmContinuationTokenBody {
+  export interface ChioSwarmContinuationTokenV1SignedBody {
+    budgetAllocationId: string;
+    childTaskId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    graphSha256: string;
+    issuedAtUnixMs: number;
+    issuer: string;
+    joinReceiptId?: string;
+    mode: string;
+    nonce: string;
+    parentReceiptIds: string[];
+    parentTaskId?: string;
+    revocationEpochRef: string;
+    revocationEpochRootHash: string;
+    routePlanReceiptId: string;
+    schema: "chio.swarm.continuation-token.v1";
+    sessionAnchorRef: string;
+    tokenId: string;
+    witnessChainRef?: string;
+    witnessChainSha256?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-join-receipt-body.schema.json
+export namespace Swarm_SwarmJoinReceiptBody {
+  export interface ChioSwarmJoinReceiptV1SignedBody {
+    actualParentReceiptIds: string[];
+    chainId: string;
+    dagOrdinal: number;
+    expectedParentReceiptIds: string[];
+    graphId: string;
+    hlcUnixMs: number;
+    issuer: string;
+    joinId: string;
+    joinPredicate: string;
+    nextTaskId: string;
+    parentSetHash: string;
+    parentTaskReceipts: {
+      receiptId: string;
+      taskId: string;
+    }[];
+    resultDigest: string;
+    schema: "chio.swarm.join-receipt.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-revocation-epoch-body.schema.json
+export namespace Swarm_SwarmRevocationEpochBody {
+  export interface ChioSwarmRevocationEpochV1SignedBody {
+    epochId: string;
+    issuedAtUnixMs: number;
+    issuer: string;
+    revokedSubjects: string[];
+    revokedTaskIds: string[];
+    rootHash: string;
+    schema: "chio.swarm.revocation-epoch.v1";
+    validUntilUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-route-plan-receipt-body.schema.json
+export namespace Swarm_SwarmRoutePlanReceiptBody {
+  export interface ChioSwarmRoutePlanReceiptV1SignedBody {
+    attenuationDecision: string;
+    bridgeId: string;
+    candidateSetDigest: string;
+    egressConstraints: string[];
+    egressContractId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    policyDigest: string;
+    protocolTarget: string;
+    registrySnapshotHash: string;
+    routePlanId: string;
+    schema: "chio.swarm.route-plan-receipt.v1";
+    selectedRoute: string;
+    taskId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-task-graph-body.schema.json
+export namespace Swarm_SwarmTaskGraphBody {
+  export interface ChioSwarmTaskGraphV1SignedBody {
+    budgetPoolRef: string;
+    createdAtUnixMs: number;
+    edges: {
+      edgeType: string;
+      fromTaskId: string;
+      toTaskId: string;
+    }[];
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    joins: {
+      joinId: string;
+      nextTaskId: string;
+      parentTaskIds: string[];
+    }[];
+    maxDepth: number;
+    maxFanout: number;
+    multiHopWitnessChains?: boolean;
+    nodes: {
+      budgetAllocationRef?: string;
+      continuationTokenRef?: string;
+      depth: number;
+      parentTaskId?: string;
+      routePlanRef?: string;
+      scopeHash: string;
+      taskId: string;
+    }[];
+    plannerSubject: string;
+    revocationEpochRef: string;
+    rootTransactionRef: string;
+    routePlanRefs: string[];
+    schema: "chio.swarm.task-graph.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-terminal-graph-receipt-body.schema.json
+export namespace Swarm_SwarmTerminalGraphReceiptBody {
+  export interface ChioSwarmTerminalGraphReceiptV1SignedBody {
+    budgetPoolId: string;
+    budgetRollups: {
+      activeUnits: number;
+      consumedUnits: number;
+      dimensionId: string;
+      releasedUnits: number;
+      reservedUnits: number;
+      reversedUnits: number;
+      totalUnits: number;
+    }[];
+    chainId: string;
+    completedAtUnixMs: number;
+    completedTaskIds: string[];
+    graphId: string;
+    issuer: string;
+    joinReceiptIds: string[];
+    receiptId: string;
+    resultDigest: string;
+    revocationEpochRef: string;
+    routePlanReceiptIds: string[];
+    schema: "chio.swarm.terminal-graph-receipt.v1";
+    terminalTaskIds: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/capability-proof-body.schema.json
+export namespace Transaction_CapabilityProofBody {
+  export interface ChioCapabilityProofV1SignedBody {
+    capability_id: string;
+    expires_at: string;
+    id: string;
+    issuer: string;
+    schema: "chio.capability.proof.v1";
+    scope: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/guard-decision-body.schema.json
+export namespace Transaction_GuardDecisionBody {
+  export interface ChioGuardDecisionV1SignedBody {
+    capability_id: string;
+    decision: string;
+    guard_key: string;
+    id: string;
+    policy_sha256: string;
+    request_sha256: string;
+    response_sha256: string;
+    schema: "chio.guard.decision.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/transaction-passport-body.schema.json
+export namespace Transaction_TransactionPassportBody {
+  export interface ChioTransactionPassportV1SignedBody {
+    claim_set_path: string;
+    claim_set_sha256: string;
+    evidence_graph_path: string;
+    evidence_graph_sha256: string;
+    id: string;
+    issued_at: string;
+    issuer: string;
+    omission_policy?: {
+      claim_id: string;
+      reason: string;
+      status: string;
+    }[];
+    schema: "chio.transaction-passport.v1";
+    verifier_policy_path: string;
+    verifier_policy_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/trust/agent-passport-presentation-response.schema.json
 export namespace Trust_AgentPassportPresentationResponse {
   export interface ChioAgentPassportPresentationResponseSignedBody {
@@ -69127,6 +75650,26 @@ export namespace Trust_AgentPassportPresentationResponse {
       validUntil: string;
     };
     schema: "chio.agent-passport-presentation-response.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-challenge-body.schema.json
+export namespace Trust_FinancialAgentPassportPresentationChallengeBody {
+  export interface ChioFinancialAgentPassportPresentationChallengeV1SignedBody {
+    challengeDigest: string;
+    challengeId: string;
+    expiresAt: string;
+    issuedAt: string;
+    nonce: string;
+    schema: "chio.financial-agent-passport-presentation-challenge.v1";
+    selectors: {
+      credentialRefDigest: string;
+      family: string;
+    }[];
+    sourcePassportId: string;
+    verifier: string;
+    verifierKeyEpoch: number;
   }
 }
 
@@ -69318,6 +75861,428 @@ export namespace Trust_FinancialAgentPassportPresentationResponse {
       };
     };
     schema: "chio.financial-agent-passport-presentation-response.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/financial-agent-passport-source-manifest-body.schema.json
+export namespace Trust_FinancialAgentPassportSourceManifestBody {
+  export interface ChioFinancialAgentPassportSourceManifestV1SignedBody {
+    credentialCount: number;
+    credentialRoot: string;
+    expiresAt: number;
+    issuedAt: number;
+    issuer: string;
+    merkleRoots: string[];
+    schema: "chio.financial-agent-passport.source-manifest.v1";
+    sourcePassportId: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-premium-history-body.schema.json
+export namespace Trust_FincredPremiumHistoryBody {
+  export interface ChioFincredPremiumHistoryV1SignedBody {
+    "@context": string[];
+    credentialId: string;
+    credentialSubject: {
+      claims: {
+        id: string;
+        quotedAmounts: {
+          currency: string;
+          units: number;
+        }[];
+        quotedCount: number;
+      };
+      family: string;
+    };
+    evidence: {
+      sourceCompletenessAttestations: {
+        body: {
+          attestationReference: string;
+          checkpointAuthorityEpoch: number;
+          checkpointAuthorityKey: string;
+          checkpointDigest: string;
+          checkpointSequence: number;
+          committedLeaves: {
+            indexProof: {
+              /**
+               * @maxItems 64
+               */
+              auditPath: string[];
+              leafIndex: number;
+              treeSize: number;
+            };
+            leaf: {
+              index: number;
+              queryKey: {
+                artifactId: string;
+                occurredAt: number;
+                sourceFamily: string;
+                subject: string;
+              };
+              sourceArtifactDigest: string;
+            };
+          }[];
+          cutoff: number;
+          disclosureDigest: string;
+          expiresAt: number;
+          indexRoot: string;
+          issuedAt: number;
+          lowerBoundary: {
+            kind: string;
+          };
+          rangeRoot: string;
+          schema: string;
+          sourceArtifactDigests: string[];
+          sourceEvidenceClass: string;
+          sourceFamily: string;
+          sourceId: string;
+          sourceSignerKey: string;
+          storeGeneration: number;
+          subject: string;
+          upperBoundary: {
+            kind: string;
+          };
+          window: {
+            endsAt: number;
+            startsAt: number;
+          };
+        };
+        signature: string;
+        signerKey: string;
+      }[];
+      sourceDisclosure: {
+        artifacts: {
+          artifactDigest: string;
+          artifactSchema: string;
+          canonicalArtifact: string;
+          role: string;
+        }[];
+        kind: string;
+      };
+      window: {
+        endsAt: number;
+        startsAt: number;
+      };
+    };
+    expirationDate: string;
+    family: string;
+    issuanceDate: string;
+    issuer: string;
+    issuerKeyEpoch: number;
+    presentationEvidenceClass: string;
+    schema: "chio.fincred.premium-history.v1";
+    sourceEvidenceClass: string;
+    type: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-settlement-reliability-body.schema.json
+export namespace Trust_FincredSettlementReliabilityBody {
+  export interface ChioFincredSettlementReliabilityV1SignedBody {
+    "@context": string[];
+    credentialId: string;
+    credentialSubject: {
+      claims: {
+        id: string;
+        obligationCount: number;
+        onTimeCount: number;
+        onTimeRatioBps: number;
+      };
+      family: string;
+    };
+    evidence: {
+      /**
+       * @maxItems 32
+       */
+      sourceCompletenessAttestations: {
+        body: {
+          schema: "chio.fincred.source-completeness-attestation.v1";
+          sourceId: string;
+          sourceFamily:
+            | "credit_scorecard"
+            | "exposure_history"
+            | "settlement_reliability"
+            | "premium_history"
+            | "loss_history";
+          subject: string;
+          sourceSignerKey: string;
+          checkpointAuthorityEpoch: number;
+          checkpointAuthorityKey: string;
+          storeGeneration: number;
+          checkpointSequence: number;
+          checkpointDigest: string;
+          cutoff: number;
+          window: {
+            startsAt: number;
+            endsAt: number;
+          };
+          /**
+           * @minItems 1
+           * @maxItems 256
+           */
+          committedLeaves: [
+            {
+              leaf: {
+                index: number;
+                queryKey: {
+                  sourceFamily:
+                    | "credit_scorecard"
+                    | "exposure_history"
+                    | "settlement_reliability"
+                    | "premium_history"
+                    | "loss_history";
+                  subject: string;
+                  occurredAt: number;
+                  artifactId: string;
+                };
+                sourceArtifactDigest: string;
+              };
+              indexProof: {
+                treeSize: number;
+                leafIndex: number;
+                /**
+                 * @maxItems 64
+                 */
+                auditPath: string[];
+              };
+            },
+            ...{
+              leaf: {
+                index: number;
+                queryKey: {
+                  sourceFamily:
+                    | "credit_scorecard"
+                    | "exposure_history"
+                    | "settlement_reliability"
+                    | "premium_history"
+                    | "loss_history";
+                  subject: string;
+                  occurredAt: number;
+                  artifactId: string;
+                };
+                sourceArtifactDigest: string;
+              };
+              indexProof: {
+                treeSize: number;
+                leafIndex: number;
+                /**
+                 * @maxItems 64
+                 */
+                auditPath: string[];
+              };
+            }[]
+          ];
+          rangeRoot: string;
+          indexRoot: string;
+          lowerBoundary:
+            | {
+                kind: "source_edge";
+              }
+            | {
+                kind: "adjacent";
+                leafProof: {
+                  leaf: {
+                    index: number;
+                    queryKey: {
+                      sourceFamily:
+                        | "credit_scorecard"
+                        | "exposure_history"
+                        | "settlement_reliability"
+                        | "premium_history"
+                        | "loss_history";
+                      subject: string;
+                      occurredAt: number;
+                      artifactId: string;
+                    };
+                    sourceArtifactDigest: string;
+                  };
+                  indexProof: {
+                    treeSize: number;
+                    leafIndex: number;
+                    /**
+                     * @maxItems 64
+                     */
+                    auditPath: string[];
+                  };
+                };
+              };
+          upperBoundary:
+            | {
+                kind: "source_edge";
+              }
+            | {
+                kind: "adjacent";
+                leafProof: {
+                  leaf: {
+                    index: number;
+                    queryKey: {
+                      sourceFamily:
+                        | "credit_scorecard"
+                        | "exposure_history"
+                        | "settlement_reliability"
+                        | "premium_history"
+                        | "loss_history";
+                      subject: string;
+                      occurredAt: number;
+                      artifactId: string;
+                    };
+                    sourceArtifactDigest: string;
+                  };
+                  indexProof: {
+                    treeSize: number;
+                    leafIndex: number;
+                    /**
+                     * @maxItems 64
+                     */
+                    auditPath: string[];
+                  };
+                };
+              };
+          /**
+           * @minItems 1
+           * @maxItems 256
+           */
+          sourceArtifactDigests: [string, ...string[]];
+          disclosureDigest: string;
+          attestationReference: string;
+          issuedAt: number;
+          expiresAt: number;
+          sourceEvidenceClass: "asserted" | "observed" | "verified";
+        };
+        signerKey: string;
+        signature: string;
+      }[];
+      sourceDisclosure: {
+        /**
+         * @maxItems 256
+         */
+        artifacts: {
+          role: "claim" | "member";
+          artifactSchema: string;
+          artifactDigest: string;
+          canonicalArtifact: string;
+        }[];
+        kind: string;
+      };
+      window: {
+        endsAt: number;
+        startsAt: number;
+      };
+    };
+    expirationDate: string;
+    family: string;
+    issuanceDate: string;
+    issuer: string;
+    issuerKeyEpoch: number;
+    presentationEvidenceClass: string;
+    schema: "chio.fincred.settlement-reliability.v1";
+    sourceEvidenceClass: string;
+    type: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-checkpoint-body.schema.json
+export namespace Trust_FincredSourceCheckpointBody {
+  export interface ChioFincredSourceCheckpointV1SignedBody {
+    checkpointAuthorityEpoch: number;
+    checkpointAuthorityKey: string;
+    checkpointSequence: number;
+    cutoff: number;
+    expiresAt: number;
+    indexRoot: string;
+    indexSize: number;
+    issuedAt: number;
+    lowerBoundary: {
+      kind: string;
+    };
+    rangeRoot: string;
+    schema: "chio.fincred.source-checkpoint.v1";
+    sourceId: string;
+    storeGeneration: number;
+    upperBoundary: {
+      kind: string;
+    };
+    window: {
+      endsAt: number;
+      startsAt: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-completeness-attestation-body.schema.json
+export namespace Trust_FincredSourceCompletenessAttestationBody {
+  export interface ChioFincredSourceCompletenessAttestationV1SignedBody {
+    attestationReference: string;
+    checkpointAuthorityEpoch: number;
+    checkpointAuthorityKey: string;
+    checkpointDigest: string;
+    checkpointSequence: number;
+    committedLeaves: {
+      indexProof: {
+        /**
+         * @maxItems 64
+         */
+        auditPath: string[];
+        leafIndex: number;
+        treeSize: number;
+      };
+      leaf: {
+        index: number;
+        queryKey: {
+          artifactId: string;
+          occurredAt: number;
+          sourceFamily: string;
+          subject: string;
+        };
+        sourceArtifactDigest: string;
+      };
+    }[];
+    cutoff: number;
+    disclosureDigest: string;
+    expiresAt: number;
+    indexRoot: string;
+    issuedAt: number;
+    lowerBoundary: {
+      kind: string;
+    };
+    rangeRoot: string;
+    schema: "chio.fincred.source-completeness-attestation.v1";
+    sourceArtifactDigests: string[];
+    sourceEvidenceClass: string;
+    sourceFamily: string;
+    sourceId: string;
+    sourceSignerKey: string;
+    storeGeneration: number;
+    subject: string;
+    upperBoundary: {
+      kind: string;
+    };
+    window: {
+      endsAt: number;
+      startsAt: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-member-body.schema.json
+export namespace Trust_FincredSourceMemberBody {
+  export interface ChioFincredSourceMemberV1SignedBody {
+    artifactSchema: string;
+    canonicalArtifact: string;
+    queryKey: {
+      artifactId: string;
+      occurredAt: number;
+      sourceFamily: string;
+      subject: string;
+    };
+    schema: string;
   }
 }
 
@@ -69756,6 +76721,86 @@ export namespace Trust_ReputationCredential {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-passport-revocation-root-body.schema.json
+export namespace Trust_TrustPassportRevocationRootBody {
+  export interface ChioTrustPassportRevocationRootV1SignedBody {
+    epoch: number;
+    issued_at_unix_ms: number;
+    leaf_count: number;
+    root_hash: number[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-reputation-import-report-body.schema.json
+export namespace Trust_TrustReputationImportReportBody {
+  export interface ChioTrustReputationImportReportV1SignedBody {
+    decay_policy_ref: string;
+    id: string;
+    import_verdict: string;
+    issued_at: string;
+    issuer: string;
+    issuer_trust_ref: string;
+    local_weight: number;
+    negative_event_refs: {}[];
+    privacy_profile_ref: string;
+    schema: "chio.trust.reputation-import-report.v1";
+    source_network: string;
+    source_reputation_ref: string;
+    subject: string;
+    subject_binding_ref: string;
+    usage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-root-body.schema.json
+export namespace Trust_TrustRootBody {
+  export interface ChioTrustRootV1SignedBody {
+    authority: string;
+    id: string;
+    root_id?: string;
+    roots: {
+      subject: string;
+    }[];
+    schema: "chio.trust.root.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-scorecard-snapshot-body.schema.json
+export namespace Trust_TrustScorecardSnapshotBody {
+  export interface ChioTrustScorecardSnapshotV1SignedBody {
+    component_scores: {
+      component: string;
+      evidence_ref: string;
+      score: number;
+      stale: boolean;
+      weight: number;
+    }[];
+    computed_score: number;
+    downgrade_reasons: {}[];
+    freshness_window: {
+      valid_from: string;
+      valid_until: string;
+    };
+    id: string;
+    issued_at: string;
+    issuer_trust_roots: string[];
+    negative_event_refs: {}[];
+    portable_reputation_import_refs: string[];
+    reputation_snapshot_refs: string[];
+    schema: "chio.trust.scorecard-snapshot.v1";
+    scope: string;
+    score_ceiling: number;
+    score_floor: number;
+    sla_performance_refs: string[];
+    subject: string;
+    verifier_policy_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
 export namespace TrustControl_Attestation {
   /**
@@ -70138,6 +77183,531 @@ export namespace Underwriting_PolicyInput {
       supportedReasons: string[];
       version: string;
     };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/web3/web3-settlement-proof-bundle-body.schema.json
+export namespace Web3_Web3SettlementProofBundleBody {
+  export interface ChioWeb3SettlementProofBundleV1SignedBody {
+    bundle_id: string;
+    chain_id: string;
+    chain_snapshot: {
+      beneficiary_identity_binding: {
+        certificate: {
+          chain_scope: string[];
+          chio_identity: string;
+          chio_public_key: string;
+          expires_at: number;
+          issued_at: number;
+          nonce: string;
+          purpose: string[];
+          schema: string;
+          settlement_address: string;
+        };
+        signature: string;
+      };
+      block: {
+        block_hash: string;
+        block_number: number;
+        transaction_hashes: string[];
+      };
+      bond: {
+        bond_vault_contract: string;
+        bond_vault_runtime_codehash: string;
+        minimum_required_amount: {
+          currency: string;
+          units: number;
+        };
+        posted_amount: {
+          currency: string;
+          units: number;
+        };
+      };
+      chain_id: string;
+      escrow: {
+        beneficiary_address: string;
+        escrow_contract: string;
+        escrow_id: string;
+        escrow_runtime_codehash: string;
+        locked_amount: {
+          currency: string;
+          units: number;
+        };
+        refund_event?: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          block: {
+            block_hash: string;
+            block_number: number;
+            transaction_hashes: string[];
+          };
+          escrow_id: string;
+          refund_tx_hash: string;
+        };
+        refunded: boolean;
+        release_event?: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          block: {
+            block_hash: string;
+            block_number: number;
+            transaction_hashes: string[];
+          };
+          escrow_id: string;
+          partial: boolean;
+          receipt_hash: string;
+          release_tx_hash: string;
+          remaining_amount: {
+            currency: string;
+            units: number;
+          };
+        };
+        released_amount: {
+          currency: string;
+          units: number;
+        };
+        settlement_token_address: string;
+      };
+      identity_registry_address: string;
+      identity_registry_operator?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        identity_registry_contract: string;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        settlement_key: string;
+      };
+      identity_registry_runtime_codehash: string;
+      latest_block_number: number;
+      max_block_lag: number;
+      observed_block_number: number;
+      registry_root: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+    };
+    collateral_position_ref?: string;
+    commerce_order_id: string;
+    deployment_provenance: {
+      approval_hash: string;
+      bond_vault_contract: string;
+      bond_vault_runtime_codehash: string;
+      chain_id: string;
+      contract_package_id: string;
+      create2_factory: string;
+      escrow_contract: string;
+      escrow_runtime_codehash: string;
+      identity_registry_address: string;
+      identity_registry_runtime_codehash: string;
+      provenance_id: string;
+      reviewed_manifest_hash: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+      salt_namespace: string;
+      settlement_token_address: string;
+    };
+    dispute_posture: string;
+    dispute_snapshot: {
+      chain_event_blocks?: {
+        block_hash: string;
+        block_number: number;
+        transaction_hashes: string[];
+      }[];
+      chain_event_tx_hashes: string[];
+      challenge_window_secs: number;
+      dispute_id: string;
+      linked_receipt_ids: string[];
+      observed_at: number;
+      open_dispute_count: number;
+      posture: string;
+      schema: string;
+      window_closed_at: number;
+    };
+    guarantee_decision_ref?: string;
+    observed_confirmations: number;
+    order_binding: {
+      beneficiary_address: string;
+      chain_id: string;
+      commerce_order_id: string;
+      custody_provider_id: string;
+      escrow_id: string;
+      settlement_amount: {
+        currency: string;
+        units: number;
+      };
+      settlement_rail_id: string;
+      settlement_reference: string;
+      settlement_tx_hash: string;
+      transaction_passport_id: string;
+    };
+    public_witness?: {
+      anchor_tx_hash: string;
+      anchored_checkpoint_seq: number;
+      anchored_merkle_root: string;
+      body_hash: string;
+      bond_vault_contract: string;
+      bond_vault_runtime_codehash: string;
+      chain_id: string;
+      escrow_contract: string;
+      escrow_runtime_codehash: string;
+      identity_registry_address: string;
+      identity_registry_operator?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        identity_registry_contract: string;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        settlement_key: string;
+      };
+      identity_registry_runtime_codehash: string;
+      mode: string;
+      observed_at: number;
+      registry_root: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+      settlement_token_address: string;
+      witness_id: string;
+    };
+    required_confirmations: number;
+    schema: "chio.web3-settlement-proof-bundle.v1";
+    settlement_receipt: {
+      dispatch: {
+        beneficiary_address: string;
+        bond?: {
+          body: {
+            bondId: string;
+            expiresAt: number;
+            issuedAt: number;
+            lifecycleState: string;
+            report: {
+              disposition: string;
+              exposure: {
+                actionableReceipts: number;
+                activeDecisions: number;
+                currencies: string[];
+                failedSettlementReceipts: number;
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                pendingSettlementReceipts: number;
+                returnedDecisions: number;
+                returnedReceipts: number;
+                supersededDecisions: number;
+                truncatedDecisions: boolean;
+                truncatedReceipts: boolean;
+              };
+              filters: {
+                agentSubject: string;
+                decisionLimit: number;
+                receiptLimit: number;
+              };
+              generatedAt: number;
+              latestFacilityId: string;
+              prerequisites: {
+                activeFacilityMet: boolean;
+                activeFacilityRequired: boolean;
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                currencyCoherent: boolean;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                autonomyGatingSupported: boolean;
+                externalEscrowExecutionSupported: boolean;
+                reserveAccountingAuthoritative: boolean;
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        bond_vault_contract: string;
+        capital_instruction: {
+          body: {
+            action: string;
+            amount: {
+              currency: string;
+              units: number;
+            };
+            authorityChain: {
+              approvedAt: number;
+              authorityProof: {
+                body: {
+                  approvedAt: number;
+                  expiresAt: number;
+                  principalId: string;
+                  role: string;
+                  schema: string;
+                };
+                signature: string;
+                signerKey: string;
+              };
+              expiresAt: number;
+              note: string;
+              principalId: string;
+              role: string;
+            }[];
+            completionFlowRowId: string;
+            counterpartyId: string;
+            counterpartyRole: string;
+            description: string;
+            evidenceRefs: {
+              kind: string;
+              locator: string;
+              observedAt: number;
+              referenceId: string;
+            }[];
+            executionWindow: {
+              notAfter: number;
+              notBefore: number;
+            };
+            governedReceiptId: string;
+            instructionId: string;
+            intendedState: string;
+            issuedAt: number;
+            ownerRole: string;
+            query: {
+              agentSubject: string;
+              bondLimit: number;
+              facilityLimit: number;
+              lossEventLimit: number;
+              receiptLimit: number;
+            };
+            rail: {
+              custodyProviderId: string;
+              destinationAccountRef: string;
+              jurisdiction: string;
+              kind: string;
+              railId: string;
+              sourceAccountRef: string;
+            };
+            reconciledState: string;
+            schema: string;
+            sourceId: string;
+            sourceKind: string;
+            subjectKey: string;
+            supportBoundary: {
+              automaticDispatchSupported: boolean;
+              capitalBookAuthoritative: boolean;
+              custodyNeutralInstructionSupported: boolean;
+              externalExecutionAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        chain_id: string;
+        contract_package_id: string;
+        dispatch_id: string;
+        escrow_contract: string;
+        escrow_id: string;
+        issued_at: number;
+        note: string;
+        operator_key_hash: string;
+        schema: string;
+        settlement_amount: {
+          currency: string;
+          units: number;
+        };
+        settlement_path: string;
+        settlement_token_address: string;
+        support_boundary: {
+          anchor_proof_required: boolean;
+          custody_boundary_explicit: boolean;
+          oracle_evidence_required_for_fx: boolean;
+          real_dispatch_supported: boolean;
+          reversal_supported: boolean;
+        };
+        trust_profile_id: string;
+      };
+      execution_receipt_id: string;
+      failure_reason?: string;
+      identity_registry_evidence?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        chain_id: string;
+        identity_registry_contract: string;
+        observed_at: number;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        registered_at: number;
+        settlement_key: string;
+      };
+      issued_at: number;
+      lifecycle_state: string;
+      note: string;
+      observed_execution: {
+        amount: {
+          currency: string;
+          units: number;
+        };
+        externalReferenceId: string;
+        observedAt: number;
+      };
+      oracle_evidence?: {
+        authority: string;
+        base: string;
+        cache_age_seconds: number;
+        converted_cost_units: number;
+        feed_address: string;
+        grant_currency: string;
+        max_age_seconds: number;
+        oracle_public_key: string;
+        original_cost_units: number;
+        original_currency: string;
+        quote: string;
+        rate_denominator: number;
+        rate_numerator: number;
+        schema: string;
+        signature: string;
+        source: string;
+        updated_at: number;
+      };
+      reconciled_anchor_proof?: {
+        chain_anchor: {
+          anchored_checkpoint_seq: number;
+          anchored_merkle_root: string;
+          block_hash: string;
+          block_number: number;
+          chain_id: string;
+          contract_address: string;
+          operator_address: string;
+          operator_epoch: number;
+          operator_key_hash: string;
+          tx_hash: string;
+        };
+        checkpoint_statement: {
+          batch_end_seq: number;
+          batch_start_seq: number;
+          checkpoint_seq: number;
+          issued_at: number;
+          kernel_key: string;
+          merkle_root: string;
+          schema: string;
+          signature: string;
+          tree_size: number;
+        };
+        key_binding_certificate: {
+          certificate: {
+            chain_scope: string[];
+            chio_identity: string;
+            chio_public_key: string;
+            expires_at: number;
+            issued_at: number;
+            nonce: string;
+            purpose: string[];
+            schema: string;
+            settlement_address: string;
+          };
+          signature: string;
+        };
+        receipt: {
+          action: {
+            parameter_hash: string;
+            parameters: {
+              amount: number;
+              currency: string;
+              to: string;
+            };
+          };
+          boundary_class: string;
+          capability_id: string;
+          content_hash: string;
+          decision: {
+            verdict: string;
+          };
+          id: string;
+          kernel_key: string;
+          metadata: {
+            chio_receipt_signing_nonce: string;
+            financial: {
+              budget_remaining: number;
+              budget_total: number;
+              cost_charged: number;
+              currency: string;
+              delegation_depth: number;
+              grant_index: number;
+              oracle_evidence: {
+                authority: string;
+                base: string;
+                cache_age_seconds: number;
+                converted_cost_units: number;
+                feed_address: string;
+                grant_currency: string;
+                max_age_seconds: number;
+                oracle_public_key?: string;
+                original_cost_units: number;
+                original_currency: string;
+                quote: string;
+                rate_denominator: number;
+                rate_numerator: number;
+                schema: string;
+                signature?: string;
+                source: string;
+                updated_at: number;
+              };
+              payment_reference: string;
+              root_budget_holder: string;
+              settlement_status: string;
+            };
+          };
+          policy_hash: string;
+          receipt_kind: string;
+          redaction_mode: string;
+          signature: string;
+          timestamp: number;
+          tool_name: string;
+          tool_origin: string;
+          tool_server: string;
+          trust_level: string;
+        };
+        receipt_inclusion: {
+          checkpoint_seq: number;
+          merkle_root: string;
+          proof: {
+            audit_path: {}[];
+            leaf_index: number;
+            tree_size: number;
+          };
+        };
+        schema: string;
+      };
+      reversal_of?: string;
+      schema: string;
+      settled_amount: {
+        currency: string;
+        units: number;
+      };
+      settlement_reference: string;
+    };
+    sla_remedy_ref?: string;
+    slash_authority_ref?: string;
+    transaction_passport_id: string;
   }
 }
 

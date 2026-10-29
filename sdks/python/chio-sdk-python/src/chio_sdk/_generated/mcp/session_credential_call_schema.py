@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -218,7 +218,7 @@ class Output(BaseModel):
     structuredContent: Any | None = None
 
 
-class RetainedDispatchCommit1(BaseModel):
+class RetainedDispatchCommit2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -230,7 +230,7 @@ class RetainedDispatchCommit1(BaseModel):
     store_fence: StoreFence
 
 
-class AdmissionOperation1(BaseModel):
+class AdmissionOperation2(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -244,7 +244,7 @@ class AdmissionOperation1(BaseModel):
     request_binding_hash: str | None = None
     request_id: str
     request_namespace_digest: str | None = None
-    retained_dispatch_commit: RetainedDispatchCommit1 | None = None
+    retained_dispatch_commit: RetainedDispatchCommit2 | None = None
     schema_: str = Field(..., alias="schema")
     store_fence: StoreFence | None = None
     tool_outcome_id: str
@@ -252,18 +252,18 @@ class AdmissionOperation1(BaseModel):
     trusted_time_unix_ms: int | None = None
 
 
-class Metadata4(BaseModel):
+class Metadata6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    admission_operation: AdmissionOperation1
+    admission_operation: AdmissionOperation2
     attribution: Attribution
     chio_receipt_signing_nonce: str
     chio_runtime: ChioRuntime | None = None
     receipt_context: ReceiptContext
 
 
-class Receipt2(BaseModel):
+class Receipt6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -274,7 +274,7 @@ class Receipt2(BaseModel):
     decision: Decision
     id: str
     kernel_key: str
-    metadata: Metadata4
+    metadata: Metadata6
     policy_hash: str
     receipt_kind: str
     redaction_mode: str
@@ -292,7 +292,7 @@ class ChioEvidence(BaseModel):
     )
     output: Output
     outputKind: str
-    receipt: Receipt2
+    receipt: Receipt6
     requestId: str
     schema_: str = Field(..., alias="schema")
     terminalState: str

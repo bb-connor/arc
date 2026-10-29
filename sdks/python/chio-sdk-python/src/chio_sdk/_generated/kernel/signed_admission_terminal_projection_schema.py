@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -195,7 +195,7 @@ class SourceOperation(BaseModel):
     version: int
 
 
-class Attachment1(BaseModel):
+class Attachment3(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -213,7 +213,7 @@ class Attachment1(BaseModel):
     ToolOutcomeId: str | None = None
 
 
-class RequestBinding1(BaseModel):
+class RequestBinding4(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -223,7 +223,7 @@ class RequestBinding1(BaseModel):
     request_binding_hash: str
 
 
-class Binding3(BaseModel):
+class Binding8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -235,12 +235,12 @@ class Binding3(BaseModel):
     kind: str
     operation_id: str
     policy_hash: str
-    request_binding: RequestBinding1
+    request_binding: RequestBinding4
     request_id: str
     request_namespace_digest: str
 
 
-class DispatchCommit3(BaseModel):
+class DispatchCommit6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -290,10 +290,10 @@ class TerminalOperation(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    attachments: list[Attachment1]
-    binding: Binding3
+    attachments: list[Attachment3]
+    binding: Binding8
     coordinator_lease_epoch: int
-    dispatch_commit: DispatchCommit3 | None = None
+    dispatch_commit: DispatchCommit6 | None = None
     dispatch_state: str
     last_error: None
     schema_: str = Field(..., alias="schema")

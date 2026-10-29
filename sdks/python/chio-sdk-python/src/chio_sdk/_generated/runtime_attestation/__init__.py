@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,7 +14,7 @@ from .appraisal_report_schema import Appraisal, Artifact, ChioRuntimeAttestation
 from .appraisal_result_schema import Appraisal, ChioRuntimeAttestationAppraisalResultSignedBody, Claims, Evidence, ExporterPolicyOutcome, NormalizedAssertions, NormalizedClaim, Policy, Reason, Subject, VendorClaims, Verifier, WorkloadIdentity
 from .evidence_schema import AwsNitro, AzureMaa, ChioRuntimeAttestationEvidenceSignedBody, Claims, EnterpriseVerifier, Pcrs, WorkloadIdentity
 from .reference_values_schema import ChioRuntimeAttestationReferenceValuesSignedBody, Measurements
-from .trust_bundle_schema import Body, Body185, ChioRuntimeAttestationTrustBundleSignedBody, Descriptor, Measurements, ReferenceValue
+from .trust_bundle_schema import Body, Body213, ChioRuntimeAttestationTrustBundleSignedBody, Descriptor, Measurements, ReferenceValue
 from .verifier_descriptor_schema import ChioRuntimeAttestationVerifierDescriptorSignedBody
 
 __all__ = [
@@ -23,7 +23,7 @@ __all__ = [
     "AwsNitro",
     "AzureMaa",
     "Body",
-    "Body185",
+    "Body213",
     "ChioRuntimeAttestationAppraisalReportSignedBody",
     "ChioRuntimeAttestationAppraisalResultSignedBody",
     "ChioRuntimeAttestationEvidenceSignedBody",

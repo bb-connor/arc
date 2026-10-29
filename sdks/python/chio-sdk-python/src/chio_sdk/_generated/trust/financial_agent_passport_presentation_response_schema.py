@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -325,7 +325,7 @@ class Leaf(BaseModel):
     family: str
 
 
-class Proof2(BaseModel):
+class Proof5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -339,10 +339,10 @@ class MembershipProof(BaseModel):
         extra="forbid",
     )
     leaf: Leaf
-    proof: Proof2
+    proof: Proof5
 
 
-class Body146(BaseModel):
+class Body160(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -361,7 +361,7 @@ class SourceManifest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    body: Body146
+    body: Body160
     signature: str
     signerKey: str
 

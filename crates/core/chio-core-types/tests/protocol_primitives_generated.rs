@@ -71,7 +71,7 @@ fn generated_instance(schema_file: &str, instance: Value) -> Value {
 fn parse_generated(schema_file: &str, instance: Wire<'_>) -> Result<Value, String> {
     match schema_file {
         "receipt/record.schema.json" => {
-            round_trip::<generated::kernel_tool_call_response::ChioReceiptRecord>(instance)
+            round_trip::<generated::shared::ChioReceiptRecord>(instance)
         }
         "kernel/caller_dispatch_authorization.schema.json" => round_trip::<
             generated::kernel_caller_dispatch_authorization::ChioSignedCallerDispatchAuthorization,
@@ -83,19 +83,19 @@ fn parse_generated(schema_file: &str, instance: Wire<'_>) -> Result<Value, Strin
             generated::kernel_tool_call_response::ChioKernelMessageToolCallResponseResult,
         >(instance),
         "kernel/execution_nonce.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioSignedExecutionNonce>(instance)
+            round_trip::<generated::shared::ChioSignedExecutionNonce>(instance)
         }
         "capability/token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioCapabilityToken>(instance)
+            round_trip::<generated::shared::ChioCapabilityToken>(instance)
         }
-        "capability/aggregate-invocation-budget.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioAggregateInvocationBudget,
-        >(instance),
-        "capability/threshold-approval-proposal.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioThresholdApprovalProposal,
-        >(instance),
+        "capability/aggregate-invocation-budget.schema.json" => {
+            round_trip::<generated::shared::ChioAggregateInvocationBudget>(instance)
+        }
+        "capability/threshold-approval-proposal.schema.json" => {
+            round_trip::<generated::shared::ChioThresholdApprovalProposal>(instance)
+        }
         "capability/governed-approval-token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioGovernedApprovalToken>(instance)
+            round_trip::<generated::shared::ChioGovernedApprovalToken>(instance)
         }
         "agent/active-response-governed-intent.schema.json" => round_trip::<
             generated::agent_tool_call_request::ChioGovernedTransactionIntent,

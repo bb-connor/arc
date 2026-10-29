@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9040b11ea385ff84e98e4063d81426678eceeb5a4d55e2f86191e7f0064502af
+# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -54,7 +54,7 @@ class Kind(Enum):
     freeze_issuance = "freeze_issuance"
 
 
-class Target15(BaseModel):
+class Target23(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -62,7 +62,7 @@ class Target15(BaseModel):
     tenant_id: Identifier
 
 
-class Target16(BaseModel):
+class Target24(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -70,7 +70,7 @@ class Target16(BaseModel):
     session_id: Identifier
 
 
-class Target17(BaseModel):
+class Target25(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -78,7 +78,7 @@ class Target17(BaseModel):
     lineage_id: Identifier
 
 
-class Target18(BaseModel):
+class Target26(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -86,8 +86,8 @@ class Target18(BaseModel):
     affected_set_hash: Digest
 
 
-class Target(RootModel[Target15 | Target16 | Target17 | Target18]):
-    root: Target15 | Target16 | Target17 | Target18
+class Target(RootModel[Target23 | Target24 | Target25 | Target26]):
+    root: Target23 | Target24 | Target25 | Target26
 
 
 class ChioResponseEffectV1(BaseModel):
