@@ -507,3 +507,8 @@ fn enforce_resolved_addresses(
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 #[path = "ureq_helper_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "ureq_tls_tests.rs"]
+mod tls_tests;
