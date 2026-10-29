@@ -10,6 +10,9 @@ use chio_kernel::admission_operation::runtime_participant::{
 use chio_kernel::admission_operation::{AdmissionOperationV1, RuntimeParticipantKind};
 use chio_store_sqlite::SqliteReceiptStore;
 
+#[path = "combined/epoch_ordering.rs"]
+mod epoch_ordering;
+
 #[path = "combined/authority_commit.rs"]
 mod authority_commit;
 
