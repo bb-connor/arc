@@ -422,10 +422,10 @@ pub fn verify_cumulative_approval_constraints(
         return verified_direct(token, trusted_issuers);
     }
 
-    validate_delegation_chain(&token.delegation_chain, None)?;
     let root = direct_root.ok_or_else(|| {
         violation("delegated cumulative approval capability requires direct-root evidence")
     })?;
+    validate_delegation_chain(&token.delegation_chain, &root.subject, None)?;
     verified_descendant(token, root, trusted_issuers)
 }
 

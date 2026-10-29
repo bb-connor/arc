@@ -144,6 +144,10 @@ struct EvaluateRequestEnvelope {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. A delegated token without it or a direct root is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry here; absent issuers fail-closed.
     #[serde(default)]
@@ -165,6 +169,10 @@ struct VerifyCapabilityRequestEnvelope {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. A delegated token without it or a direct root is refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    root_delegator: Option<PublicKey>,
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     #[serde(default)]
@@ -397,6 +405,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
 
     let capability = parsed.capability;
     let direct_root_capability = parsed.direct_root_capability;
+    let root_delegator = parsed.root_delegator;
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
     validate_capability_trust_roots(&parsed.capability_trust_roots)?;
@@ -445,6 +454,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         direct_root_capability.as_ref(),
+        root_delegator.as_ref(),
         &trust_resolver,
         &mut budgets,
     );
@@ -568,8 +578,11 @@ fn verify_capability_json_str(
         token,
         vec![authority],
         Some(now_secs),
-        CapabilityNegotiation::t1_default(),
-        None,
+        CapabilityFeatureContext {
+            peer: &CapabilityNegotiation::t1_default(),
+            direct_root: None,
+            root_delegator: None,
+        },
         std::collections::BTreeMap::new(),
         &[],
     )
@@ -590,8 +603,11 @@ fn verify_capability_with_context_json_str(request_json: &str) -> Result<String,
         parsed.token,
         trusted,
         parsed.now_secs,
-        peer_profile,
-        parsed.direct_root_capability,
+        CapabilityFeatureContext {
+            peer: &peer_profile,
+            direct_root: parsed.direct_root_capability.as_ref(),
+            root_delegator: parsed.root_delegator.as_ref(),
+        },
         parsed.capability_trust_roots,
         &parsed.parent_budget_snapshots,
     )
@@ -601,8 +617,7 @@ fn verify_capability_with_parts(
     token: CapabilityToken,
     trusted: Vec<PublicKey>,
     now_secs: Option<i64>,
-    peer_profile: CapabilityNegotiation,
-    direct_root_capability: Option<CapabilityToken>,
+    features: CapabilityFeatureContext<'_>,
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     parent_budget_snapshots: &[ParentBudgetSnapshot],
 ) -> Result<String, KernelFfiError> {
@@ -624,10 +639,7 @@ fn verify_capability_with_parts(
         &trusted,
         clock,
         CapabilityCryptoFloor::AllowClassical,
-        CapabilityFeatureContext {
-            peer: &peer_profile,
-            direct_root: direct_root_capability.as_ref(),
-        },
+        features,
         &trust_resolver,
         &mut budgets,
     )
@@ -649,6 +661,9 @@ fn verify_capability_with_parts(
         }
         CapabilityError::AttenuationViolation(message) => KernelFfiError::InvalidCapability(
             format!("capability rejected by chain binding: {message}"),
+        ),
+        CapabilityError::DelegationRootUnresolved => KernelFfiError::InvalidCapability(
+            "capability delegation chain has no verifier-supplied root delegator".to_string(),
         ),
         CapabilityError::BudgetSplitRejected(err) => KernelFfiError::InvalidCapability(format!(
             "capability rejected by sibling-sum budget split: {err}"

@@ -158,6 +158,10 @@ impl KernelCoreError {
                     out.push_str(msg);
                     out
                 }
+                CapabilityError::DelegationRootUnresolved => {
+                    "capability delegation chain has no verifier-supplied root delegator"
+                        .to_string()
+                }
                 CapabilityError::BudgetSplitRejected(err) => {
                     let mut out = String::from("capability budget split rejected: ");
                     // alloc::fmt is available; use core formatting.
@@ -338,7 +342,7 @@ pub fn evaluate_with_full_floor(
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
-    evaluate_with_full_floor_and_root(input, crypto_floor, peer, None, trust_root, budgets)
+    evaluate_with_full_floor_and_root(input, crypto_floor, peer, None, None, trust_root, budgets)
 }
 
 /// Full evaluation with authenticated optional-family root evidence.
@@ -347,6 +351,7 @@ pub fn evaluate_with_full_floor_and_root(
     crypto_floor: CapabilityCryptoFloor,
     peer: &CapabilityNegotiation,
     direct_root: Option<&CapabilityToken>,
+    root_delegator: Option<&PublicKey>,
     trust_root: &dyn TrustRootResolver,
     budgets: &mut dyn BudgetRegistry,
 ) -> EvaluationVerdict {
@@ -354,7 +359,11 @@ pub fn evaluate_with_full_floor_and_root(
         input,
         crypto_floor,
         crate::capability_verify::CapabilityEvidenceContext {
-            features: crate::capability_verify::CapabilityFeatureContext { peer, direct_root },
+            features: crate::capability_verify::CapabilityFeatureContext {
+                peer,
+                direct_root,
+                root_delegator,
+            },
             ancestors: &[],
         },
         trust_root,

@@ -241,6 +241,7 @@ fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let envelope = json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated",
             "tool_name": "echo",
@@ -267,6 +268,7 @@ fn evaluate_rejects_oversubscribed_delegated_sibling() {
     let envelope = json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated-oversub",
             "tool_name": "echo",
@@ -354,6 +356,7 @@ fn verify_capability_context_allows_delegated_token_with_parent_budget_snapshot(
     let envelope = json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": ISSUED_AT as i64 + 1,
         "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")]
     });
@@ -366,6 +369,28 @@ fn verify_capability_context_allows_delegated_token_with_parent_budget_snapshot(
 }
 
 #[test]
+fn verify_capability_context_refuses_delegated_token_without_root_delegator() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+    let envelope = json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": ISSUED_AT as i64 + 1,
+        "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")]
+    });
+
+    let error = verify_capability_with_context_json_str(&envelope.to_string()).unwrap_err();
+
+    match error {
+        KernelFfiError::InvalidCapability(message) => {
+            assert!(message.contains("no verifier-supplied root delegator"));
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
 fn verify_capability_context_rejects_oversubscribed_delegated_sibling() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -373,6 +398,7 @@ fn verify_capability_context_rejects_oversubscribed_delegated_sibling() {
     let envelope = json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": ISSUED_AT as i64 + 1,
         "parent_budget_snapshots": [oversubscribed_budget_snapshot("cap-parent")]
     });

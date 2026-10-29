@@ -91,6 +91,8 @@
 
 #define CHIO_FFI_ERROR_SIGNER_KEY_MISMATCH 33
 
+#define CHIO_FFI_ERROR_DELEGATION_ROOT_UNRESOLVED 34
+
 #define CHIO_FFI_ERROR_INTERNAL 255
 
 typedef struct {
@@ -135,7 +137,13 @@ ChioFfiResult chio_verify_wrapped_json(const char *schema_id,
                                        const char *public_key_hex,
                                        const char *signature_hex);
 
+/**
+ * `root_delegator_hex` is the subject key of the parent capability the
+ * delegation chain starts from. Pass NULL only for a token with an empty
+ * delegation chain; a delegated token without it is refused.
+ */
 ChioFfiResult chio_verify_capability_json(const char *input_json,
+                                          const char *root_delegator_hex,
                                           uint64_t now_secs,
                                           uint32_t max_delegation_depth);
 

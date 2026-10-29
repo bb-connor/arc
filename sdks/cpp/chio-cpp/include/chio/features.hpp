@@ -102,7 +102,11 @@ class CapabilityVerifier {
                      std::uint32_t max_delegation_depth = UINT32_MAX,
                      RevocationHook revocation_hook = {});
 
-  Result<std::string> verify(std::string capability_json) const;
+  // `root_delegator_hex` is the parent capability subject the delegation
+  // chain starts from; leave it empty only for a token with no delegation
+  // chain.
+  Result<std::string> verify(std::string capability_json,
+                             std::string root_delegator_hex = {}) const;
 
  private:
   ClockPtr clock_;

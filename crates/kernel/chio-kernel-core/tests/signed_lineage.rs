@@ -171,6 +171,7 @@ fn accepted(
             features: CapabilityFeatureContext {
                 peer,
                 direct_root: None,
+                root_delegator: None,
             },
             ancestors,
         },
@@ -198,6 +199,7 @@ fn lineage_refusal(
             features: CapabilityFeatureContext {
                 peer: &peer,
                 direct_root,
+                root_delegator: None,
             },
             ancestors,
         },

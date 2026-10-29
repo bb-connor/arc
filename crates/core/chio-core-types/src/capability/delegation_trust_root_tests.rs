@@ -24,7 +24,8 @@ fn delegation_chain_trust_root_accepts_matching_first_scope_hash() {
     )
     .unwrap();
 
-    validate_delegation_chain_with_trust_root(&[link], None, &root_hash).unwrap();
+    validate_delegation_chain_with_trust_root(&[link], &kp_a.public_key(), None, &root_hash)
+        .unwrap();
 }
 
 #[test]
@@ -47,7 +48,9 @@ fn delegation_chain_trust_root_rejects_mismatched_first_scope_hash() {
     )
     .unwrap();
 
-    let err = validate_delegation_chain_with_trust_root(&[link], None, &root_hash).unwrap_err();
+    let err =
+        validate_delegation_chain_with_trust_root(&[link], &kp_a.public_key(), None, &root_hash)
+            .unwrap_err();
     assert!(err.to_string().contains("trust root"));
 }
 
@@ -86,7 +89,12 @@ fn delegation_chain_trust_root_rejects_multi_hop_without_per_hop_witnesses() {
     )
     .unwrap();
 
-    let err =
-        validate_delegation_chain_with_trust_root(&[link_1, link_2], None, &root_hash).unwrap_err();
+    let err = validate_delegation_chain_with_trust_root(
+        &[link_1, link_2],
+        &kp_a.public_key(),
+        None,
+        &root_hash,
+    )
+    .unwrap_err();
     assert!(err.to_string().contains("per-hop child-scope"));
 }

@@ -220,10 +220,10 @@ pub fn verify_aggregate_invocation_budget(
         return verify_direct(token, trusted_issuers);
     }
 
-    validate_delegation_chain(&token.delegation_chain, None)?;
     let root = direct_root.ok_or_else(|| {
         violation("delegated capability requires an authenticated direct-root token")
     })?;
+    validate_delegation_chain(&token.delegation_chain, &root.subject, None)?;
     verify_descendant(token, root, trusted_issuers)
 }
 

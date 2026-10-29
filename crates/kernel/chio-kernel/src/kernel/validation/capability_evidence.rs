@@ -74,6 +74,7 @@ impl ChioKernel {
             .negotiated_capability_root(cap, &peer_profile)
             .map_err(Preparation)?;
         let ancestors = self.signed_capability_ancestors(cap).map_err(Preparation)?;
+        let root_delegator = self.delegation_root_subject(cap).map_err(Preparation)?;
         let clock = verification_clock(self).map_err(Preparation)?;
 
         chio_kernel_core::verify_capability_full_with_evidence(
@@ -85,6 +86,7 @@ impl ChioKernel {
                 features: chio_kernel_core::CapabilityFeatureContext {
                     peer: &peer_profile,
                     direct_root: direct_root.as_ref(),
+                    root_delegator: root_delegator.as_ref(),
                 },
                 ancestors: &ancestors,
             },

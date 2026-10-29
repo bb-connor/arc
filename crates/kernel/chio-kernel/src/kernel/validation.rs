@@ -654,8 +654,15 @@ impl ChioKernel {
             return Ok(());
         }
 
+        let root_delegator = self
+            .delegation_root_subject(cap)
+            .map_err(KernelError::DelegationInvalid)?
+            .ok_or_else(|| {
+                KernelError::DelegationInvalid("delegation chain has no root link".to_string())
+            })?;
         chio_core::capability::attenuation::validate_delegation_chain(
             &cap.delegation_chain,
+            &root_delegator,
             Some(self.config.max_delegation_depth),
         )
         .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?;

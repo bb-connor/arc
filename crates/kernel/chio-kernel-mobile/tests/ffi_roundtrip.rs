@@ -244,6 +244,7 @@ fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated",
             "tool_name": "echo",
@@ -271,6 +272,7 @@ fn evaluate_rejects_oversubscribed_delegated_sibling() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated-oversub",
             "tool_name": "echo",
@@ -651,6 +653,7 @@ fn verify_capability_with_context_allows_delegated_token_with_parent_budget_snap
     let request_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": EVAL_TIME as i64,
         "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")],
     })
@@ -664,6 +667,33 @@ fn verify_capability_with_context_allows_delegated_token_with_parent_budget_snap
 }
 
 #[test]
+fn verify_capability_with_context_refuses_delegated_token_without_root_delegator() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+
+    let request_json = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "now_secs": EVAL_TIME as i64,
+        "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")],
+    })
+    .to_string();
+
+    let err = verify_capability_with_context(request_json).unwrap_err();
+
+    match err {
+        ChioMobileError::InvalidCapability { message } => {
+            assert!(
+                message.contains("no verifier-supplied root delegator"),
+                "message: {message}"
+            );
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
 fn verify_capability_with_context_rejects_oversubscribed_delegated_sibling() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -672,6 +702,7 @@ fn verify_capability_with_context_rejects_oversubscribed_delegated_sibling() {
     let request_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": EVAL_TIME as i64,
         "parent_budget_snapshots": [oversubscribed_budget_snapshot("cap-parent")],
     })
