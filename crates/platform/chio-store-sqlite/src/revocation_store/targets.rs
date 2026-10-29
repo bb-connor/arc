@@ -51,6 +51,10 @@ impl SqliteRevocationStore {
     /// first value is the target value. Every other kind carries no tags and
     /// no active generation. A stored entry keeps its first `revoked_at`,
     /// reason and tags.
+    ///
+    /// The store holds no tenant index key set, so it checks the tags against
+    /// `active_key_id` but cannot derive it: the caller passes the loaded key
+    /// set's active generation, never a value taken from a request.
     pub fn revoke_target(
         &self,
         target: &RevocationTarget,

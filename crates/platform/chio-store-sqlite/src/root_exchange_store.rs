@@ -269,7 +269,8 @@ pub enum MintRevocationRefusal {
 
 /// The revocation store error behind an unavailable mint check, kept typed
 /// so a caller can match on the store's variant. Two errors are equal when
-/// they render the same text.
+/// they render the same text, so two variants with identical text compare
+/// equal; callers that need the variant match on `store_error()`.
 #[derive(Debug, Clone)]
 pub struct RevocationCheckError(Arc<RevocationStoreError>);
 
