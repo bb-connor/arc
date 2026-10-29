@@ -1387,3 +1387,132 @@ fn values_table_missing_refuses_open_without_mutation() -> TestResult {
         },
     )
 }
+
+const ENCODINGS: [&str; 3] = ["UTF-8", "UTF-16le", "UTF-16be"];
+
+fn bare_in(encoding: &str) -> Result<Connection, rusqlite::Error> {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(&format!("PRAGMA encoding = '{encoding}';"))?;
+    connection.execute_batch(RECEIPT_OPENINGS_SCHEMA)?;
+    Ok(connection)
+}
+
+fn refused_in(encoding: &str, statement: &str) -> TestResult {
+    let connection = bare_in(encoding)?;
+    let before = dump(&connection)?;
+    let error = run(&connection, statement)
+        .err()
+        .ok_or(format!("{encoding}: accepted {statement}"))?;
+    assert!(error.to_string().contains(CHECK), "{encoding}: {error}");
+    assert_eq!(dump(&connection)?, before);
+    Ok(())
+}
+
+#[test]
+fn every_table_accepts_a_valid_row_in_every_encoding() -> TestResult {
+    let rows = [
+        PRESENT,
+        VALUE,
+        IDENTITY,
+        ERASURE,
+        FACT,
+        BELOW,
+        WATERMARK,
+        "INSERT INTO receipt_openings_member_watermarks VALUES ('https://peer.example', '{O}', 4)",
+        "INSERT INTO receipt_openings_peer_cursors VALUES ('https://peer.example', 4)",
+    ];
+    for encoding in ENCODINGS {
+        for row in rows {
+            let connection = bare_in(encoding)?;
+            run(&connection, row).map_err(|error| format!("{encoding}: {row}: {error}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn key_bounds_count_characters_in_every_encoding() -> TestResult {
+    let salt_ref_max = format!("a{}", "b".repeat(63));
+    let short_receipt = R.get(1..).ok_or("receipt id fixture")?;
+    let short_store = O.get(1..).ok_or("store id fixture")?;
+    let node_max = "\u{e9}".repeat(2048);
+    for encoding in ENCODINGS {
+        let connection = bare_in(encoding)?;
+        run(
+            &connection,
+            &format!(
+                "INSERT INTO receipt_openings VALUES ('{{R}}', '{salt_ref_max}', 'present', zeroblob(32), 1)"
+            ),
+        )?;
+        run(
+            &connection,
+            &format!("INSERT INTO receipt_openings_peer_cursors VALUES ('{node_max}', 4)"),
+        )?;
+        refused_in(
+            encoding,
+            &format!(
+                "INSERT INTO receipt_openings VALUES ('{{R}}', '{salt_ref_max}c', 'present', zeroblob(32), 1)"
+            ),
+        )?;
+        refused_in(
+            encoding,
+            &format!(
+                "INSERT INTO receipt_openings VALUES ('{short_receipt}', 'params', 'present', zeroblob(32), 1)"
+            ),
+        )?;
+        refused_in(
+            encoding,
+            &format!("INSERT INTO receipt_store_identity VALUES (1, '{short_store}')"),
+        )?;
+        refused_in(
+            encoding,
+            &format!("INSERT INTO receipt_openings_peer_cursors VALUES ('{node_max}a', 4)"),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn node_id_refuses_a_continuation_stretched_utf8_value() -> TestResult {
+    let stretched = format!(
+        "CAST(x'{}c3{}' AS TEXT)",
+        "61".repeat(2047),
+        "80".repeat(1 << 16)
+    );
+    refused_in(
+        "UTF-8",
+        &format!("INSERT INTO receipt_openings_peer_cursors VALUES ({stretched}, 4)"),
+    )
+}
+
+#[test]
+fn utf16_store_opens_reads_and_erases_openings() -> TestResult {
+    for encoding in ["UTF-16le", "UTF-16be"] {
+        let (_dir, path) = chio_test_support::temp_sqlite_path("chio-openings-utf16");
+        let external = Connection::open(&path)?;
+        external.execute_batch(&format!(
+            "PRAGMA encoding = '{encoding}';
+             CREATE TABLE encoding_anchor (value TEXT);
+             DROP TABLE encoding_anchor;"
+        ))?;
+        let (store, receipt_id) = store_with_openings(&path)?;
+        let actual: String = external.pragma_query_value(None, "encoding", |row| row.get(0))?;
+        assert_eq!(actual, encoding);
+        assert_eq!(own_store_id(&path)?.len(), 32);
+        let scope = OpeningReadScope {
+            salt_refs: vec![salt_ref("params")?, salt_ref("content")?],
+            tenant_binding: None,
+        };
+        let OpeningState::Present(opened) = store.read_openings(&receipt_id, &scope)? else {
+            return Err(format!("{encoding}: present openings did not read as present").into());
+        };
+        assert_eq!(opened.salts.len(), 2, "{encoding}");
+        store.erase_openings(&receipt_id, 77)?;
+        assert_eq!(
+            store.opening_status(&receipt_id)?,
+            OpeningStatus::Erased { erased_at: 77 },
+            "{encoding}"
+        );
+    }
+    Ok(())
+}
