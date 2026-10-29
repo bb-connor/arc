@@ -2853,9 +2853,13 @@ fn append_receipt_batch(
     let rollback_generation = rollback_anchor
         .map(|anchor| {
             let generation = load_receipt_rollback_generation(&tx)?;
-            anchor.verify(generation).map_err(|error| {
-                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-            })?;
+            anchor
+                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
+                .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "receipt rollback protection failed: {error}"
+                    ))
+                })?;
             Ok::<_, ReceiptStoreError>(generation)
         })
         .transpose()?;
@@ -2979,10 +2983,14 @@ fn append_receipt_batch(
                 ));
             }
             anchor
-                .advance_while(generation, next, || {
-                    tx.commit()
-                        .map_err(|error| format!("SQLite commit failed: {error}"))
-                })
+                .advance_while(
+                    &chio_rollback_anchor::StoreHead::counter_only(generation),
+                    &chio_rollback_anchor::StoreHead::counter_only(next),
+                    || {
+                        tx.commit()
+                            .map_err(|error| format!("SQLite commit failed: {error}"))
+                    },
+                )
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"
@@ -3044,11 +3052,13 @@ fn execute_anchored_receipt_write(
         rollback_anchor
             .map(|anchor| {
                 let generation = load_receipt_rollback_generation(&tx)?;
-                anchor.verify(generation).map_err(|error| {
-                    ReceiptStoreError::Conflict(format!(
-                        "receipt rollback protection failed: {error}"
-                    ))
-                })?;
+                anchor
+                    .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
+                    .map_err(|error| {
+                        ReceiptStoreError::Conflict(format!(
+                            "receipt rollback protection failed: {error}"
+                        ))
+                    })?;
                 Ok::<_, ReceiptStoreError>(generation)
             })
             .transpose()
@@ -3087,10 +3097,14 @@ fn execute_anchored_receipt_write(
                 params![next.to_string(), generation.to_string()],
             ) {
                 Ok(1) => anchor
-                    .advance_while(generation, next, || {
-                        tx.commit()
-                            .map_err(|error| format!("SQLite commit failed: {error}"))
-                    })
+                    .advance_while(
+                        &chio_rollback_anchor::StoreHead::counter_only(generation),
+                        &chio_rollback_anchor::StoreHead::counter_only(next),
+                        || {
+                            tx.commit()
+                                .map_err(|error| format!("SQLite commit failed: {error}"))
+                        },
+                    )
                     .map_err(|error| {
                         ReceiptStoreError::Conflict(format!(
                             "receipt rollback protection failed: {error}"
@@ -3286,7 +3300,9 @@ impl SqliteReceiptStore {
         if let Some(anchor) = self.rollback_anchor.as_deref() {
             anchor
                 .verify_while(|| {
-                    load_receipt_rollback_generation(&connection).map_err(|error| error.to_string())
+                    load_receipt_rollback_generation(&connection)
+                        .map(chio_rollback_anchor::StoreHead::counter_only)
+                        .map_err(|error| error.to_string())
                 })
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(

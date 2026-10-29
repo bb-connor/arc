@@ -182,9 +182,11 @@ pub(crate) fn verify_rollback(
         return Ok(());
     };
     let generation = load_receipt_rollback_generation(connection)?;
-    anchor.verify(generation).map_err(|error| {
-        ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-    })
+    anchor
+        .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
+        .map_err(|error| {
+            ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+        })
 }
 
 fn append_binding_part(material: &mut Vec<u8>, part: &[u8]) {

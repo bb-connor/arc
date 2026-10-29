@@ -206,7 +206,10 @@ fn qualify_receipt_sink(
                 load_receipt_rollback_generation(connection).map_err(|error| error.to_string())?;
             let has_receipts =
                 receipt_store_has_receipts(connection).map_err(|error| error.to_string())?;
-            Ok((generation, !has_receipts))
+            Ok((
+                chio_rollback_anchor::StoreHead::counter_only(generation),
+                !has_receipts,
+            ))
         })
         .map_err(|error| {
             ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))

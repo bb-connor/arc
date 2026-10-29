@@ -1088,9 +1088,13 @@ pub(super) fn delete_archived_prefix_in_tx(
     let rollback_generation = rollback_anchor
         .map(|anchor| {
             let generation = super::load_receipt_rollback_generation(&tx)?;
-            anchor.verify(generation).map_err(|error| {
-                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-            })?;
+            anchor
+                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
+                .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "receipt rollback protection failed: {error}"
+                    ))
+                })?;
             Ok::<_, ReceiptStoreError>(generation)
         })
         .transpose()?;
@@ -1195,10 +1199,14 @@ pub(super) fn delete_archived_prefix_in_tx(
                 ));
             }
             anchor
-                .advance_while(generation, next, || {
-                    tx.commit()
-                        .map_err(|error| format!("SQLite commit failed: {error}"))
-                })
+                .advance_while(
+                    &chio_rollback_anchor::StoreHead::counter_only(generation),
+                    &chio_rollback_anchor::StoreHead::counter_only(next),
+                    || {
+                        tx.commit()
+                            .map_err(|error| format!("SQLite commit failed: {error}"))
+                    },
+                )
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"

@@ -150,10 +150,14 @@ fn commit_checkpoint_transaction(
                 ));
             }
             anchor
-                .advance_while(generation, next, || {
-                    tx.commit()
-                        .map_err(|error| format!("SQLite commit failed: {error}"))
-                })
+                .advance_while(
+                    &chio_rollback_anchor::StoreHead::counter_only(generation),
+                    &chio_rollback_anchor::StoreHead::counter_only(next),
+                    || {
+                        tx.commit()
+                            .map_err(|error| format!("SQLite commit failed: {error}"))
+                    },
+                )
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"
@@ -175,9 +179,13 @@ fn checkpoint_guarded_anchored_immediate<T>(
     let generation = rollback_anchor
         .map(|anchor| {
             let generation = load_receipt_rollback_generation(&tx)?;
-            anchor.verify(generation).map_err(|error| {
-                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
-            })?;
+            anchor
+                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
+                .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "receipt rollback protection failed: {error}"
+                    ))
+                })?;
             Ok::<_, ReceiptStoreError>(generation)
         })
         .transpose()?;

@@ -10,7 +10,7 @@ use rand_core::{OsRng, RngCore};
 use rusqlite::{Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 
-use chio_rollback_anchor::RollbackGenerationAnchor;
+use chio_rollback_anchor::{RollbackGenerationAnchor, StoreHead};
 
 pub(super) struct FindingPoolDomainLease {
     database_identity: PathBuf,
@@ -102,7 +102,9 @@ impl<'connection> AnchoredLedgerTransaction<'connection> {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
         let generation = load_store_generation(&transaction)?;
-        anchor.verify(generation).map_err(rollback_anchor_error)?;
+        anchor
+            .verify(&StoreHead::counter_only(generation))
+            .map_err(rollback_anchor_error)?;
         Ok(Self {
             transaction,
             anchor,
@@ -135,11 +137,15 @@ impl<'connection> AnchoredLedgerTransaction<'connection> {
             generation,
         } = self;
         anchor
-            .advance_while(generation, next, || {
-                transaction
-                    .commit()
-                    .map_err(|error| format!("SQLite commit failed: {error}"))
-            })
+            .advance_while(
+                &StoreHead::counter_only(generation),
+                &StoreHead::counter_only(next),
+                || {
+                    transaction
+                        .commit()
+                        .map_err(|error| format!("SQLite commit failed: {error}"))
+                },
+            )
             .map_err(rollback_anchor_error)
     }
 }
@@ -271,7 +277,7 @@ pub(super) fn bind_rollback_anchor(
                     |row| row.get::<_, bool>(0),
                 )
                 .map_err(|error| error.to_string())?;
-            Ok((generation, !populated))
+            Ok((StoreHead::counter_only(generation), !populated))
         })
         .map_err(rollback_anchor_error)
 }
@@ -281,7 +287,11 @@ pub(super) fn verify_rollback_anchor(
     anchor: &RollbackGenerationAnchor,
 ) -> Result<(), FindingPoolLedgerError> {
     anchor
-        .verify_while(|| load_store_generation(connection).map_err(|error| error.to_string()))
+        .verify_while(|| {
+            load_store_generation(connection)
+                .map(StoreHead::counter_only)
+                .map_err(|error| error.to_string())
+        })
         .map_err(rollback_anchor_error)
 }
 
