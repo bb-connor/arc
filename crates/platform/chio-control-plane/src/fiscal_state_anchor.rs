@@ -365,6 +365,22 @@ mod tests {
     }
 
     #[test]
+    fn anchor_name_answering_loopback_is_refused_before_connecting() -> TestResult {
+        use crate::anchor_egress::test_support::{answer_with, SilentListener};
+
+        let listener = SilentListener::bind()?;
+        let transport =
+            HttpsFiscalStateAnchorTransport::with_lookup(&config()?, answer_with(listener.addr()))?;
+
+        assert!(matches!(
+            transport.post(FISCAL_STATE_READ_PATH, b"{}"),
+            Err(FiscalStateAnchorError::Unavailable)
+        ));
+        assert!(!listener.connected()?);
+        Ok(())
+    }
+
+    #[test]
     fn config_requires_https_and_redacts_bearer_token() -> TestResult {
         let mut config = config()?;
         assert!(!format!("{config:?}").contains("fixture-token"));

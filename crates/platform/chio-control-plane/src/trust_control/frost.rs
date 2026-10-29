@@ -319,6 +319,37 @@ fn unavailable(error: impl std::fmt::Display) -> FrostAnchorError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::anchor_egress::test_support::{answer_with, SilentListener};
+
+    #[test]
+    fn anchor_name_answering_loopback_is_refused_before_connecting() -> Result<(), String> {
+        let listener = SilentListener::bind()?;
+        let client = RemoteFrostAnchorClient::with_lookup(
+            RemoteFrostAnchorConfig {
+                base_url: "https://anchor.example/api".to_string(),
+                bearer_token: "token".to_string(),
+                timeout: Duration::from_secs(5),
+            },
+            answer_with(listener.addr()),
+        )
+        .map_err(|error| error.to_string())?;
+
+        let error = match client.resolve_epoch_checkpoint("scope-1") {
+            Ok(checkpoint) => return Err(format!("loopback answer was dialed: {checkpoint:?}")),
+            Err(error) => error,
+        };
+
+        assert!(
+            matches!(
+                error,
+                FrostAnchorError::Unavailable(ref details)
+                    if details == "loopback egress target denied: anchor.example resolved to 127.0.0.1"
+            ),
+            "{error:?}"
+        );
+        assert!(!listener.connected()?);
+        Ok(())
+    }
 
     #[test]
     fn production_client_requires_https_auth_and_timeout() {

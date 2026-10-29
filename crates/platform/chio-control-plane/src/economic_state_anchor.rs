@@ -481,6 +481,38 @@ mod tests {
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+    #[test]
+    fn anchor_name_answering_loopback_is_refused_before_connecting() -> TestResult {
+        use crate::anchor_egress::test_support::{answer_with, SilentListener};
+
+        let listener = SilentListener::bind()?;
+        let config = RemoteEconomicStateAnchorConfig {
+            base_url: "https://economic-anchor.example".to_owned(),
+            bearer_token: "fixture-token".to_owned(),
+            timeout: Duration::from_secs(5),
+            pins: pins(),
+        };
+        let transport =
+            HttpsEconomicStateAnchorTransport::with_lookup(&config, answer_with(listener.addr()))?;
+
+        let error = match transport.post(ECONOMIC_STATE_READ_PATH, b"{}") {
+            Ok(body) => return Err(format!("loopback answer was dialed: {body:?}").into()),
+            Err(error) => error,
+        };
+
+        assert!(
+            matches!(
+                error,
+                EconomicStateAnchorError::Unavailable(ref details)
+                    if details
+                        == "loopback egress target denied: economic-anchor.example resolved to 127.0.0.1"
+            ),
+            "{error:?}"
+        );
+        assert!(!listener.connected()?);
+        Ok(())
+    }
+
     fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
         match mutex.lock() {
             Ok(guard) => guard,
