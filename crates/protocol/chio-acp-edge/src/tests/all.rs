@@ -3390,4 +3390,6 @@ mod tests {
     #[path = "original_input.rs"]
     mod original_input;
     include!("config_and_serde.rs");
+    #[path = "kernel_denial_codes.rs"]
+    mod kernel_denial_codes;
 }
