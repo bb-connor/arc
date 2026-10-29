@@ -41,6 +41,8 @@ mod swarm_required;
 mod execution_evidence;
 #[path = "runtime_tests/governed_denial_projection.rs"]
 mod governed_denial_projection;
+#[path = "runtime_tests/kernel_denial_codes.rs"]
+mod kernel_denial_codes;
 
 #[path = "runtime_tests/metrics.rs"]
 mod metrics;
