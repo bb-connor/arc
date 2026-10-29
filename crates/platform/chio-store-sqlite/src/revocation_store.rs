@@ -15,6 +15,14 @@ use crate::store_connection::{StoreConnection, StoreGuard};
 
 mod targets;
 pub use targets::TargetRevocation;
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures deliberately fail on violated setup invariants."
+)]
+#[path = "revocation_store/target_tests.rs"]
+mod target_tests;
 
 #[derive(Clone)]
 pub struct SqliteRevocationStore {

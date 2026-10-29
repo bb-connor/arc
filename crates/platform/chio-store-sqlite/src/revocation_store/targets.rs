@@ -30,6 +30,14 @@ pub struct TargetRevocation {
     pub roots_revoked: u64,
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How many roots a target revocation on this thread marks before it
+    /// fails, so a test can stop the fan-out part way through.
+    pub(super) static FAN_OUT_FAILS_AFTER: std::cell::Cell<Option<u64>> =
+        const { std::cell::Cell::new(None) };
+}
+
 const ENTRY_COLUMNS: &str = "entry_seq, entry_id, target_kind, target_value, revoked_at, reason";
 
 impl SqliteRevocationStore {

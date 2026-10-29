@@ -607,7 +607,7 @@ mod tests;
 
 #[cfg(test)]
 #[path = "../tests/root_exchange_support/mod.rs"]
-mod support;
+pub(crate) mod support;
 
 #[cfg(test)]
 mod recovery_tests;
