@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-pricing-body.schema.json",
+  "title": "chio.outcome.pricing.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAtUnixMs",
+    "failureMode",
+    "issuedAtUnixMs",
+    "outcomePrice",
+    "predicateDigest",
+    "predicateId",
+    "pricingId",
+    "providerId",
+    "schema",
+    "slaDigest"
+  ],
+  "properties": {
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "failureMode": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "outcomePrice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "predicateDigest": {
+      "type": "string"
+    },
+    "predicateId": {
+      "type": "string"
+    },
+    "pricingId": {
+      "type": "string"
+    },
+    "providerId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.pricing.v1"
+    },
+    "slaDigest": {
+      "type": "string"
+    }
+  }
+}

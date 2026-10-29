@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-sla-commitment-body.schema.json",
+  "title": "chio.commerce.sla-commitment.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "buyer_subject",
+    "collateral_position_ref",
+    "effective_window",
+    "exclusions_ref",
+    "guarantee_decision_ref",
+    "id",
+    "issued_at",
+    "measurement_policy_ref",
+    "metric_definitions",
+    "order_id",
+    "provider_subject",
+    "remedy_policy_ref",
+    "schema",
+    "service_scope"
+  ],
+  "properties": {
+    "buyer_subject": {
+      "type": "string"
+    },
+    "collateral_position_ref": {
+      "type": "string"
+    },
+    "effective_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end",
+        "start"
+      ],
+      "properties": {
+        "end": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        }
+      }
+    },
+    "exclusions_ref": {
+      "type": "string"
+    },
+    "guarantee_decision_ref": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "measurement_policy_ref": {
+      "type": "string"
+    },
+    "metric_definitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "target",
+          "unit"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "target": {
+            "type": "integer"
+          },
+          "unit": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "remedy_policy_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.sla-commitment.v1"
+    },
+    "service_scope": {
+      "type": "string"
+    }
+  }
+}

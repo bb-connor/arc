@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-failed-delivery-body.schema.json",
+  "title": "chio.finding.failed-delivery.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_bid_envelope_sha256",
+    "authoritative_payment_operation_id",
+    "buyer",
+    "currency",
+    "deny_checkpoint_ref",
+    "deny_checkpoint_sha256",
+    "deny_receipt_id",
+    "deny_receipt_sha256",
+    "failed_delivery_id",
+    "finding_id",
+    "hold_attempt_reference",
+    "listing_id",
+    "payout_eligible",
+    "purchase_intent_id",
+    "realized_spend_units",
+    "recorded_at",
+    "release_terminal",
+    "reservation_id",
+    "schema",
+    "seller_backing_envelope_sha256",
+    "venue_admission_envelope_sha256"
+  ],
+  "properties": {
+    "accepted_bid_envelope_sha256": {
+      "type": "string"
+    },
+    "authoritative_payment_operation_id": {
+      "type": "string"
+    },
+    "buyer": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "deny_checkpoint_ref": {
+      "type": "string"
+    },
+    "deny_checkpoint_sha256": {
+      "type": "string"
+    },
+    "deny_receipt_id": {
+      "type": "string"
+    },
+    "deny_receipt_sha256": {
+      "type": "string"
+    },
+    "failed_delivery_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "hold_attempt_reference": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "payout_eligible": {
+      "type": "boolean"
+    },
+    "purchase_intent_id": {
+      "type": "string"
+    },
+    "realized_spend_units": {
+      "type": "integer"
+    },
+    "recorded_at": {
+      "type": "integer"
+    },
+    "release_terminal": {
+      "type": "string"
+    },
+    "reservation_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.failed-delivery.v1"
+    },
+    "seller_backing_envelope_sha256": {
+      "type": "string"
+    },
+    "venue_admission_envelope_sha256": {
+      "type": "string"
+    }
+  }
+}

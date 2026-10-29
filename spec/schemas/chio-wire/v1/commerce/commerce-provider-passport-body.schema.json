@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-provider-passport-body.schema.json",
+  "title": "chio.commerce.provider-passport.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "issued_at",
+    "provider_subject",
+    "schema",
+    "service_families",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.provider-passport.v1"
+    },
+    "service_families": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

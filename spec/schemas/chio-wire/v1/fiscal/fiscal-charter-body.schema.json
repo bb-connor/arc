@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-charter-body.schema.json",
+  "title": "chio.fiscal.charter.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approvalThreshold",
+    "approvalTtlSeconds",
+    "charterId",
+    "expiresAt",
+    "governedDomains",
+    "governingOperatorId",
+    "issuedAt",
+    "issuedBy",
+    "proposalTtlSeconds",
+    "schema",
+    "sequence",
+    "signerSet",
+    "timelockSeconds"
+  ],
+  "properties": {
+    "approvalThreshold": {
+      "type": "integer"
+    },
+    "approvalTtlSeconds": {
+      "type": "integer"
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "governedDomains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "predecessorCharterDigest": {
+      "type": "string"
+    },
+    "proposalTtlSeconds": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.fiscal.charter.v1"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "signerSet": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyId",
+          "publicKey"
+        ],
+        "properties": {
+          "keyId": {
+            "type": "string"
+          },
+          "publicKey": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "timelockSeconds": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-terminal-outcome-commitment-body.schema.json",
+  "title": "chio.channel.terminal-outcome-commitment.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "operationId",
+    "outcomeRecordedAtUnixMs",
+    "receiptDigest",
+    "receiptId",
+    "reservationDigest",
+    "reservationId",
+    "schema",
+    "terminalResult",
+    "terminalizedAtUnixMs"
+  ],
+  "properties": {
+    "operationId": {
+      "type": "string"
+    },
+    "outcomeRecordedAtUnixMs": {
+      "type": "integer"
+    },
+    "receiptDigest": {
+      "type": "string"
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "reservationDigest": {
+      "type": "string"
+    },
+    "reservationId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.channel.terminal-outcome-commitment.v1"
+    },
+    "terminalResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "resultDigest",
+        "resultId"
+      ],
+      "properties": {
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "storage",
+            "value"
+          ],
+          "properties": {
+            "storage": {
+              "type": "string"
+            },
+            "value": {}
+          }
+        },
+        "resultDigest": {
+          "type": "string"
+        },
+        "resultId": {
+          "type": "string"
+        }
+      }
+    },
+    "terminalizedAtUnixMs": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-zero-dispatch-proof-body.schema.json",
+  "title": "chio.clearing.zero-dispatch-proof.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admissionCommitDigest",
+    "admissionCommitSequence",
+    "admissionStoreId",
+    "authorityId",
+    "authorityKeyEpoch",
+    "dispatchStatusCount",
+    "dispatchStatusRoot",
+    "dispatchStatuses",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "outputManifestDigest",
+    "roundCoreDigest",
+    "roundId",
+    "schema",
+    "settlementIntentCount",
+    "settlementIntentRoot",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion"
+  ],
+  "properties": {
+    "admissionCommitDigest": {
+      "type": "string"
+    },
+    "admissionCommitSequence": {
+      "type": "integer"
+    },
+    "admissionStoreId": {
+      "type": "string"
+    },
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "dispatchStatusCount": {
+      "type": "integer"
+    },
+    "dispatchStatusRoot": {
+      "type": "string"
+    },
+    "dispatchStatuses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dispatchIdempotencyKey",
+          "disposition",
+          "intentDigest",
+          "intentId"
+        ],
+        "properties": {
+          "dispatchIdempotencyKey": {
+            "type": "string"
+          },
+          "disposition": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              }
+            }
+          },
+          "intentDigest": {
+            "type": "string"
+          },
+          "intentId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.zero-dispatch-proof.v1"
+    },
+    "settlementIntentCount": {
+      "type": "integer"
+    },
+    "settlementIntentRoot": {
+      "type": "string"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/fincred-source-member-body.schema.json",
+  "title": "chio.fincred.source-member.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifactSchema",
+    "canonicalArtifact",
+    "queryKey",
+    "schema"
+  ],
+  "properties": {
+    "artifactSchema": {
+      "type": "string"
+    },
+    "canonicalArtifact": {
+      "type": "string"
+    },
+    "queryKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "occurredAt",
+        "sourceFamily",
+        "subject"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "occurredAt": {
+          "type": "integer"
+        },
+        "sourceFamily": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "type": "string"
+    }
+  }
+}

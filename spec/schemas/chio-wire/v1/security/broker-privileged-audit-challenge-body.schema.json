@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-body.schema.json",
+  "title": "chio.broker-privileged-audit-challenge.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAtUnixSeconds",
+    "issuedAtUnixSeconds",
+    "runnerAuthorizationBody",
+    "schema",
+    "sessionCommitmentSha256",
+    "sessionNonce"
+  ],
+  "properties": {
+    "expiresAtUnixSeconds": {
+      "type": "integer"
+    },
+    "issuedAtUnixSeconds": {
+      "type": "integer"
+    },
+    "runnerAuthorizationBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "auditId",
+        "brokerInstanceId",
+        "canonicalRequestSha256",
+        "capabilitySha256",
+        "credentialProvider",
+        "deploymentId",
+        "expiresAtUnixSeconds",
+        "issuedAtUnixSeconds",
+        "proofSha256",
+        "providerAdapterId",
+        "providerAdapterVersion",
+        "referenceCommitmentSha256",
+        "referenceSource",
+        "revocationAuthorityDomain",
+        "runnerId",
+        "schema",
+        "tenantScope"
+      ],
+      "properties": {
+        "auditId": {
+          "type": "string"
+        },
+        "brokerInstanceId": {
+          "type": "string"
+        },
+        "canonicalRequestSha256": {
+          "type": "string"
+        },
+        "capabilitySha256": {
+          "type": "string"
+        },
+        "credentialProvider": {
+          "type": "string"
+        },
+        "deploymentId": {
+          "type": "string"
+        },
+        "expiresAtUnixSeconds": {
+          "type": "integer"
+        },
+        "issuedAtUnixSeconds": {
+          "type": "integer"
+        },
+        "proofSha256": {
+          "type": "string"
+        },
+        "providerAdapterId": {
+          "type": "string"
+        },
+        "providerAdapterVersion": {
+          "type": "integer"
+        },
+        "referenceCommitmentSha256": {
+          "type": "string"
+        },
+        "referenceSource": {
+          "type": "string"
+        },
+        "revocationAuthorityDomain": {
+          "type": "string"
+        },
+        "runnerId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "tenantScope": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.broker-privileged-audit-challenge.v1"
+    },
+    "sessionCommitmentSha256": {
+      "type": "string"
+    },
+    "sessionNonce": {
+      "type": "string"
+    }
+  }
+}

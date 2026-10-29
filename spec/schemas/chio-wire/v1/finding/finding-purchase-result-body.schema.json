@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-purchase-result-body.schema.json",
+  "title": "chio.finding.purchase-result.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_price",
+    "authoritative_payment_operation_id",
+    "delivery_receipt_sha256",
+    "finding_id",
+    "payer",
+    "purchase_intent_id",
+    "realized_spend",
+    "recorded_at",
+    "request_id",
+    "reservation_id",
+    "result_id",
+    "schema",
+    "settlement",
+    "verdict"
+  ],
+  "properties": {
+    "accepted_price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "authoritative_payment_operation_id": {
+      "type": "string"
+    },
+    "delivery_receipt_sha256": {
+      "type": "string"
+    },
+    "failed_delivery_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "output_sha256": {
+      "type": "string"
+    },
+    "payer": {
+      "type": "string"
+    },
+    "purchase_intent_id": {
+      "type": "string"
+    },
+    "purchase_record_sha256": {
+      "type": "string"
+    },
+    "realized_spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "recorded_at": {
+      "type": "integer"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "reservation_id": {
+      "type": "string"
+    },
+    "result_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.purchase-result.v1"
+    },
+    "settlement": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string"
+    }
+  }
+}

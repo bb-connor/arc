@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-peer-directory-bundle-body.schema.json",
+  "title": "chio.pheromone.peer-directory-bundle.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "directorySha256",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "issuer",
+    "keyId",
+    "previousVersionSha256",
+    "schema",
+    "version"
+  ],
+  "properties": {
+    "directorySha256": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "previousVersionSha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "schema": {
+      "const": "chio.pheromone.peer-directory-bundle.v1"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

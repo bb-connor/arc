@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/risk/risk-collateral-position-report-body.schema.json",
+  "title": "chio.risk.collateral-position-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "available_amount",
+    "claim_priority",
+    "collateral_id",
+    "consumed_amount_refs",
+    "currency_or_asset",
+    "id",
+    "issued_at",
+    "lock_expiry",
+    "lock_start",
+    "order_id",
+    "release_policy_ref",
+    "schema",
+    "slash_authority_ref",
+    "source_ref",
+    "source_type",
+    "subject"
+  ],
+  "properties": {
+    "amount": {
+      "type": "integer"
+    },
+    "available_amount": {
+      "type": "integer"
+    },
+    "claim_priority": {
+      "type": "string"
+    },
+    "collateral_id": {
+      "type": "string"
+    },
+    "consumed_amount_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "currency_or_asset": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "lock_expiry": {
+      "type": "string"
+    },
+    "lock_start": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "release_policy_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.risk.collateral-position-report.v1"
+    },
+    "slash_authority_ref": {
+      "type": "string"
+    },
+    "source_ref": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

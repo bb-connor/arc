@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-activation-body.schema.json",
+  "title": "chio.fiscal.activation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activatedAt",
+    "activationId",
+    "activationNotBefore",
+    "admissionDigest",
+    "admissionId",
+    "approvalSetDigest",
+    "approvals",
+    "charterDigest",
+    "charterId",
+    "issuedBy",
+    "proposalDigest",
+    "proposalId",
+    "schema",
+    "target"
+  ],
+  "properties": {
+    "activatedAt": {
+      "type": "integer"
+    },
+    "activationId": {
+      "type": "string"
+    },
+    "activationNotBefore": {
+      "type": "integer"
+    },
+    "admissionDigest": {
+      "type": "string"
+    },
+    "admissionId": {
+      "type": "string"
+    },
+    "approvalSetDigest": {
+      "type": "string"
+    },
+    "approvals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "signature",
+          "signerKey"
+        ],
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "admissionDigest",
+              "admissionId",
+              "approvalExpiresAt",
+              "approvalId",
+              "approvedAt",
+              "proposalDigest",
+              "proposalId",
+              "schema",
+              "signerKeyId"
+            ],
+            "properties": {
+              "admissionDigest": {
+                "type": "string"
+              },
+              "admissionId": {
+                "type": "string"
+              },
+              "approvalExpiresAt": {
+                "type": "integer"
+              },
+              "approvalId": {
+                "type": "string"
+              },
+              "approvedAt": {
+                "type": "integer"
+              },
+              "proposalDigest": {
+                "type": "string"
+              },
+              "proposalId": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "signerKeyId": {
+                "type": "string"
+              }
+            }
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signerKey": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "charterDigest": {
+      "type": "string"
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "proposalDigest": {
+      "type": "string"
+    },
+    "proposalId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.activation.v1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "predecessorCharterDigest": {
+          "type": "string"
+        },
+        "scheduleId": {
+          "type": "string"
+        },
+        "successorCharterDigest": {
+          "type": "string"
+        },
+        "successorSchedules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signature",
+              "signerKey"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "charterDigest",
+                  "charterId",
+                  "domain",
+                  "issuedAt",
+                  "issuedBy",
+                  "params",
+                  "scheduleId",
+                  "schema",
+                  "sequence",
+                  "supersedesScheduleId",
+                  "validFrom",
+                  "validUntil"
+                ],
+                "properties": {
+                  "charterDigest": {
+                    "type": "string"
+                  },
+                  "charterId": {
+                    "type": "string"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "issuedAt": {
+                    "type": "integer"
+                  },
+                  "issuedBy": {
+                    "type": "string"
+                  },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "ceilings",
+                      "kind"
+                    ],
+                    "properties": {
+                      "ceilings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "currency",
+                            "units"
+                          ],
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "scheduleId": {
+                    "type": "string"
+                  },
+                  "schema": {
+                    "type": "string"
+                  },
+                  "sequence": {
+                    "type": "integer"
+                  },
+                  "supersedesScheduleId": {
+                    "type": "string"
+                  },
+                  "validFrom": {
+                    "type": "integer"
+                  },
+                  "validUntil": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "signature": {
+                "type": "string"
+              },
+              "signerKey": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "supersedesScheduleId": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

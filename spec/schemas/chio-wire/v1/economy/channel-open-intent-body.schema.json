@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-open-intent-body.schema.json",
+  "title": "chio.channel.open-intent.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetBinding",
+        "bound",
+        "boundTokenBaseUnits",
+        "channelExpiryUnixSecs",
+        "closeSubmissionCutoffUnixSecs",
+        "currency",
+        "disputeTierUpperBoundUnits",
+        "disputeWindowSecs",
+        "escrowReference",
+        "finalityMode",
+        "fixedFinalityBroadcastMarginSecs",
+        "fundingEvidenceDigest",
+        "openIntentId",
+        "originalOperator",
+        "originalOperatorKeyHash",
+        "originalWeb3DispatchDigest",
+        "participantSnapshotDigest",
+        "payeeBeneficiaryAddress",
+        "payeeId",
+        "payeeKey",
+        "payeeKeyEpoch",
+        "payerId",
+        "payerKey",
+        "payerKeyEpoch",
+        "payerRefundAddress",
+        "requiredConfirmations",
+        "schema",
+        "settlementAuthorityScopeId"
+      ],
+      "properties": {
+        "assetBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chainId",
+            "currency",
+            "protocolMinorUnitDecimals",
+            "schema",
+            "settlementPolicyDigest",
+            "tokenAddress",
+            "tokenDecimals",
+            "tokenSymbol"
+          ],
+          "properties": {
+            "chainId": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "protocolMinorUnitDecimals": {
+              "type": "integer"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "settlementPolicyDigest": {
+              "type": "string"
+            },
+            "tokenAddress": {
+              "type": "string"
+            },
+            "tokenDecimals": {
+              "type": "integer"
+            },
+            "tokenSymbol": {
+              "type": "string"
+            }
+          }
+        },
+        "bound": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "boundTokenBaseUnits": {
+          "type": "string"
+        },
+        "channelExpiryUnixSecs": {
+          "type": "integer"
+        },
+        "closeSubmissionCutoffUnixSecs": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "disputeTierUpperBoundUnits": {
+          "type": "integer"
+        },
+        "disputeWindowSecs": {
+          "type": "integer"
+        },
+        "escrowReference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chainId",
+            "escrowContract",
+            "escrowId"
+          ],
+          "properties": {
+            "chainId": {
+              "type": "string"
+            },
+            "escrowContract": {
+              "type": "string"
+            },
+            "escrowId": {
+              "type": "string"
+            }
+          }
+        },
+        "finalityMode": {
+          "type": "string"
+        },
+        "fixedFinalityBroadcastMarginSecs": {
+          "type": "integer"
+        },
+        "fundingEvidenceDigest": {
+          "type": "string"
+        },
+        "openIntentId": {
+          "type": "string"
+        },
+        "originalOperator": {
+          "type": "string"
+        },
+        "originalOperatorKeyHash": {
+          "type": "string"
+        },
+        "originalWeb3DispatchDigest": {
+          "type": "string"
+        },
+        "participantSnapshotDigest": {
+          "type": "string"
+        },
+        "payeeBeneficiaryAddress": {
+          "type": "string"
+        },
+        "payeeId": {
+          "type": "string"
+        },
+        "payeeKey": {
+          "type": "string"
+        },
+        "payeeKeyEpoch": {
+          "type": "integer"
+        },
+        "payerId": {
+          "type": "string"
+        },
+        "payerKey": {
+          "type": "string"
+        },
+        "payerKeyEpoch": {
+          "type": "integer"
+        },
+        "payerRefundAddress": {
+          "type": "string"
+        },
+        "requiredConfirmations": {
+          "type": "integer"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "settlementAuthorityScopeId": {
+          "type": "string"
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

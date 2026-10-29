@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-provider-discovery-snapshot-body.schema.json",
+  "title": "chio.commerce.provider-discovery-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "discovery_authority_ref",
+    "freshness_window",
+    "id",
+    "issued_at",
+    "market_scope",
+    "order_id",
+    "order_intent_ref",
+    "passport_id",
+    "provider_candidates",
+    "schema"
+  ],
+  "properties": {
+    "discovery_authority_ref": {
+      "type": "string"
+    },
+    "freshness_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        }
+      }
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "market_scope": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "order_intent_ref": {
+      "type": "string"
+    },
+    "passport_id": {
+      "type": "string"
+    },
+    "provider_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "availability_ref",
+          "excluded",
+          "jurisdiction_ref",
+          "pricing_surface_ref",
+          "provider_passport_ref",
+          "service_manifest_ref",
+          "subject"
+        ],
+        "properties": {
+          "availability_ref": {
+            "type": "string"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "jurisdiction_ref": {
+            "type": "string"
+          },
+          "pricing_surface_ref": {
+            "type": "string"
+          },
+          "provider_passport_ref": {
+            "type": "string"
+          },
+          "service_manifest_ref": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.commerce.provider-discovery-snapshot.v1"
+    }
+  }
+}

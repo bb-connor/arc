@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/keyring-artifact-signature-body.schema.json",
+  "title": "chio.keyring.artifact-signature.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_hash",
+    "artifact_signature",
+    "key_id",
+    "schema",
+    "signing_epoch"
+  ],
+  "properties": {
+    "artifact_hash": {
+      "type": "string"
+    },
+    "artifact_signature": {
+      "type": "string"
+    },
+    "key_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.keyring.artifact-signature.v1"
+    },
+    "signing_epoch": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-zero-intent-reconciliation-body.schema.json",
+  "title": "chio.clearing.zero-intent-reconciliation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "atomBindings",
+    "authorityDigest",
+    "dispositionAuthorityId",
+    "dispositionAuthorityKeyEpoch",
+    "emptyIntentRoot",
+    "finalizationDigest",
+    "nextLifecycleFence",
+    "nextLifecycleVersion",
+    "outcome",
+    "outputManifestDigest",
+    "reconciledAtUnixMs",
+    "reservationCount",
+    "reservationRoot",
+    "roundCoreDigest",
+    "roundId",
+    "schema",
+    "settlementIntentCount",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion"
+  ],
+  "properties": {
+    "atomBindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedHeadDigest",
+          "expectedLifecycleFence",
+          "expectedResourceVersion",
+          "obligationId",
+          "sourceSequence"
+        ],
+        "properties": {
+          "expectedHeadDigest": {
+            "type": "string"
+          },
+          "expectedLifecycleFence": {
+            "type": "integer"
+          },
+          "expectedResourceVersion": {
+            "type": "integer"
+          },
+          "obligationId": {
+            "type": "string"
+          },
+          "sourceSequence": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "authorityDigest": {
+      "type": "string"
+    },
+    "dispositionAuthorityId": {
+      "type": "string"
+    },
+    "dispositionAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "emptyIntentRoot": {
+      "type": "string"
+    },
+    "finalizationDigest": {
+      "type": "string"
+    },
+    "nextLifecycleFence": {
+      "type": "integer"
+    },
+    "nextLifecycleVersion": {
+      "type": "integer"
+    },
+    "outcome": {
+      "type": "string"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "reconciledAtUnixMs": {
+      "type": "integer"
+    },
+    "reservationCount": {
+      "type": "integer"
+    },
+    "reservationRoot": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.zero-intent-reconciliation.v1"
+    },
+    "settlementIntentCount": {
+      "type": "integer"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    }
+  }
+}

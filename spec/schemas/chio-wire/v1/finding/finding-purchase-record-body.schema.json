@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-purchase-record-body.schema.json",
+  "title": "chio.finding.purchase-record.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_bid_envelope_sha256",
+    "accepted_price",
+    "authoritative_payment_operation_id",
+    "buyer",
+    "delivery_receipt_id",
+    "encumbrance_id",
+    "finding_id",
+    "listing_id",
+    "payer",
+    "payment_reference",
+    "payout_destination",
+    "purchase_intent_id",
+    "purchase_key",
+    "realized_spend",
+    "recorded_at",
+    "schema",
+    "seller_backing_envelope_sha256",
+    "venue_admission_envelope_sha256"
+  ],
+  "properties": {
+    "accepted_bid_envelope_sha256": {
+      "type": "string"
+    },
+    "accepted_price": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "authoritative_payment_operation_id": {
+      "type": "string"
+    },
+    "buyer": {
+      "type": "string"
+    },
+    "delivery_receipt_id": {
+      "type": "string"
+    },
+    "encumbrance_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "payer": {
+      "type": "string"
+    },
+    "payment_reference": {
+      "type": "string"
+    },
+    "payout_destination": {
+      "type": "string"
+    },
+    "purchase_intent_id": {
+      "type": "string"
+    },
+    "purchase_key": {
+      "type": "string"
+    },
+    "realized_spend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "recorded_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.purchase-record.v1"
+    },
+    "seller_backing_envelope_sha256": {
+      "type": "string"
+    },
+    "venue_admission_envelope_sha256": {
+      "type": "string"
+    }
+  }
+}

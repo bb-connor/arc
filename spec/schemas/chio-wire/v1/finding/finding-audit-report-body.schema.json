@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-audit-report-body.schema.json",
+  "title": "chio.finding.audit-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attempt_envelope_sha256s",
+    "audit_epoch_envelope_sha256",
+    "audit_report_id",
+    "missed_attempts",
+    "outcome_envelope_digests",
+    "reported_at",
+    "revealed_seed",
+    "schema",
+    "selected_finding_ids"
+  ],
+  "properties": {
+    "attempt_envelope_sha256s": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "audit_epoch_envelope_sha256": {
+      "type": "string"
+    },
+    "audit_report_id": {
+      "type": "string"
+    },
+    "missed_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "finding_id",
+          "reason"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outcome_envelope_digests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reported_at": {
+      "type": "integer"
+    },
+    "revealed_seed": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.audit-report.v1"
+    },
+    "selected_finding_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

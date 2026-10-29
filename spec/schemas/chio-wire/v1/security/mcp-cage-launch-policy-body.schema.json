@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/mcp-cage-launch-policy-body.schema.json",
+  "title": "chio.mcp.cage-launch-policy.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enterprise_migration",
+    "limits",
+    "operator_ceilings",
+    "receipt",
+    "registered_public_key",
+    "runtime",
+    "schema",
+    "signed_manifest"
+  ],
+  "properties": {
+    "enterprise_migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deployment_id",
+        "head",
+        "state_database_path",
+        "trusted_transition_signers"
+      ],
+      "properties": {
+        "deployment_id": {
+          "type": "string"
+        },
+        "head": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "transition_digest"
+          ],
+          "properties": {
+            "key": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "control",
+                "deployment_id",
+                "scope_id",
+                "scope_kind"
+              ],
+              "properties": {
+                "control": {
+                  "type": "string"
+                },
+                "deployment_id": {
+                  "type": "string"
+                },
+                "scope_id": {
+                  "type": "string"
+                },
+                "scope_kind": {
+                  "type": "string"
+                }
+              }
+            },
+            "transition_digest": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "state_database_path": {
+          "type": "string"
+        },
+        "trusted_transition_signers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "launch_timeout_ms",
+        "max_artifact_bytes",
+        "nofile_hard",
+        "nofile_soft"
+      ],
+      "properties": {
+        "launch_timeout_ms": {
+          "type": "integer"
+        },
+        "max_artifact_bytes": {
+          "type": "integer"
+        },
+        "nofile_hard": {
+          "type": "integer"
+        },
+        "nofile_soft": {
+          "type": "integer"
+        }
+      }
+    },
+    "operator_ceilings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment_variables",
+        "forbidden_paths",
+        "native_syscall_profiles",
+        "network_destinations",
+        "read_paths",
+        "write_paths"
+      ],
+      "properties": {
+        "environment_variables": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?!(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_))(?!(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$)(?!.*(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]))[A-Za-z_][A-Za-z0-9_]*$"
+          }
+        },
+        "forbidden_paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "native_syscall_profiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "network_destinations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "host",
+              "port"
+            ],
+            "properties": {
+              "host": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253,
+                "pattern": "^[^A-Z*\\s/]+$"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              }
+            }
+          }
+        },
+        "read_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "pattern": "^/(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\/$)[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+          }
+        },
+        "write_paths": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "pattern": "^/(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\/$)[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "database_path",
+        "signer_seed_path",
+        "tenant_id",
+        "trusted_signer_public_key"
+      ],
+      "properties": {
+        "capability_id": {
+          "type": "string"
+        },
+        "database_path": {
+          "type": "string"
+        },
+        "signer_seed_path": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "trusted_signer_public_key": {
+          "type": "string"
+        }
+      }
+    },
+    "registered_public_key": {
+      "type": "string"
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cage_init_binding_digest",
+        "cage_init_path",
+        "execution_identity",
+        "runtime_files",
+        "target_argv",
+        "target_binding_digest",
+        "target_path",
+        "working_directory"
+      ],
+      "properties": {
+        "cage_init_binding_digest": {
+          "type": "string"
+        },
+        "cage_init_path": {
+          "type": "string"
+        },
+        "execution_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "gid",
+            "supplementary_gids",
+            "uid"
+          ],
+          "properties": {
+            "gid": {
+              "type": "integer"
+            },
+            "supplementary_gids": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4294967294
+              }
+            },
+            "uid": {
+              "type": "integer"
+            }
+          }
+        },
+        "runtime_files": {
+          "type": "array",
+          "maxItems": 48,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 2,
+            "pattern": "^/(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\/$)[^\\u0000-\\u001F\\u007F-\\u009F]+$"
+          }
+        },
+        "target_argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "target_binding_digest": {
+          "type": "string"
+        },
+        "target_path": {
+          "type": "string"
+        },
+        "working_directory": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.mcp.cage-launch-policy.v1"
+    },
+    "signed_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest",
+        "signature",
+        "signer_key"
+      ],
+      "properties": {
+        "manifest": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "public_key",
+            "required_permissions",
+            "schema",
+            "server_id",
+            "tools",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "public_key": {
+              "type": "string"
+            },
+            "required_permissions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "native_syscall_profile"
+              ],
+              "properties": {
+                "native_syscall_profile": {
+                  "type": "string"
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            },
+            "server_id": {
+              "type": "string"
+            },
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "annotations",
+                  "description",
+                  "input_schema",
+                  "latency_hint",
+                  "name"
+                ],
+                "properties": {
+                  "annotations": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "destructive",
+                      "idempotent",
+                      "read_only",
+                      "requires_approval"
+                    ],
+                    "properties": {
+                      "destructive": {
+                        "type": "boolean"
+                      },
+                      "idempotent": {
+                        "type": "boolean"
+                      },
+                      "read_only": {
+                        "type": "boolean"
+                      },
+                      "requires_approval": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "input_schema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "type"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "latency_hint": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "version": {
+              "type": "string"
+            }
+          }
+        },
+        "signature": {
+          "type": "string"
+        },
+        "signer_key": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

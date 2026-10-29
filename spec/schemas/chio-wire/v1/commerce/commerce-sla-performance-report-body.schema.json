@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-sla-performance-report-body.schema.json",
+  "title": "chio.commerce.sla-performance-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "breach_verdict",
+    "computed_metric_results",
+    "dispute_ref",
+    "id",
+    "issued_at",
+    "measured_at",
+    "measurement_evidence_refs",
+    "measurement_policy_ref",
+    "order_id",
+    "performance_id",
+    "provider_subject",
+    "remedy_ref",
+    "schema",
+    "sla_ref"
+  ],
+  "properties": {
+    "breach_verdict": {
+      "type": "string"
+    },
+    "computed_metric_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "passed",
+          "unit",
+          "value"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "dispute_ref": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "measured_at": {
+      "type": "string"
+    },
+    "measurement_evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "measurement_policy_ref": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "performance_id": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "remedy_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.sla-performance-report.v1"
+    },
+    "sla_ref": {
+      "type": "string"
+    }
+  }
+}

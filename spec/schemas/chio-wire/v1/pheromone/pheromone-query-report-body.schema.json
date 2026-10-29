@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-query-report-body.schema.json",
+  "title": "chio.pheromone.query-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted",
+    "concentration",
+    "schema"
+  ],
+  "properties": {
+    "accepted": {
+      "type": "boolean"
+    },
+    "concentration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distinctOriginPairs",
+        "evaluatedAtUnixMs",
+        "reputationEpoch",
+        "subjectClass",
+        "subjectClassNamespace",
+        "totalStrength"
+      ],
+      "properties": {
+        "distinctOriginPairs": {
+          "type": "integer"
+        },
+        "evaluatedAtUnixMs": {
+          "type": "integer"
+        },
+        "reputationEpoch": {
+          "type": "integer"
+        },
+        "subjectClass": {
+          "type": "string"
+        },
+        "subjectClassNamespace": {
+          "type": "string"
+        },
+        "totalStrength": {
+          "type": "number"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.pheromone.query-report.v1"
+    }
+  }
+}

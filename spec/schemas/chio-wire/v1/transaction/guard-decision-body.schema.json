@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/transaction/guard-decision-body.schema.json",
+  "title": "chio.guard.decision.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capability_id",
+    "decision",
+    "guard_key",
+    "id",
+    "policy_sha256",
+    "request_sha256",
+    "response_sha256",
+    "schema"
+  ],
+  "properties": {
+    "capability_id": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "guard_key": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "policy_sha256": {
+      "type": "string"
+    },
+    "request_sha256": {
+      "type": "string"
+    },
+    "response_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.guard.decision.v1"
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-authority-status-body.schema.json",
+  "title": "chio.finding.authority-status.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority_id",
+    "key",
+    "key_epoch",
+    "observed_at",
+    "revoked_from",
+    "schema",
+    "status_ref"
+  ],
+  "properties": {
+    "authority_id": {
+      "type": "string"
+    },
+    "key": {
+      "type": "string"
+    },
+    "key_epoch": {
+      "type": "integer"
+    },
+    "observed_at": {
+      "type": "integer"
+    },
+    "revoked_from": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "schema": {
+      "const": "chio.finding.authority-status.v1"
+    },
+    "status_ref": {
+      "type": "string"
+    }
+  }
+}

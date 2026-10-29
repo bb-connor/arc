@@ -468,6 +468,30 @@ PLACEHOLDER_ARRAY_ITEMS: tuple[tuple[str, str], ...] = (
         "chio.market.quote-response.v1",
         "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
     ),
+    (
+        "chio.risk.collateral-position-report.v1",
+        "/consumed_amount_refs",
+    ),
+    (
+        "chio.root-policy.v1",
+        "/disclosure/tools/crm~1search/result/inline_fields",
+    ),
+    (
+        "chio.trust.reputation-import-report.v1",
+        "/negative_event_refs",
+    ),
+    (
+        "chio.trust.scorecard-snapshot.v1",
+        "/downgrade_reasons",
+    ),
+    (
+        "chio.trust.scorecard-snapshot.v1",
+        "/negative_event_refs",
+    ),
+    (
+        "chio.web3-settlement-proof-bundle.v1",
+        "/settlement_receipt/reconciled_anchor_proof/receipt_inclusion/proof/audit_path",
+    ),
 )
 UNCAPTURED_WRAPPER_IDS: tuple[str, ...] = (
     "chio.agent-web.external-projection-manifest.v1",
@@ -879,11 +903,11 @@ def load_control(root: Path) -> list[dict[str, Any]]:
         if envelope is not None and not (
             isinstance(envelope, str)
             and envelope.startswith("spec/schemas/")
-            and envelope.endswith(".schema.json")
+            and envelope.endswith(".json")
             and envelope != schema_file
             and (root / envelope).is_file()
         ):
-            raise GenerationError(f"{sid}: envelopeSchemaFile must name another existing .schema.json")
+            raise GenerationError(f"{sid}: envelopeSchemaFile must name another existing schema file")
         overrides = entry.get("overrides", {})
         if not isinstance(overrides, dict) or not all(
             isinstance(k, str) and (k == "" or k.startswith("/")) for k in overrides

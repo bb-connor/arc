@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-observation-cost-verifier-root-body.schema.json",
+  "title": "chio.pheromone-observation-cost-verifier-root.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowedSubjectClassNamespaces",
+    "allowedSubjectClasses",
+    "allowedTreaties",
+    "issuerKernelId",
+    "publicKey",
+    "runtimePolicySha256",
+    "schema",
+    "validFromUnixMs",
+    "validUntilUnixMs",
+    "verifierId",
+    "verifierKeyId"
+  ],
+  "properties": {
+    "allowedSubjectClassNamespaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowedSubjectClasses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowedTreaties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "issuerKernelId": {
+      "type": "string"
+    },
+    "publicKey": {
+      "type": "string"
+    },
+    "runtimePolicySha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.pheromone-observation-cost-verifier-root.v1"
+    },
+    "validFromUnixMs": {
+      "type": "integer"
+    },
+    "validUntilUnixMs": {
+      "type": "integer"
+    },
+    "verifierId": {
+      "type": "string"
+    },
+    "verifierKeyId": {
+      "type": "string"
+    }
+  }
+}

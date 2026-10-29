@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/trust-root-body.schema.json",
+  "title": "chio.trust.root.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority",
+    "id",
+    "roots",
+    "schema"
+  ],
+  "properties": {
+    "authority": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "root_id": {
+      "type": "string"
+    },
+    "roots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.trust.root.v1"
+    }
+  }
+}

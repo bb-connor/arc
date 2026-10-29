@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/proof-room/proof-room-receipt-evidence-body.schema.json",
+  "title": "chio.proof-room.receipt-evidence.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kernel_key",
+    "policy_digest",
+    "receipt_id",
+    "schema",
+    "terminal_status"
+  ],
+  "properties": {
+    "ambient_authority": {
+      "type": "boolean"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "execution_lease_ref": {
+      "type": "string"
+    },
+    "guard_decision_id": {
+      "type": "string"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "policy_digest": {
+      "type": "string"
+    },
+    "receipt_id": {
+      "type": "string"
+    },
+    "request_digest": {
+      "type": "string"
+    },
+    "response_digest": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "string"
+    },
+    "terminal_status": {
+      "type": "string"
+    }
+  }
+}

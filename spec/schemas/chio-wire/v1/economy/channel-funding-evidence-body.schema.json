@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-funding-evidence-body.schema.json",
+  "title": "chio.channel.funding-evidence.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetBinding",
+        "blockPin",
+        "creationEvent",
+        "escrowReference",
+        "escrowState",
+        "escrowStateRead",
+        "escrowTerms",
+        "evidenceExpiresAtUnixMs",
+        "identityObservation",
+        "schema",
+        "tokenObservation"
+      ],
+      "properties": {
+        "assetBinding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chainId",
+            "currency",
+            "protocolMinorUnitDecimals",
+            "schema",
+            "settlementPolicyDigest",
+            "tokenAddress",
+            "tokenDecimals",
+            "tokenSymbol"
+          ],
+          "properties": {
+            "chainId": {
+              "type": "string"
+            },
+            "currency": {
+              "type": "string"
+            },
+            "protocolMinorUnitDecimals": {
+              "type": "integer"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "settlementPolicyDigest": {
+              "type": "string"
+            },
+            "tokenAddress": {
+              "type": "string"
+            },
+            "tokenDecimals": {
+              "type": "integer"
+            },
+            "tokenSymbol": {
+              "type": "string"
+            }
+          }
+        },
+        "blockPin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blockHash",
+            "blockNumber",
+            "blockTimestampUnixSecs",
+            "finalityMode",
+            "finalityStatus",
+            "finalizedHeadHash",
+            "finalizedHeadNumber",
+            "observedAtUnixMs",
+            "observedConfirmations",
+            "requiredConfirmations"
+          ],
+          "properties": {
+            "blockHash": {
+              "type": "string"
+            },
+            "blockNumber": {
+              "type": "integer"
+            },
+            "blockTimestampUnixSecs": {
+              "type": "integer"
+            },
+            "finalityMode": {
+              "type": "string"
+            },
+            "finalityStatus": {
+              "type": "string"
+            },
+            "finalizedHeadHash": {
+              "type": "string"
+            },
+            "finalizedHeadNumber": {
+              "type": "integer"
+            },
+            "observedAtUnixMs": {
+              "type": "integer"
+            },
+            "observedConfirmations": {
+              "type": "integer"
+            },
+            "requiredConfirmations": {
+              "type": "integer"
+            }
+          }
+        },
+        "creationEvent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "beneficiary",
+            "capabilityId",
+            "deadlineUnixSecs",
+            "depositor",
+            "escrowId",
+            "eventSignature",
+            "logEmitter",
+            "logIndex",
+            "maxTokenBaseUnits",
+            "operator",
+            "receiptBlockHash",
+            "receiptBlockNumber",
+            "tokenAddress",
+            "transactionHash",
+            "transactionSucceeded",
+            "transactionTo"
+          ],
+          "properties": {
+            "beneficiary": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "deadlineUnixSecs": {
+              "type": "integer"
+            },
+            "depositor": {
+              "type": "string"
+            },
+            "escrowId": {
+              "type": "string"
+            },
+            "eventSignature": {
+              "type": "string"
+            },
+            "logEmitter": {
+              "type": "string"
+            },
+            "logIndex": {
+              "type": "integer"
+            },
+            "maxTokenBaseUnits": {
+              "type": "string"
+            },
+            "operator": {
+              "type": "string"
+            },
+            "receiptBlockHash": {
+              "type": "string"
+            },
+            "receiptBlockNumber": {
+              "type": "integer"
+            },
+            "tokenAddress": {
+              "type": "string"
+            },
+            "transactionHash": {
+              "type": "string"
+            },
+            "transactionSucceeded": {
+              "type": "boolean"
+            },
+            "transactionTo": {
+              "type": "string"
+            }
+          }
+        },
+        "escrowReference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chainId",
+            "escrowContract",
+            "escrowId"
+          ],
+          "properties": {
+            "chainId": {
+              "type": "string"
+            },
+            "escrowContract": {
+              "type": "string"
+            },
+            "escrowId": {
+              "type": "string"
+            }
+          }
+        },
+        "escrowState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "depositedTokenBaseUnits",
+            "refunded",
+            "refundedTokenBaseUnits",
+            "releasedTokenBaseUnits"
+          ],
+          "properties": {
+            "depositedTokenBaseUnits": {
+              "type": "string"
+            },
+            "refunded": {
+              "type": "boolean"
+            },
+            "refundedTokenBaseUnits": {
+              "type": "string"
+            },
+            "releasedTokenBaseUnits": {
+              "type": "string"
+            }
+          }
+        },
+        "escrowStateRead": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "blockHash",
+            "blockNumber",
+            "callDataDigest",
+            "contract",
+            "returnDataDigest"
+          ],
+          "properties": {
+            "blockHash": {
+              "type": "string"
+            },
+            "blockNumber": {
+              "type": "integer"
+            },
+            "callDataDigest": {
+              "type": "string"
+            },
+            "contract": {
+              "type": "string"
+            },
+            "returnDataDigest": {
+              "type": "string"
+            }
+          }
+        },
+        "escrowTerms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "beneficiary",
+            "capabilityId",
+            "deadlineUnixSecs",
+            "depositor",
+            "maxTokenBaseUnits",
+            "operator",
+            "operatorKeyHash",
+            "tokenAddress"
+          ],
+          "properties": {
+            "beneficiary": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "deadlineUnixSecs": {
+              "type": "integer"
+            },
+            "depositor": {
+              "type": "string"
+            },
+            "maxTokenBaseUnits": {
+              "type": "string"
+            },
+            "operator": {
+              "type": "string"
+            },
+            "operatorKeyHash": {
+              "type": "string"
+            },
+            "tokenAddress": {
+              "type": "string"
+            }
+          }
+        },
+        "evidenceExpiresAtUnixMs": {
+          "type": "integer"
+        },
+        "identityObservation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "active",
+            "blockHash",
+            "blockNumber",
+            "operator",
+            "operatorKeyHash",
+            "registryContract"
+          ],
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "blockHash": {
+              "type": "string"
+            },
+            "blockNumber": {
+              "type": "integer"
+            },
+            "operator": {
+              "type": "string"
+            },
+            "operatorKeyHash": {
+              "type": "string"
+            },
+            "registryContract": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "tokenObservation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "allowed",
+            "blockHash",
+            "blockNumber",
+            "escrowContract",
+            "tokenAddress",
+            "tokenDecimals",
+            "tokenSymbol"
+          ],
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "blockHash": {
+              "type": "string"
+            },
+            "blockNumber": {
+              "type": "integer"
+            },
+            "escrowContract": {
+              "type": "string"
+            },
+            "tokenAddress": {
+              "type": "string"
+            },
+            "tokenDecimals": {
+              "type": "integer"
+            },
+            "tokenSymbol": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/obligation-status-proof-body.schema.json",
+  "title": "chio.obligation.status-proof.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityId",
+    "authorityKeyEpoch",
+    "currentCreditorId",
+    "currentSettlementDestinationRef",
+    "debtorId",
+    "disposition",
+    "dispositionDigest",
+    "dispositionLifecycleFence",
+    "dispositionVersion",
+    "dueAtUnixMs",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "obligationAtomDigest",
+    "obligationId",
+    "originalCreditorId",
+    "proofId",
+    "resourceFence",
+    "schema",
+    "settlementLifecycleDigest",
+    "settlementLifecycleFence",
+    "settlementLifecycleVersion",
+    "settlementState",
+    "snapshotVersion"
+  ],
+  "properties": {
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "currentCreditorId": {
+      "type": "string"
+    },
+    "currentSettlementDestinationRef": {
+      "type": "string"
+    },
+    "debtorId": {
+      "type": "string"
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "dispositionDigest": {
+      "type": "string"
+    },
+    "dispositionLifecycleFence": {
+      "type": "integer"
+    },
+    "dispositionVersion": {
+      "type": "integer"
+    },
+    "dueAtUnixMs": {
+      "type": "integer"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "obligationAtomDigest": {
+      "type": "string"
+    },
+    "obligationId": {
+      "type": "string"
+    },
+    "originalCreditorId": {
+      "type": "string"
+    },
+    "proofId": {
+      "type": "string"
+    },
+    "resourceFence": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.obligation.status-proof.v1"
+    },
+    "settlementLifecycleDigest": {
+      "type": "string"
+    },
+    "settlementLifecycleFence": {
+      "type": "integer"
+    },
+    "settlementLifecycleVersion": {
+      "type": "integer"
+    },
+    "settlementState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "evidence_digest": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "settlement_id": {
+          "type": "string"
+        }
+      }
+    },
+    "snapshotVersion": {
+      "type": "integer"
+    }
+  }
+}

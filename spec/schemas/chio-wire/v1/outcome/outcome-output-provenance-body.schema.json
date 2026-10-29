@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-output-provenance-body.schema.json",
+  "title": "chio.outcome.output-provenance.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityId",
+    "authorityKeyEpoch",
+    "eligibilityDigest",
+    "expiresAtUnixMs",
+    "finalOutputDigest",
+    "issuedAtUnixMs",
+    "postGuardEvidenceDigest",
+    "postGuardPolicyDigest",
+    "provenanceClass",
+    "provenanceId",
+    "providerAcceptanceDigest",
+    "providerOutputDigest",
+    "requestId",
+    "schema"
+  ],
+  "properties": {
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "eligibilityDigest": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "finalOutputDigest": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "postGuardEvidenceDigest": {
+      "type": "string"
+    },
+    "postGuardPolicyDigest": {
+      "type": "string"
+    },
+    "provenanceClass": {
+      "type": "string"
+    },
+    "provenanceId": {
+      "type": "string"
+    },
+    "providerAcceptanceDigest": {
+      "type": "string"
+    },
+    "providerOutputDigest": {
+      "type": "string"
+    },
+    "redactionProofDigest": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.output-provenance.v1"
+    }
+  }
+}

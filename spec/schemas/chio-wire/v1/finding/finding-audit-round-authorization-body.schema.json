@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-audit-round-authorization-body.schema.json",
+  "title": "chio.finding.audit-round-authorization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorized_at",
+    "epoch_precommitment_sha256",
+    "expires_at",
+    "schema"
+  ],
+  "properties": {
+    "authorized_at": {
+      "type": "integer"
+    },
+    "epoch_precommitment_sha256": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.audit-round-authorization.v1"
+    }
+  }
+}

@@ -1,0 +1,1587 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/economy-state-batch-body.schema.json",
+  "title": "chio.economy.state-batch.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorId",
+    "batchId",
+    "checkpointSequence",
+    "effectSlots",
+    "expectedHeadsRoot",
+    "issuedAt",
+    "namespace",
+    "nextHeadsRoot",
+    "previousCheckpointDigest",
+    "requestReplays",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "transitions"
+  ],
+  "properties": {
+    "anchorId": {
+      "type": "string"
+    },
+    "batchId": {
+      "type": "string"
+    },
+    "checkpointSequence": {
+      "type": "integer"
+    },
+    "effectSlots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actionDigest",
+          "admissionHandoff",
+          "anchorId",
+          "effectKind",
+          "idempotencyKey",
+          "namespace",
+          "operationId",
+          "parametersDigest",
+          "request",
+          "resourceHeadDigest",
+          "resourceKey",
+          "schema",
+          "slotId",
+          "state",
+          "target"
+        ],
+        "properties": {
+          "actionDigest": {
+            "type": "string"
+          },
+          "admissionHandoff": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "lifecycleFence",
+              "operationVersion",
+              "state",
+              "storeFence"
+            ],
+            "properties": {
+              "lifecycleFence": {
+                "type": "integer"
+              },
+              "operationVersion": {
+                "type": "integer"
+              },
+              "state": {
+                "type": "string"
+              },
+              "storeFence": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lease_id",
+                  "owner_epoch",
+                  "store_uuid"
+                ],
+                "properties": {
+                  "lease_id": {
+                    "type": "string"
+                  },
+                  "owner_epoch": {
+                    "type": "integer"
+                  },
+                  "store_uuid": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "anchorId": {
+            "type": "string"
+          },
+          "effectKind": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "parametersDigest": {
+            "type": "string"
+          },
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requestBindingDigest",
+              "requestId",
+              "requestNamespaceDigest"
+            ],
+            "properties": {
+              "requestBindingDigest": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "requestNamespaceDigest": {
+                "type": "string"
+              }
+            }
+          },
+          "resourceHeadDigest": {
+            "type": "string"
+          },
+          "resourceKey": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "resourceFamily",
+              "resourceId",
+              "scopeId"
+            ],
+            "properties": {
+              "resourceFamily": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "scopeId": {
+                "type": "string"
+              }
+            }
+          },
+          "schema": {
+            "type": "string"
+          },
+          "slotId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "target": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "qualificationDigest",
+              "targetId",
+              "targetKeyEpoch"
+            ],
+            "properties": {
+              "qualificationDigest": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "string"
+              },
+              "targetKeyEpoch": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "expectedHeadsRoot": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "nextHeadsRoot": {
+      "type": "string"
+    },
+    "operationId": {
+      "type": "string"
+    },
+    "previousCheckpointDigest": {
+      "type": "string"
+    },
+    "requestReplays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "effectSlotIds",
+          "operationId",
+          "request"
+        ],
+        "properties": {
+          "effectSlotIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requestBindingDigest",
+              "requestId",
+              "requestNamespaceDigest"
+            ],
+            "properties": {
+              "requestBindingDigest": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "requestNamespaceDigest": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.economy.state-batch.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nextHead",
+          "resourceKey",
+          "transitionProofDigest"
+        ],
+        "properties": {
+          "expectedHeadDigest": {
+            "type": "string"
+          },
+          "nextHead": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "anchorId",
+              "headVersion",
+              "lifecycleFence",
+              "lifecycleState",
+              "namespace",
+              "resourceKey",
+              "resourceVersion",
+              "schema",
+              "state",
+              "stateDigest",
+              "trustedClockHighWater"
+            ],
+            "properties": {
+              "anchorId": {
+                "type": "string"
+              },
+              "effectIdempotencyKey": {
+                "type": "string"
+              },
+              "frost": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "actionDigest",
+                  "authorizationId",
+                  "authorizationSlotId",
+                  "signedEnvelopeDigest"
+                ],
+                "properties": {
+                  "actionDigest": {
+                    "type": "string"
+                  },
+                  "authorizationId": {
+                    "type": "string"
+                  },
+                  "authorizationSlotId": {
+                    "type": "string"
+                  },
+                  "signedEnvelopeDigest": {
+                    "type": "string"
+                  }
+                }
+              },
+              "headVersion": {
+                "type": "integer"
+              },
+              "lifecycleFence": {
+                "type": "integer"
+              },
+              "lifecycleState": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              },
+              "operationId": {
+                "type": "string"
+              },
+              "predecessorDigest": {
+                "type": "string"
+              },
+              "resourceKey": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resourceFamily",
+                  "resourceId",
+                  "scopeId"
+                ],
+                "properties": {
+                  "resourceFamily": {
+                    "type": "string"
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "scopeId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "resourceVersion": {
+                "type": "integer"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "state": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "storage",
+                  "value"
+                ],
+                "properties": {
+                  "storage": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "actionDigest": {
+                        "type": "string"
+                      },
+                      "admissionHandoff": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "lifecycleFence",
+                          "operationVersion",
+                          "state",
+                          "storeFence"
+                        ],
+                        "properties": {
+                          "lifecycleFence": {
+                            "type": "integer"
+                          },
+                          "operationVersion": {
+                            "type": "integer"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "storeFence": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "lease_id",
+                              "owner_epoch",
+                              "store_uuid"
+                            ],
+                            "properties": {
+                              "lease_id": {
+                                "type": "string"
+                              },
+                              "owner_epoch": {
+                                "type": "integer"
+                              },
+                              "store_uuid": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "anchorId": {
+                        "type": "string"
+                      },
+                      "atomDigest": {
+                        "type": "string"
+                      },
+                      "channelId": {
+                        "type": "string"
+                      },
+                      "claim": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "beneficiaryId",
+                          "contestDeadline",
+                          "coverageAuthorityId",
+                          "fundingFacilityId",
+                          "identity",
+                          "lifecycleFence",
+                          "openedAt",
+                          "payerId",
+                          "payoutAmount",
+                          "payoutMode",
+                          "payoutRail",
+                          "schema",
+                          "state",
+                          "triggerMagnitude",
+                          "version"
+                        ],
+                        "properties": {
+                          "beneficiaryId": {
+                            "type": "string"
+                          },
+                          "contestDeadline": {
+                            "type": "integer"
+                          },
+                          "coverageAuthorityId": {
+                            "type": "string"
+                          },
+                          "fundingFacilityId": {
+                            "type": "string"
+                          },
+                          "identity": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "claimId",
+                              "key",
+                              "triggerInstanceId"
+                            ],
+                            "properties": {
+                              "claimId": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "boundCoverageBodyDigest",
+                                  "evidenceRangeDigest",
+                                  "parametricPolicyBodyDigest",
+                                  "subjectKey",
+                                  "triggerPredicateBodyDigest",
+                                  "windowEnd",
+                                  "windowStart"
+                                ],
+                                "properties": {
+                                  "boundCoverageBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "evidenceRangeDigest": {
+                                    "type": "string"
+                                  },
+                                  "parametricPolicyBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "subjectKey": {
+                                    "type": "string"
+                                  },
+                                  "triggerPredicateBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "windowEnd": {
+                                    "type": "integer"
+                                  },
+                                  "windowStart": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "triggerInstanceId": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "lifecycleFence": {
+                            "type": "integer"
+                          },
+                          "openedAt": {
+                            "type": "integer"
+                          },
+                          "payerId": {
+                            "type": "string"
+                          },
+                          "payoutAmount": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "currency",
+                              "units"
+                            ],
+                            "properties": {
+                              "currency": {
+                                "type": "string"
+                              },
+                              "units": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "payoutMode": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind",
+                              "windowSeconds"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "windowSeconds": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "payoutRail": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "destinationAccountDigest",
+                              "kind",
+                              "railId"
+                            ],
+                            "properties": {
+                              "destinationAccountDigest": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              },
+                              "railId": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "schema": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "triggerMagnitude": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "version": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "disposition": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "round_id"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "round_id": {
+                            "type": "string"
+                          },
+                          "satisfaction_digest": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "effectKind": {
+                        "type": "string"
+                      },
+                      "escrowReference": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "chainId",
+                          "escrowContract",
+                          "escrowId"
+                        ],
+                        "properties": {
+                          "chainId": {
+                            "type": "string"
+                          },
+                          "escrowContract": {
+                            "type": "string"
+                          },
+                          "escrowId": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "fence": {
+                        "type": "integer"
+                      },
+                      "finalizationDigest": {
+                        "type": "string"
+                      },
+                      "firstDispatchOperationId": {
+                        "type": "string"
+                      },
+                      "governanceScopeId": {
+                        "type": "string"
+                      },
+                      "idempotencyKey": {
+                        "type": "string"
+                      },
+                      "inputManifestDigest": {
+                        "type": "string"
+                      },
+                      "intentProgress": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "ambiguityCount",
+                            "attemptCount",
+                            "intentDigest",
+                            "intentId",
+                            "noEffectCount",
+                            "reconciliationCount"
+                          ],
+                          "properties": {
+                            "activeEffectSlotId": {
+                              "type": "string"
+                            },
+                            "ambiguityCount": {
+                              "type": "integer"
+                            },
+                            "attemptCount": {
+                              "type": "integer"
+                            },
+                            "completedEffectSlotId": {
+                              "type": "string"
+                            },
+                            "intentDigest": {
+                              "type": "string"
+                            },
+                            "intentId": {
+                              "type": "string"
+                            },
+                            "noEffectCount": {
+                              "type": "integer"
+                            },
+                            "reconciliationChainDigest": {
+                              "type": "string"
+                            },
+                            "reconciliationCount": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      },
+                      "lastTransition": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "authority_digest",
+                          "kind",
+                          "round_id"
+                        ],
+                        "properties": {
+                          "authority_digest": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "round_id": {
+                            "type": "string"
+                          },
+                          "satisfaction_digest": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "lastTransitionDigest": {
+                        "type": "string"
+                      },
+                      "latestSequence": {
+                        "type": "integer"
+                      },
+                      "latestStateDigest": {
+                        "type": "string"
+                      },
+                      "lifecycleFence": {
+                        "type": "integer"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "obligationId": {
+                        "type": "string"
+                      },
+                      "openDigest": {
+                        "type": "string"
+                      },
+                      "operationId": {
+                        "type": "string"
+                      },
+                      "outputManifestDigest": {
+                        "type": "string"
+                      },
+                      "parametersDigest": {
+                        "type": "string"
+                      },
+                      "participantAcceptanceCount": {
+                        "type": "integer"
+                      },
+                      "participantAcceptanceRoot": {
+                        "type": "string"
+                      },
+                      "request": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "requestBindingDigest",
+                          "requestId",
+                          "requestNamespaceDigest"
+                        ],
+                        "properties": {
+                          "requestBindingDigest": {
+                            "type": "string"
+                          },
+                          "requestId": {
+                            "type": "string"
+                          },
+                          "requestNamespaceDigest": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "reservationCount": {
+                        "type": "integer"
+                      },
+                      "reservationRoot": {
+                        "type": "string"
+                      },
+                      "resourceHeadDigest": {
+                        "type": "string"
+                      },
+                      "resourceId": {
+                        "type": "string"
+                      },
+                      "resourceKey": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "resourceFamily",
+                          "resourceId",
+                          "scopeId"
+                        ],
+                        "properties": {
+                          "resourceFamily": {
+                            "type": "string"
+                          },
+                          "resourceId": {
+                            "type": "string"
+                          },
+                          "scopeId": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "resourceVersion": {
+                        "type": "integer"
+                      },
+                      "roundCoreDigest": {
+                        "type": "string"
+                      },
+                      "roundId": {
+                        "type": "string"
+                      },
+                      "rowVersion": {
+                        "type": "integer"
+                      },
+                      "schema": {
+                        "type": "string"
+                      },
+                      "slotId": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "stateVersion": {
+                        "type": "integer"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "qualificationDigest",
+                          "targetId",
+                          "targetKeyEpoch"
+                        ],
+                        "properties": {
+                          "qualificationDigest": {
+                            "type": "string"
+                          },
+                          "targetId": {
+                            "type": "string"
+                          },
+                          "targetKeyEpoch": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "terminal": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "outcome"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "outcome": {
+                            "type": "string"
+                          },
+                          "proof": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "storage",
+                              "value"
+                            ],
+                            "properties": {
+                              "storage": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                  "actionDigest": {
+                                    "type": "string"
+                                  },
+                                  "admissionHandoff": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "lifecycleFence",
+                                      "operationVersion",
+                                      "state",
+                                      "storeFence"
+                                    ],
+                                    "properties": {
+                                      "lifecycleFence": {
+                                        "type": "integer"
+                                      },
+                                      "operationVersion": {
+                                        "type": "integer"
+                                      },
+                                      "state": {
+                                        "type": "string"
+                                      },
+                                      "storeFence": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "required": [
+                                          "lease_id",
+                                          "owner_epoch",
+                                          "store_uuid"
+                                        ],
+                                        "properties": {
+                                          "lease_id": {
+                                            "type": "string"
+                                          },
+                                          "owner_epoch": {
+                                            "type": "integer"
+                                          },
+                                          "store_uuid": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "authenticatedClockUnixMs": {
+                                    "type": "integer"
+                                  },
+                                  "cancellation": {
+                                    "type": "string"
+                                  },
+                                  "channelId": {
+                                    "type": "string"
+                                  },
+                                  "idempotencyKey": {
+                                    "type": "string"
+                                  },
+                                  "issuedAt": {
+                                    "type": "integer"
+                                  },
+                                  "operationId": {
+                                    "type": "string"
+                                  },
+                                  "parametersDigest": {
+                                    "type": "string"
+                                  },
+                                  "provider": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "qualificationDigest",
+                                      "targetId",
+                                      "targetKeyEpoch"
+                                    ],
+                                    "properties": {
+                                      "qualificationDigest": {
+                                        "type": "string"
+                                      },
+                                      "targetId": {
+                                        "type": "string"
+                                      },
+                                      "targetKeyEpoch": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "request": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "requestBindingDigest",
+                                      "requestId",
+                                      "requestNamespaceDigest"
+                                    ],
+                                    "properties": {
+                                      "requestBindingDigest": {
+                                        "type": "string"
+                                      },
+                                      "requestId": {
+                                        "type": "string"
+                                      },
+                                      "requestNamespaceDigest": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "reservationDigest": {
+                                    "type": "string"
+                                  },
+                                  "reservationId": {
+                                    "type": "string"
+                                  },
+                                  "reservationProposalDigest": {
+                                    "type": "string"
+                                  },
+                                  "schema": {
+                                    "type": "string"
+                                  },
+                                  "serviceBindingDigest": {
+                                    "type": "string"
+                                  },
+                                  "sourceChannelHeadDigest": {
+                                    "type": "string"
+                                  },
+                                  "sourceCheckpointDigest": {
+                                    "type": "string"
+                                  },
+                                  "sourceCheckpointSequence": {
+                                    "type": "integer"
+                                  },
+                                  "sourceEffectHeadDigest": {
+                                    "type": "string"
+                                  },
+                                  "sourceEscrowHeadDigest": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "proof_digest": {
+                            "type": "string"
+                          },
+                          "proof_id": {
+                            "type": "string"
+                          },
+                          "result": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "storage",
+                              "value"
+                            ],
+                            "properties": {
+                              "storage": {
+                                "type": "string"
+                              },
+                              "value": {}
+                            }
+                          },
+                          "result_digest": {
+                            "type": "string"
+                          },
+                          "result_id": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "trigger": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "evidenceManifest",
+                          "identity",
+                          "magnitude",
+                          "schema",
+                          "signedPolicy"
+                        ],
+                        "properties": {
+                          "evidenceManifest": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "ranges"
+                            ],
+                            "properties": {
+                              "ranges": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "anchorEpoch",
+                                    "checkpointAt",
+                                    "checkpointId",
+                                    "checkpointRoot",
+                                    "expectedCount",
+                                    "indexNamespace",
+                                    "queryIndexRoot",
+                                    "rangeProofDigest",
+                                    "selectedMemberRoot",
+                                    "sequenceRange",
+                                    "signerKeyEpoch",
+                                    "sourceId",
+                                    "sourceKind",
+                                    "sourcePrefixCutoff",
+                                    "subjectKey",
+                                    "window"
+                                  ],
+                                  "properties": {
+                                    "anchorEpoch": {
+                                      "type": "integer"
+                                    },
+                                    "checkpointAt": {
+                                      "type": "integer"
+                                    },
+                                    "checkpointId": {
+                                      "type": "string"
+                                    },
+                                    "checkpointRoot": {
+                                      "type": "string"
+                                    },
+                                    "expectedCount": {
+                                      "type": "integer"
+                                    },
+                                    "indexNamespace": {
+                                      "type": "string"
+                                    },
+                                    "queryIndexRoot": {
+                                      "type": "string"
+                                    },
+                                    "rangeProofDigest": {
+                                      "type": "string"
+                                    },
+                                    "selectedMemberRoot": {
+                                      "type": "string"
+                                    },
+                                    "sequenceRange": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "first",
+                                        "last"
+                                      ],
+                                      "properties": {
+                                        "first": {
+                                          "type": "integer"
+                                        },
+                                        "last": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    },
+                                    "signerKeyEpoch": {
+                                      "type": "integer"
+                                    },
+                                    "sourceId": {
+                                      "type": "string"
+                                    },
+                                    "sourceKind": {
+                                      "type": "string"
+                                    },
+                                    "sourcePrefixCutoff": {
+                                      "type": "integer"
+                                    },
+                                    "subjectKey": {
+                                      "type": "string"
+                                    },
+                                    "window": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "endAt",
+                                        "startAt"
+                                      ],
+                                      "properties": {
+                                        "endAt": {
+                                          "type": "integer"
+                                        },
+                                        "startAt": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "identity": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "claimId",
+                              "key",
+                              "triggerInstanceId"
+                            ],
+                            "properties": {
+                              "claimId": {
+                                "type": "string"
+                              },
+                              "key": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "boundCoverageBodyDigest",
+                                  "evidenceRangeDigest",
+                                  "parametricPolicyBodyDigest",
+                                  "subjectKey",
+                                  "triggerPredicateBodyDigest",
+                                  "windowEnd",
+                                  "windowStart"
+                                ],
+                                "properties": {
+                                  "boundCoverageBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "evidenceRangeDigest": {
+                                    "type": "string"
+                                  },
+                                  "parametricPolicyBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "subjectKey": {
+                                    "type": "string"
+                                  },
+                                  "triggerPredicateBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "windowEnd": {
+                                    "type": "integer"
+                                  },
+                                  "windowStart": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "triggerInstanceId": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "magnitude": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "kind",
+                              "value"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "schema": {
+                            "type": "string"
+                          },
+                          "signedPolicy": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "body",
+                              "signature",
+                              "signerKey"
+                            ],
+                            "properties": {
+                              "body": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "beneficiaryId",
+                                  "boundCoverageBodyDigest",
+                                  "boundCoverageEnvelopeDigest",
+                                  "coverageAmount",
+                                  "coverageAuthorityId",
+                                  "effectiveFrom",
+                                  "effectiveUntil",
+                                  "evaluatorAuthority",
+                                  "fundingFacilityId",
+                                  "issuedAt",
+                                  "maxCheckpointLagSeconds",
+                                  "payerId",
+                                  "payoutMode",
+                                  "payoutRail",
+                                  "payoutSchedule",
+                                  "preActionAuthorityDigest",
+                                  "predicate",
+                                  "schema",
+                                  "subjectKey",
+                                  "windowAnchor",
+                                  "windowSeconds"
+                                ],
+                                "properties": {
+                                  "beneficiaryId": {
+                                    "type": "string"
+                                  },
+                                  "boundCoverageBodyDigest": {
+                                    "type": "string"
+                                  },
+                                  "boundCoverageEnvelopeDigest": {
+                                    "type": "string"
+                                  },
+                                  "coverageAmount": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "currency",
+                                      "units"
+                                    ],
+                                    "properties": {
+                                      "currency": {
+                                        "type": "string"
+                                      },
+                                      "units": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "coverageAuthorityId": {
+                                    "type": "string"
+                                  },
+                                  "effectiveFrom": {
+                                    "type": "integer"
+                                  },
+                                  "effectiveUntil": {
+                                    "type": "integer"
+                                  },
+                                  "evaluatorAuthority": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "authorityId",
+                                      "keyEpoch",
+                                      "keyId"
+                                    ],
+                                    "properties": {
+                                      "authorityId": {
+                                        "type": "string"
+                                      },
+                                      "keyEpoch": {
+                                        "type": "integer"
+                                      },
+                                      "keyId": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "fundingFacilityId": {
+                                    "type": "string"
+                                  },
+                                  "issuedAt": {
+                                    "type": "integer"
+                                  },
+                                  "maxCheckpointLagSeconds": {
+                                    "type": "integer"
+                                  },
+                                  "payerId": {
+                                    "type": "string"
+                                  },
+                                  "payoutMode": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "kind",
+                                      "windowSeconds"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string"
+                                      },
+                                      "windowSeconds": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "payoutRail": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "destinationAccountDigest",
+                                      "kind",
+                                      "railId"
+                                    ],
+                                    "properties": {
+                                      "destinationAccountDigest": {
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "type": "string"
+                                      },
+                                      "railId": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "payoutSchedule": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "amount",
+                                      "kind"
+                                    ],
+                                    "properties": {
+                                      "amount": {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "required": [
+                                          "currency",
+                                          "units"
+                                        ],
+                                        "properties": {
+                                          "currency": {
+                                            "type": "string"
+                                          },
+                                          "units": {
+                                            "type": "integer"
+                                          }
+                                        }
+                                      },
+                                      "kind": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "preActionAuthorityDigest": {
+                                    "type": "string"
+                                  },
+                                  "predicate": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "kind",
+                                      "minEvents",
+                                      "thresholdBps"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string"
+                                      },
+                                      "minEvents": {
+                                        "type": "integer"
+                                      },
+                                      "thresholdBps": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "schema": {
+                                    "type": "string"
+                                  },
+                                  "subjectKey": {
+                                    "type": "string"
+                                  },
+                                  "windowAnchor": {
+                                    "type": "integer"
+                                  },
+                                  "windowSeconds": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "signature": {
+                                "type": "string"
+                              },
+                              "signerKey": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "trustedOpenedAt": {
+                        "type": "integer"
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "stateDigest": {
+                "type": "string"
+              },
+              "terminalResult": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "result",
+                  "resultDigest",
+                  "resultId"
+                ],
+                "properties": {
+                  "result": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "storage",
+                      "value"
+                    ],
+                    "properties": {
+                      "storage": {
+                        "type": "string"
+                      },
+                      "value": {}
+                    }
+                  },
+                  "resultDigest": {
+                    "type": "string"
+                  },
+                  "resultId": {
+                    "type": "string"
+                  }
+                }
+              },
+              "trustedClockHighWater": {
+                "type": "integer"
+              }
+            }
+          },
+          "preparedEffect": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "actionDigest",
+              "authorization",
+              "effectSlotDigest",
+              "effectSlotId",
+              "operationId"
+            ],
+            "properties": {
+              "actionDigest": {
+                "type": "string"
+              },
+              "authorization": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode"
+                ],
+                "properties": {
+                  "mode": {
+                    "type": "string"
+                  }
+                }
+              },
+              "effectSlotDigest": {
+                "type": "string"
+              },
+              "effectSlotId": {
+                "type": "string"
+              },
+              "operationId": {
+                "type": "string"
+              }
+            }
+          },
+          "resourceKey": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "resourceFamily",
+              "resourceId",
+              "scopeId"
+            ],
+            "properties": {
+              "resourceFamily": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "scopeId": {
+                "type": "string"
+              }
+            }
+          },
+          "transitionProofDigest": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

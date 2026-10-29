@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-challenge-body.schema.json",
+  "title": "chio.finding.challenge.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "affected_deliveries",
+    "authorization",
+    "backing_envelope_sha256",
+    "challenge_id",
+    "evidence",
+    "filed_at",
+    "finding_artifact_sha256",
+    "finding_id",
+    "listing_id",
+    "profile_envelope_sha256",
+    "schema",
+    "terms_envelope_sha256",
+    "venue_admission_envelope_sha256"
+  ],
+  "properties": {
+    "affected_deliveries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkpoint_ref",
+          "checkpoint_sha256",
+          "receipt_id",
+          "receipt_sha256"
+        ],
+        "properties": {
+          "checkpoint_ref": {
+            "type": "string"
+          },
+          "checkpoint_sha256": {
+            "type": "string"
+          },
+          "receipt_id": {
+            "type": "string"
+          },
+          "receipt_sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "buyer_submission": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "challenger",
+            "dispute_fee_terminal",
+            "dispute_lock_ref",
+            "standing"
+          ],
+          "properties": {
+            "challenger": {
+              "type": "string"
+            },
+            "dispute_fee_terminal": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "beneficiary_pool_principal_id",
+                "event",
+                "fee_schedule_envelope_sha256",
+                "payer",
+                "rail_destination"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "currency",
+                    "units"
+                  ],
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "units": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "beneficiary_pool_principal_id": {
+                  "type": "string"
+                },
+                "event": {
+                  "type": "string"
+                },
+                "fee_schedule_envelope_sha256": {
+                  "type": "string"
+                },
+                "payer": {
+                  "type": "string"
+                },
+                "rail_destination": {
+                  "type": "string"
+                }
+              }
+            },
+            "dispute_lock_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "amount",
+                "class",
+                "expiry",
+                "fee_schedule_envelope_sha256",
+                "lock_id"
+              ],
+              "properties": {
+                "amount": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "currency",
+                    "units"
+                  ],
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "units": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "class": {
+                  "type": "string"
+                },
+                "expiry": {
+                  "type": "integer"
+                },
+                "fee_schedule_envelope_sha256": {
+                  "type": "string"
+                },
+                "lock_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "standing": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "failed_delivery"
+              ],
+              "properties": {
+                "failed_delivery": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "failed_delivery_envelope_sha256",
+                    "failed_delivery_id"
+                  ],
+                  "properties": {
+                    "failed_delivery_envelope_sha256": {
+                      "type": "string"
+                    },
+                    "failed_delivery_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "venue_audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "audit_epoch_envelope_sha256",
+            "authorization_digest",
+            "selection_digest"
+          ],
+          "properties": {
+            "audit_epoch_envelope_sha256": {
+              "type": "string"
+            },
+            "authorization_digest": {
+              "type": "string"
+            },
+            "selection_digest": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "backing_envelope_sha256": {
+      "type": "string"
+    },
+    "challenge_id": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "digest_mismatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deny_checkpoint_ref",
+            "deny_receipt_ref",
+            "failed_delivery_envelope_sha256"
+          ],
+          "properties": {
+            "deny_checkpoint_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "checkpoint_ref",
+                "checkpoint_sha256"
+              ],
+              "properties": {
+                "checkpoint_ref": {
+                  "type": "string"
+                },
+                "checkpoint_sha256": {
+                  "type": "string"
+                }
+              }
+            },
+            "deny_receipt_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "receipt_id",
+                "receipt_sha256"
+              ],
+              "properties": {
+                "receipt_id": {
+                  "type": "string"
+                },
+                "receipt_sha256": {
+                  "type": "string"
+                }
+              }
+            },
+            "failed_delivery_envelope_sha256": {
+              "type": "string"
+            }
+          }
+        },
+        "evidence_invalid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "challenged_checkpoint_ref",
+            "challenged_evidence_receipt_refs",
+            "purchase_record_envelope_sha256"
+          ],
+          "properties": {
+            "challenged_checkpoint_ref": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "checkpoint_ref",
+                "checkpoint_sha256"
+              ],
+              "properties": {
+                "checkpoint_ref": {
+                  "type": "string"
+                },
+                "checkpoint_sha256": {
+                  "type": "string"
+                }
+              }
+            },
+            "challenged_evidence_receipt_refs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "receipt_id",
+                  "receipt_sha256"
+                ],
+                "properties": {
+                  "receipt_id": {
+                    "type": "string"
+                  },
+                  "receipt_sha256": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "purchase_record_envelope_sha256": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "filed_at": {
+      "type": "integer"
+    },
+    "finding_artifact_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "profile_envelope_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.challenge.v1"
+    },
+    "terms_envelope_sha256": {
+      "type": "string"
+    },
+    "venue_admission_envelope_sha256": {
+      "type": "string"
+    }
+  }
+}

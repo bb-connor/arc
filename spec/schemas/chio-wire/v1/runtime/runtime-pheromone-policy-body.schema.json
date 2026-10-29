@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/runtime-pheromone-policy-body.schema.json",
+  "title": "chio.runtime.pheromone-policy.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowedReputationEpochs",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "keyId",
+    "maxQueryReportAgeMs",
+    "minDistinctOriginPairs",
+    "mode",
+    "peerWeightsSha256",
+    "policyId",
+    "policyVersion",
+    "rules",
+    "runtimeTrustBundleSha256",
+    "schema",
+    "verifierId"
+  ],
+  "properties": {
+    "allowedReputationEpochs": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "maxQueryReportAgeMs": {
+      "type": "integer"
+    },
+    "minDistinctOriginPairs": {
+      "type": "integer"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "peerWeightsSha256": {
+      "type": "string"
+    },
+    "policyId": {
+      "type": "string"
+    },
+    "policyVersion": {
+      "type": "integer"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actionClassId",
+          "direction",
+          "effect",
+          "ruleId",
+          "subjectClass",
+          "subjectClassNamespace",
+          "thresholdTotalStrength"
+        ],
+        "properties": {
+          "actionClassId": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": "string"
+          },
+          "subjectClass": {
+            "type": "string"
+          },
+          "subjectClassNamespace": {
+            "type": "string"
+          },
+          "thresholdTotalStrength": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "runtimeTrustBundleSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.pheromone-policy.v1"
+    },
+    "verifierId": {
+      "type": "string"
+    }
+  }
+}

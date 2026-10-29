@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-payment-lifecycle-body.schema.json",
+  "title": "chio.commerce.payment-lifecycle.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount_minor",
+    "authorization_ref",
+    "balance_transaction_ref",
+    "capture_before",
+    "capture_mode",
+    "capture_ref",
+    "captured_at",
+    "charge_ref",
+    "chargeback_status",
+    "currency",
+    "dispute_status",
+    "fraud_outcome",
+    "id",
+    "issued_at",
+    "issuer",
+    "merchant_subject",
+    "order_id",
+    "payment_intent_id",
+    "payment_status",
+    "psp",
+    "quote_sha256",
+    "refund_status",
+    "schema",
+    "transfer_group",
+    "transfer_reversal_status"
+  ],
+  "properties": {
+    "amount_minor": {
+      "type": "integer"
+    },
+    "authorization_ref": {
+      "type": "string"
+    },
+    "balance_transaction_ref": {
+      "type": "string"
+    },
+    "capture_before": {
+      "type": "string"
+    },
+    "capture_mode": {
+      "type": "string"
+    },
+    "capture_ref": {
+      "type": "string"
+    },
+    "captured_at": {
+      "type": "string"
+    },
+    "charge_ref": {
+      "type": "string"
+    },
+    "chargeback_status": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "dispute_status": {
+      "type": "string"
+    },
+    "fraud_outcome": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "merchant_subject": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "payment_intent_id": {
+      "type": "string"
+    },
+    "payment_status": {
+      "type": "string"
+    },
+    "psp": {
+      "type": "string"
+    },
+    "quote_sha256": {
+      "type": "string"
+    },
+    "refund_status": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.payment-lifecycle.v1"
+    },
+    "transfer_group": {
+      "type": "string"
+    },
+    "transfer_reversal_status": {
+      "type": "string"
+    }
+  }
+}

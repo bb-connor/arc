@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json",
+  "title": "chio.threshold-approval-proposal.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorizing_capability_digest",
+    "eligible_set_digest",
+    "governed_intent_hash",
+    "policy_authority",
+    "policy_hash",
+    "proposal_created_at",
+    "proposal_deadline",
+    "proposal_id",
+    "request_id",
+    "schema",
+    "subject",
+    "threshold"
+  ],
+  "properties": {
+    "authorizing_capability_digest": {
+      "type": "string"
+    },
+    "eligible_set_digest": {
+      "type": "string"
+    },
+    "governed_intent_hash": {
+      "type": "string"
+    },
+    "policy_authority": {
+      "type": "string"
+    },
+    "policy_hash": {
+      "type": "string"
+    },
+    "proposal_created_at": {
+      "type": "integer"
+    },
+    "proposal_deadline": {
+      "type": "integer"
+    },
+    "proposal_id": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.threshold-approval-proposal.v1"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "threshold": {
+      "type": "integer"
+    }
+  }
+}

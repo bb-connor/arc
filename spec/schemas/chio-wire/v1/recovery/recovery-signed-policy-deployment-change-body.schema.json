@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/recovery/recovery-signed-policy-deployment-change-body.schema.json",
+  "title": "chio.recovery.signed-policy-deployment-change.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "base_deployment",
+    "base_generation",
+    "base_policy",
+    "domain_version",
+    "proposal_digest",
+    "proposal_id",
+    "scope",
+    "target_deployment",
+    "target_generation",
+    "target_policy",
+    "writer_fence"
+  ],
+  "properties": {
+    "base_deployment": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "base_generation": {
+      "type": "integer"
+    },
+    "base_policy": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "domain_version": {
+      "type": "integer"
+    },
+    "proposal_digest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "proposal_id": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "process_id",
+        "tenant_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "type": "string"
+        },
+        "process_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        }
+      }
+    },
+    "target_deployment": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "target_generation": {
+      "type": "integer"
+    },
+    "target_policy": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "writer_fence": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

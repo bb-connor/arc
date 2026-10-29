@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-reservation-body.schema.json",
+  "title": "chio.channel.reservation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channelId",
+        "channelStateExpectedVersion",
+        "dispositionExpectedVersion",
+        "expiresAtUnixMs",
+        "lifecycleFence",
+        "maximumCharge",
+        "maximumTokenBaseUnits",
+        "nextSequence",
+        "openDigest",
+        "operationId",
+        "priorStateDigest",
+        "receiptAuthorityDigest",
+        "requestId",
+        "reservationId",
+        "schema",
+        "serviceBindingDigest"
+      ],
+      "properties": {
+        "channelId": {
+          "type": "string"
+        },
+        "channelStateExpectedVersion": {
+          "type": "integer"
+        },
+        "dispositionExpectedVersion": {
+          "type": "integer"
+        },
+        "expiresAtUnixMs": {
+          "type": "integer"
+        },
+        "lifecycleFence": {
+          "type": "integer"
+        },
+        "maximumCharge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "maximumTokenBaseUnits": {
+          "type": "string"
+        },
+        "nextSequence": {
+          "type": "integer"
+        },
+        "openDigest": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "priorStateDigest": {
+          "type": "string"
+        },
+        "receiptAuthorityDigest": {
+          "type": "string"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "reservationId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "serviceBindingDigest": {
+          "type": "string"
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

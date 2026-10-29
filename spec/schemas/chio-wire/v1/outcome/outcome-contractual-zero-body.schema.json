@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-contractual-zero-body.schema.json",
+  "title": "chio.outcome.contractual-zero.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityId",
+    "authorityKeyEpoch",
+    "contractualZeroId",
+    "eligibilityDigest",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "noDeliverySlotProofDigest",
+    "postGuardEvidenceDigest",
+    "postGuardPolicyDigest",
+    "providerAcceptanceDigest",
+    "reason",
+    "requestId",
+    "schema",
+    "terminalToolOutcomeDigest"
+  ],
+  "properties": {
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "contractualZeroId": {
+      "type": "string"
+    },
+    "eligibilityDigest": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "noDeliverySlotProofDigest": {
+      "type": "string"
+    },
+    "postGuardEvidenceDigest": {
+      "type": "string"
+    },
+    "postGuardPolicyDigest": {
+      "type": "string"
+    },
+    "providerAcceptanceDigest": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.contractual-zero.v1"
+    },
+    "terminalToolOutcomeDigest": {
+      "type": "string"
+    }
+  }
+}

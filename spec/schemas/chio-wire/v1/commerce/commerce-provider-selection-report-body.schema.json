@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-provider-selection-report-body.schema.json",
+  "title": "chio.commerce.provider-selection-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "discovery_snapshot_ref",
+    "id",
+    "issued_at",
+    "order_id",
+    "override_receipt_ref",
+    "passport_id",
+    "price_quote_ref",
+    "ranking_policy_ref",
+    "ranking_results",
+    "rejected_candidate_summaries",
+    "risk_report_ref",
+    "schema",
+    "scorecard_ref",
+    "selected_provider_subject",
+    "selection_reason_codes",
+    "sla_commitment_ref"
+  ],
+  "properties": {
+    "discovery_snapshot_ref": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "override_receipt_ref": {
+      "type": "string"
+    },
+    "passport_id": {
+      "type": "string"
+    },
+    "price_quote_ref": {
+      "type": "string"
+    },
+    "ranking_policy_ref": {
+      "type": "string"
+    },
+    "ranking_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_subject",
+          "rank",
+          "total_score"
+        ],
+        "properties": {
+          "provider_subject": {
+            "type": "string"
+          },
+          "rank": {
+            "type": "integer"
+          },
+          "total_score": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "rejected_candidate_summaries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_subject",
+          "reason_codes",
+          "redacted_fields"
+        ],
+        "properties": {
+          "provider_subject": {
+            "type": "string"
+          },
+          "reason_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "redacted_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "risk_report_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.provider-selection-report.v1"
+    },
+    "scorecard_ref": {
+      "type": "string"
+    },
+    "selected_provider_subject": {
+      "type": "string"
+    },
+    "selection_reason_codes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sla_commitment_ref": {
+      "type": "string"
+    }
+  }
+}

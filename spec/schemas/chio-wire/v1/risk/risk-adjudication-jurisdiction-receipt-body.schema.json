@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/risk/risk-adjudication-jurisdiction-receipt-body.schema.json",
+  "title": "chio.risk.adjudication-jurisdiction-receipt.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adjudicator_subjects",
+    "appeal_authority_refs",
+    "covered_dispute_types",
+    "effective_window",
+    "evidence_rules_ref",
+    "id",
+    "issued_at",
+    "jurisdiction_id",
+    "order_id",
+    "policy_ref",
+    "remedy_limits",
+    "schema",
+    "slash_authority_refs"
+  ],
+  "properties": {
+    "adjudicator_subjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "appeal_authority_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "covered_dispute_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "effective_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end",
+        "start"
+      ],
+      "properties": {
+        "end": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence_rules_ref": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "jurisdiction_id": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "policy_ref": {
+      "type": "string"
+    },
+    "remedy_limits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currency",
+          "maximum_remedy"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "maximum_remedy": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.risk.adjudication-jurisdiction-receipt.v1"
+    },
+    "slash_authority_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

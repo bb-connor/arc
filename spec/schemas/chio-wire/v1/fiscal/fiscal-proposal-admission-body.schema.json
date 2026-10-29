@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-proposal-admission-body.schema.json",
+  "title": "chio.fiscal.proposal-admission.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admissionAuthorityId",
+    "admissionId",
+    "admissionSequence",
+    "admittedAt",
+    "governingOperatorId",
+    "predecessorCharterDigest",
+    "predecessorCharterId",
+    "predecessorCharterSequence",
+    "proposalDigest",
+    "proposalExpiresAt",
+    "proposalId",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId"
+  ],
+  "properties": {
+    "admissionAuthorityId": {
+      "type": "string"
+    },
+    "admissionId": {
+      "type": "string"
+    },
+    "admissionSequence": {
+      "type": "integer"
+    },
+    "admittedAt": {
+      "type": "integer"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "predecessorCharterDigest": {
+      "type": "string"
+    },
+    "predecessorCharterId": {
+      "type": "string"
+    },
+    "predecessorCharterSequence": {
+      "type": "integer"
+    },
+    "proposalDigest": {
+      "type": "string"
+    },
+    "proposalExpiresAt": {
+      "type": "integer"
+    },
+    "proposalId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.proposal-admission.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    }
+  }
+}

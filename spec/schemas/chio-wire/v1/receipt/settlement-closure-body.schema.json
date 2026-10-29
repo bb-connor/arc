@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/settlement-closure-body.schema.json",
+  "title": "chio.settlement-closure.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture",
+    "n"
+  ],
+  "properties": {
+    "fixture": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    }
+  }
+}

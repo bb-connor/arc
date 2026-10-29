@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-admission-body.schema.json",
+  "title": "chio.finding.admission.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission_id",
+    "audit_pool",
+    "backing_allocation_id",
+    "backing_envelope_sha256",
+    "capability_scope",
+    "challenge_administration_pool",
+    "community_fund_destination",
+    "expires_at",
+    "failed_delivery_authority",
+    "fee_schedule_envelope_sha256",
+    "fee_terminals",
+    "finding_artifact_sha256",
+    "finding_id",
+    "issued_at",
+    "listing_envelope_sha256",
+    "listing_id",
+    "metadata_url",
+    "payee_destination",
+    "pricing_hint_envelope_sha256",
+    "profile_envelope_sha256",
+    "publisher_operator_id",
+    "purchase_authority",
+    "schema",
+    "seller_authorization_envelope_sha256",
+    "server_id",
+    "status_feed_operator_ref",
+    "terms_envelope_sha256",
+    "venue",
+    "venue_id",
+    "verifier_report_envelope_sha256",
+    "verifier_report_id"
+  ],
+  "properties": {
+    "admission_id": {
+      "type": "string"
+    },
+    "audit_pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_epoch",
+        "currency",
+        "principal_id",
+        "rail_destination"
+      ],
+      "properties": {
+        "authority_epoch": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "rail_destination": {
+          "type": "string"
+        }
+      }
+    },
+    "backing_allocation_id": {
+      "type": "string"
+    },
+    "backing_envelope_sha256": {
+      "type": "string"
+    },
+    "capability_scope": {
+      "type": "string"
+    },
+    "challenge_administration_pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_epoch",
+        "currency",
+        "principal_id",
+        "rail_destination"
+      ],
+      "properties": {
+        "authority_epoch": {
+          "type": "integer"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "principal_id": {
+          "type": "string"
+        },
+        "rail_destination": {
+          "type": "string"
+        }
+      }
+    },
+    "community_fund_destination": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "failed_delivery_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "fee_schedule_envelope_sha256": {
+      "type": "string"
+    },
+    "fee_terminals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amount",
+          "event",
+          "fee_schedule_envelope_sha256",
+          "instruction_sha256",
+          "observation_sha256",
+          "payer",
+          "pool_principal_id",
+          "rail_destination"
+        ],
+        "properties": {
+          "amount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "event": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "participation_epoch"
+                ],
+                "properties": {
+                  "participation_epoch": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "epoch_index"
+                    ],
+                    "properties": {
+                      "epoch_index": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "fee_schedule_envelope_sha256": {
+            "type": "string"
+          },
+          "instruction_sha256": {
+            "type": "string"
+          },
+          "observation_sha256": {
+            "type": "string"
+          },
+          "payer": {
+            "type": "string"
+          },
+          "pool_principal_id": {
+            "type": "string"
+          },
+          "rail_destination": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "finding_artifact_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "listing_envelope_sha256": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "metadata_url": {
+      "type": "string"
+    },
+    "payee_destination": {
+      "type": "string"
+    },
+    "pricing_hint_envelope_sha256": {
+      "type": "string"
+    },
+    "profile_envelope_sha256": {
+      "type": "string"
+    },
+    "publisher_operator_id": {
+      "type": "string"
+    },
+    "purchase_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.finding.admission.v1"
+    },
+    "seller_authorization_envelope_sha256": {
+      "type": "string"
+    },
+    "server_id": {
+      "type": "string"
+    },
+    "status_feed_operator_ref": {
+      "type": "string"
+    },
+    "terms_envelope_sha256": {
+      "type": "string"
+    },
+    "venue": {
+      "type": "string"
+    },
+    "venue_id": {
+      "type": "string"
+    },
+    "verifier_report_envelope_sha256": {
+      "type": "string"
+    },
+    "verifier_report_id": {
+      "type": "string"
+    }
+  }
+}

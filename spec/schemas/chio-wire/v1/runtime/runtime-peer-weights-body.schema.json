@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/runtime-peer-weights-body.schema.json",
+  "title": "chio.runtime.peer-weights.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "keyId",
+    "reputationEpoch",
+    "schema",
+    "verifierId",
+    "weights"
+  ],
+  "properties": {
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "reputationEpoch": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.runtime.peer-weights.v1"
+    },
+    "verifierId": {
+      "type": "string"
+    },
+    "weights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "peerKernelId",
+          "weight"
+        ],
+        "properties": {
+          "peerKernelId": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

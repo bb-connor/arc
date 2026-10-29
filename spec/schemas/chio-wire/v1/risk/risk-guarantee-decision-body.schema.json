@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/risk/risk-guarantee-decision-body.schema.json",
+  "title": "chio.risk.guarantee-decision.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adjudication_jurisdiction_ref",
+    "backing_refs",
+    "beneficiary_subject",
+    "claim_window",
+    "coverage_decision_ref",
+    "currency",
+    "exclusions_ref",
+    "guarantee_id",
+    "guarantee_type",
+    "id",
+    "issued_at",
+    "maximum_remedy",
+    "order_id",
+    "provider_subject",
+    "schema",
+    "sla_commitment_ref",
+    "verdict"
+  ],
+  "properties": {
+    "adjudication_jurisdiction_ref": {
+      "type": "string"
+    },
+    "backing_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "beneficiary_subject": {
+      "type": "string"
+    },
+    "claim_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "end",
+        "start"
+      ],
+      "properties": {
+        "end": {
+          "type": "string"
+        },
+        "start": {
+          "type": "string"
+        }
+      }
+    },
+    "coverage_decision_ref": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "exclusions_ref": {
+      "type": "string"
+    },
+    "guarantee_id": {
+      "type": "string"
+    },
+    "guarantee_type": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "maximum_remedy": {
+      "type": "integer"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.risk.guarantee-decision.v1"
+    },
+    "sla_commitment_ref": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string"
+    }
+  }
+}

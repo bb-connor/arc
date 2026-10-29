@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/economy-effect-dispatch-commit-body.schema.json",
+  "title": "chio.economy.effect-dispatch-commit.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorId",
+    "casNonceDigest",
+    "commitId",
+    "committedAt",
+    "committedCheckpointDigest",
+    "effectHeadDigest",
+    "effectSlotId",
+    "namespace",
+    "previousCheckpointDigest",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId"
+  ],
+  "properties": {
+    "anchorId": {
+      "type": "string"
+    },
+    "casNonceDigest": {
+      "type": "string"
+    },
+    "commitId": {
+      "type": "string"
+    },
+    "committedAt": {
+      "type": "integer"
+    },
+    "committedCheckpointDigest": {
+      "type": "string"
+    },
+    "effectHeadDigest": {
+      "type": "string"
+    },
+    "effectSlotId": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "previousCheckpointDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.economy.effect-dispatch-commit.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    }
+  }
+}

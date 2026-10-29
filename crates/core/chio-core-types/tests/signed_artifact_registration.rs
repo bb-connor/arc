@@ -27,6 +27,30 @@ fn registry_rows() -> Vec<Value> {
         .clone()
 }
 
+/// `UNCAPTURED_WRAPPER_IDS` of `scripts/gen-signed-artifact-schemas.py`:
+/// the closed list of wrapper ids no capture test signs yet, none of which
+/// may hold a recorded body.
+fn uncaptured_wrapper_ids() -> BTreeSet<String> {
+    let script = fs::read_to_string(repo_root().join("scripts/gen-signed-artifact-schemas.py"))
+        .expect("schema generator is readable");
+    let start = script
+        .find("\nUNCAPTURED_WRAPPER_IDS: tuple[str, ...] = (\n")
+        .expect("UNCAPTURED_WRAPPER_IDS list");
+    let list = &script[start..];
+    let end = list.find("\n)\n").expect("UNCAPTURED_WRAPPER_IDS end");
+    list[..end]
+        .lines()
+        .skip(2)
+        .map(|line| {
+            line.trim()
+                .strip_prefix('"')
+                .and_then(|line| line.strip_suffix("\","))
+                .expect("one quoted id per line")
+                .to_string()
+        })
+        .collect()
+}
+
 /// The example directory name of a schema id, as
 /// `scripts/gen-signed-artifact-schemas.py` writes it.
 fn escape_schema_id(schema_id: &str) -> String {
@@ -156,7 +180,8 @@ fn wrapper_ids_are_unique_per_type() {
     }
 }
 
-/// Every wrapper id has at least one recorded body under
+/// Every wrapper id outside [`uncaptured_wrapper_ids`] has at least one
+/// recorded body under
 /// `spec/schemas/signed-artifact-examples/<escaped id>/`, and every recorded
 /// body validates against its registry row's `payloadSchemaFile`, or its
 /// `schemaFile` when the row has no separate payload schema.
@@ -177,6 +202,7 @@ fn registered_rows_validate_live_serialization() {
     let examples_root = root.join("spec/schemas/signed-artifact-examples");
     let mut failures = Vec::new();
     let mut directories = BTreeSet::new();
+    let uncaptured = uncaptured_wrapper_ids();
     let rows: BTreeMap<String, Value> = registry_rows()
         .into_iter()
         .map(|row| (row["schema"].as_str().expect("row schema").to_string(), row))
@@ -191,6 +217,14 @@ fn registered_rows_validate_live_serialization() {
             .or_else(|| row["schemaFile"].as_str())
             .expect("row schemaFile");
         let directory = examples_root.join(escape_schema_id(id));
+        if uncaptured.contains(*id) {
+            if directory.exists() {
+                failures.push(format!(
+                    "{id}: listed as uncaptured but has recorded bodies"
+                ));
+            }
+            continue;
+        }
         directories.insert(escape_schema_id(id));
         let mut examples: Vec<PathBuf> = fs::read_dir(&directory)
             .map(|entries| {

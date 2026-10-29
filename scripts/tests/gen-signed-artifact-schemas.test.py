@@ -816,6 +816,30 @@ PINNED_PLACEHOLDERS = (
         "chio.market.quote-response.v1",
         "/quoteRequest/body/riskPackage/body/scorecard/body/dimensions",
     ),
+    (
+        "chio.risk.collateral-position-report.v1",
+        "/consumed_amount_refs",
+    ),
+    (
+        "chio.root-policy.v1",
+        "/disclosure/tools/crm~1search/result/inline_fields",
+    ),
+    (
+        "chio.trust.reputation-import-report.v1",
+        "/negative_event_refs",
+    ),
+    (
+        "chio.trust.scorecard-snapshot.v1",
+        "/downgrade_reasons",
+    ),
+    (
+        "chio.trust.scorecard-snapshot.v1",
+        "/negative_event_refs",
+    ),
+    (
+        "chio.web3-settlement-proof-bundle.v1",
+        "/settlement_receipt/reconciled_anchor_proof/receipt_inclusion/proof/audit_path",
+    ),
 )
 
 check_placeholder_list()

@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/lineage/lineage-signed-subgraph-body.schema.json",
+  "title": "chio.lineage.signed-subgraph.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audience",
+    "challenge_nonce",
+    "checkpoint_inclusion_sha256",
+    "checkpoint_ref",
+    "edges",
+    "frontier_sha256",
+    "generated_at",
+    "id",
+    "leakage_ledger_sha256",
+    "lineage_anchor_ref",
+    "max_depth",
+    "nodes",
+    "policy_profile_id",
+    "projection_manifest_sha256",
+    "redaction_map_sha256",
+    "redactions",
+    "required_evidence_class",
+    "root_receipt_ids",
+    "transaction_passport_ref"
+  ],
+  "properties": {
+    "audience": {
+      "type": "string"
+    },
+    "challenge_nonce": {
+      "type": "string"
+    },
+    "checkpoint_inclusion_sha256": {
+      "type": "string"
+    },
+    "checkpoint_ref": {
+      "type": "string"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "disclosure_state",
+          "edge_id",
+          "evidence_class",
+          "from",
+          "kind",
+          "relation",
+          "source_artifact_sha256",
+          "statement_sha256",
+          "to"
+        ],
+        "properties": {
+          "disclosure_state": {
+            "type": "string"
+          },
+          "edge_id": {
+            "type": "string"
+          },
+          "evidence_class": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "relation": {
+            "type": "string"
+          },
+          "source_artifact_sha256": {
+            "type": "string"
+          },
+          "statement_sha256": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "frontier_sha256": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "leakage_ledger_sha256": {
+      "type": "string"
+    },
+    "lineage_anchor_ref": {
+      "type": "string"
+    },
+    "max_depth": {
+      "type": "integer"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifact_schema",
+          "artifact_sha256",
+          "depth",
+          "disclosure_state",
+          "evidence_class",
+          "id",
+          "kind",
+          "parent_ids",
+          "receipt_ref",
+          "source_id_hash",
+          "source_table",
+          "tenant_hash"
+        ],
+        "properties": {
+          "artifact_schema": {
+            "type": "string"
+          },
+          "artifact_sha256": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "disclosure_state": {
+            "type": "string"
+          },
+          "evidence_class": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "parent_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "receipt_ref": {
+            "type": "string"
+          },
+          "source_id_hash": {
+            "type": "string"
+          },
+          "source_table": {
+            "type": "string"
+          },
+          "tenant_hash": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "policy_profile_id": {
+      "type": "string"
+    },
+    "projection_manifest_sha256": {
+      "type": "string"
+    },
+    "redaction_map_sha256": {
+      "type": "string"
+    },
+    "redactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "node_id",
+          "reason"
+        ],
+        "properties": {
+          "node_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required_evidence_class": {
+      "type": "string"
+    },
+    "root_receipt_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "transaction_passport_ref": {
+      "type": "string"
+    }
+  }
+}

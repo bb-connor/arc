@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-status-epoch-body.schema.json",
+  "title": "chio.finding.status-epoch.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchor_refs",
+    "branch_domain",
+    "empty_leaf_domain",
+    "empty_leaf_hash",
+    "feed_id",
+    "generated_at",
+    "hash_algorithm",
+    "key_domain_nonce",
+    "key_hash_domain",
+    "map_epoch",
+    "occupied_leaf_domain",
+    "operator_id",
+    "operator_key",
+    "operator_key_epoch",
+    "proof_semantics",
+    "root_hash",
+    "schema",
+    "status_epoch_id",
+    "status_map_version",
+    "tree_depth",
+    "valid_from",
+    "valid_until"
+  ],
+  "properties": {
+    "anchor_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "branch_domain": {
+      "type": "string"
+    },
+    "empty_leaf_domain": {
+      "type": "string"
+    },
+    "empty_leaf_hash": {
+      "type": "string"
+    },
+    "feed_id": {
+      "type": "string"
+    },
+    "generated_at": {
+      "type": "integer"
+    },
+    "hash_algorithm": {
+      "type": "string"
+    },
+    "key_domain_nonce": {
+      "type": "integer"
+    },
+    "key_hash_domain": {
+      "type": "string"
+    },
+    "map_epoch": {
+      "type": "integer"
+    },
+    "occupied_leaf_domain": {
+      "type": "string"
+    },
+    "operator_id": {
+      "type": "string"
+    },
+    "operator_key": {
+      "type": "string"
+    },
+    "operator_key_epoch": {
+      "type": "integer"
+    },
+    "proof_semantics": {
+      "type": "string"
+    },
+    "root_hash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.status-epoch.v1"
+    },
+    "status_epoch_id": {
+      "type": "string"
+    },
+    "status_map_version": {
+      "type": "string"
+    },
+    "tree_depth": {
+      "type": "integer"
+    },
+    "valid_from": {
+      "type": "integer"
+    },
+    "valid_until": {
+      "type": "integer"
+    }
+  }
+}

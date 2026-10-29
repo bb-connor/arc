@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-bond-backing-body.schema.json",
+  "title": "chio.finding.bond-backing.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocation_id",
+    "appeal_horizon_secs",
+    "audit_horizon_secs",
+    "authorization_envelope_sha256",
+    "bond_class",
+    "claim_horizon_secs",
+    "collateral_authority",
+    "expires_at",
+    "fee_requirement_sha256",
+    "fee_schedule_envelope_sha256",
+    "finding_id",
+    "issued_at",
+    "listing_id",
+    "locked_amount",
+    "maximum_sale_exposure",
+    "profile_envelope_sha256",
+    "schema",
+    "seller",
+    "settlement_buffer_secs",
+    "terms_envelope_sha256",
+    "vault"
+  ],
+  "properties": {
+    "allocation_id": {
+      "type": "string"
+    },
+    "appeal_horizon_secs": {
+      "type": "integer"
+    },
+    "audit_horizon_secs": {
+      "type": "integer"
+    },
+    "authorization_envelope_sha256": {
+      "type": "string"
+    },
+    "bond_class": {
+      "type": "string"
+    },
+    "claim_horizon_secs": {
+      "type": "integer"
+    },
+    "collateral_authority": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "fee_requirement_sha256": {
+      "type": "string"
+    },
+    "fee_schedule_envelope_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "locked_amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "maximum_sale_exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "profile_envelope_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.bond-backing.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "settlement_buffer_secs": {
+      "type": "integer"
+    },
+    "terms_envelope_sha256": {
+      "type": "string"
+    },
+    "vault": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "venue_ledger"
+      ],
+      "properties": {
+        "venue_ledger": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ledger_account",
+            "operator_epoch"
+          ],
+          "properties": {
+            "ledger_account": {
+              "type": "string"
+            },
+            "operator_epoch": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

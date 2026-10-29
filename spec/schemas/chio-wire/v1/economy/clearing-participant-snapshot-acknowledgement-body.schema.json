@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-participant-snapshot-acknowledgement-body.schema.json",
+  "title": "chio.clearing.participant-snapshot-acknowledgement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acceptedAtUnixMs",
+    "algorithmVersion",
+    "expiresAtUnixMs",
+    "keyEpoch",
+    "participantId",
+    "participantSnapshotDigest",
+    "schema"
+  ],
+  "properties": {
+    "acceptedAtUnixMs": {
+      "type": "integer"
+    },
+    "algorithmVersion": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "participantId": {
+      "type": "string"
+    },
+    "participantSnapshotDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.participant-snapshot-acknowledgement.v1"
+    }
+  }
+}

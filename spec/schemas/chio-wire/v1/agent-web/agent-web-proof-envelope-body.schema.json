@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/agent-web/agent-web-proof-envelope-body.schema.json",
+  "title": "chio.agent-web-proof-envelope.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chio_claim_refs",
+    "disclosure_capsule_refs",
+    "envelope_id",
+    "external_subject",
+    "external_subject_digest",
+    "external_subject_path",
+    "external_subject_signature_ref",
+    "limitations",
+    "projection_manifest_ref",
+    "projection_manifest_sha256",
+    "receipt_refs",
+    "risk_refs",
+    "schema",
+    "settlement_refs",
+    "source_protocol",
+    "source_protocol_version",
+    "transaction_passport_ref"
+  ],
+  "properties": {
+    "agent_web_passport_scope_sha256": {
+      "type": "string"
+    },
+    "chio_claim_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "disclosure_capsule_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "envelope_id": {
+      "type": "string"
+    },
+    "external_subject": {
+      "type": "string"
+    },
+    "external_subject_digest": {
+      "type": "string"
+    },
+    "external_subject_path": {
+      "type": "string"
+    },
+    "external_subject_signature_ref": {
+      "type": "string"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "projection_manifest_ref": {
+      "type": "string"
+    },
+    "projection_manifest_sha256": {
+      "type": "string"
+    },
+    "receipt_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.agent-web-proof-envelope.v1"
+    },
+    "settlement_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "source_protocol": {
+      "type": "string"
+    },
+    "source_protocol_version": {
+      "type": "string"
+    },
+    "transaction_passport_ref": {
+      "type": "string"
+    }
+  }
+}

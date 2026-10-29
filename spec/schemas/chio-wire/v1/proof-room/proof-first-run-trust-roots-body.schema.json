@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/proof-room/proof-first-run-trust-roots-body.schema.json",
+  "title": "chio.proof.first-run.trust-roots.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "roots",
+    "schema"
+  ],
+  "properties": {
+    "authority": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "root_id": {
+      "type": "string"
+    },
+    "roots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject"
+        ],
+        "properties": {
+          "key_digest": {
+            "type": "string"
+          },
+          "key_id": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "type": "string"
+    },
+    "trust_domain": {
+      "type": "string"
+    }
+  }
+}

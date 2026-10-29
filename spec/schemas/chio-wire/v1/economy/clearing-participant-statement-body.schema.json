@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-participant-statement-body.schema.json",
+  "title": "chio.clearing.participant-statement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bilateralCreditCancelledUnits",
+    "bilateralDebitCancelledUnits",
+    "contributingAtomDigests",
+    "grossCreditUnits",
+    "grossDebitUnits",
+    "netBalance",
+    "participantId",
+    "roundCoreDigest",
+    "schema"
+  ],
+  "properties": {
+    "bilateralCreditCancelledUnits": {
+      "type": "integer"
+    },
+    "bilateralDebitCancelledUnits": {
+      "type": "integer"
+    },
+    "contributingAtomDigests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "grossCreditUnits": {
+      "type": "integer"
+    },
+    "grossDebitUnits": {
+      "type": "integer"
+    },
+    "netBalance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "direction",
+        "units"
+      ],
+      "properties": {
+        "direction": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "participantId": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.participant-statement.v1"
+    }
+  }
+}

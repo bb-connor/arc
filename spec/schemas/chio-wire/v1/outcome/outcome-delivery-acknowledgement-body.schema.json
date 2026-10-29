@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-delivery-acknowledgement-body.schema.json",
+  "title": "chio.outcome.delivery-acknowledgement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acknowledgementId",
+    "deliveryAcceptedAtUnixMs",
+    "deliveryCheckpointDigest",
+    "deliveryCheckpointSequence",
+    "deliveryId",
+    "durableBlobDigest",
+    "durableBlobReference",
+    "eligibilityDigest",
+    "finalOutputDigest",
+    "idempotencyKey",
+    "providerAcceptanceDigest",
+    "receiverBindingDigest",
+    "receiverKeyEpoch",
+    "receiverKeyId",
+    "receiverQueueId",
+    "requestId",
+    "schema"
+  ],
+  "properties": {
+    "acknowledgementId": {
+      "type": "string"
+    },
+    "deliveryAcceptedAtUnixMs": {
+      "type": "integer"
+    },
+    "deliveryCheckpointDigest": {
+      "type": "string"
+    },
+    "deliveryCheckpointSequence": {
+      "type": "integer"
+    },
+    "deliveryId": {
+      "type": "string"
+    },
+    "durableBlobDigest": {
+      "type": "string"
+    },
+    "durableBlobReference": {
+      "type": "string"
+    },
+    "eligibilityDigest": {
+      "type": "string"
+    },
+    "finalOutputDigest": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "providerAcceptanceDigest": {
+      "type": "string"
+    },
+    "receiverBindingDigest": {
+      "type": "string"
+    },
+    "receiverKeyEpoch": {
+      "type": "integer"
+    },
+    "receiverKeyId": {
+      "type": "string"
+    },
+    "receiverQueueId": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.delivery-acknowledgement.v1"
+    }
+  }
+}

@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-transit-policy-body.schema.json",
+  "title": "chio.pheromone-transit-policy.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "accepted_hubs",
+    "admission",
+    "allowed_egress_treaties",
+    "allowed_ingress_treaties",
+    "allowed_subject_class_namespaces",
+    "max_hops",
+    "pinned_ladder_refs",
+    "required_action_class_id",
+    "schema",
+    "valid_from_unix_ms",
+    "valid_until_unix_ms"
+  ],
+  "properties": {
+    "accepted_hubs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "activePeersInTreaty",
+        "authenticatedSenderKernelId",
+        "kernelPublicKeys",
+        "knownReputationEpochs",
+        "maxDepositsPerPair",
+        "observationCostVerifierRoots",
+        "passports",
+        "recipientKernelId",
+        "replayWindowMs",
+        "runtimePolicyIssuerPublicKeys",
+        "runtimeTrustFloorState",
+        "subjectClasses"
+      ],
+      "properties": {
+        "activePeersInTreaty": {
+          "type": "integer"
+        },
+        "activeReputationEpoch": {
+          "type": "integer"
+        },
+        "authenticatedSenderKernelId": {
+          "type": "string"
+        },
+        "implicitCompatibilityDefault": {
+          "type": "boolean"
+        },
+        "kernelPublicKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "knownReputationEpochs": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "maxDepositsPerPair": {
+          "type": "integer"
+        },
+        "observationCostVerifierRoots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "allowedSubjectClassNamespaces",
+              "allowedSubjectClasses",
+              "allowedTreaties",
+              "issuerKernelId",
+              "issuerSignature",
+              "publicKey",
+              "runtimePolicySha256",
+              "schema",
+              "validFromUnixMs",
+              "validUntilUnixMs",
+              "verifierId",
+              "verifierKeyId"
+            ],
+            "properties": {
+              "allowedSubjectClassNamespaces": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowedSubjectClasses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowedTreaties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "issuerKernelId": {
+                "type": "string"
+              },
+              "issuerSignature": {
+                "type": "string"
+              },
+              "publicKey": {
+                "type": "string"
+              },
+              "runtimePolicySha256": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "validFromUnixMs": {
+                "type": "integer"
+              },
+              "validUntilUnixMs": {
+                "type": "integer"
+              },
+              "verifierId": {
+                "type": "string"
+              },
+              "verifierKeyId": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "passports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "firstSeenEpoch",
+              "kernelId",
+              "publicKey",
+              "revoked",
+              "validFromUnixMs",
+              "validUntilUnixMs"
+            ],
+            "properties": {
+              "firstSeenEpoch": {
+                "type": "integer"
+              },
+              "kernelId": {
+                "type": "string"
+              },
+              "publicKey": {
+                "type": "string"
+              },
+              "revoked": {
+                "type": "boolean"
+              },
+              "validFromUnixMs": {
+                "type": "integer"
+              },
+              "validUntilUnixMs": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "recipientKernelId": {
+          "type": "string"
+        },
+        "replayWindowMs": {
+          "type": "integer"
+        },
+        "runtimePolicyIssuerPublicKeys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtimeTrustFloorState": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entries",
+            "schema"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "keyId",
+                  "verifierId"
+                ],
+                "properties": {
+                  "highestVersion": {
+                    "type": "integer"
+                  },
+                  "keyId": {
+                    "type": "string"
+                  },
+                  "latestBundleSha256": {
+                    "type": "string"
+                  },
+                  "latestRevocationCheckpointSha256": {
+                    "type": "string"
+                  },
+                  "revoked": {
+                    "type": "boolean"
+                  },
+                  "verifierId": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "scarcityPolicies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "activePeersEpoch",
+              "observationCostVerification",
+              "policyId",
+              "reputationEpoch",
+              "runtimePolicySha256",
+              "schema",
+              "subjectClass",
+              "subjectClassNamespace",
+              "tokenCapacity",
+              "treatyScope",
+              "verifierId",
+              "windowEndUnixMs",
+              "windowId",
+              "windowStartUnixMs"
+            ],
+            "properties": {
+              "activePeersEpoch": {
+                "type": "integer"
+              },
+              "newcomerHorizonEpochs": {
+                "type": "integer"
+              },
+              "observationCostVerification": {
+                "type": "string"
+              },
+              "policyId": {
+                "type": "string"
+              },
+              "policySha256": {
+                "type": "string"
+              },
+              "reputationEpoch": {
+                "type": "integer"
+              },
+              "runtimePolicySha256": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "subjectClass": {
+                "type": "string"
+              },
+              "subjectClassNamespace": {
+                "type": "string"
+              },
+              "tokenCapacity": {
+                "type": "integer"
+              },
+              "treatyScope": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "verifierId": {
+                "type": "string"
+              },
+              "windowEndUnixMs": {
+                "type": "integer"
+              },
+              "windowId": {
+                "type": "string"
+              },
+              "windowStartUnixMs": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "subjectClasses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "allowedTreaties",
+              "costCommitment",
+              "destructive",
+              "subjectClass",
+              "subjectClassNamespace"
+            ],
+            "properties": {
+              "allowedTreaties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "costCommitment": {
+                "type": "string"
+              },
+              "destructive": {
+                "type": "boolean"
+              },
+              "subjectClass": {
+                "type": "string"
+              },
+              "subjectClassNamespace": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "allowed_egress_treaties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_ingress_treaties": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_subject_class_namespaces": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "max_hops": {
+      "type": "integer"
+    },
+    "pinned_ladder_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ladder_intersection_id",
+          "ladder_intersection_sha256",
+          "ladder_manifest_expires_at_unix_ms",
+          "ladder_manifest_id",
+          "ladder_manifest_sha256"
+        ],
+        "properties": {
+          "ladder_intersection_id": {
+            "type": "string"
+          },
+          "ladder_intersection_sha256": {
+            "type": "string"
+          },
+          "ladder_manifest_expires_at_unix_ms": {
+            "type": "integer"
+          },
+          "ladder_manifest_id": {
+            "type": "string"
+          },
+          "ladder_manifest_sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required_action_class_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.pheromone-transit-policy.v1"
+    },
+    "valid_from_unix_ms": {
+      "type": "integer"
+    },
+    "valid_until_unix_ms": {
+      "type": "integer"
+    }
+  }
+}

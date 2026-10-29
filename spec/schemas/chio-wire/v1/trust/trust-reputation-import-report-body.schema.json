@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/trust-reputation-import-report-body.schema.json",
+  "title": "chio.trust.reputation-import-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decay_policy_ref",
+    "id",
+    "import_verdict",
+    "issued_at",
+    "issuer",
+    "issuer_trust_ref",
+    "local_weight",
+    "negative_event_refs",
+    "privacy_profile_ref",
+    "schema",
+    "source_network",
+    "source_reputation_ref",
+    "subject",
+    "subject_binding_ref",
+    "usage"
+  ],
+  "properties": {
+    "decay_policy_ref": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "import_verdict": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "issuer_trust_ref": {
+      "type": "string"
+    },
+    "local_weight": {
+      "type": "integer"
+    },
+    "negative_event_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "privacy_profile_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.trust.reputation-import-report.v1"
+    },
+    "source_network": {
+      "type": "string"
+    },
+    "source_reputation_ref": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "subject_binding_ref": {
+      "type": "string"
+    },
+    "usage": {
+      "type": "string"
+    }
+  }
+}

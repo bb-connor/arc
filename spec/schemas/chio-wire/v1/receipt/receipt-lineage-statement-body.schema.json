@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/receipt-lineage-statement-body.schema.json",
+  "title": "chio.receipt_lineage_statement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "childReceiptId",
+    "childRequestId",
+    "childSessionAnchor",
+    "evidenceClass",
+    "id",
+    "issuedAt",
+    "kernelKey",
+    "parentReceiptId",
+    "parentRequestId",
+    "parentSessionAnchor",
+    "relationKind",
+    "schema"
+  ],
+  "properties": {
+    "childReceiptId": {
+      "type": "string"
+    },
+    "childRequestId": {
+      "type": "string"
+    },
+    "childSessionAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionAnchorHash",
+        "sessionAnchorId"
+      ],
+      "properties": {
+        "sessionAnchorHash": {
+          "type": "string"
+        },
+        "sessionAnchorId": {
+          "type": "string"
+        }
+      }
+    },
+    "continuationTokenId": {
+      "type": "string"
+    },
+    "evidenceClass": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "kernelKey": {
+      "type": "string"
+    },
+    "parentReceiptId": {
+      "type": "string"
+    },
+    "parentRequestId": {
+      "type": "string"
+    },
+    "parentSessionAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionAnchorHash",
+        "sessionAnchorId"
+      ],
+      "properties": {
+        "sessionAnchorHash": {
+          "type": "string"
+        },
+        "sessionAnchorId": {
+          "type": "string"
+        }
+      }
+    },
+    "relationKind": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.receipt_lineage_statement.v1"
+    }
+  }
+}

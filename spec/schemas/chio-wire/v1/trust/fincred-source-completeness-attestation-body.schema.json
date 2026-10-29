@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/fincred-source-completeness-attestation-body.schema.json",
+  "title": "chio.fincred.source-completeness-attestation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attestationReference",
+    "checkpointAuthorityEpoch",
+    "checkpointAuthorityKey",
+    "checkpointDigest",
+    "checkpointSequence",
+    "committedLeaves",
+    "cutoff",
+    "disclosureDigest",
+    "expiresAt",
+    "indexRoot",
+    "issuedAt",
+    "lowerBoundary",
+    "rangeRoot",
+    "schema",
+    "sourceArtifactDigests",
+    "sourceEvidenceClass",
+    "sourceFamily",
+    "sourceId",
+    "sourceSignerKey",
+    "storeGeneration",
+    "subject",
+    "upperBoundary",
+    "window"
+  ],
+  "properties": {
+    "attestationReference": {
+      "type": "string"
+    },
+    "checkpointAuthorityEpoch": {
+      "type": "integer"
+    },
+    "checkpointAuthorityKey": {
+      "type": "string"
+    },
+    "checkpointDigest": {
+      "type": "string"
+    },
+    "checkpointSequence": {
+      "type": "integer"
+    },
+    "committedLeaves": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "indexProof",
+          "leaf"
+        ],
+        "properties": {
+          "indexProof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "auditPath",
+              "leafIndex",
+              "treeSize"
+            ],
+            "properties": {
+              "auditPath": {
+                "type": "array",
+                "maxItems": 64,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              },
+              "leafIndex": {
+                "type": "integer"
+              },
+              "treeSize": {
+                "type": "integer"
+              }
+            }
+          },
+          "leaf": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "queryKey",
+              "sourceArtifactDigest"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer"
+              },
+              "queryKey": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "artifactId",
+                  "occurredAt",
+                  "sourceFamily",
+                  "subject"
+                ],
+                "properties": {
+                  "artifactId": {
+                    "type": "string"
+                  },
+                  "occurredAt": {
+                    "type": "integer"
+                  },
+                  "sourceFamily": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  }
+                }
+              },
+              "sourceArtifactDigest": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "cutoff": {
+      "type": "integer"
+    },
+    "disclosureDigest": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "indexRoot": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lowerBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "rangeRoot": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fincred.source-completeness-attestation.v1"
+    },
+    "sourceArtifactDigests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sourceEvidenceClass": {
+      "type": "string"
+    },
+    "sourceFamily": {
+      "type": "string"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "sourceSignerKey": {
+      "type": "string"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "upperBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endsAt",
+        "startsAt"
+      ],
+      "properties": {
+        "endsAt": {
+          "type": "integer"
+        },
+        "startsAt": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

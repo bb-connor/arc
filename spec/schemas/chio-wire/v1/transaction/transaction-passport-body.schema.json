@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/transaction/transaction-passport-body.schema.json",
+  "title": "chio.transaction-passport.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim_set_path",
+    "claim_set_sha256",
+    "evidence_graph_path",
+    "evidence_graph_sha256",
+    "id",
+    "issued_at",
+    "issuer",
+    "schema",
+    "verifier_policy_path",
+    "verifier_policy_sha256"
+  ],
+  "properties": {
+    "claim_set_path": {
+      "type": "string"
+    },
+    "claim_set_sha256": {
+      "type": "string"
+    },
+    "evidence_graph_path": {
+      "type": "string"
+    },
+    "evidence_graph_sha256": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "omission_policy": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim_id",
+          "reason",
+          "status"
+        ],
+        "properties": {
+          "claim_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.transaction-passport.v1"
+    },
+    "verifier_policy_path": {
+      "type": "string"
+    },
+    "verifier_policy_sha256": {
+      "type": "string"
+    }
+  }
+}

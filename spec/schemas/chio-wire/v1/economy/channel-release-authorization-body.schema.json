@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-release-authorization-body.schema.json",
+  "title": "chio.channel.release-authorization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority",
+        "publicationRoot",
+        "releaseBroadcast",
+        "rootPublication",
+        "schema"
+      ],
+      "properties": {
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "assetBindingDigest",
+            "authorizedAtUnixMs",
+            "boundTokenBaseUnits",
+            "channelExpiryUnixMs",
+            "channelId",
+            "channelStateVersion",
+            "closeBodyDigest",
+            "closeDigest",
+            "closeSubmissionCutoffUnixMs",
+            "disputeDeadlineUnixMs",
+            "effectiveCloseDigest",
+            "escrowDeadlineUnixMs",
+            "escrowReference",
+            "escrowReservationVersion",
+            "expectedRefundTokenBaseUnits",
+            "expectedReleaseTokenBaseUnits",
+            "finalCumulativeOwed",
+            "finalStateDigest",
+            "finalStateSequence",
+            "frost",
+            "frostIssuedAtUnixMs",
+            "frostKeyEpoch",
+            "frostResourceFence",
+            "frostResourceId",
+            "frostResourceVersion",
+            "frostRosterDigest",
+            "frostScopeId",
+            "lifecycleFence",
+            "openDigest",
+            "originalOperator",
+            "originalOperatorKeyHash",
+            "originalWeb3DispatchDigest",
+            "payeeBeneficiaryAddress",
+            "publisherFence"
+          ],
+          "properties": {
+            "assetBindingDigest": {
+              "type": "string"
+            },
+            "authorizedAtUnixMs": {
+              "type": "integer"
+            },
+            "boundTokenBaseUnits": {
+              "type": "string"
+            },
+            "channelExpiryUnixMs": {
+              "type": "integer"
+            },
+            "channelId": {
+              "type": "string"
+            },
+            "channelStateVersion": {
+              "type": "integer"
+            },
+            "closeBodyDigest": {
+              "type": "string"
+            },
+            "closeDigest": {
+              "type": "string"
+            },
+            "closeSubmissionCutoffUnixMs": {
+              "type": "integer"
+            },
+            "disputeDeadlineUnixMs": {
+              "type": "integer"
+            },
+            "effectiveCloseDigest": {
+              "type": "string"
+            },
+            "escrowDeadlineUnixMs": {
+              "type": "integer"
+            },
+            "escrowReference": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "chainId",
+                "escrowContract",
+                "escrowId"
+              ],
+              "properties": {
+                "chainId": {
+                  "type": "string"
+                },
+                "escrowContract": {
+                  "type": "string"
+                },
+                "escrowId": {
+                  "type": "string"
+                }
+              }
+            },
+            "escrowReservationVersion": {
+              "type": "integer"
+            },
+            "expectedRefundTokenBaseUnits": {
+              "type": "string"
+            },
+            "expectedReleaseTokenBaseUnits": {
+              "type": "string"
+            },
+            "finalCumulativeOwed": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "finalStateDigest": {
+              "type": "string"
+            },
+            "finalStateSequence": {
+              "type": "integer"
+            },
+            "frost": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "actionDigest",
+                "authorizationId",
+                "authorizationSlotId",
+                "signedEnvelopeDigest"
+              ],
+              "properties": {
+                "actionDigest": {
+                  "type": "string"
+                },
+                "authorizationId": {
+                  "type": "string"
+                },
+                "authorizationSlotId": {
+                  "type": "string"
+                },
+                "signedEnvelopeDigest": {
+                  "type": "string"
+                }
+              }
+            },
+            "frostIssuedAtUnixMs": {
+              "type": "integer"
+            },
+            "frostKeyEpoch": {
+              "type": "integer"
+            },
+            "frostResourceFence": {
+              "type": "integer"
+            },
+            "frostResourceId": {
+              "type": "string"
+            },
+            "frostResourceVersion": {
+              "type": "integer"
+            },
+            "frostRosterDigest": {
+              "type": "string"
+            },
+            "frostScopeId": {
+              "type": "string"
+            },
+            "lifecycleFence": {
+              "type": "integer"
+            },
+            "openDigest": {
+              "type": "string"
+            },
+            "originalOperator": {
+              "type": "string"
+            },
+            "originalOperatorKeyHash": {
+              "type": "string"
+            },
+            "originalWeb3DispatchDigest": {
+              "type": "string"
+            },
+            "payeeBeneficiaryAddress": {
+              "type": "string"
+            },
+            "publisherFence": {
+              "type": "integer"
+            }
+          }
+        },
+        "publicationRoot": {
+          "type": "string"
+        },
+        "releaseBroadcast": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "callDigest",
+            "effectKind",
+            "effectSlotId",
+            "idempotencyKey",
+            "operationId",
+            "resourceHeadDigest",
+            "scopeId"
+          ],
+          "properties": {
+            "callDigest": {
+              "type": "string"
+            },
+            "effectKind": {
+              "type": "string"
+            },
+            "effectSlotId": {
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "operationId": {
+              "type": "string"
+            },
+            "resourceHeadDigest": {
+              "type": "string"
+            },
+            "scopeId": {
+              "type": "string"
+            }
+          }
+        },
+        "rootPublication": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "callDigest",
+            "effectKind",
+            "effectSlotId",
+            "idempotencyKey",
+            "operationId",
+            "resourceHeadDigest",
+            "scopeId"
+          ],
+          "properties": {
+            "callDigest": {
+              "type": "string"
+            },
+            "effectKind": {
+              "type": "string"
+            },
+            "effectSlotId": {
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "operationId": {
+              "type": "string"
+            },
+            "resourceHeadDigest": {
+              "type": "string"
+            },
+            "scopeId": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

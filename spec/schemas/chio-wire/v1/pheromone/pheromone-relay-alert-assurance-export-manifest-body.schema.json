@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-export-manifest-body.schema.json",
+  "title": "chio.pheromone.relay-alert-assurance-export-manifest.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifacts",
+    "bundleId",
+    "exportedAtUnixMs",
+    "exporterId",
+    "exporterKeyId",
+    "localKernelId",
+    "safetyClaims",
+    "schema",
+    "sourcePackageSha256"
+  ],
+  "properties": {
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "byteCount",
+          "path",
+          "retentionClass",
+          "role",
+          "schema",
+          "sha256"
+        ],
+        "properties": {
+          "byteCount": {
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "retentionClass": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "bundleId": {
+      "type": "string"
+    },
+    "exportedAtUnixMs": {
+      "type": "integer"
+    },
+    "exporterId": {
+      "type": "string"
+    },
+    "exporterKeyId": {
+      "type": "string"
+    },
+    "localKernelId": {
+      "type": "string"
+    },
+    "safetyClaims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.pheromone.relay-alert-assurance-export-manifest.v1"
+    },
+    "sourcePackageSha256": {
+      "type": "string"
+    }
+  }
+}

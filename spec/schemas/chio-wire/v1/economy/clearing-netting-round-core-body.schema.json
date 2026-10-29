@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-netting-round-core-body.schema.json",
+  "title": "chio.clearing.netting-round-core.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "algorithmVersion",
+    "clearingAuthorityId",
+    "clearingAuthorityKeyEpoch",
+    "currency",
+    "disputeWindowEndsAtUnixMs",
+    "epoch",
+    "generatedAtUnixMs",
+    "governanceScopeId",
+    "inputCount",
+    "inputManifestDigest",
+    "participantSnapshotDigest",
+    "reservationRoot",
+    "roundId",
+    "schema"
+  ],
+  "properties": {
+    "algorithmVersion": {
+      "type": "string"
+    },
+    "clearingAuthorityId": {
+      "type": "string"
+    },
+    "clearingAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "disputeWindowEndsAtUnixMs": {
+      "type": "integer"
+    },
+    "epoch": {
+      "type": "integer"
+    },
+    "generatedAtUnixMs": {
+      "type": "integer"
+    },
+    "governanceScopeId": {
+      "type": "string"
+    },
+    "inputCount": {
+      "type": "integer"
+    },
+    "inputManifestDigest": {
+      "type": "string"
+    },
+    "participantSnapshotDigest": {
+      "type": "string"
+    },
+    "reservationRoot": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.netting-round-core.v1"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/frost/frost-dkg-round2-sealed-body.schema.json",
+  "title": "chio.frost.dkg-round2-sealed.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ciphertext",
+    "metadata"
+  ],
+  "properties": {
+    "ciphertext": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ceremonyId",
+        "keyEpoch",
+        "participantSetDigest",
+        "recipientParticipantId",
+        "recipientSealingKeyId",
+        "round",
+        "schema",
+        "senderEphemeralPublicKey",
+        "senderParticipantId",
+        "suite",
+        "transportKeyId"
+      ],
+      "properties": {
+        "ceremonyId": {
+          "type": "string"
+        },
+        "keyEpoch": {
+          "type": "integer"
+        },
+        "participantSetDigest": {
+          "type": "string"
+        },
+        "recipientParticipantId": {
+          "type": "string"
+        },
+        "recipientSealingKeyId": {
+          "type": "string"
+        },
+        "round": {
+          "type": "integer"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "senderEphemeralPublicKey": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "senderParticipantId": {
+          "type": "string"
+        },
+        "suite": {
+          "type": "string"
+        },
+        "transportKeyId": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

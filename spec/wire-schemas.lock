@@ -5816,7 +5816,7 @@ first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.trust.root.v1"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
+files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-transaction-passport/src/runtime_security/artifacts.rs"]
 first_seen = "1b9620751d"
 
 [[schema]]
