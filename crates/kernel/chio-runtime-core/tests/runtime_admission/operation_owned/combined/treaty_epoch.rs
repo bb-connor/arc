@@ -9,7 +9,10 @@ use chio_runtime_core::treaty_epoch::{
 fn revocable_fixture() -> TestResult<(CombinedFixture, Ed25519Backend, VerifiedTreatyEpochUpdate)> {
     let mut authority = None;
     let fixture = CombinedFixture::with_treaty_input(None, |treaty, _, _| {
-        authority = Some((treaty.epoch_backend.clone(), treaty.epoch_update.clone()));
+        authority = Some((
+            Ed25519Backend::new(treaty.epoch_key.clone()),
+            treaty.epoch_update.clone(),
+        ));
         Ok(())
     })?;
     let (backend, update) = authority.ok_or("signed treaty epoch fixture")?;
