@@ -190,6 +190,16 @@ fn init_redacted_tracing() {
 
 pub(crate) fn run() {
     let cli = Cli::parse();
+    let json_output = cli.json_output();
+    if let Err(refusal) = crate::egress_allowance::refuse_unconsumed(
+        &cli.command,
+        cli.egress_allowance_file.as_deref(),
+    ) {
+        let mut stderr = std::io::stderr();
+        let error = CliError::cli_other_error(refusal.to_string());
+        let _ = write_cli_error(&mut stderr, &error, json_output);
+        std::process::exit(1);
+    }
     let receipt_db = cli.receipt_db.clone();
     let revocation_db = cli.revocation_db.clone();
     let authority_seed_file = cli.authority_seed_file.clone();
@@ -202,7 +212,6 @@ pub(crate) fn run() {
     let control_token = cli.control_token.clone();
     let control_authority_public_key = cli.control_authority_public_key.clone();
     let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
-    let json_output = cli.json_output();
 
     init_redacted_tracing();
 

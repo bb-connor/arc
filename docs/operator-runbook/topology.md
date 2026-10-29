@@ -60,8 +60,10 @@ The access configuration declares the trust-control credentials; see
 [Trust-Control Access Configuration](../reference/TRUST_CONTROL_ACCESS.md).
 
 When a payment rail, the trust-control leader or a cluster peer sits on a
-private network, pass `--egress-allowance-file <PATH>` to every `chio` process
-that dials it. Each `[[allow]]` entry pins one `host:port` to a CIDR; nothing
+private network, pass `--egress-allowance-file <PATH>` to the `chio` process
+that dials it. `chio trust serve`, `chio trust config check`, `chio start`,
+`chio api protect`, `chio mcp wrap` and `chio finding operator serve` consume
+the file; every other command refuses the flag and exits nonzero. Each `[[allow]]` entry pins one `host:port` to a CIDR; nothing
 private is reachable without one. `chio trust config check` and `/health`
 report the loaded set's `egressAllowanceDigest`. See
 [Private network peers and control planes](../reference/TRUST_CONTROL_ACCESS.md#private-network-peers-and-control-planes).

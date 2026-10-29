@@ -148,8 +148,10 @@ pub(crate) struct Cli {
     pub(crate) control_url: Option<String>,
 
     /// Operator egress allowance file: the private network destinations,
-    /// each a host, port and CIDR, that payment rails and trust-control
-    /// clients may reach. Absent means none.
+    /// each a host, port and CIDR, that this process may reach. Consumed by
+    /// trust serve, trust config check, start, api protect, mcp wrap and
+    /// finding operator serve; every other command refuses the flag. Absent
+    /// means none.
     #[arg(long, global = true)]
     pub(crate) egress_allowance_file: Option<PathBuf>,
 

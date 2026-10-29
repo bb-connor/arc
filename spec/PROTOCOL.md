@@ -3576,10 +3576,16 @@ with exactly the keys `host`, `port` and `cidr`; any other key is refused. It
 MUST be a regular UTF-8 file of at most 64 KiB, and every entry passes the rules
 above when it loads, so an invalid file stops the process before any contract
 uses it. Without the file the set is empty. A contract takes only the entries
-for its own authorities, so one file may serve every process role. Trust-control
-clients dial under such a contract: a contract refusal aborts the request, and
-only a transport or name-resolution failure moves a client to its next
-endpoint. Trust-control reports the set's digest as `egressAllowanceDigest` in
+for its own authorities. The commands that consume the set are `chio trust
+serve`, `chio trust config check`, `chio start`, `chio api protect`, `chio mcp
+wrap` and `chio finding operator serve`; every other command MUST refuse the flag
+with a CLI error and a nonzero exit before doing any other work, until it threads
+the set into the contracts it dials. Trust-control clients dial under such a
+contract: a contract refusal aborts the request, and only a transport or
+name-resolution failure moves a client to its next endpoint. A trust-control
+client admits loopback only when every endpoint in its list is a loopback
+literal; a list that names a loopback literal beside any other endpoint MUST be
+refused at construction, so a DNS name in the list never reaches loopback. Trust-control reports the set's digest as `egressAllowanceDigest` in
 its health document and in `chio trust config check`; the digest is not signed.
 
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
