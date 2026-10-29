@@ -17,6 +17,7 @@ mod policy_analysis;
 mod proof;
 mod receipt_evidence;
 mod reputation_guard;
+mod root_request;
 mod runtime;
 mod settle_arena;
 #[path = "trust.rs"]
