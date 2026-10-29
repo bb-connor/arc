@@ -1026,7 +1026,10 @@ mod projection {
     use super::*;
     use std::cell::Cell;
 
-    use chio_core_types::receipt::metadata::MetadataOpenings;
+    use chio_core_types::receipt::metadata::{
+        metadata_salt_ref, MetadataCommitmentError, MetadataCommitter, MetadataOpenings,
+        ProjectionError,
+    };
     use chio_core_types::rng::{Rng, RngError};
     use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
 
@@ -1056,6 +1059,79 @@ mod projection {
     fn key_set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
         TenantIndexKeySet::new(key(active), retired.iter().map(|fill| key(*fill)).collect())
             .unwrap_or_else(|error| panic!("tenant index key set: {error}"))
+    }
+
+    /// A receipt whose only committed block is its `active_defense` block: one committer
+    /// per receipt, finished once.
+    trait SingleBlockReceipt {
+        fn project(
+            &self,
+            keys: &TenantIndexKeySet,
+            rng: &dyn Rng,
+        ) -> Result<(ActiveDefenseReceiptProjection, MetadataOpenings), ProjectionError>;
+
+        fn matches_projection(
+            &self,
+            projection: &ActiveDefenseReceiptProjection,
+            openings: &MetadataOpenings,
+            keys: &TenantIndexKeySet,
+        ) -> bool;
+    }
+
+    impl SingleBlockReceipt for ActiveDefenseReceiptBody {
+        fn project(
+            &self,
+            keys: &TenantIndexKeySet,
+            rng: &dyn Rng,
+        ) -> Result<(ActiveDefenseReceiptProjection, MetadataOpenings), ProjectionError> {
+            let mut committer = MetadataCommitter::project(rng);
+            let projection = self.project_with(keys, &mut committer)?;
+            Ok((projection, committer.into_openings()))
+        }
+
+        fn matches_projection(
+            &self,
+            projection: &ActiveDefenseReceiptProjection,
+            openings: &MetadataOpenings,
+            keys: &TenantIndexKeySet,
+        ) -> bool {
+            let mut committer = MetadataCommitter::verify(openings);
+            self.matches_with(projection, keys, &mut committer) && committer.finish().is_ok()
+        }
+    }
+
+    #[test]
+    fn active_defense_block_shares_one_committer_and_one_finish_with_another_block() {
+        let keys = key_set(7, &[]);
+        let body = parse(fixture(ActiveDefenseReceiptKind::ResponseCompletion));
+        let namespace = metadata_salt_ref("receipt_context", "request_namespace")
+            .unwrap_or_else(|error| panic!("salt ref: {error}"));
+        let rng = rng();
+        let mut committer = MetadataCommitter::project(&rng);
+        let projection = body
+            .project_with(&keys, &mut committer)
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        let context = committer
+            .commit(namespace.clone(), &"tenant-a/requests")
+            .unwrap_or_else(|error| panic!("commits: {error}"));
+        let openings = committer.into_openings();
+
+        let mut receipt = MetadataCommitter::verify(&openings);
+        assert!(body.matches_with(&projection, &keys, &mut receipt));
+        assert_eq!(
+            receipt.commit(namespace.clone(), &"tenant-a/requests"),
+            Ok(context)
+        );
+        assert_eq!(receipt.finish(), Ok(()));
+
+        let mut active_defense_only = MetadataCommitter::verify(&openings);
+        assert!(body.matches_with(&projection, &keys, &mut active_defense_only));
+        assert_eq!(
+            active_defense_only.finish(),
+            Err(MetadataCommitmentError::UnusedOpening {
+                salt_ref: namespace
+            })
+        );
     }
 
     fn without_first(openings: &MetadataOpenings) -> MetadataOpenings {

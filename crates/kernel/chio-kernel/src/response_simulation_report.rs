@@ -5,9 +5,8 @@ use chio_core::receipt::decision::ToolCallAction;
 use chio_core::receipt::kinds::*;
 use chio_core::{canonical_json_bytes, sha256, Hash, PublicKey};
 use chio_core_types::receipt::metadata::{
-    metadata_salt_ref, MetadataCommitment, MetadataOpenings, MetadataProjector, ProjectionError,
+    metadata_salt_ref, MetadataCommitment, MetadataCommitter, MetadataProjector, ProjectionError,
 };
-use chio_core_types::rng::Rng;
 use chio_core_types::tenant_index::{IndexDomain, KeyedIndexValue, TenantIndexKeySet};
 use chio_security_types::ports::*;
 use chio_security_types::response_simulation::*;
@@ -235,52 +234,46 @@ pub struct ResponseSimulationProjection {
 }
 
 impl ResponseSimulationReport {
-    /// Draws one salt per committed field from `rng` and derives each keyed value under the
-    /// active generation of `keys`; returns the projection and its openings.
-    pub fn project(
+    /// The projection of this report, committing through `committer`, which the receipt's
+    /// other blocks share, and deriving each keyed value under the active generation of
+    /// `keys`.
+    pub fn project_with(
         &self,
         keys: &TenantIndexKeySet,
-        rng: &dyn Rng,
-    ) -> Result<(ResponseSimulationProjection, MetadataOpenings), SimulationProjectionError> {
-        let mut projector = MetadataProjector::project(keys, rng);
-        let projection = self.build_projection(&mut projector)?;
-        Ok((projection, projector.into_openings()))
+        committer: &mut MetadataCommitter<'_>,
+    ) -> Result<ResponseSimulationProjection, SimulationProjectionError> {
+        self.build_projection(&mut MetadataProjector::active(keys, committer))
     }
 
-    /// True when every commitment in `projection` opens to this report with `openings`,
-    /// every opening is used, and every keyed value derives from it under the generation the
-    /// projection names; false on any mismatch, missing or unused opening or unknown
-    /// generation.
+    /// True when `projection` is the projection of this report under `committer` and the
+    /// generation the projection names; false on any mismatch, missing opening or unknown
+    /// generation. The caller calls `finish` once per receipt.
     #[must_use]
-    pub fn matches_projection(
+    pub fn matches_with(
         &self,
         projection: &ResponseSimulationProjection,
-        openings: &MetadataOpenings,
         keys: &TenantIndexKeySet,
+        committer: &mut MetadataCommitter<'_>,
     ) -> bool {
-        MetadataProjector::verify(
+        MetadataProjector::generation(
             keys,
             &projection.response_simulation_evidence_id.key_id,
-            openings,
+            committer,
         )
         .map_err(SimulationProjectionError::from)
-        .and_then(|mut projector| {
-            let rebuilt = self.build_projection(&mut projector)?;
-            projector.finish()?;
-            Ok(rebuilt)
-        })
+        .and_then(|mut projector| self.build_projection(&mut projector))
         .is_ok_and(|rebuilt| rebuilt == *projection)
     }
 
     fn build_projection(
         &self,
-        projector: &mut MetadataProjector<'_>,
+        projector: &mut MetadataProjector<'_, '_>,
     ) -> Result<ResponseSimulationProjection, SimulationProjectionError> {
         let salt_ref = |field: &str| {
             metadata_salt_ref("response_simulation", field)
                 .map_err(|error| SimulationProjectionError::from(ProjectionError::from(error)))
         };
-        let keyed = |projector: &MetadataProjector<'_>, preimage: &[u8]| {
+        let keyed = |projector: &MetadataProjector<'_, '_>, preimage: &[u8]| {
             projector.keyed(IndexDomain::ActiveDefenseKeyedDigest, preimage)
         };
         let canonical = |value: Result<Vec<u8>, chio_core::Error>| {
