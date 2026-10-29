@@ -506,6 +506,7 @@ impl TrustControlClient {
             REVOCATIONS_PATH,
             &RevokeCapabilityRequest {
                 capability_id: capability_id.to_string(),
+                reason: chio_core_types::root_authority::RevocationReason::OperatorRequest,
             },
         )
     }

@@ -517,6 +517,8 @@ async fn handle_admin_revocations(
             RevocationListing::Page { limit, .. } => (None, *limit),
         };
         return match client.list_revocations(&RevocationQuery {
+            after: None,
+            kind: None,
             capability_id,
             limit: Some(limit),
         }) {
@@ -994,6 +996,8 @@ fn load_session_revocation_status(
             .map(|capability| {
                 client
                     .list_revocations(&RevocationQuery {
+                        after: None,
+                        kind: None,
                         capability_id: Some(capability.id.clone()),
                         limit: Some(1),
                     })

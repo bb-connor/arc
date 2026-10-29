@@ -165,6 +165,8 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
     let client = build_client(&server.url, "secret").test_expect("build client");
 
     let _ = client.list_revocations(&RevocationQuery {
+        after: None,
+        kind: None,
         capability_id: Some("cap-1".to_string()),
         limit: Some(2),
     });

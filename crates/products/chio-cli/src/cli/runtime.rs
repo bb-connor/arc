@@ -1721,6 +1721,8 @@ pub(crate) fn cmd_trust_status(
         let token = require_control_token(control_token)?;
         let response = trust_control::service_runtime::client::build_client(url, token)?
             .list_revocations(&trust_control::RevocationQuery {
+ after: None,
+ kind: None,
                 capability_id: Some(capability_id.to_string()),
                 limit: Some(1),
             })?;

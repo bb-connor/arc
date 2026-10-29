@@ -850,6 +850,7 @@ async fn final_f10_public_forward_preserves_authenticated_revocation_and_budget_
         headers.clone(),
         Json(RevokeCapabilityRequest {
             capability_id: "compromised-capability".to_string(),
+            reason: chio_core_types::root_authority::RevocationReason::CredentialCompromise,
         }),
     )
     .await;

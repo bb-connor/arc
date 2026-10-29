@@ -241,7 +241,11 @@ pub struct RevocationQuery {
     #[serde(default)]
     pub capability_id: Option<String>,
     #[serde(default)]
+    pub after: Option<u64>,
+    #[serde(default)]
     pub limit: Option<usize>,
+    #[serde(default)]
+    pub kind: Option<chio_core_types::root_authority::RevocationTargetKind>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

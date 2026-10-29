@@ -24,6 +24,7 @@ pub(crate) use public_authority_read::{
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RevokeCapabilityRequest {
     pub(crate) capability_id: String,
+    pub(crate) reason: chio_core_types::root_authority::RevocationReason,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

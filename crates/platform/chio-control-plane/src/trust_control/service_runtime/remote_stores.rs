@@ -68,6 +68,8 @@ impl RevocationStore for RemoteRevocationStore {
     fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         self.client
             .list_revocations(&RevocationQuery {
+ after: None,
+ kind: None,
                 capability_id: Some(capability_id.to_string()),
                 limit: Some(1),
             })

@@ -162,6 +162,8 @@ mod transport_tests {
         )?;
         let error = client
             .list_revocations(&RevocationQuery {
+                after: None,
+                kind: None,
                 capability_id: Some("test".into()),
                 limit: Some(1),
             })

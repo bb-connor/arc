@@ -71,6 +71,8 @@ impl Backend {
         match self {
             Self::Remote(client) => {
                 let response = client.list_revocations(&RevocationQuery {
+                    after: None,
+                    kind: None,
                     capability_id: Some(id.to_owned()),
                     limit: Some(1),
                 })?;
