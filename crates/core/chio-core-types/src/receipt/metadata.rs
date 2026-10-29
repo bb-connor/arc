@@ -620,12 +620,16 @@ pub struct ReceiptAttributionMetadata {
     pub grant_index: Option<u32>,
 }
 
+mod acp;
 mod commitment;
+mod committer;
 mod decision_model;
+mod financial;
 mod key_registry;
 #[cfg(feature = "tenant-index")]
 mod projector;
 mod session_anchor;
+mod stream;
 
 pub use session_anchor::{
     ReceiptSessionAnchorV1, RECEIPT_SESSION_ANCHOR_SCHEMA, SESSION_ANCHOR_METADATA_KEY,
@@ -635,6 +639,15 @@ pub use commitment::{
     check_metadata_salt_ref, metadata_salt_ref, MetadataCommitment, MetadataCommitmentError,
     MetadataOpening, MetadataOpenings, MetadataValue, METADATA_SALT_REF_PREFIX,
 };
+
+pub use acp::{AcpReceiptFields, AcpReceiptProjection};
+pub use committer::MetadataCommitter;
+pub use financial::{
+    financial_settlement_projection, ChargedFinancialBlock, FinancialBlock,
+    FinancialSettlementProjection, MalformedFinancialMetadata, PaymentAuthorizationErrorCode,
+    RetainedAmbiguousFinancialBlock,
+};
+pub use stream::StreamReceiptProjection;
 
 #[cfg(feature = "tenant-index")]
 pub use projector::{MetadataProjector, ProjectionError};

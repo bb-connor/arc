@@ -298,6 +298,7 @@ fn registered_metadata_salt_refs() -> Vec<String> {
         (
             "cage_receipt",
             &[
+                "attempt_id",
                 "plan_digest",
                 "fd_table_digest",
                 "profile_digest",

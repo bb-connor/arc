@@ -1,18 +1,13 @@
-//! Builds and checks signed metadata projections: each raw identifier becomes a
-//! `MetadataCommitment` and each low-entropy digest a keyed value under the deployment's
-//! tenant index key set.
+//! Builds and checks signed metadata projections that also carry keyed values: each raw
+//! identifier becomes a `MetadataCommitment` through a `MetadataCommitter`, and each
+//! low-entropy digest a keyed value under the deployment's tenant index key set.
 //!
-//! One projection function serves both directions. In project mode the projector draws a
-//! salt per committed field and derives keyed values under the active generation. In verify
-//! mode it rebuilds each commitment from the held opening, refusing an opening whose value
-//! is not the raw field value, and derives keyed values under the generation the projection
-//! names; the caller compares the rebuilt projection with the signed one and calls
-//! `finish`, which refuses any held opening the projection never committed.
-
-use alloc::collections::BTreeSet;
+//! In project mode keyed values derive under the active generation; in verify mode under the
+//! generation the projection names. The caller compares the rebuilt projection with the
+//! signed one and calls `finish`.
 
 use crate::receipt::metadata::{
-    MetadataCommitment, MetadataCommitmentError, MetadataOpening, MetadataOpenings, MetadataValue,
+    MetadataCommitment, MetadataCommitmentError, MetadataCommitter, MetadataOpenings,
 };
 use crate::rng::Rng;
 use crate::root_authority::{SaltRef, Sha256Digest};
@@ -21,22 +16,11 @@ use crate::tenant_index::{
     TenantIndexKeySet,
 };
 
-enum Mode<'a> {
-    Project {
-        rng: &'a dyn Rng,
-        openings: MetadataOpenings,
-    },
-    Verify {
-        openings: &'a MetadataOpenings,
-        used: BTreeSet<SaltRef>,
-    },
-}
-
 /// The state of one projection build or check.
 pub struct MetadataProjector<'a> {
     keys: &'a TenantIndexKeySet,
     key_id: Sha256Digest,
-    mode: Mode<'a>,
+    committer: MetadataCommitter<'a>,
 }
 
 impl<'a> MetadataProjector<'a> {
@@ -46,10 +30,7 @@ impl<'a> MetadataProjector<'a> {
         Self {
             keys,
             key_id: *keys.active_key_id(),
-            mode: Mode::Project {
-                rng,
-                openings: MetadataOpenings::new(),
-            },
+            committer: MetadataCommitter::project(rng),
         }
     }
 
@@ -68,37 +49,17 @@ impl<'a> MetadataProjector<'a> {
         Ok(Self {
             keys,
             key_id: *key_id,
-            mode: Mode::Verify {
-                openings,
-                used: BTreeSet::new(),
-            },
+            committer: MetadataCommitter::verify(openings),
         })
     }
 
-    /// The commitment of `value` under `salt_ref`. A `salt_ref` committed twice in one
-    /// projection yields one commitment and refuses a second, different value.
+    /// The commitment of `value` under `salt_ref`; see `MetadataCommitter::commit`.
     pub fn commit<T: serde::Serialize>(
         &mut self,
         salt_ref: SaltRef,
         value: &T,
     ) -> Result<MetadataCommitment, ProjectionError> {
-        let value = MetadataValue::from_json(value)?;
-        match &mut self.mode {
-            Mode::Project { rng, openings } => match openings.get(&salt_ref) {
-                Some(held) => commit_held(salt_ref, held, &value),
-                None => {
-                    let commitment = openings.commit_value(salt_ref, value, *rng)?;
-                    Ok(commitment)
-                }
-            },
-            Mode::Verify { openings, used } => match openings.get(&salt_ref) {
-                Some(held) => {
-                    used.insert(salt_ref.clone());
-                    commit_held(salt_ref, held, &value)
-                }
-                None => Err(MetadataCommitmentError::OpeningUnavailable { salt_ref }.into()),
-            },
-        }
+        Ok(self.committer.commit(salt_ref, value)?)
     }
 
     /// The keyed value of `domain || preimage` under the projection's generation.
@@ -120,45 +81,16 @@ impl<'a> MetadataProjector<'a> {
         })
     }
 
-    /// Ends a verify-mode check: the set of `salt_ref`s the projection committed must equal
-    /// the set of held openings, so an opening the projection never uses refuses. A
-    /// project-mode build always finishes.
+    /// Ends a verify-mode check; see `MetadataCommitter::finish`.
     pub fn finish(&self) -> Result<(), ProjectionError> {
-        match &self.mode {
-            Mode::Project { .. } => Ok(()),
-            Mode::Verify { openings, used } => match openings
-                .iter()
-                .map(|(salt_ref, _)| salt_ref)
-                .find(|salt_ref| !used.contains(*salt_ref))
-            {
-                Some(salt_ref) => Err(MetadataCommitmentError::UnusedOpening {
-                    salt_ref: salt_ref.clone(),
-                }
-                .into()),
-                None => Ok(()),
-            },
-        }
+        Ok(self.committer.finish()?)
     }
 
     /// The openings a project-mode build drew. A verify-mode check draws none.
     #[must_use]
     pub fn into_openings(self) -> MetadataOpenings {
-        match self.mode {
-            Mode::Project { openings, .. } => openings,
-            Mode::Verify { .. } => MetadataOpenings::new(),
-        }
+        self.committer.into_openings()
     }
-}
-
-fn commit_held(
-    salt_ref: SaltRef,
-    held: &MetadataOpening,
-    value: &MetadataValue,
-) -> Result<MetadataCommitment, ProjectionError> {
-    if held.value != *value {
-        return Err(MetadataCommitmentError::MetadataCommitmentMismatch { salt_ref }.into());
-    }
-    Ok(MetadataCommitment::compute(salt_ref, held)?)
 }
 
 /// Why a projection cannot be built or checked.
