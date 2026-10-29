@@ -524,15 +524,20 @@ pub(crate) async fn handle_evaluate_federation_policy(
     }
 }
 
+fn revocation_failure(error: &chio_kernel::RevocationStoreError) -> Response {
+    let (status, body) = revocation_store_failure(error);
+    plain_http_error(status, body)
+}
+
 pub(crate) async fn handle_list_revocations(
     State(state): State<TrustServiceState>,
-    Query(query): Query<RevocationQuery>,
+    query: Result<Query<RevocationQuery>, axum::extract::rejection::QueryRejection>,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsRead) {
         return response;
     }
-    let Some(listing) = query.listing() else {
+    let Some(listing) = query.ok().and_then(|Query(query)| query.listing()) else {
         return plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST);
     };
     let store = match state.revocation_store() {
@@ -547,7 +552,7 @@ pub(crate) async fn handle_list_revocations(
                 entry_id,
             })
             .into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => revocation_failure(&error),
         },
         RevocationListing::Page { after, limit, kind } => {
             match store.list_revocation_entries_after(after, limit, kind) {
@@ -560,9 +565,7 @@ pub(crate) async fn handle_list_revocations(
                     head,
                 })
                 .into_response(),
-                Err(error) => {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                }
+                Err(error) => revocation_failure(&error),
             }
         }
     }
@@ -571,7 +574,7 @@ pub(crate) async fn handle_list_revocations(
 pub(crate) async fn handle_revoke_capability(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(payload): Json<RevokeCapabilityRequest>,
+    payload: Result<Json<RevokeCapabilityRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     let clock_now = match unix_timestamp_now() {
         Ok(now) => now,
@@ -580,6 +583,9 @@ pub(crate) async fn handle_revoke_capability(
     if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsWrite) {
         return response;
     }
+    let Ok(Json(payload)) = payload else {
+        return plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST);
+    };
     let Ok(target) =
         chio_core_types::root_authority::RevocationTarget::capability(&payload.capability_id)
     else {
@@ -609,9 +615,7 @@ pub(crate) async fn handle_revoke_capability(
                 || {
                     let visible = store
                         .revocation_entry(&payload.capability_id)
-                        .map_err(|error| {
-                            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                        })?
+                        .map_err(|error| revocation_failure(&error))?
                         .is_some();
                     Ok(visible.then(|| RevokeCapabilityResponse {
                         entry: revocation.entry.clone(),
@@ -622,6 +626,6 @@ pub(crate) async fn handle_revoke_capability(
                 },
             )
         }
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Err(error) => revocation_failure(&error),
     }
 }

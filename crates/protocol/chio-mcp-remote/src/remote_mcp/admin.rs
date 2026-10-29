@@ -448,63 +448,25 @@ async fn handle_admin_budgets(
     .into_response()
 }
 
-/// The fixed refusal for every malformed revocation request.
-const INVALID_REVOCATION_REQUEST: &str = "invalid revocation request";
 /// The largest accepted revocation request body.
 const MAX_REVOCATION_REQUEST_BYTES: usize = 4096;
-const DEFAULT_REVOCATION_PAGE: usize = 100;
-const MAX_REVOCATION_PAGE: usize = 500;
 
 fn invalid_revocation_request() -> Response {
-    plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST)
-}
-
-/// A page request or a capability check parsed from the query.
-enum RevocationListing {
-    Capability(String),
-    Page {
-        after: u64,
-        limit: usize,
-        kind: Option<chio_core::root_authority::RevocationTargetKind>,
-    },
-}
-
-impl RevocationListing {
-    fn parse(query: AdminRevocationQuery) -> Option<Self> {
-        if let Some(capability_id) = query.capability_id {
-            if query.after.is_some() || query.limit.is_some() || query.kind.is_some() {
-                return None;
-            }
-            chio_core::root_authority::RevocationTarget::capability(&capability_id).ok()?;
-            return Some(Self::Capability(capability_id));
-        }
-        let after = query.after.map_or(Some(0), |after| after.parse().ok())?;
-        let limit = query
-            .limit
-            .map_or(Some(DEFAULT_REVOCATION_PAGE), |limit| limit.parse().ok())?;
-        if !(1..=MAX_REVOCATION_PAGE).contains(&limit) {
-            return None;
-        }
-        let kind = query
-            .kind
-            .map(|kind| chio_core::root_authority::RevocationTargetKind::parse(&kind).ok())
-            .map_or(Some(None), |kind| kind.map(Some))?;
-        Some(Self::Page { after, limit, kind })
-    }
+    plain_http_error(
+        StatusCode::BAD_REQUEST,
+        trust_control::INVALID_REVOCATION_REQUEST,
+    )
 }
 
 async fn handle_admin_revocations(
     State(state): State<RemoteAppState>,
-    query: Result<Query<AdminRevocationQuery>, axum::extract::rejection::QueryRejection>,
+    query: Result<Query<RevocationQuery>, axum::extract::rejection::QueryRejection>,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
-    let Some(listing) = query
-        .ok()
-        .and_then(|Query(query)| RevocationListing::parse(query))
-    else {
+    let Some(listing) = query.ok().and_then(|Query(query)| query.listing()) else {
         return invalid_revocation_request();
     };
 
@@ -513,13 +475,13 @@ async fn handle_admin_revocations(
         Err(response) => return response,
     } {
         return match listing {
-            RevocationListing::Capability(capability_id) => {
+            trust_control::RevocationListing::Status(capability_id) => {
                 match client.revocation_status(&capability_id) {
                     Ok(response) => Json(response).into_response(),
                     Err(error) => admin_backend_failure(error),
                 }
             }
-            RevocationListing::Page { after, limit, kind } => {
+            trust_control::RevocationListing::Page { after, limit, kind } => {
                 match client.list_revocation_entries(after, limit, kind) {
                     Ok(response) => Json(response).into_response(),
                     Err(error) => admin_backend_failure(error),
@@ -532,7 +494,7 @@ async fn handle_admin_revocations(
         Err(response) => return response,
     };
     match listing {
-        RevocationListing::Capability(capability_id) => {
+        trust_control::RevocationListing::Status(capability_id) => {
             match store.revocation_entry(&capability_id) {
                 Ok(entry_id) => Json(json!({
                     "capability_id": capability_id,
@@ -543,7 +505,7 @@ async fn handle_admin_revocations(
                 Err(error) => revocation_store_failure(error),
             }
         }
-        RevocationListing::Page { after, limit, kind } => {
+        trust_control::RevocationListing::Page { after, limit, kind } => {
             match store.list_revocation_entries_after(after, limit, kind) {
                 Ok((entries, head)) => {
                     let next_after = entries.last().map_or(after, |(entry_seq, _)| *entry_seq);
@@ -882,13 +844,8 @@ fn admin_backend_failure(error: impl std::fmt::Display) -> Response {
 /// left nothing committed.
 pub(super) fn revocation_store_failure(error: chio_kernel::RevocationStoreError) -> Response {
     error!(error = %error, "remote MCP admin revocation store operation failed");
-    let body = match error {
-        chio_kernel::RevocationStoreError::OutcomeUnknown(_) => {
-            "revocation outcome unknown; restart the provider, then retry the same request"
-        }
-        _ => "revocation store unavailable",
-    };
-    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, body)
+    let (status, body) = trust_control::revocation_store_failure(&error);
+    plain_http_error(status, body)
 }
 
 fn open_receipt_store(

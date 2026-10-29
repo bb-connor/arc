@@ -96,7 +96,7 @@ struct Backend {
 }
 
 async fn mock_write(State(backend): State<Arc<Backend>>, Json(body): Json<Value>) -> Response {
-    let id = body["capabilityId"].as_str().unwrap_or_default();
+    let id = body["capability_id"].as_str().unwrap_or_default();
     if backend.mode.load(Ordering::SeqCst) == 1 && id == "b" {
         return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
     }
@@ -109,9 +109,9 @@ async fn mock_write(State(backend): State<Arc<Backend>>, Json(body): Json<Value>
     .unwrap();
     Json(json!({
         "entry": entry,
-        "newlyRevoked": newly_revoked,
-        "rootsMatched": 1,
-        "rootsRevoked": u64::from(newly_revoked),
+        "newly_revoked": newly_revoked,
+        "roots_matched": 1,
+        "roots_revoked": u64::from(newly_revoked),
     }))
     .into_response()
 }
@@ -123,7 +123,7 @@ async fn mock_read(
     if backend.mode.load(Ordering::SeqCst) == 2 {
         return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
     }
-    let id = query.get("capabilityId").cloned().unwrap_or_default();
+    let id = query.get("capability_id").cloned().unwrap_or_default();
     let revoked =
         backend.mode.load(Ordering::SeqCst) != 3 && backend.revoked.lock().unwrap().contains(&id);
     let entry_id = revoked.then(|| {

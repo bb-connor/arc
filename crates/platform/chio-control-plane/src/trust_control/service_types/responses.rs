@@ -236,7 +236,7 @@ pub struct ChildReceiptQuery {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub struct RevocationQuery {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
@@ -283,15 +283,20 @@ pub struct RevocationEntryPageItem {
     pub entry: chio_core_types::root_authority::RevocationEntry,
 }
 
-/// The status and fixed body for a revocation store error.
+/// The status and fixed body for a revocation store error. An unknown commit
+/// outcome poisons the serving owner until the process restarts; every other
+/// error left nothing committed. No store text reaches the caller.
 #[must_use]
 pub fn revocation_store_failure(
-    _error: &chio_kernel::RevocationStoreError,
+    error: &chio_kernel::RevocationStoreError,
 ) -> (axum::http::StatusCode, &'static str) {
-    (
-        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-        "revocation store unavailable",
-    )
+    let body = match error {
+        chio_kernel::RevocationStoreError::OutcomeUnknown(_) => {
+            "revocation outcome unknown; restart the provider, then retry the same request"
+        }
+        _ => "revocation store unavailable",
+    };
+    (axum::http::StatusCode::SERVICE_UNAVAILABLE, body)
 }
 
 /// The fixed refusal for a malformed revocation request or query.

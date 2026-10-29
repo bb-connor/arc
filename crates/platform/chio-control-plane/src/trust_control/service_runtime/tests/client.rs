@@ -367,7 +367,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         &requests[0],
         "GET",
         REVOCATIONS_PATH,
-        &["capabilityId=cap-1"],
+        &["capability_id=cap-1"],
     );
     assert_bearer_request(
         &requests[1],

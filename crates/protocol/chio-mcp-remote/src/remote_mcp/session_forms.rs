@@ -27,23 +27,6 @@ struct AdminChildReceiptQuery {
     limit: Option<usize>,
 }
 
-/// `GET /admin/revocations`: a page of entries after `after`, of `kind`
-/// when named, or with `capability_id` the check of one capability. Members
-/// are parsed by the handler, so every malformed value answers the fixed
-/// refusal.
-#[derive(Debug, Default, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AdminRevocationQuery {
-    #[serde(default)]
-    capability_id: Option<String>,
-    #[serde(default)]
-    after: Option<String>,
-    #[serde(default)]
-    limit: Option<String>,
-    #[serde(default)]
-    kind: Option<String>,
-}
-
 #[derive(Debug, Default, Deserialize)]
 struct AdminBudgetQuery {
     #[serde(default)]

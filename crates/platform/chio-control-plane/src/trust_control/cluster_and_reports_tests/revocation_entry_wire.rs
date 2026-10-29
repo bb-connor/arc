@@ -38,10 +38,10 @@ async fn revoke(
         handle_revoke_capability(
             State(state.clone()),
             admin_headers(),
-            Json(RevokeCapabilityRequest {
+            Ok(Json(RevokeCapabilityRequest {
                 capability_id: capability_id.to_string(),
                 reason,
-            }),
+            })),
         )
         .await,
     )
@@ -49,8 +49,10 @@ async fn revoke(
 }
 
 async fn list(state: &TrustServiceState, query: RevocationQuery) -> (StatusCode, Value) {
-    json_body(handle_list_revocations(State(state.clone()), Query(query), admin_headers()).await)
-        .await
+    json_body(
+        handle_list_revocations(State(state.clone()), Ok(Query(query)), admin_headers()).await,
+    )
+    .await
 }
 
 #[tokio::test]

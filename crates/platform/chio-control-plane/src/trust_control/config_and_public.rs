@@ -21,14 +21,13 @@ pub(crate) use public_authority_read::{
 };
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RevokeCapabilityRequest {
     pub(crate) capability_id: String,
     pub(crate) reason: chio_core_types::root_authority::RevocationReason,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct RevokeCapabilityResponse {
     /// The stored entry: the first write's `revoked_at` and reason stand.
     pub entry: chio_core_types::root_authority::RevocationEntry,
