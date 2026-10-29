@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 
 mod admission;
 mod admission_hook;
+mod authority_commit;
 mod bounded_read;
 mod buyer;
 pub mod computer;
@@ -56,6 +57,10 @@ pub(crate) use admission::{
     validate_runtime_trust_floor_transition, PreparedRuntimeAdmission, RuntimeAdmissionPreparation,
 };
 pub use admission_hook::ChioRuntimeAdmissionHook;
+pub use authority_commit::{
+    RuntimeAdmissionAuthorityCommit, RuntimeTreatyAuthorizationBinding,
+    RuntimeTreatyAuthorizationRequest, RuntimeTrustFloorUpdate,
+};
 pub use buyer::{
     verify_buyer_attestation_packet, verify_buyer_attestation_review_package,
     verify_buyer_attestation_review_package_with_trust, verify_receipt_lineage_bundle,
