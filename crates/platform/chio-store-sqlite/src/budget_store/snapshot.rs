@@ -67,6 +67,11 @@ struct AnchorChainDigestBody<'a> {
     signer_public_key: &'a str,
 }
 
+#[derive(Serialize)]
+struct AnchorAuthenticatorBody<'a> {
+    chain: &'a [SignedBudgetSnapshotAnchorCommitment],
+}
+
 pub fn budget_snapshot_anchor_set_digest(
     anchors: &[BudgetUsageRecord],
 ) -> Result<String, BudgetStoreError> {
@@ -117,7 +122,7 @@ pub fn budget_snapshot_anchor_authenticator(
     leader_node_key: &chio_core::crypto::Keypair,
     chain: &[SignedBudgetSnapshotAnchorCommitment],
 ) -> Result<String, BudgetStoreError> {
-    let canonical = CanonicalBytes::from_serializable(&chain)
+    let canonical = CanonicalBytes::from_serializable(&AnchorAuthenticatorBody { chain })
         .map_err(|error| BudgetStoreError::Invariant(error.to_string()))?;
     let signature = leader_node_key
         .sign_wrapped(CHIO_CLUSTER_BUDGET_ANCHOR_V1_SCHEMA, &canonical)
@@ -888,7 +893,9 @@ fn verify_budget_snapshot_anchor_provenance<'a>(
             verify_wrapped(
                 leader_node_key,
                 CHIO_CLUSTER_BUDGET_ANCHOR_V1_SCHEMA,
-                &provenance.chain,
+                &AnchorAuthenticatorBody {
+                    chain: &provenance.chain,
+                },
                 &signature,
             )
             .is_ok()

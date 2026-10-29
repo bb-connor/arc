@@ -1753,8 +1753,8 @@ const GOLDEN_PEER_PAYLOAD: &str = concat!(
 );
 
 const GOLDEN_PEER_SIGNATURE: &str = concat!(
-    "e24d4130f03d791599b7c606f3463f3f8584e39893f4236498b505f428d4ca95",
-    "1b129b801a08d47850af1ea4d9dc0d58d5c7e752e12b97a42d2f4bf98012060b"
+    "717af1da49c0ac2917b8de22a4698468ddca0eece498c400e1af3ffdf35cb083",
+    "1e8bc67793ee62419c9a0b1af274c326cf235a0da4ac8f208b8281171d29ab0e"
 );
 
 #[test]

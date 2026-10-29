@@ -153,7 +153,7 @@ fn anchor_provenance_refuses_an_unwrapped_leader_signature() -> TestResult {
     let leader_node = chio_core::crypto::Keypair::generate();
     let bare = leader_node.sign_exempt(
         chio_core::crypto::ExemptFormat::JwsSigningInput,
-        &chio_core::canonical::canonical_json_bytes(&chain)?,
+        &chio_core::canonical::canonical_json_bytes(&serde_json::json!({ "chain": chain }))?,
     );
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".into(),
@@ -197,7 +197,9 @@ fn anchor_provenance_accepts_a_wrapper_signature_under_its_pinned_id() -> TestRe
     let leader_node = chio_core::crypto::Keypair::generate();
     let signature = leader_node.sign_wrapped(
         "chio.cluster-budget-anchor-signature.v1",
-        &chio_core::canonical::CanonicalBytes::from_serializable(&chain)?,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&serde_json::json!({
+            "chain": chain
+        }))?,
     )?;
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".into(),
