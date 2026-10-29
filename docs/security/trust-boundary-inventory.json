@@ -20673,12 +20673,14 @@
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs": [
       "claim_runtime_participants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load",
+      "live_runtime_selection::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load",
       "load_runtime_participant_evidence::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "load_runtime_participant_evidence::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load",
       "load_runtime_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
       "load_runtime_participant_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load",
       "release_runtime_participants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load",
-      "verify_runtime_budget_selection_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::load"
+      "verify_runtime_budget_selection_history_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs::live_runtime_selection",
+      "verify_runtime_budget_selection_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs::live_runtime_selection"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/dispatch_snapshot.rs": [
       "dispatch_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant.rs::verify_runtime_budget_selection_tx"

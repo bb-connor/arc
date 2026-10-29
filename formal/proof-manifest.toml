@@ -3089,10 +3089,10 @@ rust_symbols = [
   "SqliteBudgetStore::capture_composite_invocation_inner",
   "SqliteBudgetStore::capture_composite_invocation_with_diagnostic",
 ]
-normalized_sha256 = "89c30ab32907faea0ae21abaa744b3373affa823e385706ab727970c0037c0e8"
+normalized_sha256 = "ef220a26644e3cfb993d6c2654dd8a37c8a5f1aa8fd907bc614faf7624881add"
 symbol_sha256 = [
   { symbol = "SqliteBudgetStore::capture_composite_invocation_inner", sha256 = "4d1708efe74071241d2ad37a2f00d9002c4679a84b422e7e69d624b744661126" },
-  { symbol = "SqliteBudgetStore::capture_composite_invocation_with_diagnostic", sha256 = "b43d7429dd5c0c7ad90081fbef14d50ea7b3a8307292b932ed203859df6ed34f" },
+  { symbol = "SqliteBudgetStore::capture_composite_invocation_with_diagnostic", sha256 = "058473310d5c48d95ce646f217241b744e529944255c0fb99a6315f74be97be0" },
 ]
 
 [[mirror]]

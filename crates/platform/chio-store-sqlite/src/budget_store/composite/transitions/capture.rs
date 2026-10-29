@@ -135,7 +135,7 @@ impl SqliteBudgetStore {
         }
         diagnostic.at(Stage::BudgetSelection);
         if let Some(binding) = admission.as_ref() {
-            crate::admission_operation_store::verify_runtime_budget_selection_tx(
+            crate::admission_operation_store::verify_runtime_budget_selection_history_tx(
                 &transaction,
                 binding.operation,
                 request.grant_index,
@@ -237,6 +237,16 @@ impl SqliteBudgetStore {
         if let Some(binding) = admission.as_ref() {
             let owner = self.serving_owner.as_deref().ok_or_else(|| {
                 BudgetStoreError::Invariant("admission capture requires a serving owner".to_owned())
+            })?;
+            crate::admission_operation_store::verify_runtime_budget_selection_tx(
+                &transaction,
+                binding.operation,
+                request.grant_index,
+                chio_kernel::admission_operation::runtime_participant::RuntimeParticipantPhase::Dispatch,
+            )
+            .map_err(|error| {
+                diagnostic.admission_error(&error);
+                map_admission_error(self, error)
             })?;
             crate::admission_operation_store::verify_fresh_dpop_tx(
                 &transaction,
