@@ -111,7 +111,7 @@ fn seed_file_with_malformed_seed_refuses() {
     let dir = tempfile::tempdir().unwrap();
     let path = seed_file(&dir, 0o600);
     std::fs::write(&path, "not a seed\n").unwrap();
-    let expected = CliError::from(Keypair::from_seed_hex("not a seed").unwrap_err()).to_string();
+    let expected = CliError::from(Keypair::from_seed_hex("not a seed").err().unwrap()).to_string();
     assert_eq!(
         ExchangeSigner::seed_file(&path).unwrap_err(),
         ExchangeSignerError::SeedFileRefused(expected)
@@ -144,7 +144,7 @@ fn seed_file_with_a_seed_one_hex_digit_short_or_long_refuses() {
         (&long[..], "crypto hex input exceeds its encoded size limit"),
     ] {
         std::fs::write(&path, format!("{text}\n")).unwrap();
-        let expected = CliError::from(Keypair::from_seed_hex(text).unwrap_err()).to_string();
+        let expected = CliError::from(Keypair::from_seed_hex(text).err().unwrap()).to_string();
         assert!(
             expected.contains(reason),
             "{} hex digits: {expected}",
