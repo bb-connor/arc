@@ -454,6 +454,17 @@ fn load_entry(
 pub(super) fn verify_entry_tags(
     transaction: &rusqlite::Connection,
 ) -> Result<(), RevocationStoreError> {
+    // A catalog missing either table is refused by catalog validation, which
+    // names the difference; this check covers only the rows of a full catalog.
+    let tables = transaction.query_row(
+        "SELECT COUNT(*) FROM sqlite_schema
+         WHERE type = 'table' AND name IN ('revocation_entries', 'revocation_entry_tags')",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if tables != 2 {
+        return Ok(());
+    }
     let inconsistent = transaction
         .query_row(
             "SELECT entries.entry_id FROM revocation_entries AS entries
