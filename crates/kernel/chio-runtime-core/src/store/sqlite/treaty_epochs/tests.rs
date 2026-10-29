@@ -528,6 +528,39 @@ fn epoch_advancement_refuses_changed_participant_context() -> TestResult {
 }
 
 #[test]
+fn epoch_advancement_refuses_regressed_issue_time() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    for (issued, accepted) in [(899_999, false), (900_000, true)] {
+        let fixture = Fixture::new()?;
+        fixture.install()?;
+        let mut body = fixture.update.body().clone();
+        body.sequence = 2;
+        body.previous_record_sha256 = Some(fixture.update.body_digest().clone());
+        body.issued_at_unix_ms = issued;
+        let next =
+            sign_treaty_epoch_record(body, &fixture.backend, &fixture.backend.public_key()?)?;
+        let result = fixture
+            .store
+            .apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next);
+        if accepted {
+            result?;
+        } else {
+            assert_eq!(
+                result.err().ok_or("regressed issue time accepted")?.code(),
+                "treaty_epoch_update_conflict"
+            );
+        }
+        let retained: i64 = fixture.store.lock_connection()?.query_row(
+            "SELECT COUNT(*) FROM runtime_treaty_epoch_records",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(retained, if accepted { 2 } else { 1 }, "{issued}");
+    }
+    Ok(())
+}
+
+#[test]
 fn epoch_advancement_refuses_changed_trust_bundle() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(1000);
     let fixture = Fixture::new()?;
