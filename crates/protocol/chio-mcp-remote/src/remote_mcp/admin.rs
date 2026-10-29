@@ -798,6 +798,11 @@ fn admin_backend_failure(error: impl std::fmt::Display) -> Response {
     )
 }
 
+/// The response for a revocation store error.
+pub(super) fn revocation_store_failure(error: chio_kernel::RevocationStoreError) -> Response {
+    admin_backend_failure(error)
+}
+
 fn open_receipt_store(
     state: &RemoteAppState,
 ) -> Result<chio_store_sqlite::SqliteReceiptStore, Response> {
