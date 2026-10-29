@@ -687,9 +687,7 @@ fn verify_delegation_chain_shape(
     if token.delegation_chain.is_empty() {
         return Ok(());
     }
-    let root_delegator = root_delegator
-        .or(token.delegation_chain.first().map(|link| &link.delegator))
-        .ok_or(CapabilityError::DelegationRootUnresolved)?;
+    let root_delegator = root_delegator.ok_or(CapabilityError::DelegationRootUnresolved)?;
     validate_delegation_chain(&token.delegation_chain, root_delegator, None)
         .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
     let Some(final_link) = token.delegation_chain.last() else {
@@ -730,9 +728,7 @@ fn verify_chain_binding_with_resolver(
                 )
             })?;
         if !token.delegation_chain.is_empty() {
-            let root_delegator = root_delegator
-                .or(token.delegation_chain.first().map(|link| &link.delegator))
-                .ok_or(CapabilityError::DelegationRootUnresolved)?;
+            let root_delegator = root_delegator.ok_or(CapabilityError::DelegationRootUnresolved)?;
             validate_delegation_chain_with_trust_root(
                 &token.delegation_chain,
                 root_delegator,

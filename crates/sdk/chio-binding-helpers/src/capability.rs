@@ -49,12 +49,7 @@ pub fn verify_capability(
     let delegation_chain_shape_valid = if capability.delegation_chain.is_empty() {
         true
     } else {
-        let root_delegator = root_delegator
-            .or(capability
-                .delegation_chain
-                .first()
-                .map(|link| &link.delegator))
-            .ok_or(CoreError::DelegationRootUnresolved)?;
+        let root_delegator = root_delegator.ok_or(CoreError::DelegationRootUnresolved)?;
         validate_delegation_chain(
             &capability.delegation_chain,
             root_delegator,
