@@ -487,3 +487,42 @@ fn current_head_decoding_is_bounded_in_all_sqlite_encodings() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn epoch_advancement_refuses_changed_participant_context() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    for change in ["kernel", "key", "ladder", "order"] {
+        let fixture = Fixture::new()?;
+        fixture.install()?;
+        let mut body = fixture.update.body().clone();
+        body.sequence = 2;
+        body.previous_record_sha256 = Some(fixture.update.body_digest().clone());
+        match change {
+            "kernel" => body.participants[0].kernel_id = id("replacement-buyer")?,
+            "key" => body.participants[0].public_key = Keypair::generate().public_key(),
+            "ladder" => body.participants[0].ladder_manifest_sha256 = digest('d')?,
+            "order" => body.participants.swap(0, 1),
+            _ => unreachable!(),
+        }
+        let next =
+            sign_treaty_epoch_record(body, &fixture.backend, &fixture.backend.public_key()?)?;
+        assert_eq!(
+            fixture
+                .store
+                .apply_treaty_epoch_update(Some(fixture.update.body_digest()), &next)
+                .err()
+                .ok_or("changed participant context accepted")?
+                .code(),
+            "treaty_epoch_binding_mismatch",
+            "{change}"
+        );
+        fixture.store.commit_runtime_authority(&fixture.request)?;
+        let retained: i64 = fixture.store.lock_connection()?.query_row(
+            "SELECT COUNT(*) FROM runtime_treaty_epoch_records",
+            [],
+            |r| r.get(0),
+        )?;
+        assert_eq!(retained, 1);
+    }
+    Ok(())
+}
