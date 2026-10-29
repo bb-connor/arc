@@ -85,7 +85,12 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         );
         assert_eq!(payload["request_id"], execution.request_id);
         assert_eq!(payload["matched_grant_index"], 0);
-        assert!(payload["pre_invocation_guard_output"].is_array());
+        let guard_output = payload["pre_invocation_guard_output"]
+            .as_object()
+            .ok_or("frozen pre-invocation guard output")?;
+        assert_eq!(guard_output.len(), 2);
+        assert!(guard_output["evidence"].is_array());
+        assert!(guard_output["witness"].is_null());
         let private = std::str::from_utf8(frame.kernel_context_json())?;
         assert!(
             !private.contains("caller_reported"),
