@@ -535,7 +535,7 @@ Wrapper schema ids, one per signed artifact type:
 | Channel terminal outcome commitment | `chio.channel.terminal-outcome-commitment.v1` |
 | Signer readiness probe | `chio.signer-readiness-probe.v1` |
 | Finding-pool store identity proof | `chio.finding-pool.store-identity-proof.v1` |
-| ACP compliance certificate | `chio.compliance.certificate.v1` |
+| ACP-Client compliance certificate | `chio.compliance.certificate.v1` |
 | Federation kernel handshake | `chio.federation-kernel-handshake.v1` |
 | Operator purchase job (buyer ask signature) | `chio.finding.operator-purchase-job.v1` |
 | WASM guard module | `chio.wasm-module.v1` |
