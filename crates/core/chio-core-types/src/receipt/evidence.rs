@@ -801,6 +801,10 @@ pub struct ExportCommitment {
     pub payload_sha256: String,
 }
 
+impl crate::receipt::lineage::SignedExportPayload for ExportCommitment {
+    const SCHEMA_ID: &'static str = EVIDENCE_EXPORT_COMMITMENT_SCHEMA;
+}
+
 /// The signed `export-envelope.json` of a package.
 pub type EvidencePackageEnvelope = SignedExportEnvelope<ExportCommitment>;
 

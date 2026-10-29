@@ -226,6 +226,20 @@ fn package_envelope_wire_shape_and_domain_are_pinned() {
 }
 
 #[test]
+fn package_refuses_an_unwrapped_envelope_signature() {
+    let (_directory, mut package) = fixture();
+    let canonical =
+        chio_core_types::canonical::CanonicalBytes::from_serializable(&package.envelope.body)
+            .test_unwrap();
+    package.envelope.signature = package_keypair().sign_exempt(
+        chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+        canonical.as_bytes(),
+    );
+    let error = verify_decoded_package(&package, &package_trust(), None).test_unwrap_err();
+    assert!(error.message().contains("signature"), "{error}");
+}
+
+#[test]
 fn package_rejects_duplicate_inventory_and_oversized_file_commitment() {
     let (_directory, package) = fixture();
     let mut duplicate = package.manifest.clone();
@@ -405,7 +419,13 @@ fn two_checkpoints(
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         keypair,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(
+                &first,
+                std::slice::from_ref(&first.body.kernel_key),
+            )
+            .test_unwrap(),
+        ),
         &[checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
     )
     .test_unwrap();
@@ -415,8 +435,9 @@ fn two_checkpoints(
 #[test]
 fn checkpoint_transparency_records_match_derived_chain() {
     let checkpoints = two_checkpoints(&Keypair::generate());
-    let summary = verify_transparency(&checkpoints, None).test_unwrap();
-    verify_transparency(&checkpoints, Some(&summary)).test_unwrap();
+    let summary =
+        verify_transparency(&checkpoints, None, &carried_keys(&checkpoints)).test_unwrap();
+    verify_transparency(&checkpoints, Some(&summary), &carried_keys(&checkpoints)).test_unwrap();
 }
 
 #[test]
@@ -429,12 +450,19 @@ fn checkpoint_transparency_verification_fails_closed_on_duplicate_checkpoint_for
         4,
         &[b"five".to_vec(), b"six".to_vec()],
         &keypair,
-        Some(&validate_checkpoint(&checkpoints[0]).test_unwrap()),
+        Some(
+            &validate_checkpoint(
+                &checkpoints[0],
+                std::slice::from_ref(&checkpoints[0].body.kernel_key),
+            )
+            .test_unwrap(),
+        ),
         &[checkpoint_chain_leaf_hash(&checkpoints[0].body).test_unwrap()],
     )
     .test_unwrap();
     checkpoints.push(fork);
-    let error = verify_transparency(&checkpoints, None).test_unwrap_err();
+    let error =
+        verify_transparency(&checkpoints, None, &carried_keys(&checkpoints)).test_unwrap_err();
     assert!(
         error.message().contains("duplicate checkpoint sequence 2"),
         "{error}"
@@ -442,7 +470,12 @@ fn checkpoint_transparency_verification_fails_closed_on_duplicate_checkpoint_for
 }
 
 fn anchored_claims(bundle: &EvidenceExportBundle) -> EvidenceTransparencyClaims {
-    let transparency = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let count = |len: usize| u64::try_from(len).test_unwrap();
     EvidenceTransparencyClaims {
         schema: EVIDENCE_TRANSPARENCY_CLAIMS_SCHEMA.to_string(),
@@ -468,7 +501,12 @@ fn anchored_claims(bundle: &EvidenceExportBundle) -> EvidenceTransparencyClaims 
 #[test]
 fn anchored_transparency_claims_fail_closed_during_export_verification() {
     let bundle = sample_bundle();
-    let transparency = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let error =
         verify_transparency_claim_boundary(Some(&anchored_claims(&bundle)), &bundle, &transparency)
             .test_unwrap_err();
@@ -481,7 +519,12 @@ fn anchored_transparency_claims_fail_closed_during_export_verification() {
 #[test]
 fn invalid_transparency_claim_boundary_is_an_integrity_failure() {
     let bundle = sample_bundle();
-    let transparency = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let mut claims = build_evidence_transparency_claims(&bundle, &transparency, None);
     claims.schema = "invalid-schema".to_string();
     let error =
@@ -497,12 +540,19 @@ fn bound_transparency(
     CheckpointPublicationTrustAnchorBinding,
 ) {
     let checkpoint = bundle.checkpoints.first().cloned().test_unwrap();
-    let mut transparency = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let mut transparency = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let binding = anchor_binding(checkpoint_log_id(&checkpoint));
-    transparency.publications =
-        vec![
-            build_trust_anchored_checkpoint_publication(&checkpoint, binding.clone()).test_unwrap(),
-        ];
+    transparency.publications = vec![build_trust_anchored_checkpoint_publication(
+        &checkpoint,
+        binding.clone(),
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )
+    .test_unwrap()];
     (transparency, binding)
 }
 
@@ -512,7 +562,12 @@ fn self_declared_anchor_does_not_qualify_manifest_claims() {
     let (transparency, _) = bound_transparency(&bundle);
     let anchored =
         build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
-    verify_transparency(&bundle.checkpoints, Some(&transparency)).test_unwrap();
+    verify_transparency(
+        &bundle.checkpoints,
+        Some(&transparency),
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let error = verify_transparency_claim_boundary(Some(&anchored), &bundle, &transparency)
         .test_unwrap_err();
     assert!(error.message().contains("claim boundary"), "{error}");
@@ -524,7 +579,12 @@ fn evidence_export_fails_closed_on_stale_or_missing_publication() {
     let (transparency, _) = bound_transparency(&bundle);
     let anchored =
         build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
-    let missing_publication = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let missing_publication = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     let error = verify_transparency_claim_boundary(Some(&anchored), &bundle, &missing_publication)
         .test_unwrap_err();
     assert!(
@@ -534,7 +594,12 @@ fn evidence_export_fails_closed_on_stale_or_missing_publication() {
 
     let mut stale = transparency.clone();
     stale.publications[0].log_tree_size += 1;
-    let error = verify_transparency(&bundle.checkpoints, Some(&stale)).test_unwrap_err();
+    let error = verify_transparency(
+        &bundle.checkpoints,
+        Some(&stale),
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap_err();
     assert!(
         error
             .message()

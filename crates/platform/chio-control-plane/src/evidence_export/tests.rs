@@ -21,16 +21,6 @@ mod hello_receipt_fixture;
 
 const PACKAGE_EXPORTED_AT: u64 = 1_775_137_700;
 
-fn carried_kernel_keys(checkpoints: &[chio_kernel::KernelCheckpoint]) -> Vec<chio_core::PublicKey> {
-    let mut keys: Vec<chio_core::PublicKey> = Vec::new();
-    for checkpoint in checkpoints {
-        if !keys.contains(&checkpoint.body.kernel_key) {
-            keys.push(checkpoint.body.kernel_key.clone());
-        }
-    }
-    keys
-}
-
 fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
     match err {
         CliError::Chio(chio) => {

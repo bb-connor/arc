@@ -4,24 +4,29 @@
 //! from this generator. Without it the test requires the committed directory
 //! to hold exactly the generated file set, byte for byte.
 
+use std::collections::BTreeMap;
+
 use super::*;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
-use chio_kernel::{
+use chio_core::receipt::evidence::{
     CapabilitySnapshot, CapabilitySnapshotProvenance, EvidenceUncheckpointedReceipt,
 };
 
+const EXAMPLE_DIR: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../../examples/hello-receipt-verify"
+);
 const FIXTURE_DIR: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../../examples/hello-receipt-verify/fixtures/minimal-evidence"
 );
 const WRITE_ENV: &str = "CHIO_WRITE_HELLO_RECEIPT_FIXTURES";
 
-const KERNEL_SEED: [u8; 32] = [0x11; 32];
+/// The committed example kernel seed; `verifier-trust.json` pins its key.
+const KERNEL_SEED_HEX: &str =
+    include_str!("../../../../../../examples/hello-receipt-verify/fixtures/kernel.seed");
 const AGENT_SEED: [u8; 32] = [0x22; 32];
-/// Must equal `TRUSTED_KERNEL_PUBKEY` in `examples/hello-receipt-verify/smoke.sh`.
-const KERNEL_PUBLIC_KEY_HEX: &str =
-    "d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737";
 
 const CAPABILITY_ID: &str = "cap-hello-receipt-verify-1";
 const ISSUED_AT: u64 = 1_775_000_000;
@@ -30,7 +35,7 @@ const RECEIPT_AT: u64 = ISSUED_AT + 15;
 const EXPORTED_AT: u64 = ISSUED_AT + 60;
 
 fn kernel_keypair() -> Keypair {
-    Keypair::from_seed(&KERNEL_SEED)
+    Keypair::from_seed_hex(KERNEL_SEED_HEX.trim()).test_unwrap()
 }
 
 fn hello_bundle() -> EvidenceExportBundle {
@@ -44,7 +49,7 @@ fn hello_bundle() -> EvidenceExportBundle {
             scope: ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "*".to_string(),
-                    tool_name: "read_file".to_string(),
+                    tool_name: "*".to_string(),
                     operations: vec![Operation::Invoke],
                     constraints: Vec::new(),
                     max_invocations: None,
@@ -190,13 +195,13 @@ fn committed_hello_receipt_fixture_is_the_generator_output() {
         );
     }
 
-    assert_eq!(
-        kernel_keypair().public_key().to_hex(),
-        KERNEL_PUBLIC_KEY_HEX
-    );
-    let policy =
-        EvidenceVerificationPolicy::new(vec![kernel_keypair().public_key()], None).test_unwrap();
-    let package = load_verified_evidence_package(committed_dir, &policy).test_unwrap();
-    assert_eq!(package.manifest.counts.tool_receipts, 1);
-    assert_eq!(package.manifest.counts.uncheckpointed_receipts, 1);
+    let trust = chio_bundle_verify::trust::read_trust_file(
+        &Path::new(EXAMPLE_DIR).join("verifier-trust.json"),
+    )
+    .test_unwrap();
+    assert_eq!(trust.kernel_keys, vec![kernel_keypair().public_key()]);
+    let verified =
+        chio_bundle_verify::verify::verify_package(committed_dir, &trust, None).test_unwrap();
+    assert_eq!(verified.package.manifest.counts.tool_receipts, 1);
+    assert_eq!(verified.package.manifest.counts.uncheckpointed_receipts, 1);
 }

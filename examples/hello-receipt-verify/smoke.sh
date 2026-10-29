@@ -5,8 +5,6 @@ EXAMPLE_ROOT="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "${EXAMPLE_ROOT}/../.." && pwd)"
 
 CHIO_BIN="${CHIO_BIN:-${ROOT}/target/debug/chio}"
-# Public key derived from the fixture generator's fixed kernel seed.
-TRUSTED_KERNEL_PUBKEY="d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737"
 if [[ ! -x "${CHIO_BIN}" ]]; then
   (cd "${ROOT}" && cargo build --bin chio >/dev/null)
 fi

@@ -17,7 +17,7 @@ This example does not start trust, issue capabilities, or run an app surface. It
 
 ## Files
 
-`verifier-trust.json` is the `chio.verifier-trust.v1` file `chio evidence verify --trust` reads. It pins the public key of `fixtures/kernel.seed`, the example kernel seed that signed the captured receipt and the package's `export-envelope.json`.
+`verifier-trust.json` is the `chio.verifier-trust.v1` file `chio evidence verify --trust` reads. It pins the public key of `fixtures/kernel.seed`, the example kernel seed that signed the receipt and the package's `export-envelope.json`.
 
 ```text
 ARCHITECTURE.md
@@ -46,21 +46,14 @@ python3 -m unittest discover -s . -p 'test_*.py'
 
 ## Regenerate the fixture
 
-The fixture is one `read_file` decision under `examples/policies/default.yaml`, exported with the committed seed. From the workspace root, with a fresh private directory in `$dir`:
+The fixture is one `read_file` decision signed with the committed seed, written by a deterministic generator test. From the workspace root:
 
 ```bash
-install -m 600 examples/hello-receipt-verify/fixtures/kernel.seed "$dir/session.sqlite3.kernel.seed"
-chio --receipt-db "$dir/receipts.sqlite3" --session-db "$dir/session.sqlite3" \
-  check --policy examples/policies/default.yaml --server '*' --tool read_file \
-  --params '{"path":"README.md"}'
-chio --receipt-db "$dir/receipts.sqlite3" evidence export --admin-all \
-  --kernel-seed-file "$dir/session.sqlite3.kernel.seed" \
-  --output "$dir/minimal-evidence"
+CHIO_WRITE_HELLO_RECEIPT_FIXTURES=1 cargo test -p chio-control-plane --lib \
+  committed_hello_receipt_fixture_is_the_generator_output
 ```
 
-The seed copy is mode 0600 because `evidence export` refuses a seed any other user can read.
-
-Replace `fixtures/minimal-evidence/` with `$dir/minimal-evidence/`. The seed's public key does not change, so `verifier-trust.json` stays as it is.
+Without the variable the same test fails if the committed package differs from the generator output. The seed's public key does not change, so `verifier-trust.json` stays as it is.
 
 ## Note
 

@@ -872,10 +872,14 @@ fn write_evidence_package(
     policy_file: Option<&Path>,
     federation_policy: Option<&FederationPolicyDocument>,
     signing_key: &chio_core::Keypair,
+    exported_at: u64,
 ) -> Result<(), CliError> {
-    let exported_at = unix_now()?;
     ensure_clean_output_dir(output)?;
-    let transparency = verify_transparency(&bundle.checkpoints, transparency.as_ref())?;
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        transparency.as_ref(),
+        &[signing_key.public_key()],
+    )?;
     let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
     let disclosure_notice = EvidenceDisclosureNotice::for_query(&bundle.query);
     let readme = render_readme(
