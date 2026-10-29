@@ -735,6 +735,27 @@ mod tests {
         assert!(HttpSigningBackend::new("http://example.com", key, "token").is_err());
     }
 
+    #[test]
+    fn remote_signer_refuses_metadata_and_private_endpoints() {
+        let keypair = Keypair::from_seed(&[37_u8; 32]);
+        let key =
+            || RemoteSigningKey::new("finding-listing", 1, keypair.public_key()).test_unwrap();
+        for url in [
+            "https://169.254.169.254",
+            "https://10.0.0.7:8200",
+            "https://[fd00::7]",
+        ] {
+            assert!(
+                HttpSigningBackend::new(url, key(), "token").is_err(),
+                "{url}"
+            );
+            assert!(
+                VaultTransitSigningBackend::new(url, "transit", key(), "token").is_err(),
+                "{url}"
+            );
+        }
+    }
+
     fn spawn_json_server(
         body: serde_json::Value,
     ) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
