@@ -39,7 +39,7 @@ kernel/evaluation/delivery_preparation\.rs		P-i	launch state read from the signe
 admission_operation/projection/refusal_receipt\.rs		A	refusal receipt content commitment compared with the commitment recorded on the operation row
 admission_operation/remote_projection\.rs		A	delivery observed digest compared with the row's output digest; receipt commitment compared with the row's recorded commitment
 admission_operation/projection\.rs		A	receipt commitments compared with the commitments recorded on the operation row in the terminal transaction
-active_response_coordinator/execution_validation\.inc		F	bind to the signed active_defense projection; the coordinator holds the body, checks matches_projection with persisted openings and opens the content commitment
+active_response_coordinator/execution_validation\.inc		F	bind to the signed active_defense projection; the coordinator holds the body, checks matches_with over a verify-mode MetadataCommitter on the persisted openings, with one finish per receipt, and opens the content commitment
 kernel/admission_coordinator\.rs		A0	admission binding digest from canonical_parameter_digest(request.arguments); stays inside the admission store
 admission_coordinator/refusal\.rs	from_parameters	R	refusal receipt built as a ReceiptDraft with request arguments as the parameter preimage
 admission_coordinator/refusal\.rs		A	refusal receipt content commitment compared with the row's recorded commitment (empty output preimage at signing)
