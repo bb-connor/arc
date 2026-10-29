@@ -1,4 +1,5 @@
 //! Original response and nested body budgets, before projection or retention.
+//! The client contract caps each response read at `MAX_RESPONSE_BYTES`.
 use super::{AnchorWitnessError, RekorPublishResponse, BASE64_STANDARD};
 use base64::Engine;
 use chio_core::canonical::{UntrustedJsonError, UntrustedJsonText};
@@ -39,16 +40,8 @@ pub(super) fn response(
             body: "Rekor request rejected".to_owned(),
         });
     }
-    let bytes = response.body();
-    if bytes.len() > MAX_RESPONSE_BYTES {
-        return Err(UntrustedJsonError::TooLarge {
-            bytes: MAX_RESPONSE_BYTES + 1,
-            bound: MAX_RESPONSE_BYTES,
-        }
-        .into());
-    }
     let parsed: RekorPublishResponse =
-        UntrustedJsonText::from_wire(bytes, MAX_RESPONSE_BYTES)?.decode_signed()?;
+        UntrustedJsonText::from_wire(response.body(), MAX_RESPONSE_BYTES)?.decode_signed()?;
     if parsed.entries.len() != 1 {
         return Err(AnchorWitnessError::Decode(
             "Rekor must return exactly one entry".to_owned(),

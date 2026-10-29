@@ -121,13 +121,17 @@ impl RekorClient {
         }
         let endpoint = endpoint.trim_end_matches('/').to_string();
         contract.enforce_url(&format!("{endpoint}/api/v1/log/entries"), 0)?;
-        let http = client_builder_with_contract(contract)
+        let mut contract = contract.clone();
+        contract.max_response_bytes = contract
+            .max_response_bytes
+            .min(input::MAX_RESPONSE_BYTES as u64);
+        let http = client_builder_with_contract(&contract)
             .timeout(Duration::from_secs(15))
             .build()
             .map_err(|error| AnchorWitnessError::Config(error.to_string()))?;
         Ok(RekorClient {
             endpoint,
-            contract: contract.clone(),
+            contract,
             http,
             max_witness_age_seconds,
             trusted_keys: vec![REKOR_PUBLIC_KEY_PEM.to_string()],

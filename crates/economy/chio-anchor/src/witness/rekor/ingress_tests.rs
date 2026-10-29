@@ -91,7 +91,36 @@ async fn original_rekor_response_budget_precedes_projection() -> TestResult {
         RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?.with_trusted_keys(vec![key]);
     let result = client.verify_inclusion(&receipt).await;
     task.await?;
-    assert!(matches!(result, Err(error) if error.to_string().contains("too-large")));
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                chio_egress_contract::HttpEgressError::ResponseTooLarge { max, .. }
+            )) if *max == input::MAX_RESPONSE_BYTES as u64
+        ),
+        "{result:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn rekor_response_read_keeps_a_lower_contract_ceiling() -> TestResult {
+    let (response, key, receipt) = signed_response(1_700_000_000)?;
+    let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
+    let mut contract = loopback_contract(&endpoint);
+    contract.max_response_bytes = 64;
+    let client = RekorClient::new(&endpoint, &contract, 0)?.with_trusted_keys(vec![key]);
+    let result = client.verify_inclusion(&receipt).await;
+    task.await?;
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                chio_egress_contract::HttpEgressError::ResponseTooLarge { max: 64, .. }
+            ))
+        ),
+        "{result:?}"
+    );
     Ok(())
 }
 
