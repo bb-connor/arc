@@ -56,6 +56,7 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
         terminal_state: serde_json::from_value(json!({"state": "completed"}))?,
         receipt: loaded,
         execution_nonce: None,
+        denial_code: Some(chio_kernel::ClientDenialCode::KernelUnavailable),
     };
     assert!(
         !outcome_unknown(&response),

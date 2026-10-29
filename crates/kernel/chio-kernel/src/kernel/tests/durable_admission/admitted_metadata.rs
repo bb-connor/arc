@@ -89,12 +89,14 @@ fn recovery_refusal_signs_the_admitted_caller_metadata() -> TestResult {
     let mut changed = admitted();
     changed["chio_process"]["attempt"] = serde_json::json!(2);
     let conflict = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(changed));
-    let expected = format!(
-        "request id conflicts with retained operation {}",
-        store.operation().binding().operation_id().as_str()
-    );
+    let expected = store
+        .operation()
+        .binding()
+        .operation_id()
+        .as_str()
+        .to_owned();
     assert!(
-        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        matches!(&conflict, Err(KernelError::OperationConflict { operation_id }) if operation_id == &expected),
         "{conflict:?}"
     );
     assert_eq!(kernel.receipt_log().len(), receipts);
@@ -233,10 +235,12 @@ fn a_relaunched_caller_replays_the_admission_named_by_its_admitting_launch() -> 
         "{missing:?}"
     );
 
-    let expected = format!(
-        "request id conflicts with retained operation {}",
-        store.operation().binding().operation_id().as_str()
-    );
+    let expected = store
+        .operation()
+        .binding()
+        .operation_id()
+        .as_str()
+        .to_owned();
     for (field, value) in [
         ("runtime_id", serde_json::json!("runtime-other")),
         ("process_id", serde_json::json!("mallory")),
@@ -248,7 +252,7 @@ fn a_relaunched_caller_replays_the_admission_named_by_its_admitting_launch() -> 
         changed["chio_process"][field] = value;
         let conflict = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(changed));
         assert!(
-            matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+            matches!(&conflict, Err(KernelError::OperationConflict { operation_id }) if operation_id == &expected),
             "{field}: {conflict:?}"
         );
     }
@@ -256,7 +260,7 @@ fn a_relaunched_caller_replays_the_admission_named_by_its_admitting_launch() -> 
     routed["route"] = serde_json::json!({"selectedRoute": "other"});
     let conflict = kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(routed));
     assert!(
-        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        matches!(&conflict, Err(KernelError::OperationConflict { operation_id }) if operation_id == &expected),
         "{conflict:?}"
     );
     assert_eq!(kernel.receipt_log().len(), receipts);

@@ -276,11 +276,10 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
             }
         }))
         .unwrap();
-    assert_eq!(replay["result"]["isError"], true);
-    assert!(
-        replay["result"]["content"][0]["text"]
-            .as_str()
-            .is_some_and(|text| text.contains("execution nonce")),
+    assert_eq!(
+        replay["result"]["structuredContent"],
+        json!({"code": "replay_denied"}),
         "expected replay denial, got {replay}"
     );
+    assert_eq!(replay["result"]["isError"], true);
 }

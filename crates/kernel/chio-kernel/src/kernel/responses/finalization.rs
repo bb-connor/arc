@@ -45,7 +45,7 @@ impl ChioKernel {
         if let Some(reason) = post_invocation.blocked_reason.as_deref() {
             return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
-                reason,
+                &Denial::new(ClientDenialCode::GuardDenied, reason),
                 timestamp,
                 Some(matched_grant_index),
                 RefusalReceiptMetadata::new(
@@ -71,7 +71,7 @@ impl ChioKernel {
         ) {
             return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
-                &error.to_string(),
+                &Denial::from_error(&error),
                 timestamp,
                 Some(matched_grant_index),
                 RefusalReceiptMetadata::new(

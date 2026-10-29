@@ -5,7 +5,7 @@ use crate::receipt_support::{
 };
 
 pub(crate) struct DurableRefusalResponse<'a> {
-    pub(crate) reason: &'a str,
+    pub(crate) denial: &'a Denial,
     pub(crate) cancelled: bool,
     pub(crate) matched_grant_index: Option<usize>,
     pub(crate) metadata: Option<serde_json::Value>,
@@ -262,11 +262,11 @@ impl ChioKernel {
         .into_signed_metadata(operation.binding().request_namespace_digest());
         let decision = if response.cancelled {
             Decision::Cancelled {
-                reason: response.reason.into(),
+                reason: response.denial.detail().into(),
             }
         } else {
             Decision::Deny {
-                reason: response.reason.into(),
+                reason: response.denial.detail().into(),
                 guard: "kernel".into(),
             }
         };
@@ -311,7 +311,10 @@ impl ChioKernel {
             context,
             state,
         )?;
-        Ok((refusal_response(request, receipt)?, verified))
+        Ok((
+            refusal_response(request, receipt, response.denial.code())?,
+            verified,
+        ))
     }
 
     pub(super) fn deliver_durable_refusal(
@@ -520,23 +523,31 @@ impl ChioKernel {
                 return Err(mismatch());
             }
         }
-        self.deliver_durable_refusal(request, refusal_response(request, receipt)?, None)
+        self.deliver_durable_refusal(
+            request,
+            refusal_response(request, receipt, ClientDenialCode::Denied)?,
+            None,
+        )
     }
 }
 
 fn refusal_response(
     request: &ToolCallRequest,
     receipt: ChioReceipt,
+    code: ClientDenialCode,
 ) -> Result<ToolCallResponse, KernelError> {
-    let (reason, terminal_state) = match receipt.decision.as_ref() {
-        Some(Decision::Deny { reason, guard }) if guard == "kernel" => {
-            (reason.clone(), OperationTerminalState::Completed)
-        }
+    let (reason, terminal_state, denial_code) = match receipt.decision.as_ref() {
+        Some(Decision::Deny { reason, guard }) if guard == "kernel" => (
+            reason.clone(),
+            OperationTerminalState::Completed,
+            Some(code),
+        ),
         Some(Decision::Cancelled { reason }) => (
             reason.clone(),
             OperationTerminalState::Cancelled {
                 reason: reason.clone(),
             },
+            None,
         ),
         _ => {
             return Err(KernelError::DurableAdmission(
@@ -549,6 +560,7 @@ fn refusal_response(
         verdict: Verdict::Deny,
         output: None,
         reason: Some(reason),
+        denial_code,
         terminal_state,
         receipt,
         execution_nonce: None,

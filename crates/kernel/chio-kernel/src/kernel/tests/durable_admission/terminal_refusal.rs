@@ -3,9 +3,13 @@ use crate::kernel::admission_coordinator::DurableRefusalResponse;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+static REFUSED: std::sync::LazyLock<crate::kernel::Denial> = std::sync::LazyLock::new(|| {
+    crate::kernel::Denial::new(crate::ClientDenialCode::Denied, "request is refused")
+});
+
 pub(super) fn compensation_response() -> DurableRefusalResponse<'static> {
     DurableRefusalResponse {
-        reason: "request is refused",
+        denial: &REFUSED,
         cancelled: false,
         matched_grant_index: None,
         metadata: None,
@@ -164,6 +168,33 @@ fn compensated_budget_denial_replays_original_signed_bytes() -> TestResult {
     assert_eq!(store.operation(), terminal);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(kernel.receipt_log().len(), 1);
+    Ok(())
+}
+
+#[test]
+fn refusal_replay_projects_the_generic_denied_code() -> TestResult {
+    let mut grant = make_grant("durable-server", "mutate");
+    grant.max_invocations = Some(1);
+    let (kernel, request, store, calls) =
+        durable_admission_fixture_with_grants("replayed-refusal-code", vec![grant]);
+    assert!(kernel.with_budget_store(|budget| {
+        Ok(budget.try_increment(&request.capability.id, 0, Some(1))?)
+    })?);
+    let initial = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(
+        initial.denial_code,
+        Some(crate::ClientDenialCode::BudgetExhausted)
+    );
+    let replay = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_exact_response(&initial, &replay);
+    assert_eq!(replay.denial_code, Some(crate::ClientDenialCode::Denied));
+    let recovered = restarted(&kernel, &store, &calls);
+    let restarted_replay = recovered.evaluate_tool_call_blocking(&request)?;
+    assert_exact_response(&initial, &restarted_replay);
+    assert_eq!(
+        restarted_replay.denial_code,
+        Some(crate::ClientDenialCode::Denied)
+    );
     Ok(())
 }
 

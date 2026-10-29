@@ -435,12 +435,9 @@ impl Fixture {
             .kernel
             .evaluate_tool_call_blocking(&self.request)
             .expect_err("a different signing identity cannot resume the retained operation");
-        let expected = format!(
-            "request id conflicts with retained operation {}",
-            operation_id.as_str()
-        );
         assert!(
-            matches!(error, KernelError::DurableAdmission(ref reason) if *reason == expected),
+            matches!(error, KernelError::OperationConflict { operation_id: ref conflict }
+                if conflict == operation_id.as_str()),
             "{error:?}"
         );
         assert_eq!(self.kernel.receipt_log().len(), receipts);

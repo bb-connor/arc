@@ -353,6 +353,12 @@ pub enum KernelError {
     #[error("durable admission failed: {0}")]
     DurableAdmission(String),
 
+    /// The request id already names a different retained admission operation.
+    #[error(
+        "durable admission failed: request id conflicts with retained operation {operation_id}"
+    )]
+    OperationConflict { operation_id: String },
+
     /// Recovery preserves the deciding typed source. Global authority and
     /// integrity faults cannot be reclassified from diagnostic prose.
     #[error("durable admission failed: {0}")]
@@ -828,6 +834,13 @@ impl KernelError {
                 "CHIO-KERNEL-DURABLE-ADMISSION",
                 serde_json::json!({ "reason": reason }),
                 "Repair the fenced admission authority and reconcile the retained operation before retrying this request ID.",
+            ),
+            Self::OperationConflict { operation_id } => self.report_with_context(
+                "CHIO-KERNEL-DURABLE-ADMISSION",
+                serde_json::json!({
+                    "reason": format!("request id conflicts with retained operation {operation_id}"),
+                }),
+                "Use a new request ID; this one is bound to a different retained operation.",
             ),
             Self::AdmissionRecovery(failure) => self.report_with_context(
                 "CHIO-KERNEL-DURABLE-ADMISSION",

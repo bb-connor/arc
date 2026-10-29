@@ -214,6 +214,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                 .kernel
                 .sign_planned_deny_response_with_manifest_security(
                     &kernel_tool_call_request(&request),
+                    chio_kernel::ClientDenialCode::ToolUnavailable,
                     &deny_reason,
                     self.manifest_registry,
                     &request.bridge_security,

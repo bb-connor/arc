@@ -1,12 +1,5 @@
 use super::*;
 
-fn guard_error(result: Result<(), AcpProxyError>) -> AcpGuardError {
-    match result {
-        Err(AcpProxyError::Guard(error)) => error,
-        other => panic!("expected a guard refusal, got {other:?}"),
-    }
-}
-
 // -- FsGuard tests --
 
 #[test]

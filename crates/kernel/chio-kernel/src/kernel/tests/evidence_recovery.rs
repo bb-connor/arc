@@ -113,7 +113,7 @@ fn fixture() -> (ChioKernel, ChioReceipt, Arc<StoreState>) {
     let receipt = kernel
         .prepare_deny_response_with_metadata(
             &request,
-            "post-effect fixture",
+            &Denial::new(crate::ClientDenialCode::Denied, "post-effect fixture"),
             current_unix_timestamp(),
             None,
             RefusalReceiptMetadata::new(None, IdentityDisposition::Terminal),

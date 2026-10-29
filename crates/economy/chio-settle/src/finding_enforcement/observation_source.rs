@@ -2,18 +2,17 @@
 
 use std::collections::BTreeSet;
 use std::fmt;
-use std::io::Read as _;
-use std::net::{IpAddr, ToSocketAddrs as _};
 use std::sync::Arc;
 use std::time::Duration;
 
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{system_lookup, ContractLookup, HttpEgressContract};
 use chio_finding::FindingObservedFinality;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use zeroize::Zeroizing;
 
+use super::remote_http::{self, RemoteJsonClient};
 use super::{
     FindingBondObservationRecheck, FindingBondObservationSource, FindingFinalityRequirement,
     ReconciledFindingEnforcement, VerifiedFindingEnforcement,
@@ -88,10 +87,6 @@ pub enum FindingBondObservationSourceConfigError {
     InvalidTimeout,
     #[error("remote bond observation egress policy is invalid")]
     InvalidEgressPolicy,
-    #[error("remote bond observation DNS resolution failed")]
-    DnsResolution,
-    #[error("remote bond observation HTTP client could not be built")]
-    HttpClient,
 }
 
 pub struct RemoteFindingBondObservationSourceConfig {
@@ -215,54 +210,24 @@ trait FindingBondObservationTransport: Send + Sync {
 }
 
 struct HttpsFindingBondObservationTransport {
-    client: reqwest::blocking::Client,
-    base_url: String,
-    bearer_token: Zeroizing<String>,
-    contract: HttpEgressContract,
+    http: RemoteJsonClient,
 }
 
 impl HttpsFindingBondObservationTransport {
-    fn new(
+    fn with_lookup(
         config: RemoteFindingBondObservationSourceConfig,
+        lookup: ContractLookup,
     ) -> Result<Self, FindingBondObservationSourceConfigError> {
-        let (endpoint, contract) = config.endpoint_and_contract()?;
-        let host = endpoint
-            .host_str()
-            .ok_or(FindingBondObservationSourceConfigError::InvalidUrl)?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the stored contract is
-        // enforced for every pinned DNS answer and request below.
-        let mut builder = reqwest::blocking::Client::builder()
-            .https_only(true)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .timeout(config.timeout);
-        if host.parse::<IpAddr>().is_err() {
-            let port = endpoint
-                .port_or_known_default()
-                .ok_or(FindingBondObservationSourceConfigError::InvalidUrl)?;
-            let addresses = (host, port)
-                .to_socket_addrs()
-                .map_err(|_| FindingBondObservationSourceConfigError::DnsResolution)?
-                .collect::<Vec<_>>();
-            if addresses.is_empty() {
-                return Err(FindingBondObservationSourceConfigError::DnsResolution);
-            }
-            for address in &addresses {
-                contract
-                    .enforce_resolved_ip(host, address.ip())
-                    .map_err(|_| FindingBondObservationSourceConfigError::InvalidEgressPolicy)?;
-            }
-            builder = builder.resolve_to_addrs(host, &addresses);
-        }
-        let client = builder
-            .build()
-            .map_err(|_| FindingBondObservationSourceConfigError::HttpClient)?;
-        Ok(Self {
-            client,
-            base_url: config.base_url.trim_end_matches('/').to_owned(),
-            bearer_token: config.bearer_token,
+        let (_, contract) = config.endpoint_and_contract()?;
+        let http = RemoteJsonClient::new(
             contract,
-        })
+            &config.base_url,
+            &config.bearer_token,
+            config.timeout,
+            lookup,
+        )
+        .map_err(|_| FindingBondObservationSourceConfigError::InvalidEgressPolicy)?;
+        Ok(Self { http })
     }
 }
 
@@ -277,79 +242,30 @@ impl FindingBondObservationTransport for HttpsFindingBondObservationTransport {
                 "remote bond observation request exceeds its bound".to_owned(),
             ));
         }
-        let endpoint = format!("{}{}", self.base_url, operation.path());
-        self.contract.enforce_url(&endpoint, 0).map_err(|_| {
-            SettlementError::InvalidInput("remote bond observation URL rejected".to_owned())
-        })?;
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: DNS answers were pinned and
-        // checked during construction. Redirects and proxies are disabled.
         let response = self
-            .client
-            .post(endpoint)
-            .bearer_auth(self.bearer_token.as_str())
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(body.to_vec())
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with the
-            // contract-enforced, pinned-DNS client construction above.
-            .send()
+            .http
+            .post_json(operation.path(), body)
             .map_err(|error| {
-                SettlementError::Rpc(format!(
-                    "remote bond observation unavailable: {}",
-                    transport_error_class(&error)
-                ))
+                if remote_http::unreachable(&error) {
+                    SettlementError::Rpc(format!("remote bond observation unavailable: {error}"))
+                } else {
+                    SettlementError::Verification(format!(
+                        "remote bond observation egress refused: {error}"
+                    ))
+                }
             })?;
         let status = response.status();
-        if !status.is_success() {
+        if !(200..300).contains(&status) {
             return Err(SettlementError::Rpc(format!(
                 "remote bond observation returned HTTP {status}"
             )));
         }
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.split(';').next())
-            .map(str::trim);
-        if content_type != Some("application/json") {
+        if remote_http::media_type(&response) != Some("application/json") {
             return Err(SettlementError::Verification(
                 "remote bond observation media type is invalid".to_owned(),
             ));
         }
-        if response
-            .content_length()
-            .is_some_and(|length| length > MAX_OBSERVATION_RESPONSE_BYTES as u64)
-        {
-            return Err(SettlementError::Verification(
-                "remote bond observation response exceeds its bound".to_owned(),
-            ));
-        }
-        let mut response_body = Vec::new();
-        response
-            .take(MAX_OBSERVATION_RESPONSE_BYTES as u64 + 1)
-            .read_to_end(&mut response_body)
-            .map_err(|_| {
-                SettlementError::Rpc(
-                    "remote bond observation response could not be read".to_owned(),
-                )
-            })?;
-        self.contract
-            .enforce_response_bytes(response_body.len() as u64)
-            .map_err(|_| {
-                SettlementError::Verification(
-                    "remote bond observation response exceeds its bound".to_owned(),
-                )
-            })?;
-        Ok(response_body)
-    }
-}
-
-fn transport_error_class(error: &reqwest::Error) -> &'static str {
-    if error.is_timeout() {
-        "timeout"
-    } else if error.is_connect() {
-        "connect"
-    } else {
-        "transport"
+        Ok(response.body().to_vec())
     }
 }
 
@@ -370,7 +286,10 @@ impl RemoteFindingBondObservationSource {
         config: RemoteFindingBondObservationSourceConfig,
     ) -> Result<Self, FindingBondObservationSourceConfigError> {
         Ok(Self {
-            transport: Arc::new(HttpsFindingBondObservationTransport::new(config)?),
+            transport: Arc::new(HttpsFindingBondObservationTransport::with_lookup(
+                config,
+                system_lookup(),
+            )?),
         })
     }
 
@@ -489,6 +408,11 @@ fn valid_text(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::finding_enforcement::remote_http_tests::{
+        ok_json, plaintext_client, rotating_lookup, serve, METADATA,
+    };
+    use chio_egress_contract::ContractLookup;
+    use std::sync::atomic::Ordering;
 
     fn observation() -> FindingBondObservationRecheck {
         FindingBondObservationRecheck {
@@ -524,6 +448,73 @@ mod tests {
         invalid.operator_key_epoch = 1;
         invalid.operator_key_hash = "0xABC".to_owned();
         assert!(!valid_observation(&invalid));
+    }
+
+    #[test]
+    fn transport_resolves_and_checks_the_observer_name_for_each_post() -> Result<(), String> {
+        let (served, server) = serve(vec![ok_json("{}")])?;
+        let metadata = METADATA.parse().map_err(|_| "address")?;
+        let (lookup, lookups) = rotating_lookup(served, metadata);
+        let transport = HttpsFindingBondObservationTransport {
+            http: plaintext_client("observer.example", lookup)?,
+        };
+
+        let body = transport
+            .post(FindingBondObservationOperation::Observe, b"{}")
+            .map_err(|error| error.to_string())?;
+        let refused = transport.post(
+            FindingBondObservationOperation::ObserveReconciliation,
+            b"{}",
+        );
+
+        assert_eq!(body, b"{}");
+        assert!(
+            matches!(
+                &refused,
+                Err(SettlementError::Verification(message))
+                    if message == "remote bond observation egress refused: link-local egress target denied: observer.example resolved to 169.254.169.254"
+            ),
+            "{refused:?}"
+        );
+        assert_eq!(lookups.load(Ordering::SeqCst), 2);
+        let request = server
+            .join()
+            .map_err(|_| "server panicked")?
+            .concat()
+            .to_ascii_lowercase();
+        assert!(
+            request.starts_with("post /v1/finding-bond-observations/observe "),
+            "{request}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn configured_observer_refuses_a_loopback_answer() -> Result<(), String> {
+        let config = RemoteFindingBondObservationSourceConfig::new(
+            "https://observer.example/api",
+            "token",
+            "tenant:one",
+            Duration::from_secs(5),
+        )
+        .map_err(|error| error.to_string())?;
+        let loopback = ContractLookup::new(|_host: &str, port: u16| {
+            Ok(vec![std::net::SocketAddr::from(([127, 0, 0, 1], port))])
+        });
+        let transport = HttpsFindingBondObservationTransport::with_lookup(config, loopback)
+            .map_err(|error| error.to_string())?;
+
+        let refused = transport.post(FindingBondObservationOperation::Observe, b"{}");
+
+        assert!(
+            matches!(
+                &refused,
+                Err(SettlementError::Verification(message))
+                    if message == "remote bond observation egress refused: loopback egress target denied: observer.example resolved to 127.0.0.1"
+            ),
+            "{refused:?}"
+        );
+        Ok(())
     }
 
     #[test]

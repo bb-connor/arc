@@ -655,6 +655,10 @@ impl ChioKernel {
             terminal_state,
             receipt,
             execution_nonce: None,
+            denial_code: delivery_evaluation
+                .denial
+                .as_ref()
+                .map(delivery_contract::DeliveryDenial::client_code),
         })
     }
 
@@ -1839,6 +1843,10 @@ impl ChioKernel {
             terminal_state,
             receipt: projected_receipt,
             execution_nonce,
+            denial_code: delivery_evaluation
+                .denial
+                .as_ref()
+                .map(delivery_contract::DeliveryDenial::client_code),
         })
     }
 }

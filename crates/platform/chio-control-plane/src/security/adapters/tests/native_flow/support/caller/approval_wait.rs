@@ -759,6 +759,9 @@ impl Refusal {
                 let (variant, detail) = match error {
                     KernelError::GuardDenied(detail) => ("GuardDenied", detail.clone()),
                     KernelError::DurableAdmission(detail) => ("DurableAdmission", detail.clone()),
+                    KernelError::OperationConflict { operation_id } => {
+                        ("OperationConflict", operation_id.clone())
+                    }
                     KernelError::GovernedTransactionDenied(detail) => {
                         ("GovernedTransactionDenied", detail.clone())
                     }
@@ -810,10 +813,11 @@ impl Substitution {
         };
         let owned = || admission("request identity is already owned by a durable operation");
         let conflict = || {
-            admission(&format!(
-                "request id conflicts with retained operation {}",
-                parked.operation_id.as_str()
-            ))
+            Refusal::failed(
+                "OperationConflict",
+                parked.operation_id.as_str(),
+                DURABLE_ADMISSION,
+            )
         };
         let parked_state = AdmissionOperationState::ApprovalRequired;
         let retired = AdmissionOperationState::CompensatedBeforeDispatch;

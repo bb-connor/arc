@@ -162,10 +162,13 @@ impl ChioKernel {
             let runtime_admission_metadata =
                 merge_metadata_objects(extra_metadata.clone(), runtime_admission.metadata.clone());
             if !runtime_admission.allowed {
-                let msg = runtime_admission
-                    .reason
-                    .unwrap_or_else(|| "runtime admission denied".to_string());
-                warn!(request_id = %request.request_id, reason = %redacted!(&msg), "runtime admission denied (nested flow)");
+                let denial = Denial::new(
+                    ClientDenialCode::RuntimeAdmissionDenied,
+                    runtime_admission
+                        .reason
+                        .unwrap_or_else(|| "runtime admission denied".to_string()),
+                );
+                warn!(request_id = %request.request_id, reason = %redacted!(denial.detail()), "runtime admission denied (nested flow)");
                 let (runtime_admission_metadata, runtime_release_confirmed) = self
                     .release_runtime_admission_reservations_for_hook_denial(
                         durable_admission
@@ -191,7 +194,7 @@ impl ChioKernel {
                                     None,
                                     None,
                                     DurableRefusalResponse {
-                                        reason: &msg,
+                                        denial: &denial,
                                         cancelled: false,
                                         matched_grant_index: Some(matching.index),
                                         metadata: runtime_admission_metadata.clone(),
@@ -204,7 +207,7 @@ impl ChioKernel {
                         }
                         self.build_runtime_admission_deny_response_with_metadata(
                             request,
-                            &msg,
+                            &denial,
                             now,
                             Some(matching.index),
                             RefusalReceiptMetadata::new(
@@ -238,11 +241,11 @@ impl ChioKernel {
                         durable_admission.as_mut(),
                         now_unix_ms,
                     ) {
-                        let msg = error.to_string();
+                        let denial = Denial::from_error(&error);
                         return self
                             .build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                                 request,
-                                reason: &msg,
+                                denial: &denial,
                                 timestamp: now,
                                 matched_grant_index: grant_index,
                                 cap,
@@ -327,7 +330,7 @@ impl ChioKernel {
                     }
                 }
                 Err(error) => {
-                    let msg = error.to_string();
+                    let denial = Denial::from_error(&error);
                     let (runtime_admission_metadata, runtime_release_confirmed) = self
                         .release_runtime_admission_reservations_for_pre_dispatch_denial(
                             durable_admission
@@ -356,7 +359,7 @@ impl ChioKernel {
                                         None,
                                         None,
                                         DurableRefusalResponse {
-                                            reason: &msg,
+                                            denial: &denial,
                                             cancelled: false,
                                             matched_grant_index,
                                             metadata: merge_metadata_objects(
@@ -372,7 +375,7 @@ impl ChioKernel {
                             }
                             self.build_monetary_deny_response_with_metadata(
                                 request,
-                                &msg,
+                                &denial,
                                 now,
                                 matching_grants,
                                 cap,
@@ -405,11 +408,11 @@ impl ChioKernel {
             // A recorded budget denial still wins, since it carries the
             // stuck-reservation evidence the loop broke out to preserve.
             if budget_error.is_none() {
-                if let Some(denial) = guard_denial {
-                    let msg = denial.error.to_string();
+                if let Some(guard) = guard_denial {
+                    let denial = Denial::from_error(&guard.error);
                     let receipt_metadata = Some(self.budget_backend_receipt_metadata()?);
                     return self
-                        .with_pre_invocation_guard_output(&denial.output, || {
+                        .with_pre_invocation_guard_output(&guard.output, || {
                             if durable_admission.is_some() {
                                 let (matched_grant_index, financial_metadata) =
                                     self.monetary_deny_metadata(matching_grants, cap)?;
@@ -422,7 +425,7 @@ impl ChioKernel {
                                         None,
                                         None,
                                         DurableRefusalResponse {
-                                            reason: &msg,
+                                            denial: &denial,
                                             cancelled: false,
                                             matched_grant_index,
                                             metadata: merge_metadata_objects(
@@ -438,7 +441,7 @@ impl ChioKernel {
                             }
                             self.build_monetary_deny_response_with_metadata(
                                 request,
-                                &msg,
+                                &denial,
                                 now,
                                 matching_grants,
                                 cap,
@@ -460,7 +463,7 @@ impl ChioKernel {
                     "retained budget hold does not identify a matching grant".to_string(),
                 )
             });
-            let msg = error.to_string();
+            let denial = Denial::from_error(&error);
             if durable_admission.as_ref().is_some_and(|admission| {
                 runtime_release_retained
                     || !matches!(
@@ -490,7 +493,7 @@ impl ChioKernel {
                         None,
                         None,
                         DurableRefusalResponse {
-                            reason: &msg,
+                            denial: &denial,
                             cancelled: false,
                             matched_grant_index,
                             metadata: merge_metadata_objects(
@@ -507,7 +510,7 @@ impl ChioKernel {
             return self
                 .build_monetary_deny_response_with_metadata(
                     request,
-                    &msg,
+                    &denial,
                     now,
                     matching_grants,
                     cap,

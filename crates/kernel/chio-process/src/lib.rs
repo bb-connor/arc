@@ -538,8 +538,12 @@ impl ProcessRuntime {
             // future. Durable nonce verification adds a deep synchronous path;
             // embedding its state inline can exhaust ordinary executor stacks.
             let result = if let Some(reason) = &ancestor_refusal {
-                self.kernel
-                    .sign_planned_deny_response(&current, reason, Some(attribution))
+                self.kernel.sign_planned_deny_response(
+                    &current,
+                    chio_kernel::ClientDenialCode::Denied,
+                    reason,
+                    Some(attribution),
+                )
             } else if let Some(context) = &security_context {
                 let context = self.kernel.refresh_native_security_context(context)?;
                 Box::pin(

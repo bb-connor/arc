@@ -683,7 +683,7 @@ pub use kernel::{
     ActiveResponseSubmissionProofBody, ActiveResponseSubmissionProofError, AgentId,
     AuthoritativeCorrelatedFindingEvidence, AutomaticActiveResponseDispatchFenceOutcome,
     AutomaticActiveResponsePermit, CapabilityId, CapabilityIssuanceAdmissionAuthority,
-    ChildReceiptLog, ChioKernel, DispatchCommittedActiveResponseResume,
+    ChildReceiptLog, ChioKernel, ClientDenialCode, DispatchCommittedActiveResponseResume,
     FederationTreatyAdmissionBinding, FederationTreatyVerification,
     GovernedActiveResponseReservation, GovernedSecurityRuntimePublication,
     GovernedSecurityRuntimeStatus, Guard, GuardContext, GuardDecision, HotPathDeadlineConfig,
@@ -704,10 +704,11 @@ pub use kernel::{
     VerifiedFederationTreatyMaterial, VerifiedResponseSimulationAuthorization,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
     ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA, ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RECEIPT_APPEND_BUDGET_MS,
-    DEFAULT_RECEIPT_WRITER_POLL_MS, DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS,
-    EMERGENCY_STOP_DENY_REASON, MIN_RECEIPT_APPEND_BUDGET_MS,
+    CLIENT_DENIAL_CODES, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_RECEIPT_APPEND_BUDGET_MS, DEFAULT_RECEIPT_WRITER_POLL_MS,
+    DEFAULT_RECEIPT_WRITER_STALL_MS, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
+    MIN_RECEIPT_APPEND_BUDGET_MS,
 };
 
 #[cfg(not(loom))]
