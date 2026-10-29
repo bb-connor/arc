@@ -993,7 +993,6 @@ fn map_rail_egress_error(error: HttpEgressError) -> PaymentError {
         | HttpEgressError::PrivateNetworkDenied { .. }
         | HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
         | HttpEgressError::ReservedAddressDenied { .. }
-        | HttpEgressError::AllowanceRequiresPortAwareResolver { .. }
         | HttpEgressError::RedirectLimitExceeded { .. } => {
             PaymentError::RailError("payment rail egress denied".to_owned())
         }

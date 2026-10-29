@@ -111,8 +111,6 @@ pub enum HttpEgressError {
     },
     #[error("cloud metadata egress target denied: {host}")]
     ReservedAddressDenied { host: String },
-    #[error("private network allowance for {host} needs a resolver that sees the port")]
-    AllowanceRequiresPortAwareResolver { host: String },
 }
 
 impl HttpEgressContract {
@@ -296,43 +294,6 @@ impl HttpEgressContract {
         )
     }
 
-    /// Enforce the contract on a resolved address when the resolver cannot
-    /// see the request port. A request reaches the resolver only after its
-    /// `host:port` passed the authority set, so a pinned host admitted on a
-    /// single port is checked against that port's allowance. A pinned host
-    /// admitted on more than one port is refused.
-    #[cfg(feature = "reqwest-egress")]
-    pub(crate) fn enforce_resolved_address_without_port(
-        &self,
-        host: &str,
-        address: IpAddr,
-    ) -> Result<(), HttpEgressError> {
-        let ip = allowance::canonical_ip(address);
-        let label = format!("{host} resolved to {ip}");
-        let pinned_host = allowance::allowance_host(host);
-        if !self
-            .private_network_allowances
-            .iter()
-            .any(|entry| entry.host == pinned_host)
-        {
-            return self.enforce_address(host, None, ip, label);
-        }
-        let ports = self
-            .allowed_authority_set
-            .iter()
-            .filter_map(|authority| {
-                let url = Url::parse(&format!("https://{authority}/")).ok()?;
-                (allowance::allowance_host(url.host_str()?) == pinned_host)
-                    .then(|| url.port_or_known_default())
-                    .flatten()
-            })
-            .collect::<BTreeSet<u16>>();
-        match (ports.first(), ports.len()) {
-            (Some(port), 1) => self.enforce_address(host, Some(*port), ip, label),
-            _ => Err(HttpEgressError::AllowanceRequiresPortAwareResolver { host: pinned_host }),
-        }
-    }
-
     /// A host pinned by an allowance for this port must resolve inside the
     /// allowance CIDR, public answers included. Any other host falls to the
     /// address-class policy, and a cloud metadata address that policy would
@@ -346,32 +307,19 @@ impl HttpEgressContract {
     ) -> Result<(), HttpEgressError> {
         let address = allowance::canonical_ip(address);
         let host = allowance::allowance_host(host);
-        match port {
-            Some(port) => {
-                if let Some(pin) = self
-                    .private_network_allowances
-                    .iter()
-                    .find(|entry| entry.host == host && entry.port == port)
-                {
-                    if pin.cidr.contains(address) && allowance::is_unlockable_address(address) {
-                        return Ok(());
-                    }
-                    return Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
-                        host,
-                        port,
-                        address,
-                    });
-                }
+        if let Some(pin) = self
+            .private_network_allowances
+            .iter()
+            .find(|entry| entry.host == host && Some(entry.port) == port)
+        {
+            if pin.cidr.contains(address) && allowance::is_unlockable_address(address) {
+                return Ok(());
             }
-            None => {
-                if self
-                    .private_network_allowances
-                    .iter()
-                    .any(|entry| entry.host == host)
-                {
-                    return Err(HttpEgressError::AllowanceRequiresPortAwareResolver { host });
-                }
-            }
+            return Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+                host,
+                port: pin.port,
+                address,
+            });
         }
         let class = match address {
             IpAddr::V4(address) => classify_ipv4_address(&address),

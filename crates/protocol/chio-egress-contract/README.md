@@ -42,9 +42,9 @@ This example validates a URL without DNS or network access. DNS checks require
   and redirect count. It does not resolve domain names.
 - `private_network_allowances` is the only way to reach a private address: each
   entry pins one `host:port` to a CIDR every resolved address must fall inside.
-  Link-local and cloud metadata addresses are never reachable. The reqwest
-  client applies a pinned host's allowance only when the contract admits that
-  host on a single port; the blocking ureq agent checks every request port.
+  Link-local and cloud metadata addresses are never reachable. Both the reqwest
+  client and the blocking ureq agent check every resolved address with the
+  request's port.
 - `enforce_url_with_dns` checks every resolved address. Response-size enforcement
   requires an observed byte count or the feature-gated dispatch helper.
 

@@ -1,11 +1,15 @@
 //! The reqwest dispatcher checks every DNS answer against the request's own
 //! port, so an allowance pinning one port of a host leaves its other ports to
 //! the address-class policy.
+use super::ContractDnsResolver;
 use crate::{
     client_builder_with_contract, send_with_contract, HttpEgressContract, HttpEgressError,
     PrivateNetworkAllowance,
 };
+use reqwest::dns::{Name, Resolve};
 use std::collections::BTreeSet;
+use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -71,5 +75,53 @@ async fn unpinned_port_of_a_pinned_host_is_dialed() -> Result<(), Box<dyn std::e
         1,
         "the dispatcher never dialed the checked loopback answer"
     );
+    Ok(())
+}
+
+async fn resolve_localhost(
+    contract: &HttpEgressContract,
+    port: u16,
+) -> Result<Result<Vec<SocketAddr>, HttpEgressError>, Box<dyn std::error::Error>> {
+    let resolver = ContractDnsResolver {
+        contract: contract.clone(),
+        port,
+    };
+    match resolver.resolve(Name::from_str("localhost")?).await {
+        Ok(addrs) => Ok(Ok(addrs.collect())),
+        Err(error) => match error.downcast::<HttpEgressError>() {
+            Ok(error) => Ok(Err(*error)),
+            Err(other) => Err(other),
+        },
+    }
+}
+
+#[tokio::test]
+async fn resolver_checks_each_answer_with_its_own_port() -> Result<(), Box<dyn std::error::Error>> {
+    let open_port = 9443;
+    let contract = localhost_contract(open_port)?;
+
+    let open = resolve_localhost(&contract, open_port).await??;
+    assert!(!open.is_empty());
+    for addr in &open {
+        assert!(addr.ip().is_loopback(), "{addr}");
+        assert_eq!(
+            addr.port(),
+            open_port,
+            "answers are bound to the checked port"
+        );
+    }
+
+    match resolve_localhost(&contract, PINNED_PORT).await? {
+        Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host,
+            port,
+            address,
+        }) => {
+            assert_eq!(host, "localhost");
+            assert_eq!(port, PINNED_PORT);
+            assert!(address.is_loopback(), "{address}");
+        }
+        other => panic!("a pinned port must refuse answers outside its CIDR: {other:?}"),
+    }
     Ok(())
 }

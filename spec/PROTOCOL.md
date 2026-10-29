@@ -3287,11 +3287,10 @@ CIDR, or the request is refused. Cloud metadata addresses (169.254.169.254,
 address class when its flags deny it, and otherwise as `ReservedAddressDenied`. Each allowance set has a SHA-256 digest over its RFC 8785
 canonical form tagged `chio.egress.private-network-allowance.v1`; a payment
 journal records the digest its rail was dialed under, and recovery refuses a
-rail whose digest changed. The blocking ureq agent checks each address with
-the request's port. The reqwest client's resolver does not see the port, so it
-applies a pinned host's allowance only when the contract admits that host on a
-single port, and refuses a pinned host admitted on more than one port
-(`AllowanceRequiresPortAwareResolver`).
+rail whose digest changed. Dispatchers check each resolved address with the
+request's port and dial only the checked addresses: the blocking ureq agent
+resolves per request, and the reqwest client keeps one resolver per port the
+contract admits.
 
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
 

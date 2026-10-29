@@ -6,8 +6,11 @@ use reqwest::header::{
 };
 use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
+use std::collections::BTreeMap;
 use std::error::Error;
+use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Response returned by [`send_with_contract`] after the full response body
 /// has been read under the contract byte ceiling.
@@ -53,9 +56,11 @@ impl ContractResponse {
 }
 
 /// HTTP client whose only constructor is [`ContractClientBuilder::build`].
-/// It never follows redirects, never retries, ignores proxies and resolves
-/// through the contract resolver. It exposes request construction but no
-/// dispatch; [`send_with_contract`] is the only way to send.
+/// It never follows redirects, never retries and ignores proxies. Each port
+/// the contract admits has its own dispatcher whose resolver checks every
+/// answer against that port, so an allowance pinning one `host:port` applies
+/// to exactly that port. It exposes request construction but no dispatch;
+/// [`send_with_contract`] is the only way to send.
 ///
 /// ```no_run
 /// # async fn demo(contract: chio_egress_contract::HttpEgressContract) -> Result<(), Box<dyn std::error::Error>> {
@@ -85,6 +90,7 @@ impl ContractResponse {
 #[derive(Debug, Clone)]
 pub struct ContractClient {
     inner: reqwest::Client,
+    dispatchers: Arc<BTreeMap<u16, reqwest::Client>>,
 }
 
 impl ContractClient {
@@ -199,6 +205,7 @@ pub async fn send_with_contract(
     loop {
         let request_url = request.url().clone();
         prepared.enforce_url_with_dns(request_url.as_str(), redirect_chain_len)?;
+        let dispatcher = client.dispatcher(&request_url)?;
         let reusable_request = request.try_clone();
         let redirect_request = RedirectRequestParts {
             method: request.method().clone(),
@@ -206,8 +213,7 @@ pub async fn send_with_contract(
             has_body: request.body().is_some(),
         };
 
-        let response = client
-            .inner
+        let response = dispatcher
             .execute(request)
             .await
             .map_err(map_reqwest_error)?;
@@ -259,25 +265,88 @@ fn is_redirect_status(status: StatusCode) -> bool {
     )
 }
 
+impl ContractClient {
+    fn dispatcher(&self, url: &Url) -> Result<&reqwest::Client, HttpEgressError> {
+        let port = url.port_or_known_default().ok_or_else(|| {
+            HttpEgressError::InvalidUrl(format!("egress URL {url} has no known port"))
+        })?;
+        self.dispatchers.get(&port).ok_or_else(|| {
+            HttpEgressError::InvalidUrl(format!(
+                "contract client admits no dispatch to port {port}"
+            ))
+        })
+    }
+}
+
 /// Builder for a contract-backed reqwest client. It deliberately exposes
 /// only safe tuning knobs so callers cannot override the DNS resolver,
 /// proxy policy, or redirect policy after contract protections are applied.
 pub struct ContractClientBuilder {
-    inner: reqwest::ClientBuilder,
+    contract: HttpEgressContract,
+    timeout: Duration,
 }
 
 impl ContractClientBuilder {
     #[must_use]
-    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
-        self.inner = self.inner.timeout(timeout);
+    pub fn timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
         self
     }
 
     pub fn build(self) -> Result<ContractClient, reqwest::Error> {
+        self.build_tuned(|builder| builder)
+    }
+
+    fn build_tuned(
+        self,
+        tune: impl Fn(reqwest::ClientBuilder) -> reqwest::ClientBuilder,
+    ) -> Result<ContractClient, reqwest::Error> {
+        let inner = tune(base_client_builder(self.timeout))
+            .dns_resolver(Arc::new(RequestOnlyResolver))
+            .build()?;
+        let mut dispatchers = BTreeMap::new();
+        for port in admitted_ports(&self.contract) {
+            let resolver = ContractDnsResolver {
+                contract: self.contract.clone(),
+                port,
+            };
+            let dispatcher = tune(base_client_builder(self.timeout))
+                .dns_resolver(Arc::new(resolver))
+                .build()?;
+            dispatchers.insert(port, dispatcher);
+        }
         Ok(ContractClient {
-            inner: self.inner.build()?,
+            inner,
+            dispatchers: Arc::new(dispatchers),
         })
     }
+}
+
+fn base_client_builder(timeout: Duration) -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .timeout(timeout)
+        .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
+        .retry(reqwest::retry::never())
+}
+
+/// Every port a URL admitted by `contract` can name: an authority's explicit
+/// port, or the default port of each allowed scheme for a bare authority.
+fn admitted_ports(contract: &HttpEgressContract) -> Vec<u16> {
+    let mut ports = Vec::new();
+    for scheme in &contract.allowed_schemes {
+        for authority in &contract.allowed_authority_set {
+            if let Some(port) = Url::parse(&format!("{scheme}://{authority}/"))
+                .ok()
+                .and_then(|url| url.port_or_known_default())
+            {
+                ports.push(port);
+            }
+        }
+    }
+    ports.sort_unstable();
+    ports.dedup();
+    ports
 }
 
 /// Build a contract-backed reqwest client builder. [`send_with_contract`]
@@ -286,36 +355,44 @@ impl ContractClientBuilder {
 /// automatic transport retries.
 pub fn client_builder_with_contract(contract: &HttpEgressContract) -> ContractClientBuilder {
     ContractClientBuilder {
-        inner: reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
-            .retry(reqwest::retry::never())
-            .dns_resolver(Arc::new(ContractDnsResolver::new(contract.clone()))),
+        contract: contract.clone(),
+        timeout: Duration::from_secs(60),
     }
 }
 
+/// Resolver of the request-construction client, which never dispatches.
+struct RequestOnlyResolver;
+
+impl reqwest::dns::Resolve for RequestOnlyResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            Err(boxed_egress_error(HttpEgressError::InvalidUrl(format!(
+                "request construction client cannot resolve {host}"
+            ))))
+        })
+    }
+}
+
+/// Resolver of the dispatcher for one admitted port. Every answer is checked
+/// with that port and returned bound to it.
 #[derive(Clone)]
 struct ContractDnsResolver {
     contract: HttpEgressContract,
-}
-
-impl ContractDnsResolver {
-    fn new(contract: HttpEgressContract) -> Self {
-        Self { contract }
-    }
+    port: u16,
 }
 
 impl reqwest::dns::Resolve for ContractDnsResolver {
     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
         let contract = self.contract.clone();
+        let port = self.port;
         let host = name.as_str().to_string();
         Box::pin(async move {
             if let Err(error) = contract.enforce_resolver_hostname(&host) {
                 return Err(boxed_egress_error(error));
             }
 
-            let lookup = match tokio::net::lookup_host((host.as_str(), 0)).await {
+            let lookup = match tokio::net::lookup_host((host.as_str(), port)).await {
                 Ok(lookup) => lookup,
                 Err(error) => {
                     return Err(boxed_egress_error(HttpEgressError::DnsResolutionFailed {
@@ -326,12 +403,11 @@ impl reqwest::dns::Resolve for ContractDnsResolver {
             };
 
             let mut addrs = Vec::new();
-            for mut addr in lookup {
-                if let Err(error) = contract.enforce_resolved_address_without_port(&host, addr.ip())
-                {
+            for addr in lookup {
+                let addr = SocketAddr::new(addr.ip(), port);
+                if let Err(error) = contract.enforce_resolved_address(&host, addr) {
                     return Err(boxed_egress_error(error));
                 }
-                addr.set_port(0);
                 addrs.push(addr);
             }
 
