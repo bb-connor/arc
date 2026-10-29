@@ -89,7 +89,7 @@ struct DeadLetterSchemaProbe {
 pub struct SqliteDeadLetterStore {
     pool: Pool<SqliteConnectionManager>,
     writer: Option<crate::receipt_store::WriterHandle>,
-    rollback_anchor: Option<Arc<crate::rollback_generation::RollbackGenerationAnchor>>,
+    rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
     receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
 }
 

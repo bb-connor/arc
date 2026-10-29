@@ -1,0 +1,22 @@
+[package]
+name = "chio-rollback-anchor"
+description = "External rollback generation anchor for Chio SQLite stores"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.93"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-sqlite-file-identity = { workspace = true }
+libc = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

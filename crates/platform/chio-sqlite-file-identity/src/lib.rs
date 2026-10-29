@@ -1,7 +1,9 @@
 //! Audited inspection of the exact main-database file borrowed by SQLite.
 //!
 //! Inspection does not grant custody. Callers retain and validate ownership,
-//! permissions, file type and the expected descriptor identity separately.
+//! permissions, file type and the expected descriptor identity separately;
+//! [`custody`] holds the shared owner, mode and positioned-I/O checks for the
+//! private files a store keeps beside its database.
 //!
 //! The workspace uses rusqlite's pinned `bundled` SQLite build. Qualified
 //! stores require a bundled Unix VFS, whose `unixFile` prefix is stable and
@@ -10,6 +12,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod available_space;
+pub mod custody;
 mod write_capacity;
 mod write_geometry;
 mod write_liability;

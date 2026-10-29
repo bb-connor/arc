@@ -131,7 +131,7 @@ pub(crate) fn checkpoint_guarded_immediate<T>(
 
 fn commit_checkpoint_transaction(
     tx: rusqlite::Transaction<'_>,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     generation: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
     match (rollback_anchor, generation) {
@@ -166,7 +166,7 @@ fn commit_checkpoint_transaction(
 
 fn checkpoint_guarded_anchored_immediate<T>(
     connection: &mut Connection,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     operation: impl FnOnce(&Connection) -> Result<T, ReceiptStoreError>,
 ) -> Result<T, ReceiptStoreError> {
     let mut tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -898,7 +898,7 @@ pub(crate) fn insert_background_checkpoint_guarded(
     predecessor: Option<&KernelCheckpoint>,
     prior_frontier: &CheckpointChainFrontier,
     checkpoint: &KernelCheckpoint,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
 ) -> Result<(KernelCheckpoint, CheckpointChainFrontier), ReceiptStoreError> {
     checkpoint_guarded_anchored_immediate(connection, rollback_anchor, |tx| {
         let adopted = insert_checkpoint_incremental_tx(tx, predecessor, checkpoint)?;
@@ -1165,7 +1165,7 @@ pub(crate) fn create_checkpoint_anchored(
     connection: &mut Connection,
     max_batch: u64,
     keypair: &Keypair,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<ReceiptCheckpointCreateReport, ReceiptStoreError> {
     checkpoint_guarded_anchored_immediate(connection, rollback_anchor, |tx| {

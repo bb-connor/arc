@@ -33,7 +33,7 @@ mod outbox;
 mod qualification;
 mod schema;
 
-use crate::rollback_generation::RollbackGenerationAnchor;
+use chio_rollback_anchor::RollbackGenerationAnchor;
 use expiration::expired_unclaimed_reservations;
 use outbox::{
     acknowledge_mutation_receipt, advance_outbox_lease_epoch, claim_pending_mutation_receipts,
@@ -112,7 +112,7 @@ impl SqliteFindingPoolLedger {
             create_qualified_sqlite_parent(&parent)?;
         }
         let database_identity = prepare_database_identity(path_text)?;
-        crate::rollback_generation::require_separate_snapshot_domain(
+        chio_rollback_anchor::require_separate_snapshot_domain(
             database_identity.path(),
             rollback_anchor_root.as_ref(),
         )
