@@ -3644,6 +3644,7 @@ dependencies = [
  "tokio",
  "ureq 2.12.1",
  "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]

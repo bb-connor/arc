@@ -691,7 +691,7 @@ pub mod ureq_helper;
 #[cfg(feature = "ureq-egress")]
 pub use ureq_helper::{
     system_lookup, BlockingContractAgent, BlockingContractRequest, BlockingContractResponse,
-    ContractLookup,
+    BlockingContractTls, ClientIdentityPem, ContractLookup, InvalidTlsMaterial,
 };
 
 #[cfg(feature = "reqwest-egress")]

@@ -21,6 +21,7 @@ http = { version = "1", optional = true }
 reqwest = { workspace = true, default-features = false, features = ["form", "json", "query", "rustls"], optional = true }
 tokio = { workspace = true, features = ["net"], optional = true }
 ureq = { version = "2.10", optional = true }
+webpki-roots = { version = "0.26", optional = true }
 
 [features]
 default = []
@@ -31,7 +32,7 @@ reqwest-egress = ["dep:http", "dep:reqwest", "dep:serde_json", "dep:tokio", "dep
 # Blocking ureq helper: `BlockingContractAgent` enforces the contract on the
 # request URL, on every resolved address, and on the response size, and never
 # follows redirects.
-ureq-egress = ["dep:ureq"]
+ureq-egress = ["dep:ureq", "dep:webpki-roots"]
 
 [[test]]
 name = "ureq_proxy_env"

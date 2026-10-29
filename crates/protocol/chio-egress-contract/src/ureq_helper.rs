@@ -8,6 +8,8 @@ use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
+use ureq::rustls::pki_types::pem::PemObject as _;
+use ureq::rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use url::Url;
 
 type ResolveFn = dyn Fn(&str, u16) -> io::Result<Vec<SocketAddr>> + Send + Sync;
@@ -159,6 +161,101 @@ impl Drop for FlightLanding {
 /// Checked answers by host and port.
 type PinnedAnswers = BTreeMap<(String, u16), Vec<SocketAddr>>;
 
+/// Server trust and an optional client identity for a
+/// [`BlockingContractAgent`]. The agent verifies every server certificate
+/// chain against the public web roots plus the configured roots, and presents
+/// the identity when a server asks for one. Verification cannot be disabled.
+#[derive(Clone)]
+pub struct BlockingContractTls {
+    config: Arc<ureq::rustls::ClientConfig>,
+}
+
+impl std::fmt::Debug for BlockingContractTls {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BlockingContractTls")
+            .finish_non_exhaustive()
+    }
+}
+
+/// PEM client certificate chain and private key for mutual TLS.
+#[derive(Clone, Copy)]
+pub struct ClientIdentityPem<'a> {
+    pub cert_chain_pem: &'a str,
+    pub private_key_pem: &'a str,
+}
+
+/// TLS material that does not parse or does not form a client configuration.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{0}")]
+pub struct InvalidTlsMaterial(String);
+
+impl BlockingContractTls {
+    /// Trust `root_ca_pems` in addition to the public web roots, and present
+    /// `client_identity` to servers that request a client certificate.
+    pub fn from_pem(
+        root_ca_pems: &[String],
+        client_identity: Option<ClientIdentityPem<'_>>,
+    ) -> Result<Self, InvalidTlsMaterial> {
+        let mut roots = ureq::rustls::RootCertStore {
+            roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+        };
+        for root_ca_pem in root_ca_pems {
+            for certificate in pem_certificates(root_ca_pem, "custom TLS root CA")? {
+                roots.add(certificate).map_err(|error| {
+                    InvalidTlsMaterial(format!(
+                        "failed to add custom TLS root CA certificate: {error}"
+                    ))
+                })?;
+            }
+        }
+        let builder = ureq::rustls::ClientConfig::builder_with_provider(Arc::new(
+            ureq::rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .map_err(|error| InvalidTlsMaterial(format!("failed to select TLS versions: {error}")))?
+        .with_root_certificates(roots);
+        let config = match client_identity {
+            None => builder.with_no_client_auth(),
+            Some(identity) => {
+                let chain = pem_certificates(
+                    identity.cert_chain_pem,
+                    "mutual TLS client certificate chain",
+                )?;
+                let key = PrivateKeyDer::from_pem_slice(identity.private_key_pem.as_bytes())
+                    .map_err(|error| {
+                        InvalidTlsMaterial(format!(
+                            "failed to parse mutual TLS client private key: {error}"
+                        ))
+                    })?;
+                builder.with_client_auth_cert(chain, key).map_err(|error| {
+                    InvalidTlsMaterial(format!(
+                        "failed to build mutual TLS client identity: {error}"
+                    ))
+                })?
+            }
+        };
+        Ok(Self {
+            config: Arc::new(config),
+        })
+    }
+}
+
+fn pem_certificates(
+    pem: &str,
+    field_name: &str,
+) -> Result<Vec<CertificateDer<'static>>, InvalidTlsMaterial> {
+    let certificates = CertificateDer::pem_slice_iter(pem.as_bytes())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| InvalidTlsMaterial(format!("failed to parse {field_name}: {error}")))?;
+    if certificates.is_empty() {
+        return Err(InvalidTlsMaterial(format!(
+            "{field_name} did not contain any PEM certificates"
+        )));
+    }
+    Ok(certificates)
+}
+
 /// Blocking HTTP agent whose only constructors are [`BlockingContractAgent::new`]
 /// and [`BlockingContractAgent::with_lookup`]. The first request to a host
 /// resolves it within that request's deadline and checks every address in the
@@ -172,6 +269,7 @@ pub struct BlockingContractAgent {
     deadline: Duration,
     lookup: ContractLookup,
     pinned: Arc<Mutex<PinnedAnswers>>,
+    tls: Option<BlockingContractTls>,
 }
 
 impl std::fmt::Debug for BlockingContractAgent {
@@ -211,7 +309,16 @@ impl BlockingContractAgent {
             deadline,
             lookup,
             pinned: Arc::new(Mutex::new(BTreeMap::new())),
+            tls: None,
         })
+    }
+
+    /// This agent, verifying servers and presenting a client identity as
+    /// `tls` configures.
+    #[must_use]
+    pub fn with_tls(mut self, tls: BlockingContractTls) -> Self {
+        self.tls = Some(tls);
+        self
     }
 
     pub fn get(&self, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
@@ -220,6 +327,10 @@ impl BlockingContractAgent {
 
     pub fn post(&self, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
         self.request("POST", url)
+    }
+
+    pub fn delete(&self, url: &str) -> Result<BlockingContractRequest, HttpEgressError> {
+        self.request("DELETE", url)
     }
 
     fn request(
@@ -294,15 +405,18 @@ impl BlockingContractRequest {
         let (host, port) = target_host_and_port(&self.url)?;
         let addresses = resolve_within(&self.agent, &host, port, ends)?;
         let remaining = remaining_before(ends, &host)?;
-        let agent = ureq::AgentBuilder::new()
+        let mut builder = ureq::AgentBuilder::new()
             .timeout(remaining)
             .timeout_connect(self.agent.timeout.min(remaining))
             .timeout_read(self.agent.timeout)
             .timeout_write(self.agent.timeout)
             .redirects(0)
             .try_proxy_from_env(false)
-            .resolver(PinnedResolver { host, addresses })
-            .build();
+            .resolver(PinnedResolver { host, addresses });
+        if let Some(tls) = &self.agent.tls {
+            builder = builder.tls_config(Arc::clone(&tls.config));
+        }
+        let agent = builder.build();
         let mut request = agent.request(self.method, &self.url);
         for (name, value) in &self.headers {
             request = request.set(name, value);
@@ -323,6 +437,7 @@ impl BlockingContractRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockingContractResponse {
     status: u16,
+    headers: Vec<(String, String)>,
     body: Vec<u8>,
 }
 
@@ -330,6 +445,15 @@ impl BlockingContractResponse {
     #[must_use]
     pub fn status(&self) -> u16 {
         self.status
+    }
+
+    /// The first value of header `name`, matched without regard to case.
+    #[must_use]
+    pub fn header(&self, name: &str) -> Option<&str> {
+        self.headers
+            .iter()
+            .find(|(header, _)| header.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
     }
 
     #[must_use]
@@ -347,6 +471,14 @@ fn collect_capped_response(
         Err(ureq::Error::Transport(transport)) => return Err(transport_failure(transport)),
     };
     let status = response.status();
+    let headers = response
+        .headers_names()
+        .into_iter()
+        .filter_map(|name| {
+            let value = response.header(&name)?.to_string();
+            Some((name, value))
+        })
+        .collect();
     let mut body = Vec::new();
     response
         .into_reader()
@@ -354,7 +486,11 @@ fn collect_capped_response(
         .read_to_end(&mut body)
         .map_err(RequestFailure::new)?;
     prepared.enforce_response_bytes(u64::try_from(body.len()).unwrap_or(u64::MAX))?;
-    Ok(BlockingContractResponse { status, body })
+    Ok(BlockingContractResponse {
+        status,
+        headers,
+        body,
+    })
 }
 
 fn transport_failure(transport: ureq::Transport) -> HttpEgressError {
