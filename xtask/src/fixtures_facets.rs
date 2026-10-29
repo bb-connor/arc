@@ -1079,6 +1079,8 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
             "pheromone",
             "relay",
             "enqueue",
+            "--profile",
+            "local-dev",
             "--store",
             &display(&store),
             "--batch",
@@ -1106,7 +1108,7 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
         root,
         &[
             "-p", "chio-cli", "--bin", "chio", "--",
-            "pheromone", "relay", "enqueue",
+            "pheromone", "relay", "enqueue", "--profile", "local-dev",
             "--store", &display(&store),
             "--batch", &display(&auditor.bad_batch),
             "--transit-policy", &display(&auditor.transit_policy),
@@ -1125,7 +1127,7 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
         root,
         &[
             "-p", "chio-cli", "--bin", "chio", "--",
-            "pheromone", "relay", "enqueue",
+            "pheromone", "relay", "enqueue", "--profile", "local-dev",
             "--store", &display(&store),
             "--batch", &display(&auditor.empty_batch),
             "--transit-policy", &display(&auditor.transit_policy),
@@ -1144,7 +1146,7 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
         root,
         &[
             "-p", "chio-cli", "--bin", "chio", "--",
-            "pheromone", "relay", "catchup",
+            "pheromone", "relay", "catchup", "--profile", "local-dev",
             "--store", &display(&store),
             "--peer", "did:chio:auditor-kernel",
             "--treaty", "treaty:auditor-dataco:support-ops",
@@ -1161,7 +1163,7 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
         root,
         &[
             "-p", "chio-cli", "--bin", "chio", "--",
-            "pheromone", "relay", "catchup",
+            "pheromone", "relay", "catchup", "--profile", "local-dev",
             "--store", &display(&store),
             "--peer", "did:chio:auditor-kernel",
             "--peer-directory-state", &display(&peer_state),
@@ -1181,7 +1183,7 @@ fn relay_cli_orchestration(root: &Path, facet: &Facet) -> Result<(), XtaskError>
         root,
         &[
             "-p", "chio-cli", "--bin", "chio", "--",
-            "pheromone", "relay", "catchup",
+            "pheromone", "relay", "catchup", "--profile", "local-dev",
             "--store", &display(&store),
             "--peer", "did:chio:auditor-kernel",
             "--peer-directory-state", &display(&peer_state),

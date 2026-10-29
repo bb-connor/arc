@@ -72,7 +72,8 @@ service's validation boundary when relying on authenticated transport claims.
 `chio-federation` supplies gossip and transit types; `chio-pheromone-runtime`
 supplies receive reports. `chio-core-types` supplies canonical signatures.
 `axum`, `tokio`, and `chio-http-serve` supply listener and shutdown hygiene.
-`reqwest` and `url` supply HTTP transport and endpoint parsing; `rusqlite`
+`chio-egress-contract` supplies the per-peer HTTP egress contract and client,
+and `url` supplies endpoint parsing; `rusqlite`
 supplies delivery persistence; `subtle` supplies token comparison.
 
 ## Verification

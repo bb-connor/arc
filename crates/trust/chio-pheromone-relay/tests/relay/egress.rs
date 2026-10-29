@@ -19,6 +19,14 @@ async fn post_to(endpoint: String, profile: RelayProfile) -> PheromoneRelayError
         .unwrap_err()
 }
 
+fn assert_refused(error: &PheromoneRelayError) {
+    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert!(
+        error.to_string().starts_with("endpoint_denied: "),
+        "{error}"
+    );
+}
+
 async fn assert_never_dialed(listener: &TcpListener) {
     let accepted = tokio::time::timeout(Duration::from_millis(250), listener.accept()).await;
     assert!(accepted.is_err(), "the peer listener received a connection");
@@ -35,7 +43,7 @@ async fn a_production_relay_refuses_a_plain_http_peer() {
 
     let error = post_to(format!("http://{address}"), RelayProfile::Production).await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
     assert_never_dialed(&listener).await;
 }
 
@@ -46,7 +54,7 @@ async fn a_production_relay_refuses_a_loopback_https_peer() {
 
     let error = post_to(format!("https://{address}"), RelayProfile::Production).await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
     assert_never_dialed(&listener).await;
 }
 
@@ -61,7 +69,7 @@ async fn a_production_relay_refuses_localhost_by_name() {
     )
     .await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
     assert_never_dialed(&listener).await;
 }
 
@@ -73,7 +81,7 @@ async fn a_production_relay_refuses_the_metadata_address() {
     )
     .await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
 }
 
 #[tokio::test]
@@ -84,7 +92,7 @@ async fn a_local_dev_relay_refuses_plain_http_to_a_non_loopback_peer() {
     )
     .await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
 }
 
 #[tokio::test]
@@ -106,7 +114,7 @@ async fn a_local_dev_relay_does_not_follow_a_peer_redirect() {
 
     let error = post_to(format!("http://{peer_address}"), RelayProfile::LocalDev).await;
 
-    assert_eq!(error.code(), "endpoint_denied", "{error}");
+    assert_refused(&error);
     assert_never_dialed(&target).await;
     redirecting_peer.abort();
 }
