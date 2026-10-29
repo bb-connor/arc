@@ -544,8 +544,13 @@ impl FindingHostedProfile {
                     key,
                     read_secret_environment(bearer_token_env)?,
                 )
-                .map_err(|_| "remote HTTP signer configuration is invalid".to_owned())?
-                .with_timeout(timeout);
+                .and_then(|backend| {
+                    backend.with_egress(
+                        timeout,
+                        &chio_egress_contract::EgressAllowanceSet::default(),
+                    )
+                })
+                .map_err(|_| "remote HTTP signer configuration is invalid".to_owned())?;
                 backend
                     .verify_key()
                     .map_err(|_| "remote HTTP signer preflight failed".to_owned())?;
@@ -569,7 +574,12 @@ impl FindingHostedProfile {
                         .with_namespace(namespace)
                         .map_err(|_| "Vault Transit namespace is invalid".to_owned())?;
                 }
-                backend = backend.with_timeout(timeout);
+                backend = backend
+                    .with_egress(
+                        timeout,
+                        &chio_egress_contract::EgressAllowanceSet::default(),
+                    )
+                    .map_err(|_| "Vault Transit signer configuration is invalid".to_owned())?;
                 backend
                     .verify_key()
                     .map_err(|_| "Vault Transit signer preflight failed".to_owned())?;

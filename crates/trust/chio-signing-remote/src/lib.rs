@@ -6,10 +6,14 @@
 //! verification over the exact input bytes.
 
 use std::fmt;
-use std::io::Read;
 use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
+
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractRequest, BlockingContractResponse, EgressAllowanceSet,
+    EndpointSource, HttpEgressContract, HttpEgressError,
+};
 
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
@@ -25,6 +29,7 @@ const HTTP_SIGN_RESPONSE_SCHEMA: &str = "chio.signing.http-response.v1";
 const HTTP_KEY_RESPONSE_SCHEMA: &str = "chio.signing.http-key.v1";
 const MAX_SIGNING_MESSAGE_BYTES: usize = 1024 * 1024;
 const MAX_RESPONSE_BYTES: u64 = 64 * 1024;
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 struct RemoteSecret(Arc<str>);
@@ -104,7 +109,7 @@ pub struct HttpSigningBackend {
     base_url: String,
     key: RemoteSigningKey,
     bearer_token: RemoteSecret,
-    http: ureq::Agent,
+    http: BlockingContractAgent,
 }
 
 impl fmt::Debug for HttpSigningBackend {
@@ -125,18 +130,24 @@ impl HttpSigningBackend {
         bearer_token: impl Into<String>,
     ) -> Result<Self> {
         let base_url = validate_base_url(&base_url.into())?;
+        let http = signer_agent(&base_url, DEFAULT_TIMEOUT, &EgressAllowanceSet::default())?;
         Ok(Self {
             base_url,
             key,
             bearer_token: RemoteSecret::new(bearer_token)?,
-            http: build_agent(Duration::from_secs(5)),
+            http,
         })
     }
 
-    #[must_use]
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.http = build_agent(timeout);
-        self
+    /// Bound every request by `timeout` and admit the private signer
+    /// endpoints `allowances` pins.
+    pub fn with_egress(
+        mut self,
+        timeout: Duration,
+        allowances: &EgressAllowanceSet,
+    ) -> Result<Self> {
+        self.http = signer_agent(&self.base_url, timeout, allowances)?;
+        Ok(self)
     }
 
     fn sign_endpoint(&self) -> String {
@@ -155,9 +166,8 @@ impl HttpSigningBackend {
             self.key.key_handle()
         );
         let response: HttpKeyResponse = read_json(
-            self.http
-                .get(&endpoint)
-                .set(
+            signer_request(self.http.get(&endpoint))?
+                .header(
                     "Authorization",
                     &format!("Bearer {}", self.bearer_token.expose()),
                 )
@@ -196,7 +206,7 @@ impl SigningBackend for HttpSigningBackend {
             binding: &binding,
         };
         let response: HttpSignResponse = send_json(
-            self.http.post(&self.sign_endpoint()).set(
+            signer_request(self.http.post(&self.sign_endpoint()))?.header(
                 "Authorization",
                 &format!("Bearer {}", self.bearer_token.expose()),
             ),
@@ -263,7 +273,7 @@ pub struct VaultTransitSigningBackend {
     key: RemoteSigningKey,
     token: RemoteSecret,
     namespace: Option<String>,
-    http: ureq::Agent,
+    http: BlockingContractAgent,
 }
 
 impl fmt::Debug for VaultTransitSigningBackend {
@@ -288,13 +298,14 @@ impl VaultTransitSigningBackend {
     ) -> Result<Self> {
         let base_url = validate_base_url(&base_url.into())?;
         let mount = validate_path_segment(&mount.into(), "Vault Transit mount")?;
+        let http = signer_agent(&base_url, DEFAULT_TIMEOUT, &EgressAllowanceSet::default())?;
         Ok(Self {
             base_url,
             mount,
             key,
             token: RemoteSecret::new(token)?,
             namespace: None,
-            http: build_agent(Duration::from_secs(5)),
+            http,
         })
     }
 
@@ -308,10 +319,15 @@ impl VaultTransitSigningBackend {
         Ok(self)
     }
 
-    #[must_use]
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.http = build_agent(timeout);
-        self
+    /// Bound every request by `timeout` and admit the private Vault
+    /// endpoints `allowances` pins.
+    pub fn with_egress(
+        mut self,
+        timeout: Duration,
+        allowances: &EgressAllowanceSet,
+    ) -> Result<Self> {
+        self.http = signer_agent(&self.base_url, timeout, allowances)?;
+        Ok(self)
     }
 
     /// Verify that Vault still exposes the configured version and pinned key.
@@ -322,8 +338,10 @@ impl VaultTransitSigningBackend {
             self.mount,
             self.key.key_handle()
         );
-        let response: VaultKeyResponse =
-            read_json(self.vault_headers(self.http.get(&endpoint)).call())?;
+        let response: VaultKeyResponse = read_json(
+            self.vault_headers(signer_request(self.http.get(&endpoint))?)
+                .call(),
+        )?;
         let version = self.key.key_version().to_string();
         let public_key = response
             .data
@@ -345,10 +363,10 @@ impl VaultTransitSigningBackend {
         Ok(())
     }
 
-    fn vault_headers(&self, mut request: ureq::Request) -> ureq::Request {
-        request = request.set("X-Vault-Token", self.token.expose());
+    fn vault_headers(&self, mut request: BlockingContractRequest) -> BlockingContractRequest {
+        request = request.header("X-Vault-Token", self.token.expose());
         if let Some(namespace) = self.namespace.as_deref() {
-            request = request.set("X-Vault-Namespace", namespace);
+            request = request.header("X-Vault-Namespace", namespace);
         }
         request
     }
@@ -372,8 +390,10 @@ impl SigningBackend for VaultTransitSigningBackend {
             key_version: self.key.key_version(),
             prehashed: false,
         };
-        let response: VaultSignResponse =
-            send_json(self.vault_headers(self.http.post(&endpoint)), &request)?;
+        let response: VaultSignResponse = send_json(
+            self.vault_headers(signer_request(self.http.post(&endpoint))?),
+            &request,
+        )?;
         let prefix = format!("vault:v{}:", self.key.key_version());
         let encoded = response
             .data
@@ -479,35 +499,60 @@ fn binding_digest<T: Serialize>(value: &T) -> Result<String> {
     Ok(sha256(&canonical).to_hex())
 }
 
-fn build_agent(timeout: Duration) -> ureq::Agent {
-    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: remote signer at the operator-configured signer endpoint,
-    // redirects off
-    ureq::AgentBuilder::new()
-        .timeout_connect(timeout)
-        .timeout_read(timeout)
-        .timeout_write(timeout)
-        .redirects(0)
-        .build()
+/// One contract per signer: the base URL authority only, no redirects, the
+/// response ceiling, and `timeout` for every phase and for the whole request.
+fn signer_agent(
+    base_url: &str,
+    timeout: Duration,
+    allowances: &EgressAllowanceSet,
+) -> Result<BlockingContractAgent> {
+    let contract = HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "remote-signer",
+        base_url,
+        MAX_RESPONSE_BYTES,
+        allowances,
+    )
+    .map_err(|_| signing_error("remote signer URL is invalid"))?;
+    BlockingContractAgent::new(&contract, timeout, timeout)
+        .map_err(|_| signing_error("remote signer URL is invalid"))
 }
 
-fn send_json<B: Serialize, T: DeserializeOwned>(request: ureq::Request, body: &B) -> Result<T> {
-    let payload = serde_json::to_value(body)?;
-    read_json(request.send_json(payload))
+fn signer_request(
+    request: std::result::Result<BlockingContractRequest, HttpEgressError>,
+) -> Result<BlockingContractRequest> {
+    request.map_err(|_| signing_error("remote signer request failed"))
+}
+
+fn send_json<B: Serialize, T: DeserializeOwned>(
+    request: BlockingContractRequest,
+    body: &B,
+) -> Result<T> {
+    let payload = serde_json::to_vec(body)?;
+    read_json(
+        request
+            .header("Content-Type", "application/json")
+            .send_bytes(&payload),
+    )
 }
 
 fn read_json<T: DeserializeOwned>(
-    response: std::result::Result<ureq::Response, ureq::Error>,
+    response: std::result::Result<BlockingContractResponse, HttpEgressError>,
 ) -> Result<T> {
-    let response = response.map_err(|_| signing_error("remote signer request failed"))?;
-    let mut reader = response.into_reader().take(MAX_RESPONSE_BYTES + 1);
-    let mut bytes = Vec::new();
-    reader
-        .read_to_end(&mut bytes)
-        .map_err(|_| signing_error("remote signer response could not be read"))?;
-    if bytes.len() as u64 > MAX_RESPONSE_BYTES {
-        return Err(signing_error("remote signer response is too large"));
+    let response = response.map_err(|error| match error {
+        HttpEgressError::ResponseTooLarge { .. } => {
+            signing_error("remote signer response is too large")
+        }
+        _ => signing_error("remote signer request failed"),
+    })?;
+    if !(200..300).contains(&response.status()) {
+        return Err(signing_error("remote signer request failed"));
     }
-    chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_RESPONSE_BYTES as usize)
+    decode_json(response.body())
+}
+
+fn decode_json<T: DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    chio_core::canonical::UntrustedJsonText::from_wire(bytes, MAX_RESPONSE_BYTES as usize)
         .and_then(|input| input.decode_external())
         .map_err(|error| Error::UntrustedInput(error.into()))
 }
@@ -819,8 +864,7 @@ mod tests {
             r#"{"signature":"secret-sentinel","signature":"other"}"#,
             r#"{"extension":9007199254740993}"#,
         ] {
-            let response = ureq::Response::new(200, "OK", body).test_unwrap();
-            let error = read_json::<serde_json::Value>(Ok(response))
+            let error = decode_json::<serde_json::Value>(body.as_bytes())
                 .test_expect_err("response must reject");
             assert!(matches!(error, Error::UntrustedInput(_)));
             assert!(!format!("{error} {error:?}").contains("secret-sentinel"));

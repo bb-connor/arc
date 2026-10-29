@@ -5339,10 +5339,10 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chio-core",
+ "chio-egress-contract",
  "chio-test-support",
  "serde",
  "serde_json",
- "ureq 2.12.1",
  "url",
 ]
 
