@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn treaty_epoch_unavailable_refuses_before_authority_commit() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
-    let fixture = CombinedFixture::new()?;
+    let fixture = CombinedFixture::without_epoch_authority()?;
     let kernel = fixture.kernel(fixture.hook()?)?;
     let response = kernel.evaluate_tool_call_blocking_with_metadata(
         &fixture.inner.request,
