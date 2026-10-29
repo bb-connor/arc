@@ -94,3 +94,93 @@ fn signed_export_envelope_stamps_the_signing_identity() -> Result<()> {
     assert!(envelope.verify_signature(&backend.keypair().public_key())?);
     Ok(())
 }
+
+fn other_key() -> crate::crypto::PublicKey {
+    Keypair::from_seed(&[0x5a; 32]).public_key()
+}
+
+#[test]
+fn pinned_verify_refuses_a_foreign_approver_proposer_or_kernel_key() -> Result<()> {
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
+    let signer = backend.keypair().public_key();
+    let token = GovernedApprovalToken::sign_with_backend(
+        GovernedApprovalTokenBody {
+            id: "approval-pinned".to_string(),
+            approver: signer.clone(),
+            subject: Keypair::from_seed(&[83; 32]).public_key(),
+            governed_intent_hash: "a".repeat(64),
+            request_id: "req-pinned".to_string(),
+            threshold_proposal_hash: None,
+            issued_at: 100,
+            expires_at: 200,
+            decision: GovernedApprovalDecision::Approved,
+        },
+        &backend,
+    )?;
+    assert!(matches!(
+        token.verify_signature(&other_key()),
+        Err(crate::Error::SignerKeyMismatch)
+    ));
+    assert!(matches!(
+        token.verify_signature_at(&other_key(), 150),
+        Err(crate::Error::SignerKeyMismatch)
+    ));
+    assert!(token.verify_signature_at(&signer, 150)?);
+
+    let proposal = ThresholdApprovalProposal::sign_with_backend(
+        ThresholdApprovalProposalBody {
+            schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
+            proposal_id: "proposal-pinned".to_string(),
+            request_id: "req-pinned".to_string(),
+            governed_intent_hash: "a".repeat(64),
+            subject: Keypair::from_seed(&[83; 32]).public_key(),
+            authorizing_capability_digest: "b".repeat(64),
+            policy_hash: "c".repeat(64),
+            threshold: 1,
+            eligible_set_digest: "d".repeat(64),
+            proposal_created_at: 100,
+            proposal_deadline: 200,
+            policy_authority: signer.clone(),
+        },
+        &backend,
+    )?;
+    assert!(matches!(
+        proposal.verify_signature(&other_key()),
+        Err(crate::Error::SignerKeyMismatch)
+    ));
+    assert!(proposal.verify_signature(&signer)?);
+
+    let receipt = ChildRequestReceipt::sign_with_backend(
+        ChildRequestReceiptBody {
+            id: "child-pinned".to_string(),
+            timestamp: 1_710_000_001,
+            session_id: SessionId::new("sess-pinned"),
+            parent_request_id: RequestId::new("parent-pinned"),
+            request_id: RequestId::new("child-pinned"),
+            operation_kind: OperationKind::CreateMessage,
+            terminal_state: OperationTerminalState::Completed,
+            outcome_hash: sha256_hex(b"pinned"),
+            policy_hash: "c".repeat(64),
+            metadata: None,
+            kernel_key: signer.clone(),
+        },
+        &backend,
+    )?;
+    assert!(matches!(
+        receipt.verify_signature(&other_key()),
+        Err(crate::Error::SignerKeyMismatch)
+    ));
+    assert!(matches!(
+        receipt.verify_signature_with_floor(
+            &other_key(),
+            crate::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical
+        ),
+        Err(
+            crate::receipt::crypto_floor::ReceiptFloorVerifyError::Crypto(
+                crate::Error::SignerKeyMismatch
+            )
+        )
+    ));
+    assert!(receipt.verify_signature(&signer)?);
+    Ok(())
+}

@@ -867,9 +867,16 @@ impl CapabilityToken {
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.issuer)
+    }
+
+    /// Verify the token's signature under `pinned`, an issuer key the caller
+    /// trusts. A carried issuer that differs from `pinned` is refused before
+    /// the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
         self.validate_schema()?;
         wrapped_verdict(verify_wrapped(
-            &self.issuer,
+            pinned,
             CHIO_CAPABILITY_SCHEMA,
             &self.signing_body(),
             &self.signature,
@@ -909,7 +916,18 @@ impl CapabilityToken {
         &self,
         floor: CapabilityCryptoFloor,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
-        let signature_algorithm = self.issuer.algorithm();
+        self.verify_signature_with_floor(&self.issuer, floor)
+    }
+
+    /// Verify the token's signature under `pinned` and enforce the
+    /// `crypto_floor` posture over the pinned key's algorithm. A carried
+    /// issuer that differs from `pinned` is refused first.
+    pub fn verify_signature_with_floor(
+        &self,
+        pinned: &PublicKey,
+        floor: CapabilityCryptoFloor,
+    ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
+        let signature_algorithm = pinned.algorithm();
 
         // Floor enforcement. Reject any combination that the
         // configured floor disallows BEFORE doing the cryptographic
@@ -932,7 +950,7 @@ impl CapabilityToken {
         self.validate_schema()
             .map_err(CapabilityFloorVerifyError::Crypto)?;
         match verify_wrapped(
-            &self.issuer,
+            pinned,
             CHIO_CAPABILITY_SCHEMA,
             &self.signing_body(),
             &self.signature,
@@ -965,7 +983,12 @@ impl CapabilityToken {
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_integrity_embedded_key()? {
+        self.verify_signature_at(&self.issuer, now)
+    }
+
+    /// Verify the signature under `pinned` and enforce the validity window.
+    pub fn verify_signature_at(&self, pinned: &PublicKey, now: u64) -> Result<bool> {
+        if !self.verify_signature(pinned)? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -996,7 +1019,18 @@ impl CapabilityToken {
         floor: CapabilityCryptoFloor,
         now: u64,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
-        if !self.verify_integrity_embedded_key_with_floor(floor)? {
+        self.verify_signature_with_floor_at(&self.issuer, floor, now)
+    }
+
+    /// Verify the signature under `pinned`, enforce the `crypto_floor`
+    /// posture, and enforce the validity window.
+    pub fn verify_signature_with_floor_at(
+        &self,
+        pinned: &PublicKey,
+        floor: CapabilityCryptoFloor,
+        now: u64,
+    ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
+        if !self.verify_signature_with_floor(pinned, floor)? {
             return Ok(false);
         }
         self.validate_time(now)

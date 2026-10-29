@@ -485,12 +485,18 @@ impl ChioReceipt {
         }
     }
 
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        self.verify_signature_against(pinned)
+    }
+
     /// Verify the receipt signature against the embedded kernel key.
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
-        self.verify_signature_against(&self.kernel_key)
+        self.verify_signature(&self.kernel_key)
     }
 
     fn verify_signature_against(&self, key: &PublicKey) -> Result<bool> {

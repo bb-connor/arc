@@ -1012,6 +1012,16 @@ pub fn verify_exempt(
     verify_message(pinned, bytes, signature)
 }
 
+/// Refuses a carried signer key that differs from the pinned key, so a pinned
+/// verify never reports a foreign signer as a plain signature failure.
+pub fn ensure_pinned_signer(carried: &PublicKey, pinned: &PublicKey) -> Result<()> {
+    if carried == pinned {
+        Ok(())
+    } else {
+        Err(Error::SignerKeyMismatch)
+    }
+}
+
 /// Maps a wrapper verification to the boolean artifact verifiers return: a
 /// rejected signature is `Ok(false)`; every other refusal stays an error.
 pub(crate) fn wrapped_verdict(result: Result<()>) -> Result<bool> {

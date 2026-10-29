@@ -92,6 +92,9 @@ pub enum Error {
 
     #[cfg_attr(feature = "std", error("signature rejected"))]
     SignatureRejected,
+
+    #[cfg_attr(feature = "std", error("signer key does not match the pinned key"))]
+    SignerKeyMismatch,
 }
 
 // `From<serde_json::Error>` is emitted by `#[from]` under the `std` feature.
@@ -149,6 +152,7 @@ impl core::fmt::Display for Error {
                 "signature algorithm {signature:?} does not match the pinned key algorithm {key:?}"
             ),
             Error::SignatureRejected => write!(f, "signature rejected"),
+            Error::SignerKeyMismatch => write!(f, "signer key does not match the pinned key"),
         }
     }
 }

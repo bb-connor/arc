@@ -160,11 +160,9 @@ impl DelegationLink {
         }
     }
 
-    /// Verify this link's signature against the delegator's key.
-    ///
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
         if let Some(marker) = self.aggregate_budget.as_ref() {
             marker.validate()?;
         }
@@ -172,11 +170,19 @@ impl DelegationLink {
             marker.validate()?;
         }
         wrapped_verdict(verify_wrapped(
-            &self.delegator,
+            pinned,
             CHIO_DELEGATION_LINK_SCHEMA,
             &self.body(),
             &self.signature,
         ))
+    }
+
+    /// Verify this link's signature against the delegator's key.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.delegator)
     }
 }
 
