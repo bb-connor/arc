@@ -1,10 +1,11 @@
-// Regeneration of the signed three-vendor, attestation-loopback and
-// pheromone relay fixtures through their owning generators. Included into
-// `fixtures.rs` via `include!` so it shares that module's private helpers.
-//
-// Every output is produced into a scratch directory first. Regeneration copies
-// each changed output over its committed path; `check` compares and writes
-// nothing.
+//! Regeneration of the signed three-vendor, attestation-loopback and
+//! pheromone relay fixtures through their owning generators.
+//!
+//! Every output is produced into a scratch directory first. Regeneration copies
+//! each changed output over its committed path; `check` compares and writes
+//! nothing.
+
+use super::*;
 
 const THREE_VENDOR_FIXTURE_DIR: &str = "examples/chio-3vendor/fixtures";
 const ATTEST_LOOPBACK_FIXTURE_DIR: &str = "crates/trust/chio-attest-loopback/fixtures";
@@ -86,10 +87,16 @@ pub(crate) fn regenerate_three_vendor_fixtures(check: bool) -> Result<(), XtaskE
         outputs.push((proof.join(name), three_vendor.join(name)));
     }
     for name in ATTEST_LOOPBACK_OUTPUTS {
-        outputs.push((proof.join(name), root.join(ATTEST_LOOPBACK_FIXTURE_DIR).join(name)));
+        outputs.push((
+            proof.join(name),
+            root.join(ATTEST_LOOPBACK_FIXTURE_DIR).join(name),
+        ));
     }
     for name in PHEROMONE_OUTPUTS {
-        outputs.push((pheromone.join(name), three_vendor.join("pheromone").join(name)));
+        outputs.push((
+            pheromone.join(name),
+            three_vendor.join("pheromone").join(name),
+        ));
     }
     for name in RELAY_DIRECTORY_OUTPUTS {
         outputs.push((relay.join(name), root.join(RELAY_FIXTURE_DIR).join(name)));
@@ -104,7 +111,10 @@ pub(crate) fn regenerate_three_vendor_fixtures(check: bool) -> Result<(), XtaskE
         )));
     }
     for relative in generated_files {
-        outputs.push((export_bundle.join(&relative), committed_bundle.join(&relative)));
+        outputs.push((
+            export_bundle.join(&relative),
+            committed_bundle.join(&relative),
+        ));
     }
     outputs.push((
         export_report,

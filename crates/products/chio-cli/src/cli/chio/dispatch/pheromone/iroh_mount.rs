@@ -1325,6 +1325,13 @@ mod tests {
 
     const NOW: u64 = 2_000_000;
 
+    fn sign_directory_body(issuer: &Keypair, body: &TransportDirectoryBundleBody) -> chio_core_types::crypto::Signature {
+        let bytes = chio_core::canonical::CanonicalBytes::from_serializable(body).unwrap();
+        issuer
+            .sign_wrapped(TRANSPORT_DIRECTORY_BUNDLE_SCHEMA, &bytes)
+            .unwrap()
+    }
+
     fn endpoint_from_seed(seed: u8) -> EndpointId {
         SecretKey::from_bytes(&[seed; 32]).public()
     }
@@ -1361,12 +1368,7 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1667,12 +1669,7 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1732,12 +1729,7 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: NOW + 1,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -1795,12 +1787,7 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: expires_at,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -2109,12 +2096,7 @@ mod tests {
             issued_at_unix_ms: NOW - 1,
             expires_at_unix_ms: expires_at,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
@@ -2532,12 +2514,7 @@ mod tests {
             issued_at_unix_ms,
             expires_at_unix_ms,
         };
-        let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+        let signature = sign_directory_body(&issuer, &body);
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,
