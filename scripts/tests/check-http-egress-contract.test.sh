@@ -397,6 +397,7 @@ ureq_classified_source='pub fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new().build()
 }'
 printf '%s\n' "$reqwest_classified_source" | http_client_case reqwest_marker_unlisted crates/chio-fake/src/lib.rs
+printf '%s\n' "$reqwest_classified_source" | http_client_case reqwest_example_marker_unlisted examples/chio-fake-example/src/lib.rs
 printf '%s\n' "$ureq_classified_source" | http_client_case ureq_marker_unlisted crates/chio-fake/src/lib.rs
 printf '%s\n' "$ureq_classified_source" | http_client_case marker_kind_mismatch crates/chio-fake/src/lib.rs
 allow_marker "$work/marker_kind_mismatch" reqwest crates/chio-fake/src/lib.rs
@@ -747,7 +748,7 @@ for expectation in \
     accept:reqwest_example_classified reject:ureq_example_unclassified \
     reject:reqwest_marker_unlisted reject:ureq_marker_unlisted reject:marker_kind_mismatch \
     reject:marker_listed_elsewhere reject:marker_allowlist_stale \
-    reject:marker_allowlist_malformed; do
+    reject:marker_allowlist_malformed reject:reqwest_example_marker_unlisted; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
