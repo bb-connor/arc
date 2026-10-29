@@ -895,7 +895,7 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
     ),
     (
         crate::declassification::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
-        Some(("declassification_grant", "signing-wrapper-v1")),
+        Some(("security_declassification_grant", "active-defense-v1")),
     ),
     (
         crate::security_event::CHIO_SIGNED_SECURITY_EVENT_SCHEMA,

@@ -434,7 +434,7 @@ fn new_economy_artifact_families_are_registered_exactly() {
         "/../../../spec/schemas/registry.json"
     )))
     .expect("schema registry parses");
-    let rows: Vec<(&str, &str, &str, &str)> = registry
+    let mut rows: Vec<(&str, &str, &str, &str)> = registry
         .get("artifacts")
         .and_then(serde_json::Value::as_array)
         .expect("registry artifacts are present")
@@ -476,83 +476,83 @@ fn new_economy_artifact_families_are_registered_exactly() {
         })
         .collect();
 
-    assert_eq!(
-        rows,
-        [
-            (
-                "chio.obligation.status-proof.v1",
-                "obligation_status_proof",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/obligation-status-proof.v1.json",
-            ),
-            (
-                "chio.credit.facility-bind.v1",
-                "credit_facility_bind",
-                "credit-admission-v1",
-                "spec/schemas/chio-economy/credit-facility-bind.v1.json",
-            ),
-            (
-                "chio.credit.receivable-iou-envelope.v1",
-                "credit_iou_envelope",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/receivable-iou-envelope.v1.json",
-            ),
-            (
-                "chio.factor.normalized-assignment-request.v1",
-                "factor_normalized_assignment_request",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-normalized-assignment-request.v1.json",
-            ),
-            (
-                "chio.factor.receivable-claim.v1",
-                "factor_receivable_claim",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-receivable-claim.v1.json",
-            ),
-            (
-                "chio.factor.assignment-offer.v1",
-                "factor_assignment_offer",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-offer.v1.json",
-            ),
-            (
-                "chio.factor.discount-quote.v1",
-                "factor_discount_quote",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-discount-quote.v1.json",
-            ),
-            (
-                "chio.factor.assignment-bind-authorization.v1",
-                "factor_assignment_bind_authorization",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json",
-            ),
-            (
-                "chio.factor.assignment-agreement.v1",
-                "factor_assignment_agreement",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-agreement.v1.json",
-            ),
-            (
-                "chio.factor.assignment-acknowledgement.v1",
-                "factor_assignment_acknowledgement",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json",
-            ),
-            (
-                "chio.factor.assignment-not-applied.v1",
-                "factor_assignment_not_applied",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json",
-            ),
-            (
-                "chio.parametric.policy.v1",
-                "parametric_policy",
-                "parametric-insurance-v1",
-                "spec/schemas/chio-parametric/v1/policy.schema.json",
-            ),
-        ]
-    );
+    let mut expected = [
+        (
+            "chio.obligation.status-proof.v1",
+            "obligation_status_proof",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/obligation-status-proof.v1.json",
+        ),
+        (
+            "chio.credit.facility-bind.v1",
+            "credit_facility_bind",
+            "credit-admission-v1",
+            "spec/schemas/chio-economy/credit-facility-bind.v1.json",
+        ),
+        (
+            "chio.credit.receivable-iou-envelope.v1",
+            "credit_iou_envelope",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/receivable-iou-envelope.v1.json",
+        ),
+        (
+            "chio.factor.normalized-assignment-request.v1",
+            "factor_normalized_assignment_request",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-normalized-assignment-request.v1.json",
+        ),
+        (
+            "chio.factor.receivable-claim.v1",
+            "factor_receivable_claim",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-receivable-claim.v1.json",
+        ),
+        (
+            "chio.factor.assignment-offer.v1",
+            "factor_assignment_offer",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-offer.v1.json",
+        ),
+        (
+            "chio.factor.discount-quote.v1",
+            "factor_discount_quote",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-discount-quote.v1.json",
+        ),
+        (
+            "chio.factor.assignment-bind-authorization.v1",
+            "factor_assignment_bind_authorization",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json",
+        ),
+        (
+            "chio.factor.assignment-agreement.v1",
+            "factor_assignment_agreement",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-agreement.v1.json",
+        ),
+        (
+            "chio.factor.assignment-acknowledgement.v1",
+            "factor_assignment_acknowledgement",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json",
+        ),
+        (
+            "chio.factor.assignment-not-applied.v1",
+            "factor_assignment_not_applied",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json",
+        ),
+        (
+            "chio.parametric.policy.v1",
+            "parametric_policy",
+            "parametric-insurance-v1",
+            "spec/schemas/chio-parametric/v1/policy.schema.json",
+        ),
+    ];
+    rows.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(rows, expected);
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.obligation.status-proof.v1"
     ));
@@ -620,7 +620,7 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
         "/../../../spec/schemas/registry.json"
     )))
     .expect("schema registry parses");
-    let rows: Vec<(&str, &str, &str, &str)> = registry
+    let mut rows: Vec<(&str, &str, &str, &str)> = registry
         .get("artifacts")
         .and_then(serde_json::Value::as_array)
         .expect("registry artifacts are present")
@@ -646,7 +646,7 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
             })
         })
         .collect();
-    let expected = [
+    let mut expected = [
         (
             chio_core_types::CHIO_OUTCOME_PREDICATE_V1_SCHEMA,
             "outcome_predicate",
@@ -703,6 +703,8 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
         ),
     ];
 
+    rows.sort_unstable();
+    expected.sort_unstable();
     assert_eq!(rows, expected);
     for (schema, ..) in expected {
         assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
@@ -842,6 +844,12 @@ fn finding_family_schema_registry_parity_is_bidirectional() {
     }
 
     const EXPECTED_SIGNED: &[(&str, &str, &str, &str)] = &[
+        (
+            "chio.finding.anchor-checkpoint-publication.v1",
+            "finding_anchor_checkpoint_publication",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/anchor-checkpoint-publication.schema.json",
+        ),
         (
             "chio.finding.v1",
             "finding",
