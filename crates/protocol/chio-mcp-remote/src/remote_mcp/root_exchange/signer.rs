@@ -50,6 +50,17 @@ pub struct SeedFileSigner {
     key: PublicKey,
 }
 
+impl std::fmt::Debug for ExchangeSigner {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SeedFile(signer) => formatter
+                .debug_struct("SeedFile")
+                .field("key", &signer.key.to_hex())
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
 impl ExchangeSigner {
     /// Load the seed file at `path` under the authority seed custody rules.
     pub fn seed_file(path: &Path) -> Result<Self, ExchangeSignerError> {
