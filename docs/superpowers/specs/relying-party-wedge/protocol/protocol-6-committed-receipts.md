@@ -155,7 +155,7 @@ An unsigned, self-verifying opening:
 | Mobile (`chio-kernel-mobile`) | OS RNG |
 | C ABI (`chio-cpp-kernel-ffi`) | OS RNG inside the library |
 | Security producers (cage, secret broker and other `chio.receipt.v1` emitters) | host `Rng` passed into their signing path |
-| Other std processes (control plane, HTTP authority, ACP proxy, OpenTelemetry receipt exporter, product CLIs) | OS RNG through the `Rng` seam |
+| Other std processes (control plane, HTTP authority, ACP-Client proxy, OpenTelemetry receipt exporter, product CLIs) | OS RNG through the `Rng` seam |
 | Harness, conformance and fixture generators | a seeded deterministic `Rng` through the same seam; their output is fixture material only |
 
 A producer draws salts from the `Rng` seam of the process that signs.

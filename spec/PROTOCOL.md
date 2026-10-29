@@ -1609,7 +1609,7 @@ unsupported schema versions fail closed.
 | `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
 | `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
 | `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, and the receipt itself does not carry it. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
-| `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
+| `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP-Client form adds authorization_resource taken from the tool call. |
 | `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
 | `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |
 | `channel` | Chio signer | unsafe |  | Streamed-output channel accounting. No production writer. |
@@ -1629,7 +1629,7 @@ unsupported schema versions fail closed.
 | `runtime_admission` | Chio signer | unsafe |  | The kernel's runtime-admission refusal record: hook name, acceptance flag and failure code. Never accepted from a hook. No production reader. |
 | `active_response_terminal_evidence` | Chio signer | committed-safe |  | Executor receipt id, hash and key behind an active-response terminal receipt, read back by the kernel's admission terminal receipt check. |
 | `chio_http_receipt_v1` | Chio signer | unsafe |  | Embedded HTTP receipt written by the HTTP receipt projection, with raw request and session ids and nested metadata. |
-| `chio_receipt_signing_nonce` | Chio signer | unsafe |  | The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP producer embeds an unsalted content hash in it. |
+| `chio_receipt_signing_nonce` | Chio signer | unsafe |  | The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP-Client producer embeds an unsalted content hash in it. |
 | `original_metadata` | Chio signer | unsafe |  | Written by the signing path to wrap a non-object metadata value verbatim. |
 | `finding_pool_mutation` | Chio signer | unsafe |  | Finding-pool ledger mutation evidence. Duplicates the action parameters. |
 | `session_report` | Chio signer | unsafe |  | Session report event. operation_sha256 is an unsalted digest of the whole operation, arguments included. |
@@ -1650,7 +1650,7 @@ unsupported schema versions fail closed.
 | `guardOutcome` | Chio signer | unsafe |  | Wall guard outcome text. |
 | `deniedAccessRecord` | Chio signer | unsafe |  | Wall record of the denied request. |
 | `policySnapshot` | Chio signer | unsafe |  | Wall policy identity snapshot. No production reader. |
-| `acp` | Chio signer | unsafe |  | ACP session and tool-call ids. authorizationResource is taken from the tool call. |
+| `acp` | Chio signer | unsafe |  | ACP-Client session and tool-call ids. authorizationResource is taken from the tool call. |
 | `agent_web_receipt_ref` | Chio signer | unsafe |  | Agent Web receipt reference read only by the proof fixture. No production writer. |
 | `parent_receipt_ids` | Chio signer | unsafe |  | Parent receipt ids. No production writer; only the CLI explain display reads it. |
 | `batch_witness` | Chio signer | unsafe |  | Batch witness reference with unaudited contents. No production writer; only the CLI explain display reads it. |

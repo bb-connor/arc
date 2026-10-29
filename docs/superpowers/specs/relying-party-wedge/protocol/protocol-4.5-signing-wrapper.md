@@ -241,7 +241,7 @@ Wrapper schema ids, one per signed artifact type:
 | Channel terminal outcome commitment | its existing schema constant |
 | Signer readiness probe | `chio.signer-readiness-probe.v1` |
 | Finding-pool store identity proof | `chio.finding-pool.store-identity-proof.v1` |
-| ACP compliance certificate | `chio.compliance.certificate.v1` |
+| ACP-Client compliance certificate | `chio.compliance.certificate.v1` |
 | Federation kernel handshake | `chio.federation-kernel-handshake.v1` |
 | Any other artifact type added to the Signed-Artifact Registry | its id in `spec/schemas/registry.json` |
 
