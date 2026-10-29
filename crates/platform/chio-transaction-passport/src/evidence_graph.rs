@@ -1160,8 +1160,8 @@ const RECEIPT_ROLE_SCHEMAS: &[&str] =
     &[chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA];
 
 /// Schemas of the artifacts that carry a signed minimal governed action
-/// role. Each artifact is signed through the signing wrapper under its own
-/// `schema`.
+/// role. Each artifact is signed through the signing wrapper under the
+/// schema its evidence graph node declares, which its `schema` member equals.
 pub const SIGNED_EVIDENCE_ROLE_SCHEMAS: &[&str] = &[
     "chio.capability.proof.v1",
     "chio.proof.first-run.capability-proof.v1",
@@ -1172,7 +1172,7 @@ pub const SIGNED_EVIDENCE_ROLE_SCHEMAS: &[&str] = &[
     chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
 ];
 
-/// Schemas an artifact may carry for a signed evidence role.
+/// Schemas an evidence graph node may declare for a signed evidence role.
 fn signed_role_wrapper_schemas(role: EvidenceNodeRole) -> &'static [&'static str] {
     match role {
         EvidenceNodeRole::Capability => CAPABILITY_ROLE_SCHEMAS,
@@ -1202,22 +1202,23 @@ fn verify_signed_role_artifact(
     let signature = Signature::from_hex(signature).map_err(|error| {
         minimal_governed_action_signature_error(format!("{label} signature invalid: {error}"))
     })?;
-    let bytes = artifact_bytes_for_role(graph, artifacts, role)?;
-    let mut artifact: serde_json::Value = crate::decode_evidence_json(bytes)?;
-    let object = artifact.as_object_mut().ok_or_else(|| {
-        minimal_governed_action_binding_error(format!("{label} artifact must be an object"))
+    let node = node_for_role(graph, role).ok_or_else(|| {
+        TransactionPassportError::InvalidEvidenceGraphArtifact(
+            "minimal governed action evidence missing".to_string(),
+        )
     })?;
-    object.remove("signature");
     let schemas = signed_role_wrapper_schemas(role);
     if schemas.is_empty() {
         return Err(minimal_governed_action_binding_error(format!(
             "{label} role is not a signed artifact"
         )));
     }
-    let schema_id = object
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        .and_then(|schema| schemas.iter().copied().find(|known| *known == schema))
+    // The wrapper schema comes from the evidence graph node that binds this
+    // role; the artifact's own `schema` member is only checked for equality.
+    let schema_id = schemas
+        .iter()
+        .copied()
+        .find(|known| *known == node.schema)
         .ok_or_else(|| {
             let expected = match schemas {
                 [only] => (*only).to_string(),
@@ -1225,6 +1226,17 @@ fn verify_signed_role_artifact(
             };
             minimal_governed_action_binding_error(format!("{label} schema is not {expected}"))
         })?;
+    let bytes = artifact_bytes_for_node(node, artifacts)?;
+    let mut artifact: serde_json::Value = crate::decode_evidence_json(bytes)?;
+    let object = artifact.as_object_mut().ok_or_else(|| {
+        minimal_governed_action_binding_error(format!("{label} artifact must be an object"))
+    })?;
+    object.remove("signature");
+    if object.get("schema").and_then(serde_json::Value::as_str) != Some(schema_id) {
+        return Err(minimal_governed_action_binding_error(format!(
+            "{label} schema is not {schema_id}"
+        )));
+    }
     let verified =
         chio_core_types::crypto::verify_wrapped(&public_key, schema_id, &artifact, &signature)
             .is_ok();
@@ -1560,4 +1572,106 @@ fn is_authority_edge_predicate_value(predicate: &str) -> bool {
         predicate,
         "authorizes" | "executes" | "leases" | "attenuates" | "settles"
     )
+}
+
+#[cfg(test)]
+mod signed_role_tests {
+    use super::*;
+    use chio_core_types::canonical::CanonicalBytes;
+    use chio_core_types::crypto::Keypair;
+    use chio_test_support::prelude::*;
+
+    const CAPABILITY_PROOF: &str = "chio.capability.proof.v1";
+    const FIRST_RUN_CAPABILITY_PROOF: &str = "chio.proof.first-run.capability-proof.v1";
+
+    fn graph_with_capability_node(schema: &str) -> TransactionEvidenceGraph {
+        let digest = "a".repeat(64);
+        serde_json::from_value(serde_json::json!({
+            "schema": TRANSACTION_EVIDENCE_GRAPH_SCHEMA_ID,
+            "id": "graph",
+            "issued_at": "2026-10-01T00:00:00Z",
+            "nodes": [{"id": digest, "sha256": digest, "schema": schema,
+                "path": "capability-proof.json", "role": "capability"}],
+            "edges": [],
+        }))
+        .test_expect("graph decodes")
+    }
+
+    fn signed_capability_artifact(
+        keypair: &Keypair,
+        schema: &str,
+    ) -> (BTreeMap<String, Vec<u8>>, String) {
+        let body = serde_json::json!({"schema": schema, "id": "capability-1"});
+        let canonical = CanonicalBytes::from_serializable(&body).test_expect("body canonicalizes");
+        let signature = keypair
+            .sign_wrapped(schema, &canonical)
+            .test_expect("body signs")
+            .to_hex();
+        let mut artifact = body;
+        artifact["signature"] = Value::String(signature.clone());
+        let bytes = serde_json::to_vec(&artifact).test_expect("artifact encodes");
+        (
+            BTreeMap::from([("capability-proof.json".to_string(), bytes)]),
+            signature,
+        )
+    }
+
+    #[test]
+    fn signed_role_verifies_under_the_graph_node_schema() {
+        let keypair = Keypair::from_seed(&[41; 32]);
+        let signer = keypair.public_key().to_hex();
+        let (artifacts, signature) = signed_capability_artifact(&keypair, CAPABILITY_PROOF);
+        verify_signed_role_artifact(
+            &graph_with_capability_node(CAPABILITY_PROOF),
+            &artifacts,
+            EvidenceNodeRole::Capability,
+            Some(&signer),
+            Some(&signature),
+            "capability proof",
+        )
+        .test_expect("artifact signed under its graph node schema verifies");
+    }
+
+    #[test]
+    fn signed_role_refuses_an_artifact_claiming_another_allowlisted_schema() {
+        let keypair = Keypair::from_seed(&[41; 32]);
+        let signer = keypair.public_key().to_hex();
+        let (artifacts, signature) =
+            signed_capability_artifact(&keypair, FIRST_RUN_CAPABILITY_PROOF);
+        let error = verify_signed_role_artifact(
+            &graph_with_capability_node(CAPABILITY_PROOF),
+            &artifacts,
+            EvidenceNodeRole::Capability,
+            Some(&signer),
+            Some(&signature),
+            "capability proof",
+        )
+        .test_expect_err("artifact schema must equal its graph node schema");
+        assert!(
+            error.to_string().contains("capability proof schema"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn signed_role_refuses_a_graph_node_schema_outside_the_role_allowlist() {
+        let keypair = Keypair::from_seed(&[41; 32]);
+        let signer = keypair.public_key().to_hex();
+        let (artifacts, signature) = signed_capability_artifact(&keypair, "chio.trust.root.v1");
+        let error = verify_signed_role_artifact(
+            &graph_with_capability_node("chio.trust.root.v1"),
+            &artifacts,
+            EvidenceNodeRole::Capability,
+            Some(&signer),
+            Some(&signature),
+            "capability proof",
+        )
+        .test_expect_err("capability node schema must be a capability schema");
+        assert!(
+            error
+                .to_string()
+                .contains("capability proof schema is not one of"),
+            "{error}"
+        );
+    }
 }
