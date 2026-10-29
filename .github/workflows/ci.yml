@@ -308,6 +308,12 @@ jobs:
           run_gate python3 ./scripts/tests/check-required-evidence-binding.test.py
           run_gate bash ./scripts/tests/check-rust-verification-gates.test.sh
           run_gate bash ./scripts/tests/formal-workflow-wiring.test.sh
+          run_gate bash ./scripts/tests/check-chio-runtime-workflow.test.sh
+          run_gate bash ./scripts/tests/tuf-rebake-workflow.test.sh
+          run_gate bash ./scripts/tests/ci-release-assurance.test.sh
+          run_gate bash ./scripts/tests/check-receipt-append-scale.test.sh
+          run_gate bash ./scripts/tests/mutation-aggregate-pending-rerun.test.sh
+          run_gate bash ./scripts/tests/check-ioa-web3-transaction-passport-smoke.test.sh
           run_gate cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1
           run_gate bash ./scripts/check-corpus-metadata.sh
           run_gate bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
@@ -487,6 +493,12 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/check-consumer-boundaries.sh
+
+      - name: Adapter no-bypass gate self-test
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: bash scripts/tests/check-adapter-no-bypass.test.sh
 
       - name: Authenticated caller delivery
         env:
@@ -751,6 +763,9 @@ jobs:
           set -euo pipefail
           bash scripts/install-kani-toolchain.sh
           cargo kani --version
+
+      - name: Kani manifest runner self-test
+        run: bash scripts/tests/run-kani-manifest-empty-match.test.sh
 
       - name: Verify all PR Kani harnesses
         env:

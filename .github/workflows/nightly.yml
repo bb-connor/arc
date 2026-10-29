@@ -112,6 +112,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
 
+      - name: Loom manifest runner self-test
+        run: bash scripts/tests/run-loom-manifest.test.sh
+
       - name: Run registered Loom models
         env:
           CARGO_BUILD_JOBS: "1"
@@ -153,6 +156,9 @@ jobs:
           packages: protobuf-compiler
 
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32
+
+      - name: Deterministic simulation runner self-test
+        run: bash scripts/tests/run-dst.test.sh
 
       - name: Run deterministic simulation sweep
         env:
@@ -439,6 +445,9 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
         run: ./scripts/qualify-portable-browser.sh
+
+      - name: Portable mobile qualification self-test
+        run: bash scripts/tests/qualify-mobile-kernel.test.sh
 
       - name: Portable mobile qualification
         env:

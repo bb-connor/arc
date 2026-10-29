@@ -1589,7 +1589,7 @@ EXPECTED_APALACHE_VERDICT_NEEDS = {
 # Bind the durable trace generation/refusal/model checks and their required
 # aggregate verdict together; adding a needs edge alone cannot qualify a run.
 EXPECTED_APALACHE_LIFECYCLE_JOB_SHA256 = (
-    "c52bd5c6019884f8187bba3b1664cbde2a6b39a7655407db3e632882f64cd6ba"
+    "bae70ea795034c629a65c2ba05bf695f9204e33ab99e44cb4f959b77d3643609"
 )
 EXPECTED_APALACHE_VERDICT_JOB_SHA256 = (
     "56cc98fc6d735549e2f3709d2ac3abe94d4945930bb94b63106fe56871ba450f"
