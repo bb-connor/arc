@@ -3569,6 +3569,19 @@ request's port and dial only the checked addresses: the blocking ureq agent
 resolves per request, and the reqwest client keeps one resolver per port the
 contract admits.
 
+An operator declares allowances in one TOML file, read by
+`EgressAllowanceSet::load_file` and named to the `chio` CLI by the global
+`--egress-allowance-file` flag. The file holds one `[[allow]]` table per entry
+with exactly the keys `host`, `port` and `cidr`; any other key is refused. It
+MUST be a regular UTF-8 file of at most 64 KiB, and every entry passes the rules
+above when it loads, so an invalid file stops the process before any contract
+uses it. Without the file the set is empty. A contract takes only the entries
+for its own authorities, so one file may serve every process role. Trust-control
+clients dial under such a contract: a contract refusal aborts the request, and
+only a transport or name-resolution failure moves a client to its next
+endpoint. Trust-control reports the set's digest as `egressAllowanceDigest` in
+its health document and in `chio trust config check`; the digest is not signed.
+
 Reject scenarios (each surfaced as a structured `HttpEgressError`):
 
 - loopback target rejected (`LoopbackDenied`),

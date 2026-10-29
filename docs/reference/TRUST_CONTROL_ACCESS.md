@@ -191,6 +191,10 @@ Forwarded authority mutations also carry `x-chio-forwarded-authority-term`.
 - gives two credentials the same `secret_sha256`;
 - holds a credential whose `deployment` differs from the top-level value;
 - declares `[[cluster.peers]]` without a `[cluster]` identity;
+- pins a peer whose `internal_url` is a link-local or cloud metadata address
+  literal (`169.254.0.0/16`, `fe80::/10`, `100.100.100.200`, `fd00:ec2::/32`),
+  refused with `cluster URL must not target the link-local or cloud metadata
+  address`;
 - sets `internal_listen` equal to `--listen`.
 
 The service does not convert other configuration formats. Each deployment
@@ -259,8 +263,42 @@ and `--remote-authority-workload-token`, operators pass the contents of
 the tenant reader presents the contents of `/run/secrets/tenant-a-reader` as
 its bearer.
 
+## Private network peers and control planes
+
+Every trust-control client, including the clients a node uses to reach its
+pinned peers and the cluster leader, dials under an `HttpEgressContract` that
+admits exactly its endpoints, follows no redirects, and refuses private,
+loopback (except a loopback literal endpoint), link-local, unique-local and
+cloud metadata addresses. Link-local and metadata addresses are refused at
+construction and at connect. A refusal aborts the request; only a transport
+failure moves the client to its next endpoint.
+
+A peer or control plane on a private network (for example inside a VPC) is
+reached only through an operator allowance. Declare it in the file named by the
+global `--egress-allowance-file` flag:
+
+```toml
+[[allow]]
+host = "trust-b.vpc.internal"
+port = 8941
+cidr = "10.20.0.0/24"
+```
+
+Each entry pins one `host:port` to a CIDR. Every address that host resolves to,
+public ones included, must lie inside the CIDR. The CIDR must be at least a /16
+(IPv4) or /48 (IPv6), lie inside 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
+100.64.0.0/10 or fc00::/7, and never touch link-local or a metadata range. A
+host with an allowance is reached over `https` only. The file must be a regular
+file of at most 64 KiB; unknown fields and invalid entries are refused at
+startup. Without the flag no private address is
+reachable. There is no flag that admits private or loopback peers wholesale.
+
+`/health` reports `egressAllowanceDigest`, the SHA-256 digest of the loaded
+allowance set, so operators can confirm which allowances a node runs under.
+
 ## Checking a configuration
 
 `chio trust config check --access-config <PATH>` applies the same validation as
 startup and prints each credential's id, kind, scopes, and tenant authority,
-followed by the pinned peers. It never prints secrets. Run it before every restart that changes the file.
+followed by the pinned peers and the digest of the `--egress-allowance-file`
+allowances (`egressAllowanceDigest`). It never prints secrets. Run it before every restart that changes the file.
