@@ -283,8 +283,9 @@ mod projection {
     use super::*;
     use std::cell::Cell;
 
-    use chio_core_types::receipt::metadata::MetadataOpenings;
+    use chio_core_types::receipt::metadata::{MetadataOpenings, MetadataValue};
     use chio_core_types::rng::{Rng, RngError};
+    use chio_core_types::root_authority::SaltRef;
     use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
 
     struct CountingRng(Cell<u64>);
@@ -369,5 +370,16 @@ mod projection {
         assert!(!projection.matches(&event, &again_openings, &keys));
         assert!(!projection.matches(&event, &openings, &key_set(8, &[])));
         assert!(projection.matches(&event, &openings, &key_set(8, &[7])));
+        let mut padded = openings.clone();
+        padded
+            .commit_value(
+                SaltRef::new("metadata.security_event.unused")
+                    .unwrap_or_else(|error| panic!("salt ref: {error}")),
+                MetadataValue::from_json(&"unused")
+                    .unwrap_or_else(|error| panic!("value: {error}")),
+                &CountingRng(Cell::new(500)),
+            )
+            .unwrap_or_else(|error| panic!("pads: {error}"));
+        assert!(!projection.matches(&event, &padded, &keys));
     }
 }

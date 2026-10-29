@@ -9,8 +9,8 @@ use alloc::format;
 use alloc::vec::Vec;
 
 use chio_security_types::ports::{
-    DeclassificationUseState, Digest32, ErrorCode, EventId, LeaseOwnerId, LineageId,
-    OpaqueReceiptRef, RecordId, ResponseDispatchApproval, TripwireKind,
+    DeclassificationUseState, Digest32, ErrorCode, EventId, LeaseOwnerId, LineageId, RecordId,
+    ResponseDispatchApproval, TripwireKind,
 };
 use chio_security_types::{
     DetectorHealthKind, FindingEventIds, FindingSourceReceiptIds, ResponseEffectKind,
@@ -39,15 +39,24 @@ pub struct ActiveDefenseHeaderProjection {
     pub prior_receipt_ids: ActiveDefensePriorReceiptIds,
 }
 
+/// `ActiveDefensePolicyBinding` with the policy hash committed: a policy document is
+/// guessable, so its hash is not entropy-backed.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActiveDefensePolicyProjection {
+    pub policy_version: RecordId,
+    pub policy_hash: MetadataCommitment,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ActiveDefenseResponseProjection {
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub plan_hash: MetadataCommitment,
     pub action_id: MetadataCommitment,
     pub trigger_finding_id: MetadataCommitment,
     pub trigger_finding_hash: MetadataCommitment,
-    pub trigger_finding_receipt_id: OpaqueReceiptRef,
+    pub trigger_finding_receipt_id: MetadataCommitment,
     pub affected_set_hash: KeyedIndexValue,
     pub plan_expires_at_unix_ms: u64,
 }
@@ -150,7 +159,7 @@ pub enum DetectorWatermarkProjection {
 #[serde(deny_unknown_fields)]
 pub struct FlowDenialProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub request_hash: MetadataCommitment,
     pub source_label_hash: MetadataCommitment,
     pub destination_label_hash: MetadataCommitment,
@@ -163,7 +172,7 @@ pub struct FlowDenialProjection {
 #[serde(deny_unknown_fields)]
 pub struct DeclassificationConsumptionProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub grant_id: MetadataCommitment,
     pub grant_hash: MetadataCommitment,
     pub request_hash: MetadataCommitment,
@@ -175,7 +184,7 @@ pub struct DeclassificationConsumptionProjection {
 #[serde(deny_unknown_fields)]
 pub struct DeclassificationOutcomeProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub grant_id: MetadataCommitment,
     pub grant_hash: MetadataCommitment,
     pub request_hash: MetadataCommitment,
@@ -188,7 +197,7 @@ pub struct DeclassificationOutcomeProjection {
 #[serde(deny_unknown_fields)]
 pub struct TripwireObservationProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub request_id: MetadataCommitment,
     pub request_hash: MetadataCommitment,
     pub event_id: EventId,
@@ -203,7 +212,7 @@ pub struct TripwireObservationProjection {
 #[serde(deny_unknown_fields)]
 pub struct CorrelatedFindingProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub finding_id: MetadataCommitment,
     pub finding_hash: MetadataCommitment,
     pub rule_id: MetadataCommitment,
@@ -284,7 +293,7 @@ pub struct LiftRollbackCompletionProjection {
 #[serde(deny_unknown_fields)]
 pub struct DetectorHealthProjection {
     pub header: ActiveDefenseHeaderProjection,
-    pub policy: ActiveDefensePolicyBinding,
+    pub policy: ActiveDefensePolicyProjection,
     pub rule_id: MetadataCommitment,
     pub rule_version_hash: MetadataCommitment,
     pub group_binding: DetectorGroupBindingProjection,
@@ -364,9 +373,10 @@ impl ActiveDefenseReceiptBody {
         Ok((projection, projector.into_openings()))
     }
 
-    /// True when every commitment in `projection` opens to this body with `openings` and
-    /// every keyed value derives from this body under the generation the projection names;
-    /// false on any mismatch, missing opening or unknown generation.
+    /// True when every commitment in `projection` opens to this body with `openings`, every
+    /// opening is used, and every keyed value derives from this body under the generation
+    /// the projection names; false on any mismatch, missing or unused opening or unknown
+    /// generation.
     #[must_use]
     pub fn matches_projection(
         &self,
@@ -376,7 +386,11 @@ impl ActiveDefenseReceiptBody {
     ) -> bool {
         let key_id = projection.header().transition_id.key_id;
         MetadataProjector::verify(keys, &key_id, openings)
-            .and_then(|mut projector| Projection(&mut projector).body(self))
+            .and_then(|mut projector| {
+                let rebuilt = Projection(&mut projector).body(self)?;
+                projector.finish()?;
+                Ok(rebuilt)
+            })
             .is_ok_and(|rebuilt| rebuilt == *projection)
     }
 }
@@ -409,18 +423,29 @@ impl Projection<'_, '_> {
         })
     }
 
+    fn policy(
+        &mut self,
+        policy: &ActiveDefensePolicyBinding,
+    ) -> Result<ActiveDefensePolicyProjection, ProjectionError> {
+        Ok(ActiveDefensePolicyProjection {
+            policy_version: policy.policy_version.clone(),
+            policy_hash: self.commit("policy_hash", &policy.policy_hash)?,
+        })
+    }
+
     fn response(
         &mut self,
         response: &ActiveDefenseResponseBinding,
     ) -> Result<ActiveDefenseResponseProjection, ProjectionError> {
         Ok(ActiveDefenseResponseProjection {
-            policy: response.policy.clone(),
+            policy: self.policy(&response.policy)?,
             plan_hash: self.commit("plan_hash", &response.plan_hash)?,
             action_id: self.commit("action", &response.action_id)?,
             trigger_finding_id: self.commit("finding", &response.trigger_finding_id)?,
             trigger_finding_hash: self
                 .commit("trigger_finding_hash", &response.trigger_finding_hash)?,
-            trigger_finding_receipt_id: response.trigger_finding_receipt_id.clone(),
+            trigger_finding_receipt_id: self
+                .commit("finding_receipt", &response.trigger_finding_receipt_id)?,
             affected_set_hash: self.keyed(response.affected_set_hash.as_bytes())?,
             plan_expires_at_unix_ms: response.plan_expires_at_unix_ms,
         })
@@ -589,7 +614,7 @@ impl Projection<'_, '_> {
             ActiveDefenseReceiptBody::FlowDenial(body) => {
                 ActiveDefenseReceiptProjection::FlowDenial(FlowDenialProjection {
                     header: self.header(&body.header)?,
-                    policy: body.policy.clone(),
+                    policy: self.policy(&body.policy)?,
                     request_hash: self.commit("request_hash", &body.request_hash)?,
                     source_label_hash: self.commit("source_label_hash", &body.source_label_hash)?,
                     destination_label_hash: self
@@ -604,7 +629,7 @@ impl Projection<'_, '_> {
                 ActiveDefenseReceiptProjection::DeclassificationConsumption(
                     DeclassificationConsumptionProjection {
                         header: self.header(&body.header)?,
-                        policy: body.policy.clone(),
+                        policy: self.policy(&body.policy)?,
                         grant_id: self.commit("grant", &body.grant_id)?,
                         grant_hash: self.commit("grant_hash", &body.grant_hash)?,
                         request_hash: self.commit("request_hash", &body.request_hash)?,
@@ -617,7 +642,7 @@ impl Projection<'_, '_> {
                 ActiveDefenseReceiptProjection::DeclassificationOutcome(
                     DeclassificationOutcomeProjection {
                         header: self.header(&body.header)?,
-                        policy: body.policy.clone(),
+                        policy: self.policy(&body.policy)?,
                         grant_id: self.commit("grant", &body.grant_id)?,
                         grant_hash: self.commit("grant_hash", &body.grant_hash)?,
                         request_hash: self.commit("request_hash", &body.request_hash)?,
@@ -630,7 +655,7 @@ impl Projection<'_, '_> {
             ActiveDefenseReceiptBody::TripwireObservation(body) => {
                 ActiveDefenseReceiptProjection::TripwireObservation(TripwireObservationProjection {
                     header: self.header(&body.header)?,
-                    policy: body.policy.clone(),
+                    policy: self.policy(&body.policy)?,
                     request_id: self.commit("request", &body.request_id)?,
                     request_hash: self.commit("request_hash", &body.request_hash)?,
                     event_id: body.event_id.clone(),
@@ -645,7 +670,7 @@ impl Projection<'_, '_> {
             ActiveDefenseReceiptBody::CorrelatedFinding(body) => {
                 ActiveDefenseReceiptProjection::CorrelatedFinding(CorrelatedFindingProjection {
                     header: self.header(&body.header)?,
-                    policy: body.policy.clone(),
+                    policy: self.policy(&body.policy)?,
                     finding_id: self.commit("finding", &body.finding_id)?,
                     finding_hash: self.commit("finding_hash", &body.finding_hash)?,
                     rule_id: self.commit("rule_id", &body.rule_id)?,
@@ -763,7 +788,7 @@ impl Projection<'_, '_> {
                 };
                 ActiveDefenseReceiptProjection::DetectorHealth(DetectorHealthProjection {
                     header: self.header(&body.header)?,
-                    policy: body.policy.clone(),
+                    policy: self.policy(&body.policy)?,
                     rule_id: self.commit("rule_id", &body.rule_id)?,
                     rule_version_hash: self.commit("rule_version_hash", &body.rule_version_hash)?,
                     group_binding,

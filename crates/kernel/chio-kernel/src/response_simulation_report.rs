@@ -208,7 +208,7 @@ fn domain_hash(domain: &[u8], value: &impl Serialize) -> PortResult<Digest32> {
 }
 
 /// Signed metadata block `response_simulation`: the report without its plan, snapshot or
-/// evaluation. The plan, configuration and authorization digests are committed
+/// evaluation. The plan, policy, configuration and authorization digests are committed
 /// (`metadata.response_simulation.<field>`); the affected-set hash, the governed intent hash,
 /// the snapshot and evaluation digests and the evidence id are keyed under the active-defense
 /// purpose subkey. The full report stays the receipt's content preimage.
@@ -219,7 +219,7 @@ pub struct ResponseSimulationProjection {
     pub configuration_digest: MetadataCommitment,
     pub plan_hash: MetadataCommitment,
     pub policy_version: RecordId,
-    pub policy_hash: Digest32,
+    pub policy_hash: MetadataCommitment,
     pub affected_set_hash: KeyedIndexValue,
     pub created_at_unix_ms: u64,
     pub expires_at_unix_ms: u64,
@@ -247,9 +247,10 @@ impl ResponseSimulationReport {
         Ok((projection, projector.into_openings()))
     }
 
-    /// True when every commitment in `projection` opens to this report with `openings` and
-    /// every keyed value derives from it under the generation the projection names; false on
-    /// any mismatch, missing opening or unknown generation.
+    /// True when every commitment in `projection` opens to this report with `openings`,
+    /// every opening is used, and every keyed value derives from it under the generation the
+    /// projection names; false on any mismatch, missing or unused opening or unknown
+    /// generation.
     #[must_use]
     pub fn matches_projection(
         &self,
@@ -263,7 +264,11 @@ impl ResponseSimulationReport {
             openings,
         )
         .map_err(SimulationProjectionError::from)
-        .and_then(|mut projector| self.build_projection(&mut projector))
+        .and_then(|mut projector| {
+            let rebuilt = self.build_projection(&mut projector)?;
+            projector.finish()?;
+            Ok(rebuilt)
+        })
         .is_ok_and(|rebuilt| rebuilt == *projection)
     }
 
@@ -296,7 +301,7 @@ impl ResponseSimulationReport {
             )?,
             plan_hash: projector.commit(salt_ref("plan_hash")?, &self.plan.plan_hash)?,
             policy_version: self.plan.policy_version.clone(),
-            policy_hash: self.plan.policy_hash,
+            policy_hash: projector.commit(salt_ref("policy_hash")?, &self.plan.policy_hash)?,
             affected_set_hash: keyed(projector, self.plan.affected_set_hash.as_bytes())?,
             created_at_unix_ms: self.plan.created_at_unix_ms,
             expires_at_unix_ms: self.plan.expires_at_unix_ms,

@@ -256,8 +256,10 @@ fn registered_metadata_salt_refs() -> Vec<String> {
             &[
                 "action",
                 "finding",
+                "finding_receipt",
                 "grant",
                 "request",
+                "policy_hash",
                 "plan_hash",
                 "trigger_finding_hash",
                 "request_hash",
@@ -426,6 +428,7 @@ fn registered_metadata_salt_refs() -> Vec<String> {
             &[
                 "configuration_digest",
                 "plan_hash",
+                "policy_hash",
                 "authorization_capability_hash",
                 "policy_decision_hash",
                 "approval_set_hash",

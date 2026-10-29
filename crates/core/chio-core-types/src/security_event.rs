@@ -151,8 +151,8 @@ mod projection {
         }
 
         /// True when this projection is the projection of `body` under `openings` and the
-        /// generation its tenant binding names; false on any mismatch, missing opening or
-        /// unknown generation.
+        /// generation its tenant binding names; false on any mismatch, missing or unused
+        /// opening or unknown generation.
         #[must_use]
         pub fn matches(
             &self,
@@ -161,7 +161,11 @@ mod projection {
             keys: &TenantIndexKeySet,
         ) -> bool {
             MetadataProjector::verify(keys, &self.tenant_binding.key_id, openings)
-                .and_then(|mut projector| Self::build(body, &mut projector))
+                .and_then(|mut projector| {
+                    let rebuilt = Self::build(body, &mut projector)?;
+                    projector.finish()?;
+                    Ok(rebuilt)
+                })
                 .is_ok_and(|rebuilt| rebuilt == *self)
         }
 

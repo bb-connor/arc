@@ -3,8 +3,9 @@
 
 use std::cell::Cell;
 
-use chio_core_types::receipt::metadata::MetadataOpenings;
+use chio_core_types::receipt::metadata::{MetadataOpenings, MetadataValue};
 use chio_core_types::rng::{Rng, RngError};
+use chio_core_types::root_authority::SaltRef;
 use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
 use chio_kernel::response_simulation_report::{
     ResponseSimulationProjection, ResponseSimulationReport,
@@ -79,6 +80,26 @@ fn response_simulation_projection_carries_no_raw_plan_identifier() -> TestResult
         let raw = String::from_utf8_lossy(opening.value.as_bytes()).into_owned();
         assert!(!encoded.contains(&raw), "{salt_ref} leaks {raw}");
     }
+    for (field, raw) in [
+        (
+            "policy_hash",
+            serde_json::to_string(&report.plan.policy_hash)?,
+        ),
+        (
+            "affected_set_hash",
+            serde_json::to_string(&report.plan.affected_set_hash)?,
+        ),
+        (
+            "evidence_id",
+            serde_json::to_string(&report.evidence_id()?)?,
+        ),
+    ] {
+        assert!(!encoded.contains(&raw), "projection carries raw {field}");
+    }
+    assert_eq!(
+        projection.policy_hash.salt_ref().as_str(),
+        "metadata.response_simulation.policy_hash"
+    );
     let decoded: ResponseSimulationProjection = serde_json::from_str(&encoded)?;
     assert_eq!(decoded, projection);
     Ok(())
@@ -100,5 +121,12 @@ fn response_simulation_projection_refuses_other_reports_openings_and_generations
     assert!(!report.matches_projection(&projection, &other_openings, &keys));
     assert!(!report.matches_projection(&projection, &openings, &key_set(8, &[])?));
     assert!(report.matches_projection(&projection, &openings, &key_set(8, &[7])?));
+    let mut padded = openings.clone();
+    padded.commit_value(
+        SaltRef::new("metadata.response_simulation.unused")?,
+        MetadataValue::from_json(&"unused")?,
+        &CountingRng(Cell::new(5_000)),
+    )?;
+    assert!(!report.matches_projection(&projection, &padded, &keys));
     Ok(())
 }

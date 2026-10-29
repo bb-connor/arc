@@ -293,6 +293,10 @@ pub enum MetadataCommitmentError {
     MetadataCommitmentMismatch {
         salt_ref: SaltRef,
     },
+    /// A projection check was given an opening the projection never commits.
+    UnusedOpening {
+        salt_ref: SaltRef,
+    },
 }
 
 impl fmt::Display for MetadataCommitmentError {
@@ -321,6 +325,10 @@ impl fmt::Display for MetadataCommitmentError {
             Self::MetadataCommitmentMismatch { salt_ref } => write!(
                 formatter,
                 "opening of metadata salt_ref `{salt_ref}` does not match its commitment"
+            ),
+            Self::UnusedOpening { salt_ref } => write!(
+                formatter,
+                "opening of metadata salt_ref `{salt_ref}` has no commitment in the projection"
             ),
         }
     }
