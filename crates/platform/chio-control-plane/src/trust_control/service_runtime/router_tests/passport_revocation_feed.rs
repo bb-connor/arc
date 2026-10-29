@@ -232,9 +232,7 @@ async fn a_revocation_at_the_partner_reaches_the_mirror_over_http() -> TestResul
         partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
     };
     use crate::revocation_partner::RevocationPartner;
-    use crate::trust_control::{
-        build_portable_fetch_agent, PartnerRevocationFeed, PortableFetchDeadline,
-    };
+    use crate::trust_control::{PartnerRevocationFeed, PortableFetchDeadline};
 
     let publisher = publisher()?;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -269,10 +267,14 @@ async fn a_revocation_at_the_partner_reaches_the_mirror_over_http() -> TestResul
             .map_err(|error| error.to_string())?;
         let sync = || -> Result<(), String> {
             let deadline = PortableFetchDeadline::start().map_err(|error| error.to_string())?;
-            let agent = build_portable_fetch_agent(vec![addr], false, &deadline)
-                .map_err(|error| error.to_string())?;
-            let mut feed =
-                PartnerRevocationFeed::new("acme", &format!("http://{addr}"), agent, deadline);
+            let mut feed = PartnerRevocationFeed::new(
+                "acme",
+                &format!("http://{addr}"),
+                &chio_egress_contract::HttpEgressContract::permissive_for_tests(&addr.to_string()),
+                chio_egress_contract::system_lookup(),
+                deadline,
+            )
+            .map_err(|error| error.to_string())?;
             mirror
                 .sync(&partner, &mut feed, &FixedClock::from_millis(NOW_MS))
                 .map(|_| ())

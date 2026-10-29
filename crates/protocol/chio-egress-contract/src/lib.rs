@@ -322,7 +322,7 @@ impl HttpEgressContract {
         Ok(false)
     }
 
-    #[cfg(any(feature = "reqwest-egress", feature = "ureq-egress"))]
+    #[cfg(feature = "reqwest-egress")]
     fn enforce_resolver_hostname(&self, host: &str) -> Result<(), HttpEgressError> {
         self.prepare()?.enforce_resolver_hostname(host)
     }
@@ -689,7 +689,10 @@ pub use transport_failure::RequestFailure;
 pub mod ureq_helper;
 
 #[cfg(feature = "ureq-egress")]
-pub use ureq_helper::{BlockingContractAgent, BlockingContractRequest, BlockingContractResponse};
+pub use ureq_helper::{
+    system_lookup, BlockingContractAgent, BlockingContractRequest, BlockingContractResponse,
+    ContractLookup,
+};
 
 #[cfg(feature = "reqwest-egress")]
 mod operator_readiness;

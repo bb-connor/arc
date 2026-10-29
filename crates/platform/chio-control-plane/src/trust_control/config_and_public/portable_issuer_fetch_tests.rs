@@ -21,7 +21,6 @@ use chio_test_support::prelude::*;
 
 use crate::bounded_worker_pool::tests::{drain, single_worker_pool};
 
-const GLOBAL_IPV4: &str = "8.8.8.8";
 const HANG_GUARD: Duration = Duration::from_secs(30);
 
 /// A fetch deadline with only `left` remaining, as if the fetch had already
@@ -37,12 +36,18 @@ fn open_deadline() -> PortableFetchDeadline {
     PortableFetchDeadline::start().test_unwrap()
 }
 
-fn strict_jwks_fetch_target() -> (Url, HttpEgressContract) {
-    let url = Url::parse("https://good.example/.well-known/jwks.json").test_unwrap();
-    let contract =
-        strict_portable_fetch_contract(url.as_str(), "control-plane.portable-issuer-jwks")
-            .test_unwrap();
-    (url, contract)
+/// The stand-in issuer every loopback fetch names. Its lookup answers with the
+/// test listener, so the request reaches the listener over plaintext.
+const LOOPBACK_ISSUER: &str = "remote.issuer.example:80";
+
+fn loopback_contract() -> HttpEgressContract {
+    let mut contract = HttpEgressContract::permissive_for_tests(LOOPBACK_ISSUER);
+    contract.max_response_bytes = crate::integer::count(PORTABLE_ISSUER_FETCH_MAX_BODY_BYTES);
+    contract
+}
+
+fn answer_with(addr: std::net::SocketAddr) -> ContractLookup {
+    ContractLookup::new(move |_host: &str, _port: u16| Ok(vec![addr]))
 }
 
 fn empty_config() -> TrustServiceConfig {
@@ -154,8 +159,8 @@ fn serve_once(mut stream: TcpStream, status: &str, body: &str) {
     }
 }
 
-fn loopback_fetch_agent(addr: std::net::SocketAddr) -> Agent {
-    build_portable_fetch_agent(vec![addr], false, &open_deadline()).test_unwrap()
+fn loopback_fetch_agent(addr: std::net::SocketAddr) -> BlockingContractAgent {
+    portable_fetch_agent(&loopback_contract(), &open_deadline(), answer_with(addr)).test_unwrap()
 }
 
 #[test]
@@ -223,7 +228,7 @@ fn http_allowlisted_issuer_is_refused_before_any_fetch() {
 }
 
 #[test]
-fn pin_checked_addrs_refuses_private_resolution() {
+fn strict_fetch_refuses_a_private_resolution() {
     let config = empty_config();
     let allowed = BTreeSet::from(["https://good.example".to_string()]);
     let PortableIssuerResolution::Remote(fetch) = plan_portable_issuer_keys(
@@ -235,46 +240,45 @@ fn pin_checked_addrs_refuses_private_resolution() {
     .test_unwrap() else {
         panic!("expected a remote fetch plan");
     };
-    let url = Url::parse(&fetch.jwks_url).test_unwrap();
-    let private =
-        |_host: &str, port: u16| Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()]);
-    let error = pin_checked_https_addrs(&fetch.contract, &url, private).test_unwrap_err();
+    let private = ContractLookup::new(|_host: &str, port: u16| {
+        Ok(vec![std::net::SocketAddr::from(([127, 0, 0, 1], port))])
+    });
+    let agent = portable_fetch_agent(&fetch.contract, &open_deadline(), private).test_unwrap();
+    let error = fetch_portable_issuer_jwks(&agent, &fetch.jwks_url).test_unwrap_err();
     assert!(error.to_string().to_lowercase().contains("loopback"));
 }
 
 #[test]
 fn dns_resolution_is_pinned_to_the_checked_addresses_once() {
-    let config = empty_config();
-    let allowed = BTreeSet::from(["https://good.example".to_string()]);
-    let PortableIssuerResolution::Remote(fetch) = plan_portable_issuer_keys(
-        &config,
-        "https://good.example",
-        &allowed,
-        &chio_test_support::clock::clock(),
-    )
-    .test_unwrap() else {
-        panic!("expected a remote fetch plan");
-    };
-    let url = Url::parse(&fetch.jwks_url).test_unwrap();
+    let issuer_keypair = Keypair::generate();
+    let server = RecordingServer::start(
+        "200 OK",
+        jwks_body(
+            "https://remote.issuer.example",
+            &issuer_keypair.public_key(),
+        ),
+    );
+    let server_addr = server.addr;
     let calls = Arc::new(AtomicUsize::new(0));
     let observed = Arc::clone(&calls);
-    // A rebinding resolver: public on the first lookup, private on any second
-    // lookup. Pinning must resolve exactly once and reuse the checked address,
-    // so the private rebind is never reachable by the connection.
-    let rebinding = move |_host: &str, port: u16| {
-        let nth = observed.fetch_add(1, Ordering::SeqCst);
-        if nth == 0 {
-            Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
+    // A rebinding resolver: the test listener on the first lookup, a private
+    // address on any later one. The fetch resolves exactly once and dials the
+    // checked address, so the rebind is never reachable.
+    let rebinding = ContractLookup::new(move |_host: &str, port: u16| {
+        if observed.fetch_add(1, Ordering::SeqCst) == 0 {
+            Ok(vec![server_addr])
         } else {
-            Ok(vec![format!("127.0.0.1:{port}").parse().test_unwrap()])
+            Ok(vec![std::net::SocketAddr::from(([10, 0, 0, 1], port))])
         }
-    };
-    let pinned = pin_checked_https_addrs(&fetch.contract, &url, rebinding).test_unwrap();
-    assert_eq!(
-        pinned,
-        vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()]
-    );
+    });
+    let agent =
+        portable_fetch_agent(&loopback_contract(), &open_deadline(), rebinding).test_unwrap();
+    let keys =
+        fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
+            .test_unwrap();
+    assert_eq!(keys, vec![issuer_keypair.public_key()]);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(server.connections(), 1);
 }
 
 #[test]
@@ -449,18 +453,11 @@ fn healthy_fetch_runs_dns_through_decode_on_a_single_worker() {
         ),
     );
     let server_addr = server.addr;
-    let (url, contract) = strict_jwks_fetch_target();
     let pool = BoundedWorkerPool::new(1, 1);
 
     let keys = run_portable_fetch(&pool, open_deadline(), move |deadline| {
-        let pinned = pin_checked_https_addrs(&contract, &url, |_host: &str, port: u16| {
-            Ok(vec![format!("{GLOBAL_IPV4}:{port}").parse().test_unwrap()])
-        })?;
-        assert_eq!(
-            pinned,
-            vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()]
-        );
-        let agent = build_portable_fetch_agent(vec![server_addr], false, &deadline)?;
+        let agent =
+            portable_fetch_agent(&loopback_contract(), &deadline, answer_with(server_addr))?;
         fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
     })
     .test_unwrap();
@@ -562,10 +559,10 @@ fn http_phase_is_bounded_by_the_budget_left_after_resolution() {
         }
     });
 
-    let agent = build_portable_fetch_agent(
-        vec![addr],
-        false,
+    let agent = portable_fetch_agent(
+        &loopback_contract(),
         &deadline_with(Duration::from_millis(200)),
+        answer_with(addr),
     )
     .test_unwrap();
     let started = Instant::now();
@@ -579,7 +576,7 @@ fn http_phase_is_bounded_by_the_budget_left_after_resolution() {
         CliError::cli_other_error("portable issuer JWKS endpoint was unreachable").to_string()
     );
     assert!(
-        elapsed < PORTABLE_ISSUER_FETCH_READ_TIMEOUT,
+        elapsed < PORTABLE_ISSUER_FETCH_PHASE_TIMEOUT,
         "the HTTP phase must get only the remaining budget, took {elapsed:?}"
     );
     drop(accepted_rx);
@@ -601,7 +598,8 @@ async fn connect_stage_cannot_outlive_the_fetch_deadline() {
     // Resolution has spent all but a sliver of the budget, far less than the
     // connect timeout a fresh connect clock would allow.
     let deadline = deadline_with(Duration::from_millis(300));
-    let agent = build_portable_fetch_agent(vec![addr], false, &deadline).test_unwrap();
+    let agent =
+        portable_fetch_agent(&loopback_contract(), &deadline, answer_with(addr)).test_unwrap();
     let error =
         fetch_portable_issuer_jwks(&agent, "http://remote.issuer.example/.well-known/jwks.json")
             .test_unwrap_err();
@@ -619,10 +617,15 @@ async fn connect_stage_cannot_outlive_the_fetch_deadline() {
 
 #[test]
 fn exhausted_deadline_refuses_the_http_phase() {
-    let error = build_portable_fetch_agent(
-        vec![format!("{GLOBAL_IPV4}:443").parse().test_unwrap()],
-        true,
+    let contract = strict_portable_fetch_contract(
+        "https://good.example/.well-known/jwks.json",
+        "control-plane.portable-issuer-jwks",
+    )
+    .test_unwrap();
+    let error = portable_fetch_agent(
+        &contract,
         &deadline_with(Duration::ZERO),
+        chio_egress_contract::system_lookup(),
     )
     .test_unwrap_err();
     assert_eq!(

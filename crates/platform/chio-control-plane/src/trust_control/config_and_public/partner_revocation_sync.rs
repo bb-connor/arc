@@ -8,7 +8,7 @@
 //! caller abandoned never writes the mirror.
 use super::*;
 
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{BlockingContractAgent, ContractLookup, HttpEgressContract};
 use chio_revocation_oracle::{EpochRoot, SignedEpochRoot};
 
 use crate::bounded_worker_pool::BoundedWorkerPool;
@@ -22,8 +22,8 @@ use crate::passport_revocation_mirror::{
 use crate::revocation_partner::RevocationPartner;
 
 use super::portable_issuer_fetch::{
-    build_portable_fetch_agent, pin_checked_https_addrs, portable_fetch_transport_error,
-    run_portable_fetch, system_resolve_host, PortableFetchDeadline, PORTABLE_ISSUER_FETCH_POOL,
+    portable_fetch_agent, portable_fetch_response, run_portable_fetch, PortableFetchDeadline,
+    PORTABLE_ISSUER_FETCH_POOL,
 };
 
 /// Largest accepted signed-root body, in bytes.
@@ -33,7 +33,7 @@ const MAX_SIGNED_ROOT_BYTES: usize = 16 * 1024;
 pub(crate) struct PartnerRevocationFeed {
     partner_id: String,
     base: String,
-    agent: Agent,
+    agent: BlockingContractAgent,
     deadline: PortableFetchDeadline,
 }
 
@@ -41,15 +41,16 @@ impl PartnerRevocationFeed {
     pub(crate) fn new(
         partner_id: &str,
         base: &str,
-        agent: Agent,
+        contract: &HttpEgressContract,
+        lookup: ContractLookup,
         deadline: PortableFetchDeadline,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CliError> {
+        Ok(Self {
             partner_id: partner_id.to_owned(),
             base: base.to_owned(),
-            agent,
+            agent: portable_fetch_agent(contract, &deadline, lookup)?,
             deadline,
-        }
+        })
     }
 
     fn fetch_error(&self, error: CliError) -> PartnerRevocationError {
@@ -66,14 +67,13 @@ impl PartnerRevocationFeed {
             .deadline
             .remaining()
             .map_err(|error| self.fetch_error(error))?;
-        let response = self
+        let outcome = self
             .agent
             .get(url)
-            .timeout(remaining)
-            .call()
-            .map_err(|error| self.fetch_error(portable_fetch_transport_error(endpoint, error)))?;
-        crate::json_input::read(response.into_reader(), cap)
-            .map_err(|error| self.fetch_error(error))
+            .and_then(|request| request.deadline(remaining).call());
+        let response =
+            portable_fetch_response(outcome, endpoint).map_err(|error| self.fetch_error(error))?;
+        crate::json_input::read(response.body(), cap).map_err(|error| self.fetch_error(error))
     }
 }
 
@@ -105,9 +105,7 @@ impl PartnerRevocationSource for PartnerRevocationFeed {
 }
 
 /// The strict HTTPS egress contract for `partner`'s issuer host.
-fn partner_feed_contract(
-    partner: &RevocationPartner,
-) -> Result<(Url, HttpEgressContract), CliError> {
+fn partner_feed_contract(partner: &RevocationPartner) -> Result<HttpEgressContract, CliError> {
     let url = Url::parse(&partner.issuer).map_err(|error| {
         CliError::cli_other_error(format!("partner trust-control URL is invalid: {error}"))
     })?;
@@ -117,7 +115,7 @@ fn partner_feed_contract(
         crate::integer::count(MAX_PASSPORT_REVOCATION_PAGE_BYTES),
     )
     .map_err(CliError::cli_other_error)?;
-    Ok((url, contract))
+    Ok(contract)
 }
 
 /// Syncs `mirror` from `partner` over the bounded strict transport, sampling
@@ -178,12 +176,15 @@ fn stage_over_strict_transport(
     let fetch_error = |error: CliError| {
         PartnerRevocationError::Fetch(partner.partner_id.clone(), error.to_string())
     };
-    let (url, contract) = partner_feed_contract(partner).map_err(fetch_error)?;
-    let pinned =
-        pin_checked_https_addrs(&contract, &url, system_resolve_host).map_err(fetch_error)?;
-    let agent = build_portable_fetch_agent(pinned, true, &deadline).map_err(fetch_error)?;
-    let mut feed =
-        PartnerRevocationFeed::new(&partner.partner_id, &partner.issuer, agent, deadline);
+    let contract = partner_feed_contract(partner).map_err(fetch_error)?;
+    let mut feed = PartnerRevocationFeed::new(
+        &partner.partner_id,
+        &partner.issuer,
+        &contract,
+        chio_egress_contract::system_lookup(),
+        deadline,
+    )
+    .map_err(fetch_error)?;
     mirror.stage(partner, &mut feed)
 }
 
