@@ -158,17 +158,20 @@ pub fn is_authoritative_spend_receipt(
     admitted_kernel_keys: &[PublicKey],
     presented_nonce: &dyn PresentedNonceView,
 ) -> Result<(), NotAuthoritativeReason> {
-    // The receipt body must be signed by the embedded kernel key. The execution
+    // (e) signer must be an admitted kernel key.
+    let Some(admitted) = admitted_kernel_keys
+        .iter()
+        .find(|key| **key == receipt.kernel_key)
+    else {
+        return Err(NotAuthoritativeReason::SignerNotAdmitted);
+    };
+    // The receipt body must be signed by that admitted key. The execution
     // nonce signature covers only the nonce, so without this a holder of a
     // signed nonce could forge receipt fields (invented reconciled-budget
     // metadata) under an admitted key. Fail-closed on a verification error or a
     // false result.
-    if !matches!(receipt.verify_integrity_embedded_key(), Ok(true)) {
+    if !matches!(receipt.verify_signature(admitted), Ok(true)) {
         return Err(NotAuthoritativeReason::ReceiptSignatureInvalid);
-    }
-    // (e) signer must be an admitted kernel key.
-    if !admitted_kernel_keys.contains(&receipt.kernel_key) {
-        return Err(NotAuthoritativeReason::SignerNotAdmitted);
     }
     // (a) mediated-decision semantics (mirrors sidecar.rs:796-799 verify side).
     if receipt.receipt_kind != ReceiptKind::MediatedDecision {
