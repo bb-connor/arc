@@ -37,7 +37,16 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> TestResult<Self> {
+        Self::with_encoding("UTF-8")
+    }
+    fn with_encoding(encoding: &str) -> TestResult<Self> {
+        assert!(["UTF-8", "UTF-16le", "UTF-16be"].contains(&encoding));
         let directory = tempfile::tempdir()?;
+        {
+            let connection = Connection::open(directory.path().join("source.sqlite3"))?;
+            connection.pragma_update(None, "encoding", encoding)?;
+            connection.execute_batch("VACUUM")?;
+        }
         let store = SqliteRuntimeOrchestrationStore::open_with_clock(
             directory.path().join("source.sqlite3"),
             chio_test_support::clock::clock(),
@@ -379,10 +388,14 @@ fn selected_pin_storage_refuses_non_blob_empty_and_oversized_values() -> TestRes
     ] {
         let fixture = Fixture::new()?;
         let key = authority_id(&id("verifier")?, &id("treaty")?)?;
-        fixture.store.lock_connection()?.execute(
-            "INSERT INTO runtime_treaty_epoch_pins (authority_id, canonical_bytes) VALUES (?1, ?2)",
-            params![key, value],
-        )?;
+        {
+            let connection = fixture.store.lock_connection()?;
+            let insert = "INSERT INTO runtime_treaty_epoch_pins (authority_id, canonical_bytes) VALUES (?1, ?2)";
+            assert!(connection.execute(insert, params![key, value]).is_err());
+            connection.execute_batch("PRAGMA ignore_check_constraints = ON")?;
+            connection.execute(insert, params![key, value])?;
+            connection.execute_batch("PRAGMA ignore_check_constraints = OFF")?;
+        }
         assert_eq!(
             fixture
                 .store
@@ -426,5 +439,49 @@ fn independently_committed_revocation_precedes_prepared_authority_commit() -> Te
         |r| r.get(0),
     )?;
     assert_eq!(count, 0);
+    Ok(())
+}
+
+#[test]
+fn current_head_decoding_is_bounded_in_all_sqlite_encodings() -> TestResult {
+    let _clock = chio_test_support::clock::scope_unix_secs(1000);
+    for encoding in ["UTF-8", "UTF-16le", "UTF-16be"] {
+        let fixture = Fixture::with_encoding(encoding)?;
+        fixture.install()?;
+        let actual: String =
+            fixture
+                .store
+                .lock_connection()?
+                .query_row("PRAGMA encoding", [], |r| r.get(0))?;
+        assert_eq!(actual.to_lowercase(), encoding.to_lowercase());
+        fixture.store.commit_runtime_authority(&fixture.request)?;
+        let key = authority_id(&id("verifier")?, &id("treaty")?)?;
+        for value in [
+            rusqlite::types::Value::Text("a".repeat(65)),
+            rusqlite::types::Value::Text(format!("{}\0{}", "a".repeat(64), "b".repeat(100))),
+            rusqlite::types::Value::Blob(vec![b'a'; 64]),
+            rusqlite::types::Value::Text("f".repeat(64)),
+        ] {
+            {
+                let connection = fixture.store.lock_connection()?;
+                connection.execute_batch("PRAGMA ignore_check_constraints = ON")?;
+                connection.execute(
+                    "UPDATE runtime_treaty_epoch_heads SET record_digest = ?1 WHERE authority_id = ?2",
+                    params![value, key],
+                )?;
+                connection.execute_batch("PRAGMA ignore_check_constraints = OFF")?;
+            }
+            assert_eq!(
+                fixture
+                    .store
+                    .commit_runtime_authority(&fixture.request)
+                    .err()
+                    .ok_or("corrupted current head accepted")?
+                    .code(),
+                "treaty_epoch_invalid",
+                "{encoding}"
+            );
+        }
+    }
     Ok(())
 }
