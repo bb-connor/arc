@@ -2249,6 +2249,7 @@ fn normalize_runtime_swarm_static_baseline(
     }
     let package_path = out.join("proof-package.json");
     let report_path = out.join("verifier-report.json");
+    let mut last_error = String::new();
     for _ in 0..RUNTIME_SWARM_BASELINE_PASSES {
         let work = tempfile::tempdir()?;
         let scenario_path = work.path().join("scenario.json");
@@ -2282,9 +2283,10 @@ fn normalize_runtime_swarm_static_baseline(
         }
         fs::write(&package_path, crate::input::read(out_dir.join("proof-package.json"))?)?;
         fs::write(&report_path, crate::input::read(out_dir.join("verifier-report.json"))?)?;
+        last_error = error.to_string();
     }
     Err(CliError::cli_other_error(format!(
-        "proof fixture runtime baseline did not reach parity in {RUNTIME_SWARM_BASELINE_PASSES} runs"
+        "proof fixture runtime baseline did not reach parity in {RUNTIME_SWARM_BASELINE_PASSES} runs: {last_error}"
     )))
 }
 
