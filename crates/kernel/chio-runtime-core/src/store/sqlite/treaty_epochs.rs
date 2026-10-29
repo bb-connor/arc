@@ -137,6 +137,20 @@ impl SqliteRuntimeOrchestrationStore {
                 "epoch sequence does not advance current head",
             ));
         }
+        if let Some(previous) = previous.as_ref() {
+            if previous.body().participants != body.participants {
+                return Err(refusal(
+                    "treaty_epoch_binding_mismatch",
+                    "epoch participants differ from the authenticated predecessor",
+                ));
+            }
+            if previous.body().trust_bundle_sha256 != body.trust_bundle_sha256 {
+                return Err(refusal(
+                    "treaty_epoch_binding_mismatch",
+                    "epoch trust bundle differs from the authenticated predecessor",
+                ));
+            }
+        }
         check_count(&tx, "runtime_treaty_epoch_records", MAX_RECORDS, true)?;
         if head.is_none() {
             check_count(&tx, "runtime_treaty_epoch_heads", MAX_PINS, true)?;
