@@ -9,6 +9,7 @@ pub mod checkpoint;
 pub mod commitment;
 pub mod crypto_floor;
 pub mod decision;
+pub mod disclosure;
 pub mod economics;
 pub mod evidence;
 pub mod governance;
