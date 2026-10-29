@@ -115,6 +115,18 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
     (authority, handle)
 }
 
+/// Every layer of an error, outermost first: the opaque transport class hides
+/// the ureq, rustls or I/O error that caused it.
+fn source_chain(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut chain = format!("{error:?}");
+    let mut source = error.source();
+    while let Some(inner) = source {
+        chain.push_str(&format!(" <- {inner:?}"));
+        source = inner.source();
+    }
+    chain
+}
+
 fn tls_agent(authority: &str) -> BlockingContractAgent {
     let contract = HttpEgressContract::permissive_for_tests(authority);
     BlockingContractAgent::new(&contract, Duration::from_secs(2), Duration::from_secs(10))
@@ -132,7 +144,7 @@ fn an_agent_trusts_a_server_signed_by_its_configured_root() {
         .delete(&format!("https://{authority}/task"))
         .expect("allowed")
         .call()
-        .expect("response");
+        .unwrap_or_else(|error| panic!("response: {}", source_chain(&error)));
     assert_eq!(response.status(), 204);
     assert_eq!(response.header("x-egress"), Some("pinned"));
     assert!(server.join().expect("server"));
@@ -149,7 +161,8 @@ fn an_agent_refuses_a_server_its_roots_do_not_sign() {
         .expect_err("an unknown issuer is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 
@@ -164,7 +177,8 @@ fn an_agent_refuses_a_server_its_roots_do_not_sign() {
         .expect_err("a root that did not sign the server is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }
@@ -185,7 +199,7 @@ fn a_mutual_tls_server_admits_only_the_configured_identity() {
         .post(&format!("https://{authority}/"))
         .expect("allowed")
         .send_bytes(b"{}")
-        .expect("response");
+        .unwrap_or_else(|error| panic!("response: {}", source_chain(&error)));
     assert_eq!(response.status(), 204);
     assert!(server.join().expect("server"));
 
@@ -200,7 +214,8 @@ fn a_mutual_tls_server_admits_only_the_configured_identity() {
         .expect_err("no client identity is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }
@@ -240,7 +255,8 @@ fn an_agent_refuses_a_trusted_certificate_issued_for_another_name() {
         .expect_err("a certificate for another name is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }
