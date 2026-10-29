@@ -202,8 +202,8 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if root.expires_at <= now || root.expires_at <= request.root.issued_at {
         return Err(refuse(MintRequestRefusal::RootExpired));
     }
-    if request.replay_retain_until <= now {
-        return Err(refuse(MintRequestRefusal::ReplayRetentionPast));
+    if request.replay_retain_until < root.expires_at {
+        return Err(refuse(MintRequestRefusal::ReplayRetentionShort));
     }
     match (anchor.kind.is_provider_backed(), request.provider_identity) {
         (true, Some(identity)) => {

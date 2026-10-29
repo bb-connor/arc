@@ -229,6 +229,7 @@ fn expired_replay_binding_rebinds_to_a_second_root_and_keeps_the_first() -> Test
     assert_eq!(env.store.presentation("cap-2")?.minted_at, NOW + 120);
     let mut retry = Case::id_jag("cap-3")?;
     retry.expires_at = NOW + 400;
+    retry.replay_retain_until = NOW + 460;
     assert_eq!(env.refused(&retry, &Admit, NOW + 121)?, E::AssertionReplay);
     Ok(())
 }
