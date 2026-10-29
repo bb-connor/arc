@@ -894,6 +894,7 @@ impl HttpEgressContract {
             deny_ipv6_ula: true,
             max_redirect_chain: 0,
             max_response_bytes,
+            private_network_allowances: BTreeSet::new(),
         };
         contract.enforce_url(url, 0)?;
         Ok(contract)
