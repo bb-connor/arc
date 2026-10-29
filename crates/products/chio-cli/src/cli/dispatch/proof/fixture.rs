@@ -983,7 +983,7 @@ fn export_envelope_signed(
     else {
         return Ok(None);
     };
-    let signer_key: chio_core_types::PublicKey = serde_json::from_value(signer.clone())
+    let signer_key: chio_core_types::PublicKey = crate::input::project(signer.clone())
         .map_err(|error| format!("envelope signer key invalid: {error}"))?;
     let key = signers
         .iter()
@@ -1000,7 +1000,7 @@ fn export_envelope_signed(
 }
 
 fn swarm_artifact<T: serde::de::DeserializeOwned>(value: &serde_json::Value) -> Option<T> {
-    serde_json::from_value(value.clone()).ok()
+    crate::input::project(value.clone()).ok()
 }
 
 fn sign_with_any<T>(
@@ -2764,15 +2764,12 @@ fn normalize_runtime_swarm_static_baseline(
         let Err(error) = run else {
             return Ok(());
         };
-        let parity: serde_json::Value =
-            match crate::input::read_text(out_dir.join("runtime-proof-parity-report.json")) {
-                Ok(text) => serde_json::from_str(&text)?,
-                Err(_) => {
-                    return Err(CliError::cli_other_error(format!(
-                        "proof fixture runtime baseline loopback failed: {error}"
-                    )))
-                }
-            };
+        let parity = read_json_value(&out_dir.join("runtime-proof-parity-report.json"))
+            .map_err(|_| {
+                CliError::cli_other_error(format!(
+                    "proof fixture runtime baseline loopback failed: {error}"
+                ))
+            })?;
         let semantic_match = parity
             .get("mismatches")
             .and_then(serde_json::Value::as_array)

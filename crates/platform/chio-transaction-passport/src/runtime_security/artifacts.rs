@@ -1682,7 +1682,7 @@ fn signing_error(label: &str, error: impl std::fmt::Display) -> TransactionPassp
 }
 
 fn typed<T: serde::de::DeserializeOwned>(value: &serde_json::Value) -> Option<T> {
-    serde_json::from_value(value.clone()).ok()
+    crate::input::project(value.clone()).ok()
 }
 
 fn without_signature<T: Serialize>(
