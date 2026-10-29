@@ -1200,10 +1200,59 @@ fn governed_call_chain_provenance_refuses_a_missing_context_member() {
         wire.as_object_mut().unwrap().remove(member);
         let error = serde_json::from_value::<GovernedCallChainProvenance>(wire).unwrap_err();
         assert!(
-            error.to_string().contains("missing field"),
+            error
+                .to_string()
+                .contains(&format!("missing field `{member}`")),
             "{member}: {error}"
         );
     }
+}
+
+#[test]
+fn governed_call_chain_provenance_refuses_a_padded_asserted_context() {
+    let mut padded = pinned_call_chain_provenance_wire();
+    padded["assertedContext"]
+        .as_object_mut()
+        .unwrap()
+        .insert("pad".to_string(), serde_json::json!(1));
+
+    let error = serde_json::from_value::<GovernedCallChainProvenance>(padded).unwrap_err();
+    assert!(error.to_string().contains("unknown field `pad`"), "{error}");
+}
+
+#[test]
+fn governed_transaction_intent_refuses_a_padded_call_chain() {
+    let intent = GovernedTransactionIntent {
+        id: "intent-padded-chain-1".to_string(),
+        server_id: "srv-pay".to_string(),
+        tool_name: "charge".to_string(),
+        purpose: "pay supplier".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(GovernedCallChainContext {
+            chain_id: "chain-padded-1".to_string(),
+            parent_request_id: "req-parent-padded-1".to_string(),
+            parent_receipt_id: None,
+            origin_subject: "origin-padded".to_string(),
+            delegator_subject: "delegator-padded".to_string(),
+        }),
+        autonomy: None,
+        context: None,
+        body: GovernedTransactionIntentBody::ToolInvocation,
+    };
+    let wire = serde_json::to_value(&intent).unwrap();
+    let decoded: GovernedTransactionIntent = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(decoded, intent);
+
+    let mut padded = wire;
+    padded["call_chain"]
+        .as_object_mut()
+        .unwrap()
+        .insert("pad".to_string(), serde_json::json!(1));
+    let error = serde_json::from_value::<GovernedTransactionIntent>(padded).unwrap_err();
+    assert!(error.to_string().contains("unknown field `pad`"), "{error}");
 }
 
 #[test]
