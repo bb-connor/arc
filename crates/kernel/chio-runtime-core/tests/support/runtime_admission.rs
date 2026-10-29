@@ -945,3 +945,32 @@ pub(super) fn runtime_swarm_bundle(
 
     Ok(bundle)
 }
+
+#[test]
+fn treaty_fixture_epoch_is_signed_by_its_independent_operator_and_bound_to_scope(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = treaty_runtime_fixture_with_signers(
+        allow_policy_evaluation_summary(),
+        Keypair::generate(),
+        Keypair::generate(),
+    )?;
+    assert_eq!(fixture.epoch_key.public_key(), fixture.epoch_authority);
+    assert!(!fixture
+        .treaty_scope
+        .participant_public_keys
+        .contains(&fixture.epoch_authority));
+    let verified = runtime_api::treaty_epoch::verify_treaty_epoch_update(
+        fixture.epoch_update.envelope().clone(),
+        &fixture.epoch_authority,
+    )?;
+    assert_eq!(verified.body_digest(), fixture.epoch_update.body_digest());
+    assert_eq!(
+        verified.body_digest().as_str(),
+        fixture.treaty_scope.revocation_epoch_sha256
+    );
+    assert_eq!(
+        verified.body().treaty_id.as_str(),
+        fixture.treaty_scope.treaty_id
+    );
+    Ok(())
+}
