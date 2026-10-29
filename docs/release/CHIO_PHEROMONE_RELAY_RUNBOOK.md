@@ -8,8 +8,8 @@ Production relays use verifier-owned peer-directory state. The state stores a la
 
 Profiles:
 
-- `local-dev` permits loopback HTTP for fixture and operator rehearsal.
-- `production` requires HTTPS endpoints, no credentials, no query string, no fragment, bounded batch sizes, bounded catch-up sizes, and explicit peer-directory issuer trust.
+- `local-dev` admits plain HTTP and loopback addresses only for a peer whose endpoint names a loopback host (`localhost`, `127.0.0.0/8` or `::1`), for fixture and operator rehearsal. Every other peer is held to the production egress rules. Only `--profile local-dev` selects it; every relay command runs as `production` by default and nothing in a peer directory can change the profile.
+- `production` requires HTTPS endpoints, no credentials, no query string, no fragment, bounded batch sizes, bounded catch-up sizes, and explicit peer-directory issuer trust. Delivery dials only the peer's exact authority, refuses loopback, link-local, unique-local and private addresses after DNS resolution, and follows no redirects.
 
 Recommended deployment:
 

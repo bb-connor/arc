@@ -11,6 +11,8 @@ mod archive;
 mod delivery;
 #[path = "relay/directory.rs"]
 mod directory;
+#[path = "relay/egress.rs"]
+mod egress;
 #[path = "relay/observability.rs"]
 mod observability;
 #[path = "relay/service.rs"]

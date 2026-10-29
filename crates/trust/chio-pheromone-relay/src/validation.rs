@@ -2,7 +2,7 @@ use crate::{PeerDirectoryDocument, PheromoneRelayError, RelayProfile, RelayProfi
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::crypto::sha256_hex;
 use serde::Serialize;
-use url::Url;
+use url::{Host, Url};
 
 pub(crate) fn validate_endpoint(endpoint: &str) -> Result<(), PheromoneRelayError> {
     let url = Url::parse(endpoint)
@@ -88,7 +88,14 @@ pub(crate) fn validate_peer_directory_profile(
 }
 
 pub(crate) fn is_loopback_host(url: &Url) -> bool {
-    matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "::1"))
+    match url.host() {
+        Some(Host::Domain(domain)) => domain
+            .trim_end_matches('.')
+            .eq_ignore_ascii_case("localhost"),
+        Some(Host::Ipv4(address)) => address.is_loopback(),
+        Some(Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    }
 }
 
 pub(crate) fn canonical_sha256<T: Serialize>(value: &T) -> Result<String, PheromoneRelayError> {
