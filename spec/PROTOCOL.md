@@ -4381,6 +4381,10 @@ envelope and the scope itself. An operator provisions an immutable signer pin
 for each verifier and treaty; peer input cannot choose or replace that pin.
 Signed updates append history and advance the current head with an exact
 predecessor and sequence compare-and-swap.
+Participants and `trustBundleSha256` are fixed for a treaty id. An update
+whose participants or trust bundle digest differ from its authenticated
+predecessor is refused with `treaty_epoch_binding_mismatch`; rotating either
+requires a new treaty id.
 
 Fresh admission compares the authenticated active epoch, retains authorization
 for the exact operation claim, plan, request binding and phase, and applies any
