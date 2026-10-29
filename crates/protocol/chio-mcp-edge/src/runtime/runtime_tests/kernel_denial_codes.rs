@@ -33,6 +33,10 @@ fn kernel_error_families() -> Vec<(KernelError, &'static str, &'static str)> {
         "session_unsupported",
         "Request is not supported in this session",
     );
+    let operation_conflict = (
+        "operation_conflict",
+        "Request id is bound to a different retained operation",
+    );
     let detail = || PRIVATE_DETAIL.to_string();
     [
         (KernelError::CapabilityExpired, capability_invalid),
@@ -88,6 +92,12 @@ fn kernel_error_families() -> Vec<(KernelError, &'static str, &'static str)> {
             runtime_admission_denied,
         ),
         (KernelError::ExecutionNonceCapacity, overloaded),
+        (
+            KernelError::OperationConflict {
+                operation_id: detail(),
+            },
+            operation_conflict,
+        ),
         (KernelError::Internal(detail()), kernel_unavailable),
         (KernelError::DurableAdmission(detail()), kernel_unavailable),
         (

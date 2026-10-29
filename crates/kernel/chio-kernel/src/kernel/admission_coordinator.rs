@@ -941,10 +941,9 @@ impl ChioKernel {
                 AdmissionBeginResult::Conflict {
                     existing_operation_id,
                 } => {
-                    return Err(KernelError::DurableAdmission(format!(
-                        "request id conflicts with retained operation {}",
-                        existing_operation_id.as_str()
-                    )));
+                    return Err(KernelError::OperationConflict {
+                        operation_id: existing_operation_id.as_str().to_owned(),
+                    });
                 }
             };
             // A replay continues under the request retained at admission,

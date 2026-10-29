@@ -98,7 +98,7 @@ async fn a_retry_from_another_session_is_refused_by_the_retained_operation() -> 
     shutdown(&fixture).await?;
 
     assert_eq!(retry["id"], json!(63));
-    assert_eq!(denial_code(&retry)?, "kernel_unavailable");
+    assert_eq!(denial_code(&retry)?, "operation_conflict");
     assert_eq!(calls, 1, "the stable-id retry redispatched the tool");
     Ok(())
 }

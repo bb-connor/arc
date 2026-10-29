@@ -150,13 +150,10 @@ fn broker_prepares_a_unique_original_and_refuses_unknown_or_reused_requests() ->
     // The tenant namespace and request ID form a unique replay key, so the
     // same tenant cannot retain a second operation under this request ID.
     let reused = broker.reissued(REQUEST_ID, "4".repeat(32))?;
-    let expected = format!(
-        "request id conflicts with retained operation {}",
-        dispatch.operation_id
-    );
+    let expected = dispatch.operation_id.to_string();
     let conflict = broker.admit(&reused)?;
     assert!(
-        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        matches!(&conflict, Err(KernelError::OperationConflict { operation_id }) if operation_id == &expected),
         "{conflict:?}"
     );
     assert_eq!(

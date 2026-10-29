@@ -376,9 +376,9 @@ fn registered_composite_execution(
         let [operation] = operations.as_slice() else {
             return Err(format!("expected one registration, found {}", operations.len()).into());
         };
-        let expected = format!("request id conflicts with retained operation {operation}");
+        let expected = operation.to_string();
         assert!(
-            matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+            matches!(&conflict, Err(KernelError::OperationConflict { operation_id }) if operation_id == &expected),
             "{conflict:?}"
         );
         assert!(authority

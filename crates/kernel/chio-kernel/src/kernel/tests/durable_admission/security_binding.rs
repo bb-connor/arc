@@ -102,8 +102,7 @@ fn evaluate(
 fn assert_conflict(result: Result<ToolCallResponse, KernelError>) {
     let error = result.expect_err("conflicting identity cannot mint another receipt");
     assert!(
-        matches!(error, KernelError::DurableAdmission(ref reason)
-        if reason.contains("conflicts with retained operation")),
+        matches!(error, KernelError::OperationConflict { .. }),
         "{error:?}"
     );
 }
@@ -135,12 +134,7 @@ fn replay_matrix(nested: bool) -> TestResult {
         changed["context"][field] = value;
         let changed = serde_json::from_value(changed)?;
         match evaluate(&kernel, &request, Some(&changed), parent) {
-            Err(KernelError::DurableAdmission(reason)) => {
-                assert!(
-                    reason.contains("conflicts with retained operation"),
-                    "{field}: {reason}"
-                );
-            }
+            Err(KernelError::OperationConflict { .. }) => {}
             Ok(response) => panic!("{field}: conflicting identity minted a receipt: {response:?}"),
             Err(KernelError::GuardDenied(_)) => {
                 assert!(

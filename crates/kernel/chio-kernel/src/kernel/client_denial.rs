@@ -22,11 +22,12 @@ pub enum ClientDenialCode {
     Overloaded,
     KernelUnavailable,
     SessionUnsupported,
+    OperationConflict,
     Denied,
 }
 
 /// Every client denial code, in wire order.
-pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 16] = [
+pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 17] = [
     ClientDenialCode::EmergencyStop,
     ClientDenialCode::CapabilityInvalid,
     ClientDenialCode::CapabilityRevoked,
@@ -42,6 +43,7 @@ pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 16] = [
     ClientDenialCode::Overloaded,
     ClientDenialCode::KernelUnavailable,
     ClientDenialCode::SessionUnsupported,
+    ClientDenialCode::OperationConflict,
     ClientDenialCode::Denied,
 ];
 
@@ -81,6 +83,10 @@ impl ClientDenialCode {
             Self::SessionUnsupported => (
                 "session_unsupported",
                 "Request is not supported in this session",
+            ),
+            Self::OperationConflict => (
+                "operation_conflict",
+                "Request id is bound to a different retained operation",
             ),
             Self::Denied => ("denied", "Request denied"),
         }
@@ -182,6 +188,7 @@ impl KernelError {
             | Self::ExecutionNonce(_)
             | Self::ReplayClockAnomaly { .. } => Code::ReplayDenied,
             Self::RuntimeAdmissionReadinessTimeout { .. } => Code::RuntimeAdmissionDenied,
+            Self::OperationConflict { .. } => Code::OperationConflict,
             Self::Overloaded { .. }
             | Self::ExecutionNonceCapacity
             | Self::HotPathDeadlineExceeded { .. }
@@ -262,6 +269,10 @@ mod tests {
             (
                 "session_unsupported",
                 "Request is not supported in this session",
+            ),
+            (
+                "operation_conflict",
+                "Request id is bound to a different retained operation",
             ),
             ("denied", "Request denied"),
         ];
