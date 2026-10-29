@@ -24,3 +24,8 @@ pub(crate) use validation::{
     certification_marketplace_search_path, certification_marketplace_transparency_path,
     path_with_encoded_param, should_retry_status,
 };
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+#[path = "client/egress_tests.rs"]
+mod egress_tests;
