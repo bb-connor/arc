@@ -1,9 +1,5 @@
 # Files that may carry an HTTP egress classification marker.
 # kind<TAB>path<TAB>reason. A marker in any other file fails check-http-egress-contract.sh.
-reqwest	crates/economy/chio-anchor/src/witness/ots.rs	OpenTimestamps calendar witness client
-reqwest	crates/economy/chio-anchor/src/witness/rekor.rs	Sigstore Rekor witness client
-reqwest	crates/economy/chio-settle/src/finding_enforcement/observation_source.rs	stored contract enforced on every pinned DNS answer and request
-reqwest	crates/economy/chio-settle/src/finding_enforcement/publish.rs	stored contract enforced on every pinned DNS answer and request
 reqwest	crates/platform/chio-control-plane/src/economic_state_anchor.rs	blocking anchor client, redirects and proxies denied, each request contract-preflighted
 reqwest	crates/platform/chio-control-plane/src/fiscal_state_anchor.rs	blocking anchor client, redirects and proxies denied, each request contract-preflighted
 reqwest	crates/platform/chio-control-plane/src/trust_control/frost.rs	blocking anchor client, redirects and proxies denied, each request contract-preflighted
@@ -23,5 +19,4 @@ ureq	crates/products/chio-cli/src/cli/dispatch/finding.rs	operator CLI request t
 ureq	crates/products/chio-cli/src/cli/dispatch/finding/challenge.rs	operator CLI request to the --control-url venue
 ureq	crates/products/chio-cli/src/cli/dispatch/finding/operator.rs	operator CLI request to the --control-url venue
 ureq	crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs	operator CLI request to the --control-url venue
-ureq	crates/products/chio-cli/src/passport/http.rs	operator CLI fetch of a document URL the operator named
 ureq	crates/trust/chio-signing-remote/src/lib.rs	remote signer at the operator-configured endpoint, redirects off
