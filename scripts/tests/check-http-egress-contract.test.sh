@@ -366,4 +366,334 @@ if [[ $positive_classified_status -ne 0 ]]; then
     exit 1
 fi
 
-echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms)."
+
+# Non-reqwest HTTP clients. Each case is a tiny crate tree; the expected
+# outcome is "reject" or "accept".
+http_client_case() {
+    local name="$1" path="$2"
+    mkdir -p "$work/$name/$(dirname "$path")"
+    cat > "$work/$name/$path"
+}
+
+http_client_case ureq_builder crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::AgentBuilder::new().redirects(0).build()
+}
+EOF
+http_client_case ureq_top_level crates/chio-fake/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    let _ = ureq::get(url).call();
+}
+EOF
+http_client_case ureq_imported_builder crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{Agent, AgentBuilder};
+
+pub fn agent() -> Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_imported_fn crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::post;
+
+pub fn publish(url: &str) {
+    let _ = post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_aliased crates/chio-fake/src/lib.rs <<'EOF'
+use ureq as http;
+
+pub fn publish(url: &str) {
+    let _ = http::post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_v3_agent crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::Agent::new_with_defaults()
+}
+EOF
+http_client_case ureq_kernel_classified crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: kernel crates take no classification.
+    ureq::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_kernel_type_only crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+pub struct Rail {
+    pub http: ureq::Agent,
+}
+EOF
+http_client_case hyper_client crates/chio-fake/src/lib.rs <<'EOF'
+use hyper_util::client::legacy::Client;
+use hyper_util::rt::TokioExecutor;
+
+pub fn client() {
+    let _ = Client::builder(TokioExecutor::new());
+}
+EOF
+http_client_case unscanned_client_crate crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+attohttpc = "0.28"
+EOF
+http_client_case ureq_classified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the
+    // endpoint the operator named.
+    ureq::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_contract_owner crates/protocol/chio-egress-contract/src/ureq_helper.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ureq::AgentBuilder::new().redirects(0).build()
+}
+EOF
+http_client_case ureq_test_source crates/chio-fake/tests/http.rs <<'EOF'
+#[test]
+fn fetch() {
+    let _ = ureq::get("http://127.0.0.1:1").call();
+}
+EOF
+http_client_case ureq_mention crates/kernel/chio-fake-kernel/src/lib.rs <<'EOF'
+//! The price oracle once used a `ureq` client.
+pub fn noop() {}
+EOF
+
+http_client_case ureq_agent_rename crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_multiline_group crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{
+    AgentBuilder,
+};
+
+pub fn agent() -> ureq::Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case hyper_module_alias crates/chio-fake/src/lib.rs <<'EOF'
+use hyper_util::client as http;
+use hyper_util::rt::TokioExecutor;
+
+pub fn client() {
+    let _ = http::legacy::Client::builder(TokioExecutor::new());
+}
+EOF
+http_client_case ureq_cargo_rename crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+http_client = { package = "ureq", version = "2" }
+EOF
+http_client_case ureq_cargo_rename crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> http_client::Agent {
+    http_client::AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_workspace_rename Cargo.toml <<'EOF'
+[workspace.dependencies]
+fetch = { package = "ureq", version = "2" }
+EOF
+http_client_case ureq_workspace_rename crates/chio-fake/src/lib.rs <<'EOF'
+pub fn publish(url: &str) {
+    let _ = fetch::post(url).send_string("{}");
+}
+EOF
+http_client_case unscanned_renamed_crate crates/chio-fake/Cargo.toml <<'EOF'
+[package]
+name = "chio-fake"
+
+[dependencies]
+fetcher = { package = "isahc", version = "1" }
+EOF
+http_client_case ureq_glob crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::*;
+
+pub fn agent() -> Agent {
+    AgentBuilder::new().build()
+}
+EOF
+http_client_case ureq_self_rename crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::{self as h};
+
+pub fn fetch(url: &str) {
+    let _ = h::get(url).call();
+}
+EOF
+http_client_case ureq_extern_crate crates/chio-fake/src/lib.rs <<'EOF'
+extern crate ureq as h;
+
+pub fn publish(url: &str) {
+    let _ = h::post(url).send_string("{}");
+}
+EOF
+http_client_case ureq_rename_classified crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the
+    // endpoint the operator named.
+    Http::new()
+}
+EOF
+http_client_case ureq_type_only crates/chio-fake/src/lib.rs <<'EOF'
+pub struct Rail {
+    pub http: ureq::Agent,
+}
+EOF
+
+http_client_case ureq_alias_declared_after_use crates/chio-fake/src/lib.rs <<'EOF'
+use h::Agent as Http;
+use ureq as h;
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_constructor_split_across_lines crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    Http::
+        new()
+}
+EOF
+http_client_case ureq_absolute_path crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    ::ureq::Agent::new()
+}
+EOF
+http_client_case ureq_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = ureq::AgentBuilder;
+
+pub fn agent() -> ureq::Agent {
+    Http::new().build()
+}
+EOF
+http_client_case ureq_function_reference crates/chio-fake/src/lib.rs <<'EOF'
+pub fn fetch(urls: &[&str]) {
+    let _ = urls.iter().map(|url| url.to_string()).map(|url| (ureq::get)(&url));
+}
+EOF
+
+http_client_case ureq_crate_qualified_alias crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    crate::Http::new()
+}
+EOF
+http_client_case ureq_qualified_type_path crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    <ureq::Agent>::new()
+}
+EOF
+http_client_case ureq_qualified_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = ureq::Agent;
+
+pub fn agent() -> Http {
+    <Http>::new()
+}
+EOF
+http_client_case ureq_trait_qualified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn builder() -> ureq::AgentBuilder {
+    <ureq::AgentBuilder as Default>::default()
+}
+EOF
+http_client_case ureq_self_qualified_alias crates/chio-fake/src/lib.rs <<'EOF'
+mod transport {
+    pub use ureq::Agent as Http;
+}
+
+pub fn agent() -> ureq::Agent {
+    self::transport::Http::new()
+}
+EOF
+
+http_client_case ureq_trait_generic_qualified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent(config: ureq::Config) -> ureq::Agent {
+    <ureq::Agent as From<ureq::Config>>::from(config)
+}
+EOF
+http_client_case ureq_alias_trait_generic_qualified crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+use ureq::Config as Cfg;
+
+pub fn agent(config: Cfg) -> Http {
+    <Http as From<Cfg>>::from(config)
+}
+EOF
+http_client_case ureq_agent_in_turbofish crates/chio-fake/src/lib.rs <<'EOF'
+use std::sync::Arc;
+
+pub fn share(agent: ureq::Agent) -> Arc<ureq::Agent> {
+    Arc::<ureq::Agent>::new(agent)
+}
+EOF
+
+http_client_case ureq_parenthesized_qualified crates/chio-fake/src/lib.rs <<'EOF'
+pub fn agent() -> ureq::Agent {
+    <(ureq::Agent)>::new()
+}
+EOF
+http_client_case ureq_parenthesized_alias_qualified crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as Http;
+
+pub fn agent() -> Http {
+    <((Http))>::new()
+}
+EOF
+
+http_client_case ureq_parenthesized_type_alias crates/chio-fake/src/lib.rs <<'EOF'
+type Http = (ureq::Agent);
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+http_client_case ureq_parenthesized_alias_chain crates/chio-fake/src/lib.rs <<'EOF'
+use ureq::Agent as A;
+type Http = (A);
+
+pub fn agent() -> Http {
+    Http::new()
+}
+EOF
+
+for expectation in \
+    reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
+    reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
+    reject:ureq_kernel_classified reject:ureq_kernel_type_only reject:hyper_client \
+    reject:unscanned_client_crate accept:ureq_classified accept:ureq_contract_owner \
+    accept:ureq_test_source accept:ureq_mention reject:ureq_agent_rename \
+    reject:ureq_multiline_group reject:hyper_module_alias reject:ureq_cargo_rename \
+    reject:ureq_workspace_rename reject:unscanned_renamed_crate reject:ureq_glob \
+    reject:ureq_self_rename reject:ureq_extern_crate accept:ureq_rename_classified \
+    accept:ureq_type_only reject:ureq_alias_declared_after_use \
+    reject:ureq_constructor_split_across_lines reject:ureq_absolute_path \
+    reject:ureq_type_alias reject:ureq_function_reference \
+    reject:ureq_crate_qualified_alias reject:ureq_qualified_type_path \
+    reject:ureq_qualified_type_alias reject:ureq_trait_qualified \
+    reject:ureq_self_qualified_alias reject:ureq_trait_generic_qualified \
+    reject:ureq_alias_trait_generic_qualified accept:ureq_agent_in_turbofish \
+    reject:ureq_parenthesized_qualified reject:ureq_parenthesized_alias_qualified \
+    reject:ureq_parenthesized_type_alias reject:ureq_parenthesized_alias_chain; do
+    expected="${expectation%%:*}"
+    name="${expectation#*:}"
+    case_status=0
+    CHIO_EGRESS_LINT_ROOT="$work/$name" bash "$LINT" > "$work/$name.log" 2>&1 || case_status=$?
+    if [[ "$expected" == reject && $case_status -eq 0 ]] || \
+       [[ "$expected" == accept && $case_status -ne 0 ]]; then
+        cat "$work/$name.log" >&2
+        echo "FAIL: lint should $expected the $name case" >&2
+        exit 1
+    fi
+done
+
+echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients under renamed imports, aliases, globs and renamed dependencies, any ureq in kernel crates, and unscanned HTTP client crates."

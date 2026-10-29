@@ -77,12 +77,25 @@ fn combined_owned_nonce_preflight_releases_three_resources_before_fresh_dispatch
     let (operation, after) = fixture.history(&history[0].reference)?;
     assert!(operation.dispatch_commit().is_some());
     assert_eq!(after.len(), 2);
-    assert_eq!(after[0], history[0]);
-    assert_eq!(after[1].intent.resources(), history[0].intent.resources());
-    assert_eq!(after[1].intent.phase(), RuntimeParticipantPhase::Dispatch);
-    assert_ne!(after[1].reference, history[0].reference);
+    let preflight_claim = after
+        .iter()
+        .find(|entry| entry.reference == history[0].reference)
+        .ok_or("original combined preflight claim")?;
+    let dispatch_claim = after
+        .iter()
+        .find(|entry| entry.reference != history[0].reference)
+        .ok_or("fresh combined dispatch claim")?;
+    assert_eq!(preflight_claim, &history[0]);
     assert_eq!(
-        after[1].disposition,
+        dispatch_claim.intent.resources(),
+        history[0].intent.resources()
+    );
+    assert_eq!(
+        dispatch_claim.intent.phase(),
+        RuntimeParticipantPhase::Dispatch
+    );
+    assert_eq!(
+        dispatch_claim.disposition,
         RuntimeParticipantDisposition::RetainedAfterDispatchCommit
     );
     let replay = kernel

@@ -1344,21 +1344,14 @@ mod entry_tests;
     reason = "Test and proof fixtures deliberately fail on violated setup invariants."
 )]
 mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-    }
+    use chio_test_support::temp_sqlite_path;
 
     #[test]
     fn sqlite_revocation_store_persists_across_reopen() {
-        let path = unique_db_path("chio-revocations");
+        let (_path_dir, path) = temp_sqlite_path("chio-revocations");
         {
             let store = SqliteRevocationStore::open(&path).unwrap();
             assert!(!store.is_revoked("cap-1").unwrap());
@@ -1376,8 +1369,8 @@ mod tests {
     #[test]
     fn revocation_stream_identity_is_durable_and_store_unique(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let first_path = unique_db_path("chio-rev-stream-first");
-        let second_path = unique_db_path("chio-rev-stream-second");
+        let (_first_path_dir, first_path) = temp_sqlite_path("chio-rev-stream-first");
+        let (_second_path_dir, second_path) = temp_sqlite_path("chio-rev-stream-second");
         let first_id = SqliteRevocationStore::open(&first_path)?.revocation_stream_id()?;
         let reopened_id = SqliteRevocationStore::open(&first_path)?.revocation_stream_id()?;
         let second_id = SqliteRevocationStore::open(&second_path)?.revocation_stream_id()?;
@@ -1397,8 +1390,9 @@ mod tests {
     #[test]
     fn replication_source_epoch_rotates_after_restored_sequence_reuse(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-stream-restore");
-        let restored_snapshot = unique_db_path("chio-rev-stream-snapshot");
+        let (_path_dir, path) = temp_sqlite_path("chio-rev-stream-restore");
+        let (_restored_snapshot_dir, restored_snapshot) =
+            temp_sqlite_path("chio-rev-stream-snapshot");
         let store = SqliteRevocationStore::open(&path)?;
         store.upsert_revocation(&RevocationRecord {
             capability_id: "cap-first".to_string(),
@@ -1443,7 +1437,7 @@ mod tests {
     #[test]
     fn revocation_sequence_does_not_skip_same_second_backfill(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-sequence");
+        let (_path_dir, path) = temp_sqlite_path("chio-rev-sequence");
         let store = SqliteRevocationStore::open(&path)?;
         store.upsert_revocation(&RevocationRecord {
             capability_id: "cap-revoke-leader".to_string(),
@@ -1480,7 +1474,7 @@ mod tests {
 
     #[test]
     fn revocation_schema_other_than_current_is_refused() -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-stale-schema");
+        let (_path_dir, path) = temp_sqlite_path("chio-rev-stale-schema");
         drop(SqliteRevocationStore::open(&path)?);
         let connection = Connection::open(&path)?;
         crate::test_schema::write_version(&connection, REVOCATION_STORE_SCHEMA_KEY, 4)?;
@@ -1500,7 +1494,7 @@ mod tests {
     #[test]
     fn unstamped_provisioned_revocation_database_is_refused(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = unique_db_path("chio-rev-unstamped");
+        let (_path_dir, path) = temp_sqlite_path("chio-rev-unstamped");
         drop(SqliteRevocationStore::open(&path)?);
         let connection = Connection::open(&path)?;
         connection.execute(
@@ -1522,7 +1516,7 @@ mod tests {
 
     #[test]
     fn file_backed_revocation_store_reports_durable() {
-        let path = unique_db_path("chio-rev-durable");
+        let (_path_dir, path) = temp_sqlite_path("chio-rev-durable");
         let store = SqliteRevocationStore::open(&path).unwrap();
         assert!(
             !store.is_ephemeral(),
@@ -1544,11 +1538,7 @@ mod tests {
 
     #[test]
     fn open_creates_parent_dirs_for_a_file_uri_with_query() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        let base = std::env::temp_dir().join(format!("chio-rev-uri-{nonce}"));
+        let (_base_dir, base) = chio_test_support::temp_sqlite_path("chio-rev-uri");
         let db = base.join("nested").join("receipts.db.revocations");
         let parent = db.parent().expect("db path has a parent");
         assert!(
@@ -1570,13 +1560,11 @@ mod tests {
             parent.exists(),
             "the real parent directory must be created before SQLite opens the URI"
         );
-
-        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]
     fn sqlite_revocation_store_lists_filtered_entries() {
-        let path = unique_db_path("chio-revocations-filtered");
+        let (_path_dir, path) = temp_sqlite_path("chio-revocations-filtered");
         let store = SqliteRevocationStore::open(&path).unwrap();
         assert!(store.revoke("cap-1").unwrap());
         assert!(store.revoke("cap-2").unwrap());

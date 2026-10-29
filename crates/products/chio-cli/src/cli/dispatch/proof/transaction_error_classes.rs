@@ -235,6 +235,65 @@ fn expected_commerce(error: &chio_commerce_order::CommerceOrderError) -> i32 {
         | E::ProviderTrustFailed(_)
         | E::SettlementFailed(_)
         | E::CoverageFailed(_) => REQUIRED,
+        E::Escrow(escrow) => expected_commerce_escrow(escrow),
+    }
+}
+
+fn expected_commerce_escrow(error: &chio_commerce_order::CommerceEscrowError) -> i32 {
+    use chio_commerce_order::CommerceEscrowError as E;
+    match error {
+        E::LedgerSchemaUnsupported(_)
+        | E::ReservationSchemaUnsupported(_)
+        | E::AcceptanceSchemaUnsupported(_)
+        | E::Canonicalization(_) => SCHEMA,
+        E::AcceptanceDigestMismatch
+        | E::OfferSignatureInvalid
+        | E::AcceptanceSignatureInvalid
+        | E::ReservationSignatureInvalid
+        | E::SettlementSignatureInvalid
+        | E::ExecutionSignatureInvalid => INTEGRITY,
+        E::AcceptStateNotAllowed(_)
+        | E::OfferOutsideValidityWindow
+        | E::OfferSelfIssued
+        | E::OfferIssuerNotMerchant
+        | E::AcceptorNotSubject
+        | E::AcceptanceUnbound(_)
+        | E::OfferLiabilityInvalid(_)
+        | E::LiabilityCurrencyMismatch
+        | E::LiabilityQuoteMismatch
+        | E::NoTrustedReservationAuthority
+        | E::ReservationSignerUntrusted
+        | E::ReservationIdEmpty
+        | E::ReservationUnbound(_)
+        | E::ReservationCurrencyMismatch
+        | E::ReservationUnderCollateralized
+        | E::DispatchFieldEmpty(_)
+        | E::DispatchStatusNotDispatched(_)
+        | E::DispatchIssuedAtInvalid
+        | E::SettlementSigningFailed(_)
+        | E::LedgerZeroAmount
+        | E::LedgerCustodyAccount(_)
+        | E::LedgerAccountsNotDistinct
+        | E::LedgerLegsNotCanonical
+        | E::LedgerNotLocked
+        | E::LedgerOrderBinding(_)
+        | E::LedgerMissing
+        | E::LedgerUnpinned
+        | E::LedgerPinnedBeforeAccept(_)
+        | E::LedgerStatusMismatch { .. }
+        | E::AcceptedContextUnbound
+        | E::NoTrustedSettlementAuthority
+        | E::SettlementSignerUntrusted
+        | E::SettlementPacketUnbound(_)
+        | E::ReleaseContextMismatch(_)
+        | E::ReleaseStateNotAllowed(_)
+        | E::NoTrustedExecutionAuthority
+        | E::ExecutionSignerUntrusted
+        | E::ExecutionInvalid(_)
+        | E::ExecutionActionNotRelease
+        | E::ExecutionNotMatched
+        | E::ExecutionUnbound(_)
+        | E::ExecutionAfterRelease(_) => REQUIRED,
     }
 }
 
@@ -272,6 +331,22 @@ fn every_commerce_variant_has_its_exit_class() {
         E::SettlementDigestMismatch(text()),
         E::SettlementSignatureInvalid(text()),
         E::CoverageFailed(text()),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerSchemaUnsupported(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::Canonicalization(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSchemaUnsupported(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSignatureInvalid),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::OfferIssuerNotMerchant),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceUnbound("buyer_subject")),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceDigestMismatch),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::SettlementSignatureInvalid),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerMissing),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerUnpinned),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerCustodyAccount(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerOrderBinding("order_id")),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerStatusMismatch {
+            state: text(),
+            required: chio_commerce_order::CommerceEscrowStatus::Locked,
+        }),
     ];
     assert_classes(samples, expected_commerce, map_commerce_proof_error);
 }

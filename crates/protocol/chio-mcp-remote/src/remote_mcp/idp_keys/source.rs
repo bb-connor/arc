@@ -169,6 +169,8 @@ pub enum IdpKeySourceError {
     NotAJwksRecord,
     #[error(transparent)]
     Document(#[from] JwksDocumentError),
+    #[error("provider id cannot name a registry key snapshot source: {0}")]
+    UnrepresentableProviderId(RootAuthorityShapeError),
 }
 
 enum Origin {
@@ -242,7 +244,8 @@ impl PinnedIdpKeys {
                 },
             ),
             (ProviderRecordKind::OidcJwks, None, Some(inline)) => (
-                KeySnapshotSource::Registry(identity.provider_id.as_str().to_owned()),
+                KeySnapshotSource::parse(&format!("registry:{}", identity.provider_id))
+                    .map_err(IdpKeySourceError::UnrepresentableProviderId)?,
                 Origin::Inline(admit_keys(inline.keys.clone())?),
             ),
             _ => return Err(IdpKeySourceError::NotAJwksRecord),

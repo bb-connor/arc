@@ -8,10 +8,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::receipt::lineage::ChildRequestReceipt;
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
 use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
 
 use super::db::{
@@ -22,7 +23,7 @@ use super::project::{
     child_source_matches, SignedToolProjection, CHILD_SOURCE_PROJECTION_SQL,
     TOOL_SOURCE_PROJECTION_SQL,
 };
-use crate::capability_lineage::snapshot_from_row;
+use crate::capability_lineage::{snapshot_from_row, LineageReaderRefusal};
 use crate::receipt_store::support::{
     checkpoint_error_to_receipt_store, latest_watermark_archive_path,
     parse_persisted_checkpoint_row, retention_watermark, validate_checkpoint_base,
@@ -953,7 +954,7 @@ pub(super) fn authenticate_checkpoints(
         let checkpoint = parse_persisted_checkpoint_row(row.clone()).map_err(integrity)?;
         match next_previous.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+                chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(
                     predecessor,
                     &checkpoint,
                 )
@@ -962,7 +963,7 @@ pub(super) fn authenticate_checkpoints(
             None => validate_checkpoint_base(&checkpoint).map_err(integrity)?,
         }
         next_chain.append(
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body)
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
                 .map_err(|error| integrity(checkpoint_error_to_receipt_store(error)))?,
         );
         if let Some(chain_root) = checkpoint.body.chain_root {
@@ -1280,7 +1281,7 @@ pub(super) struct LineageRow {
     pub(super) capability_id: String,
     /// The subject the canonical local reader accepts from this row, or why
     /// it refuses the row.
-    pub(super) subject: Result<String, String>,
+    pub(super) subject: Result<String, LineageReaderRefusal>,
 }
 
 /// Read capability lineage rows above `after` for subject refresh through
@@ -1347,9 +1348,10 @@ pub(super) fn copy_lineage(
             Ok(LineageRow {
                 rowid: row.get(11)?,
                 capability_id: row.get(0)?,
-                subject: snapshot_from_row(row)
-                    .map(|snapshot| snapshot.subject_key)
-                    .map_err(|error| error.to_string()),
+                subject: match snapshot_from_row(row) {
+                    Ok(snapshot) => Ok(snapshot.subject_key),
+                    Err(error) => Err(LineageReaderRefusal::from_sql(error)?),
+                },
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)

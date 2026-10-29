@@ -1,4 +1,3 @@
-// Signed, enforced runtime inputs and an independently sealed replay source.
 use super::*;
 use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1;
@@ -45,23 +44,15 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
     let store = fixture.authority.admission_operation_store();
     let fence = fixture.authority.mutation_fence();
     let authority = AdmissionIdentifier::try_new("authority", "native-combined-runtime")?;
-    let expected = store.expect_runtime_replay_source(
+    let installed = store.install_runtime_source(
         &AdmissionIdentifier::try_new("source", "native-combined-runtime-source")?,
         &authority,
         &source,
         &fence,
         now_ms()?,
     )?;
-    store.import_runtime_replay_source(
-        &authority,
-        expected.expectation_id(),
-        &source,
-        &fence,
-        now_ms()?,
-    )?;
     let binding =
-        RuntimeParticipantAuthorityBindingV1::new(authority, expected.expectation_id().clone());
-    store.activate_runtime_replay_source(&binding, &source, &fence, now_ms()?)?;
+        RuntimeParticipantAuthorityBindingV1::new(authority, installed.qualification_id().clone());
     let verifier = Keypair::generate();
     let verifier_id = "native-runtime-verifier";
     let key_id = "native-runtime-key";
@@ -105,7 +96,7 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
         schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(), profile_id: "native-runtime-profile".into(),
         local_kernel_id: local_kernel.into(), verifier_id: verifier_id.into(),
         issued_at_unix_ms: now, expires_at_unix_ms: expires,
-    }, source)
+    }, source, binding)
         .with_runtime_trust_input(SignedExportEnvelope::sign(RuntimeVerifierTrustBundle {
             schema: CHIO_RUNTIME_VERIFIER_TRUST_BUNDLE_SCHEMA.into(), verifier_id: verifier_id.into(),
             key_id: key_id.into(), version: 1, previous_hash_sha256: None,
@@ -122,7 +113,7 @@ pub(super) fn install(fixture: &mut Fixture) -> TestResult {
                 "totalStrength": 0.1, "distinctOriginPairs": 1, "reputationEpoch": 1, "evaluatedAtUnixMs": now },
         })), &verifier)?)
         .with_runtime_pheromone_policy(SignedExportEnvelope::sign(policy, &verifier)?, SignedExportEnvelope::sign(weights, &verifier)?)
-        .with_operation_owned_runtime_replay(binding);
+        ;
     fixture.kernel.set_runtime_admission_hook(Arc::new(hook));
     Ok(())
 }

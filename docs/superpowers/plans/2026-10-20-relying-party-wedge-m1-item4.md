@@ -774,6 +774,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 
 - **L1 (was O4), lead decision 2026-10-20.** `POST /admin/roots` with its own signed request schema, `chio.operator-root-request.v1` (Decision 6). `/admin/authority` is not extended: an operator root request and an authority rotation are different trust objects.
 - **L2 (was O5), lead decision 2026-10-20.** PR E is one PR, so `main` never has two issuance paths. If it grows past reviewable size, it splits by caller group inside a stacked series whose members merge together in one MERGING window. A separately landed half is not allowed.
+- **R2 (was O7), owner decision 2026-10-27.** M1 tenant export excludes child receipts (PR A2 tags tool receipts only). Each parent receipt MUST carry deterministic commitment hashes binding its child receipts (Task A, child receipt commitments), so the export stays auditable fail-closed and M2 can hydrate children with no wire break. Item 2 F and item 6 amendments gate PR A2 (Task A).
 
 ## Open decisions
 
@@ -782,7 +783,6 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
 | O1 | owner (Connor) | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | Decided by director ruling 2026-10-28 under delegated owner authority: option 2, fail-closed. A trust service without lifecycle state (keyring-backed or seed-file-backed) is refused as a remote exchange signer at config load with the typed refusal `trust-control exchange signer requires lifecycle state`. The option 1 work is not done. The edge's local `seed-file:` exchange signer (D1) is unaffected |
 | O2 | owner (Connor) | Decision 1: `serve-http` has no remote store and refuses `--control-url` | proposed (Root-2 endorses it technically); item 5's Q4 refusal stays until PR E lands the rule and both amendments atomically |
 | O6 | owner (Connor) | Sign off the spec amendment (2.4 trust-control row, the last 8.3 refusal, 10.5 `factory.rs`, 10.8 signer flags) | separate docs PR; gates PR D2 and PR E |
-| O7 | owner (Connor) | Child receipts and tenant export: `ChildRequestReceipt` carries no root capability id on main | Decided: M1 tenant export excludes child receipts (PR A2 tags tool receipts only). Each parent receipt MUST carry deterministic commitment hashes binding its child receipts, so the export stays auditable fail-closed and M2 can hydrate children with no wire break. Item 2 F and item 6 amendments gate PR A2 (Task A) |
 
 ## Cross-plan amendments
 

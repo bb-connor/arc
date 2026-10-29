@@ -18,7 +18,6 @@
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federated_request_without_receipt_store_denies_before_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_cosigner_not_called_when_local_persistence_fails": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::federation_receipt_context_fixture": 1,
-    "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/federation_cosign.rs::installed_artifact_store_preserves_cosign_evidence_across_cache_eviction": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/fixtures/revocation_store.rs::revoke": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": 1,
@@ -1320,8 +1319,8 @@
   },
   "composition_sites": [
     "crates/guards/chio-guards/src/external/cache.rs::default::native-adapter",
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter",
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_chain_frontier::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_previous::native-adapter",
     "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter",
     "crates/platform/chio-control-plane/src/durable_admission.rs::open::native-adapter",
     "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority::native-adapter",

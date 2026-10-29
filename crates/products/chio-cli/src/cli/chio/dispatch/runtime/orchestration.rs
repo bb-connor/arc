@@ -26,7 +26,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_lint(
         store_backend: "profile_lint".to_string(),
         store_path_sha256: profile_sha256,
         run_counts: std::collections::BTreeMap::new(),
-        consumed_lease_count: 0,
         trust_floor_count: 0,
         latest_failure_code: None,
         evidence_sink_healthy: true,
@@ -68,7 +67,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_plan(
                 admission_id: step.admission_id.clone(),
                 state: step.state.clone(),
                 destructive: false,
-                admission_report_sha256: None,
                 tool_receipt_sha256: None,
                 lease_id: None,
             })
@@ -186,7 +184,6 @@ pub(crate) fn cmd_chio_runtime_orchestrate_run(
             admission_id: step.admission_id,
             state: status.to_string(),
             destructive: step.destructive,
-            admission_report_sha256: Some(step.admission_report_sha256),
             tool_receipt_sha256: Some(step.tool_receipt_sha256),
             lease_id: step.lease_id,
         };

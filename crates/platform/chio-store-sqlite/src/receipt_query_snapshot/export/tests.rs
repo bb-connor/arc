@@ -736,7 +736,7 @@ fn oversized_subject_is_rejected_from_its_record_header() {
 }
 
 const REFUSED_LINEAGE: &str = "INSERT INTO capability_lineage (capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, provenance) VALUES ('cap', 'bad-subject', 'bad-issuer', 1, 100, '{}', 0, 'signed_token')";
-const READER_REFUSAL: &str = "capability lineage of cap is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap claims signed-token provenance without a signed token";
+const READER_REFUSAL: &str = "capability lineage of cap is refused by the local reader: conflict: capability lineage cap claims signed-token provenance without a signed token";
 const REQUEST_REFUSAL: &str =
     "capability lineage cap claims signed-token provenance without a signed token";
 

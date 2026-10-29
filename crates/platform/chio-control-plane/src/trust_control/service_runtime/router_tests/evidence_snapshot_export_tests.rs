@@ -7,6 +7,7 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::Keypair;
 use chio_core::receipt::body::ChioReceipt;
+use chio_kernel::EvidenceExportReceiptQuery;
 use chio_store_sqlite::receipt_query_snapshot::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
 };
@@ -74,7 +75,7 @@ async fn export(
         .header(AUTHORIZATION, "Bearer tenant-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a"),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
@@ -93,10 +94,11 @@ async fn export_requires_an_authenticated_snapshot_instead_of_scanning_the_store
     )?);
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{body}");
     assert_eq!(body["code"], "receipt_query_snapshot_unavailable");
@@ -147,7 +149,7 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
     )?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
     let baseline = store.build_evidence_export_bundle(
-        &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a"),
+        &chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a"),
     )?;
     assert_eq!(baseline.tool_receipts.len(), 1);
     assert_eq!(baseline.inclusion_proofs.len(), 1);
@@ -168,10 +170,11 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
     let receipts = body["bundle"]["toolReceipts"]
@@ -211,10 +214,11 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
     assert_eq!(body["code"], "receipt_query_work_budget_exhausted");
@@ -223,7 +227,7 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     assert_eq!(
         snapshots
             .query_receipts(
-                &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+                &chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a")
                     .as_receipt_query(None)
             )?
             .total_count,
@@ -282,14 +286,14 @@ async fn refused_lineage_router(
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-b".into(), "tenant-b-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[
+            ("tenant-a", "tenant-secret"),
+            ("tenant-b", "tenant-b-secret"),
+        ],
+    );
     Ok((directory, path, snapshots, state))
 }
 
@@ -351,7 +355,7 @@ async fn assert_typed_refusal_keeps_other_tenants(
         .header(AUTHORIZATION, "Bearer tenant-b-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-b"),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
@@ -390,7 +394,7 @@ async fn refused_lineage_of_unattributed_receipts_fails_the_snapshot_after_exten
     assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
 }
 
-const READER_REFUSAL_BODY: &str = "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: Conversion error from type Text at index: 10, conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token";
+const READER_REFUSAL_BODY: &str = "receipt query snapshot failed authentication: capability lineage of cap-bad-signed is refused by the local reader: conflict: capability lineage cap-bad-signed claims signed-token provenance without a signed token";
 
 async fn assert_reader_refusal_fails_the_snapshot(
     snapshots: &ReceiptQuerySnapshots,
@@ -412,27 +416,10 @@ async fn assert_reader_refusal_fails_the_snapshot(
     Ok(())
 }
 
-/// Wait until the extension cycle that follows publication has completed.
-/// With a one-hour tick the next cycle cannot start before the test ends.
-async fn await_first_extension_cycle(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
+async fn pause_extension(snapshots: Arc<ReceiptQuerySnapshots>) -> TestResult {
     tokio::task::spawn_blocking(move || {
-        let observed =
-            |status: &chio_store_sqlite::receipt_query_snapshot::ReceiptQuerySnapshotStatus| {
-                status
-                    .watermark
-                    .as_ref()
-                    .map(|watermark| watermark.observed_at_unix_ms)
-            };
-        let published = observed(&snapshots.status());
-        // A hang guard, not an extension cadence requirement.
-        let deadline = std::time::Instant::now() + Duration::from_secs(60);
-        while observed(&snapshots.status()) == published {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the first extension cycle never completed"
-            );
-            std::thread::sleep(Duration::from_millis(10));
-        }
+        snapshots.pause_extension_for_test(true);
+        assert!(snapshots.wait_for_paused_extension_for_test(Duration::from_secs(60)));
     })
     .await?;
     Ok(())
@@ -450,7 +437,7 @@ async fn refused_lineage_shared_with_unattributed_receipts_fails_the_snapshot_wh
         },
     )
     .await?;
-    await_first_extension_cycle(Arc::clone(&snapshots)).await?;
+    pause_extension(Arc::clone(&snapshots)).await?;
     insert_refused_lineage(&path)?;
     assert_reader_refusal_fails_the_snapshot(&snapshots, state).await
 }
@@ -489,7 +476,7 @@ async fn captured_attribution_tamper_invalidates_before_export_refusal() -> Test
     )?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
     let mut by_subject =
-        chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+        chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a")
             .as_receipt_query(None);
     by_subject.agent_subject = Some(subject);
     assert_eq!(snapshots.query_receipts(&by_subject)?.total_count, 1);
@@ -503,10 +490,11 @@ async fn captured_attribution_tamper_invalidates_before_export_refusal() -> Test
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("tenant-a", "tenant-secret")],
+    );
     let (status, body) = export(state).await?;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
     assert_eq!(body["code"], "receipt_query_snapshot_invalid");
@@ -564,14 +552,14 @@ async fn signed_lineage_router(
     let mut state = metrics_state("snapshot-secret");
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-a".into(), "tenant-secret".into());
-    state
-        .config
-        .tenant_read_tokens
-        .insert("tenant-b".into(), "tenant-b-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[
+            ("tenant-a", "tenant-secret"),
+            ("tenant-b", "tenant-b-secret"),
+        ],
+    );
     Ok((directory, path, snapshots, state))
 }
 
@@ -591,7 +579,7 @@ async fn tenant_b_export_status(
         .header(AUTHORIZATION, "Bearer tenant-b-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-b"),
             "requireProofs": false,
         }))?))?;
     Ok(super::super::build_router(state)
@@ -661,7 +649,7 @@ async fn non_utf8_lineage_issuer_of_unsigned_receipts_returns_snapshot_invalid()
     assert_eq!(body["code"], "receipt_query_snapshot_invalid");
     assert_eq!(
         body["error"],
-        "receipt query snapshot failed authentication: capability lineage of cap-signed is refused by the local reader: invalid utf-8 sequence of 1 bytes from index 0 at index 2"
+        "receipt query snapshot failed authentication: capability lineage of cap-signed is refused by the local reader: capability lineage contains invalid UTF-8 at column 2"
     );
     assert!(body.get("bundle").is_none(), "{body}");
     assert!(matches!(

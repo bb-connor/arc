@@ -29,6 +29,8 @@ mod fixture_regenerate;
 mod fixture_finding;
 #[path = "fixture_finding_cognition.rs"]
 mod fixture_finding_cognition;
+#[path = "fixture_runtime_check.rs"]
+mod fixture_runtime_check;
 #[path = "fixture_committed_disclosure.rs"]
 mod fixture_committed_disclosure;
 use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;
@@ -2242,6 +2244,13 @@ fn refresh_commerce_order_passport_graph_binding(
     } else {
         None
     };
+    let escrow_ledger_bytes = load_commerce_escrow_ledger_bytes(
+        bundle,
+        &mut budget,
+        &graph.nodes,
+        &order_context,
+        "commerce fixture",
+    )?;
     let commerce_authority_key = Keypair::from_seed(&[7u8; 32]).public_key();
     let report = chio_commerce_order::verify_commerce_order(
         &chio_commerce_order::CommerceOrderVerificationBundle {
@@ -2256,6 +2265,7 @@ fn refresh_commerce_order_passport_graph_binding(
             settlement_packet_bytes,
             mandate_protocol_payloads,
             risk_comptroller_report_bytes,
+            escrow_ledger_bytes,
             verified_trust_market_context: fixture_commerce_trust_market_context(
                 bundle,
                 &order_context,
@@ -2681,7 +2691,7 @@ fn add_runtime_swarm_loopback_evidence(bundle: &Path, temp_root: &Path) -> Resul
     let out_dir = temp_root.join("out");
     let static_package_json = crate::input::read_text(bundle.join("proof-package.json"))?;
     let static_report_json = crate::input::read_text(bundle.join("verifier-report.json"))?;
-    chio_runtime_harness::run_runtime_loopback_scenario_with_static_artifacts(
+    chio_runtime_harness::generate_runtime_loopback_fixture(
         &scenario_path,
         &store_dir,
         RUNTIME_SWARM_LOOPBACK_NOW_UNIX_MS,

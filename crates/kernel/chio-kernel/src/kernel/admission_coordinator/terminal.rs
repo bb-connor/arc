@@ -82,7 +82,7 @@ struct LocalToolReturnEvidence<'a> {
     output: &'a InvocationOutputV1,
     reported_cost: &'a Option<ToolInvocationCost>,
     receipt_metadata_snapshot: &'a Option<serde_json::Value>,
-    pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pre_invocation_guard_output: &'a crate::kernel::PreInvocationGuardOutput,
 }
 
 #[derive(Serialize)]
@@ -360,7 +360,7 @@ impl ChioKernel {
         };
         self.require_caller_output_release(&tool_return, request)?;
         self.require_durable_security_release(admission, &tool_return.raw, &tool_return.outcome)?;
-        let federation_scope = self.scope_retained_federation_return(
+        let _federation_scope = self.scope_retained_federation_return(
             admission,
             request,
             &tool_return.raw,
@@ -522,8 +522,12 @@ impl ChioKernel {
             .and_then(|metadata| metadata.get("financial"))
             .cloned()
             .map(|financial| serde_json::json!({ "financial": financial }));
-        let expected_non_admission_metadata =
-            merge_metadata_objects(expected_non_financial_metadata, retained_financial_metadata);
+        let retained_session_anchor_metadata =
+            retained_session_anchor_metadata(receipt.metadata.as_ref())?;
+        let expected_non_admission_metadata = merge_metadata_objects(
+            merge_metadata_objects(expected_non_financial_metadata, retained_financial_metadata),
+            retained_session_anchor_metadata,
+        );
         // Reproduce the delivery-contract and finding-delivery blocks so
         // the replayed metadata byte-matches the persisted receipt.
         let expected_non_admission_metadata =
@@ -612,29 +616,6 @@ impl ChioKernel {
         if request.federated_origin_kernel_id.is_some()
             && self.federation_dsse_envelope(&receipt.id).is_none()
         {
-            // An outcome without retained federation evidence: a completed
-            // replay enters recovery before the ordinary runtime
-            // admission stage. Re-admit and reinstall the verified treaty
-            // material before retrying the missing bilateral projection.
-            if federation_scope.is_none() {
-                let now_unix_ms = self.read_authority_time()?.get();
-                let treaty_admission = self.run_runtime_admission_hook(
-                    request,
-                    tool_return.raw.receipt_metadata_snapshot(),
-                    now_unix_ms / 1_000,
-                    now_unix_ms,
-                    Some(matched_grant_index),
-                    None,
-                );
-                if !treaty_admission.allowed {
-                    return Err(KernelError::Internal(format!(
-                        "federation runtime treaty re-admission failed during completed replay: {}",
-                        treaty_admission
-                            .reason
-                            .unwrap_or_else(|| "runtime admission denied".to_string())
-                    )));
-                }
-            }
             self.apply_federation_cosign_for_admitted_request(request, &receipt)?;
         }
         if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
@@ -758,6 +739,14 @@ impl ChioKernel {
                     "projected receipt has no canonical signing nonce".to_owned(),
                 )
             })?;
+        let expected_non_admission_metadata = crate::receipt_support::bind_decision_model_witness(
+            expected_non_admission_metadata,
+            tool_return
+                .raw
+                .pre_invocation_guard_output()
+                .witness
+                .as_ref(),
+        )?;
         let expected_metadata = merge_metadata_objects(
             merge_metadata_objects(
                 expected_non_admission_metadata,
@@ -806,7 +795,8 @@ impl ChioKernel {
             || receipt.evidence
                 != tool_return
                     .raw
-                    .pre_invocation_guard_evidence()
+                    .pre_invocation_guard_output()
+                    .evidence
                     .iter()
                     .chain(expected_post_invocation_evidence)
                     .cloned()
@@ -897,8 +887,8 @@ impl ChioKernel {
             .transpose()?
             .flatten();
 
-        let _guard_evidence_scope = scope_pre_invocation_guard_evidence(
-            tool_return.raw.pre_invocation_guard_evidence().to_vec(),
+        let _guard_evidence_scope = scope_pre_invocation_guard_output(
+            tool_return.raw.pre_invocation_guard_output().clone(),
         );
         let DurableEvaluationContract {
             matched_grant_index,
@@ -1863,3 +1853,19 @@ fn terminal_receipt_error(error: crate::receipt_store::ReceiptStoreError) -> Ker
 #[cfg(test)]
 #[path = "terminal_tests.rs"]
 mod tests;
+
+/// The session anchor block a retained receipt was signed with, re-encoded
+/// from its strict decode so a malformed block fails the replay.
+fn retained_session_anchor_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Result<Option<serde_json::Value>, KernelError> {
+    use chio_core::receipt::metadata::{ReceiptSessionAnchorV1, SESSION_ANCHOR_METADATA_KEY};
+    ReceiptSessionAnchorV1::from_receipt_metadata(metadata)
+        .and_then(|block| block.map(|block| block.to_metadata_value()).transpose())
+        .map(|block| block.map(|block| serde_json::json!({ SESSION_ANCHOR_METADATA_KEY: block })))
+        .map_err(|error| {
+            KernelError::DurableAdmission(format!(
+                "retained receipt session anchor block is malformed: {error}"
+            ))
+        })
+}

@@ -32,6 +32,19 @@ pub(crate) fn resolve_sidecar_payment_adapter(
     }
 }
 
+/// The trust-control internal listener URL a kernel host reaches the
+/// admission authority through.
+pub(crate) fn require_control_internal_url(
+    control_internal_url: Option<&str>,
+) -> Result<&str, CliError> {
+    control_internal_url.ok_or_else(|| {
+        CliError::cli_other_error(
+            "durable admission against --control-url requires --control-internal-url, the trust-control internal listener"
+                .to_string(),
+        )
+    })
+}
+
 fn open_cli_durable_admission_runtime(
     mode: chio_kernel::admission_operation::DurableAdmissionMode,
     admission_db_path: Option<&Path>,
@@ -40,6 +53,7 @@ fn open_cli_durable_admission_runtime(
     authority_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
     control_url: Option<&str>,
+    control_internal_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<Option<DurableAdmissionRuntime>, CliError> {
     let maintenance = chio_control_plane::TerminalPayloadMaintenanceConfig::from_env()?;
@@ -80,7 +94,8 @@ fn open_cli_durable_admission_runtime(
         (chio_kernel::admission_operation::DurableAdmissionMode::Off, _, _) => Ok(None),
         (_, Some(identity_path), Some(url)) => {
             let token = require_control_token(control_token)?;
-            DurableAdmissionRuntime::open_remote(identity_path, url, token).map(Some)
+            let internal_url = require_control_internal_url(control_internal_url)?;
+            DurableAdmissionRuntime::open_remote(identity_path, url, internal_url, token).map(Some)
         }
         _ => open_durable_admission_runtime(mode, admission_db_path),
     }?;
@@ -121,6 +136,7 @@ pub(crate) fn cmd_run(
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
+    control_internal_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
@@ -139,6 +155,7 @@ pub(crate) fn cmd_run(
         authority_db_path,
         budget_db_path,
         control_url,
+        control_internal_url,
         control_token,
     )?;
 
@@ -738,6 +755,7 @@ pub(crate) fn cmd_check(
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
+    control_internal_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
     let loaded_policy = load_policy(policy_path)?;
@@ -756,6 +774,7 @@ pub(crate) fn cmd_check(
         authority_db_path,
         budget_db_path,
         control_url,
+        control_internal_url,
         control_token,
     )?;
 
@@ -1032,6 +1051,7 @@ pub(crate) fn cmd_mcp_serve(
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
     control_url: Option<&str>,
+    control_internal_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
     // Resolve `--preset` to a materialized YAML on disk so the rest
@@ -1109,6 +1129,7 @@ pub(crate) fn cmd_mcp_serve(
         authority_db_path,
         budget_db_path,
         control_url,
+        control_internal_url,
         control_token,
     )?;
 
@@ -1268,6 +1289,7 @@ pub(crate) fn cmd_mcp_serve_http(
     session_db_path: Option<&Path>,
     resume_hmac_keyring_path: Option<&Path>,
     control_url: Option<&str>,
+    control_internal_url: Option<&str>,
     control_token: Option<&str>,
     control_authority_public_key: Option<&chio_core::PublicKey>,
     control_authority_trusted_public_keys: &[chio_core::PublicKey],
@@ -1331,6 +1353,7 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_audience: auth_jwt_audience.map(ToOwned::to_owned),
         admin_token,
         control_url: control_url.map(ToOwned::to_owned),
+        control_internal_url: control_internal_url.map(ToOwned::to_owned),
         control_token: control_token.map(ToOwned::to_owned),
         remote_authority_workload_token: remote_authority_workload_token.map(ToOwned::to_owned),
         control_authority_public_key: control_authority_public_key.cloned(),
@@ -1566,9 +1589,7 @@ pub(crate) fn require_local_capital_authority(
 pub(crate) fn cmd_trust_serve(
     transport: chio_http_serve::ServerTransportConfig,
     listen: SocketAddr,
-    service_token: &str,
-    tenant_read_tokens: &[String],
-    authority_workload_token: Option<&str>,
+    access_config: &Path,
     authority_keyring_config_path: Option<&Path>,
     authority_keyring_receipt_anchor_root: Option<&Path>,
     policy_path: Option<&Path>,
@@ -1599,33 +1620,17 @@ pub(crate) fn cmd_trust_serve(
     advertise_url: Option<&str>,
     allow_local_peer_urls: bool,
     certification_public_metadata_ttl_seconds: u64,
-    peer_urls: &[String],
     cluster_sync_interval_ms: u64,
+    cluster_peer_replay_db_path: Option<&Path>,
     authority_replication_max_future_skew_seconds: u64,
     roster_policy_file: Option<&Path>,
     capital_authority_keys: &[String],
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(&transport, listen)?;
-    if service_token.trim().is_empty() {
-        return Err(CliError::cli_other_error(
-            "trust serve requires a non-empty --service-token".to_string(),
-        ));
-    }
-    let tenant_read_tokens = parse_tenant_read_tokens(tenant_read_tokens)?;
-    if let Some((tenant_id, _)) = tenant_read_tokens
-        .iter()
-        .find(|(_, token)| token.as_str() == service_token)
-    {
-        return Err(CliError::cli_other_error(format!(
-            "--tenant-read-token for tenant {tenant_id} must not equal --service-token"
-        )));
-    }
-    if authority_workload_token == Some(service_token) {
-        return Err(CliError::cli_other_error(
-            "--authority-workload-token must not equal --service-token".to_string(),
-        ));
-    }
+    let access = std::sync::Arc::new(trust_control::caller_credentials::TrustAccess::load(
+        access_config,
+    )?);
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
@@ -1661,9 +1666,7 @@ pub(crate) fn cmd_trust_serve(
     trust_control::serve(trust_control::TrustServiceConfig {
         transport,
         listen,
-        service_token: service_token.to_string(),
-        tenant_read_tokens,
-        authority_workload_token: authority_workload_token.map(ToOwned::to_owned),
+        access,
         receipt_db_path: receipt_db_path.map(Path::to_path_buf),
         receipt_query_snapshot_quota_bytes,
         revocation_db_path: revocation_db_path.map(Path::to_path_buf),
@@ -1673,6 +1676,7 @@ pub(crate) fn cmd_trust_serve(
         authority_keyring_receipt_anchor_root: authority_keyring_receipt_anchor_root
             .map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        cluster_peer_replay_db_path: cluster_peer_replay_db_path.map(Path::to_path_buf),
         joint_authority_db_path: session_db_path.map(Path::to_path_buf),
         fiscal_runtime,
         enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
@@ -1690,7 +1694,6 @@ pub(crate) fn cmd_trust_serve(
         advertise_url: advertise_url.map(ToOwned::to_owned),
         allow_local_peer_urls,
         certification_public_metadata_ttl_seconds,
-        peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
         authority_replication_max_future_skew_seconds,
         roster_policy,
@@ -1701,43 +1704,6 @@ pub(crate) fn cmd_trust_serve(
         // would publish a venue nobody pinned.
         finding_market: None,
     })
-}
-
-pub(crate) fn parse_tenant_read_tokens(
-    specs: &[String],
-) -> Result<std::collections::BTreeMap<String, String>, CliError> {
-    let mut parsed = std::collections::BTreeMap::new();
-    for spec in specs {
-        let (tenant, token) = spec.split_once('=').ok_or_else(|| {
-            CliError::cli_other_error("--tenant-read-token must use tenant=token form".to_string())
-        })?;
-        if tenant.trim() != tenant || token.trim() != token {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must not contain surrounding whitespace"
-                    .to_string(),
-            ));
-        }
-        if tenant.chars().any(char::is_control) || token.chars().any(char::is_control) {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must not contain control characters"
-                    .to_string(),
-            ));
-        }
-        if tenant.is_empty() || token.is_empty() {
-            return Err(CliError::cli_other_error(
-                "--tenant-read-token tenant and token must be non-empty".to_string(),
-            ));
-        }
-        if parsed
-            .insert(tenant.to_string(), token.to_string())
-            .is_some()
-        {
-            return Err(CliError::cli_other_error(format!(
-                "duplicate --tenant-read-token for tenant {tenant}"
-            )));
-        }
-    }
-    Ok(parsed)
 }
 
 pub(crate) fn cmd_trust_revoke(
@@ -1931,38 +1897,6 @@ mod runtime_local_error_domain_tests {
         );
 
         assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
-    }
-
-    #[test]
-    fn tenant_read_token_mapping_rejects_surrounding_whitespace() {
-        for spec in [" tenant-a=read-token", "tenant-a=read-token "] {
-            let error = must_err(
-                parse_tenant_read_tokens(&[spec.to_string()]),
-                "tenant token mapping with surrounding whitespace should fail closed",
-            );
-
-            let message = error.to_string();
-            assert!(
-                message.contains("surrounding whitespace"),
-                "unexpected tenant token validation error for {spec}: {message}"
-            );
-        }
-    }
-
-    #[test]
-    fn tenant_read_token_mapping_rejects_control_characters() {
-        for spec in ["tenant-\na=read-token", "tenant-a=read\u{7f}token"] {
-            let error = must_err(
-                parse_tenant_read_tokens(&[spec.to_string()]),
-                "tenant token mapping with control characters should fail closed",
-            );
-
-            let message = error.to_string();
-            assert!(
-                message.contains("control characters"),
-                "unexpected tenant token validation error for {spec:?}: {message}"
-            );
-        }
     }
 
     #[test]

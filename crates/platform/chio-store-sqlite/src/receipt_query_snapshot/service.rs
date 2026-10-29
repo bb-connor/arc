@@ -6,12 +6,13 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use chio_core::receipt::body::ChioReceipt;
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_kernel::receipt_query::{
     ReceiptQuery, ReceiptQueryResult, ReceiptQuerySnapshotError, ReceiptReadContext,
     ReceiptSnapshotWatermark,
 };
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 
 use super::db::{SnapshotBatch, SnapshotDb, SnapshotDbError};
 use super::extend::extend_cycle;
@@ -647,9 +648,9 @@ pub(super) struct Inner {
     /// Epoch of the latest transition to Invalid.
     last_invalid_epoch: AtomicU64,
     last_recertification_ms: AtomicU64,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "receipt-query-test-support"))]
     pause_extension: AtomicBool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "receipt-query-test-support"))]
     extension_parked: AtomicBool,
     /// Whether a lineage was published since the walker's last integrity
     /// failure.
@@ -703,9 +704,9 @@ impl ReceiptQuerySnapshots {
             epoch: AtomicU64::new(0),
             last_invalid_epoch: AtomicU64::new(0),
             last_recertification_ms: AtomicU64::new(0),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "receipt-query-test-support"))]
             pause_extension: AtomicBool::new(false),
-            #[cfg(test)]
+            #[cfg(any(test, feature = "receipt-query-test-support"))]
             extension_parked: AtomicBool::new(false),
             published_since_failure: AtomicBool::new(false),
             #[cfg(test)]
@@ -1454,13 +1455,13 @@ fn serve(
                 "receipt writer head is poisoned".into(),
             ));
         }
-        #[cfg(test)]
+        #[cfg(any(test, feature = "receipt-query-test-support"))]
         if inner.pause_extension.load(Ordering::SeqCst) {
             inner.extension_parked.store(true, Ordering::SeqCst);
             inner.sleep(inner.config.extension_tick);
             continue;
         }
-        #[cfg(test)]
+        #[cfg(any(test, feature = "receipt-query-test-support"))]
         inner.extension_parked.store(false, Ordering::SeqCst);
         published.hold(|owned| owned.db.increase_quota(inner.requested_quota()))?;
         match extend_cycle(ctx, published, &|| inner.now_ms()) {
@@ -1546,11 +1547,6 @@ impl ReceiptQuerySnapshots {
         let started = Self::start(store, config);
         NEXT_OBSERVER.with(|next| next.borrow_mut().take());
         started
-    }
-
-    pub(super) fn pause_extension_for_test(&self, paused: bool) {
-        self.inner.pause_extension.store(paused, Ordering::SeqCst);
-        self.inner.wake();
     }
 
     /// True once a paused extension has finished its last cycle.
@@ -1728,6 +1724,25 @@ impl ReceiptQuerySnapshots {
                 .unwrap_or(0),
             _ => 0,
         }
+    }
+}
+
+#[cfg(any(test, feature = "receipt-query-test-support"))]
+impl ReceiptQuerySnapshots {
+    pub fn pause_extension_for_test(&self, paused: bool) {
+        self.inner.pause_extension.store(paused, Ordering::SeqCst);
+        self.inner.wake();
+    }
+
+    pub fn wait_for_paused_extension_for_test(&self, timeout: Duration) -> bool {
+        let started = Instant::now();
+        while !self.inner.extension_parked.load(Ordering::SeqCst) {
+            if started.elapsed() >= timeout {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        true
     }
 }
 

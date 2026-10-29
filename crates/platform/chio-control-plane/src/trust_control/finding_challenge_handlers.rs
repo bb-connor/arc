@@ -22,7 +22,6 @@ use super::finding_challenge_coordinator::{
 use super::finding_handlers::{
     finding_market_context, strict_artifact_ingress, FINDING_PUBLISH_MAX_BODY_BYTES,
 };
-use super::report_validation::validate_service_auth;
 use super::*;
 
 const FINDING_CHALLENGE_SCHEMA_JSON: &str =
@@ -280,7 +279,7 @@ pub(crate) async fn handle_submit_finding_challenge(
     let clock = Arc::clone(&state.finding_challenge_clock);
     let executor = Arc::clone(executor);
     let purchase_executor = state.finding_purchase_executor.clone();
-    let service_token = state.config.service_token.clone();
+    let access = Arc::clone(&state.config.access);
     let response = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let raw_challenge_envelope = match std::str::from_utf8(&raw_challenge_envelope) {
@@ -325,13 +324,19 @@ pub(crate) async fn handle_submit_finding_challenge(
                         StatusCode::UNAUTHORIZED,
                         "buyer challenge authentication failed",
                     );
-                } else if let Err(response) = validate_service_auth(&headers, &service_token) {
-                    return response;
+                } else if let Err(error) = access
+                    .credentials()
+                    .validate_caller(&headers, Scope::FindingsWrite)
+                {
+                    return error.into_response();
                 }
             }
             chio_finding::FindingChallengeAuthorization::VenueAudit(_) => {
-                if let Err(response) = validate_service_auth(&headers, &service_token) {
-                    return response;
+                if let Err(error) = access
+                    .credentials()
+                    .validate_caller(&headers, Scope::FindingsWrite)
+                {
+                    return error.into_response();
                 }
             }
         }
@@ -456,7 +461,7 @@ pub(crate) async fn handle_get_finding_challenge(
     };
     let headers = request.headers().clone();
     let purchase_executor = state.finding_purchase_executor.clone();
-    let service_token = state.config.service_token.clone();
+    let access = Arc::clone(&state.config.access);
     let response = tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let record = match executor.challenge(&challenge_id) {
@@ -471,7 +476,10 @@ pub(crate) async fn handle_get_finding_challenge(
                 )
             }
         };
-        let service_authenticated = validate_service_auth(&headers, &service_token).is_ok();
+        let service_authenticated = access
+            .credentials()
+            .validate_caller(&headers, Scope::FindingsRead)
+            .is_ok();
         match record.authorization_branch {
             FindingChallengeAuthorizationBranch::BuyerSubmission if !service_authenticated => {
                 let authenticated = purchase_executor.as_ref().and_then(|purchase| {

@@ -33,14 +33,16 @@ pub use metrics::{
 #[cfg(feature = "fuzz")]
 pub mod fuzz;
 
+use chio_core::receipt::checkpoint::{
+    KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
+};
+use chio_core::receipt::evidence::{EvidenceExportBundle, EvidenceToolReceiptRecord};
 use chio_core::web3::anchors::{
     validate_anchor_inclusion_proof, verify_anchor_inclusion_proof, AnchorInclusionProof,
     Web3ChainAnchorRecord, Web3CheckpointStatement, Web3ReceiptInclusion,
     CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA, CHIO_CHECKPOINT_STATEMENT_SCHEMA,
 };
 use chio_core::web3::identity::SignedWeb3IdentityBinding;
-use chio_kernel::checkpoint::{KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof};
-use chio_kernel::evidence_export::{EvidenceExportBundle, EvidenceToolReceiptRecord};
 use serde::{Deserialize, Serialize};
 
 pub use automation::{
@@ -318,19 +320,21 @@ mod tests {
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine;
     use chio_core::crypto::Keypair;
+    use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+    use chio_core::receipt::evidence::{
+        EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
+        EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+    };
     use chio_core::receipt::{
         checkpoint::CheckpointPublicationIdentity, checkpoint::CheckpointPublicationIdentityKind,
         checkpoint::CheckpointPublicationTrustAnchorBinding,
         checkpoint::CheckpointTrustAnchorIdentity, checkpoint::CheckpointTrustAnchorIdentityKind,
     };
     use chio_core::web3::anchors::AnchorInclusionProof;
-    use chio_kernel::checkpoint::{
-        build_checkpoint, build_checkpoint_transparency, build_inclusion_proof,
-        build_trust_anchored_checkpoint_publication, CheckpointTransparencySummary,
-    };
-    use chio_kernel::evidence_export::{
-        EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
-        EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+    use chio_kernel::checkpoint::build_checkpoint;
+    use chio_kernel_core::evidence_verify::{
+        build_checkpoint_transparency, build_inclusion_proof,
+        build_trust_anchored_checkpoint_publication,
     };
     use opentimestamps::attestation::Attestation;
     use opentimestamps::ser::{DetachedTimestampFile, DigestType};
@@ -383,7 +387,7 @@ mod tests {
     fn sample_evidence_bundle() -> EvidenceExportBundle {
         let proof = sample_primary_proof();
         let checkpoint = kernel_checkpoint_from_statement(&proof.checkpoint_statement);
-        let inclusion = chio_kernel::checkpoint::ReceiptInclusionProof {
+        let inclusion = chio_core::receipt::checkpoint::ReceiptInclusionProof {
             checkpoint_seq: proof.receipt_inclusion.checkpoint_seq,
             receipt_seq: proof.checkpoint_statement.batch_start_seq,
             leaf_index: proof.receipt_inclusion.proof.leaf_index,
@@ -714,7 +718,7 @@ mod tests {
     fn example_proof_projects_back_into_anchor_inclusion() {
         let proof = sample_primary_proof();
         let checkpoint = kernel_checkpoint_from_statement(&proof.checkpoint_statement);
-        let inclusion = chio_kernel::checkpoint::ReceiptInclusionProof {
+        let inclusion = chio_core::receipt::checkpoint::ReceiptInclusionProof {
             checkpoint_seq: proof.receipt_inclusion.checkpoint_seq,
             receipt_seq: proof.checkpoint_statement.batch_start_seq,
             leaf_index: proof.receipt_inclusion.proof.leaf_index,

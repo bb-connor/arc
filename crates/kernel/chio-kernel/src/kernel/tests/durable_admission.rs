@@ -1256,13 +1256,27 @@ fn durable_admission_fixture_with_grants(
     std::sync::Arc<TestAdmissionOperationStore>,
     std::sync::Arc<AtomicU64>,
 ) {
+    durable_admission_fixture_with_clock(request_id, grants, chio_test_support::clock::clock())
+}
+
+fn durable_admission_fixture_with_clock(
+    request_id: &str,
+    grants: Vec<ToolGrant>,
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+) -> (
+    ChioKernel,
+    ToolCallRequest,
+    std::sync::Arc<TestAdmissionOperationStore>,
+    std::sync::Arc<AtomicU64>,
+) {
     let tools = grants
         .iter()
         .map(|grant| grant.tool_name.clone())
         .collect::<Vec<_>>();
     let mut config = make_config();
     config.policy_hash = sha256_hex(b"durable-admission-test-policy");
-    let mut kernel = make_kernel(config);
+    let mut kernel = ChioKernel::new_with_clock(config, clock);
+    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel

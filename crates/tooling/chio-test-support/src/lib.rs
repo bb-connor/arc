@@ -45,6 +45,33 @@ pub fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
     }
 }
 
+/// Create a SQLite database path inside a fresh test-owned directory under the
+/// canonicalized temp root. Resolving the root keeps the path free of symlinks,
+/// which SQLite's no-follow open refuses. Dropping the returned directory guard
+/// removes the database together with its `-wal` and `-shm` files.
+///
+/// # Panics
+///
+/// Panics when the temp root cannot be resolved or the directory cannot be
+/// created.
+pub fn temp_sqlite_path(prefix: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let root = std::fs::canonicalize(std::env::temp_dir())
+        .unwrap_or_else(|error| panic!("temp root is not resolvable: {error}"));
+    let name = format!("{prefix}-");
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(&name);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    let directory = builder
+        .tempdir_in(root)
+        .unwrap_or_else(|error| panic!("test temp directory was not created: {error}"));
+    let path = directory.path().join(format!("{prefix}.sqlite3"));
+    (directory, path)
+}
+
 /// Context-free unwrap helpers (the dominant workspace convention).
 ///
 /// Methods here mirror `Result::unwrap` / `Option::unwrap` /

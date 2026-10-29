@@ -191,7 +191,7 @@ impl VerifiedFederationTreatyMaterial {
         };
         let receipt_metadata = serde_json::json!({
             "chio_runtime": {
-                "federation_treaty_dsse": {
+                (crate::kernel::runtime_field::FEDERATION_TREATY_DSSE): {
                     "capability_lease_ref": capability_lease_ref,
                     "policy_evaluation_summary": policy_evaluation_summary,
                     "governance_receipt_ref": predicate.governance_receipt_ref,

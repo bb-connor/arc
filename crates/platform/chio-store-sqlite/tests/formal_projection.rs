@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
     scope::{ChioScope, Operation, ToolGrant},
@@ -15,13 +13,7 @@ use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore, SqliteRevocationS
 
 use chio_test_support::prelude::*;
 
-fn temp_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_unwrap()
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn capability(id: &str, subject: &Keypair) -> CapabilityToken {
     let issuer = Keypair::generate();
@@ -114,7 +106,7 @@ fn receipt(id: &str, capability_id: &str) -> ChioReceipt {
 
 #[test]
 fn sqlite_revocation_projection_preserves_token_and_ancestor_membership() {
-    let path = temp_path("formal-revocation-projection");
+    let (_path_dir, path) = temp_sqlite_path("formal-revocation-projection");
     {
         let store = SqliteRevocationStore::open(&path).test_unwrap();
         assert!(store.revoke("cap-token").test_unwrap());
@@ -129,7 +121,7 @@ fn sqlite_revocation_projection_preserves_token_and_ancestor_membership() {
 
 #[test]
 fn sqlite_budget_projection_atomic_commits_do_not_overspend() {
-    let path = temp_path("formal-budget-projection");
+    let (_path_dir, path) = temp_sqlite_path("formal-budget-projection");
     let store = SqliteBudgetStore::open(&path).test_unwrap();
 
     assert!(store
@@ -146,7 +138,7 @@ fn sqlite_budget_projection_atomic_commits_do_not_overspend() {
 
 #[test]
 fn sqlite_budget_projection_idempotent_retry_does_not_double_charge() {
-    let path = temp_path("formal-budget-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("formal-budget-idempotent");
     let store = SqliteBudgetStore::open(&path).test_unwrap();
 
     assert!(store
@@ -181,7 +173,7 @@ fn sqlite_budget_projection_idempotent_retry_does_not_double_charge() {
 
 #[test]
 fn sqlite_receipt_projection_persists_signed_receipts() {
-    let path = temp_path("formal-receipt-projection");
+    let (_path_dir, path) = temp_sqlite_path("formal-receipt-projection");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = receipt("rcpt-projection", "cap-projection");
 
@@ -193,7 +185,7 @@ fn sqlite_receipt_projection_persists_signed_receipts() {
 
 #[test]
 fn sqlite_lineage_projection_preserves_root_first_chain() {
-    let path = temp_path("formal-lineage-projection");
+    let (_path_dir, path) = temp_sqlite_path("formal-lineage-projection");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject = Keypair::generate();
     let root = capability("cap-root", &subject);

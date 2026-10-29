@@ -863,7 +863,7 @@ fn test_credit_issue_endpoints_require_service_auth() {
     assert!(facility_body["error"]
         .as_str()
         .expect("facility error string")
-        .contains("missing or invalid control bearer token"));
+        .contains("missing or invalid trust-control credential"));
 
     let bond_response = client
         .post(format!("{base_url}/v1/bonds/issue"))
@@ -889,7 +889,7 @@ fn test_credit_issue_endpoints_require_service_auth() {
     assert!(bond_body["error"]
         .as_str()
         .expect("bond error string")
-        .contains("missing or invalid control bearer token"));
+        .contains("missing or invalid trust-control credential"));
 
     let _ = std::fs::remove_dir_all(&dir);
 }

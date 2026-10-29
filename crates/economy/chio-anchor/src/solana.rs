@@ -1,5 +1,5 @@
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::web3::anchors::AnchorInclusionProof;
-use chio_kernel::checkpoint::KernelCheckpoint;
 use serde::{Deserialize, Serialize};
 
 use crate::AnchorError;

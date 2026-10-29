@@ -6,7 +6,6 @@
 //! Tenant IDs come from signed receipt bodies.
 
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
@@ -109,13 +108,7 @@ fn point_reads_bind_ids_to_authenticated_tenants() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("chio-{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn cleanup(path: &std::path::Path) {
     let _ = fs::remove_file(path);
@@ -181,7 +174,7 @@ fn operator_tenant_query(tenant: String) -> ReceiptQuery {
 
 #[test]
 fn tenant_filter_without_read_context_fails_closed() {
-    let path = unique_db_path("tenant-isolation-missing-context");
+    let (_path_dir, path) = temp_sqlite_path("tenant-isolation-missing-context");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
 
     let err = store
@@ -205,7 +198,7 @@ fn tenant_filter_without_read_context_fails_closed() {
 
 #[test]
 fn tenant_scoped_queries_exclude_other_tenants_and_unattributed_rows() {
-    let path = unique_db_path("tenant-isolation");
+    let (_path_dir, path) = temp_sqlite_path("tenant-isolation");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
 
     // 5 receipts for tenant A.
@@ -288,7 +281,7 @@ fn tenant_scoped_queries_exclude_other_tenants_and_unattributed_rows() {
 
 #[test]
 fn explicit_admin_context_returns_all_rows_regardless_of_tags() {
-    let path = unique_db_path("tenant-isolation-all");
+    let (_path_dir, path) = temp_sqlite_path("tenant-isolation-all");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
 
     // Three distinct tenants + untagged nulls.
@@ -321,7 +314,7 @@ fn explicit_admin_context_returns_all_rows_regardless_of_tags() {
 fn tenant_a_queries_never_return_tenant_b_rows() {
     // Receipts from tenant A are invisible to tenant B queries.
     // Verify isolation in both directions.
-    let path = unique_db_path("tenant-isolation-cross");
+    let (_path_dir, path) = temp_sqlite_path("tenant-isolation-cross");
     let store = SqliteReceiptStore::open(&path).test_expect("open store");
 
     let a = signed_receipt("rcpt-secret-a", "cap-a", Some("tenant-A"));

@@ -136,6 +136,10 @@ path  = "crates/platform/chio-store-sqlite"
 crate = "chio-commerce-order"
 path  = "crates/platform/chio-commerce-order"
 
+[targets.decision_model_artifact]
+crate = "chio-predicate-dag"
+path  = "crates/guards/chio-predicate-dag"
+
 [targets.peers_lock_decode]
 crate = "chio-conformance"
 path  = "crates/tooling/chio-conformance"
@@ -147,3 +151,7 @@ path  = "crates/guards/chio-guards"
 [targets.frost_round2_envelope]
 crate = "chio-federation-authority"
 path = "crates/trust/chio-federation-authority"
+
+[targets.settlement_approval_witness]
+crate = "chio-settle"
+path = "crates/economy/chio-settle"

@@ -1,5 +1,7 @@
 use crate::*;
 use chio_core::capability::governance::GovernedApprovalToken;
+use chio_kernel::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
+use chio_kernel::admission_operation::AdmissionIdentifier;
 use std::sync::atomic::AtomicUsize;
 
 #[path = "fixed_bodies.rs"]
@@ -178,7 +180,7 @@ async fn ap23_mcp_pending_decision_rechecks_current_policy_and_revocation() -> T
 }
 
 #[test]
-fn ap23_mcp_startup_rejects_invalid_roster_or_unactivated_replay_source() -> TestResult {
+fn ap23_mcp_startup_rejects_invalid_roster_or_uninstalled_approval_authority() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let approver = Keypair::generate();
     let mut config = config(directory.path(), &approver, Arc::new(AtomicUsize::new(0)))?;
@@ -201,16 +203,12 @@ fn ap23_mcp_startup_rejects_invalid_roster_or_unactivated_replay_source() -> Tes
     config.approval = Some(good.clone());
     config.approval.as_mut().ok_or("approval config")?.tenant_id = " ".into();
     assert!(RemoteSessionFactory::new(config.clone()).is_err());
-    config.approval = Some(good);
-    let unrelated = directory.path().join("unactivated.sqlite3");
-    drop(
-        chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_capacity(&unrelated, 128)?,
+    let uninstalled = GovernedApprovalAuthorityBindingV1::new(
+        good.binding.approval_authority_id().clone(),
+        AdmissionIdentifier::try_new("expectation_id", "uninstalled-generation")?,
     );
-    config
-        .approval
-        .as_mut()
-        .ok_or("approval config")?
-        .replay_source_path = unrelated;
+    config.approval = Some(good);
+    config.approval.as_mut().ok_or("approval config")?.binding = uninstalled;
     assert!(RemoteSessionFactory::new(config).is_err());
     Ok(())
 }

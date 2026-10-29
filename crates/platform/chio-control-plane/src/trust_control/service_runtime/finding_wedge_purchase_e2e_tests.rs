@@ -34,6 +34,7 @@ use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::{ReceiptLineageRelationKind, SignedExportEnvelope};
@@ -69,10 +70,7 @@ use chio_finding::{
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
 use chio_http_serve::{apply_server_hygiene, ServeHygieneConfig};
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_inclusion_proof, checkpoint_log_id, KernelCheckpoint,
-    ReceiptInclusionProof,
-};
+use chio_kernel::checkpoint::build_checkpoint;
 use chio_kernel::finding_purchase::{
     FINDING_PURCHASE_CONTEXT_KEY, FINDING_STATUS_PROOF_CONTEXT_KEY,
 };
@@ -84,6 +82,7 @@ use chio_kernel::{
     ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use chio_kernel_core::evidence_verify::{build_inclusion_proof, checkpoint_log_id};
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, ReservationReceipt, SignedAcceptedBid,
     SignedAskResponse, SignedBidRequest, SignedReservationReceipt, VerifiedReservationReceipt,
@@ -565,9 +564,7 @@ fn market_state(
     let config = TrustServiceConfig {
         transport: Default::default(),
         listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-        service_token: SERVICE_TOKEN.to_string(),
-        tenant_read_tokens: std::collections::BTreeMap::new(),
-        authority_workload_token: None,
+        access: crate::trust_control::caller_credentials::tests::test_access(SERVICE_TOKEN),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
@@ -576,6 +573,7 @@ fn market_state(
         authority_keyring_config_path: None,
         authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
+        cluster_peer_replay_db_path: None,
         joint_authority_db_path: None,
         fiscal_runtime: None,
         enterprise_providers_file: None,
@@ -593,7 +591,6 @@ fn market_state(
         advertise_url: None,
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: std::time::Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
@@ -621,6 +618,7 @@ fn market_state(
             FederationAdmissionRateLimiter::default(),
         )),
         cluster: None,
+        peer_nonces: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),

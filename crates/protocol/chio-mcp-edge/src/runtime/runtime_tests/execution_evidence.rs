@@ -172,7 +172,17 @@ fn execution_evidence_reports_kernel_denial_without_invoking_or_exposing_output(
 #[test]
 fn execution_evidence_does_not_project_streams_as_verified_values() {
     let mut edge = make_streaming_edge(10);
-    initialize_edge(&mut edge);
+    let initialized = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {},
+        }))
+        .unwrap();
+    assert_eq!(
+        initialized["result"]["capabilities"]["experimental"]["io.chio/execution-evidence"]
+            ["outputKinds"],
+        json!(["value", "stream", "none"])
+    );
+    edge.handle_jsonrpc(json!({"jsonrpc":"2.0", "method":"notifications/initialized"}));
     let response = edge
         .handle_jsonrpc(json!({
             "jsonrpc": "2.0", "id": 9, "method": "tools/call",

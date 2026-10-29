@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
+# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -13,6 +13,7 @@ from __future__ import annotations
 from .admission_metadata_schema import ChioDurableAdmissionReceiptMetadata, CompensationStatus, Digest, DispatchCommit, DispatchLaunch, Identifier, LaunchRef, NativeLaunch, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, StoreFence, WorkerProfile
 from .ag_ui_receipt_schema import ChioAgUiReceiptSignedBody, Target
 from .child_request_receipt_schema import ChioChildRequestReceiptSignedBody, Metadata, Surface, TerminalState
+from .decision_model_witness_schema import ChioDecisionModelWitnessReceiptMetadata, Digest, Evaluation, FallbackReason, Outcome
 from .delivery_contract_schema import ChioDeliveryContractReceiptMetadata, Digest, Result
 from .disclosure_schema import ChioReceiptDisclosure, Opening
 from .finding_delivery_schema import ChioFindingDeliveryReceiptMetadata, Digest, DigestCheck, HierarchicalIdentifier, IJsonU64NonZero, Identifier, MediaTypeCheck, SettlementMode, StatusProof, TransformProfile
@@ -22,6 +23,7 @@ from .lineage_statement_schema import ChioReceiptLineageStatement, EvidenceClass
 from .receipt_body_schema import AcceptedPrice, Action, Action1, ActiveDefenseBody, AdmissionOperation, AggregateBudget, AggregateInvocationBudget, AggregateInvocationBudget2, AggregateInvocationBudget3, AggregateInvocationBudget4, AggregateInvocationBudget5, Alice, AmountBounds, Approval, Approval2, ApprovedMax, Arguments, Attachment, Attachment1, AttenuationProof, AttenuationProof2, AttenuationProof3, AttenuationProof4, Attribution, Authority, Authorize, Autonomy, Binding, Binding5, Binding6, Bob, Body, Body196, Body202, Body203, Bootstrap, BoundTo, BrokerAttempt, Budget, BudgetAuthority, CallChain, Capabilities, CapabilityLeaseRef, Carol, Checkpoint, ChioReceiptV1SignedBody, ChioRuntime, Claim, Commerce, Context, CostBreakdown, Dave, Decision, DelegationChainItem, DelegationChainItem2, DelegationChainItem3, DelegationChainItem4, DeliveryContract, Digest, DispatchCommit, DispatchCommit4, DispatchLaunch, EconomicAuthorization, Effect, Effect2, EvidenceItem, ExecutionDispatch, ExecutionNonce, FederationTreatyDsse, Financial, FindingDelivery, FindingPurchaseReplaySnapshot, GovernanceReceiptRef, GovernedTransaction, Grant, Header, History, HistoryItem, HoldAmount, Inclusion, Intent, Intent2, LiabilityRefs, MaxAmount, Merchant, Metadata, MeteredBilling, Metering, Nonce, Nonce2, NormalizedSubsetProof, NormalizedSubsetProof2, NormalizedSubsetProof3, NormalizedSubsetProof4, Operation, Operation20, Operation21, OperationOwnedReplay, Outcome, Output, Parameters, Parameters1, ParticipantRequirements, Payee, Payer, Payload, Payment, PheromoneAdvisory, PheromonePolicyDecision, Policy, PolicyEvaluationSummary, PricingBasis, Proof, ProviderAttempt, Purchase, Quote, QuotedCost, Rail, Receipt, ReceiptContext, ReceiptLog, Reference, ReportedCost, Request, RequestBinding, RequestBinding1, RequestBinding2, Resource, Response, Response2, RetainedDispatchCommit, Root, RootBinding, RootBinding2, RootBinding3, RootBinding4, RootBinding5, Route, RuntimeAssurance, Scope, Scope20, Scope21, Scope22, Scope23, ServerAVerdict, ServerBVerdict, Settlement, SettlementCap, SignedNonce, StatusProof, StatusProof2, StoreFence, SubsetRelation, Target, Terminal, TerminalReplay, TerminalReplay1, TerminalState, TreatyBindingRef, UpstreamProof, UsageEvidence, Value, VerifiedSwarmRequestBinding, VerifiedSwarmRouteMetadata
 from .receipt_lineage_statement_body_schema import ChildSessionAnchor, ChioReceiptLineageStatementV1SignedBody, ParentSessionAnchor
 from .record_schema import ActorRef, BbsReceiptSignature, BoundaryClass, ChioReceiptRecord, Decision, Decision10, Decision7, Decision8, Decision9, GuardEvidence, ObservationOutcome, ReceiptKind, RedactionMode, ToolCallAction, ToolOrigin, TrustLevel
+from .session_anchor_metadata_schema import ChioReceiptSessionAnchorMetadata
 from .settlement_closure_body_schema import ChioSettlementClosureV1SignedBody
 from .settlement_closure_schema import Asset, ChioSettlementClosure, Kind, Rail, RailRef, SettlementState
 
@@ -79,6 +81,7 @@ __all__ = [
     "ChildSessionAnchor",
     "ChioAgUiReceiptSignedBody",
     "ChioChildRequestReceiptSignedBody",
+    "ChioDecisionModelWitnessReceiptMetadata",
     "ChioDeliveryContractReceiptMetadata",
     "ChioDurableAdmissionReceiptMetadata",
     "ChioFindingDeliveryReceiptMetadata",
@@ -89,6 +92,7 @@ __all__ = [
     "ChioReceiptLineageStatementV1SignedBody",
     "ChioReceiptMerkleInclusionProof",
     "ChioReceiptRecord",
+    "ChioReceiptSessionAnchorMetadata",
     "ChioReceiptV1SignedBody",
     "ChioRuntime",
     "ChioSettlementClosure",
@@ -117,10 +121,12 @@ __all__ = [
     "EconomicAuthorization",
     "Effect",
     "Effect2",
+    "Evaluation",
     "EvidenceClass",
     "EvidenceItem",
     "ExecutionDispatch",
     "ExecutionNonce",
+    "FallbackReason",
     "FederationTreatyDsse",
     "Financial",
     "FindingDelivery",

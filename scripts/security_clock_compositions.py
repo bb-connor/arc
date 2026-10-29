@@ -6,8 +6,8 @@ adapter without remaining-debt classification. These are lexical contracts.
 
 COMPOSITION_CONTRACTS = {
     'crates/guards/chio-guards/src/external/cache.rs::default::native-adapter': 'e7feb30104f1093ac5b75fb21c962b9fef6b318db38aefd1a3f449a018cdaf8d',
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter": "7d478f8a1f489f8c6a58737efbab40628d518c38a5c95f28e6d6160bb7063511",
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter": "d943af11f845f9ec634827077318a461ccea2fa2d6ed1dc21a3158fa87abc8d4",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_chain_frontier::native-adapter": "f0577fead8f758fea1901948aed59dec8768d7edc069563ef97901533418ede6",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_previous::native-adapter": "b769e6b3808f4bafbe40d1bccaf00d8276f1ab3db8e5c1a0cffae0f1e245322a",
     "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter": "17f9d4795ceda383de82d58e24111070d06dd17a0ca70eb34d15c1300b20f04b",
     "crates/platform/chio-control-plane/src/durable_admission.rs::open::native-adapter": "58bc48bb4a6b959b27928b45b0dfd14a05959c0733b0535e4f38faba68b31361",
     "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority::native-adapter": "dcd0aca91aa8eea73c2241dd806fb5adda9f485386febd8940e1fe278b8aa10f",

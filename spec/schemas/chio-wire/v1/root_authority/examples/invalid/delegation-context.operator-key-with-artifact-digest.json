@@ -1,0 +1,29 @@
+{
+  "schema": "chio.delegation-context.v1",
+  "anchor": {
+    "kind": "chio_operator_key",
+    "issuer": "urn:chio:operator-key",
+    "artifact_retained": false,
+    "replay_key_digest": "sha256:a8d5951b0e84672ecd89c9089affe7796acec1e116c048f4f03d19fb5f8b0c06",
+    "token_iat": 1792234795,
+    "token_exp": 1792235095,
+    "subject": {
+      "commit": "sha256:5565e37737480e1919ede379b1957b7b9acaf6c1356394f06390772615a482de",
+      "salt_ref": "anchor.sub"
+    },
+    "tenant": {
+      "commit": "sha256:69c4352be0bbc0f9e0570d6a2b699412b0697890a72c6b82f5e522a3fc7bf805",
+      "salt_ref": "anchor.tenant"
+    },
+    "claims": {},
+    "artifact_digest": "sha256:cd36b537365257d2d7a2789136e5c4db82ff6c849b3299fd4aa9352367a42093"
+  },
+  "exchange": {
+    "exchange_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+    "exchanged_at": 1792234795,
+    "request_digest": "sha256:82b739ad69e8c3ffda9cbb4b34a96954c0505f2c4107353ef4cb670f7c4bb577",
+    "holder": "edge_session"
+  },
+  "root_policy_rule_id": "operator-key",
+  "effective_root_scope_hash": "sha256:1e5438e3d49f3872e8756dac70d59266ec8aab7d61a6e1f9fc86cbc24780e33f"
+}

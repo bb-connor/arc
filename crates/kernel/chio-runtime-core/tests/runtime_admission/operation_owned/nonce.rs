@@ -63,18 +63,30 @@ fn owned_nonce_preflight_releases_before_issuance_and_dispatch_claims_a_new_epis
         .ok_or("dispatch ownership")?;
     assert!(completed.dispatch_commit().is_some());
     assert_eq!(history.len(), 2);
-    assert_eq!(history[0].reference, reference);
+    let preflight_claim = history
+        .iter()
+        .find(|entry| entry.reference == reference)
+        .ok_or("original preflight claim")?;
+    let dispatch_claim = history
+        .iter()
+        .find(|entry| entry.reference != reference)
+        .ok_or("fresh dispatch claim")?;
     assert_eq!(
-        history[0].disposition,
+        preflight_claim.disposition,
         RuntimeParticipantDisposition::ReleasedBeforeDispatch
     );
-    assert_ne!(history[1].reference, reference);
-    assert_eq!(history[1].intent.phase(), RuntimeParticipantPhase::Dispatch);
     assert_eq!(
-        history[1].disposition,
+        dispatch_claim.intent.phase(),
+        RuntimeParticipantPhase::Dispatch
+    );
+    assert_eq!(
+        dispatch_claim.disposition,
         RuntimeParticipantDisposition::RetainedAfterDispatchCommit
     );
-    assert_eq!(history[0].intent.resources(), history[1].intent.resources());
+    assert_eq!(
+        preflight_claim.intent.resources(),
+        dispatch_claim.intent.resources()
+    );
     let replay = kernel.evaluate_tool_call_blocking(&execution)?;
     assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);

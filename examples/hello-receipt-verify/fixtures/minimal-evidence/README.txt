@@ -3,9 +3,9 @@ Chio evidence export
 This directory is a local SQLite export assembled by `chio evidence export`.
 export-envelope.json authenticates the manifest and complete decoded payload.
 Verify with an independently obtained kernel public key:
-  chio evidence verify --input <directory> --trusted-kernel-pubkey <key>
-Repeat the key flag for every trusted receipt/checkpoint and package signer.
-Without --trusted-anchor-file, publication metadata is only a transparency preview.
+  chio evidence verify --input <directory> --trust <trust-file>
+The chio.verifier-trust.v1 file pins every trusted receipt/checkpoint and package signer.
+Without its checkpoint_trust_anchor, publication metadata is only a transparency preview.
 It contains signed receipts, checkpoints, inclusion proofs, capability lineage,
 and retention metadata for offline review.
 

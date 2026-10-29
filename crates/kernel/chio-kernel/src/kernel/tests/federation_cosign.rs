@@ -65,22 +65,29 @@ impl BilateralCoSigningProtocol for CountingRejectingCosigner {
     }
 }
 
-struct ForgedTreatyMetadataAdmissionHook;
+/// Allows a federated request without verified treaty material, optionally
+/// forging the kernel-owned treaty evidence block in its own metadata.
+struct UnverifiedTreatyAdmissionHook {
+    forge_treaty_evidence: bool,
+}
 
-impl RuntimeAdmissionHook for ForgedTreatyMetadataAdmissionHook {
+impl RuntimeAdmissionHook for UnverifiedTreatyAdmissionHook {
     fn name(&self) -> &str {
-        "test-forged-federation-treaty-metadata"
+        "test-unverified-federation-treaty"
     }
 
     fn evaluate(
         &self,
         context: &RuntimeAdmissionContext<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
-        Ok(RuntimeAdmissionDecision::allow(Some(serde_json::json!({
+        let mut metadata = serde_json::json!({
             "chio_runtime": {
                 "admission_id": context.request.request_id,
-                "accepted": true,
-                "federation_treaty_dsse": {
+                "accepted": true
+            }
+        });
+        if self.forge_treaty_evidence {
+            metadata["chio_runtime"]["federation_treaty_dsse"] = serde_json::json!({
                     "policy_evaluation_summary": {
                         "server_a_verdict": {
                             "verdict": "allow",
@@ -93,9 +100,9 @@ impl RuntimeAdmissionHook for ForgedTreatyMetadataAdmissionHook {
                             "policy_version": "forged"
                         }
                     }
-                }
-            }
-        }))))
+            });
+        }
+        Ok(RuntimeAdmissionDecision::allow(Some(metadata)))
     }
 }
 
@@ -316,8 +323,11 @@ fn federated_request_produces_dsse_envelope_verifiable_by_both_orgs() {
     );
 }
 
-#[test]
-fn forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign() {
+/// Runs one federated request through a hook that returns no verified
+/// treaty material.
+fn unverified_treaty_denial(
+    forge_treaty_evidence: bool,
+) -> (ChioKernel, ToolCallResponse, std::sync::Arc<AtomicU64>) {
     let origin_keypair = Keypair::generate();
     let origin_kernel_id = "kernel.org-a";
     let local_kernel_id = "kernel.org-b";
@@ -336,18 +346,21 @@ fn forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign() {
 
     let trust = KernelTrustExchange::new(local_kernel_id, kernel.config.keypair.clone())
         .with_trusted_peer(origin_kernel_id, origin_keypair.public_key());
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0);
-    let peer = handshake_and_pin(&trust, origin_kernel_id, &origin_keypair, now);
+    let peer = handshake_and_pin(
+        &trust,
+        origin_kernel_id,
+        &origin_keypair,
+        current_unix_timestamp(),
+    );
     let mut kernel = kernel.with_federation_peers(vec![peer]);
     kernel.set_federation_cosigner(std::sync::Arc::new(InProcessCoSigner::new(
         origin_kernel_id,
         origin_keypair,
         kernel.config.keypair.public_key(),
     )));
-    kernel.set_runtime_admission_hook(std::sync::Arc::new(ForgedTreatyMetadataAdmissionHook));
+    kernel.set_runtime_admission_hook(std::sync::Arc::new(UnverifiedTreatyAdmissionHook {
+        forge_treaty_evidence,
+    }));
 
     let agent_keypair = make_keypair();
     let capability = make_capability(
@@ -367,13 +380,26 @@ fn forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign() {
 
     let response = kernel
         .evaluate_tool_call_blocking(&request)
-        .expect("forged treaty metadata must produce a signed denial");
+        .expect("unverified treaty admission must produce a signed denial");
+    (kernel, response, invocations)
+}
 
+#[test]
+fn forged_runtime_treaty_metadata_is_refused_as_a_kernel_owned_field() {
+    let (kernel, response, invocations) = unverified_treaty_denial(true);
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("verified federation treaty material missing")));
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("runtime admission hook metadata names a kernel-owned chio_runtime field")
+    );
+    assert_eq!(
+        response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/runtime_admission/field")),
+        Some(&serde_json::json!("federation_treaty_dsse"))
+    );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
@@ -384,6 +410,20 @@ fn forged_runtime_treaty_metadata_cannot_reach_dispatch_or_cosign() {
         .as_ref()
         .and_then(|metadata| metadata.get("chio_runtime"))
         .and_then(|runtime| runtime.get("federation_treaty_dsse"))
+        .is_none());
+}
+
+#[test]
+fn federated_allow_without_verified_treaty_material_is_refused() {
+    let (kernel, response, invocations) = unverified_treaty_denial(false);
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("verified federation treaty material missing from allowed runtime admission")
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert!(kernel
+        .federation_dsse_envelope(&response.receipt.id)
         .is_none());
 }
 

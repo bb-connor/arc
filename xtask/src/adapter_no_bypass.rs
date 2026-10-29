@@ -18,6 +18,8 @@ mod source;
 const SOURCE_INVENTORY_PATH: &str = "formal/adapter-source-inventory.toml";
 const MCP_LAUNCH_SOURCE: &str =
     "crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc";
+const OPERATION_OWNED_HOOK_SOURCE: &str =
+    "crates/kernel/chio-runtime-core/src/admission_hook/operation_owned.rs";
 const MAINTENANCE_SUPERVISION_SOURCE: &str =
     "crates/products/chio-api-protect/src/proxy/state/admission_maintenance.rs";
 
@@ -344,14 +346,14 @@ const CALL_CONTRACTS: &[CallContract] = &[
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
+        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate_operation_owned",
         target: "self.prepare_request",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook.rs",
-        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate",
-        target: "prepared.reserve",
+        function: "<ChioRuntimeAdmissionHook as RuntimeAdmissionHook>::evaluate_operation_owned",
+        target: "prepared.reserve_operation_owned",
         minimum: 1,
     },
     CallContract {
@@ -361,9 +363,15 @@ const CALL_CONTRACTS: &[CallContract] = &[
         minimum: 1,
     },
     CallContract {
-        path: "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
-        function: "PreparedHookAdmission::reserve",
-        target: "hook.store.consume_swarm_continuation",
+        path: OPERATION_OWNED_HOOK_SOURCE,
+        function: "PreparedHookAdmission::reserve_operation_owned",
+        target: "self.operation_owned_resources",
+        minimum: 1,
+    },
+    CallContract {
+        path: OPERATION_OWNED_HOOK_SOURCE,
+        function: "PreparedHookAdmission::reserve_operation_owned",
+        target: "authority.claim",
         minimum: 1,
     },
     CallContract {
@@ -451,6 +459,7 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
         "PolicyDecision::DenyByDefault",
     )?;
     require_pre_admit_budget_registry(&parsed)?;
+    require_swarm_continuation_claim(&parsed)?;
     require_call_tokens(
         parsed
             .get("crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs")
@@ -479,6 +488,16 @@ fn require_pre_admit_budget_registry(parsed: &BTreeMap<String, SourceFacts>) -> 
             .ok_or_else(|| "kernel capability evidence source was not parsed".to_string())?,
         "ChioKernel::verify_capability_full_typed_with_clock",
         "chio_kernel_core::NoopBudgetRegistry",
+    )
+}
+
+fn require_swarm_continuation_claim(parsed: &BTreeMap<String, SourceFacts>) -> Result<(), String> {
+    require_path(
+        parsed
+            .get(OPERATION_OWNED_HOOK_SOURCE)
+            .ok_or_else(|| "operation-owned runtime hook source was not parsed".to_string())?,
+        "PreparedHookAdmission::operation_owned_resources",
+        "RuntimeParticipantKind::SwarmContinuation",
     )
 }
 
@@ -1218,6 +1237,44 @@ mod tests {
     }
 
     #[test]
+    fn swarm_continuation_stays_in_the_operation_owned_claim() -> Result<(), String> {
+        let root = workspace_root().map_err(|error| error.to_string())?;
+        let source = fs::read_to_string(root.join(OPERATION_OWNED_HOOK_SOURCE))
+            .map_err(|error| error.to_string())?;
+        let mut parsed = BTreeMap::new();
+        parsed.insert(
+            OPERATION_OWNED_HOOK_SOURCE.to_owned(),
+            parse_source(&source, OPERATION_OWNED_HOOK_SOURCE)?,
+        );
+        require_swarm_continuation_claim(&parsed)?;
+        let kind = "RuntimeParticipantKind::SwarmContinuation";
+        let owner = source
+            .find("fn operation_owned_resources")
+            .ok_or("operation_owned_resources is missing")?;
+        let next = source
+            .find("fn operation_owned_plan_digest")
+            .ok_or("operation_owned_plan_digest is missing")?;
+        let first = source
+            .find(kind)
+            .ok_or("swarm continuation kind is missing")?;
+        assert!(owner < first && first < next);
+        let mutated = source.replacen(kind, "RuntimeParticipantKind::TreatyContinuation", 1);
+        parsed.insert(
+            OPERATION_OWNED_HOOK_SOURCE.to_owned(),
+            parse_source(&mutated, OPERATION_OWNED_HOOK_SOURCE)?,
+        );
+        let error = match require_swarm_continuation_claim(&parsed) {
+            Ok(()) => return Err("claim without the swarm continuation was accepted".to_owned()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error,
+            "mediation contract path missing: PreparedHookAdmission::operation_owned_resources requires RuntimeParticipantKind::SwarmContinuation",
+        );
+        Ok(())
+    }
+
+    #[test]
     fn transport_channel_successor_keeps_its_required_kernel_mediation() -> Result<(), String> {
         let contract = CallContract {
             path: "crates/protocol/chio-mcp-edge/src/runtime/tool_calls.rs",
@@ -1522,15 +1579,16 @@ mod tests {
                 matches!(
                     contract.target,
                     "self.prepare_request"
-                        | "prepared.reserve"
+                        | "prepared.reserve_operation_owned"
                         | "verify_swarm_authority_reference"
                         | "verify_swarm_authority_for_admission"
                         | "verify_swarm_request_binding"
-                        | "hook.store.consume_swarm_continuation"
+                        | "self.operation_owned_resources"
+                        | "authority.claim"
                 )
             })
             .collect();
-        assert_eq!(contracts.len(), 6);
+        assert_eq!(contracts.len(), 7);
         for contract in contracts {
             let source = fs::read_to_string(root.join(contract.path))
                 .unwrap_or_else(|error| panic!("read {}: {error}", contract.path));

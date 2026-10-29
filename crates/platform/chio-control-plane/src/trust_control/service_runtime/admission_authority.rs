@@ -21,7 +21,7 @@ use chio_store_sqlite::{SqliteAdmissionOperationStore, SqliteBudgetStore, Sqlite
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use super::super::report_validation::validate_service_auth;
+use super::super::report_validation::validate_caller;
 use super::super::*;
 
 #[path = "admission_authority/recovery.rs"]
@@ -32,7 +32,11 @@ pub(crate) async fn handle_admission_authority(
     request: Request,
 ) -> Response {
     // Authenticate before buffering a potentially large admission snapshot.
-    if let Err(response) = validate_service_auth(request.headers(), &state.config.service_token) {
+    if let Err(response) = validate_caller(
+        request.headers(),
+        &state.config,
+        Scope::AdmissionAuthorityWrite,
+    ) {
         return response;
     }
     let Json(request) = match Json::<AdmissionAuthorityRequest>::from_request(request, &state).await

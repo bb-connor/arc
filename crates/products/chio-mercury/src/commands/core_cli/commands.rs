@@ -8,13 +8,15 @@ pub fn cmd_mercury_proof_export(
     input: &Path,
     output: &Path,
     bundle_manifest_paths: &[PathBuf],
-    trusted_kernel_keys: &[String],
+    trust: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let package = build_proof_package(input, bundle_manifest_paths, trusted_kernel_keys)?;
+    let trust = chio_bundle_verify::read_trust_file(trust)?;
+    let keys = trusted_kernel_key_set(&trust)?;
+    let package = build_proof_package(input, bundle_manifest_paths, &trust)?;
     package
-        .verify_integrity_only(unix_now())
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
+        .map_err(mercury_verify_error)?;
     write_json_file(output, &package)?;
 
     if json_output {
@@ -33,16 +35,18 @@ pub fn cmd_mercury_proof_export(
 
 pub fn cmd_mercury_inquiry_export(
     input: &Path,
+    trust: &Path,
     output: &Path,
     audience: &str,
     redaction_profile: Option<&str>,
     verifier_equivalent: bool,
     json_output: bool,
 ) -> Result<(), CliError> {
+    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?)?;
     let proof_package: MercuryProofPackage = read_json_file(input)?;
     proof_package
-        .verify_integrity_only(unix_now())
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
+        .map_err(mercury_verify_error)?;
     let package = build_inquiry_package(
         proof_package,
         audience,
@@ -50,8 +54,8 @@ pub fn cmd_mercury_inquiry_export(
         verifier_equivalent,
     )?;
     let report = package
-        .verify_integrity_only(unix_now())
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
+        .map_err(mercury_verify_error)?;
     write_json_file(output, &package)?;
 
     if json_output {
@@ -68,7 +72,13 @@ pub fn cmd_mercury_inquiry_export(
     Ok(())
 }
 
-pub fn cmd_mercury_verify(input: &Path, json_output: bool, explain: bool) -> Result<(), CliError> {
+pub fn cmd_mercury_verify(
+    input: &Path,
+    trust: &Path,
+    json_output: bool,
+    explain: bool,
+) -> Result<(), CliError> {
+    let keys = trusted_kernel_key_set(&chio_bundle_verify::read_trust_file(trust)?)?;
     let value: serde_json::Value = read_json_file(input)?;
     let schema = value
         .get("schema")
@@ -78,14 +88,14 @@ pub fn cmd_mercury_verify(input: &Path, json_output: bool, explain: bool) -> Res
         MERCURY_PROOF_PACKAGE_SCHEMA => {
             let package: MercuryProofPackage = serde_json::from_value(value)?;
             package
-                .verify_integrity_only(unix_now())
-                .map_err(|error| CliError::Other(error.to_string()))?
+                .verify_with_trusted_kernel_keys(unix_now(), &keys)
+                .map_err(mercury_verify_error)?
         }
         MERCURY_INQUIRY_PACKAGE_SCHEMA => {
             let package: MercuryInquiryPackage = serde_json::from_value(value)?;
             package
-                .verify_integrity_only(unix_now())
-                .map_err(|error| CliError::Other(error.to_string()))?
+                .verify_with_trusted_kernel_keys(unix_now(), &keys)
+                .map_err(mercury_verify_error)?
         }
         _ => {
             return Err(CliError::Other(format!(

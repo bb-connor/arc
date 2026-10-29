@@ -235,11 +235,7 @@ pub(super) fn read_signer(
     public_key: &PublicKey,
 ) -> Result<Arc<Ed25519Backend>, CliError> {
     use std::io::Read;
-    use std::os::unix::fs::OpenOptionsExt;
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)?;
+    let file = crate::input::open_regular(path)?;
     let metadata = file.metadata()?;
     if !metadata.is_file()
         || metadata.nlink() != 1
@@ -253,9 +249,11 @@ pub(super) fn read_signer(
             "broker authority seed must be a private regular file owned by the host",
         ));
     }
+    #[cfg(test)]
+    reader_tests::after_open_metadata(path)?;
     let mut seed = zeroize::Zeroizing::new(String::new());
     file.take(66).read_to_string(&mut seed)?;
-    if metadata.len() > 65 {
+    if metadata.len() > 65 || seed.len() > 65 {
         return Err(error("broker authority seed is oversized"));
     }
     let key = chio_core_types::Keypair::from_seed_hex(seed.trim()).map_err(error)?;
@@ -266,3 +264,7 @@ pub(super) fn read_signer(
     }
     Ok(Arc::new(Ed25519Backend::new(key)))
 }
+
+#[cfg(test)]
+#[path = "config_reader_tests.rs"]
+mod reader_tests;

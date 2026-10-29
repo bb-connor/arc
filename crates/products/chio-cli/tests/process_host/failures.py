@@ -456,6 +456,41 @@ def main(binary):
     assert report["independent"]["attempts"] == 0
     assert not (directory / "independent-1-started.json").exists()
 
+    for i, policy in enumerate((None, "continue_independent")):
+        directory = root / f"cancelled-after-completion-{i}"
+        plan = prepare(binary, directory, policy=policy)
+        plan["workers"][0]["input"]["exit_code"] = 0
+        write(directory / "plan.json", plan)
+        arguments = (
+            "process",
+            "run",
+            "--state",
+            directory / "host",
+            "--plan",
+            directory / "plan.json",
+        )
+        assert invoke(binary, *arguments)["complete"]
+        assert invoke(binary, *arguments)["complete"]
+        cancelled = invoke(
+            binary,
+            "process",
+            "cancel",
+            "--state",
+            directory / "host",
+            "--process",
+            "gather",
+        )
+        assert cancelled["cancelled_processes"] == 1, cancelled
+        refused = subprocess.run(
+            [binary, *map(str, arguments)],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            check=False,
+        )
+        assert refused.returncode != 0, (refused.stdout, refused.stderr)
+        assert "run worker was cancelled" in refused.stderr, refused.stderr
+
     for i, invalid in enumerate(("ignore", None, False)):
         directory = root / f"invalid-{i}"
         plan = prepare(binary, directory)

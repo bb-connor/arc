@@ -244,11 +244,6 @@ DEBT: dict[str, DomainDebt] = {
         "colon convention; retires with a versioned rename",
         shape=True,
     ),
-    r"chio:governed-approval-replay-source-inventory:v1\0": allow(
-        "2027-01-31",
-        "colon convention; retires with a versioned rename",
-        shape=True,
-    ),
     r"chio:response-plan:v1\0": allow(
         "2027-01-31",
         "colon convention; retires with a versioned rename",

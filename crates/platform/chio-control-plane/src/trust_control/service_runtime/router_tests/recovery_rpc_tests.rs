@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Actual authenticated recovery RPCs over a private temporary joint authority.
 use super::*;
 
@@ -62,7 +63,8 @@ impl Fixture {
         state.joint_authority_store = Some(authority.clone());
         let reply_fault = Arc::new(AtomicU8::new(0));
         let hold = Arc::new(RequestHold::default());
-        let router = crate::trust_control::service_runtime::router::build_router(state)
+        let router = crate::trust_control::service_runtime::router::build_router(state.clone())
+            .merge(crate::trust_control::service_runtime::router::build_internal_router(state))
             .layer(axum::middleware::from_fn_with_state(
                 reply_fault.clone(),
                 fault_reply,
@@ -104,6 +106,7 @@ impl Fixture {
         })?;
         let remote =
             crate::trust_control::service_runtime::remote_admission::build_remote_admission_stores(
+                &url,
                 &url,
                 "recovery-rpc-secret",
                 chio_core::Keypair::generate(),

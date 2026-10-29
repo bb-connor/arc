@@ -1,6 +1,6 @@
 use super::super::support;
 use super::{
-    copy_checkpoint_prefix_to_attached_archive, create_canonical_archive, unique_db_path,
+    copy_checkpoint_prefix_to_attached_archive, create_canonical_archive, temp_sqlite_path,
     ReceiptStoreError, SqliteReceiptStore,
 };
 
@@ -13,8 +13,8 @@ use super::{
 #[test]
 fn repair_is_idempotent_when_watermark_already_covers_boundary(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-idempotent-watermark");
-    let archive = unique_db_path("repair-idempotent-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-idempotent-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-idempotent-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     create_canonical_archive(&archive)?;
     let keypair = support::receipt_test_keypair();

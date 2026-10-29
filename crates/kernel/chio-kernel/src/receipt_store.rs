@@ -9,8 +9,8 @@ use chio_core::receipt::{
 use chio_log_redact::redacted;
 use chio_security_types::ports::OpaqueReceiptRef;
 
-use crate::capability_lineage::CapabilitySnapshot;
-use crate::checkpoint::KernelCheckpoint;
+use chio_core::receipt::checkpoint::KernelCheckpoint;
+use chio_core::receipt::evidence::CapabilitySnapshot;
 
 /// Durable logical active-defense evidence index backed by signed receipts.
 ///

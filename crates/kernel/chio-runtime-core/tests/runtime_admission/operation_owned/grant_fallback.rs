@@ -126,22 +126,25 @@ fn ordinary_and_nested_fallback_retire_the_denied_grants_runtime_episode() -> Te
             )?
             .ok_or("fallback ownership")?;
         assert_eq!(history.len(), 2);
-        assert_eq!(history[0].intent.grant_index(), 0);
+        let denied = history
+            .iter()
+            .find(|entry| entry.intent.grant_index() == 0)
+            .ok_or("denied grant history")?;
+        let allowed = history
+            .iter()
+            .find(|entry| entry.intent.grant_index() == 1)
+            .ok_or("allowed grant history")?;
         assert_eq!(
-            history[0].disposition,
+            denied.disposition,
             RuntimeParticipantDisposition::ReleasedBeforeDispatch
         );
-        assert_eq!(history[1].intent.grant_index(), 1);
         assert_eq!(
-            history[1].disposition,
+            allowed.disposition,
             RuntimeParticipantDisposition::RetainedAfterDispatchCommit
         );
-        assert_ne!(history[0].reference, history[1].reference);
-        assert_ne!(
-            history[0].intent.plan_digest(),
-            history[1].intent.plan_digest()
-        );
-        assert_eq!(history[0].intent.resources(), history[1].intent.resources());
+        assert_ne!(denied.reference, allowed.reference);
+        assert_ne!(denied.intent.plan_digest(), allowed.intent.plan_digest());
+        assert_eq!(denied.intent.resources(), allowed.intent.resources());
     }
     Ok(())
 }

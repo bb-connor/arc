@@ -15,6 +15,9 @@ use chio_federation::bilateral_dsse::{
     GovernanceReceiptRef, HashRecord, PolicyEvaluationSummary, PolicyVerdict, TreatyBindingRef,
 };
 use chio_federation::trust_establishment::{KernelTrustExchange, PeerHandshakeEnvelope};
+use chio_kernel::admission_operation::{
+    runtime_participant::RuntimeParticipantAuthorityBindingV1, AdmissionIdentifier,
+};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallRequest, ToolServerConnection,
     Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
@@ -25,15 +28,15 @@ use chio_runtime_core::{
     compute_ladder_intersection, governance_ladder_manifest_sha256, ladder_intersection_sha256,
     runtime_admission_bundle_sha256, tool_args_sha256, treaty_scope_sha256, BilateralInvocation,
     ChioRuntimeAdmissionHook, CrossKernelContinuation, GovernanceLadderActionClass,
-    GovernanceLadderManifest, InMemoryRuntimeAdmissionStore, ReceiptLineageBundle,
-    ReceiptLineageStatement, RuntimeAdmissionBundle, RuntimeAdmissionProfile,
-    RuntimeRequestBinding, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
+    GovernanceLadderManifest, ReceiptLineageBundle, ReceiptLineageStatement,
+    RuntimeAdmissionBundle, RuntimeAdmissionProfile, RuntimeRequestBinding,
+    SqliteRuntimeOrchestrationStore, TreatyScope, CHIO_BILATERAL_INVOCATION_SCHEMA,
     CHIO_CROSS_KERNEL_CONTINUATION_SCHEMA, CHIO_GOVERNANCE_LADDER_MANIFEST_SCHEMA,
     CHIO_RECEIPT_LINEAGE_BUNDLE_SCHEMA, CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
     CHIO_RUNTIME_ADMISSION_BUNDLE_SCHEMA, CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA,
     CHIO_TREATY_SCOPE_SCHEMA,
 };
-use chio_store_sqlite::SqliteReceiptStore;
+use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tempfile::{tempdir, TempDir};
@@ -47,12 +50,13 @@ pub struct TreatyPredispatchDenyFixture {
     kernel: ChioKernel,
     base_request: ToolCallRequest,
     base_bundle: RuntimeAdmissionBundle,
-    store: InMemoryRuntimeAdmissionStore,
+    store: SqliteRuntimeOrchestrationStore,
     request_sequence: AtomicU64,
     last_receipt_id: Mutex<Option<String>>,
     tool_invocations: Arc<AtomicU64>,
     runtime: Runtime,
     _receipt_directory: TempDir,
+    _authority: SqliteAuthorityStore,
 }
 
 impl TreatyPredispatchDenyFixture {
@@ -85,7 +89,41 @@ impl TreatyPredispatchDenyFixture {
         };
         let bundle_sha256 = runtime_admission_bundle_sha256(&bundle)?;
         let artifacts = TreatyArtifacts::new(&args)?;
-        let store = InMemoryRuntimeAdmissionStore::new();
+        let receipt_directory = tempdir()?;
+        let clock: Arc<dyn chio_security_types::clock::Clock> = Arc::new(
+            chio_security_types::clock::FixedClock::from_millis(NOW_UNIX_MS),
+        );
+        let source_path = receipt_directory.path().join("runtime.sqlite3");
+        let store = SqliteRuntimeOrchestrationStore::open_with_clock(&source_path, clock.clone())?;
+        let locks = receipt_directory.path().join("locks");
+        std::fs::create_dir(&locks)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(
+                receipt_directory.path(),
+                std::fs::Permissions::from_mode(0o700),
+            )?;
+            std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700))?;
+        }
+        let database = receipt_directory.path().join("authority.sqlite3");
+        SqliteAuthorityStore::provision(&database, &locks)?;
+        let authority =
+            SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
+        let runtime_id = AdmissionIdentifier::try_new("runtime_id", "treaty-benchmark")?;
+        let installed = authority
+            .admission_operation_store()
+            .install_runtime_source(
+                &AdmissionIdentifier::try_new("source_id", "treaty-benchmark-source")?,
+                &runtime_id,
+                &store,
+                &authority.mutation_fence(),
+                NOW_UNIX_MS,
+            )?;
+        let source_binding = RuntimeParticipantAuthorityBindingV1::new(
+            runtime_id,
+            installed.qualification_id().clone(),
+        );
         artifacts.insert_into(&store)?;
         let request = treaty_request(args, bundle_sha256, &artifacts)?;
         let profile = RuntimeAdmissionProfile {
@@ -96,13 +134,14 @@ impl TreatyPredispatchDenyFixture {
             issued_at_unix_ms: 1_800_000_000_000,
             expires_at_unix_ms: 1_800_003_600_000,
         };
-        let hook = ChioRuntimeAdmissionHook::new(profile, store.clone())
-            .with_fixed_now_unix_ms(NOW_UNIX_MS);
+        let hook = ChioRuntimeAdmissionHook::new(
+            profile,
+            SqliteRuntimeOrchestrationStore::open_with_clock(&source_path, clock.clone())?,
+            source_binding,
+        );
         let tool_invocations = Arc::new(AtomicU64::new(0));
         let config = kernel_config();
-        let peer_now_unix_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_secs();
+        let peer_now_unix_secs = NOW_UNIX_MS / 1000;
         let origin_keypair = Keypair::from_seed(&[21_u8; 32]);
         let trust = KernelTrustExchange::new("kernel.vendor-b", config.keypair.clone())
             .with_trusted_peer("kernel.buyer", origin_keypair.public_key());
@@ -114,9 +153,15 @@ impl TreatyPredispatchDenyFixture {
             &origin_keypair,
         )?;
         let peer = trust.accept_envelope(&peer_envelope, "kernel.buyer", peer_now_unix_secs)?;
-        let mut kernel = ChioKernel::new(config).with_federation_peers(vec![peer]);
+        let mut kernel =
+            ChioKernel::new_with_clock(config, clock).with_federation_peers(vec![peer]);
+        kernel.set_durable_admission_store(
+            Arc::new(authority.admission_operation_store()),
+            Arc::new(authority.tool_outcome_store()),
+            authority.mutation_fence(),
+        )?;
+        kernel.set_budget_store_handle(Arc::new(authority.budget_store()));
         kernel.set_federation_local_kernel_id("kernel.vendor-b");
-        let receipt_directory = tempdir()?;
         kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(
             receipt_directory.path().join("receipts.sqlite3"),
         )?))?;
@@ -135,6 +180,7 @@ impl TreatyPredispatchDenyFixture {
             tool_invocations,
             runtime,
             _receipt_directory: receipt_directory,
+            _authority: authority,
         };
         let smoke_request = fixture.prepare_request()?;
         assert!(
@@ -462,7 +508,7 @@ impl TreatyArtifacts {
 
     fn insert_into(
         &self,
-        store: &InMemoryRuntimeAdmissionStore,
+        store: &SqliteRuntimeOrchestrationStore,
     ) -> Result<(), Box<dyn std::error::Error>> {
         store.insert_treaty_runtime_artifact("treaty_scope", &self.scope.treaty_id, &self.scope)?;
         store.insert_treaty_runtime_artifact(

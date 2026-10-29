@@ -41,7 +41,7 @@ chio-decoy = { workspace = true }
 chio-errors = { workspace = true }
 chio-enterprise-export = { workspace = true }
 chio-did = { workspace = true }
-chio-egress-contract = { workspace = true }
+chio-egress-contract = { workspace = true, features = ["ureq-egress"] }
 chio-external-guards = { workspace = true }
 chio-federation = { workspace = true }
 chio-fiscal = { workspace = true }
@@ -51,6 +51,8 @@ chio-http-serve = { workspace = true }
 # The market verifiers this crate installs are kernel seams that only
 # exist with the kernel's finding-market lane compiled in.
 chio-kernel = { workspace = true, features = ["finding-market"] }
+chio-kernel-core = { workspace = true }
+chio-bundle-verify = { workspace = true }
 chio-keyring = { workspace = true }
 chio-manifest = { workspace = true }
 chio-log-redact = { workspace = true }
@@ -78,6 +80,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 yaml_serde = { workspace = true }
 thiserror = { workspace = true }
+toml = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 tracing = { workspace = true }
 tokio = { workspace = true }
@@ -124,7 +127,7 @@ chio-runtime-core = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-link = { workspace = true }
 chio-mcp-edge = { workspace = true }
-chio-store-sqlite = { workspace = true, features = ["cognition-market-test-support", "admission-test-support", "security-admission-test-support"] }
+chio-store-sqlite = { workspace = true, features = ["receipt-query-test-support", "cognition-market-test-support", "admission-test-support", "security-admission-test-support"] }
 chio-test-support = { workspace = true }
 jsonschema = { workspace = true }
 proptest = { workspace = true }

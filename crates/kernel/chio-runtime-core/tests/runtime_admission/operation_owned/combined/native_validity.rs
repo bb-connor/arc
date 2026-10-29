@@ -6,7 +6,7 @@ use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeDispatchValidity, RuntimeParticipantClaimIntentV1,
 };
-use chio_kernel::admission_operation::{AdmissionOperationStore, RuntimeReplaySourceSnapshotV1};
+use chio_kernel::admission_operation::{AdmissionOperationStore, RuntimeSourceQualificationV1};
 use chio_kernel::{KernelError, RuntimeAdmissionDecision, RuntimeParticipantClaimAuthority};
 
 type Hook = ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>;
@@ -15,7 +15,7 @@ type Hook = ChioRuntimeAdmissionHook<SqliteRuntimeOrchestrationStore>;
 fn native_swarm_evolution_preserves_treaty_and_original_physical_claim() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let (prior, next) = crate::swarm_evolution::treaty_versions()?;
-    let fixture = CombinedFixture::with_swarm_input(None, |_, _, _| Ok(()), prior.clone())?;
+    let fixture = CombinedFixture::with_swarm_input(|_, _, _| Ok(()), prior.clone())?;
     // A restart must retain the owner's verifier configuration, not generate a
     // fresh trust root as the default independent-test fixture does.
     let policy_inputs = signed_policy_inputs(0.1)?;
@@ -124,7 +124,7 @@ impl RuntimeAdmissionHook for SharedHook {
     fn revalidate_operation_owned_before_dispatch(
         &self,
         context: &RuntimeAdmissionRevalidationContext<'_>,
-        source: &RuntimeReplaySourceSnapshotV1,
+        source: &RuntimeSourceQualificationV1,
     ) -> Result<(), KernelError> {
         self.0
             .revalidate_operation_owned_before_dispatch(context, source)
@@ -148,7 +148,7 @@ fn revalidation_input<'a>(
 fn physical_input(
     fixture: &Fixture,
 ) -> TestResult<(
-    RuntimeReplaySourceSnapshotV1,
+    RuntimeSourceQualificationV1,
     RuntimeParticipantClaimIntentV1,
 )> {
     let history = super::super::faults::history(fixture)?;
@@ -157,7 +157,7 @@ fn physical_input(
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,
@@ -171,7 +171,7 @@ fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() ->
     use chio_federation::bilateral_dsse::{pae, DsseSignature};
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     const UNTIL: u64 = NOW + 5_000;
-    let fixture = CombinedFixture::with_treaty_input(None, |treaty, origin, local| {
+    let fixture = CombinedFixture::with_treaty_input(|treaty, origin, local| {
         let (mut statement, _) = treaty.bilateral_dsse.decode_statement()?;
         statement
             .predicate
@@ -246,7 +246,7 @@ fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_p
         ("planDigest", serde_json::json!("e".repeat(64))),
         ("requestBindingHash", serde_json::json!("f".repeat(64))),
         ("grantIndex", serde_json::json!(1)),
-        ("expectationId", serde_json::json!("wrong-expectation")),
+        ("qualificationId", serde_json::json!("wrong-qualification")),
         ("phase", serde_json::json!("nonce_preflight")),
         ("resources", serde_json::json!([])),
     ] {
@@ -298,14 +298,14 @@ fn native_runtime_deadline_includes_every_selected_signed_time_bound() -> TestRe
                 SqliteRuntimeOrchestrationStore::open(
                     fixture._directory.path().join("runtime.sqlite3"),
                 )?,
+                fixture.binding.clone(),
             )
             .with_runtime_trust_input(SignedExportEnvelope::sign(trust, &verifier)?, keys)
             .with_pheromone_query_report(signed_query_report(advisory(0.1), &verifier)?)
             .with_runtime_pheromone_policy(
                 SignedExportEnvelope::sign(policy, &verifier)?,
                 SignedExportEnvelope::sign(weights, &verifier)?,
-            )
-            .with_operation_owned_runtime_replay(fixture.binding.clone()),
+            ),
         );
         let kernel = fixture.kernel(SharedHook(hook.clone()), true, false)?;
         let response = kernel.evaluate_tool_call_blocking(&fixture.request)?;

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7c51d7910f0345879134e0bf5bbb042abd7b8dbfdcd23700753b77f6814a0f36
+# Schema sha256: b55a701e44e8cab56a79619656a773cbb3b9fd63c65594e997f7efc988bc178c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -771,7 +771,7 @@ class Outcome(BaseModel):
     owner_operation_ref: OwnerOperationRef
 
 
-class Outcome12(BaseModel):
+class Outcome13(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -925,7 +925,7 @@ class Result18(BaseModel):
     view: View
 
 
-class Outcome10(BaseModel):
+class Outcome11(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -939,7 +939,7 @@ class CommandResult(BaseModel):
         extra="forbid",
     )
     command_ref: CommandRef
-    outcome: Outcome10 | Outcome | Outcome12
+    outcome: Outcome11 | Outcome | Outcome13
 
 
 class Body208(BaseModel):

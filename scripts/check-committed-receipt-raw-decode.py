@@ -17,21 +17,42 @@ impl, or a call to a function of the same crate that is generic over a
 or `const` initializer. It is flagged when its target is strict by turbofish,
 by a `let` annotation (including a declared-then-assigned binding), by the
 item's declared type, or by the strict return type of the function that holds
-it (with `Self` read as the implementing type), either directly or through an
-unannotated `let` binding that the function returns. An extractor is flagged
-when its type argument is strict. Each exception in ALLOWED names
+it (with `Self` read as the implementing type). Context applies only along
+value-preserving flows: `Ok`/`Some`/`Box::new` wrappers, `?`, `.await` and
+error- or option-adapting methods, the tail of an `if` branch, `match` arm,
+block or `and_then` closure, and an unannotated `let` binding the function
+returns. A `match` or `if let` scrutinee takes the types its arm patterns
+name when some arm constrains every position and names only workspace
+types without type parameters (a std, external or generic type such as
+`Option::None` leaves its parameters uninferred) (otherwise a pattern that names no
+strict type leaves the target inferred), or the construct's own context when every value-carrying arm forwards
+the value unchanged; a closure that consumes the value gives its annotated
+parameter type. A `_` placeholder in a target is completed by that context. A decode
+whose target is neither named nor completed by context is refused as inferred
+unless ALLOWED_INFERRED names it with a reason, or ALLOWED_GENERIC_INFERRED
+names it as decoding its function's `Deserialize` parameter (no other generic
+decode is exempt). An extractor (`Json`, `Query`,
+`Form`, or an import of axum's) is flagged when its type argument is strict.
+A `macro_rules!` template decode is flagged when its concrete target is
+strict, when a target that depends on a capture is expanded by an invocation
+whose arguments name a strict type, and, for a template decode without a
+target, at each expansion site whose context is strict. Each exception in ALLOWED names
 one exact call in one function that reads an already parsed `Value`, together
 with the duplicate-refusing reader that produced it. The script checks itself
 against fixture trees on every run before it scans the workspace.
 
 Every production workspace member is scanned: `crates/` and each other
-top-level member directory except `bench`, `examples` and `tests`. A renamed
+declared member directory except `bench`, `examples` and `tests`. A renamed
 import (`use path::ChioReceipt as Receipt`) is read as an alias.
 
-The scan is lexical. It does not resolve paths, trait dispatch, or helpers in
-other crates, and a short type name defined differently in two crates is only
-strict when every definition is, so a pass is evidence for the listed forms
-only.
+The scan resolves lexical crate/module paths, type aliases and imports before
+computing the strict wrapper closure, and resolves renamed `serde_json` crates,
+modules, functions and `Deserializer` imports. It does not perform Rust type
+inference, trait dispatch or general macro expansion, or follow generic helpers
+in other crates; inferred targets it cannot name fail closed instead.
+Inside a generic `impl`, the impl's type parameters are read as unknown
+members of the target, so a strict type it also names is still flagged.
+A pass is evidence for the listed forms only.
 """
 
 from __future__ import annotations
@@ -39,11 +60,14 @@ from __future__ import annotations
 import argparse
 import functools
 import importlib.util
+import io
 import re
 import sys
 import tempfile
 import tomllib
+import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -59,10 +83,144 @@ def _load(name: str, path: Path):
 _gate = _load("trust_boundaries_gate", ROOT / "scripts/check-trust-boundaries.py")
 _lexer = _gate._lexer
 _contracts = _gate._contracts
+_resolution = _load("receipt_type_resolution", ROOT / "scripts/receipt_type_resolution.py")
 
 # The receipt types that carry a serde_json::Value member (action parameters,
 # metadata). Derived impls already refuse a duplicate field of a Chio object;
 # only a Value member can keep the last of two duplicate keys.
+EXCLUDED_TYPE_MODULES = {
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1":
+        "Generated wire mirrors are decoded through the typed v1 decoder, outside raw receipt strictness.",
+}
+
+ALLOWED_TYPE_PATHS: dict[tuple[str, str], str] = {}
+
+# Raw decodes whose target the scan cannot name (inferred from a use the scan
+# does not follow), keyed by (path, function, whitespace-normalized call), each
+# with the reason its inferred type holds no strict receipt type.
+# Raw decodes inside a function generic over a `Deserialize` parameter whose
+# target the scan cannot name but which decode that parameter. An entry on a
+# direct decode makes its function a generic raw helper, so every caller's
+# target is checked. An entry in a function without such a parameter is refused.
+ALLOWED_GENERIC_INFERRED: dict[tuple[str, str, str], str] = {
+    ("crates/kernel/chio-runtime-core/src/work/decode.rs", "recovery_observation", "recovery_contract(value)"):
+        "Decodes the observation value T of WorkObservationV1<T>, the function's DeserializeOwned parameter.",
+    ("crates/products/chio-cli/src/cli/chio/dispatch/pheromone/io.rs", "read_json_documents_from_dir", "crate::input::project(value)"):
+        "Each document is pushed into the returned Vec<T>; T is the function's DeserializeOwned parameter.",
+    ("crates/products/chio-cli/src/cli/input/config.rs", "load_document", "super::UntrustedJsonText::from_wire(bytes,super::MAX_DOCUMENT_BYTES)"):
+        "The load_with closure returns the decoded T, the function's DeserializeOwned parameter and return type.",
+    ("crates/products/chio-finding-market-canary/src/main.rs", "read_canonical_private", "read_canonical_private_bytes(path)"):
+        "The (bytes, value) tuple is projected to its T, the function's DeserializeOwned parameter and return type.",
+    ("crates/products/chio-finding-market-canary/src/main.rs", "read_canonical_private_bytes", "serde_json::from_slice(&bytes)"):
+        "The value is returned as the T in Ok((bytes, value)); T is the function's DeserializeOwned parameter.",
+    ("crates/protocol/chio-openapi/src/extensions.rs", "decode_extension", "serde_json::from_value(value.clone())"):
+        "The closure result is transposed into the Option<T> return; T is the function's DeserializeOwned parameter.",
+    ("crates/tooling/chio-bundle-verify/src/read.rs", "read_ndjson", "decode_strict(name,type_name,line.as_bytes())"):
+        "Each line is collected into the returned Vec<T>; T is the function's DeserializeOwned parameter.",
+    ("crates/trust/chio-finding-challenge/src/digest_mismatch.rs", "typed_block", "serde_json::from_value(value.clone())"):
+        "The Ok(block) arm wraps the value as MetadataBlock::Present(block) of the MetadataBlock<T> return; T is the DeserializeOwned parameter.",
+}
+
+ALLOWED_INFERRED: dict[tuple[str, str, str], str] = {
+    ("crates/core/chio-response-model/src/simulation.rs", "apply_effect", "decode(&effect.canonical_contribution)"):
+        "Inferred SessionSuspensionSpec and SessionThrottleLimits, effect contribution members; neither holds a receipt type.",
+    ("crates/guards/chio-guards/src/embedding_anomaly.rs", "from_json_file", ".decode_document()"):
+        "Inferred Vec<PatternEntry> from from_entries; guard pattern rows hold no receipt type.",
+    ("crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs", "from_ledger", "serde_json::from_value(value.get().cloned().unwrap_or(serde_json::Value::Null),)"):
+        "Inferred PersistedAdmissionOperationV1 member of a ledger Value already parsed by decode_signed in from_ledger.",
+    ("crates/kernel/chio-kernel/src/kernel/session_ops.rs", "parse_tool_call_operation_dpop", "serde_json::from_value(value.clone())"):
+        "Inferred DpopProof from the Option return type through map and transpose; a DPoP proof holds no receipt type.",
+    ("crates/kernel/chio-kernel/src/kernel/session_ops.rs", "parse_tool_call_operation_execution_nonce", "serde_json::from_value(value.clone())"):
+        "Inferred SignedExecutionNonce through a match arm and transpose into the Option return type; a nonce holds no receipt type.",
+    ("crates/kernel/chio-kernel/src/tool_outcome/release/persistence.rs", "validate_zero_charge_records", "parse_artifact_value(&checked_artifacts[0])"):
+        "Inferred PersistedToolOutcomeRecordV1 from ToolOutcomeRecordV1::from_persisted; it holds no receipt type.",
+    ("crates/kernel/chio-kernel/src/tool_outcome/release/persistence.rs", "validate_zero_charge_records", "parse_artifact_value(&checked_artifacts[1])"):
+        "Inferred PersistedPostReturnEvaluationRecordV1 from PostReturnEvaluationRecordV1::from_persisted; it holds no receipt type.",
+    ("crates/kernel/chio-process/src/lib.rs", "tool_request", "serde_json::from_value(json!({:String::from_utf8(canonical_json_bytes(&arguments)?).map_err(|_|ProcessError::Invalid())?,}))"):
+        "Inferred ToolCallRequest supplemental_authorization from a kernel-built json! object, not external input.",
+    ("crates/kernel/chio-process/src/mailboxes/mod.rs", "dispatch", "serde_json::from_value(arguments)"):
+        "Inferred mailbox Send, Receive and Acknowledge argument structs from the store calls; none holds a receipt type.",
+    ("crates/kernel/chio-process/src/state_reader.rs", "checkpoint", "serde_json::from_str(&value.ok_or(ProcessError::Invalid())?,)"):
+        "Inferred Checkpoint.value, a serde_json::Value.",
+    ("crates/kernel/chio-process/src/store.rs", "read_process", "serde_json::from_str(&capability)"):
+        "Inferred the stored process capability field, a CapabilityToken, not a receipt type.",
+    ("crates/kernel/chio-process/src/store.rs", "read_process", "serde_json::from_str(&checkpoint)"):
+        "Inferred Checkpoint.value, a serde_json::Value.",
+    ("crates/kernel/chio-process/src/store.rs", "read_process", "serde_json::from_str(&limits)"):
+        "Inferred the stored process limits field, a ProcessLimits.",
+    ("crates/kernel/chio-process/src/store/children.rs", "waits", "serde_json::from_str(&children)"):
+        "Inferred Vec<String> child ids from the BTreeMap<String, Vec<String>> return type.",
+    ("crates/kernel/chio-process/src/store/children.rs", "work", "serde_json::from_str(&input)"):
+        "Inferred ChildWork.input, a serde_json::Value.",
+    ("crates/kernel/chio-process/src/store/children.rs", "worker_wait", "serde_json::from_str(&children)"):
+        "Inferred WorkerWait.children, a Vec<String>.",
+    ("crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs", "verify_treaty_reference_from_store", "load_treaty_artifact::<_,CrossKernelContinuation>(store,,reference,,,)"):
+        "The turbofish names CrossKernelContinuation; the placeholder fills the store parameter S.",
+    ("crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs", "verify_treaty_reference_from_store", "load_treaty_artifact::<_,ReceiptLineageBundle>(store,,reference,,,)"):
+        "The turbofish names ReceiptLineageBundle, which holds no strict receipt type; the placeholder fills the store parameter S.",
+    ("crates/kernel/chio-runtime-core/src/admission_hook/treaty_evidence.rs", "verify_treaty_reference_from_store", "load_treaty_artifact::<_,chio_federation::bilateral_dsse::DsseEnvelope>(store,,reference,,,)"):
+        "The turbofish names DsseEnvelope; the placeholder fills the store parameter S.",
+    ("crates/platform/chio-control-plane/src/fiscal_state_anchor.rs", "compare_and_swap", "serde_json::from_slice(advance.canonical_proof_bytes())"):
+        "Inferred FiscalStateCasRequest.advance_proof, a serde_json::Value.",
+    ("crates/products/chio-cli/src/cli/mcp/provision/discovery.rs", "discover_tool_surface", "serde_json::from_value(tools)"):
+        "Inferred Vec<McpToolInfo> from the function return type through a closure; tool descriptors hold no receipt type.",
+    ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_export.rs", "export", "serde_json::from_value(source[].clone())"):
+        "Inferred Outcomes.authorities, a Vec<SwarmAuthorityBundle>, which holds no strict receipt type.",
+    ("crates/products/chio-cli/src/cli/process_response_verify.rs", "response_nonce", "serde_json::from_value(value.clone())"):
+        "Inferred SignedExecutionNonce from the Option return type; a nonce holds no receipt type.",
+    ("crates/protocol/chio-a2a-edge/src/jsonrpc.rs", "handle_jsonrpc", ".decode_document()"):
+        "Inferred serde_json::Value from handle_jsonrpc_value(message: Value).",
+    ("crates/protocol/chio-acp-edge/src/jsonrpc.rs", "handle_jsonrpc", ".decode_document()"):
+        "Inferred serde_json::Value from handle_jsonrpc_value(message: Value).",
+    ("crates/protocol/chio-acp-proxy/src/input.rs", "decode", "original.decode_document()"):
+        "Inferred serde_json::Value, the field of the Self newtype that as_value returns as &serde_json::Value.",
+    ("crates/protocol/chio-mcp-adapter/src/framing.rs", "read_jsonrpc_frame_with_admission", ".decode_document()"):
+        "Inferred serde_json::Value from the Option<(Value, T)> return type.",
+    ("crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc", "complete_prompt_argument", "serde_json::from_value(completion_value.clone())"):
+        "Inferred CompletionResult from the Option return type.",
+    ("crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc", "complete_resource_argument", "serde_json::from_value(completion_value.clone())"):
+        "Inferred CompletionResult from the Option return type.",
+    ("crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc", "get_prompt", "serde_json::from_value(result)"):
+        "Inferred PromptResult from the Option return type.",
+    ("crates/protocol/chio-mcp-adapter/src/transport/stdio_parts/transport.inc", "read_resource", "serde_json::from_value(contents_value.clone())"):
+        "Inferred Vec<ResourceContent> from the Option return type.",
+    ("crates/protocol/chio-mcp-edge/src/ingress/framing.rs", "read_document_frame_with_admission", ".decode_document()"):
+        "Inferred serde_json::Value from the Option<(Value, T)> return type.",
+    ("crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs", "parse_request_approval_artifacts", "serde_json::from_value(value.clone())"):
+        "Inferred Option<GovernedApprovalToken> from the ParsedApprovalArtifacts tuple; an approval token holds no receipt type.",
+    ("crates/protocol/chio-openapi/src/extensions.rs", "from_operation", "decode_extension(map,)"):
+        "Inferred Option<Sensitivity> and Option<bool> extension members of the Self literal.",
+    ("crates/protocol/chio-provider-adapter-core/src/input.rs", "arguments", "json_bounded(text.as_bytes(),MAX_ARGUMENT_BYTES)"):
+        "Inferred serde_json::Value from argument_object(value: Value).",
+    ("crates/security/chio-active-response-authority/src/store.rs", "prepare_logical_records", "serde_json::from_slice(&payload)"):
+        "Inferred LogicalRecord.payload, a serde_json::Value.",
+    ("crates/tooling/chio-conformance/src/native_suite.rs", "collect_native_scenarios", "serde_json::from_str(&content)"):
+        "Inferred NativeScenarioDescriptor pushed into Vec<NativeScenarioDescriptor>; it holds no strict receipt type.",
+    ("crates/tooling/chio-conformance/src/runner/restart_probe.rs", "parse_sse", "text.decode_document()"):
+        "Inferred SseEvent.message, a serde_json::Value.",
+    ("crates/tooling/chio-conformance/src/runner/restart_probe.rs", "validate_initialize", "text.decode_document()"):
+        "Inferred serde_json::Value conformance responses filtered by their id member.",
+    ("xtask/src/decision_model_compile.rs", "run", "read_json(rules)"):
+        "Inferred RulesFile from compile(rules: &RulesFile, ..).",
+    ("xtask/src/decision_model_compile.rs", "run", "read_json(thresholds)"):
+        "Inferred ThresholdsFile from compile(.., thresholds: &ThresholdsFile).",
+    ("xtask/src/recovery_authority_vectors.rs", "corpus", "typed(&grant[][])"):
+        "Inferred the declassification claims body signed by SignedDeclassificationGrant::sign in xtask vector generation.",
+    ("xtask/src/recovery_authority_vectors.rs", "sign_positive", "typed(&positive[][])"):
+        "Inferred the provider finality body signed by SignedRecoveryProviderFinalityV1::sign in xtask vector generation.",
+    ("xtask/src/recovery_authority_vectors.rs", "sign_positive", "typed(&proof[])"):
+        "Inferred the coverage attestation body signed by SignedAuthorityCoverageAttestationV1::sign in xtask vector generation.",
+}
+
+ALLOWED_INCLUDES = {
+    ("crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs", 'concat!(env!("OUT_DIR"),"/proof_fixture_files.rs")'):
+        "proof_fixture_build.rs emits only the EmbeddedProofFixtureFile constant array, not types or decoders.",
+    ("crates/products/chio-proof-room/src/lib.rs", 'concat!(env!("OUT_DIR"),"/proof_fixture_files.rs")'):
+        "proof_fixture_build.rs emits only the EmbeddedProofFixtureFile constant array, not types or decoders.",
+    ("crates/protocol/chio-a2a-adapter/src/lib.rs", '"fuzz.rs"'):
+        "The fuzz-only source is outside the production decode gate, matching production_files exclusions.",
+}
+
 STRICT_TYPES = frozenset({
     "ChioReceipt",
     "ChioReceiptBody",
@@ -181,6 +339,37 @@ ALLOWED = (
         ),
     },
     {
+        "path": "crates/products/chio-cli/src/cli/process_host/call_evidence.rs",
+        "owner": "verify_file",
+        "call": "crate::input::project(signed.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/process_host/run_evidence.rs",
+        "owner": "verify_file",
+        "call": "serde_json::from_value(signed.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/run_evidence.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs",
+        "owner": "verify_outcomes",
+        "call": "serde_json::from_value(signed_call.action.parameters.clone())",
+        "custody": (
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_outcomes("),
+            ("crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs", "verify_file", "verify_original_receipt("),
+            ("crates/products/chio-cli/src/cli/receipt_verify.rs", "verify_original_receipt", "crate::input::decode("),
+            ("crates/products/chio-cli/src/cli/input.rs", "decode", "decode_signed("),
+        ),
+    },
+    {
         "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
         "owner": "cmd_mercury_verify",
         "call": "serde_json::from_value(value)",
@@ -189,6 +378,16 @@ ALLOWED = (
             ("crates/products/chio-mercury/src/commands/core_cli/commands.rs", "cmd_mercury_verify", "read_json_file("),
             ("crates/products/chio-mercury/src/commands/shared/utils.rs", "read_json_file", "read_json_file_bounded("),
             ("crates/products/chio-mercury/src/commands/shared/utils.rs", "read_json_file_bounded", "decode_signed("),
+        ),
+    },
+    {
+        "path": "crates/platform/chio-control-plane/src/evidence_export.rs",
+        "owner": "decode_remote_import_request",
+        "call": "serde_json::from_value::<RemoteEvidenceImportRequest>, |typed: &RemoteEvidenceImportRequest| serde_json::to_value(typed)",
+        "custody": (
+            ("crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs", "handle_evidence_import", "SignedJson(body): SignedJson<serde_json::Value>"),
+            ("crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs", "handle_evidence_import", "evidence_export::decode_remote_import_request(body)"),
+            ("crates/platform/chio-control-plane/src/trust_control/json_ingress.rs", "from_request", "decode_signed("),
         ),
     },
     {
@@ -216,15 +415,6 @@ ALLOWED = (
         "custody": (
             ("crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/writer.rs", "flush_complete_lines", "decode_json("),
             ("crates/protocol/chio-mcp-remote/src/input.rs", "decode", "decode_signed("),
-        ),
-    },
-    {
-        "path": "crates/products/chio-cli/src/active_defense_migration.rs",
-        "owner": "verify_backfill_receipts",
-        "call": "strict_typed_value(&registered.receipt,)",
-        "custody": (
-            ("crates/products/chio-cli/src/active_defense_migration.rs", "load_and_build_report", "parse_shadow_migration_input("),
-            ("crates/products/chio-cli/src/active_defense_migration.rs", "parse_shadow_migration_input", "decode_signed("),
         ),
     },
     {
@@ -353,13 +543,11 @@ RAW_CALL = re.compile(r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*(?:(?:de|value
 EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*::\s*)?(?:Json|Query|Form)\s*<")
 TYPE_DEFINITION = re.compile(r"\b(?:struct|enum)\s+(\w+)\b[^;{(]*([({])")
 IDENTIFIER = re.compile(r"\b[A-Za-z_]\w*\b")
-TYPE_ALIAS = re.compile(r"^[ \t]*(?:pub(?:\([^)]*\))?\s+)?type\s+(\w+)\b[^=;]*=\s*([^;]+);", re.M)
 TRAIT_CALL = re.compile(
     r"(?<![\w:.])(?:::\s*)?(?:[a-z_]\w*\s*::\s*)*(?:Deserialize\b"
-    r"|<\s*((?:[\w:&',\s]|<(?:[^<>]|<[^<>]*>)*>)+?)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
+    r"|<\s*((?:[\w:&',\s$]|<(?:[^<>]|<[^<>]*>)*>)+?)(?:\s+as\s+[\w:]+(?:\s*<[^<>]*>)?)?\s*>|([A-Z]\w*))\s*::\s*deserialize\s*\("
 )
 GENERIC_BOUND = re.compile(r"\b([A-Z]\w*)\s*:\s*(?:for\s*<[^<>]*>|[^,>{])*?\bDeserialize")
-SERDE_JSON_USE = re.compile(r"use\s+(?:::\s*)?serde_json\b")
 STREAM_CALL = re.compile(
     r"(?<![\w.:])(?:::\s*)?(?:serde_json\s*::\s*)?(?:de\s*::\s*)?Deserializer\s*::\s*from_(?:str|slice|reader)\s*\("
 )
@@ -369,18 +557,73 @@ BODY_EXTRACTOR = re.compile(r"(?<![\w:])(?:::\s*)?(?:axum\s*::\s*)?(?:extract\s*
 IMPL_HEADER = re.compile(r"\bimpl\b[^{};]*\{")
 BLOCK_HEADER = re.compile(r"\b(?:impl|trait)\b[^{};]*\{")
 USE_STATEMENT = re.compile(r"\buse\s[^;]*;")
-USE_RENAME = re.compile(r"\b(\w+)\s+as\s+(\w+)\b")
 VARIANT_NAME = re.compile(r"([{,]\s*(?:#\[[^\]]*\]\s*)*)[A-Z]\w*(?=\s*(?:[,{(}]|=))")
 DOCUMENT_CALL = re.compile(r"\.\s*decode_document\s*(?=::|\()")
 STATIC_ITEM = re.compile(r"\b(?:static|const)\s+(?:mut\s+)?(\w+)\s*:\s*([^=;]+?)\s*=(?![=>])")
 LET = re.compile(r"\blet\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])")
+QUALIFIED_DECODE = re.compile(
+    r"(?<![\w.:$])((?:::\s*)?[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*)\s*::\s*(from_(?:str|slice|reader|value))\s*(?=::|\()"
+)
+TYPE_APPLICATION = re.compile(r"(?<![\w.:$])((?:::\s*)?[A-Za-z_]\w*(?:\s*::\s*[A-Za-z_]\w*)*)\s*(?:::\s*)?<")
+PLACEHOLDER = re.compile(r"(?<![\w$'])_(?!\w)")
+CAPTURE = re.compile(r"\$(?!crate\b)\w+")
+MACRO_RULES = re.compile(r"\bmacro_rules!\s*(\w+)\s*\{")
+INVOCATION = re.compile(r"(?<![\w$])(\w+)\s*!\s*([({\[])")
+SERDE_JSON_DECODE_MODULES = frozenset({(), ("de",), ("value",)})
+SERDE_JSON_STREAMS = frozenset({("Deserializer",), ("de", "Deserializer")})
+AXUM_EXTRACTORS = frozenset({"Json", "Query", "Form"})
+
+
+def production_cfg(expression: str):
+    expression = expression.strip()
+    if expression == "test":
+        return False
+    match = re.fullmatch(r"(all|any|not)\((.*)\)", expression, re.S)
+    if not match:
+        return None
+    values = [production_cfg(part) for part in _resolution.split_arguments(match.group(2))]
+    if match.group(1) == "not":
+        return not values[0] if len(values) == 1 and values[0] is not None else None
+    if match.group(1) == "all":
+        return False if False in values else True if all(value is True for value in values) else None
+    return True if True in values else False if all(value is False for value in values) else None
 
 
 def without_test_items(code: str) -> str:
     """Blank every `#[cfg(test)]` item in code whose comments and literals are masked."""
     output = list(code)
-    for match in re.finditer(r"#\[cfg\(test\)\]", code):
+    for match in re.finditer(r"#\[cfg\((.*?)\)\]", code, re.S):
+        if production_cfg(match.group(1)) is not False:
+            continue
         start = match.end()
+        prefix = re.match(r"\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?", code[start:])
+        fragment = start + prefix.end()
+        item = re.match(r"(?:async\s+|unsafe\s+)?(?:fn|mod|struct|enum|impl|trait|type|const|static|use)\b", code[fragment:])
+        if not item:
+            macro = re.match(r"(?:::\s*)?\w+(?:\s*::\s*\w+)*\s*!\s*([({\[])", code[fragment:])
+            if macro:
+                opening = fragment + macro.end() - 1
+                delimiter = code[opening]
+                end = _contracts.closing(code, opening, delimiter, {"(": ")", "[": "]", "{": "}"}[delimiter])
+                trailing = re.match(r"\s*;", code[end:])
+                if trailing:
+                    end += trailing.end()
+            else:
+                end = fragment
+                depth = 0
+                while end < len(code):
+                    char = code[end]
+                    if depth == 0 and char in ",;}":
+                        end += char in ",;"
+                        break
+                    if char == "}" and depth == 1:
+                        end += 1
+                        break
+                    depth += char in "([{"
+                    depth -= char in ")]}" and depth > 0
+                    end += 1
+            output[match.start():end] = " " * (end - match.start())
+            continue
         while start < len(code) and code[start] not in "{;":
             start += 1
         end = start + 1
@@ -394,25 +637,39 @@ NONPRODUCTION_ROOTS = frozenset({"bench", "examples", "tests"})
 
 
 def production_roots(root: Path) -> list[str]:
-    """Top-level directories that hold production workspace members."""
+    """Production crates and the declared non-crate workspace member directories."""
     roots = {"crates"}
     manifest = root / "Cargo.toml"
     if manifest.is_file():
         members = tomllib.loads(manifest.read_text(encoding="utf-8")).get("workspace", {}).get("members", [])
-        roots |= {member.split("/")[0] for member in members} - NONPRODUCTION_ROOTS
+        roots |= {path.relative_to(root).as_posix() for member in members if member.split("/")[0] not in NONPRODUCTION_ROOTS | {"crates"} for path in root.glob(member) if path.is_dir()}
     return sorted(roots)
+
+
+def production_code(path: Path) -> str:
+    """Noise-blanked production source; a `fn $name` template item reads as `fn _name`."""
+    code = without_test_items(_lexer.blank_rust_noise(path.read_text(encoding="utf-8")))
+    return re.sub(r"\bfn(\s+)\$(?=\w)", lambda match: "fn" + match.group(1) + "_", code)
 
 
 def production_files(root: Path) -> list[tuple[str, str]]:
     files = []
-    paths = sorted(path for top in production_roots(root) for path in (root / top).rglob("*"))
+    paths = sorted({path for top in production_roots(root) for path in (root / top).rglob("*")})
     for path in paths:
         rel = path.relative_to(root).as_posix()
         if path.suffix not in {".rs", ".inc"} or not _gate.production(path) or "examples" in rel.split("/") or path.name == "fuzz.rs":
             continue
-        code = _lexer.blank_rust_noise(path.read_text(encoding="utf-8"))
-        files.append((rel, without_test_items(code)))
-    return files
+        files.append((rel, production_code(path)))
+    seen = {rel for rel, _ in files}
+    for rel, code in files:
+        for _, child, expression in _resolution.include_paths(root, rel, code, _contracts, crate_of):
+            if (rel, expression) in ALLOWED_INCLUDES or child is None or child in seen:
+                continue
+            path = root / child
+            if path.is_file() and path.suffix in {".rs", ".inc"} and path.resolve().is_relative_to(root.resolve()):
+                seen.add(child)
+                files.append((child, production_code(path)))
+    return _resolution.production_module_files(root, files, SimpleNamespace(**globals()))
 
 
 @functools.lru_cache(maxsize=64)
@@ -450,43 +707,17 @@ def implementing_type(code: str, offset: int) -> str:
     return found
 
 
-def strict_closure(files: list[tuple[str, str]]) -> frozenset[str]:
-    """Names whose every workspace definition holds a strict type at any depth.
-
-    A name defined more than once with a non-strict body stays out, so an
-    unrelated type that shares a name with a wrapper is not swept in. Error
-    types carry receipts for reporting and are never decoded from input."""
-    definitions: dict[str, list[str]] = {}
-    for _, code in files:
-        for match in TYPE_DEFINITION.finditer(code):
-            opening = match.end(2) - 1
-            right = ")" if code[opening] == "(" else "}"
-            close = _contracts.closing(code, opening, code[opening], right)
-            body = code[opening:close]
-            if match.group(0).startswith("enum"):
-                body = VARIANT_NAME.sub(r"\1", body)
-            if not match.group(1).endswith("Error"):
-                definitions.setdefault(match.group(1), []).append(body)
-        for statement in USE_STATEMENT.finditer(code):
-            for original, alias in USE_RENAME.findall(statement.group(0)):
-                if original != alias:
-                    definitions.setdefault(alias, []).append(original)
-        for match in TYPE_ALIAS.finditer(code):
-            if not any(start < match.start() < end for start, end, _ in block_spans(code)):
-                definitions.setdefault(match.group(1), []).append(match.group(2))
-    strict = set(STRICT_TYPES)
-    changed = True
-    while changed:
-        changed = False
-        for name, bodies in definitions.items():
-            if name not in strict and all(set(IDENTIFIER.findall(body)) & strict for body in bodies):
-                strict.add(name)
-                changed = True
-    return frozenset(strict)
-
-
-def mentions_strict(text: str, strict: frozenset[str]) -> bool:
-    return bool(set(IDENTIFIER.findall(text)) & strict)
+def impl_parameters(code: str, offset: int) -> set[str]:
+    """The generic parameter names of the innermost `impl` block holding `offset`."""
+    found = set()
+    for start, end, header in block_spans(code):
+        if start < offset < end and header.startswith("impl"):
+            text = header[4:-1].strip()
+            found = set()
+            if text.startswith("<"):
+                inner, _ = angle_argument(text, 0)
+                found = {match.group(1) for part in _resolution.split_arguments(inner) if (match := re.match(r"\s*(?:const\s+)?(\w+)", part))}
+    return found
 
 
 def angle_argument(code: str, index: int) -> tuple[str, int]:
@@ -570,26 +801,399 @@ def let_annotation(fn_code: str, offset: int) -> str:
     return enclosing_let(fn_code, offset)[1]
 
 
-def returned(fn_code: str, offset: int) -> bool:
-    """Whether the call at `offset` is the function's value: its tail or a `return`."""
-    statement_start = max(fn_code.rfind(";", 0, offset), fn_code.rfind("{", 0, offset)) + 1
-    prefix = fn_code[statement_start:offset].strip()
-    if prefix.startswith("return"):
-        return True
+def call_end(code: str, offset: int) -> int:
+    """The end of the call starting at `offset`, past any turbofish or qualified-path angles."""
+    index = offset
+    while index < len(code):
+        if code[index] == "<":
+            index = _contracts.closing(code, index, "<", ">")
+        elif code[index] == "(":
+            return _contracts.closing(code, index)
+        elif code[index] == "!" and re.match(r"!\s*[({\[]", code[index:]):
+            opening = index + re.match(r"!\s*", code[index:]).end()
+            return _contracts.closing(code, opening, code[opening], {"(": ")", "[": "]", "{": "}"}[code[opening]])
+        elif code[index] in ";{}":
+            return index
+        else:
+            index += 1
+    return index
+
+
+def condition_end(code: str, index: int):
+    """The `{` that opens the block after an `if` or `match` head starting at `index`."""
+    while index < len(code):
+        char = code[index]
+        if char in "([":
+            index = _contracts.closing(code, index, char, ")" if char == "(" else "]")
+            continue
+        if char == "{":
+            return index
+        if char in ";}":
+            return None
+        index += 1
+    return None
+
+
+@functools.lru_cache(maxsize=4096)
+def control_flow(fn_code: str) -> tuple:
+    """(start, end, keyword, head end, branch block openings) for each `match` and `if` chain."""
+    pairs = brace_pairs(fn_code)
+    rows = []
+    for match in re.finditer(r"\b(if|match)\b", fn_code):
+        if match.group(1) == "if" and re.search(r"\belse\s*$", fn_code[max(0, match.start() - 16):match.start()]):
+            continue
+        opening = condition_end(fn_code, match.end())
+        if opening is None or opening not in pairs:
+            continue
+        blocks = [opening]
+        end = pairs[opening] + 1
+        while match.group(1) == "if":
+            chained = re.match(r"\s*else\b\s*", fn_code[end:])
+            if not chained:
+                break
+            position = end + chained.end()
+            if re.match(r"if\b", fn_code[position:]):
+                opening = condition_end(fn_code, position + 2)
+            else:
+                opening = position if fn_code[position:position + 1] == "{" else None
+            if opening is None or opening not in pairs:
+                break
+            blocks.append(opening)
+            end = pairs[opening] + 1
+        rows.append((match.start(), end, match.group(1), blocks[0], tuple(blocks)))
+    return tuple(rows)
+
+
+IDENTITY_WRAPPERS = frozenset({"Ok", "Some", "Box::new", "Arc::new", "Rc::new", "std::sync::Arc::new", "std::rc::Rc::new"})
+IDENTITY_METHODS = frozenset({
+    "map_err", "ok", "unwrap", "expect", "unwrap_or", "unwrap_or_else", "unwrap_or_default",
+    "context", "with_context", "ok_or", "ok_or_else", "inspect_err",
+})
+IDENTITY_MAPS = frozenset({"Some", "Ok", "Box::new", "Arc::new", "Rc::new"})
+VALUELESS_ARM = re.compile(r"\s*(?:Err\s*\(|None\b|_\s*$)")
+
+
+def value_prefix(prefix: str) -> bool:
+    """Whether `prefix` only wraps the expression after it in value-preserving constructors."""
     pieces = prefix.split("(")
-    if pieces[-1].strip() or not all(re.fullmatch(r"\s*[A-Za-z_][\w:]*\s*", piece) for piece in pieces[:-1]):
+    return not pieces[-1].strip() and all(re.sub(r"\s+", "", piece) in IDENTITY_WRAPPERS for piece in pieces[:-1])
+
+
+def postfix_end(code: str, index: int, wrappers: bool = True) -> tuple[int, str]:
+    """The first token after the value-preserving `?`, `.await`, closing wrapper
+    parens and methods at `index`, and the first value-changing method call there.
+
+    A method outside IDENTITY_METHODS (or `map` with a constructor other than
+    IDENTITY_MAPS) changes the value, so the walk stops at it and returns its text."""
+    while True:
+        while index < len(code) and code[index].isspace():
+            index += 1
+        if index < len(code) and (code[index] == "?" or wrappers and code[index] == ")"):
+            index += 1
+            continue
+        method = re.match(r"\.\s*(\w+)\s*(?:::\s*(?=<))?", code[index:])
+        if not method:
+            return index, ""
+        position = index + method.end()
+        if method.group(1) == "await":
+            index = position
+            continue
+        if code[position:position + 1] == "<":
+            position = _contracts.closing(code, position, "<", ">")
+            while position < len(code) and code[position].isspace():
+                position += 1
+        if code[position:position + 1] != "(":
+            return index, code[index:position]
+        close = _contracts.closing(code, position)
+        argument = re.sub(r"\s+", "", code[position + 1:close - 1])
+        if method.group(1) not in IDENTITY_METHODS and not (method.group(1) == "map" and argument in IDENTITY_MAPS):
+            return index, code[index:close]
+        index = close
+
+
+SELF_FIELD = "Self.0"
+
+
+def closure_parameter_type(projection: str) -> str:
+    """The annotated parameter type of a closure passed to a value-changing method,
+    or SELF_FIELD when the value becomes the field of a `Self` newtype."""
+    if re.fullmatch(r"\.\s*map\s*\(\s*Self\s*\)", projection):
+        return SELF_FIELD
+    closure = re.match(r"\.\s*\w+\s*\(\s*(?:move\s+)?\|\s*(?:mut\s+)?\w+\s*:\s*([^|]+)\|", projection)
+    return closure.group(1).strip() if closure else ""
+
+
+def match_arms(code: str, opening: int) -> list[tuple[str, str]]:
+    """(pattern, value expression) for each arm of the match body opening at `opening`."""
+    close = brace_pairs(code).get(opening, len(code) - 1)
+    arms, index = [], opening + 1
+    while index < close:
+        arrow = index
+        depth = 0
+        while arrow < close and not (depth == 0 and code.startswith("=>", arrow)):
+            depth += code[arrow] in "([{"
+            depth -= code[arrow] in ")]}"
+            arrow += 1
+        if arrow >= close:
+            break
+        pattern = code[index:arrow].strip().lstrip(",").strip()
+        start = arrow + 2
+        while start < close and code[start].isspace():
+            start += 1
+        if code[start:start + 1] == "{":
+            end = brace_pairs(code).get(start, close) + 1
+            value = block_tail(code[start + 1:end - 1])
+            following = end
+            while following < close and code[following].isspace():
+                following += 1
+            index = following + 1 if code[following:following + 1] == "," else following
+        else:
+            end, depth = start, 0
+            while end < close and not (depth == 0 and code[end] == ","):
+                depth += code[end] in "([{"
+                depth -= code[end] in ")]}"
+                end += 1
+            value = code[start:end]
+            index = end + 1
+        arms.append((re.split(r"\bif\b", pattern)[0], value.strip()))
+    return arms
+
+
+def block_tail(body: str) -> str:
+    """The tail expression of a block body: the text after its last top-level `;`."""
+    depth, last = 0, -1
+    for index, char in enumerate(body):
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == ";" and depth == 0:
+            last = index
+    return body[last + 1:].strip()
+
+
+PARTIAL = "?"
+PATTERN = "!"
+
+
+def pattern_type(path: str) -> str:
+    """The type a pattern path names, with an enum variant read as its enum."""
+    parts = [part.strip() for part in path.split("::")]
+    if len(parts) > 1 and parts[-2][:1].isupper():
+        parts = parts[:-1]
+    return "::".join(parts)
+
+
+def top_level_split(text: str, separator: str) -> list[str]:
+    """`text` split at each `separator` outside brackets."""
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(text):
+        depth += char in "([{"
+        depth -= char in ")]}"
+        if char == separator and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    parts.append(text[start:])
+    return [part.strip() for part in parts if part.strip()]
+
+
+def pattern_info(pattern: str) -> tuple[bool, list[str]]:
+    """Whether a pattern constrains the complete type it matches, and the types it names.
+
+    A struct or tuple-struct pattern names its type even with `..`; `Ok`/`Some`
+    wrappers, `&`, `name @` and or-patterns pass through; a tuple is complete
+    only when every position is; a slice when any element is; a binding, `_`,
+    a rest `..` or a bare unit name constrains nothing."""
+    pattern = pattern.strip().lstrip("|").strip()
+    alternatives = top_level_split(pattern, "|")
+    if len(alternatives) > 1:
+        infos = [pattern_info(alternative) for alternative in alternatives]
+        return any(complete for complete, _ in infos), [kind for _, kinds in infos for kind in kinds]
+    bound = re.fullmatch(r"(?:ref\s+)?(?:mut\s+)?[a-z_]\w*\s*@\s*(.+)", pattern, re.S)
+    if bound:
+        return pattern_info(bound.group(1))
+    if pattern.startswith("&"):
+        return pattern_info(re.sub(r"^&\s*(?:mut\s+)?", "", pattern))
+    if re.fullmatch(r"-?\d[\w.]*|true|false|b?\"[^\"]*\"|b?'[^']*'", pattern):
+        return True, []
+    if pattern[:1] in "([" and _contracts.closing(pattern, 0, pattern[0], ")" if pattern[0] == "(" else "]") == len(pattern):
+        inner = pattern[1:-1]
+        elements = _resolution.split_arguments(inner)
+        if pattern[0] == "(" and len(elements) == 1 and not inner.rstrip().endswith(","):
+            return pattern_info(elements[0])
+        rest = [element for element in elements if re.fullmatch(r"(?:[a-z_]\w*\s*@\s*)?\.\.", element.strip())]
+        infos = [pattern_info(element) for element in elements if element not in rest]
+        kinds = [kind for _, found in infos for kind in found]
+        if pattern[0] == "[":
+            return any(complete for complete, _ in infos), kinds
+        return bool(infos) and not rest and all(complete for complete, _ in infos), kinds
+    call = re.match(r"((?:\w+\s*::\s*)*[A-Za-z_]\w*)\s*([({])", pattern)
+    if call and _contracts.closing(pattern, call.end() - 1, call.group(2), ")" if call.group(2) == "(" else "}") == len(pattern):
+        path = call.group(1)
+        if call.group(2) == "(" and path.split("::")[-1].strip() in {"Ok", "Some"}:
+            return pattern_info(pattern[call.end():-1])
+        if path.split("::")[-1].strip()[:1].isupper():
+            return True, [pattern_type(path)]
+        return False, []
+    if re.fullmatch(r"(?:\w+\s*::\s*)+[A-Z]\w*", pattern):
+        return True, [pattern_type(pattern)]
+    return False, []
+
+
+def identity_arm(pattern: str, value: str) -> bool:
+    """Whether an arm binds the scrutinee's value by name and yields it unchanged."""
+    binding = re.fullmatch(r"\s*(?:(?:Ok|Some)\s*\(\s*)?(?:mut\s+)?([a-z_]\w*)\s*\)?\s*", pattern)
+    if not binding:
         return False
-    paren = fn_code.find("(", offset)
-    end = _contracts.closing(fn_code, paren)
-    rest = fn_code[end:]
-    rest = re.sub(r"^(?:\s*(?:\?|\)|\.\s*\w+\s*(?:::<[^;{}]*?>)?\s*\([^;{}]*?\)))*", "", rest)
-    return rest.strip() == "}"
+    name = re.escape(binding.group(1))
+    return bool(re.fullmatch(r"(?:return\s+)?(?:(?:Ok|Some)\s*\(\s*)?" + name + r"\s*\)?", value.strip()))
 
 
-def let_binding(fn_code: str, offset: int) -> str:
-    """The name an unannotated `let` binds to the call at `offset`, if any."""
-    pattern, annotation = enclosing_let(fn_code, offset)
-    return pattern if not annotation and re.fullmatch(r"\w+", pattern) else ""
+def value_type(returns) -> str:
+    """The function's value type: `()` without a return type, empty when unknown (None)."""
+    return "" if returns is None else returns or "()"
+
+
+CLOSURE_TAIL = re.compile(r"\.\s*(?:and_then|or_else)\s*\(\s*(?:move\s+)?\|[^|]*\|\s*$")
+
+
+def chain_start(code: str, index: int) -> int:
+    """Where the method chain whose `.` sits at `index` begins."""
+    position = index
+    while True:
+        cursor = position - 1
+        while cursor >= 0 and code[cursor].isspace():
+            cursor -= 1
+        while cursor >= 0 and code[cursor] == "?":
+            cursor -= 1
+        if cursor >= 0 and code[cursor] in ")]":
+            opening = {")": "(", "]": "["}[code[cursor]]
+            depth = 0
+            while cursor >= 0:
+                depth += code[cursor] in ")]"
+                depth -= code[cursor] in "(["
+                if code[cursor] == opening and depth == 0:
+                    break
+                cursor -= 1
+            cursor -= 1
+        while cursor >= 0 and (code[cursor].isalnum() or code[cursor] in "_:&*"):
+            cursor -= 1
+        start = cursor + 1
+        while cursor >= 0 and code[cursor].isspace():
+            cursor -= 1
+        if cursor >= 0 and code[cursor] == ".":
+            position = cursor
+            continue
+        return start
+
+
+def closure_flow(fn_code: str, start: int, end: int, returns, depth: int) -> str | None:
+    """The flow of a decode that is the whole body of an `and_then`/`or_else` closure,
+    whose result is then the chain's value; None when the decode is not such a body."""
+    head = CLOSURE_TAIL.search(fn_code, max(0, start - 200), start)
+    if not head or head.end() != start:
+        return None
+    paren = fn_code.index("(", head.start())
+    close = _contracts.closing(fn_code, paren)
+    following, projection = postfix_end(fn_code, end, wrappers=False)
+    if projection or following != close - 1:
+        return ""
+    return flow(fn_code, chain_start(fn_code, head.start()), close, returns, depth + 1)
+
+
+def flow(fn_code: str, start: int, end: int, returns, depth: int = 0) -> str:
+    """The type the value of the expression in `[start, end)` is checked against.
+
+    The type is named only along value-preserving flows: a `let` annotation,
+    an assignment to a declared binding, a `return` or tail of the function,
+    a value-preserving `if`/`match` arm or block tail, a scrutinee whose arms
+    name a type in their patterns or forward the value unchanged, or the
+    annotated parameter of a closure that consumes it. Anything else is empty."""
+    if depth > 64:
+        return ""
+    closure = closure_flow(fn_code, start, end, returns, depth)
+    if closure is not None:
+        return closure
+    pairs = brace_pairs(fn_code)
+    openings = {close: opening for opening, close in pairs.items()}
+    following, projection = postfix_end(fn_code, end)
+    if projection:
+        return closure_parameter_type(projection)
+    constructs = control_flow(fn_code)
+    for row in constructs:
+        if row[3] == following and row[0] < start:
+            head = fn_code[row[0]:row[3]]
+            lead = re.sub(r"^(?:match\b|if\s+let\b.*?=(?!=)|if\b)", "", fn_code[row[0]:start], count=1, flags=re.S)
+            if not value_prefix(lead):
+                return ""
+            if row[2] == "match":
+                arms = match_arms(fn_code, row[3])
+            elif re.match(r"if\s+let\b", head):
+                pattern = re.match(r"if\s+let\s+(.*?)=(?!=)", head, re.S)
+                arms = [(pattern.group(1) if pattern else "", block_tail(fn_code[row[3] + 1:pairs[row[3]]]))]
+            else:
+                return ""
+            carrying = [(pattern, value) for pattern, value in arms if not VALUELESS_ARM.match(pattern)]
+            infos = [pattern_info(pattern) for pattern, _ in carrying]
+            named = [kind for _, kinds in infos for kind in kinds]
+            if any(complete for complete, _ in infos):
+                return PATTERN + "(" + ", ".join(named) + ")"
+            if named:
+                return PARTIAL + "(" + ", ".join(named) + ")"
+            if carrying and all(identity_arm(pattern, value) for pattern, value in carrying):
+                return flow(fn_code, row[0], row[1], returns, depth + 1)
+            return ""
+    statement_start = max(fn_code.rfind(char, 0, start) for char in ";{}") + 1
+    prefix = fn_code[statement_start:start]
+    returning = re.match(r"\s*return\b", prefix)
+    if returning:
+        return value_type(returns) if value_prefix(prefix[returning.end():]) else ""
+    binding = re.match(r"\s*let\s+(?:mut\s+)?([\w()\s,]+?)\s*(?::\s*([^=;]+?))?\s*=(?![=>])", prefix)
+    if binding:
+        if not value_prefix(prefix[binding.end():]) or fn_code[following:following + 1] != ";":
+            return ""
+        if binding.group(2):
+            return binding.group(2).strip()
+        name = binding.group(1).strip()
+        if re.fullmatch(r"\w+", name) and binding_returned(fn_code, following, name):
+            return value_type(returns)
+        return ""
+    assignment = re.match(r"\s*(\w+)\s*=(?![=>])", prefix)
+    if assignment:
+        if not value_prefix(prefix[assignment.end():]) or fn_code[following:following + 1] != ";":
+            return ""
+        declarations = re.findall(r"\blet\s+(?:mut\s+)?" + re.escape(assignment.group(1)) + r"\s*:\s*([^=;]+?)\s*;", fn_code[:start])
+        return declarations[-1] if declarations else ""
+    arm = "=>" in prefix
+    if arm:
+        prefix = prefix.rsplit("=>", 1)[1]
+    if not value_prefix(prefix) or following >= len(fn_code) or fn_code[following] not in ",}":
+        return ""
+    if arm:
+        holders = [row for row in constructs if row[2] == "match" and row[3] < start < pairs[row[3]]]
+        if holders:
+            row = max(holders, key=lambda row: row[3])
+            if fn_code[following] == "," or following == pairs[row[3]]:
+                return flow(fn_code, row[0], row[1], returns, depth + 1)
+    if fn_code[following] != "}":
+        return ""
+    opening = openings.get(following)
+    if opening is None:
+        return ""
+    if following == len(fn_code.rstrip()) - 1:
+        return value_type(returns)
+    for row in constructs:
+        if row[2] == "if" and opening in row[4]:
+            return flow(fn_code, row[0], row[1], returns, depth + 1)
+    before = fn_code[:opening].rstrip()
+    if before.endswith("=>"):
+        holders = [row for row in constructs if row[2] == "match" and row[3] < opening < pairs[row[3]]]
+        if holders:
+            row = max(holders, key=lambda row: row[3])
+            return flow(fn_code, row[0], row[1], returns, depth + 1)
+        return ""
+    if not before or before[-1] in ";{}=" or re.search(r"\bunsafe$", before):
+        return flow(fn_code, opening, following + 1, returns, depth + 1)
+    closure = closure_flow(fn_code, opening, following + 1, returns, depth)
+    return closure or ""
 
 
 def binding_returned(fn_code: str, offset: int, name: str) -> bool:
@@ -606,29 +1210,6 @@ def binding_returned(fn_code: str, offset: int, name: str) -> bool:
 def generic_parameters(fn_code: str) -> set[str]:
     signature_end = fn_code.find("{")
     return set(GENERIC_BOUND.findall(fn_code[:signature_end if signature_end >= 0 else len(fn_code)]))
-
-
-def raw_aliases(code: str) -> tuple:
-    """Per-file patterns for serde_json crate and function renames in `use` trees.
-
-    Covers `use serde_json as x`, `use serde_json::{self as x}` and
-    `use serde_json::{de::from_str as y, ..}`."""
-    crates, functions = [], []
-    for statement in USE_STATEMENT.finditer(code):
-        text = statement.group(0)
-        if not SERDE_JSON_USE.match(text):
-            continue
-        crates += re.findall(r"\b(?:serde_json|self)\s+as\s+(\w+)", text)
-        functions += re.findall(r"\b(from_(?:str|slice|reader|value))\s+as\s+(\w+)", text)
-    patterns = []
-    if crates:
-        patterns.append(re.compile(
-            r"(?<![\w.:])(?:" + "|".join(map(re.escape, crates))
-            + r")\s*::\s*(?:(?:de|value)\s*::\s*)?(from_(?:str|slice|reader|value))\s*(?=::|\()"
-        ))
-    for source, alias in functions:
-        patterns.append(re.compile(r"(?<![\w.:])" + re.escape(alias) + r"(?P<" + source + r">)\s*(?=::|\()"))
-    return tuple(patterns)
 
 
 def receiver_start(code: str, index: int) -> int:
@@ -654,57 +1235,75 @@ def receiver_start(code: str, index: int) -> int:
     return position + 1
 
 
-def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], aliases: tuple = ()):
+def decode_sites(fn_code: str, body_start: int, helpers: dict[str, str], resolve=None, aliases=None):
     """Yield (offset, explicit target or None, input kind) for each raw decode in a body.
 
     The input kind is "value" when the decode reads an already parsed Value and
-    "text" when it reads wire text or a deserializer.
+    "text" when it reads wire text or a deserializer. `resolve(path, offset)`
+    names the items a path reaches, so a renamed `serde_json` crate, module,
+    function or `Deserializer` (matched by `aliases`) and a qualified helper path
+    resolve to their source.
     """
-    for match in RAW_CALL.finditer(fn_code, body_start):
-        kind = "value" if match.group(0).rstrip().endswith("from_value") else "text"
-        after = fn_code[match.end():].lstrip()
-        if after.startswith("::"):
-            target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
-            yield match.start(), target, kind
-        else:
-            yield match.start(), None, kind
-    for pattern in aliases:
-        for match in pattern.finditer(fn_code, body_start):
-            source = match.group(1) if pattern.groups and match.group(1) else next(iter(pattern.groupindex), "")
-            kind = "value" if source == "from_value" else "text"
-            after = fn_code[match.end():].lstrip()
-            if after.startswith("::"):
-                target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
-                yield match.start(), target, kind
-            else:
-                yield match.start(), None, kind
-    for match in TRAIT_CALL.finditer(fn_code, body_start):
-        yield match.start(), match.group(1) or match.group(2), "text"
-    for match in DOCUMENT_CALL.finditer(fn_code, body_start):
-        start = receiver_start(fn_code, match.start())
-        after = fn_code[match.end():].lstrip()
-        if after.startswith("::"):
-            target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
-            yield start, target, "text"
-        else:
-            yield start, None, "text"
-    for match in STREAM_CALL.finditer(fn_code, body_start):
-        end = _contracts.closing(fn_code, match.end() - 1)
+    def turbofish(index):
+        after = fn_code[index:].lstrip()
+        return angle_argument(fn_code, fn_code.index("<", index))[0] if after.startswith("::") else None
+
+    def stream(start, paren):
+        end = _contracts.closing(fn_code, paren)
         if INTO_ITER.match(fn_code[end:]):
-            target, _ = angle_argument(fn_code, fn_code.index("<", end))
-            yield match.start(), target, "text"
-        elif "StreamDeserializer" in let_annotation(fn_code, match.start()):
-            yield match.start(), let_annotation(fn_code, match.start()), "text"
+            return start, angle_argument(fn_code, fn_code.index("<", end))[0], "text"
+        if re.match(r"\s*\.\s*into_iter\s*\(", fn_code[end:]):
+            return start, None, "text"
+        if "StreamDeserializer" in let_annotation(fn_code, start):
+            return start, let_annotation(fn_code, start), "text"
+        return None
+
+    seen = set()
+    for match in RAW_CALL.finditer(fn_code, body_start):
+        seen.add(match.start())
+        yield match.start(), turbofish(match.end()), "value" if match.group(0).rstrip().endswith("from_value") else "text"
+    if resolve and aliases:
+        for match in aliases.finditer(fn_code, body_start):
+            paths = {key[2:] for key in resolve(match.group(1), match.start()) if key[:2] == (":external", "serde_json")}
+            source = next((path[-1] for path in paths if path[:-1] in SERDE_JSON_DECODE_MODULES and path[-1:] and path[-1].startswith("from_")), None)
+            if source:
+                seen.add(match.start())
+                yield match.start(), turbofish(match.end()), "value" if source == "from_value" else "text"
+    for match in STREAM_CALL.finditer(fn_code, body_start):
+        seen.add(match.start())
+        site = stream(match.start(), match.end() - 1)
+        if site:
+            yield site
+    if resolve:
+        for match in QUALIFIED_DECODE.finditer(fn_code, body_start):
+            if match.start() in seen:
+                continue
+            keys = resolve(match.group(1), match.start())
+            paths = {key[2:] for key in keys if key[:2] == (":external", "serde_json")}
+            if not keys and resolve.serde_json_glob(match.start()):
+                paths = {tuple(part.strip() for part in match.group(1).split("::"))}
+            if paths & SERDE_JSON_STREAMS:
+                site = stream(match.start(), fn_code.index("(", match.end()))
+                if site:
+                    yield site
+            elif paths & SERDE_JSON_DECODE_MODULES:
+                yield match.start(), turbofish(match.end()), "value" if match.group(2) == "from_value" else "text"
+    for match in TRAIT_CALL.finditer(fn_code, body_start):
+        target = match.group(1)
+        if target is None and match.group(2):
+            target = re.sub(r"\s*::\s*deserialize\s*\($", "", match.group()).strip()
+            if match.start() > 0 and fn_code[match.start() - 1] == "$":
+                target = "$" + target
+        yield match.start(), target, "text"
+    for match in DOCUMENT_CALL.finditer(fn_code, body_start):
+        yield receiver_start(fn_code, match.start()), turbofish(match.end()), "text"
     if helpers:
-        pattern = re.compile(r"(?<![\w.])(?:\w+\s*::\s*)*(" + "|".join(sorted(map(re.escape, helpers))) + r")\s*(?=::\s*<|\()")
+        pattern = re.compile(r"(?<![\w.])((?:\w+\s*::\s*)*)(" + "|".join(sorted(map(re.escape, helpers))) + r")\s*(?=::\s*<|\()")
         for match in pattern.finditer(fn_code, body_start):
-            after = fn_code[match.end():].lstrip()
-            kind = helpers[match.group(1)]
-            if after.startswith("::"):
-                target, _ = angle_argument(fn_code, fn_code.index("<", match.end()))
-                yield match.start(), target, kind
-            else:
-                yield match.start(), None, kind
+            qualifier = tuple(part.strip() for part in match.group(1).split("::")[:-1])
+            if resolve and not resolve.helper(qualifier, match.group(2), match.start()):
+                continue
+            yield match.start(), turbofish(match.end()), helpers[match.group(2)]
 
 
 def assigned_annotation(fn_code: str, offset: int) -> str:
@@ -719,30 +1318,55 @@ def assigned_annotation(fn_code: str, offset: int) -> str:
 
 
 def targets(fn_code: str, offset: int, explicit, returns: str) -> str:
-    """The decode target text: explicit, annotated, or the function's value type."""
-    if explicit is not None:
+    """The decode target text: explicit, annotated, or the function's value type.
+
+    An explicit target holding a `_` placeholder is completed by its context, and
+    is empty, like an inferred target, when no context names the type."""
+    if explicit is not None and not PLACEHOLDER.search(explicit):
         return explicit
-    annotation = let_annotation(fn_code, offset) or assigned_annotation(fn_code, offset)
-    if annotation:
-        return annotation
-    if returned(fn_code, offset):
-        return returns
-    name = let_binding(fn_code, offset)
-    if name and binding_returned(fn_code, offset, name):
-        return returns
-    return ""
+    context = contextual_target(fn_code, offset, returns)
+    if explicit is not None:
+        if context[:1] in {PARTIAL, PATTERN}:
+            return context[0] + f"({explicit}, {context[1:]})"
+        return f"({explicit}, {context})" if context else ""
+    return context
+
+
+def placeholder_strict(explicit, mentions) -> bool:
+    """Whether the named parts of a placeholder target already hold a strict type."""
+    return explicit is not None and bool(PLACEHOLDER.search(explicit)) and mentions(PLACEHOLDER.sub("()", explicit))
+
+
+RECEIVER_DECODE = re.compile(r"(?:\s*\?|\s*\.\s*\w+\s*\([^;{}]*?\))*?\s*\.\s*decode_document\s*(?:::\s*<[^;{}]*?>\s*)?\(")
+
+
+def contextual_target(fn_code: str, offset: int, returns) -> str:
+    if fn_code.startswith(".", offset):
+        start = chain_start(fn_code, offset)
+        end = _contracts.closing(fn_code, fn_code.index("(", offset))
+        return flow(fn_code, start, end, returns)
+    end = call_end(fn_code, offset)
+    document = RECEIVER_DECODE.match(fn_code, end)
+    if document:
+        end = _contracts.closing(fn_code, document.end() - 1)
+    return flow(fn_code, offset, end, returns)
 
 
 def crate_of(rel: str) -> str:
     return rel.split("/src/")[0]
 
 
-def generic_raw_helpers(files: list[tuple[str, str]]) -> dict[str, dict[str, str]]:
+def generic_raw_helpers(files: list[tuple[str, str]], resolver=None, aliases=None):
     """Per crate, functions generic over a `Deserialize` parameter that raw decode it.
 
     Each helper maps to "value" when every such decode reads a Value, else "text".
+    A direct decode counts when its target names the parameter, or when
+    ALLOWED_GENERIC_INFERRED names it as decoding the parameter. The second
+    value lists each helper definition as (path, offset, name, whether it is
+    an associated function).
     """
     helpers: dict[str, dict[str, str]] = {}
+    definitions = set()
     for rel, code in files:
         for row in _contracts.functions(code):
             fn_code = _contracts.owner_code(code, row)
@@ -750,12 +1374,16 @@ def generic_raw_helpers(files: list[tuple[str, str]]) -> dict[str, dict[str, str
             if not parameters:
                 continue
             returns = return_type(fn_code)
-            for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], {}):
-                if set(IDENTIFIER.findall(targets(fn_code, offset, explicit, returns))) & parameters:
+            resolve = resolver(rel, row[1]) if resolver else None
+            for offset, explicit, kind in decode_sites(fn_code, row[2] - row[1], {}, resolve, aliases):
+                target = targets(fn_code, offset, explicit, returns)
+                allowed = not target and (rel, row[0], call_text(fn_code, offset)) in ALLOWED_GENERIC_INFERRED
+                if set(IDENTIFIER.findall(target)) & parameters or allowed:
                     crate = helpers.setdefault(crate_of(rel), {})
                     name = row[0].split("#")[0]
                     crate[name] = "text" if "text" in (kind, crate.get(name)) else "value"
-    return helpers
+                    definitions.add((rel, row[1], name, bool(implementing_type(code, row[1]))))
+    return helpers, definitions
 
 
 def custody_breaks(by_path: dict[str, str], custody, origin: str = "decode_signed") -> str:
@@ -801,51 +1429,306 @@ def in_deserialize_impl(code: str, offset: int) -> bool:
 
 def scan(root: Path) -> list[str]:
     files = production_files(root)
-    strict = strict_closure(files)
-    helpers = generic_raw_helpers(files)
-    aliases = {rel: raw_aliases(code) for rel, code in files}
-    findings = []
+    by_path = dict(files)
+    strict = _resolution.TypeResolver(root, files, SimpleNamespace(**globals()))
+    templates = {}
     for rel, code in files:
-        for row in _contracts.functions(code):
+        spans = []
+        for match in MACRO_RULES.finditer(code):
+            end = _contracts.closing(code, match.end() - 1, "{", "}")
+            body = code[match.end():end]
+            definitions = {}
+            for definition in TYPE_DEFINITION.finditer(body):
+                opening = definition.end() - 1
+                closing = _contracts.closing(body, opening, body[opening], {"(": ")", "{": "}"}[body[opening]])
+                fields = body[opening:closing]
+                if definition.group().startswith("enum"):
+                    fields = strict.enum_fields(fields)
+                fields = re.sub(r"\bpub(?:\([^)]*\))?\s+", "", fields)
+                fields = re.sub(r"\b\w+\s*:(?!:)", "", fields)
+                definitions[definition.group(1)] = fields
+            for alias in re.finditer(r"\btype\s+(\w+)\s*=([^;]+);", body):
+                definitions[alias.group(1)] = alias.group(2)
+            spans.append((match.start(), end, definitions, match.group(1), match.end()))
+        templates[rel] = spans
+
+    resolved = {}
+
+    def resolve_path(text, rel, offset):
+        path = tuple(part.strip() for part in text.split("::"))
+        found = set()
+        for scope in strict.scopes(rel, offset):
+            if (path, scope) not in resolved:
+                resolved[(path, scope)] = strict.resolve(path, scope)
+            found |= resolved[(path, scope)]
+        return found
+
+    def function_paths(path, scope, seen=frozenset()):
+        """The module paths a function path written in `scope` can name."""
+        if not path or path[0] in {"crate", "self", "super", ""}:
+            target = strict.absolute(path[1:] if path and path[0] == "" else path, scope) if path else None
+            if not target:
+                return set()
+            for split in range(len(target) - 1, 0, -1):
+                alias = strict.imports[target[:split]].get(target[split])
+                if alias and (target[split], target[:split]) not in seen:
+                    return function_paths(alias + target[split + 1:], target[:split], seen | {(target[split], target[:split])})
+            return {target}
+        current = scope
+        while current:
+            alias = strict.imports[current].get(path[0])
+            if alias and (path[0], current) not in seen:
+                return function_paths(alias + path[1:], current, seen | {(path[0], current)})
+            if not current[-1].startswith("@"):
+                break
+            current = current[:-1]
+        found = {strict.module(scope) + path}
+        target = strict.absolute(path, scope)
+        if target:
+            found.add(target)
+        current = scope
+        while current:
+            for glob in strict.globs[current]:
+                if (("*",) + glob, current) not in seen:
+                    found |= function_paths(glob + path, current, seen | {(("*",) + glob, current)})
+            if not current[-1].startswith("@"):
+                break
+            current = current[:-1]
+        return found
+
+    helper_paths, associated_helpers = set(), set()
+    known_functions = {
+        strict.module(scope) + (row[0].split("#")[0],)
+        for rel, code in files for row in _contracts.functions(code) for scope in strict.scopes(rel, row[1])
+    }
+
+    class Paths:
+        """Item and function path resolution at offsets of one source body."""
+
+        def __init__(self, rel, base):
+            self.rel, self.base = rel, base
+
+        def __call__(self, text, offset):
+            return resolve_path(text, self.rel, self.base + offset)
+
+        def serde_json_glob(self, offset):
+            """Whether a `serde_json` glob import is visible at `offset`, so an
+            unresolved `de::`/`value::` qualifier may name its module."""
+            for scope in strict.scopes(self.rel, self.base + offset):
+                current = scope
+                while current:
+                    for glob in strict.globs[current]:
+                        if any(key[:2] == (":external", "serde_json") for key in strict.resolve(glob, current)) or glob[:1] == ("serde_json",):
+                            return True
+                    current = current[:-1]
+            return False
+
+        def helper(self, qualifier, name, offset):
+            scopes = strict.scopes(self.rel, self.base + offset)
+            paths = [function_paths(qualifier + (name,), scope) for scope in scopes]
+            if any(found & helper_paths for found in paths):
+                return True
+            if qualifier and (qualifier[-1] == "Self" or qualifier[-1][:1].isupper()):
+                return name in associated_helpers
+            return any(found and not found & known_functions and all(path[0] != ":external" for path in found) for found in paths)
+
+    def resolver(rel, base):
+        return Paths(rel, base)
+
+    alias_names = {
+        alias for imports in strict.imports.values() for alias, path in imports.items()
+        if path and re.fullmatch(r"from_(?:str|slice|reader|value)", path[-1]) and alias != path[-1]
+    }
+    aliases = re.compile(r"(?<![\w.:$])(" + "|".join(sorted(map(re.escape, alias_names))) + r")\s*(?=::|\()") if alias_names else None
+
+    def template_at(rel, offset):
+        return next((span for span in templates[rel] if span[0] <= offset < span[1]), None)
+
+    def expand(text, definitions, seen=frozenset()):
+        text = re.sub(r"\$crate\b", "crate", text)
+
+        def replace(match):
+            name = match.group()
+            if name not in definitions:
+                return name
+            return "()" if name in seen else "(" + expand(definitions[name], definitions, seen | {name}) + ")"
+        return _resolution.PATH.sub(replace, text)
+
+    def expanded(target, rel, offset):
+        span = template_at(rel, offset)
+        return (expand(target, span[2]), span[3]) if span else (target, None)
+
+    def mentions_target(target, rel, offset):
+        return strict.mentions(CAPTURE.sub("()", expanded(target, rel, offset)[0]), rel, offset)
+
+    macro_names = {span[3] for spans in templates.values() for span in spans}
+    invocations = {name: [] for name in macro_names}
+    for rel, code in files:
+        for match in INVOCATION.finditer(code):
+            if match.group(1) not in macro_names:
+                continue
+            opening = match.end() - 1
+            delimiter = code[opening]
+            end = _contracts.closing(code, opening, delimiter, {"(": ")", "[": "]", "{": "}"}[delimiter])
+            invocations[match.group(1)].append((rel, match.start(), code[opening + 1:end - 1], normalized(code[match.start():end])))
+
+    def invoked_with_strict(name):
+        for rel, offset, arguments, text in invocations[name]:
+            arguments = CAPTURE.sub("()", re.sub(r"\$crate\b", "crate", arguments))
+            if any(strict.references(arguments, scope) & strict.strict for scope in strict.scopes(rel, offset)):
+                yield rel, offset, text
+
+    def owner_at(rel, offset, fallback):
+        row = _contracts.function_at(by_path[rel], offset)
+        return (row[0], row) if row else (fallback, None)
+
+    findings, inferred = [], []
+
+    def newtype_field(self_type, rel, offset):
+        """The field type of a single-field tuple struct `self_type`, or empty."""
+        name = re.match(r"(?:\w+\s*::\s*)*\w+", self_type or "")
+        bodies = {entry[0] for key in resolve_path(name.group(), rel, offset) if name for entry in strict.definitions.get(key, ())} if name else set()
+        fields = [re.fullmatch(r"\(\s*([^,]+?)\s*,?\s*\)", body.strip()) for body in bodies]
+        return fields[0].group(1) if len(fields) == 1 and fields[0] else ""
+
+    def names_generic(text, rel, offset):
+        """Whether a pattern names a type it cannot complete: one with type
+        parameters the pattern leaves uninferred, or one outside the workspace
+        (`Option`, `Result`, external crates) whose parameters are unknown."""
+        for match in _resolution.PATH.finditer(text):
+            keys = resolve_path(match.group(), rel, offset)
+            if not keys or any(key not in strict.definitions or any(entry[3] for entry in strict.definitions[key]) for key in keys):
+                return True
+        return False
+
+    def record(rel, owner, call, kind, target, offset):
+        expansion, macro = expanded(target, rel, offset)
+        if macro and CAPTURE.search(expansion):
+            for invocation_rel, invocation_offset, text in invoked_with_strict(macro):
+                findings.append((invocation_rel, owner_at(invocation_rel, invocation_offset, f"{macro}!")[0], f"{call} via {text}", "decode", kind))
+        partial = target[:1] == PARTIAL or target[:1] == PATTERN and names_generic(target[1:], rel, offset)
+        target = target[1:] if target[:1] in {PARTIAL, PATTERN} else target
+        if mentions_target(target, rel, offset):
+            findings.append((rel, owner, call, "decode", kind))
+        elif partial or not target:
+            inferred.append((rel, owner, call))
+
+    helpers, definitions = generic_raw_helpers(files, resolver, aliases)
+    helper_paths.update(
+        strict.module(scope) + (name,)
+        for rel, offset, name, _ in definitions for scope in strict.scopes(rel, offset)
+    )
+    associated_helpers.update(name for _, _, name, associated in definitions if associated)
+    for scope, imports in strict.imports.items():
+        crate_helpers = helpers.get(scope[0], {})
+        for alias, path in imports.items():
+            if path[-1] in crate_helpers and alias not in crate_helpers:
+                crate_helpers[alias] = crate_helpers[path[-1]]
+
+    local_extractors = set()
+    for rel, code in files:
+        for start, end, header in block_spans(code):
+            extractor = re.match(r"impl\s*<[^{]*?>\s*(?:[\w:]*::)?FromRequest(?:Parts)?\s*<[^{]*?>\s*for\s+(\w+)\s*<", header)
+            if extractor and any(True for _ in decode_sites(code[start:end], 0, helpers.get(crate_of(rel), {}), resolver(rel, start), aliases)):
+                local_extractors |= resolve_path(extractor.group(1), rel, start)
+    extractor_names = {"axum", ""} | {key[-1] for key in local_extractors}
+    changed = True
+    while changed:
+        additions = {
+            alias for imports in strict.imports.values() for alias, path in imports.items()
+            if {path[0], path[-1]} & extractor_names
+        } - extractor_names
+        extractor_names |= additions
+        changed = bool(additions)
+
+    def extractors(text, rel, offset, pattern):
+        """(start, opening `<`) for each extractor type applied in `text`.
+
+        Every path that can reach axum or a local raw-decoding extractor through
+        an import chain is resolved, so renamed and re-exported extractors count."""
+        found = {match.start(): match.end() - 1 for match in pattern.finditer(text)}
+        for match in TYPE_APPLICATION.finditer(text):
+            segments = [part.strip() for part in match.group(1).split("::")]
+            if match.start() in found or not {segments[0], segments[-1]} & extractor_names:
+                continue
+            if any(
+                key[:2] == (":external", "axum") and key[-1] in AXUM_EXTRACTORS or key in local_extractors
+                for key in resolve_path(match.group(1), rel, offset)
+            ):
+                found[match.start()] = match.end() - 1
+        return sorted(found.items())
+
+    for rel, code in files:
+        crate_helpers = helpers.get(crate_of(rel), {})
+        rows = _contracts.functions(code)
+        for row in rows:
             owner = row[0]
             fn_code = _contracts.owner_code(code, row)
             arguments_start = fn_code.find("(")
             arguments = fn_code[arguments_start:_contracts.closing(fn_code, arguments_start)]
-            for match in EXTRACTOR.finditer(arguments):
-                target, _ = angle_argument(arguments, match.end() - 1)
-                if mentions_strict(target, strict):
-                    findings.append((rel, owner, normalized(match.group(0) + target + ">"), "extractor", "text"))
+            for start, opening in extractors(arguments, rel, row[1], EXTRACTOR):
+                target, _ = angle_argument(arguments, opening)
+                if mentions_target(target, rel, row[1]):
+                    findings.append((rel, owner, normalized(arguments[start:opening + 1] + target + ">"), "extractor", "text"))
             body_start = row[2] - row[1]
             for match in FROM_REQUEST.finditer(fn_code, body_start):
                 statement_start = max(fn_code.rfind(c, 0, match.start()) for c in ";{}") + 1
                 statement = fn_code[statement_start:match.start()] + " " + let_annotation(fn_code, match.start())
-                for extractor in BODY_EXTRACTOR.finditer(statement):
-                    target, _ = angle_argument(statement, extractor.end() - 1)
-                    if mentions_strict(target, strict):
+                for _, opening in extractors(statement, rel, row[1] + match.start(), BODY_EXTRACTOR):
+                    target, _ = angle_argument(statement, opening)
+                    if mentions_target(target, rel, row[1] + match.start()):
                         findings.append((rel, owner, call_text(fn_code, match.start()), "extractor", "text"))
                         break
             if owner.split("#")[0] == "deserialize" and in_deserialize_impl(code, row[1]):
                 continue
             returns = return_type(fn_code)
             self_type = implementing_type(code, row[1])
-            for offset, explicit, kind in decode_sites(fn_code, body_start, helpers.get(crate_of(rel), {}), aliases[rel]):
+            parameters = generic_parameters(fn_code)
+            for offset, explicit, kind in decode_sites(fn_code, body_start, crate_helpers, resolver(rel, row[1]), aliases):
                 target = targets(fn_code, offset, explicit, returns)
+                if target == SELF_FIELD:
+                    target = newtype_field(self_type, rel, row[1])
                 if self_type:
                     target = re.sub(r"\bSelf\b", self_type, target)
-                if mentions_strict(target, strict):
-                    findings.append((rel, owner, call_text(fn_code, offset), "decode", kind))
-        rows = _contracts.functions(code)
+                if not target and placeholder_strict(explicit, lambda text: mentions_target(text, rel, row[1] + offset)):
+                    target = PLACEHOLDER.sub("()", explicit)
+                generic = set(IDENTIFIER.findall(target)) & impl_parameters(code, row[1]) - {"Self"}
+                if generic:
+                    target = re.sub(r"\b(?:" + "|".join(sorted(generic)) + r")\b", "()", target)
+                record(rel, owner, call_text(fn_code, offset), kind, target, row[1] + offset)
         for item in STATIC_ITEM.finditer(code):
             if any(row[1] < item.start() < row[3] for row in rows):
                 continue
             initializer = code[item.start():statement_end(code, item.end())]
-            for offset, explicit, kind in decode_sites(initializer, item.end() - item.start(), helpers.get(crate_of(rel), {}), aliases[rel]):
-                target = explicit if explicit is not None else item.group(2)
-                if mentions_strict(target, strict):
-                    findings.append((rel, f"static {item.group(1)}", call_text(initializer, offset), "decode", kind))
-    errors = []
+            for offset, explicit, kind in decode_sites(initializer, item.end() - item.start(), crate_helpers, resolver(rel, item.start()), aliases):
+                target = explicit if explicit is not None and not PLACEHOLDER.search(explicit) else item.group(2) if explicit is None else f"({explicit}, {item.group(2)})"
+                record(rel, f"static {item.group(1)}", call_text(initializer, offset), kind, target, item.start() + offset)
+        for start, end, _, name, body_start in templates[rel]:
+            body = list(code[body_start:end - 1])
+            for row in rows:
+                if body_start <= row[1] < end:
+                    body[row[1] - body_start:row[3] - body_start] = " " * (row[3] - row[1])
+            body = "".join(body)
+            for offset, explicit, kind in decode_sites(body, 0, crate_helpers, resolver(rel, body_start), aliases):
+                call = call_text(body, offset)
+                target = targets_in_template(body, offset, explicit)
+                if target:
+                    record(rel, f"macro {name}!", call, kind, target, body_start + offset)
+                    continue
+                for invocation_rel, invocation_offset, _, text in invocations[name]:
+                    invocation_owner, row = owner_at(invocation_rel, invocation_offset, f"{name}!")
+                    context = ""
+                    if row:
+                        fn_code = _contracts.owner_code(by_path[invocation_rel], row)
+                        context = contextual_target(fn_code, invocation_offset - row[1], return_type(fn_code))
+                        self_type = implementing_type(by_path[invocation_rel], row[1])
+                        if self_type:
+                            context = re.sub(r"\bSelf\b", self_type, context)
+                    if context and explicit is not None:
+                        context = f"({explicit}, {context})"
+                    record(invocation_rel, invocation_owner, f"{call} via {text}", kind, context, invocation_offset)
+    errors = [f"{rel}: unresolved type path {path}" for rel, path in sorted(strict.unresolved)]
     remaining = list(findings)
-    by_path = dict(files)
     for entry in ALLOWED:
         key = (entry["path"], entry["owner"], normalized(entry["call"]), "decode", "value")
         count = entry.get("count", 1)
@@ -858,7 +1741,34 @@ def scan(root: Path) -> list[str]:
         for finding in matched:
             remaining.remove(finding)
     errors.extend(f"{rel}::{owner}: raw {site} {text}" for rel, owner, text, site, _ in remaining)
+    used = set()
+    generic_owners = {(rel, row[0]) for rel, code in files for row in _contracts.functions(code) if generic_parameters(_contracts.owner_code(code, row))}
+    for rel, owner, call in sorted(set(inferred)):
+        key = (rel, owner, call)
+        if ALLOWED_INFERRED.get(key, "").strip() or ALLOWED_GENERIC_INFERRED.get(key, "").strip() and (rel, owner) in generic_owners:
+            used.add(key)
+        else:
+            errors.append(f"{rel}::{owner}: inferred decode target {call}")
+    for allowances in (ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED):
+        errors.extend(
+            f"{rel}::{owner}: inferred decode allowance {call} matched no call"
+            for rel, owner, call in sorted(set(allowances) - used)
+            if allowances[(rel, owner, call)].strip()
+        )
     return errors
+
+
+def targets_in_template(body: str, offset: int, explicit) -> str:
+    """A decode target inside a `macro_rules!` template outside any function.
+
+    Without an explicit or annotated type the target comes from each expansion
+    site, so this returns an empty string."""
+    if explicit is not None and not PLACEHOLDER.search(explicit):
+        return explicit
+    annotation = contextual_target(body, offset, None)
+    if explicit is not None:
+        return f"({explicit}, {annotation})" if annotation else ""
+    return annotation
 
 
 FIXTURES = {
@@ -877,7 +1787,7 @@ FIXTURES = {
     "unrelated decode": ("fn f(t: &str) -> Result<Other, E> { serde_json::from_str(t) }", 0),
     "inferred local returned": ("fn f(t: &str) -> Result<ChioReceipt, E> { let receipt = serde_json::from_str(t)?; Ok(receipt) }", 1),
     "inferred local returned by return": ("fn f(t: &str) -> Result<ChioReceipt, E> {\n    let receipt = serde_json::from_str(t)?;\n    check(&receipt);\n    return Ok(receipt);\n}", 1),
-    "inferred local not returned": ("fn f(t: &str) -> Result<ChioReceipt, E> { let other = serde_json::from_str(t)?; use_it(other); build() }", 0),
+    "inferred local not returned": ("fn f(t: &str) -> Result<ChioReceipt, E> { let other = serde_json::from_str(t)?; use_it(other); build() }", 1),
     "type alias": ("type Receipt = ChioReceipt;\nfn f(t: &str) { serde_json::from_str::<Receipt>(t); }", 1),
     "associated type": ("impl Visitor for V {\n    type Value = ChioReceipt;\n}\nfn f(t: &str) { serde_json::from_str::<Value>(t); }", 0),
     "generic helper": ("fn decode<T: serde::de::DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { decode(t) }", 1),
@@ -943,19 +1853,36 @@ FIXTURES = {
 
 
 def self_test() -> None:
+    global ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED
+    allowed, generic = ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED
+    ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED = {}, {}
+    try:
+        fixture_self_test()
+    finally:
+        ALLOWED_INFERRED, ALLOWED_GENERIC_INFERRED = allowed, generic
+
+
+def fixture_self_test() -> None:
+    def write_fixture(path, text, **kwargs):
+        declarations = "type Other = (); type E = (); type R = (); type Value = serde_json::Value; use std::sync::LazyLock;\n"
+        path.write_text(declarations + text, **kwargs)
+
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         source = root / "crates/demo/src/lib.rs"
         source.parent.mkdir(parents=True)
+        other = root / "crates/other/src/lib.rs"
+        other.parent.mkdir(parents=True, exist_ok=True)
+        other.write_text("pub struct Thing {}\n", encoding="utf-8")
         for label, (code, expected) in FIXTURES.items():
-            source.write_text(code + "\n", encoding="utf-8")
+            write_fixture(source, code + "\n", encoding="utf-8")
             found = len(scan(root))
             if found != expected + len(ALLOWED):
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found - len(ALLOWED)}")
         for label, name, expected in (("included fragment", "part.inc", 1), ("test fragment", "part_tests.inc", 0)):
             fragment = root / "crates/demo/src" / name
-            fragment.write_text("fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
-            source.write_text("\n", encoding="utf-8")
+            write_fixture(fragment, "fn f(t: &str) { serde_json::from_str::<ChioReceipt>(t); }\n", encoding="utf-8")
+            write_fixture(source, "\n", encoding="utf-8")
             found = len(scan(root)) - len(ALLOWED)
             fragment.unlink()
             if found != expected:
@@ -974,7 +1901,7 @@ def self_test() -> None:
         allowed = ALLOWED[0]
         target = root / allowed["path"]
         target.parent.mkdir(parents=True)
-        source.write_text("\n", encoding="utf-8")
+        write_fixture(source, "\n", encoding="utf-8")
         signed = "UntrustedJsonText::new(raw).decode_signed()"
         for label, body, producer, expected in (
             ("approved call", "let receipt: ChioReceipt = serde_json::from_value(value)?;", signed, 0),
@@ -982,7 +1909,7 @@ def self_test() -> None:
             ("producer regressed to a raw decode", "let receipt: ChioReceipt = serde_json::from_value(value)?;", "serde_json::from_str(raw)", 1),
             ("producer with a raw decode beside decode_signed", "let receipt: ChioReceipt = serde_json::from_value(value)?;", f"{{ let _: Value = serde_json::from_str(raw)?; {signed} }}", 1),
         ):
-            target.write_text(
+            write_fixture(target,
                 f"fn decode_stored_json(raw: &str) -> Result<Value, E> {{ {producer} }}\n"
                 f"fn {allowed['owner']}(raw: &str) -> Result<ChioReceipt, E> {{\n"
                 f"    let value = decode_stored_json(raw)?;\n    {body}\n    Ok(receipt)\n}}\n",
@@ -991,20 +1918,20 @@ def self_test() -> None:
             found = len(scan(root)) - (len(ALLOWED) - 1)
             if found != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
-        target.write_text("\n", encoding="utf-8")
+        write_fixture(target, "\n", encoding="utf-8")
         other = root / "crates/other/src/lib.rs"
-        other.parent.mkdir(parents=True)
+        other.parent.mkdir(parents=True, exist_ok=True)
         other.write_text("fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\n", encoding="utf-8")
         for label, code, expected in (
             ("same-named helper in another crate", "fn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 0),
             ("helper in the same crate", "fn decode<T: DeserializeOwned>(t: &str) -> Result<T, E> { serde_json::from_str(t) }\nfn f(t: &str) -> Result<ChioReceipt, E> { crate::input::decode(t) }", 1),
         ):
-            source.write_text(code + "\n", encoding="utf-8")
+            write_fixture(source, code + "\n", encoding="utf-8")
             found = len(scan(root)) - len(ALLOWED)
             if found != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {found}")
         other.write_text("\n", encoding="utf-8")
-        source.write_text("\n", encoding="utf-8")
+        write_fixture(source, "\n", encoding="utf-8")
         member = next(entry for entry in ALLOWED if entry["owner"] == "extract_financial_metadata")
         target = root / member["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1012,7 +1939,7 @@ def self_test() -> None:
             ("receipt member", "receipt.metadata.as_ref()", 0),
             ("receipt member read from elsewhere", "other.as_ref()", 1),
         ):
-            target.write_text(
+            write_fixture(target,
                 f"fn {member['owner']}(receipt: &ChioReceipt, other: Option<Value>) {{ let value = {read}; "
                 f"let projection = {member['call']}; }}\n",
                 encoding="utf-8",
@@ -1020,20 +1947,33 @@ def self_test() -> None:
             matched = [error for error in scan(root) if member["owner"] in error]
             if len(matched) != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {matched}")
-        target.write_text("\n", encoding="utf-8")
-        helper_entry = next(entry for entry in ALLOWED if entry["owner"] == "verify_backfill_receipts")
+        write_fixture(target, "\n", encoding="utf-8")
+        helper_entry = next(
+            entry for entry in ALLOWED
+            if entry["call"] == "crate::input::project(signed.action.parameters.clone())"
+        )
         target = root / helper_entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
+        verifier = root / "crates/products/chio-cli/src/cli/receipt_verify.rs"
+        verifier.parent.mkdir(parents=True, exist_ok=True)
+        write_fixture(verifier,
+            "fn verify_original_receipt(raw: &str) -> Result<ChioReceipt, E> { crate::input::decode(raw) }\n",
+            encoding="utf-8",
+        )
+        write_fixture(target,
+            f"fn {helper_entry['owner']}(raw: &str) -> Result<(), E> {{\n"
+            "    let signed = verify_original_receipt(raw)?;\n"
+            f"    let parameters: ChioReceipt = {helper_entry['call']}?;\n    Ok(())\n}}\n",
+            encoding="utf-8",
+        )
+        helper = root / "crates/products/chio-cli/src/cli/input.rs"
         for label, reader, expected in (
-            ("approved Value helper", "serde_json::from_value(value.clone())", 0),
+            ("approved Value helper", "serde_json::from_value(value)", 0),
             ("approved helper reading text", "serde_json::from_str(value.as_str())", 2),
         ):
-            target.write_text(
-                "fn load_and_build_report(bytes: &[u8]) { parse_shadow_migration_input(bytes); }\n"
-                "fn parse_shadow_migration_input(bytes: &[u8]) -> R { UntrustedJsonText::from_wire(bytes, 1)?.decode_signed() }\n"
-                f"fn strict_typed_value<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, E> {{ Ok({reader}?) }}\n"
-                f"fn {helper_entry['owner']}(registered: Registered) -> Result<(), E> {{\n"
-                f"    let receipt: ChioReceipt = strict_typed_value(&registered.receipt, \"label\")?;\n    Ok(())\n}}\n",
+            write_fixture(helper,
+                "fn decode<T: DeserializeOwned>(raw: &str) -> Result<T, E> { UntrustedJsonText::new(raw).decode_signed() }\n"
+                f"fn project<T: DeserializeOwned>(value: Value) -> Result<T, E> {{ Ok({reader}?) }}\n",
                 encoding="utf-8",
             )
             found = len(scan(root)) - (len(ALLOWED) - 1)
@@ -1046,6 +1986,11 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=ROOT)
     args = parser.parse_args()
     self_test()
+    tests = _load("receipt_type_resolution_tests", ROOT / "scripts/test-committed-receipt-type-resolution.py")
+    output = io.StringIO()
+    result = unittest.TextTestRunner(stream=output).run(unittest.defaultTestLoader.loadTestsFromModule(tests))
+    if not result.wasSuccessful():
+        raise SystemExit(output.getvalue())
     errors = scan(args.root)
     if errors:
         print("raw JSON decode of a strict type outside decode_signed:", file=sys.stderr)

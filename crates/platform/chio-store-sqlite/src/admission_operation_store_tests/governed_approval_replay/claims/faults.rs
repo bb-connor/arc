@@ -15,8 +15,7 @@ fn claim_insert_failures_roll_back_all_ownership_and_commits() -> AnchoredTestRe
         ("governed_approval_replay_claim_resources", ""),
     ] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, credential) = setup(&fixture, table)?;
         let intent = candidate(&operation, &binding, "atomic", credential)?;
         let count = global_count(&fixture);
@@ -56,8 +55,7 @@ fn altered_or_missing_approval_history_denies_readback() -> AnchoredTestResult {
         "DROP TRIGGER governed_approval_replay_claim_episodes_no_update; PRAGMA ignore_check_constraints = ON; UPDATE governed_approval_replay_claim_episodes SET claim_json = zeroblob(16385)",
     ] {
         let fixture = fixture();
-        let source = Source::new(&fixture, true)?;
-        let binding = activate(&fixture, &source)?;
+        let binding = install(&fixture)?;
         let (operation, lease, credential) = setup(&fixture, "damaged-approval")?;
         let intent = candidate(&operation, &binding, "claim", credential)?;
         let (operation, _) = fixture.store.claim_governed_approval(&operation, &lease, &intent, now_ms())?;
@@ -72,8 +70,7 @@ fn altered_or_missing_approval_history_denies_readback() -> AnchoredTestResult {
 #[test]
 fn failed_release_retains_ownership_and_retry_preserves_the_exact_episode() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let binding = activate(&fixture, &source)?;
+    let binding = install(&fixture)?;
     let (operation, lease, credential) = setup(&fixture, "release-fault")?;
     let intent = candidate(&operation, &binding, "claim", credential)?;
     let (operation, reference) =
@@ -118,8 +115,7 @@ fn failed_release_retains_ownership_and_retry_preserves_the_exact_episode() -> A
 #[test]
 fn generic_cas_and_superseded_lease_cannot_fabricate_or_release_ownership() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let binding = activate(&fixture, &source)?;
+    let binding = install(&fixture)?;
     let (operation, lease, credential) = setup(&fixture, "stale-owner")?;
     let forged = command(
         &operation,

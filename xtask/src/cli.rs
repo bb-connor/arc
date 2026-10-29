@@ -185,6 +185,22 @@ pub enum GenCommand {
         #[arg(long = "require-complete")]
         require_complete: bool,
     },
+    /// Compile a decision-model rules and thresholds file into a canonical artifact.
+    #[command(name = "decision-model")]
+    DecisionModel {
+        /// Rules JSON file.
+        #[arg(long)]
+        rules: PathBuf,
+        /// Thresholds JSON file.
+        #[arg(long)]
+        thresholds: PathBuf,
+        /// Output artifact path.
+        #[arg(long)]
+        out: PathBuf,
+        /// Compare the compiled artifact with the existing file.
+        #[arg(long)]
+        check: bool,
+    },
     /// Generate the declared verification evidence matrix.
     #[command(name = "proof-coverage")]
     ProofCoverage {
@@ -621,6 +637,38 @@ mod tests {
                 clap::error::ErrorKind::InvalidSubcommand,
                 "got: {err}"
             ),
+        }
+    }
+
+    #[test]
+    fn gen_decision_model_parses_paths_and_check() {
+        match parse(&[
+            "xtask",
+            "gen",
+            "decision-model",
+            "--rules",
+            "r.json",
+            "--thresholds",
+            "t.json",
+            "--out",
+            "m.cdm",
+            "--check",
+        ]) {
+            Command::Gen {
+                command:
+                    GenCommand::DecisionModel {
+                        rules,
+                        thresholds,
+                        out,
+                        check,
+                    },
+            } => {
+                assert_eq!(rules, PathBuf::from("r.json"));
+                assert_eq!(thresholds, PathBuf::from("t.json"));
+                assert_eq!(out, PathBuf::from("m.cdm"));
+                assert!(check);
+            }
+            other => panic!("expected gen decision-model, got {other:?}"),
         }
     }
 

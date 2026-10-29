@@ -1,20 +1,24 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core::receipt::checkpoint::is_supported_checkpoint_schema;
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    EvidenceExportBundle, EvidenceExportQuery, EvidenceTransparencyClaims,
+};
 use chio_core::receipt::{
     body::ChioReceipt,
     decision::Decision,
     kinds::{ReceiptKind, TrustLevel},
 };
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_kernel::checkpoint::{
+use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
+use chio_kernel_core::evidence_verify::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
-    verify_integrity_embedded_key_set, CheckpointTransparencySummary,
 };
-use chio_kernel::evidence_export::{
-    build_evidence_transparency_claims, EvidenceExportBundle, EvidenceExportQuery,
-    EvidenceTransparencyClaims,
+use chio_kernel_core::evidence_verify::{
+    verify_checkpoint_signature, CheckpointError, VerifiedCheckpoint,
 };
-use chio_kernel::{is_supported_checkpoint_schema, ReceiptReadBoundary};
 use serde::{Deserialize, Serialize};
 
 use crate::bundle::{MercuryBundleManifest, MercuryBundleReference};
@@ -39,7 +43,6 @@ pub struct MercuryPublicationProfile {
     pub schema: String,
     pub checkpoint_continuity: String,
     pub inclusion_proofs_required: bool,
-    pub checkpoint_signatures_required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub witness_record: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,7 +63,6 @@ impl MercuryPublicationProfile {
             schema: MERCURY_PUBLICATION_PROFILE_SCHEMA.to_string(),
             checkpoint_continuity: CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW.to_string(),
             inclusion_proofs_required: true,
-            checkpoint_signatures_required: true,
             witness_record: None,
             trust_anchor: None,
             rotation_material: None,
@@ -450,7 +452,7 @@ impl MercuryProofPackage {
                 },
                 MercuryVerificationStep {
                     name: "chio_bundle_integrity".to_string(),
-                    detail: "tool and child receipt self-signatures, required checkpoint signatures, inclusion proofs, and unsigned capability-lineage ID uniqueness checks passed".to_string(),
+                    detail: "tool and child receipt self-signatures, checkpoint signatures, inclusion proofs, and unsigned capability-lineage ID uniqueness checks passed".to_string(),
                 },
                 MercuryVerificationStep {
                     name: "kernel_authority".to_string(),
@@ -892,14 +894,16 @@ fn authenticate_authoritative_receipt_order(
             record.seq, proof.checkpoint_seq
         )));
     }
-    if !is_supported_checkpoint_schema(&checkpoint.body.schema)
-        || checkpoint.verify_integrity_embedded_key().is_err()
-    {
-        return Err(MercuryContractError::Validation(format!(
+    let unbound = || {
+        format!(
             "authoritative receipt sequence {} is not bound to a valid signed checkpoint",
             record.seq
-        )));
+        )
+    };
+    if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
+        return Err(MercuryContractError::Validation(unbound()));
     }
+    let checkpoint = verified_checkpoint(checkpoint, unbound)?;
     if proof.merkle_root != checkpoint.body.merkle_root
         || proof.leaf_index != proof.proof.leaf_index
     {
@@ -1242,8 +1246,8 @@ fn verify_mercury_kernel_authority(
     for record in &bundle.tool_receipts {
         let kernel_key = record.receipt.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "tool receipt {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "tool receipt {}",
                 record.receipt.id
             )));
         }
@@ -1251,8 +1255,8 @@ fn verify_mercury_kernel_authority(
     for record in &bundle.child_receipts {
         let kernel_key = record.receipt.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "child receipt {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "child receipt {}",
                 record.receipt.id
             )));
         }
@@ -1260,8 +1264,8 @@ fn verify_mercury_kernel_authority(
     for checkpoint in &bundle.checkpoints {
         let kernel_key = checkpoint.body.kernel_key.to_hex();
         if !trusted_kernel_keys.contains(&kernel_key) {
-            return Err(MercuryContractError::Validation(format!(
-                "checkpoint {} was signed by an untrusted Mercury kernel key",
+            return Err(MercuryContractError::UntrustedKernelKey(format!(
+                "checkpoint {}",
                 checkpoint.body.checkpoint_seq
             )));
         }
@@ -1306,25 +1310,30 @@ fn verify_trusted_checkpoint_requirements(
             ));
         }
     };
-    if !publication_profile.checkpoint_signatures_required {
-        return Err(MercuryContractError::Validation(
-            "trusted Mercury verification requires checkpoint_signatures_required=true".to_string(),
-        ));
-    }
     if !publication_profile.inclusion_proofs_required {
         return Err(MercuryContractError::Validation(
             "trusted Mercury verification requires inclusion_proofs_required=true".to_string(),
         ));
     }
     for checkpoint in &bundle.checkpoints {
-        if checkpoint.verify_integrity_embedded_key().is_err() {
-            return Err(MercuryContractError::Validation(format!(
+        verified_checkpoint(checkpoint, || {
+            format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
-            )));
-        }
+            )
+        })?;
     }
     Ok(bundled_checkpoint_prefix_covered)
+}
+
+fn verified_checkpoint(
+    checkpoint: &KernelCheckpoint,
+    refusal: impl FnOnce() -> String,
+) -> Result<VerifiedCheckpoint<'_>, MercuryContractError> {
+    verify_checkpoint_signature(checkpoint).map_err(|error| match error {
+        CheckpointError::InvalidSignature => MercuryContractError::Validation(refusal()),
+        error => MercuryContractError::Validation(error.to_string()),
+    })
 }
 
 fn verify_signed_bundle_manifest_coverage(
@@ -1504,14 +1513,12 @@ fn verify_chio_bundle(
                 checkpoint.body.schema
             )));
         }
-        if publication_profile.checkpoint_signatures_required
-            && checkpoint.verify_integrity_embedded_key().is_err()
-        {
-            return Err(MercuryContractError::Validation(format!(
+        let checkpoint = verified_checkpoint(checkpoint, || {
+            format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
-            )));
-        }
+            )
+        })?;
         if checkpoints_by_seq
             .insert(checkpoint.body.checkpoint_seq, checkpoint)
             .is_some()

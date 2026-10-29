@@ -50,6 +50,7 @@ use chio_core::capability::{
 };
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::listing::GenericTrustAdmissionClass;
+use chio_core::receipt::evidence::{CapabilitySnapshot, EvidenceExportQuery, ReceiptReadBoundary};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     economics::SettlementStatus, lineage::ChildRequestReceipt,
@@ -136,14 +137,13 @@ use chio_kernel::{
     BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
     BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
     BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,
-    BudgetUtilizationSummary, CapabilityAuthority, CapabilitySnapshot,
-    CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
-    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
-    CapitalAllocationDecisionSupportBoundary, CapitalAllocationInstructionDraft,
-    CapitalAuthorityTrustError, CapitalBookEvent, CapitalBookEventKind, CapitalBookEvidenceKind,
-    CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookReport, CapitalBookRole,
-    CapitalBookSource, CapitalBookSourceKind, CapitalBookSummary, CapitalBookSupportBoundary,
-    CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
+    BudgetUtilizationSummary, CapabilityAuthority, CapitalAllocationDecisionArtifact,
+    CapitalAllocationDecisionFinding, CapitalAllocationDecisionOutcome,
+    CapitalAllocationDecisionReasonCode, CapitalAllocationDecisionSupportBoundary,
+    CapitalAllocationInstructionDraft, CapitalAuthorityTrustError, CapitalBookEvent, CapitalBookEventKind,
+    CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookReport,
+    CapitalBookRole, CapitalBookSource, CapitalBookSourceKind, CapitalBookSummary,
+    CapitalBookSupportBoundary, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
     CapitalExecutionInstructionArtifact, CapitalExecutionInstructionSupportBoundary,
     CapitalExecutionIntendedState, CapitalExecutionObservation, CapitalExecutionRail,
     CapitalExecutionReconciledState, CapitalExecutionRole, CapitalExecutionWindow,
@@ -172,11 +172,10 @@ use chio_kernel::{
     CreditScorecardDimensionKind, CreditScorecardEvidenceKind, CreditScorecardEvidenceReference,
     CreditScorecardProbationStatus, CreditScorecardReasonCode, CreditScorecardReport,
     CreditScorecardReputationContext, CreditScorecardSummary, CreditScorecardSupportBoundary,
-    EconomicCompletionFlowReport, EconomicReceiptProjectionReport, EvidenceExportQuery,
-    ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind,
-    ExposureLedgerEvidenceReference, ExposureLedgerQuery, ExposureLedgerReceiptEntry,
-    ExposureLedgerReport, ExposureLedgerSummary, ExposureLedgerSupportBoundary,
-    LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
+    EconomicCompletionFlowReport, EconomicReceiptProjectionReport, ExposureLedgerCurrencyPosition,
+    ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind, ExposureLedgerEvidenceReference,
+    ExposureLedgerQuery, ExposureLedgerReceiptEntry, ExposureLedgerReport, ExposureLedgerSummary,
+    ExposureLedgerSupportBoundary, LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
     LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
     LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
     LiabilityClaimEvidenceReference, LiabilityClaimPackageArtifact,
@@ -194,38 +193,38 @@ use chio_kernel::{
     LiabilityQuoteResponseArtifact, LiabilityQuoteTerms, LocalCapabilityAuthority,
     MeteredBillingEvidenceRecord, MeteredBillingReconciliationReport,
     MeteredBillingReconciliationState, OperatorReport, OperatorReportQuery, ReceiptAnalyticsQuery,
-    ReceiptAnalyticsResponse, ReceiptQuery, ReceiptReadBoundary, ReceiptReadContext, ReceiptStore,
-    ReceiptStoreError, RevocationRecord, RevocationStore, RevocationStoreError,
-    SettlementReconciliationReport, SettlementReconciliationState, SharedEvidenceQuery,
-    SharedEvidenceReferenceReport, SignedBehavioralFeed, SignedCapitalAllocationDecision,
-    SignedCapitalBookReport, SignedCapitalExecutionInstruction, SignedCreditBond,
-    SignedCreditFacility, SignedCreditLossLifecycle, SignedCreditProviderRiskPackage,
-    SignedCreditScorecardReport, SignedExposureLedgerReport, SignedLiabilityAutoBindDecision,
-    SignedLiabilityBoundCoverage, SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute,
-    SignedLiabilityClaimPackage, SignedLiabilityClaimPayoutInstruction,
-    SignedLiabilityClaimPayoutReceipt, SignedLiabilityClaimResponse,
-    SignedLiabilityClaimSettlementInstruction, SignedLiabilityClaimSettlementReceipt,
-    SignedLiabilityPlacement, SignedLiabilityPricingAuthority, SignedLiabilityProvider,
-    SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse, SignedUnderwritingDecision,
-    SignedUnderwritingPolicyInput, StoredCapabilitySnapshot, StoredChildReceipt, StoredToolReceipt,
-    TrustedCapitalAuthority, UnderwritingAppealCreateRequest, UnderwritingAppealRecord,
-    UnderwritingAppealResolveRequest, UnderwritingCertificationEvidence,
-    UnderwritingCertificationState, UnderwritingDecisionListReport, UnderwritingDecisionPolicy,
-    UnderwritingDecisionQuery, UnderwritingDecisionReport, UnderwritingEvidenceKind,
-    UnderwritingEvidenceReference, UnderwritingPolicyInput, UnderwritingPolicyInputQuery,
-    UnderwritingReasonCode, UnderwritingReceiptEvidence, UnderwritingReputationEvidence,
-    UnderwritingRiskClass, UnderwritingRiskTaxonomy, UnderwritingRuntimeAssuranceEvidence,
-    UnderwritingSignal, UnderwritingSimulationDelta, UnderwritingSimulationReport,
-    UnderwritingSimulationRequest, BEHAVIORAL_FEED_SCHEMA,
-    CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA, CAPITAL_BOOK_REPORT_SCHEMA,
-    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CREDIT_BACKTEST_REPORT_SCHEMA,
-    CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA, CREDIT_BOND_ARTIFACT_SCHEMA,
-    CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
-    CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA, CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
-    CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA, CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA,
-    LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA, LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA, LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
+    ReceiptAnalyticsResponse, ReceiptQuery, ReceiptReadContext, ReceiptStore, ReceiptStoreError,
+    RevocationRecord, RevocationStore, RevocationStoreError, SettlementReconciliationReport,
+    SettlementReconciliationState, SharedEvidenceQuery, SharedEvidenceReferenceReport,
+    SignedBehavioralFeed, SignedCapitalAllocationDecision, SignedCapitalBookReport,
+    SignedCapitalExecutionInstruction, SignedCreditBond, SignedCreditFacility,
+    SignedCreditLossLifecycle, SignedCreditProviderRiskPackage, SignedCreditScorecardReport,
+    SignedExposureLedgerReport, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
+    SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
+    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
+    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
+    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
+    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
+    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, SignedUnderwritingPolicyInput,
+    StoredCapabilitySnapshot, StoredChildReceipt, StoredToolReceipt, TrustedCapitalAuthority,
+    UnderwritingAppealCreateRequest, UnderwritingAppealRecord, UnderwritingAppealResolveRequest,
+    UnderwritingCertificationEvidence, UnderwritingCertificationState,
+    UnderwritingDecisionListReport, UnderwritingDecisionPolicy, UnderwritingDecisionQuery,
+    UnderwritingDecisionReport, UnderwritingEvidenceKind, UnderwritingEvidenceReference,
+    UnderwritingPolicyInput, UnderwritingPolicyInputQuery, UnderwritingReasonCode,
+    UnderwritingReceiptEvidence, UnderwritingReputationEvidence, UnderwritingRiskClass,
+    UnderwritingRiskTaxonomy, UnderwritingRuntimeAssuranceEvidence, UnderwritingSignal,
+    UnderwritingSimulationDelta, UnderwritingSimulationReport, UnderwritingSimulationRequest,
+    BEHAVIORAL_FEED_SCHEMA, CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA,
+    CAPITAL_BOOK_REPORT_SCHEMA, CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
+    CREDIT_BACKTEST_REPORT_SCHEMA, CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA,
+    CREDIT_FACILITY_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
+    CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA, CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA,
+    CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA, LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA,
+    LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
     LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA,
     LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA,
     LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_PLACEMENT_ARTIFACT_SCHEMA,
@@ -246,7 +245,6 @@ use chio_store_sqlite::{
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
-use subtle::ConstantTimeEq;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
@@ -298,6 +296,8 @@ use crate::{
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
 mod budget_handlers;
+#[path = "trust_control/caller_credentials.rs"]
+pub mod caller_credentials;
 #[path = "trust_control/capital_and_liability.rs"]
 mod capital_and_liability;
 #[path = "trust_control/certification_handlers.rs"]
@@ -309,6 +309,8 @@ pub mod cluster;
 mod cluster_and_reports;
 #[path = "trust_control/config_and_public.rs"]
 mod config_and_public;
+#[path = "trust_control/credential_roles.rs"]
+pub mod credential_roles;
 #[path = "trust_control/credit_and_loss.rs"]
 mod credit_and_loss;
 #[path = "trust_control/finding_challenge_coordinator.rs"]
@@ -371,6 +373,8 @@ pub(crate) mod report_validation;
 pub mod reports;
 #[path = "trust_control/risk_finance_handlers.rs"]
 mod risk_finance_handlers;
+#[path = "trust_control/route_authorization.rs"]
+pub mod route_authorization;
 #[path = "trust_control/service_runtime.rs"]
 pub mod service_runtime;
 #[path = "trust_control/service_types.rs"]
@@ -417,6 +421,7 @@ pub(crate) use self::finding_status_handlers::*;
 // The evidenced-rail seam is part of the finding lane's deployment
 // surface: the dispute-fee charge takes it by injection exactly as the
 // admission and participation charges do.
+pub(crate) use self::caller_credentials::Scope;
 pub use self::finding_handlers::{
     FindingRailInstruction, FindingRailObservation, FindingRailObserver, VenueLedgerRailObserver,
 };

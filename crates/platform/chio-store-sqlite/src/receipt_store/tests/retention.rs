@@ -1,27 +1,13 @@
 //! Retention behavior tests (co-archive-and-delete, watermark, chain
 //! exemption, size convergence, recovery).
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use chio_kernel::{ReceiptStoreError, RetentionConfig};
 
 use crate::SqliteReceiptStore;
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    // Canonicalize the temp dir so test paths match the symlink-resolved form
-    // production records via absolute_archive_path (on macOS temp_dir sits under
-    // the /var -> /private/var symlink, so a raw path fails the repair archive
-    // identity check that compares against the canonicalized ledger path).
-    let base = std::fs::canonicalize(std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
-    base.join(format!(
-        "chio-{prefix}-{}-{nonce}.sqlite3",
-        std::process::id()
-    ))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn copy_checkpoint_prefix_to_attached_archive(
     connection: &rusqlite::Connection,
@@ -42,7 +28,7 @@ fn copy_checkpoint_prefix_to_attached_archive(
 #[test]
 fn watermark_ledger_reports_max_and_rejects_regression() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::{insert_receipt_retention_watermark, retention_watermark};
-    let path = unique_db_path("watermark-ledger");
+    let (_path_dir, path) = temp_sqlite_path("watermark-ledger");
     let store = SqliteReceiptStore::open(&path)?;
     // A pristine store has never archived.
     let connection = store.reader_connection_for_test()?;
@@ -74,7 +60,7 @@ fn watermark_ledger_reports_max_and_rejects_regression() -> Result<(), Box<dyn s
 fn missing_claim_log_projection_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::validate_claim_receipt_log_entries;
 
-    let path = unique_db_path("claim-log-missing");
+    let (_path_dir, path) = temp_sqlite_path("claim-log-missing");
     let mut first_receipt_id = None;
     {
         let store = SqliteReceiptStore::open(&path)?;
@@ -165,10 +151,11 @@ fn retained_lookup_queries_the_archive_connection_that_was_authenticated(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::load_retained_chio_receipt_after_archive_trust_for_test;
 
-    let path = unique_db_path("retained-lookup-open-archive");
-    let archive = unique_db_path("retained-lookup-open-archive-data");
-    let replacement = unique_db_path("retained-lookup-open-archive-replacement");
-    let displaced = unique_db_path("retained-lookup-open-archive-displaced");
+    let (_path_dir, path) = temp_sqlite_path("retained-lookup-open-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("retained-lookup-open-archive-data");
+    let (_replacement_dir, replacement) =
+        temp_sqlite_path("retained-lookup-open-archive-replacement");
+    let (_displaced_dir, displaced) = temp_sqlite_path("retained-lookup-open-archive-displaced");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
@@ -213,8 +200,8 @@ fn retained_lookup_queries_the_archive_connection_that_was_authenticated(
 
 #[test]
 fn retention_preserves_exact_cost_projection() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cost-projection-retention");
-    let archive = unique_db_path("cost-projection-retention-archive");
+    let (_path_dir, path) = temp_sqlite_path("cost-projection-retention");
+    let (_archive_dir, archive) = temp_sqlite_path("cost-projection-retention-archive");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
@@ -253,8 +240,8 @@ fn retention_preserves_exact_cost_projection() -> Result<(), Box<dyn std::error:
 fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::verify_checkpoint_chain_integrity;
 
-    let path = unique_db_path("chain-exemption");
-    let archive = unique_db_path("chain-exemption-archive");
+    let (_path_dir, path) = temp_sqlite_path("chain-exemption");
+    let (_archive_dir, archive) = temp_sqlite_path("chain-exemption-archive");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
@@ -295,8 +282,8 @@ fn checkpoint_chain_watermark_exemption() -> Result<(), Box<dyn std::error::Erro
 fn watermark_trust_requires_backing_archive() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::trusted_retention_watermark;
 
-    let path = unique_db_path("watermark-backing");
-    let archive = unique_db_path("watermark-backing-archive");
+    let (_path_dir, path) = temp_sqlite_path("watermark-backing");
+    let (_archive_dir, archive) = temp_sqlite_path("watermark-backing-archive");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
@@ -327,9 +314,9 @@ fn watermark_trust_requires_backing_archive() -> Result<(), Box<dyn std::error::
 /// behind would leave set drift that bricks the store on the next rotation.)
 #[test]
 fn retention_then_append_and_reopen_succeeds() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retention-reopen");
+    let (_path_dir, path) = temp_sqlite_path("retention-reopen");
     let keypair = super::support::receipt_test_keypair();
-    let archive = unique_db_path("retention-reopen-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("retention-reopen-archive");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
 
     {
@@ -396,7 +383,7 @@ fn retention_then_append_and_reopen_succeeds() -> Result<(), Box<dyn std::error:
 /// `reader_pool_never_begins_a_write_transaction`).
 #[test]
 fn reader_pool_never_rotates() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("reader-never-rotates");
+    let (_path_dir, path) = temp_sqlite_path("reader-never-rotates");
     let store = SqliteReceiptStore::open(&path)?;
     // A rotation over an empty store is a no-op but still routes through the
     // &self -> Rotate-command path to the single writer.
@@ -424,7 +411,7 @@ fn reader_pool_never_rotates() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn watermark_ledger_db_triggers_reject_tamper() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::insert_receipt_retention_watermark;
-    let path = unique_db_path("watermark-triggers");
+    let (_path_dir, path) = temp_sqlite_path("watermark-triggers");
     let store = SqliteReceiptStore::open(&path)?;
     let connection = store.reader_connection_for_test()?;
 
@@ -487,7 +474,7 @@ fn watermark_ledger_db_triggers_reject_tamper() -> Result<(), Box<dyn std::error
 
 #[test]
 fn tenant_scoped_rotation_rejected() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("tenant-rejected");
+    let (_path_dir, path) = temp_sqlite_path("tenant-rejected");
     let store = SqliteReceiptStore::open(&path)?;
     let config = RetentionConfig {
         tenant_id: Some("tenant-a".to_string()),
@@ -509,8 +496,8 @@ fn tenant_scoped_rotation_rejected() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn settlement_and_metered_rows_are_archived_not_cascaded() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("recon-archived");
-    let archive = unique_db_path("recon-archive");
+    let (_path_dir, path) = temp_sqlite_path("recon-archived");
+    let (_archive_dir, archive) = temp_sqlite_path("recon-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -620,8 +607,8 @@ fn settlement_and_metered_rows_are_archived_not_cascaded() -> Result<(), Box<dyn
 #[test]
 fn rotation_refreshes_stale_reconciliation_archive_rows() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("recon-refresh");
-    let archive = unique_db_path("recon-refresh-archive");
+    let (_path_dir, path) = temp_sqlite_path("recon-refresh");
+    let (_archive_dir, archive) = temp_sqlite_path("recon-refresh-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -725,9 +712,9 @@ fn rotation_refreshes_stale_reconciliation_archive_rows() -> Result<(), Box<dyn 
 
 #[test]
 fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("size-converges");
+    let (_path_dir, path) = temp_sqlite_path("size-converges");
     let keypair = super::support::receipt_test_keypair();
-    let archive = unique_db_path("size-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("size-archive");
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
     for i in 0..64u64 {
@@ -778,9 +765,9 @@ fn size_rotation_converges_below_threshold() -> Result<(), Box<dyn std::error::E
 #[test]
 fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("size-shared-median");
+    let (_path_dir, path) = temp_sqlite_path("size-shared-median");
     let keypair = super::support::receipt_test_keypair();
-    let archive = unique_db_path("size-shared-median-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("size-shared-median-archive");
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(super::support::signer(&keypair, 4))?;
     // Every receipt carries the SAME timestamp, so the median equals it too.
@@ -821,8 +808,8 @@ fn size_rotation_archives_when_median_timestamp_is_shared() -> Result<(), Box<dy
 /// co-archives child rows once a cutoff is chosen.
 #[test]
 fn child_only_evidence_ages_out_under_time_trigger() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retention-child-only");
-    let archive = unique_db_path("retention-child-only-archive");
+    let (_path_dir, path) = temp_sqlite_path("retention-child-only");
+    let (_archive_dir, archive) = temp_sqlite_path("retention-child-only-archive");
     let keypair = super::support::receipt_test_keypair();
 
     let store = SqliteReceiptStore::open(&path)?;
@@ -891,8 +878,8 @@ fn child_only_evidence_ages_out_under_time_trigger() -> Result<(), Box<dyn std::
 /// same pass.
 #[test]
 fn size_trigger_applies_when_time_cutoff_is_a_noop() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retention-size-fallthrough");
-    let archive = unique_db_path("retention-size-fallthrough-archive");
+    let (_path_dir, path) = temp_sqlite_path("retention-size-fallthrough");
+    let (_archive_dir, archive) = temp_sqlite_path("retention-size-fallthrough-archive");
     let keypair = super::support::receipt_test_keypair();
 
     let now = std::time::SystemTime::now()
@@ -965,8 +952,8 @@ fn size_trigger_applies_when_time_cutoff_is_a_noop() -> Result<(), Box<dyn std::
 #[test]
 fn non_incremental_rotation_validates_chain_before_deleting(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retention-nonincremental-validate");
-    let archive = unique_db_path("retention-nonincremental-validate-archive");
+    let (_path_dir, path) = temp_sqlite_path("retention-nonincremental-validate");
+    let (_archive_dir, archive) = temp_sqlite_path("retention-nonincremental-validate-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1058,8 +1045,8 @@ fn non_incremental_rotation_validates_chain_before_deleting(
 /// `retention_repair` needs to recover.
 #[test]
 fn incremental_rotation_rejects_projection_drift() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("incremental-drift-rotation");
-    let archive = unique_db_path("incremental-drift-rotation-archive");
+    let (_path_dir, path) = temp_sqlite_path("incremental-drift-rotation");
+    let (_archive_dir, archive) = temp_sqlite_path("incremental-drift-rotation-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1146,8 +1133,8 @@ fn incremental_rotation_rejects_projection_drift() -> Result<(), Box<dyn std::er
 /// its remaining live evidence gone).
 #[test]
 fn incremental_rotation_audits_chain_before_deleting() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("incremental-chain-audit-rotation");
-    let archive = unique_db_path("incremental-chain-audit-rotation-archive");
+    let (_path_dir, path) = temp_sqlite_path("incremental-chain-audit-rotation");
+    let (_archive_dir, archive) = temp_sqlite_path("incremental-chain-audit-rotation-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1229,8 +1216,8 @@ fn incremental_rotation_audits_chain_before_deleting() -> Result<(), Box<dyn std
 #[test]
 fn first_rotation_creates_archive_on_open_existing_store() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("open-existing-first-rotation");
-    let archive = unique_db_path("open-existing-first-rotation-archive");
+    let (_path_dir, path) = temp_sqlite_path("open-existing-first-rotation");
+    let (_archive_dir, archive) = temp_sqlite_path("open-existing-first-rotation-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1290,7 +1277,7 @@ fn first_rotation_creates_archive_on_open_existing_store() -> Result<(), Box<dyn
 #[test]
 fn rotation_rejects_non_durable_or_aliasing_archive_path() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("nondurable-archive");
+    let (_path_dir, path) = temp_sqlite_path("nondurable-archive");
     let keypair = super::support::receipt_test_keypair();
 
     let store = SqliteReceiptStore::open(&path)?;
@@ -1360,8 +1347,8 @@ fn rotation_rejects_non_durable_or_aliasing_archive_path() -> Result<(), Box<dyn
 /// would report a permanently in-flight writer after any rotation.
 #[test]
 fn rotate_does_not_leak_inflight() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rotate-inflight");
-    let archive = unique_db_path("rotate-inflight-archive");
+    let (_path_dir, path) = temp_sqlite_path("rotate-inflight");
+    let (_archive_dir, archive) = temp_sqlite_path("rotate-inflight-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1424,7 +1411,7 @@ fn bogus_watermark_does_not_skip_verification() -> Result<(), Box<dyn std::error
         insert_receipt_retention_watermark, verify_checkpoint_chain_integrity,
     };
 
-    let path = unique_db_path("bogus-watermark");
+    let (_path_dir, path) = temp_sqlite_path("bogus-watermark");
     let store = SqliteReceiptStore::open(&path)?;
     let keypair = super::support::receipt_test_keypair();
     store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
@@ -1479,8 +1466,8 @@ fn bogus_watermark_does_not_skip_verification() -> Result<(), Box<dyn std::error
 /// leaving the live rows intact.
 #[test]
 fn co_archival_rejects_conflicting_stale_archive() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("co-archival-conflict");
-    let archive = unique_db_path("co-archival-conflict-archive");
+    let (_path_dir, path) = temp_sqlite_path("co-archival-conflict");
+    let (_archive_dir, archive) = temp_sqlite_path("co-archival-conflict-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1562,8 +1549,8 @@ fn co_archival_rejects_conflicting_stale_archive() -> Result<(), Box<dyn std::er
 /// Verification must FAIL fail-closed before any delete.
 #[test]
 fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("co-archival-cap-lineage");
-    let archive = unique_db_path("co-archival-cap-lineage-archive");
+    let (_path_dir, path) = temp_sqlite_path("co-archival-cap-lineage");
+    let (_archive_dir, archive) = temp_sqlite_path("co-archival-cap-lineage-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1640,8 +1627,8 @@ fn co_archival_rejects_conflicting_capability_lineage() -> Result<(), Box<dyn st
 /// behind can be repaired back to a writable, reopenable, healthy store.
 #[test]
 fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("bricked-repair");
-    let archive = unique_db_path("bricked-archive");
+    let (_path_dir, path) = temp_sqlite_path("bricked-repair");
+    let (_archive_dir, archive) = temp_sqlite_path("bricked-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
@@ -1723,8 +1710,8 @@ fn bricked_store_repair_restores_append() -> Result<(), Box<dyn std::error::Erro
 /// row. Verification must FAIL fail-closed before any delete.
 #[test]
 fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("co-archival-reused-seq");
-    let archive = unique_db_path("co-archival-reused-seq-archive");
+    let (_path_dir, path) = temp_sqlite_path("co-archival-reused-seq");
+    let (_archive_dir, archive) = temp_sqlite_path("co-archival-reused-seq-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1811,8 +1798,8 @@ fn co_archival_rejects_reused_seq_archive() -> Result<(), Box<dyn std::error::Er
 /// Verification must FAIL fail-closed before any delete.
 #[test]
 fn co_archival_rejects_divergent_attribution_columns() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("co-archival-attribution");
-    let archive = unique_db_path("co-archival-attribution-archive");
+    let (_path_dir, path) = temp_sqlite_path("co-archival-attribution");
+    let (_archive_dir, archive) = temp_sqlite_path("co-archival-attribution-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1899,8 +1886,8 @@ fn co_archival_rejects_divergent_attribution_columns() -> Result<(), Box<dyn std
 /// no faithful archived evidence behind.
 #[test]
 fn repair_rejects_divergent_archive_identity() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-divergent-archive");
-    let archive = unique_db_path("repair-divergent-archive-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-divergent-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-divergent-archive-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -1985,8 +1972,8 @@ fn repair_rejects_divergent_archive_identity() -> Result<(), Box<dyn std::error:
 /// batch fail-closed.
 #[test]
 fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-partial-batch");
-    let archive = unique_db_path("repair-partial-batch-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-partial-batch");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-partial-batch-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2075,8 +2062,8 @@ fn repair_refuses_partial_checkpoint_batch() -> Result<(), Box<dyn std::error::E
 /// prefix and refuse otherwise.
 #[test]
 fn repair_refuses_incomplete_prefix_archive() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-incomplete-prefix");
-    let archive = unique_db_path("repair-incomplete-prefix-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-incomplete-prefix");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-incomplete-prefix-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2182,8 +2169,8 @@ mod repair_idempotence;
 /// watermark exists; the empty projection matches the empty source tables.
 #[test]
 fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("fully-archived-reopen");
-    let archive = unique_db_path("fully-archived-reopen-archive");
+    let (_path_dir, path) = temp_sqlite_path("fully-archived-reopen");
+    let (_archive_dir, archive) = temp_sqlite_path("fully-archived-reopen-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2228,8 +2215,8 @@ fn fully_archived_store_reopens_writable() -> Result<(), Box<dyn std::error::Err
 #[test]
 fn checkpoint_status_floors_committed_at_watermark_after_full_archive(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("status-floor-watermark");
-    let archive = unique_db_path("status-floor-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("status-floor-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("status-floor-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2277,8 +2264,8 @@ fn checkpoint_status_floors_committed_at_watermark_after_full_archive(
 #[test]
 fn latest_committed_entry_seq_floors_at_watermark_after_full_archive(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("committed-floor-watermark");
-    let archive = unique_db_path("committed-floor-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("committed-floor-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("committed-floor-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2318,8 +2305,8 @@ fn latest_committed_entry_seq_floors_at_watermark_after_full_archive(
 #[test]
 fn health_reports_checkpoint_error_without_probing_archived_rows(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("health-missing-archive");
-    let archive = unique_db_path("health-missing-archive-archive");
+    let (_path_dir, path) = temp_sqlite_path("health-missing-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("health-missing-archive-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2362,8 +2349,8 @@ fn health_reports_checkpoint_error_without_probing_archived_rows(
 #[test]
 fn rotation_preserves_binding_for_live_consumer_of_aged_authorization(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("live-consumer-binding");
-    let archive = unique_db_path("live-consumer-binding-archive");
+    let (_path_dir, path) = temp_sqlite_path("live-consumer-binding");
+    let (_archive_dir, archive) = temp_sqlite_path("live-consumer-binding-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2470,8 +2457,8 @@ fn rotation_preserves_binding_for_live_consumer_of_aged_authorization(
 /// fail for a session whose parent just aged out.
 #[test]
 fn rotation_preserves_live_child_lineage_parent() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("lineage-parent-preserve");
-    let archive = unique_db_path("lineage-parent-preserve-archive");
+    let (_path_dir, path) = temp_sqlite_path("lineage-parent-preserve");
+    let (_archive_dir, archive) = temp_sqlite_path("lineage-parent-preserve-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2584,8 +2571,8 @@ fn rotation_preserves_live_child_lineage_parent() -> Result<(), Box<dyn std::err
 #[test]
 fn rotation_preserves_receipt_with_open_settlement_reconciliation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("open-settlement-preserve");
-    let archive = unique_db_path("open-settlement-preserve-archive");
+    let (_path_dir, path) = temp_sqlite_path("open-settlement-preserve");
+    let (_archive_dir, archive) = temp_sqlite_path("open-settlement-preserve-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2708,8 +2695,8 @@ fn rotation_preserves_receipt_with_open_settlement_reconciliation(
 #[test]
 fn rotation_preserves_receipt_with_scheduled_metered_reconciliation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("scheduled-metered-preserve");
-    let archive = unique_db_path("scheduled-metered-preserve-archive");
+    let (_path_dir, path) = temp_sqlite_path("scheduled-metered-preserve");
+    let (_archive_dir, archive) = temp_sqlite_path("scheduled-metered-preserve-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2817,8 +2804,8 @@ fn rotation_preserves_receipt_with_scheduled_metered_reconciliation(
 #[test]
 fn flush_report_floors_committed_at_watermark_after_full_archive(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("flush-floor-watermark");
-    let archive = unique_db_path("flush-floor-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("flush-floor-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("flush-floor-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2862,8 +2849,8 @@ fn flush_report_floors_committed_at_watermark_after_full_archive(
 #[test]
 fn flush_reports_watermark_covered_checkpoint_from_stale_head(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("flush-stale-head-watermark");
-    let archive = unique_db_path("flush-stale-head-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("flush-stale-head-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("flush-stale-head-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -2938,7 +2925,7 @@ fn boundary_matching_watermark_over_live_prefix_does_not_skip_verification(
         insert_receipt_retention_watermark, verify_checkpoint_chain_integrity,
     };
 
-    let path = unique_db_path("boundary-live-watermark");
+    let (_path_dir, path) = temp_sqlite_path("boundary-live-watermark");
     let store = SqliteReceiptStore::open(&path)?;
     let keypair = super::support::receipt_test_keypair();
     store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;
@@ -2979,8 +2966,8 @@ fn boundary_matching_watermark_over_live_prefix_does_not_skip_verification(
 /// it rebuilds the deleted prefix from the live claim log and fails.
 #[test]
 fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("catch-up-watermark");
-    let archive = unique_db_path("catch-up-watermark-archive");
+    let (_path_dir, path) = temp_sqlite_path("catch-up-watermark");
+    let (_archive_dir, archive) = temp_sqlite_path("catch-up-watermark-archive");
     let archive_path = archive.to_str().ok_or("archive path is not valid utf-8")?;
     let keypair = super::support::receipt_test_keypair();
     // Checkpoints cover [1,2] and [3,4]; the aged [1,2] range is genuinely
@@ -3011,8 +2998,8 @@ fn catch_up_honors_archival_watermark_exemption() -> Result<(), Box<dyn std::err
 /// prefix so a healthy, fully-archived store is not reported as behind.
 #[test]
 fn read_only_health_floors_committed_at_watermark() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("read-only-fully-archived");
-    let archive = unique_db_path("read-only-fully-archived-archive");
+    let (_path_dir, path) = temp_sqlite_path("read-only-fully-archived");
+    let (_archive_dir, archive) = temp_sqlite_path("read-only-fully-archived-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -3060,7 +3047,7 @@ fn read_only_health_floors_committed_at_watermark() -> Result<(), Box<dyn std::e
 #[cfg(unix)]
 #[test]
 fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Error>> {
-    let dir = unique_db_path("abs-archive-dir");
+    let (_dir_dir, dir) = temp_sqlite_path("abs-archive-dir");
     std::fs::create_dir_all(&dir)?;
     #[cfg(unix)]
     {
@@ -3075,7 +3062,7 @@ fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Er
     let noncanonical = link.join("archive.sqlite3");
     let noncanonical_str = noncanonical.to_str().ok_or("archive path not utf-8")?;
 
-    let path = unique_db_path("abs-archive-store");
+    let (_path_dir, path) = temp_sqlite_path("abs-archive-store");
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, noncanonical_str, &keypair)?;
 
@@ -3112,9 +3099,9 @@ fn rotation_records_absolute_archive_path() -> Result<(), Box<dyn std::error::Er
 /// rotation committed to must be rejected fail-closed before any copy or delete.
 #[test]
 fn rotation_rejects_archive_path_change_after_first() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("archive-path-change");
-    let archive_a = unique_db_path("archive-path-change-a");
-    let archive_b = unique_db_path("archive-path-change-b");
+    let (_path_dir, path) = temp_sqlite_path("archive-path-change");
+    let (_archive_a_dir, archive_a) = temp_sqlite_path("archive-path-change-a");
+    let (_archive_b_dir, archive_b) = temp_sqlite_path("archive-path-change-b");
     let archive_a_path = archive_a.to_str().ok_or("archive path invalid")?;
     let archive_b_path = archive_b.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
@@ -3188,8 +3175,8 @@ fn rotation_rejects_archive_path_change_after_first() -> Result<(), Box<dyn std:
 fn watermark_trust_rejects_tampered_archive_contents() -> Result<(), Box<dyn std::error::Error>> {
     use crate::receipt_store::support::trusted_retention_watermark;
 
-    let path = unique_db_path("watermark-tampered");
-    let archive = unique_db_path("watermark-tampered-archive");
+    let (_path_dir, path) = temp_sqlite_path("watermark-tampered");
+    let (_archive_dir, archive) = temp_sqlite_path("watermark-tampered-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
@@ -3236,8 +3223,8 @@ fn watermark_trust_rejects_tampered_archive_contents() -> Result<(), Box<dyn std
 /// the archived/live identity ambiguity the tombstone exists to prevent.
 #[test]
 fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-tombstone");
-    let archive = unique_db_path("repair-tombstone-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-tombstone");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-tombstone-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
@@ -3314,8 +3301,8 @@ fn repair_tombstones_archived_ids_to_block_reuse() -> Result<(), Box<dyn std::er
 /// ambiguity. Re-appending an already-deleted archived id must still be rejected.
 #[test]
 fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-tombstone-prefix");
-    let archive = unique_db_path("repair-tombstone-prefix-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-tombstone-prefix");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-tombstone-prefix-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     create_canonical_archive(&archive)?;
     let keypair = super::support::receipt_test_keypair();
@@ -3404,12 +3391,13 @@ fn repair_tombstones_already_deleted_prefix_ids() -> Result<(), Box<dyn std::err
 #[test]
 fn repair_rejects_archive_that_does_not_back_the_watermark(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-wrong-backing");
-    let ledger_archive = unique_db_path("repair-wrong-backing-ledger");
+    let (_path_dir, path) = temp_sqlite_path("repair-wrong-backing");
+    let (_ledger_archive_dir, ledger_archive) = temp_sqlite_path("repair-wrong-backing-ledger");
     let ledger_path = ledger_archive
         .to_str()
         .ok_or("ledger archive path invalid")?;
-    let supplied_archive = unique_db_path("repair-wrong-backing-supplied");
+    let (_supplied_archive_dir, supplied_archive) =
+        temp_sqlite_path("repair-wrong-backing-supplied");
     let supplied_path = supplied_archive
         .to_str()
         .ok_or("supplied archive path invalid")?;
@@ -3542,8 +3530,8 @@ fn repair_rejects_archive_that_does_not_back_the_watermark(
 #[test]
 fn rotation_archives_to_freshest_verified_checkpoint_despite_stale_head(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rotation-verified-ceiling");
-    let archive = unique_db_path("rotation-verified-ceiling-archive");
+    let (_path_dir, path) = temp_sqlite_path("rotation-verified-ceiling");
+    let (_archive_dir, archive) = temp_sqlite_path("rotation-verified-ceiling-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -3623,7 +3611,7 @@ fn rotation_archives_to_freshest_verified_checkpoint_despite_stale_head(
 /// tombstone and then re-insert the archived id.
 #[test]
 fn retention_tombstones_are_immutable() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("tombstone-immutable");
+    let (_path_dir, path) = temp_sqlite_path("tombstone-immutable");
     let store = SqliteReceiptStore::open(&path)?;
     let conn = store.reader_connection_for_test()?;
 
@@ -3677,8 +3665,8 @@ fn retention_tombstones_are_immutable() -> Result<(), Box<dyn std::error::Error>
 /// may advance the watermark or delete the surviving suffix.
 #[test]
 fn rotation_refuses_when_prior_archive_missing() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rotation-missing-prior-archive");
-    let archive = unique_db_path("rotation-missing-prior-archive-archive");
+    let (_path_dir, path) = temp_sqlite_path("rotation-missing-prior-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("rotation-missing-prior-archive-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
     let store = store_with_archived_first_checkpoint(&path, archive_path, &keypair)?;
@@ -3727,8 +3715,8 @@ fn rotation_refuses_when_prior_archive_missing() -> Result<(), Box<dyn std::erro
 /// the covered checkpoint roots from the archive and refuse a divergent one.
 #[test]
 fn repair_rejects_corrupted_archive_prefix() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-corrupt-prefix");
-    let archive = unique_db_path("repair-corrupt-prefix-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-corrupt-prefix");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-corrupt-prefix-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -3829,8 +3817,8 @@ fn repair_rejects_corrupted_archive_prefix() -> Result<(), Box<dyn std::error::E
 /// ledger names a missing file) fails closed without deleting.
 #[test]
 fn repair_refuses_when_ledger_names_missing_archive() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("repair-ledger-missing-archive");
-    let archive = unique_db_path("repair-ledger-missing-archive-archive");
+    let (_path_dir, path) = temp_sqlite_path("repair-ledger-missing-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("repair-ledger-missing-archive-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -3941,8 +3929,8 @@ mod delete_races;
 /// surface the archived receipt's call-chain provenance.
 #[test]
 fn governed_receipt_lineage_is_co_archived() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("lineage-archived");
-    let archive = unique_db_path("lineage-archive");
+    let (_path_dir, path) = temp_sqlite_path("lineage-archived");
+    let (_archive_dir, archive) = temp_sqlite_path("lineage-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 

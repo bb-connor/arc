@@ -37,15 +37,15 @@ use chio_finding::{
 };
 use chio_kernel::finding_denial::FindingDenial;
 
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionOperationStore, AdmissionReceiptMetadataV1,
     AdmissionTerminalReplay, ADMISSION_RECEIPT_METADATA_KEY,
 };
-use chio_kernel::checkpoint::{
-    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint, KernelCheckpoint,
-    ReceiptInclusionProof,
-};
 use chio_kernel::tool_outcome::{ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeStore};
+use chio_kernel_core::evidence_verify::{
+    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint,
+};
 use chio_open_market::bidding::{
     ReservationReceipt, SignedAskResponse, SignedBidRequest, SignedReservationReceipt,
     ASK_RESPONSE_SCHEMA, RESERVATION_RECEIPT_SCHEMA,
@@ -1685,14 +1685,16 @@ impl FindingPurchaseCoordinator {
                 "zero-charge currency conflicts with the reservation".to_owned(),
             ));
         }
-        validate_checkpoint(checkpoint, std::slice::from_ref(&receipt.kernel_key))
-            .map_err(|error| PurchaseCoordinatorError::CheckpointEvidence(error.to_string()))?;
+        let checkpoint = validate_checkpoint(checkpoint, std::slice::from_ref(&receipt.kernel_key))
+            .map_err(|error| PurchaseCoordinatorError::CheckpointEvidence(error.to_string()))?
+            .checkpoint();
         if checkpoint.body.issued_at > now {
             return Err(PurchaseCoordinatorError::CheckpointEvidence(
                 "denial checkpoint is ahead of the finalization clock".to_owned(),
             ));
         }
-        if checkpoint.body.issued_at < receipt.timestamp
+        if checkpoint.body.kernel_key != receipt.kernel_key
+            || checkpoint.body.issued_at < receipt.timestamp
             || inclusion_proof.checkpoint_seq != checkpoint.body.checkpoint_seq
             || inclusion_proof.merkle_root != checkpoint.body.merkle_root
             || inclusion_proof.proof.tree_size != checkpoint.body.tree_size

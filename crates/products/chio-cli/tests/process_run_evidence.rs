@@ -127,14 +127,14 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
     )?;
     checkpoint.body.issued_at = original.timestamp;
     checkpoint.signature = signer.sign_wrapped(
-        chio_kernel::checkpoint::CHECKPOINT_SCHEMA,
+        chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
         &chio_core::canonical::CanonicalBytes::from_serializable(&checkpoint.body)?,
     )?;
-    chio_kernel::checkpoint::validate_checkpoint(
+    chio_kernel_core::evidence_verify::validate_checkpoint(
         &checkpoint,
         std::slice::from_ref(&checkpoint.body.kernel_key),
     )?;
-    let proof = chio_kernel::checkpoint::build_inclusion_proof(&tree, 0, 1, 1)?;
+    let proof = chio_kernel_core::evidence_verify::build_inclusion_proof(&tree, 0, 1, 1)?;
     assert!(proof.verify(&foreign_bytes, &checkpoint.body.merkle_root));
     let foreign_log = json!({"checkpoint": checkpoint, "inclusion": proof});
     let mut extra_nonce: Value = serde_json::from_str(

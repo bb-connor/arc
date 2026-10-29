@@ -242,24 +242,20 @@ pub(crate) enum EvidenceCommands {
         /// Input directory containing a previously exported evidence package.
         #[arg(long)]
         input: PathBuf,
-        /// Independently trusted kernel public key. Repeat to allow key rotation.
-        #[arg(long, required = true)]
-        trusted_kernel_pubkey: Vec<String>,
-        /// Independently obtained complete checkpoint publication anchor binding.
+        /// The verifier-owned `chio.verifier-trust.v1` file pinning every
+        /// trusted kernel key and the checkpoint trust anchor.
         #[arg(long)]
-        trusted_anchor_file: Option<PathBuf>,
+        trust: PathBuf,
     },
     /// Import a verified bilateral evidence package for later federated delegation.
     Import {
         /// Input directory containing a previously exported evidence package.
         #[arg(long)]
         input: PathBuf,
-        /// Independently trusted kernel public key. Repeat to allow key rotation.
-        #[arg(long, required = true)]
-        trusted_kernel_pubkey: Vec<String>,
-        /// Independently obtained complete checkpoint publication anchor binding.
+        /// The verifier-owned `chio.verifier-trust.v1` file pinning every
+        /// trusted kernel key and the checkpoint trust anchor.
         #[arg(long)]
-        trusted_anchor_file: Option<PathBuf>,
+        trust: PathBuf,
     },
     /// Create a signed bilateral receipt-sharing policy document.
     FederationPolicy {

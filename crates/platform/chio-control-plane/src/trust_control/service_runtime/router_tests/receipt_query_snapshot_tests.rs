@@ -234,7 +234,7 @@ async fn export_lane_refuses_a_second_export_without_borrowing_read_capacity() -
         .header(AUTHORIZATION, "Bearer snapshot-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::admin_all(),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::admin_all(),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state.clone())
@@ -351,10 +351,11 @@ async fn http_pages_use_the_pinned_projection_and_refuse_a_changed_returned_leaf
     state.config.receipt_db_path = Some(path.clone());
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("snapshot-tenant".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("snapshot-tenant", "tenant-secret")],
+    );
     let original = appended
         .last()
         .test_expect("fixture contains a live final row");

@@ -20,7 +20,7 @@ use chio_core::receipt::{
     lineage::ChildRequestReceipt, lineage::ChildRequestReceiptBody,
 };
 use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
-use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_core::sha256_hex;
 use chio_kernel::BudgetStore;
 use chio_store_sqlite::SqliteBudgetStore;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
@@ -47,13 +47,15 @@ const CLUSTER_NODE_ID_HEADER: &str = "x-chio-cluster-node-id";
 const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-chio-cluster-auth-issued-at";
 const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-chio-cluster-auth-signature";
 const CLUSTER_AUTH_TERM_HEADER: &str = "x-chio-cluster-auth-term";
-const CLUSTER_AUTH_SCHEME: &str = "chio.cluster.peer.v1";
+
+#[path = "support/trust_access.rs"]
+mod trust_access;
 
 #[path = "trust_cluster/peer_identity.rs"]
 mod peer_identity;
 use peer_identity::{
-    cluster_peer_auth_signature, internal_peer_node_id, register_internal_peer,
-    trust_cluster_test_lock,
+    internal_peer_node_id, internal_url, register_internal_peer, signed_internal_headers,
+    trust_cluster_test_lock, write_node_access_config,
 };
 
 fn workspace_root() -> PathBuf {
@@ -119,21 +121,29 @@ fn spawn_trust_service(
         "serve".to_string(),
         "--listen".to_string(),
         listen.to_string(),
-        "--service-token".to_string(),
-        service_token.to_string(),
+        "--access-config".to_string(),
+        write_node_access_config(service_token, advertise_url, peer_urls)
+            .display()
+            .to_string(),
         "--advertise-url".to_string(),
         advertise_url.to_string(),
         "--allow-local-peer-urls".to_string(),
         "--cluster-sync-interval-ms".to_string(),
         "2000".to_string(),
     ];
-    for peer_url in peer_urls {
-        args.push("--peer-url".to_string());
-        args.push(peer_url.clone());
-    }
     if let Some(policy_path) = policy_path {
         args.push("--policy".to_string());
         args.push(policy_path.to_str().expect("policy path").to_string());
+    }
+    if !peer_urls.is_empty() {
+        args.push("--cluster-peer-replay-db".to_string());
+        args.push(
+            budget_db_path
+                .with_extension("peer-replay.sqlite3")
+                .to_str()
+                .expect("peer replay db path")
+                .to_string(),
+        );
     }
     register_internal_peer(advertise_url, peer_urls);
 
@@ -238,48 +248,38 @@ fn try_get_json(client: &Client, url: &str, token: &str) -> Option<Value> {
         .ok()
 }
 
-fn try_internal_cluster_status(client: &Client, base_url: &str, token: &str) -> Option<Value> {
+fn try_internal_cluster_status(client: &Client, base_url: &str, _token: &str) -> Option<Value> {
     let endpoint = "/v1/internal/cluster/status";
-    let node_id = internal_peer_node_id(base_url)?;
-    let issued_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, &node_id, endpoint, issued_at, None);
-    client
-        .get(format!("{base_url}{endpoint}"))
-        .header(CLUSTER_NODE_ID_HEADER, node_id)
-        .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature)
-        .send()
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json()
-        .ok()
+    let sender = internal_peer_node_id(base_url)?;
+    let mut request = client.get(format!("{}{endpoint}", internal_url(base_url)));
+    for (name, value) in signed_internal_headers(base_url, &sender, "GET", endpoint, "", b"", None)
+    {
+        request = request.header(name, value);
+    }
+    request.send().ok()?.error_for_status().ok()?.json().ok()
 }
 
 fn set_cluster_partition(
     client: &Client,
     base_url: &str,
-    token: &str,
+    _token: &str,
     blocked_peer_urls: &[String],
 ) -> Value {
     let endpoint = "/v1/internal/cluster/partition";
-    let node_id =
+    let sender =
         internal_peer_node_id(base_url).expect("registered internal peer node id for partition");
-    let issued_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, &node_id, endpoint, issued_at, Some(0));
-    client
-        .post(format!("{base_url}{endpoint}"))
-        .header(CLUSTER_NODE_ID_HEADER, node_id)
-        .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature)
-        .header(CLUSTER_AUTH_TERM_HEADER, "0")
-        .json(&json!({ "blockedPeerUrls": blocked_peer_urls }))
+    let body = serde_json::to_vec(&json!({ "blockedPeerUrls": blocked_peer_urls }))
+        .expect("encode cluster partition body");
+    let mut request = client
+        .post(format!("{}{endpoint}", internal_url(base_url)))
+        .header(reqwest::header::CONTENT_TYPE, "application/json");
+    for (name, value) in
+        signed_internal_headers(base_url, &sender, "POST", endpoint, "", &body, Some(0))
+    {
+        request = request.header(name, value);
+    }
+    request
+        .body(body)
         .send()
         .expect("send cluster partition POST")
         .error_for_status()
@@ -288,29 +288,21 @@ fn set_cluster_partition(
         .expect("decode cluster partition response")
 }
 
-fn post_internal_json_status(
+fn post_forwarded_authority_status(
     client: &Client,
     base_url: &str,
     token: &str,
     endpoint: &str,
-    node_id: &str,
-    term: Option<u64>,
+    term: u64,
     body: &Value,
 ) -> (u16, String) {
-    let issued_at = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs() as i64;
-    let signature = cluster_peer_auth_signature(token, node_id, endpoint, issued_at, term);
-    let mut request = client
+    let response = client
         .post(format!("{base_url}{endpoint}"))
-        .header(CLUSTER_NODE_ID_HEADER, node_id)
-        .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
-        .header(CLUSTER_AUTH_SIGNATURE_HEADER, signature);
-    if let Some(term) = term {
-        request = request.header(CLUSTER_AUTH_TERM_HEADER, term.to_string());
-    }
-    let response = request.json(body).send().expect("send internal POST");
+        .header(AUTHORIZATION, bearer(token))
+        .header("x-chio-forwarded-authority-term", term.to_string())
+        .json(body)
+        .send()
+        .expect("send forwarded authority POST");
     let status = response.status().as_u16();
     let body = response.text().unwrap_or_default();
     (status, body)
@@ -1760,8 +1752,15 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
     );
     wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
 
-    let unsigned = client
+    let public = client
         .get(format!("{url_a}/v1/internal/cluster/status"))
+        .send()
+        .expect("send internal cluster status request to the public listener");
+    assert_eq!(public.status().as_u16(), 404);
+
+    let internal_a = internal_url(&url_a);
+    let unsigned = client
+        .get(format!("{internal_a}/v1/internal/cluster/status"))
         .send()
         .expect("send unsigned internal cluster status request");
     assert_eq!(unsigned.status().as_u16(), 401);
@@ -1771,7 +1770,7 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
         .expect("system time before unix epoch")
         .as_secs() as i64;
     let invalid_signature = client
-        .get(format!("{url_a}/v1/internal/cluster/status"))
+        .get(format!("{internal_a}/v1/internal/cluster/status"))
         .header(CLUSTER_NODE_ID_HEADER, url_b.clone())
         .header(CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string())
         .header(CLUSTER_AUTH_SIGNATURE_HEADER, "deadbeef")
@@ -2183,19 +2182,12 @@ fn trust_control_cluster_rejects_stale_authority_term_after_failover_and_restart
     )["generation"]
         .as_u64()
         .expect("generation before stale mutation");
-    let stale_peer_url = urls
-        .iter()
-        .find(|candidate| *candidate != &restarted_leader)
-        .cloned()
-        .expect("stale peer url");
-
-    let (stale_status, stale_body) = post_internal_json_status(
+    let (stale_status, stale_body) = post_forwarded_authority_status(
         &client,
         &restarted_leader,
         service_token,
         "/v1/authority",
-        &stale_peer_url,
-        Some(initial_term),
+        initial_term,
         &json!({}),
     );
     assert_eq!(stale_status, 409);

@@ -182,23 +182,20 @@ fn retained_federation_context_is_private_and_bound_to_the_committed_outcome() -
         );
     }
 
-    // Recovery requires the exact committed blob before federation co-signing.
     let mut missing = raw.to_persisted();
     missing.federation_context_json = None;
-    fixture
-        .store
-        .state
-        .lock()
-        .map_err(|_| "test lock")?
-        .raw_outcome = Some(RawInvocationOutcomeV1::from_persisted(missing)?);
-    let (kernel, admissions) = recovered_kernel(&fixture)?;
-    assert!(matches!(
-        recover(&kernel, &fixture.request),
-        Err(KernelError::DurableAdmission(message))
-            if message == "binding mismatch: outcome.raw_invocation_blob"
-    ));
-    assert_eq!(admissions.load(Ordering::SeqCst), 0);
-    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        RawInvocationOutcomeV1::from_persisted(missing.clone()),
+        Err(crate::tool_outcome::ToolOutcomeError::Binding(
+            "raw.federation_context"
+        ))
+    );
+    assert_eq!(
+        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&missing)?),
+        Err(crate::tool_outcome::ToolOutcomeError::Binding(
+            "raw.federation_context"
+        ))
+    );
     Ok(())
 }
 

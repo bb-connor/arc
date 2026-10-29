@@ -72,7 +72,7 @@ pub(super) fn extend_cycle(
             settle_streaming(published, &owned, chunk)?;
             publish_verified(ctx, &mut sink, published, &mut next, owned.batch_end)?;
             accepted_chain.append(
-                chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body)
+                chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
                     .map_err(|error| WalkError::Integrity(error.to_string()))?,
             );
             published.accept_checkpoint(
@@ -196,11 +196,13 @@ fn publish_verified(
 /// capability carries a signed subject, the row is export metadata only and
 /// each export that selects it refuses the row. A row for a capability the
 /// snapshot does not hold is validated again when a receipt first needs it.
-fn refuse_lineage(published: &Published, capability: &str, reason: &str) -> Result<(), WalkError> {
+fn refuse_lineage(
+    published: &Published,
+    capability: &str,
+    reason: &crate::capability_lineage::LineageReaderRefusal,
+) -> Result<(), WalkError> {
     if published.with_db(|db| db.holds_unsigned_subject(capability))? {
-        return Err(WalkError::Integrity(format!(
-            "capability lineage of {capability} is refused by the local reader: {reason}"
-        )));
+        return Err(WalkError::Integrity(reason.message(capability)));
     }
     Ok(())
 }
@@ -241,7 +243,7 @@ fn settle_streaming(
     checkpoint: &super::db::OwnedCheckpoint,
     chunk: i64,
 ) -> Result<(), WalkError> {
-    let mut frontier = chio_kernel::checkpoint::CheckpointChainFrontier::empty();
+    let mut frontier = chio_kernel_core::evidence_verify::CheckpointChainFrontier::empty();
     let mut expected = checkpoint.batch_start;
     while expected <= checkpoint.batch_end {
         let high = expected.saturating_add(chunk - 1).min(checkpoint.batch_end);

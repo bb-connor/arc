@@ -221,30 +221,30 @@ where
 }
 
 fn apply_request_headers(
-    mut request: ureq::Request,
+    mut request: BlockingContractRequest,
     request_headers: &[A2aRequestHeader],
     strip_sensitive_headers: bool,
-) -> ureq::Request {
+) -> BlockingContractRequest {
     for header in request_headers {
         if strip_sensitive_headers
             && (header.sensitive || is_sensitive_redirect_header(&header.name))
         {
             continue;
         }
-        request = request.set(header.name.as_str(), header.value.as_str());
+        request = request.header(header.name.as_str(), header.value.as_str());
     }
     request
 }
 
 fn apply_request_auth(
-    mut request: ureq::Request,
+    mut request: BlockingContractRequest,
     request_auth: &A2aResolvedRequestAuth,
     strip_sensitive_headers: bool,
-) -> ureq::Request {
+) -> BlockingContractRequest {
     request = apply_request_headers(request, &request_auth.headers, strip_sensitive_headers);
     if !strip_sensitive_headers && !request_auth.cookies.is_empty() {
         let cookie_value = build_cookie_header(request_auth);
-        request = request.set("Cookie", cookie_value.as_str());
+        request = request.header("Cookie", cookie_value.as_str());
     }
     request
 }
@@ -305,71 +305,16 @@ fn apply_request_auth_url(mut url: Url, request_auth: &A2aResolvedRequestAuth) -
     url
 }
 
-fn enforce_ureq_content_length(
-    contract: &HttpEgressContract,
-    response: &ureq::Response,
-    context: &str,
-) -> Result<(), AdapterError> {
-    if let Some(content_length) = response.header("Content-Length") {
-        let content_length = content_length.trim().parse::<u64>().map_err(|error| {
-            AdapterError::Protocol(format!(
-                "invalid A2A Content-Length from {context}: {error}"
-            ))
-        })?;
-        contract
-            .enforce_response_bytes(content_length)
-            .map_err(|err| {
-                AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}"))
-            })?;
-    }
-    Ok(())
+fn error_status(status: u16) -> AdapterError {
+    AdapterError::Remote(format!("HTTP {status}"))
 }
 
-fn read_ureq_response_body_with_contract(
-    response: ureq::Response,
-    contract: &HttpEgressContract,
-    context: &str,
-) -> Result<Vec<u8>, AdapterError> {
-    enforce_ureq_content_length(contract, &response, context)?;
-    let mut body = Vec::new();
-    response
-        .into_reader()
-        .take(contract.max_response_bytes.min(MAX_A2A_JSON_BYTES as u64) + 1)
-        .read_to_end(&mut body)
-        .map_err(|error| {
-            AdapterError::Remote(format!(
-                "failed to read A2A response from {context}: {error}"
-            ))
-        })?;
-    contract
-        .enforce_response_bytes(body.len() as u64)
-        .map_err(|err| {
-            AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {err}"))
-        })?;
-    if body.len() > MAX_A2A_JSON_BYTES {
-        return Err(chio_core::canonical::UntrustedJsonError::TooLarge {
-            bytes: body.len(),
-            bound: MAX_A2A_JSON_BYTES,
-        }
-        .into());
-    }
-    Ok(body)
-}
-
-fn map_ureq_error_with_contract(error: ureq::Error, contract: &HttpEgressContract) -> AdapterError {
+fn map_egress_error(error: HttpEgressError) -> AdapterError {
     match error {
-        ureq::Error::Status(status, response) => {
-            let body = match read_ureq_response_body_with_contract(
-                response,
-                contract,
-                &format!("HTTP {status} error"),
-            ) {
-                Ok(body) => body,
-                Err(error) => return error,
-            };
-            let body = String::from_utf8_lossy(&body).into_owned();
-            AdapterError::Remote(format!("HTTP {status}: {}", body.trim()))
+        HttpEgressError::Transport(failure) => AdapterError::Remote(failure.to_string()),
+        HttpEgressError::ResponseTooLarge { .. } => {
+            AdapterError::Protocol(format!("HttpEgressContract rejects A2A response: {error}"))
         }
-        ureq::Error::Transport(error) => AdapterError::Remote(error.to_string()),
+        refusal => AdapterError::InvalidUrl(format!("HttpEgressContract rejects A2A URL: {refusal}")),
     }
 }

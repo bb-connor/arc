@@ -1,5 +1,7 @@
 #![allow(clippy::expect_used, clippy::too_many_arguments, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
 #[path = "support/trust_health.rs"]
 mod trust_health;
 
@@ -947,10 +949,18 @@ fn spawn_trust_control_service(
             "serve",
             "--listen",
             &listen.to_string(),
-            "--service-token",
-            service_token,
-            "--authority-workload-token",
-            authority_workload_token,
+            "--access-config",
+            &trust_access::write_access_config_for(
+                &listen.to_string(),
+                service_token,
+                &[trust_access::TestCredential {
+                    id: "authority-workload",
+                    kind: "deployment",
+                    secret: authority_workload_token,
+                    scopes: &["authority:read", "capabilities:issue"],
+                    tenant: None,
+                }],
+            ),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -975,13 +985,16 @@ fn spawn_http_server_with_control_plane(
     let policy_path = write_policy(dir);
     let script_path = write_mock_server_script(dir);
     let session_db_path = default_session_db_path(dir, listen);
+    let kernel_host_token = trust_access::kernel_host_token(control_token);
 
     let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
     command.args([
         "--control-url",
         control_url,
+        "--control-internal-url",
+        &trust_access::internal_url_for(control_url),
         "--control-token",
-        control_token,
+        &kernel_host_token,
         "--control-authority-public-key",
         control_authority_public_key,
         "mcp",
@@ -6058,3 +6071,5 @@ fn mcp_serve_http_refuses_a_wrapped_command_the_launch_policy_does_not_bind() {
 mod confinement;
 #[path = "mcp_serve_http/durable_stop.rs"]
 mod durable_stop;
+#[path = "mcp_serve_http/kernel_host_preset.rs"]
+mod kernel_host_preset;

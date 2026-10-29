@@ -1155,6 +1155,30 @@ sha256    = "0e3defc0031ed999b6572b9c1714ddd5ff3211eb0e59ab5144f61424515b28dd"
 source    = "hand_curated_coverage"
 
 [[seed]]
+target    = "decision_model_artifact"
+path      = "fuzz/corpus/decision_model_artifact/valid-two-rules.cdm"
+sha256    = "123990d439923ef7ad79a60d7b092b777cb82385ad240158fef9cff6867353ea"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "decision_model_artifact"
+path      = "fuzz/corpus/decision_model_artifact/valid-single-hold-rule.cdm"
+sha256    = "a0777e64a353920e2a125f4aaa137f5a257f3d931eaae4f4ad27ce4ac391bab6"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "decision_model_artifact"
+path      = "fuzz/corpus/decision_model_artifact/rejected-literal-order.cdm"
+sha256    = "e616dfdcef1dfa73eac0c0bc1bbcf24822563fa018187ce9ee6c6e414d45ef29"
+source    = "hand_curated_coverage"
+
+[[seed]]
+target    = "decision_model_artifact"
+path      = "fuzz/corpus/decision_model_artifact/truncated-header.bin"
+sha256    = "ab9a0d5a0e048634c84661b312d43d9dfde9aaf98b877512b3ff825799640777"
+source    = "hand_curated_coverage"
+
+[[seed]]
 target    = "peers_lock_decode"
 path      = "fuzz/corpus/peers_lock_decode/shipped-lockfile.toml"
 sha256    = "bf45f4bddd95878227a056415a50fbae6198e4f803c4cf823d4efca0d4ed5c08"
@@ -1356,4 +1380,28 @@ source = "hand_curated_coverage"
 target = "frost_round2_envelope"
 path = "fuzz/corpus/frost_round2_envelope/pair-19.json"
 sha256 = "e0a6335ee34c1cb400670daef5d7d723cfd4548bec74134bcd9f7c94af8241c6"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/valid-usd.json"
+sha256 = "9b9c11f9cb954016c2e10f97d4c3f279cca87393fb58aaa75fe01371a767d490"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/valid-usdc-rail.json"
+sha256 = "9974c9c7a9e065fee00f505ad9d304cfcb0a9607f6cd5833d904575571952e3b"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/contract-pinned.json"
+sha256 = "87fbaf01dccef22da896d7c69c1f07edd84d1bfc95ffbe02989a2c5d24c1b9ca"
+source = "hand_curated_coverage"
+
+[[seed]]
+target = "settlement_approval_witness"
+path = "fuzz/corpus/settlement_approval_witness/capability-mismatch.json"
+sha256 = "bccc247bcb2e7472e0956207b4cd6aee037337c8bc26affc9722933266d1ee02"
 source = "hand_curated_coverage"

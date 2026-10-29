@@ -441,6 +441,23 @@ fn ensure_source_records_bind_workflow_step_evidence(
         "runtime_proof_regeneration_workflow_steps_missing",
     )?;
     for source_record in source_records {
+        if source_record.as_object().is_some_and(|record| {
+            record.keys().any(|key| {
+                !matches!(
+                    key.as_str(),
+                    "stepIndex"
+                        | "toolReceiptSha256"
+                        | "bilateralDsseSha256"
+                        | "workflowStepSha256"
+                )
+            })
+        }) {
+            return rejected(
+                "runtime_proof_regeneration_source_record_unknown_field",
+                "runtime proof regeneration source record contains unknown fields",
+            );
+        }
+
         let step_index = required_u64(
             source_record,
             "stepIndex",
@@ -456,7 +473,6 @@ fn ensure_source_records_bind_workflow_step_evidence(
             );
         };
         for field in [
-            "admissionReportSha256",
             "toolReceiptSha256",
             "bilateralDsseSha256",
             "workflowStepSha256",

@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-162 of 613 identifier constants in the security crates are unpinned.
+157 of 615 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (52)
 
@@ -65,18 +65,13 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/recovery/domains.rs:74` `PARTICIPANT_OWNER_DOMAIN` = `chio.participant.owner.v1`
 - `crates/core/chio-core-types/src/recovery/domains.rs:75` `SEMANTIC_NATIVE_STATUS_ORIGIN_DOMAIN` = `chio.semantic.native-status-origin.v1`
 
-## crates/kernel/chio-kernel (29)
+## crates/kernel/chio-kernel (24)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
-- `crates/kernel/chio-kernel/src/admission_operation.rs:94` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
+- `crates/kernel/chio-kernel/src/admission_operation.rs:93` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs:9` `SCHEMA` = `chio.admission-caller-dispatch-context.v1`
-- `crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs:12` `SCHEMA` = `chio.governed-approval-replay-source-seal.v1`
 - `crates/kernel/chio-kernel/src/admission_operation/native_security_binding.rs:6` `SCHEMA` = `chio.native-security-authority-binding.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:39` `CHECKPOINT_PUBLICATION_SCHEMA` = `chio.checkpoint_publication.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:40` `CHECKPOINT_WITNESS_SCHEMA` = `chio.checkpoint_witness.v1`
-- `crates/kernel/chio-kernel/src/checkpoint.rs:43` `CHECKPOINT_EQUIVOCATION_SCHEMA` = `chio.checkpoint_equivocation.v1`
 - `crates/kernel/chio-kernel/src/dpop/replay_source/snapshot.rs:24` `SCHEMA` = `chio.dpop-replay-source-seal.v1`
-- `crates/kernel/chio-kernel/src/evidence_export.rs:13` `EVIDENCE_TRANSPARENCY_CLAIMS_SCHEMA` = `chio.evidence_transparency_claims.v1`
 - `crates/kernel/chio-kernel/src/finding_pool.rs:27` `FINDING_POOL_MUTATION_SCHEMA_V1` = `chio.finding.pool-mutation.v1`
 - `crates/kernel/chio-kernel/src/finding_recovery.rs:49` `FINDING_RECOVERY_REPLAY_SNAPSHOT_SCHEMA` = `chio.finding.recovery-replay-snapshot.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:21` `ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA` = `chio.attested-finding-admission-artifact-payload.v1`
@@ -86,15 +81,15 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/recovery_gate.rs:34` `FINDING_RECOVERY_REQUEST_BINDING_SCHEMA` = `chio.finding.recovery-request-binding.v1`
 - `crates/kernel/chio-kernel/src/memory_provenance.rs:46` `MEMORY_PROVENANCE_ENTRY_SCHEMA` = `chio.memory_provenance_entry.v1`
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:23` `ECONOMIC_COMPLETION_FLOW_SCHEMA` = `chio.economic-completion-flow.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:443` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:444` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:446` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:447` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
 - `crates/kernel/chio-kernel/src/receipt_store.rs:1112` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:32` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:33` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:34` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:77` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:31` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:32` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:33` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:76` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome/security_release.rs:34` `SCHEMA` = `chio.security-release-checkpoint.v1`
 
 ## crates/platform/chio-control-plane (36)
@@ -121,7 +116,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:176` `TRIGGER_DOMAIN` = `chio.finding.challenge-trigger.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:179` `PURCHASE_SNAPSHOT_DOMAIN` = `chio.finding.claim-snapshot.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:187` `ENFORCEMENT_ROOT_DOMAIN` = `chio.finding.enforcement-root.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:101` `FINDING_CHALLENGE_STATUS_SCHEMA` = `chio.finding.challenge-status.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:100` `FINDING_CHALLENGE_STATUS_SCHEMA` = `chio.finding.challenge-status.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:33` `FINDING_HOSTED_PROFILE_SCHEMA` = `chio.finding.hosted-operator-profile.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:15` `FINDING_OPERATOR_PROFILE_SCHEMA` = `chio.finding.operator-profile.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:16` `FINDING_OPERATOR_CLIENT_PROFILE_SCHEMA` = `chio.finding.operator-client-profile.v1`
@@ -129,11 +124,11 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:18` `FINDING_OPERATOR_SELLER_CLIENT_SCHEMA` = `chio.finding.seller-client.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_seller_routes.rs:19` `FINDING_VOLUNTARY_RETRACTION_REQUEST_SCHEMA` = `chio.finding.voluntary-retraction-request.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_purchase_coordinator.rs:101` `RESERVATION_DOMAIN` = `chio.finding.reservation.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:50` `FINDING_PURCHASE_REQUEST_SCHEMA` = `chio.finding.purchase-request.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:54` `FINDING_PURCHASE_ERROR_SCHEMA` = `chio.finding.purchase-error.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:51` `FINDING_PURCHASE_REQUEST_SCHEMA` = `chio.finding.purchase-request.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_purchase_routes.rs:55` `FINDING_PURCHASE_ERROR_SCHEMA` = `chio.finding.purchase-error.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:26` `FINDING_STATUS_INTENT_ID_DOMAIN` = `chio.finding.status-intent-id.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:70` `VERIFIED_FIX_DRAFT_SCHEMA` = `chio.finding.verified-fix-draft.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:72` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:73` `VERIFIED_FIX_DRAFT_SCHEMA` = `chio.finding.verified-fix-draft.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:75` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
 - `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs:4` `STRUCTURED_BUDGET_RESPONSE_SCHEMA` = `chio.structured-budget-response.v1`
 
 ## crates/platform/chio-store-sqlite (15)

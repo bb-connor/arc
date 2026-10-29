@@ -18,7 +18,7 @@ impl ChioKernel {
         context.validate_binding(admission, request)?;
         let receipt_signing_identity = context.receipt_signing_identity.clone();
         let matched_grant_index = context.matched_grant_index;
-        let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
+        let pre_invocation_guard_output = &context.pre_invocation_guard_output;
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
         let runtime = self.durable_runtime()?;
         let _mutation_guard = runtime.lock_mutations()?;
@@ -102,7 +102,7 @@ impl ChioKernel {
                 output: &invocation_output,
                 reported_cost: &reported_cost,
                 receipt_metadata_snapshot: &receipt_metadata_snapshot,
-                pre_invocation_guard_evidence,
+                pre_invocation_guard_output,
             },
         )?;
         let monetary_cost =
@@ -134,7 +134,7 @@ impl ChioKernel {
             invocation_output,
             monetary_cost,
             receipt_metadata_snapshot,
-            pre_invocation_guard_evidence.to_vec(),
+            pre_invocation_guard_output.clone(),
             crate::tool_outcome::RawInvocationContext {
                 request,
                 security_invocation_context: context.security_invocation_context.clone(),

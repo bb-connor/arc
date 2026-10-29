@@ -1,9 +1,9 @@
 # cflite_pr.yml - ClusterFuzzLite PR smoke.
 #
 # Default mode is changed-target sampling. Diffs the PR against its
-# merge base, looks up which fuzz targets each changed source-path glob in
-# fuzz/target-map.toml triggers, and runs only those targets at 60 seconds
-# each.
+# merge base, selects the fuzz targets with scripts/select-fuzz-targets.py
+# (trigger globs in fuzz/target-map.toml, or the whole inventory for fuzz
+# build inputs), and builds and runs only those targets for 60 seconds.
 #
 # Opt-in PR label `fuzz: full` switches the run to a full-corpus sweep at
 # 120 seconds per target. The trailing-30d budget check reports shared usage
@@ -36,6 +36,12 @@ on:
       - ".github/workflows/cflite_pr.yml"
       - ".clusterfuzzlite/**"
       - "scripts/check-fuzz-budget.sh"
+      - "scripts/select-fuzz-targets.py"
+      - "scripts/tests/check-fuzz-manifest-selection.test.py"
+      - "Makefile"
+      - "scripts/ci-pr-tier.sh"
+      - "scripts/spec-drift-check.sh"
+      - "scripts/check-review-slices.py"
 
 permissions:
   contents: read
@@ -57,20 +63,34 @@ jobs:
   budget-check:
     name: fuzz-budget
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Restore fuzz budget ledger
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
       - name: Verify 30-day fuzz budget
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
-          GH_FUZZ_BUDGET_WORKFLOWS: cflite_pr.yml,cflite_batch.yml,fuzz.yml
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          GH_FUZZ_BUDGET_SCOPE: cflite
+          GH_FUZZ_BUDGET_CAP_EXCEPTION: cflite-pr-evidence
         run: |
           set -euo pipefail
-          # PR-time CFLite is an advisory release qualification signal. Report
-          # budget exhaustion without blocking unrelated PRs while the shared
-          # trailing window is already over cap.
+          # Named exception cflite-pr-evidence: PR fuzzing is per-PR evidence,
+          # its minutes still count toward the ClusterFuzzLite window, and
+          # cflite_batch enforces the 1,800 min/30d cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+      - name: Save fuzz budget ledger
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
   changed-target-sampling:
     name: changed-target-sampling
@@ -126,61 +146,38 @@ jobs:
           merge_base="$(git merge-base "${base_sha}" "${head_sha}")"
           echo "merge-base: ${merge_base}"
           git diff --no-renames --name-only "${merge_base}" "${head_sha}" > changed.txt
-          mapfile -t targets < <(yq -p=toml -r '.targets | keys | .[]' \
-            fuzz/target-map.toml)
-          fired=()
-          for tgt in "${targets[@]}"; do
-            mapfile -t triggers < <(yq -p=toml -r \
-              ".targets.${tgt}.triggers[]" fuzz/target-map.toml)
-            for trig in "${triggers[@]}"; do
-              regex="$(printf '%s' "${trig}" | sed -e 's|\.|\\.|g' \
-                -e 's|\*\*|__DSTAR__|g' -e 's|\*|[^/]*|g' \
-                -e 's|__DSTAR__|.*|g')"
-              if grep -qE "^${regex}$" changed.txt; then
-                fired+=("${tgt}")
-                break
-              fi
-            done
-          done
-          # Inventory fallback: builder, workflow, and target-map edits
-          # can break changed-target sampling without matching a source
-          # trigger. Every member manifest can change feature/dependency
-          # unification, even without a lockfile edit, so it selects all targets.
-          if grep -qE '^(\.cargo/|\.clusterfuzzlite/|\.github/workflows/cflite_pr\.yml$|([^/]+/)*Cargo\.toml$|Cargo\.lock$|fuzz/target-map\.toml$|Makefile$|scripts/(ci-pr-tier|spec-drift-check|check-review-slices)\.(sh|py)$)' changed.txt; then
-            echo "fuzz inventory edit detected; firing the full inventory"
-            fired=("${targets[@]}")
-          fi
-          if ((${#fired[@]} == 0)); then
-            : > fired.txt
-          else
-            printf '%s\n' "${fired[@]}" | sort -u > fired.txt
-          fi
+          python3 scripts/select-fuzz-targets.py --changed changed.txt \
+            --base "${merge_base}" --classification classification.txt > fired.txt
           fired_count="$(wc -l < fired.txt | tr -d ' ')"
-          printf 'fired targets: %s\n' "${fired_count}"
+          classification="$(cat classification.txt)"
+          printf 'fired targets: %s (%s)\n' "${fired_count}" "${classification}"
           cat fired.txt
           {
             echo "count=${fired_count}"
-            printf 'targets<<EOF\n%s\nEOF\n' "$(cat fired.txt)"
+            echo "classification=${classification}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Fail if no targets fired (changed-target mode)
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count == '0'
+        env:
+          CLASSIFICATION: ${{ steps.targets.outputs.classification }}
         run: |
-          if [[ -s changed.txt ]] && ! grep -E '\.rs$|^"' changed.txt \
-            | grep -vqE '(^|/)(tests|benches|examples)/|_tests(\.rs$|/)|(^|/)tests\.rs$'; then
-            echo "no production Rust source changed; nothing to fuzz"
+          if [[ "${CLASSIFICATION}" == "no-fuzz-relevant-change" ]]; then
+            echo "no fuzz-relevant change in this diff; nothing to fuzz"
             exit 0
           fi
-          echo "changed-target sampling found no mapped fuzz target for this diff" >&2
+          echo "changed-target sampling found no mapped fuzz target for this diff (${CLASSIFICATION})" >&2
           echo "changed files:" >&2
           sed 's/^/  /' changed.txt >&2
           exit 1
 
+      - name: Select changed targets for the ClusterFuzzLite builder
+        if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
+        run: cp fired.txt .clusterfuzzlite/selected-targets
+
       - name: Build ClusterFuzzLite changed-target fuzzers
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           sanitizer: address
@@ -190,8 +187,6 @@ jobs:
       - name: Run ClusterFuzzLite changed-target sampling without corpus storage
         if: steps.mode.outputs.full == 'false' && steps.targets.outputs.count != '0'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGETS: ${{ steps.targets.outputs.targets }}
         with:
           language: rust
           fuzz-seconds: ${{ steps.mode.outputs.fuzz_seconds }}

@@ -44,6 +44,7 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("caller_delivery", Registered(ChioInternal, CommittedSafe)),
     ("protocol_refusal", Registered(ChioInternal, Unsafe)),
     ("chio_runtime", Registered(ChioInternal, CommittedSafe)),
+    ("session_anchor", Registered(ChioInternal, CommittedSafe)),
     ("receipt_context", Registered(ChioInternal, Unsafe)),
     (
         "governed_transaction_diagnostics",
@@ -56,6 +57,10 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("finding_recovery", Registered(ChioInternal, CommittedSafe)),
     (
         "finding_purchase_replay_snapshot",
+        Registered(ChioInternal, CommittedSafe),
+    ),
+    (
+        "decision_model_witness",
         Registered(ChioInternal, CommittedSafe),
     ),
     (
@@ -112,10 +117,6 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ),
     (
         "response_simulation_evidence_id",
-        Registered(ChioInternal, Unsafe),
-    ),
-    (
-        "active_defense_backfill_v1",
         Registered(ChioInternal, Unsafe),
     ),
     ("scimLifecycle", Registered(ChioInternal, Unsafe)),
@@ -254,6 +255,17 @@ fn unknown_metadata_key_is_refused() {
     let error = check_internal_receipt_metadata(&json!({ "unregistered_block": {} }))
         .expect_err("an unregistered key must refuse");
     assert!(error.to_string().contains("unregistered_block"), "{error}");
+}
+
+#[test]
+fn active_defense_backfill_key_is_unregistered() {
+    assert!(metadata_key_spec("active_defense_backfill_v1").is_none());
+    let error = check_internal_receipt_metadata(&json!({ "active_defense_backfill_v1": {} }))
+        .expect_err("the retired backfill key must refuse");
+    assert_eq!(
+        error.to_string(),
+        "canonical JSON error: receipt metadata key \"active_defense_backfill_v1\" is not registered"
+    );
 }
 
 #[test]

@@ -71,7 +71,8 @@ custody procedure. `replication-init` publishes only its public key. Retire,
 revoke and recover require a pinned stream. Local unpinned rotation still uses the
 bounded overlap but does not establish peer trust. Distribute the public anchor
 and its digest through independent authenticated operator channels before pinning
-followers. An HTTP service token cannot replace a pin or authorize a transition.
+followers. No trust-control caller credential can replace a pin or authorize a
+transition.
 
 ## Migration and bounded history
 

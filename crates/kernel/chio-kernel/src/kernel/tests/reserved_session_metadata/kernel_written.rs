@@ -163,6 +163,14 @@ fn caller_cannot_set_finding_recovery_replay_snapshot() {
 }
 
 #[test]
+fn caller_cannot_set_decision_model_witness() {
+    assert_refused_on_every_caller_path(
+        "decision_model_witness",
+        "decision_model_witness is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
 fn caller_cannot_set_finding_denial() {
     assert_refused_on_every_caller_path(
         "findingDenial",
@@ -288,6 +296,14 @@ fn caller_cannot_set_lineage_references() {
 }
 
 #[test]
+fn caller_cannot_set_session_anchor() {
+    assert_refused_on_every_caller_path(
+        "session_anchor",
+        "session_anchor is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
 fn caller_cannot_set_acp() {
     assert_refused_on_every_caller_path("acp", "acp is reserved for kernel-derived receipts");
 }
@@ -374,6 +390,7 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "caller_delivery",
             "protocol_refusal",
             "chio_runtime",
+            "session_anchor",
             "receipt_context",
             "governed_transaction_diagnostics",
             "model_metadata",
@@ -383,6 +400,7 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "finding_recovery",
             "finding_purchase_replay_snapshot",
             "finding_recovery_replay_snapshot",
+            "decision_model_witness",
             "findingDenial",
             "stream",
             "threshold_approval",
@@ -408,7 +426,6 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "active_defense_evidence_id",
             "occurred_at_unix_ms",
             "response_simulation_evidence_id",
-            "active_defense_backfill_v1",
             "scimLifecycle",
             "mercury",
             "authorizationContext",

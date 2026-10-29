@@ -1,5 +1,3 @@
--- Runtime claims share the admission authority and its participant commit chain.
--- Historical source markers remain in the separate, permanent migration import.
 CREATE TABLE IF NOT EXISTS runtime_replay_claim_episodes (
     operation_id TEXT NOT NULL CHECK (
         typeof(operation_id) = 'text'
@@ -30,7 +28,7 @@ CREATE TABLE IF NOT EXISTS runtime_replay_claim_episodes (
     PRIMARY KEY (operation_id, episode_id),
     FOREIGN KEY (operation_id) REFERENCES admission_operations(operation_id),
     FOREIGN KEY (runtime_authority_id)
-        REFERENCES runtime_replay_migration_expectations(runtime_authority_id)
+        REFERENCES runtime_source_qualifications(runtime_authority_id)
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS runtime_replay_claim_resources (

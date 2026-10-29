@@ -21,6 +21,7 @@ use super::{
 
 mod catalog;
 mod core;
+mod escrow_ledger_tests;
 mod receipt_schema_tests;
 mod source;
 mod support;

@@ -56,7 +56,7 @@ original plans; individual defects and evidence are recorded below this table.
 | Protocol 2: original durable authority profile | Retained v4 pins explicit runtime, approval and DPoP selections; native selection requires retained admission; targeted kernel/runtime/SQLite/control-plane qualification complete | Remaining legacy-consumer and composed recovery qualification; no in-place authority upgrade, arbitrary legacy callback identity claim, or external dispatch authorization; see the original operation authority profile checkpoint below |
 | Protocol 2: stable trusted security identity across durable replay | Ordinary/nested begin and pre-dispatch freeze, private caller decoding, retained v2 request data and owner-restart replay locally verified | Live flow observations and authority-specific native participant ownership remain separate; hook presence is not source identity or activation; see the stable security identity checkpoint below |
 | Protocol 2: operation-owned runtime replay custody | Live ordinary/nested dispatch, grant fallback, nonce integration and explicit activation locally verified; composed three-resource ordinary lifecycle and controlled overlap exercised | Complete nested/combinatorial failure matrix, concurrent-process and process-crash qualification; operator quiescence before activation; see the live runtime admission and composed-custody checkpoints below |
-| Protocol 2: operation-owned governed approval replay custody | Source activation, operation-fenced claims, exact release, expiry-aware budget/dispatch boundaries and kernel recovery implemented; configured normal/nested/preflight acquisition and legacy exclusion locally verified | Complete combined runtime/credential interruption and independent-process qualification; DPoP history remains a separate requirement |
+| Protocol 2: operation-owned governed approval replay custody | Operator-installed authority, operation-fenced claims, exact release, expiry-aware budget/dispatch boundaries and kernel recovery implemented; configured normal/nested/preflight acquisition and legacy exclusion locally verified | Complete combined runtime/credential interruption and independent-process qualification; DPoP history remains a separate requirement |
 | Protocol 2: DPoP replay continuity and custody | Instance-bound retirement, exact-source import, explicit signed v2 activation and physical SQLite custody locally verified; configured kernel normal/nested/preflight acquisition, exact cleanup, source-loss recovery and composed approval grant fallback locally verified | Authenticated deployment selection, full caller credential/security custody, complete composed interruption and independent-process qualification; lost inactive history must refuse or require an independently authenticated transition, never a fresh empty cache; see the configured DPoP kernel checkpoint below |
 | Protocol 2: external caller dispatch commitment | Typed private return component retained at report-time capture; unsupported credential/security-hook caller profiles now reject before acquisition; handshake missing and contract counterexample remains | Complete durable typed admission snapshot including credential/security custody, authenticated start before the external effect, executor-owned durable claim and delivery evidence; lost report plus expiry must not refund an execution; see the caller dispatch design and live security-owner checkpoint below |
 | Protocol 2: operation-owned flow/declassification/security custody | Origin-bound production preparation, final-release checkpoint, source retirement/archive, scoped native hydration, transaction-owned flow/use/outbox composition, actual leased native joins and egress acquire/commit, anchored mixed history, portable two-phase readback and original native-authority selection locally verified; kernel-owned affine egress coordinator, native post-join policy and production before-budget classified-input full-source join implemented; immutable preparation journal and dedicated atomic quota/dispatch-ledger capture with borrowed actual credential custody locally exercised | Native nonce/declassification custody and composed recovery, complete combined runtime/approval freshness and credential-failure matrix, complete authorization and frozen return-context coupling, post-commit acknowledgement/crash qualification, explicit destination activation, every affected legacy consumer, joined caller snapshot, current release policy and history-retention/scale qualification remain required; the capture-only checkpoint always stops before tool execution and does not release imported obligations |
@@ -4832,312 +4832,49 @@ still fails at the intended assertion, `((0, 0), Allow)` versus
 not a passing launch gate. No commit, push, hosted CI rerun, workflow repin,
 merge, user-database activation or publication occurred.
 
-### Governed approval legacy source sealing
+### Governed approval authority install and operation ownership
 
-The durable governed approval replay store now has an explicit source-retirement
-boundary: preview a complete inventory, seal exactly that pinned expectation,
-load its persisted seal and verify the current source against the expectation.
-This is a migration prerequisite, not destination activation or operation-owned
-credential custody. No configured user database has been sealed.
+An operator installs each governed approval authority directly in the admission
+store with `install_governed_approval_authority`. The install is one immutable
+row naming the approval authority, its generation (`expectation_id`), the
+destination store UUID, the live claim capacity, the authority time of install
+and the mutation fence. It is committed under that fence together with exactly
+one global anchored commit (`governed_approval_authority` projection), synced
+and read back. An exact retry returns the existing install. A different
+capacity, generation or authority for an existing key refuses before mutation.
+Rows cannot be updated, replaced or deleted, and the integrity verifier requires
+a bijection between installs and their global commits.
 
-One immediate transaction compares the complete candidate before its first
-write and installs the inventory with twelve persistent SQL mutation barriers.
-It freezes every physically retained reservation and committed marker, expiry,
-clock high-water, prune horizon and capacity. Sealing never prunes or rewrites
-the inventory. Legacy unscoped-subject markers retain their cross-subject
-blocking semantics; historical reservation IDs do not become operation owners.
-WAL with synchronous FULL and exact post-commit SQLite readback are required.
-Commit ambiguity must be resolved through load/verify, never legacy resumption.
-
-Reserve, owner-qualified commit/rollback, clock recovery and startup paths now
-exclude sealed sources. Typed writers reject even no-op mutations, while
-persistent triggers block actual mutations from already-open old connections.
-Sealed reopen validates before schema initialization, journal normalization,
-clock advancement, pruning or capacity changes. Requested capacity is ignored
-for a sealed read-only source. Incomplete or substituted evidence is refused
-without repair. Every pooled connection now initializes synchronous FULL.
-
-Canonical evidence is bounded to 16,384 markers, 512-byte identifiers and
-8 MiB. Full-range integer fields use exact decimal strings. Storage types and
-text sizes are checked before marker allocation; duplicate or unordered
-decoded markers reject even with a recomputed digest. The exact protected SQL
-catalog and barriers are committed, and the source binds its actual SQLite
-file descriptor to the configured regular, single-link path. Copied files,
-changed path identity, symlink/hardlink aliases, memory databases and unsupported
-VFSes cannot qualify. Historical ALTER-created schema variants require separate
-qualification rather than silent normalization.
-
-The implementation separates the store transaction boundary, bounded evidence
-codec, SQL catalog/barriers and inventory reader into focused modules. An opaque
-seal can only result from live store verification; decoding yields data only.
-Debug output omits marker and reservation identifiers. The source/authority
-labels are operator configuration, not authenticated authority credentials.
-
-All 34 focused approval replay tests pass, including 18 new regressions. The
-new matrix covers populated reserved/committed/legacy inventories, exact retry
-and read-only reopen, typed no-ops and old-connection writes, changed candidates,
-four pre-commit SQL cutpoints, post-commit acknowledgement loss with reopen,
-reservation/seal races, restored-barrier inventory tampering, malformed and
-oversized data, copied/path-substituted sources and changed journal mode.
-These are local real-SQLite and injected-error tests, not power-loss or native
-independent-process crash qualification.
-
-The first full SQLite run exposed a receipt-retention fixture race: the repaired
-store was sampled immediately after reopen while its writer could still have
-the intentionally fail-closed unseeded head. The test passed in isolation, but
-its health assertion had no startup barrier. The idempotent-repair test now
-awaits an actor flush before checking the complete health report, and the
-neighboring fully-archived reopen test uses the existing bounded writer-readiness
-helper. No production readiness or integrity check was weakened. Extracting
-the repaired fixture into its own module also reduces the oversized retention
-test file from 4,668 to 4,566 lines without raising its hygiene allowance.
-
-Source sealing grants no new dispatch permission and cannot revoke work already
-admitted. Legacy consumers must be quiesced. Independent destination expectation
-pinning, conservative replay import, operation-fenced approval claims and their
-activation remain open. DPoP still has a separate volatile replay-history gap;
-an empty cache after restart cannot prove absence of prior consumption. Durable
-security-hook custody, authenticated external start, independent executor claims
-and reports, the ignored lost-report counterexample and all original operational
-and release gates also remain open. No antirollback theorem is claimed. The
-ignored external-effect/lost-report test was explicitly rerun and still fails
-at the intended assertion, `((0, 0), Allow)` versus `((0, 1), Deny)`.
-
-Final local verification uses Rust 1.94.1, offline dependencies and `umask 022`.
-The complete SQLite library rerun passes 1,301 tests with three existing ignored
-cases. The first full run had 1,300 passes and the fixture failure described
-above; it is not counted as a green gate. The repaired fixture passes in
-isolation, all 62 active retention tests pass, and both repaired reopen tests
-pass ten additional repetitions each under concurrent full-suite load.
-The complete kernel library passes 1,259 tests. Caller execution passes 21
-with its one known ignored contract; nonce lifecycle passes 15, governed
-approval kernel replay passes one, and kernel/SQLite integration passes 11.
-These selected suites total 2,608 passing tests, without counting repeated
-focused runs or the deliberately failing lost-report counterexample.
-
-Kernel and SQLite all-target Clippy pass with warnings denied; the final
-retention edits also pass SQLite all-target Clippy. The kernel check without
-default features passes. All 85 formal mirrors match, and regenerated proof
-coverage matches at 58 rows and 168 artifacts. No formal transition, assumption
-or proof bound changed. Formatting, explicit included-test formatting,
-public-surface policy, Rust file hygiene and their self-tests pass. Formal
-mapping, Apalache slice contracts, the static security CI contract and its
-trust-boundary/evidence mutation tests pass. WIP classification covers 313
-individual files across 11 slices; the commit-only check still sees zero files
-against unchanged HEAD. Cargo.lock is unchanged during this slice. The final
-graph refresh completed with 161,043 nodes, 418,820 edges and 6,944 communities.
-
-No commit, push, hosted CI rerun, workflow repin, merge, user-database activation
-or publication occurred. Workspace-wide and exact-candidate release qualification
-remain separate gates; this checkpoint does not authorize launch.
-
-### Governed approval destination expectation and inactive import
-
-The qualified admission store now independently pins a complete governed
-approval replay source generation to its actual store UUID and the configured
-approval authority. Exact sealing and live verification precede an atomic
-import of every retained marker as unresolved blocking evidence. Expectation
-and import each have an immutable local event and exactly one matching global
-anchored commit, including their original owner fence. This advances the
-credential migration prerequisite; it does not activate approval claims or
-grant dispatch permission. No configured user source has been sealed or imported.
-
-The kernel now owns the dependency-neutral, bounded canonical data codec and
-the configured source port. Its byte format and digest domain are unchanged.
-Snapshot construction or decoding proves data validity only; the SQLite seal
-remains an opaque result of live source verification. Source callback panics
-are contained, and callbacks run outside the destination database mutex and
-transaction. Imports share an owner-wide nonblocking guard with runtime source
-import and activation, including adapters obtained from the same owner.
-
-The destination retains subject, request, intent, exact expiry, nullable
-historical reservation identity, wildcard-subject semantics, source identity,
-clock high-water, prune horizon and capacity. Legacy reservation IDs do not
-become operation owners. Pending expectations reserve complete inventory
-capacity before freezing a source: at most 128 sources, 64 MiB of canonical
-source data and 65,536 markers overall, with the existing per-source bounds.
-One physical source cannot be pinned under multiple bindings, and source and
-destination must be different physical database files. Existing exact pins do
-not rediscover the source; imported retry verifies live evidence without
-resealing or writing another destination event. Failed SQL writes roll back;
-lost seal acknowledgements preserve the original pin for exact recovery.
-
-A restart hazard was fixed before qualifying this boundary. Normal legacy
-startup may advance clocks and prune rows, invalidating a pending pin even if
-no tool call occurs. `SqliteGovernedApprovalReplaySource::open` is a distinct,
-migration-only handle that preserves an existing canonical source without file
-creation, migration, clock advancement, pruning or capacity changes. It exposes
-no legacy replay writer. Migration inspection now uses a read-only metadata
-check instead of the shared startup helper that can adopt application IDs.
-Ordinary sealed reopen also verifies evidence before that adoption helper, so
-a cleared application identity cannot be silently repaired. Legacy consumers
-must still be quiesced; changed unsealed inventory is refused, never repinned.
-
-Admission schema v22 introduces only the empty approval migration namespace
-after verifying its predecessor. Existing active runtime history is preserved.
-Global schema migration recognizes only exact historical catalogs, preserves
-all rows and digests, and rejects future projection kinds smuggled through a
-disabled CHECK before changing any schema. Historical test fixtures explicitly
-remove only empty newer namespaces; populated security history is never erased
-to make a downgrade qualify. Global reference dispatch is extracted into its
-own module, reducing the existing oversized parent without raising its cap.
-
-The profile remains imported-inactive. Approval operation ownership,
-operation-fenced release, activation and the imported clock/prune-horizon
-handoff remain open. A future claim path must not revive previously pruned
-credentials after clock rollback. DPoP still has distinct volatile-history
-requirements. Full caller credential/security custody, authenticated start
-before external effects, independent executor claims and authenticated reports,
-the ignored lost-report contract, SDK/adapter integration and all original
-operational, platform, supply-chain and release gates remain open. This is not
-an antirollback theorem, a completed roadmap or launch authorization.
-
-Seventeen new destination/source integration tests cover real SQLite inventory
-preservation across pin/import/restart, subjectless markers, null and historical
-reservation IDs, stale fences, changed candidates, duplicate physical bindings,
-same-file refusal, pending capacity exhaustion, exact read-only retry, lost seal
-acknowledgements, source panics, unlocked callbacks, reentry and concurrent
-owner-wide exclusion. They also exercise expectation/tombstone/event/global
-write cutpoints, local/global corruption independent of external-write
-detection, immutable SQL guards, missing or damaged source metadata, changed
-journal mode, missing source barriers and strict v21 migration. Two additional
-tests preserve active runtime history through v22 and refuse future global
-projection kinds injected with CHECK enforcement disabled. These are local
-SQLite and injected-failure checks, not power-loss or native-platform crash
-qualification.
-
-The final complete SQLite run passes 1,320 tests with three existing ignored
-cases, including the added sealed-metadata regression and stricter
-duplicate-version-row refusal. The earlier complete run passed 1,319 tests.
-The three ignored cases are the serving-owner child-process helper, opt-in
-million-receipt scale proof and existing CI-wedging retention test, not passing
-coverage. The complete kernel library passes 1,259 tests; kernel/SQLite
-integration passes 11, caller execution passes 21 with its known ignored
-lost-report contract, nonce lifecycle passes 15 and governed approval kernel
-replay passes one. These selected suites total 2,627 passing tests, excluding
-repeated focused runs and the earlier complete run. Kernel and SQLite all-target
-Clippy pass with warnings denied, including a final SQLite check after metadata
-hardening. The kernel check without default features passes. All 85 formal
-mirrors match; regenerated coverage matches at 58 rows and 168 artifacts. No
-formal transition, assumption or proof bound changed. Formatting, diff whitespace,
-Rust public-surface policy, file hygiene and their self-tests, formal mapping,
-Apalache slice contracts, static security CI checks and trust-boundary/evidence
-mutation tests pass. The graph refresh completed with 161,226 nodes, 419,229
-edges and 6,957 communities. All final verification commands have completed.
-
-WIP classification covers 328 individual files across 11 slices, with none
-unclassified. The commit-only review check still sees zero files against
-unchanged HEAD `8b9f9243905dfa61acac82d83438684940777fe3`. Cargo.lock is unchanged
-during this slice. No commit, push, hosted CI rerun, workflow repin, merge,
-user-database activation or publication occurred. Workspace-wide and
-exact-candidate release qualification remain separate gates.
-
-### Governed approval operation ownership, clock handoff and recovery
-
-Admission schema v23 adds explicit activation of an independently pinned and
-imported approval source, plus operation-owned replay claims. Activation is an
-immutable third migration event with an exact global commitment. The authority's
-actual clock must reach the imported high-water and prune horizon before any
-claim can be admitted; a caller timestamp ahead within tolerated skew cannot
-substitute for that observation. Import alone remains inactive. Source callbacks
-stay outside the destination lock and use the shared owner-wide migration guard.
-No configured user source was activated.
+Kernel configuration (`set_operation_owned_governed_approval_authority`) never
+installs anything. It requires the exact installed binding on this destination
+store under the mutation sequencer, and every presented approval re-verifies it.
+A missing install, another generation or an install from another store refuses.
 
 Claims bind the original retained request and governed intent, selected grant,
 preflight or dispatch phase, token digest, signer identity, signed validity
-interval and exact imported authority generation. They carry no reusable token
+interval and the exact installed generation. They carry no reusable token
 signature. The first claim attaches a permanent operation ledger; subsequent
 episodes append named commits without changing that ledger or operation version.
 At most 128 episodes and one live owner are admitted. Every claim and release has
 bounded canonical physical evidence in bijection with named admission commits
 and the global anchored chain. Generic begin and compare-and-swap cannot invent
-this ownership. Historical source reservation IDs never become operation leases.
+this ownership. A spent or reserved approval identity refuses a second claim,
+and live claims are bounded by the installed capacity.
 
-Fresh claims, budget authorization and capture reject expired authority. The
-freshness check runs after exact historical replay recognition; an already
-committed authorization or dispatch acknowledgement is not a new use. Dispatch
-history validates approval at its retained commit observation, also preventing
-expiry between the pre-write check and commit append from leaving a committed
-dispatch. Releasing an old episode cannot release its successor. A current
-pre-dispatch lease can release expired ownership, but dispatch commitment
-permanently forbids release, including restart or an absent execution report.
-Expired scoped and wildcard legacy markers remain spent. Expiry frees live
-capacity for different identities without deleting historical evidence.
-
-Kernel startup compensation and nonce issuance now release exact retained
-approval ownership through the store ports. They validate bounded history and
-read back the exact release disposition. No token lookup or current signer
-preparation participates in cleanup; store callback errors and panics remain
-unresolved rather than evidence of release. Recovery does not grant execution.
-
-The migration preserves v22 source bytes, fences, digests and admission history
-and introduces only empty claim tables. Unqualified claim namespaces, premature
-activation rows and damaged predecessor catalogs reject without repair. The
-older v20/v21 migration definitions now name their historical admission DDL,
-not newly added approval commit kinds. Fixture table reconstruction preserves
-parent references rather than allowing SQLite to rewrite unrelated triggers.
-
-Sixteen new regression tests cover real source activation and clock handoff,
-original provenance and generation rejection, exact retry and successor release,
-stale leases, expiry and capacity, permanent wildcard/scoped markers, SQL
-cutpoint rollback, corrupted bounded history, post-dispatch retention, v22
-migration, real combined budget authorization/capture, and kernel restart
-compensation for both preflight and dispatch claims. These are local SQLite
-and injected-failure checks, not independent-process power-loss qualification.
-
-Normal configured verifier acquisition is still open. The next integration must
-route completely prepared credentials into these claims without also consuming
-the sealed legacy approval store, retain operation updates across a lost claim
-acknowledgement, and exercise ordinary, nested and preflight routes together.
-Acquisition belongs to the selected-grant admission episode before its budget
-authorization. Replacing only the later dispatch credential reservation would
-leave the initial budget authorization outside approval custody. Grant fallback
-must release the preceding exact episode before claiming a successor; later
-credential reservation must verify existing ownership rather than consume the
-legacy marker or create a second claim. Complete non-consuming credential
-preparation must precede that episode's first credential mutation.
-Decoded claim data is not signer trust, a live lease or dispatch permission.
-DPoP volatile-history migration, full caller credential/security-hook custody,
-authenticated external start, independent executor claims/reports, the ignored
-lost-report contract, SDK/adapter integration and every original platform,
-supply-chain, pilot and release gate remain open. This checkpoint is not full
-caller custody, an antirollback theorem, roadmap completion or launch authority.
-
-Final serial validation on this checkpoint's source passed 1,336 SQLite library
-tests (three existing ignored), 1,259 kernel library tests, 11 kernel SQLite
-integration tests, 21 caller-execution tests (the external-start/lost-report
-contract remains ignored), 15 execution-nonce lifecycle tests and one governed
-kernel replay test. That is 2,643 passing tests across the selected suites,
-excluding focused reruns and the subprocess helper's duplicate execution.
-The 15 focused approval claim tests and 12 schema tests also passed. An earlier
-full run exposed the corrected historical schema definitions; a subsequent
-overlapping Cargo rebuild invalidated a running subprocess fixture by replacing
-its executable. The final run was serial, with the subprocess fence case passing
-both in isolation and inside the full SQLite suite. Failed runs are not counted
-as qualification.
-
-Strict all-target Clippy passed for `chio-kernel` and `chio-store-sqlite`, and
-the kernel no-default-features check passed. Formatting, diff whitespace,
-public-surface policy and Rust file hygiene passed without relaxing allowances.
-All 85 formal mirrors match without blessing changed models. Proof coverage was
-regenerated and checked at 58 rows and 168 artifacts. Formal mapping, the
-Apalache slice static contract, security CI static contract and their applicable
-mutation/self-tests passed. These checks do not claim new model-checker or
-workspace-wide qualification. The final code graph refresh completed with
-161,400 nodes, 419,826 edges and 6,968 communities.
-
-WIP classification covers 340 individual files across 11 slices, with none
-unclassified. The commit-only review check still sees zero files against
-unchanged HEAD `8b9f9243905dfa61acac82d83438684940777fe3`. Cargo.lock is unchanged
-during this slice. No commit, push, hosted CI rerun, workflow repin, merge,
-user-database activation or publication occurred. Exact-candidate release
-qualification and the full remaining roadmap stay open.
+Fresh claims, budget authorization and capture reject expired authority, and
+the authority clock must not precede the install. The freshness check runs after
+exact historical replay recognition; an already committed authorization or
+dispatch acknowledgement is not a new use. Dispatch history validates approval
+at its retained commit observation. Releasing an old episode cannot release its
+successor. A current pre-dispatch lease can release expired ownership, but
+dispatch commitment permanently forbids release, including restart or an absent
+execution report. Kernel startup compensation and nonce issuance release exact
+retained approval ownership through the store ports and read back the release.
 
 ### Configured approval acquisition on normal kernel routes
 
-`set_operation_owned_governed_approval_source` now selects an already activated
-generation and its actual sealed source. It performs no import, activation or
-history reset. Invalid reconfiguration leaves the installed authority unchanged.
+`set_operation_owned_governed_approval_authority` selects an already installed
+generation. It performs no install or history reset. Invalid reconfiguration leaves the installed authority unchanged.
 Presented single approvals force structured admission with the original request,
 including read-only grants outside the default side-effecting profile. Complete
 non-consuming credential preparation precedes replay mutation. Normal and nested

@@ -653,13 +653,17 @@ impl SqliteReceiptStore {
     ) -> Result<(), ReceiptStoreError> {
         crate::capability_lineage::validate_snapshot_for_transport(anchor)?;
         crate::capability_lineage::validate_snapshot_for_transport(child)?;
-        if anchor.provenance != chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor {
+        if anchor.provenance
+            != chio_core::receipt::evidence::CapabilitySnapshotProvenance::SyntheticAnchor
+        {
             return Err(ReceiptStoreError::Conflict(format!(
                 "federated delegation anchor {} is not synthetic",
                 anchor.capability_id
             )));
         }
-        if child.provenance != chio_kernel::CapabilitySnapshotProvenance::SignedToken {
+        if child.provenance
+            != chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken
+        {
             return Err(ReceiptStoreError::Conflict(format!(
                 "federated delegation child {} is not signed",
                 child.capability_id
@@ -717,14 +721,14 @@ impl SqliteReceiptStore {
     pub fn get_combined_lineage(
         &self,
         capability_id: &str,
-    ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Option<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         Self::get_combined_lineage_on_connection(&*self.connection()?, capability_id)
     }
 
     pub(crate) fn get_combined_lineage_on_connection(
         connection: &Connection,
         capability_id: &str,
-    ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Option<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         if let Some(snapshot) = Self::get_lineage_on_connection(connection, capability_id).map_err(
             |error| match error {
                 chio_kernel::CapabilityLineageError::ReceiptStore(error) => error,
@@ -745,14 +749,14 @@ impl SqliteReceiptStore {
     pub fn get_combined_delegation_chain(
         &self,
         capability_id: &str,
-    ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Vec<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         Self::get_combined_delegation_chain_on_connection(&*self.connection()?, capability_id)
     }
 
     pub(crate) fn get_combined_delegation_chain_on_connection(
         connection: &Connection,
         capability_id: &str,
-    ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Vec<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         const MAX_CHAIN_LENGTH: usize = 32;
 
         let mut chain = Vec::new();

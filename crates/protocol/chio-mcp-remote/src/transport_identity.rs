@@ -122,6 +122,13 @@ impl TransportIdentity {
     pub(crate) fn attestation(&self) -> Option<&str> {
         self.attestation.as_deref()
     }
+    #[cfg(test)]
+    pub(crate) fn for_tests(mtls: Option<&str>, attestation: Option<&str>) -> Self {
+        Self {
+            mtls: mtls.map(str::to_owned),
+            attestation: attestation.map(str::to_owned),
+        }
+    }
 }
 
 /// Carries provenance alongside the headers without exposing an identity constructor.

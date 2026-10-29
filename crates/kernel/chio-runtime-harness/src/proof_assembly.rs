@@ -12,26 +12,16 @@ use crate::proof_parity::{
 use crate::scenario::RuntimeLoopbackStep;
 use crate::RuntimeLoopbackError;
 
+#[derive(Clone)]
 pub(crate) struct StaticProofBaseline {
     pub(crate) package: chio_attest_buyer_core::proof_package::ChioProofPackage,
     pub(crate) report: chio_attest_buyer_core::report::VerifierReport,
 }
 
-pub(crate) struct StepAdmissionBinding {
-    pub(crate) admission_report_sha256: String,
-    pub(crate) admission_id: String,
-}
-
 pub(crate) fn validate_step_admission_binding_counts(
     workflow_step_count: usize,
-    admission_hash_count: usize,
     admission_id_count: usize,
 ) -> Result<(), RuntimeLoopbackError> {
-    if workflow_step_count != admission_hash_count {
-        return Err(RuntimeLoopbackError::message(format!(
-            "Chio runtime proof generation workflow step count {workflow_step_count} did not match admission report hash count {admission_hash_count}"
-        )));
-    }
     if workflow_step_count != admission_id_count {
         return Err(RuntimeLoopbackError::message(format!(
             "Chio runtime proof generation workflow step count {workflow_step_count} did not match admission id count {admission_id_count}"
@@ -42,43 +32,13 @@ pub(crate) fn validate_step_admission_binding_counts(
 
 pub(crate) fn step_admission_binding(
     index: usize,
-    admission_hashes: &[String],
     admission_ids: &[String],
-) -> Result<StepAdmissionBinding, RuntimeLoopbackError> {
-    let admission_report_sha256 = admission_hashes.get(index).cloned().ok_or_else(|| {
-        RuntimeLoopbackError::message(format!(
-            "Chio runtime proof generation missing admission report hash for workflow step {index}"
-        ))
-    })?;
-    let admission_id = admission_ids.get(index).cloned().ok_or_else(|| {
+) -> Result<String, RuntimeLoopbackError> {
+    admission_ids.get(index).cloned().ok_or_else(|| {
         RuntimeLoopbackError::message(format!(
             "Chio runtime proof generation missing admission id for workflow step {index}"
         ))
-    })?;
-
-    Ok(StepAdmissionBinding {
-        admission_report_sha256,
-        admission_id,
     })
-}
-
-pub(crate) fn runtime_admission_report_sha256_for_workflow(
-    principal_admission_report_sha256: Option<&str>,
-    admission_hashes: &[String],
-    terminal_admission_report_sha256: Option<&str>,
-) -> Result<String, RuntimeLoopbackError> {
-    if let Some(principal_admission_report_sha256) = principal_admission_report_sha256 {
-        return Ok(principal_admission_report_sha256.to_string());
-    }
-    if let Some(admission_report_sha256) = admission_hashes.first() {
-        return Ok(admission_report_sha256.clone());
-    }
-    if let Some(terminal_admission_report_sha256) = terminal_admission_report_sha256 {
-        return Ok(terminal_admission_report_sha256.to_string());
-    }
-    Err(RuntimeLoopbackError::message(
-        "Chio runtime proof generation missing admission report hash".to_string(),
-    ))
 }
 
 pub(crate) fn assemble_runtime_loopback_outputs(
@@ -93,8 +53,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
         mut accepted,
         mut failure_code,
         mut evidence_paths,
-        admission_hashes,
-        terminal_admission_report_sha256,
         mut evidence_manifest_entries,
         live_tool_receipts,
         live_treaty_contexts,
@@ -107,7 +65,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
     let mut trust_bundle_sha256 = None;
     let mut verification_context_sha256 = None;
     let mut parity_report: Option<chio_runtime_core::RuntimeProofParityReport> = None;
-    let mut principal_admission_report_sha256 = None;
     let mut proof_checks = vec!["runtime_source_records.bound".to_string()];
 
     if accepted {
@@ -319,7 +276,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
             .collect::<Vec<_>>();
         validate_step_admission_binding_counts(
             package.workflow_receipt.steps.len(),
-            admission_hashes.len(),
             admission_ids.len(),
         )?;
         for (index, step) in package.workflow_receipt.steps.iter().enumerate() {
@@ -381,8 +337,7 @@ pub(crate) fn assemble_runtime_loopback_outputs(
                 &mut evidence_manifest_entries,
                 &mut evidence_paths,
             )?;
-            let admission_binding =
-                step_admission_binding(index, &admission_hashes, &admission_ids)?;
+            let admission_binding = step_admission_binding(index, &admission_ids)?;
             step_evidence.push(chio_runtime_core::RuntimeStepEvidence {
                 schema: chio_runtime_core::CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA.to_string(),
                 step_index: u64::try_from(step.step_index).map_err(|error| {
@@ -390,8 +345,7 @@ pub(crate) fn assemble_runtime_loopback_outputs(
                         "Chio runtime step index conversion failed: {error}"
                     ))
                 })?,
-                admission_id: admission_binding.admission_id.clone(),
-                admission_report_sha256: admission_binding.admission_report_sha256.clone(),
+                admission_id: admission_binding,
                 tool_receipt_id: tool_receipt_id.clone(),
                 tool_receipt_sha256: tool_receipt_sha256.clone(),
                 output_sha256: step.output_hash.clone().ok_or_else(|| {
@@ -422,7 +376,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
                         "Chio runtime source step conversion failed: {error}"
                     ))
                 })?,
-                admission_report_sha256: admission_binding.admission_report_sha256,
                 tool_receipt_sha256,
                 bilateral_dsse_sha256,
                 workflow_step_sha256,
@@ -430,21 +383,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
         }
 
         if let Some(closure) = buyer_closure.as_ref() {
-            let step = step_evidence.get_mut(closure.step_index).ok_or_else(|| {
-                RuntimeLoopbackError::message(format!(
-                    "Chio runtime buyer closure missing step evidence {}",
-                    closure.step_index
-                ))
-            })?;
-            step.admission_report_sha256 = closure.admission_report_sha256.clone();
-            let source_record = source_records.get_mut(closure.step_index).ok_or_else(|| {
-                RuntimeLoopbackError::message(format!(
-                    "Chio runtime buyer closure missing source record {}",
-                    closure.step_index
-                ))
-            })?;
-            source_record.admission_report_sha256 = closure.admission_report_sha256.clone();
-            principal_admission_report_sha256 = Some(closure.admission_report_sha256.clone());
             write_runtime_json_artifact(
                 out_dir,
                 "cross_boundary_admission_report",
@@ -656,18 +594,12 @@ pub(crate) fn assemble_runtime_loopback_outputs(
             &mut evidence_paths,
         )?;
     }
-    let runtime_admission_report_sha256 = runtime_admission_report_sha256_for_workflow(
-        principal_admission_report_sha256.as_deref(),
-        &admission_hashes,
-        terminal_admission_report_sha256.as_deref(),
-    )?;
     let workflow_report = chio_runtime_core::RuntimeWorkflowRunReport {
         schema: chio_runtime_core::CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA.to_string(),
         run_id: run_id.to_string(),
         accepted,
         failure_code,
         generated_at_unix_ms: now_unix_ms,
-        admission_report_sha256: runtime_admission_report_sha256.clone(),
         evidence_paths: evidence_paths.clone(),
         step_evidence,
         proof_regeneration_report_sha256: Some(proof_regeneration_report_sha256.clone()),
@@ -724,7 +656,6 @@ pub(crate) fn assemble_runtime_loopback_outputs(
             run_id: run_id.to_string(),
             evidence_manifest_sha256,
             workflow_run_report_sha256,
-            admission_report_sha256: runtime_admission_report_sha256,
             trust_bundle_sha256: trust_bundle_sha256.ok_or_else(|| {
                 RuntimeLoopbackError::message(
                     "Chio runtime proof input missing trust bundle hash".to_string(),

@@ -745,3 +745,297 @@ fn a_late_lineage_row_the_canonical_reader_refuses_is_refused_for_archived_histo
     );
     service.shutdown();
 }
+
+const REFUSED_CAPTURED_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input";
+const REFUSED_REBUILT_LINEAGE: &str = "capability lineage of cap-late is refused by the local reader: urn:chio:error:attest:signed-json-invalid-input";
+
+fn captured_lineage_reinsert(malformed: bool, export_first: bool) {
+    use chio_core::receipt::evidence::EvidenceExportQuery;
+    use chio_kernel::evidence_export::EvidenceExportError;
+    use chio_kernel::ReceiptQuerySnapshotError;
+
+    let fixture = Fixture::new(4);
+    record_lineage(&fixture);
+    record_signed_lineage(&fixture, OTHER, &holder());
+    fixture.append(&spec(0, CAPABILITY, None));
+    fixture.append(&spec(2, OTHER, None));
+    fixture.flush();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            recertify_interval: Duration::from_secs(3_600),
+            invalid_retry_backoff: Duration::from_secs(600),
+            ..config()
+        },
+    );
+    service.pause_extension_for_test(true);
+    assert!(service.wait_for_paused_extension_for_test(Duration::from_secs(60)));
+    let query = EvidenceExportQuery::tenant_scoped("tenant-a");
+    let valid = service
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap();
+    assert_eq!(valid.0.tool_receipts.len(), 2);
+    assert_eq!(valid.0.capability_lineage.len(), 2);
+    let mut connection = rusqlite::Connection::open(&fixture.live).unwrap();
+    let transaction = connection.transaction().unwrap();
+    transaction
+        .execute_batch(
+            "CREATE TEMP TABLE reinsert_lineage AS SELECT * FROM capability_lineage;
+             DELETE FROM capability_lineage WHERE capability_id = 'cap-late';
+             INSERT INTO capability_lineage SELECT * FROM reinsert_lineage WHERE capability_id = 'cap-late';",
+        )
+        .unwrap();
+    if malformed {
+        assert_eq!(
+            transaction
+                .execute(
+                    "UPDATE capability_lineage SET grants_json = 'x' WHERE capability_id = ?1",
+                    [CAPABILITY],
+                )
+                .unwrap(),
+            1
+        );
+    }
+    transaction.commit().unwrap();
+    let rowid: i64 = connection
+        .query_row(
+            "SELECT rowid FROM capability_lineage WHERE capability_id = ?1",
+            [CAPABILITY],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let assert_refusal = || {
+        let error = service
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap_err();
+        assert!(
+            matches!(&error, EvidenceExportError::ReceiptStore(ReceiptStoreError::QuerySnapshot(ReceiptQuerySnapshotError::Invalid(reason))) if reason == REFUSED_CAPTURED_LINEAGE),
+            "{error:?}"
+        );
+        assert_eq!(
+            service.status().state,
+            ReceiptQuerySnapshotState::Invalid {
+                reason: REFUSED_CAPTURED_LINEAGE.into()
+            }
+        );
+    };
+    if export_first {
+        assert_refusal();
+    }
+    service.pause_extension_for_test(false);
+    if malformed {
+        assert_eq!(
+            wait_for(&service, "refused reinsert", |state| {
+                matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+            }),
+            ReceiptQuerySnapshotState::Invalid {
+                reason: REFUSED_CAPTURED_LINEAGE.into()
+            }
+        );
+    } else {
+        assert!(service.wait_for_lineage_through_for_test(rowid, Duration::from_secs(60)));
+    }
+    if malformed {
+        assert_refusal();
+    } else {
+        let valid = service
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap();
+        assert_eq!(valid.0.tool_receipts.len(), 2);
+        assert_eq!(valid.0.capability_lineage.len(), 2);
+    }
+    service.shutdown();
+}
+
+#[test]
+fn captured_lineage_reinsert_export_first_invalidates() {
+    captured_lineage_reinsert(true, true);
+}
+
+#[test]
+fn captured_lineage_reinsert_extension_first_invalidates() {
+    captured_lineage_reinsert(true, false);
+}
+
+#[test]
+fn captured_lineage_reinsert_valid_control_keeps_export_readable() {
+    captured_lineage_reinsert(false, false);
+}
+
+fn refused_lineage_subject_stays_invalid(captured: bool) {
+    let fixture = Fixture::new(4);
+    if captured {
+        record_lineage(&fixture);
+    }
+    record_signed_lineage(&fixture, OTHER, &holder());
+    fixture.append(&spec(0, CAPABILITY, None));
+    fixture.flush();
+    let service = ready(
+        &fixture,
+        ReceiptQuerySnapshotConfig {
+            recertify_interval: Duration::from_secs(3_600),
+            invalid_retry_backoff: Duration::from_secs(600),
+            ..config()
+        },
+    );
+    service.pause_extension_for_test(true);
+    assert!(service.wait_for_paused_extension_for_test(Duration::from_secs(60)));
+    let query = ReceiptQuery {
+        agent_subject: Some(late_subject()),
+        ..admin(100)
+    };
+    assert_eq!(
+        service.query_receipts(&query).unwrap().total_count,
+        u64::from(captured)
+    );
+    if !captured {
+        record_lineage(&fixture);
+    }
+    let mut connection = rusqlite::Connection::open(&fixture.live).unwrap();
+    let transaction = connection.transaction().unwrap();
+    transaction
+        .execute_batch(
+            "CREATE TEMP TABLE reinsert_lineage AS SELECT * FROM capability_lineage;
+             DELETE FROM capability_lineage WHERE capability_id = 'cap-late';
+             INSERT INTO capability_lineage SELECT * FROM reinsert_lineage WHERE capability_id = 'cap-late';",
+        )
+        .unwrap();
+    let subject = if captured {
+        Keypair::from_seed(&[0x63; 32]).public_key().to_hex()
+    } else {
+        late_subject()
+    };
+    assert_eq!(
+        transaction
+            .execute(
+                "UPDATE capability_lineage SET grants_json = 'x', subject_key = ?1 WHERE capability_id = ?2",
+                params![subject, CAPABILITY],
+            )
+            .unwrap(),
+        1
+    );
+    transaction.commit().unwrap();
+    service.pause_extension_for_test(false);
+    let state = wait_for(&service, "refused lineage subject", |state| {
+        matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+    });
+    let ReceiptQuerySnapshotState::Invalid { reason } = state else {
+        unreachable!()
+    };
+    assert_eq!(reason, REFUSED_CAPTURED_LINEAGE);
+    assert!(
+        matches!(service.query_receipts(&admin(100)), Err(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(actual))) if actual == reason)
+    );
+    service.shutdown();
+}
+
+#[test]
+fn captured_lineage_reinsert_changed_subject_still_invalidates() {
+    refused_lineage_subject_stays_invalid(true);
+}
+
+#[test]
+fn captured_lineage_reinsert_unknown_subject_is_never_filled_from_refused_metadata() {
+    refused_lineage_subject_stays_invalid(false);
+}
+
+fn captured_lineage_recertification_and_restart(malformed: bool) {
+    use chio_core::receipt::evidence::EvidenceExportQuery;
+    let fixture = Fixture::new(4);
+    record_lineage(&fixture);
+    fixture.append(&spec(0, CAPABILITY, None));
+    fixture.flush();
+    let settings = ReceiptQuerySnapshotConfig {
+        recertify_interval: Duration::from_millis(50),
+        invalid_retry_backoff: Duration::from_secs(600),
+        ..config()
+    };
+    let service = ready(&fixture, settings.clone());
+    service.pause_extension_for_test(true);
+    assert!(service.wait_for_paused_extension_for_test(Duration::from_secs(60)));
+    let query = EvidenceExportQuery::tenant_scoped("tenant-a");
+    let valid = service
+        .build_evidence_export_bundle_with_transparency(&query)
+        .unwrap();
+    assert_eq!(valid.0.tool_receipts.len(), 1);
+    assert_eq!(valid.0.capability_lineage.len(), 1);
+    let connection = fixture.tamper();
+    let rowid = || {
+        connection
+            .query_row(
+                "SELECT rowid FROM capability_lineage WHERE capability_id = ?1",
+                [CAPABILITY],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+    let before = rowid();
+    if malformed {
+        assert_eq!(
+            connection
+                .execute(
+                    "UPDATE capability_lineage SET grants_json = 'x' WHERE capability_id = ?1",
+                    [CAPABILITY],
+                )
+                .unwrap(),
+            1
+        );
+    }
+    assert_eq!(rowid(), before);
+    drop(connection);
+    service.pause_extension_for_test(false);
+    if malformed {
+        assert_eq!(
+            wait_for(&service, "recertification refusal", |state| {
+                matches!(state, ReceiptQuerySnapshotState::Invalid { .. })
+            }),
+            ReceiptQuerySnapshotState::Invalid {
+                reason: REFUSED_REBUILT_LINEAGE.into()
+            }
+        );
+    } else {
+        await_recertified(&service);
+        let export = service
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap();
+        assert_eq!(export.0.tool_receipts.len(), 1);
+        assert_eq!(export.0.capability_lineage.len(), 1);
+    }
+    service.shutdown();
+    let restarted = ReceiptQuerySnapshots::start(fixture.store.clone(), settings).unwrap();
+    let state = wait_for(&restarted, "restart disposition", |state| {
+        matches!(
+            state,
+            ReceiptQuerySnapshotState::Ready | ReceiptQuerySnapshotState::Invalid { .. }
+        )
+    });
+    if malformed {
+        assert_eq!(
+            state,
+            ReceiptQuerySnapshotState::Invalid {
+                reason: REFUSED_REBUILT_LINEAGE.into()
+            }
+        );
+        assert!(matches!(restarted.query_receipts(&admin(100)),
+            Err(ReceiptStoreError::QuerySnapshot(chio_kernel::ReceiptQuerySnapshotError::Invalid(reason)))
+            if reason == REFUSED_REBUILT_LINEAGE));
+    } else {
+        assert_eq!(state, ReceiptQuerySnapshotState::Ready);
+        let export = restarted
+            .build_evidence_export_bundle_with_transparency(&query)
+            .unwrap();
+        assert_eq!(export.0.tool_receipts.len(), 1);
+        assert_eq!(export.0.capability_lineage.len(), 1);
+    }
+    restarted.shutdown();
+}
+
+#[test]
+fn captured_lineage_in_place_refusal_invalidates_recertification_and_restart() {
+    captured_lineage_recertification_and_restart(true);
+}
+
+#[test]
+fn captured_lineage_intact_control_survives_recertification_and_restart() {
+    captured_lineage_recertification_and_restart(false);
+}

@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
-use std::io::Read;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -159,12 +158,7 @@ pub(super) fn error(error: impl std::fmt::Display) -> CliError {
 }
 
 pub(super) fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
-    let file = File::open(path)?;
-    let mut bytes = Vec::new();
-    file.take(MAX_CONFIG_BYTES + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_CONFIG_BYTES {
-        return Err(error("configuration exceeds one MiB"));
-    }
+    let bytes = crate::input::read_regular(path, MAX_CONFIG_BYTES as usize)?;
     Ok(crate::input::decode(&bytes, MAX_CONFIG_BYTES as usize)?)
 }
 

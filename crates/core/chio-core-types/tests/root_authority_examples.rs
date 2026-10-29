@@ -21,11 +21,11 @@ const REJECTIONS: &[(&str, &str)] = &[
     ),
     (
         "delegation-context.claim-commitment-padding.json",
-        "data did not match any variant of untagged enum LosslessTarget",
+        "data did not match any variant of untagged enum ClaimValue",
     ),
     (
         "delegation-context.claim-wrong-type.json",
-        "data did not match any variant of untagged enum LosslessTarget",
+        "data did not match any variant of untagged enum ClaimValue",
     ),
     (
         "delegation-context.claims-padding.json",
@@ -52,6 +52,10 @@ const REJECTIONS: &[(&str, &str)] = &[
         "`provider_record_id` is required for oauth_id_jag",
     ),
     (
+        "delegation-context.introspection-with-artifact-digest.json",
+        "`artifact_digest` is not allowed for oauth_introspection",
+    ),
+    (
         "delegation-context.issuer-nul.json",
         "`uri` is not a URI without NUL or whitespace",
     ),
@@ -60,10 +64,18 @@ const REJECTIONS: &[(&str, &str)] = &[
         "`uri` has 2070 characters, outside 1..=2048",
     ),
     (
+        "delegation-context.local-as-with-artifact-digest.json",
+        "`artifact_digest` is not allowed for chio_local_as",
+    ),
+    (
         "delegation-context.oidc-jwt-without-kid.json",
         "`kid` is required for oidc_jwt",
     ),
     ("delegation-context.padding.json", "unknown field `pad`"),
+    (
+        "delegation-context.operator-key-with-artifact-digest.json",
+        "`artifact_digest` is not allowed for chio_operator_key",
+    ),
     (
         "delegation-context.retained-on-static-bearer.json",
         "`artifact_retained` has a value not admitted for operator_static_bearer",

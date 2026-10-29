@@ -68,7 +68,7 @@ fn checkpoint_validation_rejects_a_signer_substitution_between_reads(
 
 #[test]
 fn append_chio_receipt_rejects_invalid_signature() {
-    let path = unique_db_path("chio-receipts-invalid-signature");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-invalid-signature");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut receipt = sample_receipt_with_id("rcpt-invalid-signature");
     receipt.tool_name = "sh".to_string();
@@ -102,7 +102,7 @@ fn receipt_operation_reports_keep_stable_null_json_fields() {
 
 #[test]
 fn append_chio_receipt_canonical_rejects_unsigned_extra_fields() {
-    let path = unique_db_path("chio-receipts-canonical-extra-fields");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-canonical-extra-fields");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-canonical-extra-fields");
     let mut value = serde_json::to_value(&receipt).test_unwrap();
@@ -130,7 +130,7 @@ fn append_chio_receipt_canonical_rejects_unsigned_extra_fields() {
 
 #[test]
 fn append_chio_receipt_rejects_mismatched_parameter_hash() {
-    let path = unique_db_path("chio-receipts-invalid-parameter-hash");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-invalid-parameter-hash");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let keypair = Keypair::generate();
     let receipt = ChioReceipt::sign(
@@ -176,7 +176,7 @@ fn append_chio_receipt_rejects_mismatched_parameter_hash() {
 
 #[test]
 fn append_child_receipt_rejects_invalid_signature() {
-    let path = unique_db_path("chio-child-receipts-invalid-signature");
+    let (_path_dir, path) = temp_sqlite_path("chio-child-receipts-invalid-signature");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut receipt = sample_child_receipt_with_id_and_timestamp("child-invalid-signature", 2);
     receipt.outcome_hash = "outcome-mutated".to_string();
@@ -194,7 +194,7 @@ fn append_child_receipt_rejects_invalid_signature() {
 
 #[test]
 fn evidence_export_rejects_tampered_persisted_tool_receipt() {
-    let path = unique_db_path("chio-evidence-export-tamper");
+    let (_path_dir, path) = temp_sqlite_path("chio-evidence-export-tamper");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("tampered-export-receipt");
     store.append_chio_receipt(&receipt).test_unwrap();
@@ -215,7 +215,7 @@ fn evidence_export_rejects_tampered_persisted_tool_receipt() {
 
 #[test]
 fn behavioral_feed_report_rejects_tampered_persisted_tool_receipt() {
-    let path = unique_db_path("chio-behavioral-feed-tamper");
+    let (_path_dir, path) = temp_sqlite_path("chio-behavioral-feed-tamper");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("tampered-report-receipt");
     store.append_chio_receipt(&receipt).test_unwrap();
@@ -240,7 +240,7 @@ fn behavioral_feed_report_rejects_tampered_persisted_tool_receipt() {
 
 #[test]
 fn claim_log_replay_rejects_tampered_persisted_tool_receipt() {
-    let path = unique_db_path("chio-claim-log-tamper");
+    let (_path_dir, path) = temp_sqlite_path("chio-claim-log-tamper");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("tampered-claim-log-receipt");
     let seq = store
@@ -263,7 +263,7 @@ fn claim_log_replay_rejects_tampered_persisted_tool_receipt() {
 
 #[test]
 fn append_child_receipt_fails_closed_on_existing_claim_log_projection_drift() {
-    let path = unique_db_path("chio-claim-log-child-append-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-claim-log-child-append-drift");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("tampered-claim-log-before-child-append");
     store.append_chio_receipt(&receipt).test_unwrap();
@@ -298,7 +298,7 @@ fn append_child_receipt_fails_closed_on_existing_claim_log_projection_drift() {
 
 #[test]
 fn receipt_base_tables_reject_update_and_delete() {
-    let path = unique_db_path("chio-receipts-base-immutable");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-base-immutable");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let tool = sample_receipt_with_id("base-immutable-tool");
@@ -356,7 +356,7 @@ fn receipt_base_tables_reject_update_and_delete() {
 
 #[test]
 fn claim_log_projection_uses_capability_lineage_when_receipt_lacks_attribution() {
-    let path = unique_db_path("chio-claim-log-lineage-projection");
+    let (_path_dir, path) = temp_sqlite_path("chio-claim-log-lineage-projection");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -451,7 +451,7 @@ fn claim_log_projection_uses_capability_lineage_when_receipt_lacks_attribution()
 
 #[test]
 fn store_checkpoint_rejects_merkle_root_mismatch_with_claim_log() {
-    let path = unique_db_path("chio-receipts-cp-merkle-mismatch");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-merkle-mismatch");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-merkle-mismatch");
     let seq = store
@@ -473,7 +473,7 @@ fn store_checkpoint_rejects_merkle_root_mismatch_with_claim_log() {
 
 #[test]
 fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
-    let path = unique_db_path("chio-receipts-cp-fail-closed");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-fail-closed");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let kp = receipt_test_keypair();
 
@@ -484,8 +484,11 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &kp,
-        Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     let third = build_checkpoint_with_previous(
@@ -494,10 +497,12 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
         6,
         &[b"five".to_vec(), b"six".to_vec()],
         &kp,
-        Some(&second),
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&second).test_unwrap()),
         &[
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap(),
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&second.body).test_unwrap(),
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&second.body)
+                .test_unwrap(),
         ],
     )
     .test_unwrap();
@@ -529,7 +534,7 @@ fn append_receipt_fails_closed_when_earlier_checkpoint_row_is_corrupted() {
 
 #[test]
 fn trait_store_checkpoint_rejects_conflicting_rewritten_checkpoint_rows() {
-    let path = unique_db_path("chio-receipts-cp-rewrite-detect");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-rewrite-detect");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let mut seqs = Vec::new();
@@ -572,7 +577,7 @@ fn trait_store_checkpoint_rejects_conflicting_rewritten_checkpoint_rows() {
 
 #[test]
 fn store_checkpoint_rejects_wrong_predecessor_digest() {
-    let path = unique_db_path("chio-receipts-cp-continuity");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-continuity");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let kp = receipt_test_keypair();
 
@@ -602,8 +607,11 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
-        Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     second.body.previous_checkpoint_sha256 = Some("00".repeat(32));
@@ -623,7 +631,7 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
 
 #[test]
 fn store_checkpoint_rejects_conflicting_rewrite() {
-    let path = unique_db_path("chio-receipts-cp-rewrite");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-rewrite");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let kp = receipt_test_keypair();
 
@@ -663,7 +671,7 @@ fn store_checkpoint_rejects_conflicting_rewrite() {
 
 #[test]
 fn store_checkpoint_rejects_missing_projection_atomically() {
-    let path = unique_db_path("chio-receipts-cp-projection-missing");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-projection-missing");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-projection-missing");
     let seq = store
@@ -706,7 +714,7 @@ fn store_checkpoint_rejects_missing_projection_atomically() {
 
 #[test]
 fn store_checkpoint_idempotent_rechecks_projection_rows() {
-    let path = unique_db_path("chio-receipts-cp-idempotent-projection-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-idempotent-projection-drift");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-idempotent-projection-drift");
     let seq = store
@@ -744,7 +752,7 @@ fn store_checkpoint_idempotent_rechecks_projection_rows() {
 
 #[test]
 fn receipt_checkpoint_status_reports_projection_drift() {
-    let path = unique_db_path("chio-receipts-cp-status-projection-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-status-projection-drift");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-status-projection-drift");
     let seq = store
@@ -787,7 +795,7 @@ fn receipt_checkpoint_status_reports_projection_drift() {
 
 #[test]
 fn open_existing_checkpoint_status_does_not_repair_missing_projection() {
-    let path = unique_db_path("chio-receipts-cp-open-existing-projection-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-open-existing-projection-drift");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-open-existing-projection-drift");
     let seq = store
@@ -869,7 +877,7 @@ fn open_existing_checkpoint_status_does_not_repair_missing_projection() {
 /// shape of `receipt_checkpoint_status`.
 #[test]
 fn health_read_only_reports_checkpoint_error_under_chain_corruption() {
-    let path = unique_db_path("chio-receipts-health-ro-chain-corruption");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-health-ro-chain-corruption");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-health-ro-chain-corruption");
     let seq = store
@@ -925,7 +933,7 @@ fn health_read_only_reports_checkpoint_error_under_chain_corruption() {
 
 #[test]
 fn receipt_checkpoint_status_reports_extra_projection_drift() {
-    let path = unique_db_path("chio-receipts-cp-status-extra-projection");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-status-extra-projection");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-status-extra-projection");
     let seq = store
@@ -993,7 +1001,7 @@ fn receipt_checkpoint_status_reports_extra_projection_drift() {
 
 #[test]
 fn store_checkpoint_rejects_mixed_receipt_signer_range() {
-    let path = unique_db_path("chio-receipts-cp-mixed-signer-range");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-mixed-signer-range");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let first_keypair = receipt_test_keypair();
     let second_keypair = Keypair::from_seed(&[0x43; 32]);
@@ -1025,7 +1033,7 @@ fn store_checkpoint_rejects_mixed_receipt_signer_range() {
 
 #[test]
 fn store_checkpoint_rejects_checkpoint_key_that_does_not_match_receipt_signer() {
-    let path = unique_db_path("chio-receipts-cp-wrong-kernel-key");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-wrong-kernel-key");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-wrong-checkpoint-key");
     let seq = store
@@ -1061,7 +1069,7 @@ fn health_detects_invalid_uncheckpointed_receipt_bytes() {
     // checkpointer entirely by never calling
     // `create_next_receipt_checkpoint`, leaving the appended receipts
     // in the uncheckpointed range.
-    let path = unique_db_path("chio-receipts-health-uncheckpointed");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-health-uncheckpointed");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let receipt = sample_receipt_with_id_and_timestamp("rcpt-health-tamper", 1);

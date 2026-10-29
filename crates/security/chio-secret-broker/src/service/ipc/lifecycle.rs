@@ -2,7 +2,7 @@ use super::{BrokerError, Path, Result};
 #[cfg(unix)]
 use super::{BrokerSocketIdentity, OpenOptions, OpenOptionsExt, PathBuf, UnixBrokerEndpoint};
 #[cfg(unix)]
-use crate::lifecycle_lock::LifecycleLock;
+use chio_secure_ipc::LifecycleLock;
 
 #[cfg(unix)]
 pub(in crate::service) struct ProvisionalBrokerSocketCleanup {

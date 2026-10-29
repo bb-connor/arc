@@ -768,6 +768,12 @@
       "schemaFile": "spec/schemas/chio-pheromone/v1/relay-trend-report.schema.json"
     },
     {
+      "schema": "chio.receipt-session-anchor.v1",
+      "artifactKind": "receipt_session_anchor",
+      "introducedBy": "receipt-session-anchor-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json"
+    },
+    {
       "schema": "chio.runtime.admission-bundle.v1",
       "artifactKind": "chio_runtime_admission_bundle",
       "introducedBy": "chio-runtime-admission-schema-cutover/v1",
@@ -2799,6 +2805,12 @@
       "introducedBy": "protocol-primitives-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json",
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/capability/cumulative-approval-root-body.schema.json"
+    },
+    {
+      "schema": "chio.decision-model-witness.v1",
+      "artifactKind": "decision_model_witness",
+      "introducedBy": "decision-model-witness-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
     },
     {
       "schema": "chio.declassification-grant.v1",

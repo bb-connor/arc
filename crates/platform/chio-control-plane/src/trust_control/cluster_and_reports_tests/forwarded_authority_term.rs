@@ -11,13 +11,6 @@ enum Operation {
 }
 
 impl Operation {
-    fn endpoint(self) -> &'static str {
-        match self {
-            Self::Issue => ISSUE_CAPABILITY_PATH,
-            Self::Rotate => AUTHORITY_PATH,
-        }
-    }
-
     async fn invoke(self, state: TrustServiceState, headers: HeaderMap) -> Response {
         match self {
             Self::Issue => {
@@ -38,25 +31,13 @@ impl Operation {
     }
 }
 
-fn forwarded_headers(cluster: &MajorityCluster, operation: Operation, term: u64) -> HeaderMap {
-    let issued_at = i64::try_from(unix_timestamp_now().test_unwrap()).test_unwrap();
-    let signature = cluster_peer_auth_signature(
-        &cluster.leader.state.config.service_token,
-        &cluster.majority.url,
-        operation.endpoint(),
-        issued_at,
-        Some(term),
-    )
-    .test_unwrap();
+fn forwarded_headers(term: u64) -> HeaderMap {
     let mut headers = HeaderMap::new();
-    for (name, value) in [
-        (CLUSTER_NODE_ID_HEADER, cluster.majority.url.clone()),
-        (CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string()),
-        (CLUSTER_AUTH_SIGNATURE_HEADER, signature),
-        (CLUSTER_AUTH_TERM_HEADER, term.to_string()),
-    ] {
-        headers.insert(name, HeaderValue::from_str(&value).test_unwrap());
-    }
+    headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
+    headers.insert(
+        FORWARDED_AUTHORITY_TERM_HEADER,
+        HeaderValue::from_str(&term.to_string()).test_unwrap(),
+    );
     headers
 }
 
@@ -94,11 +75,9 @@ fn queued_mutation(operation: Operation, change_term: bool) {
         let state = &cluster.leader.state;
         let lease = cluster_authority_lease_view(state).test_unwrap();
         assert!(lease.lease_valid);
-        let headers = forwarded_headers(&cluster, operation, lease.term);
-        let authenticated = validate_authority_mutation_auth(&headers, state, operation.endpoint())
-            .test_unwrap()
-            .test_unwrap();
-        assert_eq!(authenticated.term, Some(lease.term));
+        let headers = forwarded_headers(lease.term);
+        let authenticated = validate_authority_mutation_auth(&headers, state).test_unwrap();
+        assert_eq!(authenticated, Some(lease.term));
         let before =
             chio_store_sqlite::authority::SqliteAuthorityInspection::open_existing_with_clock(
                 state.config.authority_db_path.as_deref().test_unwrap(),

@@ -1,9 +1,10 @@
 //! Proof trees materialize authenticated hashes of selected checkpoint batches,
 //! with a total leaf allowance checked before reading a batch.
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
+use chio_core::receipt::evidence::{EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt};
 use chio_core::{hashing::Hash, merkle::MerkleTree};
-use chio_kernel::checkpoint::{build_inclusion_proof, KernelCheckpoint, ReceiptInclusionProof};
-use chio_kernel::evidence_export::{EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt};
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::build_inclusion_proof;
 use rusqlite::params;
 use std::collections::{BTreeMap, BTreeSet};
 

@@ -18,6 +18,7 @@ pub(super) use chio_core::crypto::Keypair;
 #[cfg(feature = "pq")]
 pub(super) use chio_core::crypto::{Ed25519Backend, HybridBackend, MlDsa65Backend, SigningBackend};
 pub(super) use chio_core::merkle::MerkleTree;
+pub(super) use chio_core::receipt::evidence::EvidenceExportQuery;
 pub(super) use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     economics::EconomicAmountBoundsReceiptMetadata, economics::EconomicAuthorizationMode,
@@ -39,25 +40,19 @@ pub(super) use chio_core::session::{
     OperationKind, OperationTerminalState, RequestId, RequestLineageMode, RequestLineageRecord,
     SessionAnchorReference, SessionId,
 };
-pub(super) use chio_kernel::checkpoint::build_checkpoint_publication;
 pub(super) use chio_kernel::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof, AnalyticsTimeBucket,
-    BehavioralFeedQuery, EvidenceExportQuery, MeteredBillingEvidenceRecord,
-    MeteredBillingReconciliationState, OperatorReportQuery, ReceiptAnalyticsQuery,
-    SettlementReconciliationState,
+    build_checkpoint, build_checkpoint_with_previous, AnalyticsTimeBucket, BehavioralFeedQuery,
+    MeteredBillingEvidenceRecord, MeteredBillingReconciliationState, OperatorReportQuery,
+    ReceiptAnalyticsQuery, SettlementReconciliationState,
 };
+pub(super) use chio_kernel_core::evidence_verify::build_checkpoint_publication;
+pub(super) use chio_kernel_core::evidence_verify::build_inclusion_proof;
 
 pub(super) use super::super::*;
 
 pub(super) use chio_test_support::prelude::*;
 
-pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+pub(super) use chio_test_support::temp_sqlite_path;
 
 pub(super) fn temp_db(prefix: &str) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
     let directory = tempfile::Builder::new().prefix(prefix).tempdir()?;

@@ -18,21 +18,25 @@ pub fn build_public_client(control_url: &str) -> Result<TrustControlClient, CliE
     build_client_with_cluster_peer(control_url, "", None, ControlClientAuthKind::Public)
 }
 
+/// A client for one pinned peer's internal listener. Requests are signed with
+/// this node's key for that peer; no bearer secret is sent.
 pub(crate) fn build_cluster_peer_client(
-    control_url: &str,
-    control_token: &str,
-    node_id: &str,
+    access: &Arc<crate::trust_control::caller_credentials::TrustAccess>,
+    peer_node_id: &str,
 ) -> Result<TrustControlClient, CliError> {
-    for endpoint in control_url.split(',') {
-        normalize_cluster_config_url(endpoint, true)?;
-    }
+    let recipient = normalize_cluster_url(peer_node_id)?;
+    let peer = access.peers().get(&recipient).ok_or_else(|| {
+        CliError::cli_other_error(format!("cluster peer {recipient} is not pinned"))
+    })?;
+    normalize_cluster_config_url(&peer.internal_url, true)?;
     build_client_with_cluster_peer(
-        control_url,
-        control_token,
+        &peer.internal_url,
+        "",
         Some(ClusterPeerClientAuth {
-            node_id: Arc::<str>::from(normalize_cluster_url(node_id)?),
+            access: Arc::clone(access),
+            recipient: Arc::<str>::from(recipient),
         }),
-        ControlClientAuthKind::Service,
+        ControlClientAuthKind::Peer,
     )
 }
 
@@ -40,6 +44,7 @@ pub(crate) fn build_cluster_peer_client(
 enum ControlClientAuthKind {
     Service,
     Public,
+    Peer,
 }
 
 fn build_client_with_cluster_peer(
@@ -63,6 +68,8 @@ fn build_client_with_cluster_peer(
         ));
     }
     // Credential-bearing and public clients use the same fixed authority boundary.
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: trust-control client for the operator-configured control
+    // endpoints, redirects off
     let http = ureq::AgentBuilder::new()
         .timeout(CONTROL_HTTP_TIMEOUT)
         .redirects(0)

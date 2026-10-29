@@ -13,9 +13,8 @@ type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 /// Runs a bounded sequence. Invalid transitions must preserve the committed row.
 pub fn response_lifecycle(data: &[u8]) {
-    if let Err(error) = drive(data) {
-        panic!("valid lifecycle fixture failed: {error}");
-    }
+    let outcome = drive(data).map(drop).map_err(|error| error.to_string());
+    assert_eq!(outcome, Ok(()), "valid lifecycle fixture failed");
 }
 
 #[derive(serde::Serialize)]
@@ -50,12 +49,17 @@ fn drive(data: &[u8]) -> TestResult<LifecycleTrace> {
     {
         let before = serde_json::to_value(before)?;
         let after = serde_json::to_value(after)?;
-        let key = if before["kind"] == "suspension" {
+        let key = if before.get("kind").is_some_and(|kind| kind == "suspension") {
             "active_contributions"
         } else {
             "contributions"
         };
-        assert_eq!(before["snapshot"][key], after["snapshot"][key]);
+        assert_eq!(
+            before
+                .get("snapshot")
+                .and_then(|snapshot| snapshot.get(key)),
+            after.get("snapshot").and_then(|snapshot| snapshot.get(key))
+        );
     }
     let plan = build_response_plan(ResponsePlanInput {
         execution: ResponseExecutionBinding::new(ResponseExecutionMode::Live),
@@ -106,11 +110,13 @@ fn drive(data: &[u8]) -> TestResult<LifecycleTrace> {
     for byte in data.iter().copied().take(64) {
         let before = current.clone();
         let result = match byte % 18 {
-            0..=9 => machine.transition(
+            selector @ 0..=9 => machine.transition(
                 &current,
                 &ResponseTransitionRequest {
                     expected_generation: current.generation,
-                    target_state: states[usize::from(byte % 18)],
+                    target_state: *states
+                        .get(usize::from(selector))
+                        .ok_or("transition selector exceeds the state table")?,
                     occurred_at_unix_ms: now,
                     applying_lease_expires_at_unix_ms: (byte % 18 == 0)
                         .then_some(plan.expires_at_unix_ms),
@@ -144,7 +150,11 @@ fn drive(data: &[u8]) -> TestResult<LifecycleTrace> {
                 continue;
             }
             12..=16 => {
-                let effect = &plan.effects.as_slice()[0];
+                let effect = plan
+                    .effects
+                    .as_slice()
+                    .first()
+                    .ok_or("live plan has no effects")?;
                 machine.record_effect(
                     &current,
                     &EffectMutationRequest {

@@ -110,6 +110,7 @@ pub struct PreparedAnchoredRoot {
     anchor: RootAnchor,
     context: DelegationContext,
     openings: Vec<ContextOpening>,
+    artifact_digest: Option<Sha256Digest>,
     replay_key: ReplayKey,
     replay_retain_until: u64,
     holder: HolderClass,
@@ -152,6 +153,13 @@ impl PreparedAnchoredRoot {
     #[must_use]
     pub fn openings(&self) -> &[ContextOpening] {
         &self.openings
+    }
+    /// SHA-256 of the presented assertion, token or introspection response,
+    /// the artifact member of the root's retry binding. The delegation
+    /// context carries it only for JWS-verified kinds.
+    #[must_use]
+    pub fn artifact_digest(&self) -> Option<&Sha256Digest> {
+        self.artifact_digest.as_ref()
     }
     #[must_use]
     pub fn replay_key(&self) -> &ReplayKey {
@@ -626,6 +634,7 @@ impl RootExchange {
             provider_id: Some(record.identity().provider_id.to_string()),
             scope_bound: None,
             holder: None,
+            sender_constraint: None,
         })
     }
 
@@ -743,7 +752,9 @@ impl RootExchange {
             key_snapshot_digest: jws.map(|jws| jws.key_snapshot_digest),
             kid: jws.map(|jws| jws.kid.clone()),
             alg: jws.map(|jws| jws.alg),
-            artifact_digest: evidence.artifact_digest,
+            artifact_digest: evidence
+                .artifact_digest
+                .filter(|_| evidence.kind.is_jws_verified()),
             artifact_retained: false,
             replay_key_digest: evidence.replay_key.digest(),
             token_iat: evidence.token_iat,
@@ -787,6 +798,7 @@ impl RootExchange {
             anchor,
             context,
             openings,
+            artifact_digest: evidence.artifact_digest,
             replay_retain_until: evidence
                 .token_exp
                 .saturating_add(REPLAY_RETENTION_SKEW_SECS),

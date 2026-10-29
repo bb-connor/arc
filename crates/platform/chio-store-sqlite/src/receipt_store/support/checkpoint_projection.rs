@@ -1067,13 +1067,13 @@ pub(crate) fn validate_checkpoint_transparency_projections(
     for row in rows {
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         if let Some(predecessor) = parsed_checkpoints.last() {
-            chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+            chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(
                 predecessor,
                 &checkpoint,
             )
             .map_err(checkpoint_error_to_receipt_store)?;
         }
-        let publication = chio_kernel::checkpoint::build_checkpoint_publication(
+        let publication = chio_kernel_core::evidence_verify::build_checkpoint_publication(
             &checkpoint,
             std::slice::from_ref(&checkpoint.body.kernel_key),
         )

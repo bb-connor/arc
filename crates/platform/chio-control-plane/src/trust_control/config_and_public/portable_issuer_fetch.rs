@@ -3,7 +3,10 @@
 //! passport-lifecycle resolution.
 use super::*;
 
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractResponse, ContractLookup, HttpEgressContract,
+    HttpEgressError,
+};
 use std::time::Instant;
 
 use crate::bounded_worker_pool::{BoundedWorkerPool, DeadlinePassed};
@@ -27,8 +30,7 @@ pub(crate) const PORTABLE_ISSUER_FETCH_PERMITS: usize = 16;
 /// The total deadline bounds the caller's wait for DNS and HTTP together.
 /// A started fetch may retain its physical worker after that deadline; the
 /// fixed pool below bounds those workers independently of the waiting callers.
-const PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
-const PORTABLE_ISSUER_FETCH_READ_TIMEOUT: Duration = Duration::from_secs(5);
+const PORTABLE_ISSUER_FETCH_PHASE_TIMEOUT: Duration = Duration::from_secs(5);
 pub(super) const PORTABLE_ISSUER_FETCH_TOTAL_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Fetch workers, and fetches that may queue behind them. A started fetch cannot
@@ -195,11 +197,11 @@ impl RemotePortableIssuerFetch {
     }
 
     fn fetch(self, deadline: &PortableFetchDeadline) -> Result<Vec<PublicKey>, CliError> {
-        let url = Url::parse(&self.jwks_url).map_err(|error| {
-            CliError::cli_other_error(format!("portable issuer JWKS URL is invalid: {error}"))
-        })?;
-        let pinned = pin_checked_https_addrs(&self.contract, &url, system_resolve_host)?;
-        let agent = build_portable_fetch_agent(pinned, true, deadline)?;
+        let agent = portable_fetch_agent(
+            &self.contract,
+            deadline,
+            chio_egress_contract::system_lookup(),
+        )?;
         fetch_portable_issuer_jwks(&agent, &self.jwks_url)
     }
 }
@@ -230,13 +232,13 @@ pub(crate) fn plan_portable_issuer_keys(
 }
 
 /// Parse an issuer JWKS body (bounded and non-reflected) into its public keys.
-fn fetch_portable_issuer_jwks(agent: &Agent, jwks_url: &str) -> Result<Vec<PublicKey>, CliError> {
-    let response = agent
-        .get(jwks_url)
-        .call()
-        .map_err(|error| portable_fetch_transport_error("portable issuer JWKS endpoint", error))?;
+fn fetch_portable_issuer_jwks(
+    agent: &BlockingContractAgent,
+    jwks_url: &str,
+) -> Result<Vec<PublicKey>, CliError> {
+    let response = portable_fetch_get(agent, jwks_url, "portable issuer JWKS endpoint")?;
     let jwks: chio_credentials::PortableJwkSet =
-        crate::json_input::read(response.into_reader(), PORTABLE_ISSUER_FETCH_MAX_BODY_BYTES)?;
+        crate::json_input::read(response.body(), PORTABLE_ISSUER_FETCH_MAX_BODY_BYTES)?;
     let mut public_keys = Vec::with_capacity(jwks.keys.len());
     for entry in &jwks.keys {
         public_keys.push(
@@ -284,18 +286,15 @@ impl RemotePassportLifecycleFetch {
         self,
         deadline: &PortableFetchDeadline,
     ) -> Result<PassportLifecycleResolution, CliError> {
-        let parsed = Url::parse(&self.url).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "portable passport lifecycle URL is invalid: {error}"
-            ))
-        })?;
-        let pinned = pin_checked_https_addrs(&self.contract, &parsed, system_resolve_host)?;
-        let agent = build_portable_fetch_agent(pinned, true, deadline)?;
-        let response = agent.get(&self.url).call().map_err(|error| {
-            portable_fetch_transport_error("portable passport lifecycle endpoint", error)
-        })?;
+        let agent = portable_fetch_agent(
+            &self.contract,
+            deadline,
+            chio_egress_contract::system_lookup(),
+        )?;
+        let response =
+            portable_fetch_get(&agent, &self.url, "portable passport lifecycle endpoint")?;
         let lifecycle: PassportLifecycleResolution =
-            crate::json_input::read(response.into_reader(), PORTABLE_ISSUER_FETCH_MAX_BODY_BYTES)?;
+            crate::json_input::read(response.body(), PORTABLE_ISSUER_FETCH_MAX_BODY_BYTES)?;
         lifecycle
             .validate()
             .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -409,84 +408,52 @@ fn strict_portable_fetch_contract(
     .map_err(CliError::cli_other_error)
 }
 
-/// Resolve a host once, check every resolved address against the strict policy,
-/// and return the exact checked addresses. Pinning these into the fetch agent's
-/// resolver closes the validate-then-re-resolve gap that DNS rebinding exploits.
-pub(super) fn pin_checked_https_addrs<R>(
+/// The agent for one portable fetch. The time left on the fetch deadline,
+/// sampled here immediately before the request, is the request deadline, so
+/// name resolution, connect and body share the fetch's single budget. The host
+/// resolves once, and only addresses that pass `contract` are dialed.
+pub(crate) fn portable_fetch_agent(
     contract: &HttpEgressContract,
-    url: &Url,
-    resolve: R,
-) -> Result<Vec<SocketAddr>, CliError>
-where
-    R: Fn(&str, u16) -> std::io::Result<Vec<SocketAddr>>,
-{
-    contract
-        .enforce_url(url.as_str(), 0)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let host = url
-        .host_str()
-        .ok_or_else(|| CliError::cli_other_error("egress URL must include a host".to_string()))?;
-    let port = url
-        .port_or_known_default()
-        .ok_or_else(|| CliError::cli_other_error("egress URL must declare a port".to_string()))?;
-    let resolved = resolve(host, port).map_err(|error| {
-        CliError::cli_other_error(format!("failed to resolve egress host `{host}`: {error}"))
-    })?;
-    let mut checked = Vec::with_capacity(resolved.len());
-    for addr in resolved {
-        contract
-            .enforce_resolved_ip(host, addr.ip())
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-        checked.push(addr);
-    }
-    if checked.is_empty() {
-        return Err(CliError::cli_other_error(format!(
-            "egress host `{host}` resolved to no addresses"
-        )));
-    }
-    Ok(checked)
-}
-
-pub(super) fn system_resolve_host(host: &str, port: u16) -> std::io::Result<Vec<SocketAddr>> {
-    (host, port).to_socket_addrs().map(|iter| iter.collect())
-}
-
-/// Build the bounded fetch agent. The resolver returns only the pre-checked
-/// pinned addresses, redirects are disabled, and connect, read and overall
-/// deadlines bound every attempt. The fetch deadline's remainder, sampled here
-/// immediately before the request, is the overall deadline and also caps the
-/// connect stage, which ureq otherwise times from its own start.
-/// `require_https` enforces HTTPS on the one production transport; the
-/// loopback test seam supplies plaintext.
-pub(crate) fn build_portable_fetch_agent(
-    pinned: Vec<SocketAddr>,
-    require_https: bool,
     deadline: &PortableFetchDeadline,
-) -> Result<Agent, CliError> {
+    lookup: ContractLookup,
+) -> Result<BlockingContractAgent, CliError> {
     let remaining = deadline.remaining()?;
-    let mut builder = ureq::AgentBuilder::new()
-        .timeout_connect(remaining.min(PORTABLE_ISSUER_FETCH_CONNECT_TIMEOUT))
-        .timeout_read(PORTABLE_ISSUER_FETCH_READ_TIMEOUT)
-        .timeout(remaining)
-        .redirects(0)
-        .resolver(move |_netloc: &str| Ok(pinned.clone()));
-    if require_https {
-        builder = builder.https_only(true);
-    }
-    Ok(builder.build())
+    BlockingContractAgent::with_lookup(
+        contract,
+        PORTABLE_ISSUER_FETCH_PHASE_TIMEOUT,
+        remaining,
+        lookup,
+    )
+    .map_err(|error| CliError::cli_other_error(error.to_string()))
 }
 
-/// Map a transport error to a fail-closed message that never echoes the fetched
-/// body or any resolved internal address back to the caller.
-pub(super) fn portable_fetch_transport_error(endpoint: &str, error: ureq::Error) -> CliError {
-    match error {
-        ureq::Error::Status(status, _response) => {
-            CliError::cli_other_error(format!("{endpoint} returned HTTP {status}"))
-        }
-        ureq::Error::Transport(_transport) => {
+fn portable_fetch_get(
+    agent: &BlockingContractAgent,
+    url: &str,
+    endpoint: &str,
+) -> Result<BlockingContractResponse, CliError> {
+    portable_fetch_response(agent.get(url).and_then(|request| request.call()), endpoint)
+}
+
+/// Accept only a 2xx response. A failure never echoes the fetched body back to
+/// the caller.
+pub(super) fn portable_fetch_response(
+    outcome: Result<BlockingContractResponse, HttpEgressError>,
+    endpoint: &str,
+) -> Result<BlockingContractResponse, CliError> {
+    let response = outcome.map_err(|error| match error {
+        HttpEgressError::Transport(_) => {
             CliError::cli_other_error(format!("{endpoint} was unreachable"))
         }
+        refusal => CliError::cli_other_error(refusal.to_string()),
+    })?;
+    if !(200..300).contains(&response.status()) {
+        return Err(CliError::cli_other_error(format!(
+            "{endpoint} returned HTTP {}",
+            response.status()
+        )));
     }
+    Ok(response)
 }
 
 #[cfg(test)]

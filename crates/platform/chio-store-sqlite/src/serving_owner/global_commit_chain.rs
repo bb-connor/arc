@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS authority_global_commits (
     commit_sequence INTEGER PRIMARY KEY CHECK (commit_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     projection_kind TEXT NOT NULL CHECK (
-        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_replay_migration', 'governed_approval_replay_migration', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch', 'recovery', 'work_delegation', 'work_graph', 'revocation_entry')
+        projection_kind IN ('baseline', 'admission', 'budget', 'revocation', 'frost', 'payment', 'economic', 'channel_release_publication', 'factor_assignment_authority_set', 'fiscal', 'finding_challenge', 'finding_status', 'runtime_source_qualification', 'governed_approval_authority', 'dpop_replay_migration', 'security_participant_migration', 'security_participant_state', 'security_participant_egress', 'native_dispatch_ledger', 'security_participant_output', 'security_participant_nonce_preflight', 'security_participant_checkpoint', 'stop_epoch', 'recovery', 'work_delegation', 'work_graph', 'revocation_entry')
     ),
     projection_key TEXT NOT NULL,
     projection_sequence INTEGER NOT NULL CHECK (projection_sequence >= 0),
@@ -1246,8 +1246,8 @@ pub(crate) fn verify_pristine_authority_tables(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
     // The runtime replay projection covers every row written by an active owner.
-    crate::admission_operation_store::verify_runtime_replay_pristine(connection)?;
-    crate::admission_operation_store::verify_governed_approval_replay_pristine(connection)?;
+    crate::admission_operation_store::verify_runtime_source_pristine(connection)?;
+    crate::admission_operation_store::verify_governed_approval_authority_pristine(connection)?;
     crate::admission_operation_store::verify_dpop_replay_pristine(connection)?;
     crate::admission_operation_store::verify_security_participant_migration_pristine(connection)?;
     for table in table_names(connection, false)? {
@@ -1347,8 +1347,8 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
 fn verify_global_projection_coverage(
     connection: &Connection,
 ) -> Result<(), SqliteServingOwnerError> {
-    admission_store::verify_runtime_replay_projection_coverage(connection)?;
-    admission_store::verify_governed_approval_replay_projection_coverage(connection)?;
+    admission_store::verify_runtime_source_projection_coverage(connection)?;
+    admission_store::verify_governed_approval_authority_projection_coverage(connection)?;
     admission_store::verify_dpop_replay_projection_coverage(connection)?;
     admission_store::verify_security_participant_migration_coverage(connection)?;
     admission_store::verify_stop_epoch_projection_coverage(connection)?;

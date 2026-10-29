@@ -176,7 +176,7 @@ fn immutable_request_commits_to_every_original_profile_selection(
         "schema": "chio.admission-authority-profile.v1", "selection": {
             "runtime_hook_installed": true, "swarm_admission_required": false,
             "runtime_enforces_swarm_authority": true, "runtime_requires_dispatch_revalidation": true,
-            "runtime": {"runtime_authority_id": "runtime", "expectation_id": "runtime-generation"},
+            "runtime": {"runtime_authority_id": "runtime", "qualification_id": "runtime-generation"},
             "approval": {"approval_authority_id": "approval", "expectation_id": "approval-generation"},
             "dpop": {"destination_store_uuid": "11111111-1111-4111-8111-111111111111",
                 "dpop_authority_id": "dpop", "expectation_id": "a".repeat(64),
@@ -218,7 +218,7 @@ fn immutable_request_commits_to_every_original_profile_selection(
             serde_json::json!("other-runtime"),
         ),
         (
-            "/selection/runtime/expectation_id",
+            "/selection/runtime/qualification_id",
             serde_json::json!("other-runtime-generation"),
         ),
         (

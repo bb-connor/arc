@@ -14,7 +14,7 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_finding::{
     FindingFacetKind, FindingFacetOutcome, FindingPurchaseContext, PURCHASE_CONTEXT_SCHEMA,
 };
-use chio_kernel::checkpoint::{build_checkpoint, build_inclusion_proof};
+use chio_kernel::checkpoint::build_checkpoint;
 use chio_kernel::finding_purchase::{
     FINDING_PURCHASE_CONTEXT_KEY, FINDING_STATUS_PROOF_CONTEXT_KEY,
 };
@@ -23,6 +23,7 @@ use chio_kernel::{
     ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DPOP_SCHEMA,
 };
+use chio_kernel_core::evidence_verify::build_inclusion_proof;
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, SignedAcceptedBid, SignedAskResponse,
     SignedBidRequest, SignedReservationReceipt, VerifiedReservationReceipt, BID_REQUEST_SCHEMA,
@@ -66,6 +67,7 @@ use super::finding_status_verifier::MarketFindingStatusVerifier;
 use super::{FindingMarketConfig, TrustStop};
 
 const MAX_CREDENTIAL_TEXT_BYTES: usize = 512;
+const MAX_CACHED_TERMINAL_BYTES: usize = 64 * 1024 * 1024;
 const FINDING_OPERATOR_PURCHASE_JOB_SCHEMA: &str = "chio.finding.operator-purchase-job.v1";
 const PREDISPATCH_RELEASE_REJECTION: &str =
     "purchase failed before dispatch and its reservation was released";
@@ -574,9 +576,7 @@ impl FindingOperatorPurchaseExecutor {
                 "purchase request id is bound to another authenticated request".to_owned(),
             ));
         }
-        serde_json::from_slice(&record.result_json)
-            .map(Some)
-            .map_err(|error| execution_internal(error.to_string()))
+        decode_cached_terminal(&record.result_json).map(Some)
     }
 
     fn retain_terminal(
@@ -1718,6 +1718,14 @@ fn validate_credential_text(value: &str, label: &str) -> Result<(), String> {
 fn unix_timestamp_now() -> Result<u64, chio_security_types::clock::ClockError> {
     use chio_security_types::clock::{Clock, SystemClock};
     SystemClock.unix_millis().map(|now| now.as_secs())
+}
+
+pub(crate) fn decode_cached_terminal(
+    result_json: &[u8],
+) -> Result<FindingPurchaseResult, FindingPurchaseExecutionError> {
+    chio_core::canonical::UntrustedJsonText::from_wire(result_json, MAX_CACHED_TERMINAL_BYTES)
+        .and_then(|input| input.decode_signed())
+        .map_err(|error| execution_internal(error.code()))
 }
 
 fn execution_internal(error: impl std::fmt::Display) -> FindingPurchaseExecutionError {

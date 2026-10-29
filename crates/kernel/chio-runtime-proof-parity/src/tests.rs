@@ -229,7 +229,6 @@ fn runtime_regeneration_artifacts(
     let workflow_receipt_sha256 = test_canonical_value_sha256(&workflow_receipt);
     let mut source_record = serde_json::json!({
         "stepIndex": 0,
-        "admissionReportSha256": "1".repeat(64),
         "toolReceiptSha256": "2".repeat(64),
         "bilateralDsseSha256": "3".repeat(64),
         "workflowStepSha256": "4".repeat(64)
@@ -262,7 +261,6 @@ fn runtime_regeneration_artifacts(
     if let Some(step_index) = options.workflow_step_record_index {
         workflow_report["stepEvidence"] = serde_json::json!([{
             "stepIndex": step_index,
-            "admissionReportSha256": "1".repeat(64),
             "toolReceiptSha256": "2".repeat(64),
             "bilateralDsseSha256": "3".repeat(64),
             "workflowStepSha256": "4".repeat(64)
@@ -328,4 +326,35 @@ fn test_canonical_value_sha256(value: &Value) -> String {
         Ok(hash) => hash,
         Err(error) => panic!("test canonical hash failed: {error}"),
     }
+}
+
+#[test]
+fn source_record_reader_refuses_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let record = serde_json::json!({
+        "stepIndex": 0,
+        "toolReceiptSha256": "1".repeat(64),
+        "bilateralDsseSha256": "2".repeat(64),
+        "workflowStepSha256": "3".repeat(64)
+    });
+    let workflow = serde_json::json!({"stepEvidence": [record.clone()]});
+    ensure_source_records_bind_workflow_step_evidence(
+        &serde_json::json!({"sourceRecords": [record.clone()]}),
+        &workflow,
+    )?;
+    for field in ["admissionReceiptSha256", "unexpectedBinding"] {
+        let mut extra = record.clone();
+        extra[field] = serde_json::json!("4".repeat(64));
+        let error = match ensure_source_records_bind_workflow_step_evidence(
+            &serde_json::json!({"sourceRecords": [extra]}),
+            &workflow,
+        ) {
+            Ok(()) => panic!("unknown source-record field accepted: {field}"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.code(),
+            "runtime_proof_regeneration_source_record_unknown_field"
+        );
+    }
+    Ok(())
 }

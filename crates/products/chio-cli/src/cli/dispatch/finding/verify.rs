@@ -23,9 +23,7 @@ use chio_finding_verifier::{
     FindingVerifierDraft, FindingVerifierTrustRoots, ResolvedFindingDeliveryEvidence,
     ResolvedReceiptEvidence, SignedFindingBondStoreSnapshot, MAX_RAW_FINDING_BYTES,
 };
-use chio_kernel::checkpoint::{
-    CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
-};
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof};
 use chio_open_market::fee_schedule::SignedOpenMarketFeeSchedule;
 
 const FINDING_SCHEMA_JSON: &str =

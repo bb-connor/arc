@@ -14,7 +14,7 @@ pub(super) struct NativeCaptureCheckpointContext<'a> {
     pub metadata: Option<&'a serde_json::Value>,
     pub verified_payee_binding: Option<&'a VerifiedGovernedPayeeBinding>,
     pub budget_lease_acquired: bool,
-    pub evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pub evidence: &'a crate::kernel::PreInvocationGuardOutput,
 }
 
 pub(super) type NativeCaptureCheckpointOutcome<'a> =

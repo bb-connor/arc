@@ -91,7 +91,7 @@ fn profile_codec_checks_schema_fields_and_each_selected_generation() {
     );
     for pointer in [
         "/selection/runtime/runtime_authority_id",
-        "/selection/runtime/expectation_id",
+        "/selection/runtime/qualification_id",
         "/selection/approval/approval_authority_id",
         "/selection/approval/expectation_id",
         "/selection/dpop/dpop_authority_id",

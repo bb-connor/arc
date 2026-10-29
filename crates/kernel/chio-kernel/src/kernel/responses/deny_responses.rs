@@ -387,7 +387,7 @@ impl ChioKernel {
             .as_object_mut()
         {
             runtime.insert(
-                "retryable_after_resume".into(),
+                crate::kernel::runtime_field::RETRYABLE_AFTER_RESUME.into(),
                 serde_json::Value::Bool(true),
             );
         }

@@ -21,8 +21,8 @@ contract_sources = [
   "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
   "crates/kernel/chio-kernel/src/kernel/validation/caller_budget.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook.rs",
+  "crates/kernel/chio-runtime-core/src/admission_hook/operation_owned.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
-  "crates/kernel/chio-runtime-core/src/admission_hook/reservation.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
   "crates/kernel/chio-runtime-core/src/admission_hook/swarm_ref.rs",
   "crates/products/chio-api-protect/src/evaluator.rs",
@@ -199,7 +199,7 @@ references = 1
 id = "C23"
 path = "crates/kernel/chio-runtime-core/benches/fixtures/treaty_admission_fixture.rs"
 symbol = "TreatyPredispatchDenyFixture::new"
-target = "ChioKernel::new"
+target = "ChioKernel::new_with_clock"
 references = 1
 
 [[constructor_sites]]

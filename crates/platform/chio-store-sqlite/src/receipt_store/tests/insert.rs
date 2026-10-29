@@ -3,7 +3,7 @@ use super::support::*;
 
 #[test]
 fn append_chio_receipt_returning_seq_returns_seq() {
-    let path = unique_db_path("chio-receipts-seq");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-seq");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-seq-001");
     let seq = store
@@ -15,7 +15,7 @@ fn append_chio_receipt_returning_seq_returns_seq() {
 
 #[test]
 fn append_chio_receipt_consuming_authorization_rejects_reuse_after_reopen() {
-    let path = unique_db_path("chio-auth-consume");
+    let (_path_dir, path) = temp_sqlite_path("chio-auth-consume");
     let keypair = receipt_test_keypair();
     let tenant_id = "tenant-acp";
     let authorization =
@@ -77,7 +77,7 @@ fn append_chio_receipt_consuming_authorization_rejects_reuse_after_reopen() {
 
 #[test]
 fn append_returned_claim_log_seqs_survive_reopen() {
-    let path = unique_db_path("chio-receipts-seq-reopen");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-seq-reopen");
     let tool_seq;
     let child_seq;
     {
@@ -111,7 +111,7 @@ fn append_returned_claim_log_seqs_survive_reopen() {
 
 #[test]
 fn append_100_receipts_seqs_span_1_to_100() {
-    let path = unique_db_path("chio-receipts-100");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-100");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let mut seqs = Vec::new();
     for i in 0..100usize {
@@ -129,7 +129,7 @@ fn append_100_receipts_seqs_span_1_to_100() {
 #[test]
 fn receipt_writer_pool_accepts_writes_when_reader_pool_is_saturated(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-pool-split");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-pool-split");
     let store = Arc::new(SqliteReceiptStore::open_with_pool_sizes(&path, 1, 1)?);
     let reader_connection = store.connection()?;
     let (result_sender, result_receiver) = std::sync::mpsc::sync_channel(1);
@@ -156,7 +156,7 @@ fn receipt_writer_pool_accepts_writes_when_reader_pool_is_saturated(
 #[test]
 fn append_receipt_batch_commits_multiple_receipts_together(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-group-batch");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-group-batch");
     let store = SqliteReceiptStore::open(&path)?;
 
     let mut requests = Vec::new();
@@ -192,7 +192,7 @@ fn append_receipt_batch_commits_multiple_receipts_together(
 
 #[test]
 fn duplicate_tool_receipt_bytes_return_existing_claim_log_seq() {
-    let path = unique_db_path("chio-receipts-duplicate-tool");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-duplicate-tool");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-duplicate-tool");
 
@@ -213,7 +213,7 @@ fn duplicate_tool_receipt_bytes_return_existing_claim_log_seq() {
 
 #[test]
 fn duplicate_tool_receipt_id_with_different_bytes_conflicts() {
-    let path = unique_db_path("chio-receipts-duplicate-tool-conflict");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-duplicate-tool-conflict");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_receipt_with_id("rcpt-duplicate-tool-conflict");
     let raw_json = serde_json::to_string(&receipt).test_unwrap();
@@ -247,7 +247,7 @@ fn duplicate_tool_receipt_id_with_different_bytes_conflicts() {
 #[test]
 fn duplicate_tool_receipt_rejects_divergent_cost_projection(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-duplicate-cost-projection");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-duplicate-cost-projection");
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_financial_receipt("rcpt-duplicate-cost-projection", u64::MAX)?;
     let raw_json = serde_json::to_string(&receipt)?;
@@ -284,7 +284,7 @@ fn duplicate_tool_receipt_rejects_divergent_cost_projection(
 
 #[test]
 fn duplicate_child_receipt_bytes_return_existing_claim_log_seq() {
-    let path = unique_db_path("chio-receipts-duplicate-child");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-duplicate-child");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_child_receipt_with_id_and_timestamp("child-duplicate", 2);
 
@@ -305,7 +305,7 @@ fn duplicate_child_receipt_bytes_return_existing_claim_log_seq() {
 
 #[test]
 fn duplicate_child_receipt_id_with_different_bytes_conflicts() {
-    let path = unique_db_path("chio-receipts-duplicate-child-conflict");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-duplicate-child-conflict");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt = sample_child_receipt_with_id_and_timestamp("child-duplicate-conflict", 2);
     let conflicting = sample_child_receipt_with_id_and_timestamp("child-duplicate-conflict", 3);
@@ -331,7 +331,7 @@ fn duplicate_child_receipt_id_with_different_bytes_conflicts() {
 /// Independent producers keep independent success/failure semantics.
 #[test]
 fn append_receipt_batch_isolates_per_record_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-group-isolation");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-group-isolation");
     let store = SqliteReceiptStore::open(&path)?;
     let mut requests = Vec::new();
 
@@ -381,7 +381,7 @@ fn append_receipt_batch_isolates_per_record_error() -> Result<(), Box<dyn std::e
 
 #[test]
 fn receipt_commit_flush_waits_for_queued_receipts() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-group-flush");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-group-flush");
     let store = SqliteReceiptStore::open(&path)?;
     let mut results = Vec::new();
 
@@ -424,7 +424,7 @@ fn receipt_commit_flush_waits_for_queued_receipts() -> Result<(), Box<dyn std::e
 
 #[test]
 fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-group-flush-error");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-group-flush-error");
     let store = SqliteReceiptStore::open(&path)?;
     let mut invalid = sample_receipt_with_id("rcpt-group-flush-error-invalid");
     invalid.timestamp = u64::MAX;
@@ -467,7 +467,7 @@ fn receipt_commit_flush_reports_queued_batch_error() -> Result<(), Box<dyn std::
 #[test]
 fn append_receipt_batch_isolates_trailing_invalid_in_full_batch(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipts-full-batch-isolation");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-full-batch-isolation");
     let store = SqliteReceiptStore::open(&path)?;
     let mut requests = Vec::new();
 
@@ -524,7 +524,7 @@ fn append_receipt_batch_isolates_trailing_invalid_in_full_batch(
 
 #[test]
 fn append_chio_receipt_returning_seq_supports_concurrent_writers() {
-    let path = unique_db_path("chio-receipts-concurrent");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-concurrent");
     let store = Arc::new(SqliteReceiptStore::open(&path).test_unwrap());
     let thread_count = 8usize;
     let receipts_per_thread = 24usize;
@@ -572,7 +572,7 @@ fn append_inflight_counter_does_not_underflow_on_concurrent_drain() {
     use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
     use std::time::Instant;
 
-    let path = unique_db_path("chio-receipts-inflight-race");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-inflight-race");
     let store = Arc::new(SqliteReceiptStore::open(&path).test_unwrap());
 
     let thread_count = 12usize;
@@ -775,7 +775,7 @@ pub(super) fn sample_receipt_with_id_and_call_chain(id: &str) -> ChioReceipt {
 
 #[test]
 fn receipt_and_lineage_commit_atomically() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-receipt-lineage-atomic");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipt-lineage-atomic");
     let store = SqliteReceiptStore::open(&path)?;
 
     // Baseline: the trait append writes receipt AND lineage in one tx.
@@ -842,7 +842,7 @@ fn receipt_and_lineage_commit_atomically() -> Result<(), Box<dyn std::error::Err
 #[test]
 fn batched_duplicate_receipts_commit_without_false_drift() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-batch-dup-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-batch-dup-drift");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
 
@@ -907,7 +907,7 @@ fn batched_duplicate_receipts_commit_without_false_drift() -> Result<(), Box<dyn
 /// Independent callers keep independent success/failure semantics.
 #[test]
 fn group_commit_isolates_per_record_failure() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-group-commit-isolation");
+    let (_path_dir, path) = temp_sqlite_path("chio-group-commit-isolation");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
 

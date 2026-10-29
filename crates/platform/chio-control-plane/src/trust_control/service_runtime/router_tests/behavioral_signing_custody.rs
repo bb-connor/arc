@@ -48,7 +48,11 @@ async fn issue(
 fn with_receipts(directory: &Path) -> Result<TrustServiceState, Box<dyn std::error::Error>> {
     let mut state = metrics_state("service-secret");
     state.finding_challenge_clock = chio_test_support::clock::clock();
-    state.config.authority_workload_token = Some("workload-secret".to_string());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "service-secret",
+        Some("workload-secret"),
+        &[],
+    );
     let receipts = directory.join("receipts.sqlite3");
     state.config.receipt_db_path = Some(receipts.clone());
     state.receipt_store = Some(Arc::new(SqliteReceiptStore::open(&receipts)?));

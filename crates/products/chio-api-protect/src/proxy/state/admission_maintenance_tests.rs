@@ -673,7 +673,11 @@ async fn admission_host_settlement_drain_failure_fails_the_tick() -> TestResult 
         None,
         clock,
     )?;
-    kernel.install_settlement_ledger(Arc::new(outcomes), Default::default())?;
+    kernel.install_settlement_ledger(
+        Arc::new(outcomes),
+        Default::default(),
+        chio_kernel::SettlementDrainTrust::from(kernel.public_key()),
+    )?;
     rusqlite::Connection::open(&database)?.execute_batch("DROP TABLE settle_attempts")?;
     let controller = Arc::new(ShutdownController::manual());
     let mut owner = AdmissionMaintenance::spawn(

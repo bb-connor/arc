@@ -38,9 +38,11 @@ TARGETS=(
     manifest_roundtrip
     federation_trust_establishment
     finding_worker_protocol
+    frost_round2_envelope
     response_authority_protocol
     response_lifecycle
     underwriting_policy_input
+    settlement_approval_witness
     fuzz_policy_parse_compile
     policy_analyze
     fuzz_sql_parser
@@ -49,6 +51,7 @@ TARGETS=(
     rollback_anchor_slots
     commerce_receipt_verify
     peers_lock_decode
+    decision_model_artifact
     fuzz_tool_action
 )
 

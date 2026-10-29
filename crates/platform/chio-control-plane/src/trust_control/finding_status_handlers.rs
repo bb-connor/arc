@@ -15,7 +15,7 @@ use chio_store_sqlite::{
     FindingStatusWriteOutcome, FindingStickyStatus, SqliteFindingStatusStore,
 };
 
-use super::report_validation::validate_service_auth;
+use super::report_validation::validate_caller;
 use super::*;
 
 /// Status intent requests remain far below the service-wide body cap. Keeping
@@ -814,7 +814,7 @@ pub(crate) async fn handle_submit_finding_status_intent(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     let signed = match strict_intent_ingress(&raw) {
@@ -927,16 +927,13 @@ fn service_state(
     authority: Arc<chio_store_sqlite::SqliteAuthorityStore>,
     market: FindingMarketConfig,
 ) -> TrustServiceState {
-    use std::collections::BTreeMap;
     use std::time::Duration;
     TrustServiceState {
         finding_challenge_clock: Arc::new(chio_security_types::clock::SystemClock),
         config: TrustServiceConfig {
             transport: Default::default(),
             listen: std::net::SocketAddr::from(([127, 0, 0, 1], 0)),
-            service_token: "service-secret".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
+            access: crate::trust_control::caller_credentials::tests::test_access("service-secret"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2 * 1024 * 1024 * 1024,
             revocation_db_path: None,
@@ -945,6 +942,7 @@ fn service_state(
             authority_keyring_config_path: None,
             authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
+            cluster_peer_replay_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
             enterprise_providers_file: None,
@@ -962,7 +960,6 @@ fn service_state(
             advertise_url: None,
             allow_local_peer_urls: true,
             certification_public_metadata_ttl_seconds: 300,
-            peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
@@ -985,6 +982,7 @@ fn service_state(
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         federation_admission_rate_limiter: Arc::default(),
         cluster: None,
+        peer_nonces: None,
         cluster_progress: None,
         leader_forward_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         authority_health_lane: Arc::new(tokio::sync::Semaphore::new(1)),

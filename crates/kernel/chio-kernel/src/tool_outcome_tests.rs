@@ -289,7 +289,7 @@ fn raw_for_attempt(
             currency: "USD".to_owned(),
         }),
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         raw_context(&request),
     )
 }
@@ -500,7 +500,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         },
         reported_cost: None,
         receipt_metadata_snapshot: None,
-        pre_invocation_guard_evidence: Vec::new(),
+        pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
         request_canonical_json: request_canonical_json.clone(),
         security_invocation_context: None,
         security_release_required: false,
@@ -515,7 +515,7 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
             "\"federation_context_json\":null,\"matched_grant_index\":0,",
             "\"operation_id\":\"{operation_id}\",\"original_security_dispatch_binding\":null,",
             "\"output\":{{\"kind\":\"value\",\"value\":{{\"a\":1,\"z\":2}}}},",
-            "\"pre_invocation_guard_evidence\":[],\"provider_attempt\":{{\"attempt_id\":\"attempt\",",
+            "\"pre_invocation_guard_output\":{{\"evidence\":[],\"witness\":null}},\"provider_attempt\":{{\"attempt_id\":\"attempt\",",
             "\"operation_id\":\"{operation_id}\",\"transport_id\":\"transport\",\"transport_key_epoch\":1}},",
             "\"receipt_metadata_snapshot\":null,\"receipt_signing_identity\":{{",
             "\"crypto_floor\":\"allow_classical\",\"public_key\":\"{receipt_key}\"}},",
@@ -663,7 +663,7 @@ fn raw_outcome_omits_transient_credentials_without_changing_request_material() {
         InvocationOutputV1::Value { value: json!(1) },
         None,
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         raw_context(&request),
     )
     .unwrap();
@@ -744,7 +744,7 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
         InvocationOutputV1::Value { value: json!(1) },
         None,
         None,
-        Vec::new(),
+        crate::kernel::PreInvocationGuardOutput::default(),
         RawInvocationContext {
             security_invocation_context: Some(security_context.clone()),
             ..raw_context(&request)
@@ -840,14 +840,31 @@ fn raw_outcome_rejects_unsafe_recovery_fields() {
         details: Some("bound to the returned invocation".to_owned()),
     };
     let mut persisted = raw.to_persisted();
-    persisted.pre_invocation_guard_evidence = vec![evidence; MAX_RECEIPT_GUARD_EVIDENCE + 1];
+    persisted.pre_invocation_guard_output.evidence = vec![evidence; MAX_RECEIPT_GUARD_EVIDENCE + 1];
     assert!(matches!(
         RawInvocationOutcomeV1::from_persisted(persisted),
         Err(ToolOutcomeError::TooLarge {
-            field: "raw.pre_invocation_guard_evidence",
+            field: "raw.pre_invocation_guard_output",
             actual,
             maximum: MAX_RECEIPT_GUARD_EVIDENCE,
         }) if actual == MAX_RECEIPT_GUARD_EVIDENCE + 1
+    ));
+
+    let mut witness = chio_core::receipt::metadata::DecisionModelWitness::evaluated(
+        sha256_hex(b"decision-model-card"),
+        sha256_hex(b"decision-model-artifact"),
+        chio_core::receipt::metadata::DecisionModelOutcome::Allow,
+        1_413,
+    )
+    .unwrap();
+    witness.model_card_digest = "A".repeat(64);
+    let mut persisted = raw.to_persisted();
+    persisted.pre_invocation_guard_output.witness = Some(witness);
+    assert!(matches!(
+        RawInvocationOutcomeV1::from_persisted(persisted),
+        Err(ToolOutcomeError::Invalid(
+            "raw.pre_invocation_guard_output.witness"
+        ))
     ));
 }
 
@@ -879,7 +896,10 @@ fn raw_outcome_round_trip_retains_finalization_inputs() {
         },
         None,
         Some(metadata.clone()),
-        vec![evidence.clone()],
+        crate::kernel::PreInvocationGuardOutput {
+            evidence: vec![evidence.clone()],
+            witness: None,
+        },
         raw_context(&request),
     )
     .unwrap();
@@ -891,7 +911,7 @@ fn raw_outcome_round_trip_retains_finalization_inputs() {
     assert_eq!(restored.elapsed_millis(), 17);
     assert_eq!(restored.stream_limits(), stream_limits());
     assert_eq!(restored.receipt_metadata_snapshot(), Some(&metadata));
-    assert_eq!(restored.pre_invocation_guard_evidence(), &[evidence]);
+    assert_eq!(restored.pre_invocation_guard_output().evidence, [evidence]);
 }
 
 #[test]
@@ -915,7 +935,7 @@ fn canonical_blob_and_admission_bindings_reject_substitution() {
             InvocationOutputV1::Value { value: json!(1) },
             None,
             None,
-            Vec::new(),
+            crate::kernel::PreInvocationGuardOutput::default(),
             raw_context(&request),
         ),
         Err(ToolOutcomeError::Binding(
@@ -1015,7 +1035,7 @@ fn broker_attempt_registration_binds_raw_outcome_creation_and_recording() {
                 InvocationOutputV1::Value { value: json!(1) },
                 None,
                 None,
-                Vec::new(),
+                crate::kernel::PreInvocationGuardOutput::default(),
                 raw_context(&request),
             )
             .unwrap_err(),
@@ -1381,7 +1401,7 @@ fn exact_replay_rejects_immutable_semantic_substitution() {
                 currency: "USD".to_owned(),
             }),
             None,
-            Vec::new(),
+            crate::kernel::PreInvocationGuardOutput::default(),
             raw_context(&request),
         )
         .unwrap();

@@ -23,13 +23,14 @@ use chio_credit::{
 use chio_underwriting::{UnderwritingDecisionListReport, UnderwritingDecisionOutcome};
 
 use crate::cost_attribution::CostAttributionQuery;
-use crate::evidence_export::{
-    EvidenceChildReceiptScope, EvidenceExportQuery, EvidenceLineageReferences,
-};
 use crate::receipt_analytics::{AnalyticsTimeBucket, ReceiptAnalyticsResponse};
-use crate::receipt_query::{ReceiptQuery, ReceiptReadBoundary, ReceiptReadContext};
+use crate::receipt_query::{ReceiptQuery, ReceiptReadContext};
 use crate::receipt_store::FederatedEvidenceShareSummary;
 use crate::CostAttributionReport;
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    EvidenceChildReceiptScope, EvidenceExportQuery, EvidenceLineageReferences,
+};
 
 mod authorization_context;
 mod behavioral_analysis;

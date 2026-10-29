@@ -34,10 +34,13 @@ The current ship boundary is:
 Required:
 
 - `--listen`
-- `--service-token`
-- `--authority-workload-token` when remote MCP edges request capability
-  issuance from this service; it must differ from the service, edge, session,
-  admin, and tenant-read bearers
+- `--access-config <path>` declaring the credentials, scopes, tenant
+  authorities, and internal listener described in
+  `docs/reference/TRUST_CONTROL_ACCESS.md`. When remote MCP edges request
+  capability issuance from this service, it includes an authority workload
+  credential (`deployment` kind, `authority:read` and `capabilities:issue`)
+  whose secret differs from every other credential and from the edge, session,
+  and admin bearers
 
 Recommended persistent state:
 
@@ -55,9 +58,11 @@ of the following together:
 - `--receipt-db <path>` for key-transition receipt forwarding
 - `--authority-keyring-receipt-anchor-root <path>` for private receipt rollback
   anchors on a separate filesystem device from the receipt database
-- `--authority-workload-token` distinct from every other bearer
+- an authority workload credential in `--access-config` whose secret differs
+  from every other bearer
 
-Do not combine this profile with `--authority-db` or any `--peer-url`. Startup
+Do not combine this profile with `--authority-db` or any `[[cluster.peers]]`
+entry in the access configuration. Startup
 contacts all three configured witnesses and both auditors, validates their
 independent durable identities, verifies the enforced migration ledger, and
 fails before binding the listener when any requirement is unavailable. While
@@ -81,12 +86,17 @@ Optional shared registries and federation state:
 Clustered deployments additionally require:
 
 - `--advertise-url <public-base-url>`
-- one or more `--peer-url <peer-base-url>` values
+- a `[cluster]` identity in the access configuration whose `node_id` equals
+  `--advertise-url`, and one `[[cluster.peers]]` entry per other node
 - an `--authority-db` that already holds the out-of-band pinned authority
   replication anchor: `chio federation authority replication-init` on the
   signing custodian and `chio federation authority replication-pin` on every
   follower (see `docs/security/kernel-signing-authority.md`). Startup refuses a
   clustered authority database without one.
+- `--cluster-peer-replay-db <path>`: a SQLite database, private to this node,
+  that holds each pinned peer's highest accepted request issue time. Startup
+  refuses a node with pinned peers without it, and refuses a database it cannot
+  read. Keep it on durable storage beside the other node databases.
 
 ### Remote MCP Edge
 
@@ -209,16 +219,20 @@ single source of truth.
    ```
 
 2. Place policy and registry files under `/etc/chio` and SQLite state under
-   `/var/lib/chio`. Set `CHIO_TRUST_SERVICE_TOKEN` and the distinct
-   `CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN` through the supervisor's protected
-   environment or secret injection mechanism.
+   `/var/lib/chio`. Write `/etc/chio/trust-access.toml` with an administrative
+   control credential and a distinct authority workload credential, and
+   `internal_listen = "127.0.0.1:8941"` (see
+   `docs/reference/TRUST_CONTROL_ACCESS.md`). The file holds only SHA-256
+   digests. Supply `CHIO_CONTROL_TOKEN` and the workload secret to clients
+   through the supervisor's protected environment or secret injection
+   mechanism.
 
 3. Start the service:
 
    ```bash
    chio trust serve \
      --listen 127.0.0.1:8940 \
-     --authority-workload-token "$CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN" \
+     --access-config /etc/chio/trust-access.toml \
      --receipt-db /var/lib/chio/receipts.sqlite3 \
      --authority-db /var/lib/chio/authority.sqlite3 \
      --session-db /var/lib/chio/trust-sessions.sqlite3 \
@@ -232,7 +246,7 @@ single source of truth.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_CONTROL_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    ```
 
@@ -249,10 +263,10 @@ command above with:
 ```
 
 After startup, verify the backend reports `enterprise_keyring` and fetch a
-canonical synchronization response with the administrative service token:
+canonical synchronization response with the administrative control credential:
 
 ```bash
-curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
+curl -s -H "Authorization: Bearer $CHIO_CONTROL_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}' \
   http://127.0.0.1:8940/v1/authority/key-log/sync | jq
@@ -357,7 +371,7 @@ Then load:
 http://127.0.0.1:8940/
 ```
 
-Enter your trust-control service token in the **Bearer token** field and select **Log in**.
+Enter the secret of your trust-control `operator` credential in the **Bearer token** field and select **Log in**.
 
 ## 3. Configuration Checks Before Promotion
 
@@ -445,8 +459,9 @@ tag/publication.
 Authority pins are exact by design. An edge does not automatically trust a new
 current key just because trust-control reports it.
 
-1. Read and archive `/v1/authority` with the administrative service token.
-2. Rotate the authority with the administrative service token.
+1. Read and archive `/v1/authority` with a deployment-kind credential holding
+   `authority:read`, such as the edge's `authority-workload` credential.
+2. Rotate the authority with the `operator` credential (`authority:admin`).
 3. Drain each edge. Existing cached capabilities can remain usable until their
    normal expiry or revocation, but new issuance fails closed while the edge's
    current-key pin is stale.
@@ -537,7 +552,7 @@ and session HMAC key versions used for the snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
+   curl -s -H "Authorization: Bearer $CHIO_CONTROL_TOKEN" \
      http://127.0.0.1:8940/v1/authority | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
@@ -559,8 +574,8 @@ and session HMAC key versions used for the snapshot.
 
    ```bash
    curl -s http://127.0.0.1:8940/health | jq
-   curl -s -H "Authorization: Bearer $CHIO_TRUST_SERVICE_TOKEN" \
-     http://127.0.0.1:8940/v1/internal/cluster/status | jq
+   curl -s -H "Authorization: Bearer $CHIO_CONTROL_TOKEN" \
+     http://127.0.0.1:8940/v1/authority | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \
      http://127.0.0.1:8931/admin/health | jq
    curl -s -H "Authorization: Bearer $CHIO_ADMIN_TOKEN" \

@@ -192,20 +192,32 @@ pub(crate) fn dispatch_evidence(
                 &signing_key,
             )
             },
-            EvidenceCommands::Verify { input, trusted_kernel_pubkey, trusted_anchor_file } => {
-                let verification = evidence_export::EvidenceVerificationPolicy::from_cli(&trusted_kernel_pubkey, trusted_anchor_file.as_deref())?;
-                evidence_export::cmd_evidence_verify(&input, &verification, json_output)
+            EvidenceCommands::Verify { input, trust } => {
+                let verified = chio_bundle_verify::read_trust_file(&trust)
+                    .map_err(CliError::from)
+                    .and_then(|trust| evidence_export::cmd_evidence_verify(&input, &trust, json_output));
+                match verified {
+                    Ok(()) => Ok(()),
+                    Err(error) => exit_evidence_verify_error(error, json_output),
+                }
             }
-            EvidenceCommands::Import { input, trusted_kernel_pubkey, trusted_anchor_file } => {
-                let verification = evidence_export::EvidenceVerificationPolicy::from_cli(&trusted_kernel_pubkey, trusted_anchor_file.as_deref())?;
-                evidence_export::cmd_evidence_import(
-                &input,
-                receipt_db.as_deref(),
-                control_url.as_deref(),
-                control_token.as_deref(),
-                json_output,
-                &verification,
-            )
+            EvidenceCommands::Import { input, trust } => {
+                let imported = chio_bundle_verify::read_trust_file(&trust)
+                    .map_err(CliError::from)
+                    .and_then(|trust| {
+                        evidence_export::cmd_evidence_import(
+                            &input,
+                            receipt_db.as_deref(),
+                            control_url.as_deref(),
+                            control_token.as_deref(),
+                            json_output,
+                            &trust,
+                        )
+                    });
+                match imported {
+                    Ok(()) => Ok(()),
+                    Err(error) => exit_evidence_verify_error(error, json_output),
+                }
             },
             EvidenceCommands::FederationPolicy { command } => match command {
                 EvidenceFederationPolicyCommands::Create {
@@ -242,4 +254,13 @@ pub(crate) fn dispatch_evidence(
                 ),
             },
     }
+}
+
+/// Exit with the class `chio-verify` and `chio proof verify` assign to the
+/// rejection's registry code; the message is never read.
+fn exit_evidence_verify_error(error: CliError, json_output: bool) -> ! {
+    let class = chio_bundle_verify::exit_class_for_urn(error.report().code.as_str());
+    let mut stderr = std::io::stderr();
+    let _ = write_cli_error(&mut stderr, &error, json_output);
+    std::process::exit(class.code());
 }

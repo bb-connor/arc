@@ -8,8 +8,8 @@
 #
 # Per-target wall-time: 1,800s via `--max_total_time=1800` plus
 # `timeout-minutes: 45`. Budget guard (`scripts/check-fuzz-budget.sh`)
-# counts cflite + this workflow toward the 1,800 min/30d cap and refuses
-# to fan out the matrix when the trailing total would breach it.
+# holds this workflow to its own 26,000 runner-min/30d cap and refuses to
+# fan out the matrix once the trailing total reaches it.
 #
 # Matrix entries must stay in lockstep with fuzz/Cargo.toml,
 # .clusterfuzzlite/build.sh, and fuzz/target-map.toml.
@@ -85,24 +85,35 @@ jobs:
   fuzz-budget:
     name: fuzz-budget
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Restore fuzz budget ledger
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
 
       - name: Verify 30-day fuzz budget
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          GH_FUZZ_BUDGET_SCOPE: native
         run: |
           set -euo pipefail
-          # Reuse the cflite budget guard; its WORKFLOWS array enumerates
-          # every fuzz workflow (cflite_pr.yml, cflite_batch.yml, fuzz.yml)
-          # against the 1,800-min/30-day cap. Cap is advisory (CAP_MODE=warn):
-          # this cron's own runs count toward the trailing 30-day window, so
-          # a hard halt would not clear on its own. The script emits
-          # used/cap/remaining.
+          # Hard halt at the native matrix cap. The trailing window drops
+          # runs older than 30 days, so the matrix resumes once usage is
+          # back under the cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+      - name: Save fuzz budget ledger
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
   fuzz-scheduled:
     name: fuzz-scheduled (${{ matrix.target }})
@@ -144,10 +155,12 @@ jobs:
           - response_authority_protocol
           - response_lifecycle
           - underwriting_policy_input
+          - settlement_approval_witness
           - revocation_oracle_merkle
           - rollback_anchor_slots
           - commerce_receipt_verify
           - peers_lock_decode
+          - decision_model_artifact
           - fuzz_tool_action
     steps:
       # GHA `exit 0` only marks the step successful; it does

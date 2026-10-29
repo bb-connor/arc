@@ -48,6 +48,10 @@ mod recovery_sweep;
 mod review_boundaries;
 #[path = "durable_admission_sqlite/security_release.rs"]
 mod security_release;
+#[path = "durable_admission_sqlite/session_anchor_parent.rs"]
+mod session_anchor_parent;
+#[path = "durable_admission_sqlite/settlement_drain.rs"]
+mod settlement_drain;
 #[path = "durable_admission_sqlite/unrecorded_dispatch.rs"]
 mod unrecorded_dispatch;
 

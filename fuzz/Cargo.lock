@@ -1368,9 +1368,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
- "ureq",
  "url",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -1417,6 +1415,7 @@ dependencies = [
  "chio-core",
  "chio-egress-contract",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-metrics-spec",
  "chio-security-types",
  "chio-web3-bindings",
@@ -1498,6 +1497,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bundle-verify"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-errors",
+ "chio-kernel-core",
+ "chio-security-types",
+ "clap",
+ "rustix",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-cage"
 version = "0.1.0"
 dependencies = [
@@ -1539,6 +1552,7 @@ name = "chio-commerce-order"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credit",
  "chio-risk-comptroller",
  "chrono",
  "hex",
@@ -1589,6 +1603,7 @@ dependencies = [
  "base64 0.22.1",
  "chio-agent-web-interop",
  "chio-appraisal",
+ "chio-bundle-verify",
  "chio-commerce-order",
  "chio-conformance",
  "chio-core",
@@ -1614,6 +1629,7 @@ dependencies = [
  "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-log-redact",
  "chio-manifest",
@@ -1658,6 +1674,7 @@ dependencies = [
  "subtle",
  "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.23",
  "tower-http",
  "tracing",
  "ureq",
@@ -1877,7 +1894,9 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "ureq",
  "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -2006,6 +2025,7 @@ dependencies = [
  "chio-finding",
  "chio-finding-verifier",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-open-market",
  "serde",
  "serde_json",
@@ -2091,6 +2111,7 @@ dependencies = [
  "chio-finding",
  "chio-fiscal",
  "chio-kernel",
+ "chio-kernel-core",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -2126,6 +2147,10 @@ dependencies = [
  "serde_json",
  "thiserror 1.0.69",
 ]
+
+[[package]]
+name = "chio-fixed"
+version = "0.1.0"
 
 [[package]]
 name = "chio-flow"
@@ -2167,8 +2192,11 @@ dependencies = [
  "chio-mcp-edge",
  "chio-openapi-mcp-bridge",
  "chio-policy",
+ "chio-predicate-dag",
  "chio-quarantine",
  "chio-revocation-oracle",
+ "chio-security-types",
+ "chio-settle",
  "chio-store-sqlite",
  "chio-underwriting",
  "chio-wasm-guards",
@@ -2277,6 +2305,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-egress-contract",
  "chio-federation",
  "chio-kernel-core",
  "chio-link",
@@ -2305,7 +2334,6 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tracing",
- "ureq",
  "url",
  "uuid",
 ]
@@ -2547,6 +2575,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-predicate-dag"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+]
+
+[[package]]
 name = "chio-quarantine"
 version = "0.1.0"
 dependencies = [
@@ -2761,7 +2796,6 @@ dependencies = [
  "chio-transaction-passport",
  "chio-workflow",
  "hex",
- "hmac 0.12.1",
  "libc",
  "nix",
  "r2d2",
@@ -2772,7 +2806,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "subtle",
  "thiserror 1.0.69",
  "tracing",
  "uuid",

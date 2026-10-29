@@ -1,12 +1,14 @@
 use super::*;
 
-pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+pub(super) fn canonical_tempdir(prefix: &str) -> tempfile::TempDir {
+    let root = std::fs::canonicalize(std::env::temp_dir()).expect("canonical temp root");
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(root)
+        .expect("private temp dir")
 }
+
+pub(super) use chio_test_support::temp_sqlite_path;
 
 pub(super) fn usage_record(
     capability_id: &str,

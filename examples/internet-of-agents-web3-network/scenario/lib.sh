@@ -84,41 +84,45 @@ start_live_topology() {
   export CHIO_IOA_WEB3_REPO_ROOT="${ROOT}"
   export PYTHONDONTWRITEBYTECODE=1
 
+  write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access-1.toml" "${SERVICE_TOKEN}" "${WORKLOAD_TOKEN}"
   "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-operator-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${OPERATOR_TRUST_PORT}" \
     --advertise-url "${OPERATOR_CONTROL_URL}" \
-    --service-token "${SERVICE_TOKEN}" \
-    --authority-workload-token "${WORKLOAD_TOKEN}" \
+    --access-config "${STATE_DIR}/trust-access-1.toml" \
     --receipt-db "${STATE_DIR}/operator-receipts.sqlite3" \
     --authority-seed-file "${OPERATOR_AUTHORITY_SEED}" \
     >"${LOG_DIR}/operator-trust-control.log" 2>&1 &
   OPERATOR_TRUST_PID=$!
 
+  write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access-2.toml" "${SERVICE_TOKEN}" "${WORKLOAD_TOKEN}"
+  PROVIDER_CONTROL_INTERNAL_URL="${CHIO_CONTROL_INTERNAL_URL}"
   "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-provider-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${PROVIDER_TRUST_PORT}" \
     --advertise-url "${PROVIDER_CONTROL_URL}" \
-    --service-token "${SERVICE_TOKEN}" \
-    --authority-workload-token "${WORKLOAD_TOKEN}" \
+    --access-config "${STATE_DIR}/trust-access-2.toml" \
     --receipt-db "${STATE_DIR}/provider-receipts.sqlite3" \
     --authority-seed-file "${PROVIDER_AUTHORITY_SEED}" \
     >"${LOG_DIR}/provider-trust-control.log" 2>&1 &
   PROVIDER_TRUST_PID=$!
 
+  write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access-3.toml" "${SERVICE_TOKEN}" "${WORKLOAD_TOKEN}"
+  SUBCONTRACTOR_CONTROL_INTERNAL_URL="${CHIO_CONTROL_INTERNAL_URL}"
   "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-subcontractor-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${SUBCONTRACTOR_TRUST_PORT}" \
     --advertise-url "${SUBCONTRACTOR_CONTROL_URL}" \
-    --service-token "${SERVICE_TOKEN}" \
-    --authority-workload-token "${WORKLOAD_TOKEN}" \
+    --access-config "${STATE_DIR}/trust-access-3.toml" \
     --receipt-db "${STATE_DIR}/subcontractor-receipts.sqlite3" \
     --authority-seed-file "${SUBCONTRACTOR_AUTHORITY_SEED}" \
     >"${LOG_DIR}/subcontractor-trust-control.log" 2>&1 &
   SUBCONTRACTOR_TRUST_PID=$!
 
+  write_trust_access_config "${CHIO_BIN}" "${STATE_DIR}/trust-access-4.toml" "${SERVICE_TOKEN}" "${WORKLOAD_TOKEN}" \
+    evidence:write federation:write
+  FEDERATION_CONTROL_INTERNAL_URL="${CHIO_CONTROL_INTERNAL_URL}"
   "${CHIO_BIN}" --session-db "${PRIVATE_STATE}/trust-federation-sessions.sqlite3" trust serve \
     --listen "127.0.0.1:${FEDERATION_TRUST_PORT}" \
     --advertise-url "${FEDERATION_CONTROL_URL}" \
-    --service-token "${SERVICE_TOKEN}" \
-    --authority-workload-token "${WORKLOAD_TOKEN}" \
+    --access-config "${STATE_DIR}/trust-access-4.toml" \
     --receipt-db "${STATE_DIR}/federation-receipts.sqlite3" \
     --authority-seed-file "${FEDERATION_AUTHORITY_SEED}" \
     >"${LOG_DIR}/federation-trust-control.log" 2>&1 &
@@ -164,6 +168,7 @@ start_live_topology() {
     "${CHIO_BIN}" "${PRIVATE_STATE}/web3-evidence-security" "web3-evidence" "Meridian Web3 Evidence" 1 "${PWD}" \
     python3 "${EXAMPLE_ROOT}/tools/web3_evidence.py"
   "${CHIO_BIN}" --control-url "${FEDERATION_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-internal-url "${FEDERATION_CONTROL_INTERNAL_URL}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${FEDERATION_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/web3-evidence.yaml" \
@@ -186,6 +191,7 @@ start_live_topology() {
     "${CHIO_BIN}" "${PRIVATE_STATE}/provider-review-security" "provider-review" "ProofWorks Provider Review" 1 "${PWD}" \
     python3 "${EXAMPLE_ROOT}/tools/provider_review.py"
   "${CHIO_BIN}" --control-url "${PROVIDER_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-internal-url "${PROVIDER_CONTROL_INTERNAL_URL}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${PROVIDER_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/provider-review.yaml" \
@@ -208,6 +214,7 @@ start_live_topology() {
     "${CHIO_BIN}" "${PRIVATE_STATE}/subcontractor-review-security" "subcontractor-review" "CipherWorks Specialist Review" 1 "${PWD}" \
     python3 "${EXAMPLE_ROOT}/tools/subcontractor_review.py"
   "${CHIO_BIN}" --control-url "${SUBCONTRACTOR_CONTROL_URL}" --control-token "${SERVICE_TOKEN}" \
+    --control-internal-url "${SUBCONTRACTOR_CONTROL_INTERNAL_URL}" \
     --control-authority-public-key "$(chio_control_authority_public_key "${SUBCONTRACTOR_CONTROL_URL}" "${SERVICE_TOKEN}")" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/policies/subcontractor-review.yaml" \

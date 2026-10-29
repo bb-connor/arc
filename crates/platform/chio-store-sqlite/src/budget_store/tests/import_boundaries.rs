@@ -82,9 +82,10 @@ fn verified_snapshot_refuses_corrupted_local_provenance_without_replacing_it() -
         1,
         10,
     )?;
+    let leader_node = chio_core::crypto::Keypair::generate();
     let provenance = BudgetSnapshotAnchorProvenance {
         schema: "chio.budget-snapshot-anchor-provenance.v1".into(),
-        cluster_authenticator: budget_snapshot_anchor_authenticator("cluster-root", &chain)?,
+        cluster_authenticator: budget_snapshot_anchor_authenticator(&leader_node, &chain)?,
         chain,
     };
     let import = || {
@@ -93,7 +94,7 @@ fn verified_snapshot_refuses_corrupted_local_provenance_without_replacing_it() -
             &provenance,
             "https://leader",
             1,
-            "cluster-root",
+            &leader_node.public_key(),
         )
     };
     import()?;

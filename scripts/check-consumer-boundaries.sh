@@ -41,7 +41,7 @@ run_target() {
 }
 
 run_case "MCP malformed profile before acquisition" runtime::runtime_tests::authorization::mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acquisition cargo test -p chio-mcp-edge --lib
-run_case "MCP profile recovery without upgrade" runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade cargo test -p chio-mcp-edge --lib
+run_case "MCP profile recovery without upgrade" runtime::runtime_tests::authorization::restored_mcp_authorization_profile_is_exact_and_profileless_sessions_do_not_upgrade cargo test -p chio-mcp-edge --lib
 run_case "MCP bound target authority" runtime::source_receipt_tests::mcp_target_executor_carries_source_receipt_context_into_kernel_receipt_metadata cargo test -p chio-mcp-edge --lib
 run_case "remote MCP early profile rejection" tests::session_runtime::remote_session_factory_rejects_flow_before_launch_authority_or_store_acquisition cargo test -p chio-mcp-remote --lib
 run_case "remote MCP retained authorization" tests::restored_authorization_is_required_and_matches_the_handshake cargo test -p chio-mcp-remote --lib

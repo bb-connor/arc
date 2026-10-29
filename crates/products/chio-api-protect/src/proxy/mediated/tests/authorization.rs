@@ -1155,9 +1155,8 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
     // exact store the sidecar would select from that configuration.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let dir = std::env::temp_dir().join(format!("chio-budget-both-e2e-{}", uuid::Uuid::now_v7()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let db = dir.join("budget.sqlite");
+    let dir = canonical_tempdir("chio-budget-both-e2e-");
+    let db = dir.path().join("budget.sqlite");
     let config = ProtectConfig {
         transport: Default::default(),
         upstream: "http://127.0.0.1:1".to_string(),

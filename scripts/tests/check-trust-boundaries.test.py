@@ -187,7 +187,7 @@ class BoundaryGateCalibration(unittest.TestCase):
                 self.assertTrue(any("reader evidence" in error and path in error for error in errors), errors)
 
     def test_checkpoint_typed_evidence_requires_its_closed_source_shape(self):
-        path = "crates/kernel/chio-kernel/src/checkpoint.rs"
+        path = "crates/core/chio-core-types/src/receipt/checkpoint.rs"
         errors = self.errors(path, lambda text: text.replace("pub checkpoint_seq: u64,", "pub checkpoint_seq: serde_json::Value,", 1))
         self.assertTrue(any("reader evidence" in error and "checkpoint_validate.rs" in error for error in errors), errors)
 
@@ -529,6 +529,15 @@ _mcp_spec = importlib.util.spec_from_file_location(
 _mcp_tests = importlib.util.module_from_spec(_mcp_spec)
 _mcp_spec.loader.exec_module(_mcp_tests)
 InitializeRejectWitnessMutations = _mcp_tests.InitializeRejectWitnessMutations
+
+# Keep the ingress census and router-composition controls in the same CI gate command.
+_ingress_spec = importlib.util.spec_from_file_location(
+    "ingress_calibration", ROOT / "scripts/tests/check-trust-boundaries-ingress.test.py"
+)
+_ingress_tests = importlib.util.module_from_spec(_ingress_spec)
+_ingress_spec.loader.exec_module(_ingress_tests)
+IngressCensusCalibration = _ingress_tests.IngressCensusCalibration
+IngressContractCalibration = _ingress_tests.IngressContractCalibration
 
 
 if __name__ == "__main__":

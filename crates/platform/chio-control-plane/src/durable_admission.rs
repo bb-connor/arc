@@ -199,6 +199,7 @@ impl DurableAdmissionRuntime {
     pub fn open_remote(
         identity_path: &Path,
         control_url: &str,
+        control_internal_url: &str,
         control_token: &str,
     ) -> Result<Self, CliError> {
         if identity_path
@@ -216,6 +217,7 @@ impl DurableAdmissionRuntime {
         let stores =
             crate::trust_control::service_runtime::remote_admission::build_remote_admission_stores(
                 control_url,
+                control_internal_url,
                 control_token,
                 kernel_keypair.clone(),
             )?;

@@ -304,13 +304,17 @@ use response::write_broker_ipc_response;
 mod lifecycle;
 
 #[cfg(unix)]
-use crate::lifecycle_lock::LifecycleLock;
+use chio_secure_ipc::LifecycleLock;
 #[cfg(unix)]
 use lifecycle::acquire_broker_socket_lifecycle_lock;
 
 #[cfg(all(test, unix))]
 #[path = "error_wire_tests.rs"]
 mod error_wire_tests;
+
+#[cfg(all(test, unix))]
+#[path = "ipc_lifecycle_lock_tests.rs"]
+mod ipc_lifecycle_lock_tests;
 
 #[cfg(unix)]
 pub(super) use lifecycle::{validate_broker_socket_identity, ProvisionalBrokerSocketCleanup};

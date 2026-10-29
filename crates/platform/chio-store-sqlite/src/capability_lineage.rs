@@ -1,8 +1,10 @@
+mod refusal;
+
+pub(crate) use refusal::{lineage_reader_error, LineageReaderRefusal};
+
 use chio_core::capability::token::CapabilityToken;
-pub use chio_kernel::capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
-    StoredCapabilitySnapshot,
-};
+pub use chio_core::receipt::evidence::{CapabilitySnapshot, CapabilitySnapshotProvenance};
+pub use chio_kernel::capability_lineage::{CapabilityLineageError, StoredCapabilitySnapshot};
 use rusqlite::types::Type;
 use rusqlite::{params, OptionalExtension, Row};
 
@@ -40,10 +42,7 @@ pub(crate) fn validate_snapshot_from_row(
         rusqlite::Error::FromSqlConversionFailure(
             signed_capability_column,
             Type::Text,
-            Box::new(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                error.to_string(),
-            )),
+            Box::new(chio_kernel::ReceiptStoreError::from(error)),
         )
     })?;
     Ok(snapshot)
@@ -77,11 +76,12 @@ pub(crate) fn provenance_from_row(
     row: &Row<'_>,
     column: usize,
 ) -> rusqlite::Result<CapabilitySnapshotProvenance> {
-    row.get::<_, String>(column)?.parse().map_err(|error| {
+    let value = row.get::<_, String>(column)?;
+    value.parse().map_err(|_| {
         rusqlite::Error::FromSqlConversionFailure(
             column,
             Type::Text,
-            Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
+            Box::new(LineageReaderRefusal::UnknownProvenance { column, value }),
         )
     })
 }
@@ -104,7 +104,9 @@ pub(crate) fn signed_capability_from_row(
 pub(crate) fn validate_snapshot_for_transport(
     snapshot: &CapabilitySnapshot,
 ) -> Result<(), chio_kernel::ReceiptStoreError> {
-    snapshot.validate()
+    snapshot
+        .validate()
+        .map_err(chio_kernel::ReceiptStoreError::from)
 }
 
 pub(crate) fn ensure_snapshots_compatible(
@@ -259,10 +261,11 @@ fn negative_lineage_integer_error(
     rusqlite::Error::FromSqlConversionFailure(
         column,
         Type::Integer,
-        Box::new(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("capability_lineage.{field_name} must be non-negative, got {value}"),
-        )),
+        Box::new(LineageReaderRefusal::NegativeInteger {
+            column,
+            field: field_name,
+            value,
+        }),
     )
 }
 

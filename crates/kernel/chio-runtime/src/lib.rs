@@ -106,14 +106,6 @@ pub type RuntimeProviderHealthReport = chio_runtime_core::RuntimeProviderHealthR
 pub type RuntimeProviderLoadedWeightsEvidence =
     chio_runtime_core::RuntimeProviderLoadedWeightsEvidence;
 pub type RuntimeRecoveryDrillReport = chio_runtime_core::RuntimeRecoveryDrillReport;
-pub type RuntimeReplayMarker = chio_runtime_core::RuntimeReplayMarker;
-pub type RuntimeReplayMarkerKind = chio_runtime_core::RuntimeReplayMarkerKind;
-pub type RuntimeReplaySourceBinding = chio_runtime_core::RuntimeReplaySourceBinding;
-pub type RuntimeReplaySourceSeal = chio_runtime_core::RuntimeReplaySourceSeal;
-pub const MAX_RUNTIME_REPLAY_SOURCE_MARKERS: usize =
-    chio_runtime_core::MAX_RUNTIME_REPLAY_SOURCE_MARKERS;
-pub const MAX_RUNTIME_REPLAY_SOURCE_BYTES: usize =
-    chio_runtime_core::MAX_RUNTIME_REPLAY_SOURCE_BYTES;
 pub type RuntimeRequestBinding = chio_runtime_core::RuntimeRequestBinding;
 pub type RuntimeRunContract = chio_runtime_core::RuntimeRunContract;
 pub type RuntimeRunLease = chio_runtime_core::RuntimeRunLease;
@@ -188,41 +180,6 @@ pub(crate) fn unwrap_runtime<T>(
     result: Result<T, ChioRuntimeError>,
 ) -> Result<T, RuntimeCoreError> {
     result.map_err(ChioRuntimeError::into_runtime_core)
-}
-
-pub struct ChioRuntimeAdmissionInput<'a> {
-    pub profile: &'a RuntimeAdmissionProfile,
-    pub store: &'a dyn ChioRuntimeAdmissionStore,
-    pub admission_id: &'a str,
-    pub request: &'a RuntimeRequestBinding,
-    pub action_class_id: Option<&'a str>,
-    pub runtime_trust_input: Option<&'a SignedRuntimeVerifierTrustBundle>,
-    pub trusted_verifier_keys: &'a [RuntimeTrustedVerifierKey],
-    pub pheromone_query_report: Option<&'a SignedRuntimePheromoneQueryReport>,
-    pub runtime_pheromone_policy: Option<&'a SignedRuntimePheromonePolicy>,
-    pub runtime_peer_weights: Option<&'a SignedRuntimePeerWeights>,
-    pub now_unix_ms: u64,
-}
-
-pub fn evaluate_runtime_admission(
-    input: ChioRuntimeAdmissionInput<'_>,
-) -> Result<RuntimeAdmissionReport, ChioRuntimeError> {
-    let store = RuntimeCoreAdmissionStoreAdapter { inner: input.store };
-    wrap_runtime(chio_runtime_core::evaluate_runtime_admission(
-        chio_runtime_core::RuntimeAdmissionInput {
-            profile: input.profile,
-            store: &store,
-            admission_id: input.admission_id,
-            request: input.request,
-            action_class_id: input.action_class_id,
-            runtime_trust_input: input.runtime_trust_input,
-            trusted_verifier_keys: input.trusted_verifier_keys,
-            pheromone_query_report: input.pheromone_query_report,
-            runtime_pheromone_policy: input.runtime_pheromone_policy,
-            runtime_peer_weights: input.runtime_peer_weights,
-            now_unix_ms: input.now_unix_ms,
-        },
-    ))
 }
 
 pub fn runtime_admission_profile_from_json(

@@ -40,6 +40,28 @@ finally:
   pagination helpers.
 - `chio.invariants` provides canonical JSON, hashing, signing, capability,
   receipt, and manifest verification helpers.
+- `chio.mcp` verifies the `_meta.chioEvidence` a Chio MCP edge attaches to
+  every `tools/call` result (`pip install "chio-sdk[mcp]"` for the session
+  wrapper). `verify_mcp_result` checks the receipt against an operator-pinned
+  kernel key and returns only the output the receipt commits to.
+  `VerifiedMcpSession` wraps an open `mcp.ClientSession`, sends a fresh
+  `_meta.chioRequestId` per call and never retries.
+
+```python
+from chio.mcp import VerifiedMcpSession
+
+verified = VerifiedMcpSession(
+    session,  # an initialized mcp.ClientSession connected to a Chio edge
+    trusted_signers=[KERNEL_PUBLIC_KEY_HEX],
+    server_id="wrapped-http-mock",
+)
+result = await verified.call_tool("echo_text", {"message": "hello"})
+print(result.allowed, result.output, result.receipt["id"])
+```
+
+Streamed results, pending approvals and incomplete calls raise
+`McpEvidenceError`, as do missing or tampered evidence. The rendered `content`
+and `structuredContent` are never read as signed data.
 
 The full public reference lives in [docs/reference/SDK_PYTHON_REFERENCE.md](../../../docs/reference/SDK_PYTHON_REFERENCE.md).
 

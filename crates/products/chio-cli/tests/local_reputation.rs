@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -10,6 +13,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
+use chio_core::receipt::evidence::{CapabilitySnapshot, CapabilitySnapshotProvenance};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::ReceiptAttributionMetadata,
@@ -22,8 +26,8 @@ use chio_credentials::{
     SignedPortableNegativeEvent, SignedPortableReputationSummary,
 };
 use chio_kernel::{
-    BudgetStore, CapabilityAuthority, CapabilitySnapshot, CapabilitySnapshotProvenance,
-    FederatedEvidenceShareImport, LocalCapabilityAuthority, ReceiptStore, StoredToolReceipt,
+    BudgetStore, CapabilityAuthority, FederatedEvidenceShareImport, LocalCapabilityAuthority,
+    ReceiptStore, StoredToolReceipt,
 };
 use chio_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
@@ -85,8 +89,8 @@ fn spawn_trust_service(
             &listen.to_string(),
             "--advertise-url",
             &format!("http://{listen}"),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &trust_access::write_access_config(service_token, &[]),
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])

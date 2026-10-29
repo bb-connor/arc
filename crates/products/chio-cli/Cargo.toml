@@ -52,6 +52,8 @@ chio-spec-validate = { workspace = true }
 chio-hosted-mcp = { workspace = true }
 chio-http-serve = { workspace = true }
 chio-kernel = { workspace = true }
+chio-kernel-core = { workspace = true }
+chio-bundle-verify = { workspace = true }
 chio-guards = { workspace = true }
 chio-guard-registry = { workspace = true, features = ["marketplace"] }
 chio-underwriting = { workspace = true }

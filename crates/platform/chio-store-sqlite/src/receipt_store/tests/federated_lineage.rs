@@ -6,7 +6,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_kernel::CapabilitySnapshotProvenance;
+use chio_core::receipt::evidence::CapabilitySnapshotProvenance;
 
 fn signed_token(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
     CapabilityToken::sign(
@@ -79,7 +79,7 @@ fn share_import(share_id: &str, snapshot: CapabilitySnapshot) -> FederatedEviden
 
 #[test]
 fn federation_bridge_is_immutable_and_preserves_signed_parent() {
-    let path = unique_db_path("federated-bridge-immutable");
+    let (_path_dir, path) = temp_sqlite_path("federated-bridge-immutable");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let child = signed_token("bridge-child", &Keypair::generate(), &issuer);
@@ -129,7 +129,7 @@ fn federation_bridge_is_immutable_and_preserves_signed_parent() {
 
 #[test]
 fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
-    let path = unique_db_path("federated-chain-integrity");
+    let (_path_dir, path) = temp_sqlite_path("federated-chain-integrity");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let missing_parent = signed_snapshot(
@@ -163,7 +163,7 @@ fn combined_delegation_chain_rejects_partial_and_cyclic_federated_lineage() {
 
 #[test]
 fn federated_import_rejects_cross_share_divergence() {
-    let path = unique_db_path("federated-cross-share-conflict");
+    let (_path_dir, path) = temp_sqlite_path("federated-cross-share-conflict");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer = Keypair::generate();
     let token = signed_token("shared-capability", &Keypair::generate(), &issuer);
@@ -221,7 +221,7 @@ fn federated_import_rejects_cross_share_divergence() {
 
 #[test]
 fn federated_row_decode_rejects_negative_synthetic_timestamp() {
-    let path = unique_db_path("federated-negative-timestamp");
+    let (_path_dir, path) = temp_sqlite_path("federated-negative-timestamp");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let anchor = synthetic_anchor("negative-timestamp", None);
     store
@@ -247,7 +247,7 @@ fn federated_row_decode_rejects_negative_synthetic_timestamp() {
 
 #[test]
 fn atomic_federated_lineage_is_idempotent_and_concurrent() {
-    let path = unique_db_path("federated-lineage-concurrent");
+    let (_path_dir, path) = temp_sqlite_path("federated-lineage-concurrent");
     let store_a = SqliteReceiptStore::open(&path).test_unwrap();
     let store_b = SqliteReceiptStore::open(&path).test_unwrap();
     let anchor = synthetic_anchor("concurrent", None);
@@ -306,7 +306,7 @@ fn atomic_federated_lineage_is_idempotent_and_concurrent() {
 
 #[test]
 fn atomic_federated_lineage_rolls_back_on_child_conflict() {
-    let path = unique_db_path("federated-lineage-rollback");
+    let (_path_dir, path) = temp_sqlite_path("federated-lineage-rollback");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let existing = signed_token(
         "conflicting-federated-child",
@@ -348,7 +348,7 @@ fn atomic_federated_lineage_rolls_back_on_child_conflict() {
 
 #[test]
 fn atomic_federated_lineage_rolls_back_on_sqlite_integer_overflow() {
-    let path = unique_db_path("federated-lineage-overflow");
+    let (_path_dir, path) = temp_sqlite_path("federated-lineage-overflow");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let anchor = synthetic_anchor("overflow", None);
     let issuer = Keypair::generate();

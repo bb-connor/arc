@@ -20,15 +20,15 @@ pub(crate) use receipt_content::{
 pub(crate) use receipt_metadata::governed_request_metadata;
 pub(crate) use receipt_metadata::validate_caller_provenance_metadata;
 pub(crate) use receipt_metadata::{
-    checked_receipt_count, merge_metadata_objects, receipt_attribution_metadata,
-    request_receipt_metadata, request_receipt_metadata_with_payee_binding,
-    verify_governed_runtime_attestation_record,
+    bind_decision_model_witness, checked_receipt_count, merge_metadata_objects,
+    receipt_attribution_metadata, request_receipt_metadata,
+    request_receipt_metadata_with_payee_binding, verify_governed_runtime_attestation_record,
 };
 pub(crate) use receipt_scopes::{
-    current_post_invocation_guard_evidence, current_pre_invocation_guard_evidence,
-    scope_governed_call_chain_receipt_evidence, scope_governed_runtime_attestation_receipt_record,
-    scope_post_invocation_guard_evidence, scope_pre_invocation_guard_evidence,
-    GovernedCallChainReceiptEvidence,
+    current_post_invocation_guard_evidence, current_pre_invocation_guard_output,
+    next_fixed_runtime_episode_id, scope_governed_call_chain_receipt_evidence,
+    scope_governed_runtime_attestation_receipt_record, scope_post_invocation_guard_evidence,
+    scope_pre_invocation_guard_output, GovernedCallChainReceiptEvidence,
 };
 pub use receipt_scopes::{scope_receipt_ids_for_current_thread, ReceiptIdScope};
 pub use signing::{

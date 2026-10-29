@@ -207,6 +207,10 @@
       "type": "string",
       "minLength": 1
     },
+    "escrow_digest": {
+      "description": "sha256 of the canonical chio.commerce.escrow-ledger.v1 ledger. Optional only because an order without escrow is a valid v1 order context; an escrow-backed order always pins it.",
+      "$ref": "#/$defs/sha256"
+    },
     "provider_passport_ref": {
       "type": "string",
       "minLength": 1

@@ -23,31 +23,13 @@ mod settle_arena;
 mod trust_cmd;
 mod workflow;
 
-#[allow(unused_imports)]
-pub(crate) use self::attest::{
-    cmd_chio_attest_runtime_quote_verify, cmd_chio_attest_supply_chain_verify, decode_fixed_hex,
-    dispatch_chio_attest_command, dispatch_chio_buyer_command, verify_runtime_quote_with_backend,
-    write_chio_attest_report, RuntimeQuoteBackendReport,
-};
-#[cfg(feature = "tee-quotes")]
-#[allow(unused_imports)]
-pub(crate) use self::attest::{
-    collateral_required_str, collateral_required_u32, decode_hex_required, decode_hex_vec_required,
-    parse_quote_tcb_status, unix_seconds_to_system_time, RuntimeQuoteCollateralDocument,
-};
-#[allow(unused_imports)]
-pub(crate) use self::federation::{
-    dispatch_chio_authority_command, dispatch_chio_federation_command, dispatch_chio_treaty_command,
-};
-#[allow(unused_imports)]
-pub(crate) use self::lineage_cmd::{dispatch_lineage, emit_lineage_report};
-#[allow(unused_imports)]
-pub(crate) use self::market_cmd::{
-    cmd_market_info, cmd_market_install, cmd_market_list, parse_market_tier,
-};
-#[allow(unused_imports)]
+pub(crate) use self::attest::dispatch_chio_attest_command;
+#[cfg(test)]
+pub(crate) use self::attest::cmd_chio_attest_runtime_quote_verify;
+pub(crate) use self::federation::dispatch_chio_federation_command;
+pub(crate) use self::lineage_cmd::dispatch_lineage;
+pub(crate) use self::market_cmd::{cmd_market_info, cmd_market_install, cmd_market_list};
 pub(crate) use self::pheromone::dispatch_chio_pheromone_command;
-#[allow(unused_imports)]
 pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use api_mcp::{dispatch_api, dispatch_mcp};
 use certify_cert::{dispatch_cert, dispatch_certify};
@@ -214,6 +196,7 @@ pub(crate) fn run() {
     let budget_db = cli.budget_db.clone();
     let session_db = cli.session_db.clone();
     let control_url = cli.control_url.clone();
+    let control_internal_url = cli.control_internal_url.clone();
     let control_token = cli.control_token.clone();
     let control_authority_public_key = cli.control_authority_public_key.clone();
     let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
@@ -253,6 +236,7 @@ pub(crate) fn run() {
             budget_db.as_deref(),
             session_db.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
         ),
         Commands::Check {
@@ -277,6 +261,7 @@ pub(crate) fn run() {
             budget_db.as_deref(),
             session_db.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
@@ -300,6 +285,7 @@ pub(crate) fn run() {
             budget_db,
             session_db,
             control_url,
+            control_internal_url,
             control_token,
             control_authority_public_key,
             control_authority_trusted_public_keys,

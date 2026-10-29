@@ -381,6 +381,54 @@ fn ipv4_mapped_private_literal_fails_closed_even_when_declared() {
     ));
 }
 
+#[test]
+fn ipv6_forms_embedding_an_ipv4_destination_fail_closed() {
+    for literal in [
+        "64:ff9b::a9fe:a9fe",
+        "64:ff9b::7f00:1",
+        "64:ff9b:1::a00:1",
+        "64:ff9b:1:ffff::7f00:1",
+        "::127.0.0.1",
+        "::a00:1",
+        "::808:808",
+        "2002:7f00:1::",
+        "2002:a00:1::1",
+        "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+    ] {
+        let address: Ipv6Addr = literal.parse().expect("IPv6 literal");
+        assert_eq!(
+            strict_contract("rail.example")
+                .enforce_resolved_ip("rail.example", IpAddr::V6(address)),
+            Err(HttpEgressError::PrivateNetworkDenied {
+                host: format!("rail.example resolved to {address}")
+            }),
+            "resolved {literal}"
+        );
+        let authority = format!("[{address}]");
+        let error = strict_contract(&authority)
+            .enforce_url(&format!("https://{authority}/admin"), 0)
+            .expect_err("embedded IPv4 literal must fail closed even when allow-listed");
+        assert_eq!(
+            error,
+            HttpEgressError::PrivateNetworkDenied {
+                host: address.to_string()
+            },
+            "literal {literal}"
+        );
+    }
+}
+
+#[test]
+fn ipv6_neighbours_of_the_embedding_prefixes_stay_global() {
+    let contract = strict_contract("rail.example");
+    for literal in ["2001:4860::8888", "64:ff9b:2::1", "2003::1"] {
+        let address: Ipv6Addr = literal.parse().expect("IPv6 literal");
+        contract
+            .enforce_resolved_ip("rail.example", IpAddr::V6(address))
+            .expect(literal);
+    }
+}
+
 #[cfg(all(test, feature = "reqwest-egress"))]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod reqwest_egress_tests {

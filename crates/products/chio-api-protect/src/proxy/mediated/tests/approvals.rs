@@ -65,39 +65,16 @@ impl ApprovalHarness {
         )?;
         let store = authority.admission_operation_store();
         let fence: StoreMutationFence = authority.mutation_fence();
-        let replay = directory.path().join("approvals-replay.db");
-        drop(
-            chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_clock(
-                &replay,
-                128,
-                Arc::new(clock.clone()),
-            )?,
+        let binding = GovernedApprovalAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("approval_authority", "api-approval-authority")?,
+            AdmissionIdentifier::try_new("expectation_id", "api-approval-generation")?,
         );
-        let source = chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-            &replay,
-            Arc::new(clock.clone()),
-        )?;
-        let id = AdmissionIdentifier::try_new("approval_authority", "api-approval-authority")?;
-        let source_id = AdmissionIdentifier::try_new("approval_source", "api-approval-source")?;
-        let now = clock.millis()?;
-        let expected =
-            store.expect_governed_approval_replay_source(&source_id, &id, &source, &fence, now)?;
-        let imported = store.import_governed_approval_replay_source(
-            &id,
-            expected.expectation_id(),
-            &source,
-            &fence,
-            now,
-        )?;
-        let binding =
-            GovernedApprovalAuthorityBindingV1::new(id, imported.expectation_id().clone());
-        store.activate_governed_approval_replay_source(&binding, &source, &fence, now)?;
+        store.install_governed_approval_authority(&binding, 128, &fence, clock.millis()?)?;
         let executor_key = Keypair::generate();
         let approver = Keypair::generate();
         let config = crate::ProtectApprovalConfig {
             tenant_id: "tenant-a".into(),
             approvers: vec![approver.public_key()],
-            replay_source_path: replay.to_string_lossy().into_owned(),
             binding,
             caller_executor: CallerExecutorIdentityV1 {
                 executor_id: AdmissionIdentifier::try_new("executor_id", "api-approval-executor")?,
@@ -339,9 +316,9 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         .ok_or("shared receipt sink")?
         .lock()
         .await;
-    let bundle = store
-        .core
-        .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+    let bundle = store.core.build_evidence_export_bundle(
+        &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+    )?;
     assert!(
         bundle
             .tool_receipts

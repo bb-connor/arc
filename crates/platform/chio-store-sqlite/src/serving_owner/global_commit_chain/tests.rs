@@ -88,6 +88,7 @@ fn factor_projection_fixture() -> Result<Connection, rusqlite::Error> {
         );
         "#,
     )?;
+    connection.execute_batch(include_str!("../../admission_operation_runtime_source.sql"))?;
     connection.execute_batch(include_str!("../../admission_operation_recovery.sql"))?;
     connection.execute_batch(include_str!("../../delegation_store.sql"))?;
     connection.execute_batch(include_str!("../../work_graph_store.sql"))?;

@@ -56,7 +56,7 @@ pub(super) struct CallerReservation<'a, 'c> {
     pub(super) now: u64,
     pub(super) now_unix_ms: u64,
     pub(super) matched_grant_index: usize,
-    pub(super) pre_invocation_guard_evidence: &'a [chio_core::receipt::metadata::GuardEvidence],
+    pub(super) pre_invocation_guard_output: &'a crate::kernel::PreInvocationGuardOutput,
     pub(super) budget_lease_acquired: bool,
 }
 
@@ -260,7 +260,7 @@ impl ChioKernel {
             now,
             now_unix_ms,
             matched_grant_index,
-            pre_invocation_guard_evidence,
+            pre_invocation_guard_output,
             budget_lease_acquired,
         } = reservation;
         let reserved = durable_admission
@@ -302,7 +302,7 @@ impl ChioKernel {
             }
         };
         credential_reservation.commit()?;
-        self.with_pre_invocation_guard_evidence(pre_invocation_guard_evidence, || {
+        self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
             self.build_execution_nonce_authorization_reserving_response(
                 ExecutionNonceReservingResponse {
                     durable_admission: durable_admission.as_deref(),

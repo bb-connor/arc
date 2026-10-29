@@ -1,7 +1,10 @@
+#![cfg(test)]
+
 use chio_core::crypto::Keypair;
 use chio_core::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 use chio_core::receipt::authoritative_spend::BudgetAuthorityReceiptRef;
 use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_core::receipt::metadata::{
     DeliveryContract, DeliveryResult, DELIVERY_CONTRACT_METADATA_KEY, DELIVERY_CONTRACT_SCHEMA,
@@ -18,7 +21,7 @@ use chio_finding_verifier::{
     FindingNonceResolver, FindingVerifierTrustRoots, ResolvedReceiptEvidence,
     FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1,
 };
-use chio_kernel::checkpoint::{build_checkpoint_transparency, KernelCheckpoint};
+use chio_kernel_core::evidence_verify::build_checkpoint_transparency;
 use chio_open_market::fee_schedule::SignedOpenMarketFeeSchedule;
 
 pub(super) struct FindingReportInputs<'a> {

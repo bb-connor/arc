@@ -172,8 +172,13 @@ async fn leader_forward_leaves_the_async_worker_free_while_the_leader_withholds_
         let state = state.clone();
         let forward_finished = Arc::clone(&forward_finished);
         async move {
-            let outcome =
-                forward_post_to_leader(&state, FORWARD_PATH, &json!({ "write": 1 })).await;
+            let outcome = forward_post_to_leader(
+                &state,
+                &forward_headers(),
+                FORWARD_PATH,
+                &json!({ "write": 1 }),
+            )
+            .await;
             forward_finished.store(true, Ordering::SeqCst);
             outcome
         }
@@ -232,16 +237,16 @@ async fn assert_same_response(actual: Response, expected: Response) {
 fn forwards_polled_once(state: &TrustServiceState) -> [Result<Option<Response>, Response>; 4] {
     let body = json!({ "write": "next" });
     [
-        forward_post_to_leader(state, FORWARD_PATH, &body)
+        forward_post_to_leader(state, &forward_headers(), FORWARD_PATH, &body)
             .now_or_never()
             .test_unwrap(),
-        forward_authority_post_to_leader(state, FORWARD_PATH, &body)
+        forward_authority_post_to_leader(state, &forward_headers(), FORWARD_PATH, &body)
             .now_or_never()
             .test_unwrap(),
-        forward_scim_post_to_leader(state, FORWARD_PATH, &body)
+        forward_scim_post_to_leader(state, &forward_headers(), FORWARD_PATH, &body)
             .now_or_never()
             .test_unwrap(),
-        forward_scim_delete_to_leader(state, FORWARD_PATH)
+        forward_scim_delete_to_leader(state, &forward_headers(), FORWARD_PATH)
             .now_or_never()
             .test_unwrap(),
     ]
@@ -257,7 +262,13 @@ async fn next_leader_forward_is_refused_at_once_while_paused_forwards_hold_every
         .map(|write| {
             let state = state.clone();
             tokio::spawn(async move {
-                forward_post_to_leader(&state, FORWARD_PATH, &json!({ "write": write })).await
+                forward_post_to_leader(
+                    &state,
+                    &forward_headers(),
+                    FORWARD_PATH,
+                    &json!({ "write": write }),
+                )
+                .await
             })
         })
         .collect::<Vec<_>>();
@@ -308,7 +319,15 @@ async fn cancelled_leader_forward_keeps_its_permit_until_the_transport_ends() {
     state.leader_forward_lane = Arc::clone(&lane);
     let forward = tokio::spawn({
         let state = state.clone();
-        async move { forward_post_to_leader(&state, FORWARD_PATH, &json!({ "write": 1 })).await }
+        async move {
+            forward_post_to_leader(
+                &state,
+                &forward_headers(),
+                FORWARD_PATH,
+                &json!({ "write": 1 }),
+            )
+            .await
+        }
     });
     await_requests(&mut received, 1).await;
 
@@ -320,10 +339,15 @@ async fn cancelled_leader_forward_keeps_its_permit_until_the_transport_ends() {
     assert!(cancelled.is_cancelled());
     assert_eq!(lane.available_permits(), 0);
     update_peer_reachable(&state, &leader.url);
-    let refused = forward_post_to_leader(&state, FORWARD_PATH, &json!({ "write": 2 }))
-        .now_or_never()
-        .test_unwrap()
-        .test_unwrap_err();
+    let refused = forward_post_to_leader(
+        &state,
+        &forward_headers(),
+        FORWARD_PATH,
+        &json!({ "write": 2 }),
+    )
+    .now_or_never()
+    .test_unwrap()
+    .test_unwrap_err();
     assert_same_response(
         refused,
         plain_http_error(StatusCode::SERVICE_UNAVAILABLE, AT_CAPACITY),
@@ -385,7 +409,15 @@ async fn leader_forward_retry_readmits_under_one_permit_after_a_failed_attempt()
 
     let forward = tokio::spawn({
         let state = state.clone();
-        async move { forward_post_to_leader(&state, FORWARD_PATH, &json!({ "write": 1 })).await }
+        async move {
+            forward_post_to_leader(
+                &state,
+                &forward_headers(),
+                FORWARD_PATH,
+                &json!({ "write": 1 }),
+            )
+            .await
+        }
     });
     await_requests(&mut received, 1).await;
     assert_eq!(lane.available_permits(), 0);
@@ -428,9 +460,16 @@ impl FinalizedForward {
     async fn forward(self, state: &TrustServiceState) -> Result<Option<Response>, Response> {
         let body = json!({ "write": format!("{self:?}") });
         match self {
-            Self::Authority => forward_authority_post_to_leader(state, FORWARD_PATH, &body).await,
-            Self::ScimPost => forward_scim_post_to_leader(state, FORWARD_PATH, &body).await,
-            Self::ScimDelete => forward_scim_delete_to_leader(state, FORWARD_PATH).await,
+            Self::Authority => {
+                forward_authority_post_to_leader(state, &forward_headers(), FORWARD_PATH, &body)
+                    .await
+            }
+            Self::ScimPost => {
+                forward_scim_post_to_leader(state, &forward_headers(), FORWARD_PATH, &body).await
+            }
+            Self::ScimDelete => {
+                forward_scim_delete_to_leader(state, &forward_headers(), FORWARD_PATH).await
+            }
         }
     }
 
@@ -728,10 +767,17 @@ impl PublicForwardLeader {
         )
     }
 
+    /// The leader accepts only the caller bearer the follower forwards.
     async fn privileged_write(headers: HeaderMap) -> Response {
-        match validate_service_auth(&headers, "token") {
-            Ok(()) => (StatusCode::OK, LEADER_BODY).into_response(),
-            Err(response) => response,
+        match headers
+            .get(AUTHORIZATION)
+            .and_then(|value| value.to_str().ok())
+        {
+            Some("Bearer token") => (StatusCode::OK, LEADER_BODY).into_response(),
+            _ => plain_http_error(
+                StatusCode::UNAUTHORIZED,
+                "missing or invalid trust-control credential",
+            ),
         }
     }
 }
@@ -851,4 +897,11 @@ async fn final_f10_public_forwards_refuse_the_seventeenth_submission_without_que
         "public forwarding admitted or queued a submission beyond its sixteen-worker bound"
     );
     assert_eq!(state.leader_forward_lane.available_permits(), 64);
+}
+
+/// The caller bearer a follower forwards to the leader.
+fn forward_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
+    headers
 }

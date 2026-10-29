@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn chio_swarm_runtime_request(
+pub(crate) fn chio_swarm_runtime_request(
     args: serde_json::Value,
     bundle_hash: String,
     swarm_context: serde_json::Value,
@@ -45,7 +45,7 @@ pub(super) fn chio_swarm_runtime_request(
     })
 }
 
-pub(super) fn swarm_runtime_context(
+pub(crate) fn swarm_runtime_context(
     bundle: &SwarmAuthorityBundle,
 ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let mut context = serde_json::json!({

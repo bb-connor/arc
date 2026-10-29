@@ -127,10 +127,6 @@ pub fn validate_runtime_proof_regeneration_input(
         "runtime_proof_regeneration_input_invalid_workflow_report_hash",
     )?;
     ensure_sha256_hash(
-        &input.admission_report_sha256,
-        "runtime_proof_regeneration_input_invalid_admission_hash",
-    )?;
-    ensure_sha256_hash(
         &input.trust_bundle_sha256,
         "runtime_proof_regeneration_input_invalid_trust_bundle_hash",
     )?;
@@ -379,8 +375,7 @@ fn runtime_proof_source_records_match_steps(
 
     steps.iter().all(|step| {
         records_by_step.get(&step.step_index).is_some_and(|record| {
-            record.admission_report_sha256 == step.admission_report_sha256
-                && record.tool_receipt_sha256 == step.tool_receipt_sha256
+            record.tool_receipt_sha256 == step.tool_receipt_sha256
                 && record.bilateral_dsse_sha256 == step.bilateral_dsse_sha256
                 && record.workflow_step_sha256 == step.workflow_step_sha256
         })
@@ -462,10 +457,6 @@ fn validate_runtime_proof_source_records(
                 ),
             });
         }
-        ensure_sha256_hash(
-            &record.admission_report_sha256,
-            "runtime_proof_regeneration_invalid_admission_hash",
-        )?;
         ensure_sha256_hash(
             &record.tool_receipt_sha256,
             "runtime_proof_regeneration_invalid_tool_receipt_hash",

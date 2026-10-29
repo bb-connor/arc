@@ -228,6 +228,11 @@ fn cleanup_state(run: &Run) -> TestResult<serde_json::Value> {
                 .ok_or("metadata object")?
                 .remove("chio_receipt_signing_nonce")
                 .ok_or("signing nonce")?;
+            // Each run opens its own session, so the anchor commitments differ.
+            metadata
+                .as_object_mut()
+                .ok_or("metadata object")?
+                .remove("session_anchor");
             metadata
                 .pointer_mut("/admission_operation")
                 .and_then(serde_json::Value::as_object_mut)

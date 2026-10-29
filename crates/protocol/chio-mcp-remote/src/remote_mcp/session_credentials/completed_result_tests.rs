@@ -137,3 +137,43 @@ fn nonce_window_uses_signed_admission_time_instead_of_the_timestamp_fallback(
     }
     Ok(())
 }
+
+fn relabeled(
+    decision: chio_core::receipt::decision::Decision,
+) -> Result<(Keypair, Box<CredentialCall>, Value), Box<dyn std::error::Error>> {
+    let (keypair, pending, mut message) = fixture(false)?;
+    let receipt: ChioReceipt =
+        serde_json::from_value(message["result"]["_meta"]["chioEvidence"]["receipt"].clone())?;
+    let mut body = receipt.body();
+    body.decision = Some(decision);
+    body.content_hash = sha256_hex(&canonical_json_bytes(&Value::Null)?);
+    let resigned = ChioReceipt::sign(body, &keypair)?;
+    message["result"]["_meta"]["chioEvidence"] =
+        json!({"receipt": resigned, "outputKind": "value", "output": null});
+    Ok((keypair, pending, message))
+}
+
+#[test]
+fn a_signed_denial_relabeled_as_a_value_output_is_rejected(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use chio_core::receipt::decision::Decision;
+    let (keypair, pending, message) = relabeled(Decision::Allow)?;
+    assert!(verified_receipt(&keypair, &pending, &message).is_some());
+    for decision in [
+        Decision::Deny {
+            reason: "denied".to_owned(),
+            guard: "policy".to_owned(),
+        },
+        Decision::Cancelled {
+            reason: "cancelled".to_owned(),
+        },
+        Decision::Incomplete {
+            reason: "incomplete".to_owned(),
+        },
+    ] {
+        let (keypair, pending, message) = relabeled(decision)?;
+        assert!(verified_receipt(&keypair, &pending, &message).is_none());
+        assert!(verify(&keypair, &pending, &message).is_none());
+    }
+    Ok(())
+}

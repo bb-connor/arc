@@ -86,7 +86,7 @@ fn live_swarm_without_future_results_uses_durable_continuation_custody() -> Test
     assert_eq!(resources.len(), 1);
     assert_eq!(
         resources[0].kind(),
-        chio_kernel::admission_operation::RuntimeReplayParticipantKind::SwarmContinuation
+        chio_kernel::admission_operation::RuntimeParticipantKind::SwarmContinuation
     );
     let replay = kernel.evaluate_tool_call_blocking_with_metadata(
         &fixture.request,

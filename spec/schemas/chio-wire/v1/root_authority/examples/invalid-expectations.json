@@ -35,6 +35,10 @@
     "keyword": "required",
     "path": "/anchor"
   },
+  "delegation-context.introspection-with-artifact-digest.json": {
+    "keyword": "not",
+    "path": "/anchor"
+  },
   "delegation-context.issuer-nul.json": {
     "keyword": "pattern",
     "path": "/anchor/issuer"
@@ -43,8 +47,16 @@
     "keyword": "maxLength",
     "path": "/anchor/issuer"
   },
+  "delegation-context.local-as-with-artifact-digest.json": {
+    "keyword": "not",
+    "path": "/anchor"
+  },
   "delegation-context.oidc-jwt-without-kid.json": {
     "keyword": "required",
+    "path": "/anchor"
+  },
+  "delegation-context.operator-key-with-artifact-digest.json": {
+    "keyword": "not",
     "path": "/anchor"
   },
   "delegation-context.padding.json": {

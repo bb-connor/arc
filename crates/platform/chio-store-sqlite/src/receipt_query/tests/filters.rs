@@ -4,10 +4,10 @@ use chio_kernel::ReceiptStore;
 
 use crate::receipt_store::SqliteReceiptStore;
 
-use super::support::{make_receipt, make_receipt_with_currency, unique_db_path, ReceiptCost};
+use super::support::{make_receipt, make_receipt_with_currency, temp_sqlite_path, ReceiptCost};
 #[test]
 fn test_query_no_filters() {
-    let path = unique_db_path("rq-no-filters");
+    let (_path_dir, path) = temp_sqlite_path("rq-no-filters");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..5usize {
@@ -44,7 +44,7 @@ fn test_query_no_filters() {
 
 #[test]
 fn test_query_filter_capability_id() {
-    let path = unique_db_path("rq-cap-id");
+    let (_path_dir, path) = temp_sqlite_path("rq-cap-id");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -101,7 +101,7 @@ fn test_query_filter_capability_id() {
 
 #[test]
 fn test_query_filter_tool_server() {
-    let path = unique_db_path("rq-tool-server");
+    let (_path_dir, path) = temp_sqlite_path("rq-tool-server");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -158,7 +158,7 @@ fn test_query_filter_tool_server() {
 
 #[test]
 fn test_query_filter_tool_name() {
-    let path = unique_db_path("rq-tool-name");
+    let (_path_dir, path) = temp_sqlite_path("rq-tool-name");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -215,7 +215,7 @@ fn test_query_filter_tool_name() {
 
 #[test]
 fn test_query_filter_outcome() {
-    let path = unique_db_path("rq-outcome");
+    let (_path_dir, path) = temp_sqlite_path("rq-outcome");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -275,7 +275,7 @@ fn test_query_filter_outcome() {
 
 #[test]
 fn test_query_filter_time_range_since() {
-    let path = unique_db_path("rq-since");
+    let (_path_dir, path) = temp_sqlite_path("rq-since");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -336,7 +336,7 @@ fn test_query_filter_time_range_since() {
 
 #[test]
 fn test_query_filter_time_range_until() {
-    let path = unique_db_path("rq-until");
+    let (_path_dir, path) = temp_sqlite_path("rq-until");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -397,7 +397,7 @@ fn test_query_filter_time_range_until() {
 
 #[test]
 fn test_query_filter_time_range_both() {
-    let path = unique_db_path("rq-time-both");
+    let (_path_dir, path) = temp_sqlite_path("rq-time-both");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -466,7 +466,7 @@ fn test_query_filter_time_range_both() {
 
 #[test]
 fn test_query_filter_cost_range_min() {
-    let path = unique_db_path("rq-min-cost");
+    let (_path_dir, path) = temp_sqlite_path("rq-min-cost");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // No cost (no financial metadata).
@@ -529,7 +529,7 @@ fn test_query_filter_cost_range_min() {
 
 #[test]
 fn test_query_filter_cost_range_max() {
-    let path = unique_db_path("rq-max-cost");
+    let (_path_dir, path) = temp_sqlite_path("rq-max-cost");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // No cost (no financial metadata).
@@ -592,7 +592,7 @@ fn test_query_filter_cost_range_max() {
 
 #[test]
 fn test_query_filter_cost_range_both() {
-    let path = unique_db_path("rq-cost-both");
+    let (_path_dir, path) = temp_sqlite_path("rq-cost-both");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     store
@@ -664,7 +664,7 @@ fn test_query_filter_cost_range_both() {
 
 #[test]
 fn cost_filters_preserve_full_u64_order() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rq-cost-u64-order");
+    let (_path_dir, path) = temp_sqlite_path("rq-cost-u64-order");
     let store = SqliteReceiptStore::open(&path)?;
     let signed_max = u64::try_from(i64::MAX)?;
     let costs = [0, signed_max, signed_max + 1, u64::MAX];
@@ -752,7 +752,7 @@ fn cost_filters_preserve_full_u64_order() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn cost_query_uses_one_reader_for_page_and_count() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rq-cost-one-reader");
+    let (_path_dir, path) = temp_sqlite_path("rq-cost-one-reader");
     let store = SqliteReceiptStore::open_with_pool_sizes(&path, 1, 1)?;
     store.append_chio_receipt(&make_receipt(
         "one-reader",
@@ -783,7 +783,7 @@ fn cost_query_uses_one_reader_for_page_and_count() -> Result<(), Box<dyn std::er
 
 #[test]
 fn cost_filters_require_one_valid_currency() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("rq-cost-currency");
+    let (_path_dir, path) = temp_sqlite_path("rq-cost-currency");
     let store = SqliteReceiptStore::open(&path)?;
     for (id, currency) in [("usd", "USD"), ("eur", "EUR")] {
         store.append_chio_receipt(&make_receipt_with_currency(
@@ -855,7 +855,7 @@ fn cost_filters_require_one_valid_currency() -> Result<(), Box<dyn std::error::E
 
 #[test]
 fn test_query_combined_filters() {
-    let path = unique_db_path("rq-combined");
+    let (_path_dir, path) = temp_sqlite_path("rq-combined");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // cap-A, allow, ts=200

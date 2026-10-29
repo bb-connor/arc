@@ -2,9 +2,11 @@
 
 import json
 import os
+from uuid import uuid4
 
 import httpx
 from chio import ChioClient, ReceiptQueryClient
+from chio.mcp import verify_mcp_result
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
@@ -14,6 +16,7 @@ DEFAULT_CHIO_CONTROL_URL = "http://127.0.0.1:8940"
 DEFAULT_CHIO_AUTH_TOKEN = "demo-token"
 DEFAULT_CHIO_ADMIN_TOKEN = "demo-admin-token"
 DEFAULT_CHIO_CONTROL_TOKEN = "demo-control-token"
+DEFAULT_CHIO_SERVER_ID = "wrapped-http-mock"
 
 
 def session_capability_id(base_url: str, admin_token: str, session_id: str) -> str:
@@ -43,6 +46,13 @@ def main() -> None:
     auth_token = os.environ.get("CHIO_AUTH_TOKEN", DEFAULT_CHIO_AUTH_TOKEN)
     admin_token = os.environ.get("CHIO_ADMIN_TOKEN", DEFAULT_CHIO_ADMIN_TOKEN)
     control_token = os.environ.get("CHIO_CONTROL_TOKEN", DEFAULT_CHIO_CONTROL_TOKEN)
+    server_id = os.environ.get("CHIO_SERVER_ID", DEFAULT_CHIO_SERVER_ID)
+    kernel_public_key = os.environ.get("CHIO_KERNEL_PUBLIC_KEY")
+    if not kernel_public_key:
+        raise SystemExit(
+            "set CHIO_KERNEL_PUBLIC_KEY to the edge kernel receipt signing key, "
+            "obtained from the operator and not from the edge response"
+        )
     client = ChioClient.with_static_bearer(base_url, auth_token)
     session = client.initialize(
         client_info={"name": "chio-langchain-example", "version": "0.2.0"}
@@ -52,13 +62,40 @@ def main() -> None:
         tools = tools_result.get("result", {}).get("tools", [])
         capability_id = session_capability_id(base_url, admin_token, session.session_id)
 
-        def echo_via_chio(message: str) -> str:
-            """Call the Chio-governed echo_text tool and return its text payload."""
+        verified_receipts: list[dict] = []
 
-            result = session.call_tool("echo_text", {"message": message}).get("result", {})
-            if result.get("structuredContent"):
-                return str(result["structuredContent"].get("echo", ""))
-            content = result.get("content", [])
+        def echo_via_chio(message: str) -> str:
+            """Call echo_text and return only output covered by the signed receipt."""
+
+            arguments = {"message": message}
+            request_id = str(uuid4())
+            response = session.request_result(
+                "tools/call",
+                {
+                    "name": "echo_text",
+                    "arguments": arguments,
+                    "_meta": {"chioRequestId": request_id},
+                },
+            )
+            if "result" not in response:
+                raise RuntimeError(f"tools/call failed: {response.get('error')}")
+            verified = verify_mcp_result(
+                response["result"],
+                trusted_signers=[kernel_public_key],
+                request_id=request_id,
+                server_id=server_id,
+                tool_name="echo_text",
+                arguments=arguments,
+            )
+            if not verified.allowed or verified.tool_error:
+                raise RuntimeError(
+                    f"Chio did not complete echo_text (receipt {verified.receipt['id']})"
+                )
+            verified_receipts.append(verified.receipt)
+            output = verified.output if isinstance(verified.output, dict) else {}
+            if output.get("structuredContent"):
+                return str(output["structuredContent"].get("echo", ""))
+            content = output.get("content", [])
             return "\n".join(
                 item["text"] for item in content if item.get("type") == "text"
             )
@@ -75,10 +112,11 @@ def main() -> None:
         receipts = ReceiptQueryClient(control_url, control_token).query(
             {"capabilityId": capability_id, "limit": 10}
         )
-        receipt_list = receipts.get("receipts", [])
-        if not receipt_list:
-            raise RuntimeError("receipt query did not return the governed tool receipt")
-        receipt = receipt_list[-1]
+        receipt = verified_receipts[-1]
+        if not any(
+            item.get("id") == receipt["id"] for item in receipts.get("receipts", [])
+        ):
+            raise RuntimeError("receipt query did not return the verified tool receipt")
 
         print(
             json.dumps(

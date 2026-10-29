@@ -19,26 +19,6 @@ use chio_kernel::admission_operation::governed_approval_claim::{
     GovernedApprovalCredentialV1,
 };
 
-fn activate(
-    fixture: &Fixture,
-    source: &Source,
-) -> AnchoredTestResult<GovernedApprovalAuthorityBindingV1> {
-    let pinned = pin(fixture, source)?;
-    let imported = import(fixture, source, &pinned)?;
-    let binding = GovernedApprovalAuthorityBindingV1::new(
-        identifier("authority", AUTHORITY_ID),
-        imported.expectation_id().clone(),
-    );
-    let active = fixture.store.activate_governed_approval_replay_source(
-        &binding,
-        source,
-        &fixture.fence,
-        now_ms(),
-    )?;
-    assert!(active.is_active());
-    Ok(binding)
-}
-
 fn setup(
     fixture: &Fixture,
     name: &str,
@@ -84,17 +64,8 @@ fn setup_for_phase(
         },
         Some(intent),
     )?;
-    let selected = load(fixture)?;
-    let profile = super::super::retained_request::authority_profile::selection(
-        None,
-        selected.map(|selected| {
-            GovernedApprovalAuthorityBindingV1::new(
-                identifier("authority", AUTHORITY_ID),
-                selected.expectation_id().clone(),
-            )
-        }),
-        None,
-    )?;
+    let profile =
+        super::super::retained_request::authority_profile::selection(None, Some(binding()), None)?;
     let (operation, retained) =
         super::super::retained_request::authority_profile::prepare_with_profile(
             operation, retained, profile,
@@ -187,8 +158,7 @@ fn candidate(
 #[test]
 fn approval_claim_retry_release_and_successor_preserve_exact_ownership() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let binding = activate(&fixture, &source)?;
+    let binding = install(&fixture)?;
     let (operation, lease, credential) = setup(&fixture, "approval-lifecycle")?;
     let first = candidate(&operation, &binding, "first", credential.clone())?;
     let (operation, reference) =
@@ -244,28 +214,18 @@ fn approval_claim_retry_release_and_successor_preserve_exact_ownership() -> Anch
 }
 
 #[test]
-fn inactive_wrong_generation_or_original_provenance_cannot_claim() -> AnchoredTestResult {
+fn uninstalled_wrong_generation_or_original_provenance_cannot_claim() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let imported = import(&fixture, &source, &pin(&fixture, &source)?)?;
-    let binding = GovernedApprovalAuthorityBindingV1::new(
-        identifier("authority", AUTHORITY_ID),
-        imported.expectation_id().clone(),
-    );
+    let binding = binding();
     let (operation, lease, credential) = setup(&fixture, "approval-provenance")?;
-    let intent = candidate(&operation, &binding, "inactive", credential.clone())?;
+    let intent = candidate(&operation, &binding, "uninstalled", credential.clone())?;
     let count = global_count(&fixture);
     assert!(fixture
         .store
         .claim_governed_approval(&operation, &lease, &intent, now_ms())
         .is_err());
     assert_eq!(global_count(&fixture), count);
-    fixture.store.activate_governed_approval_replay_source(
-        &binding,
-        &source,
-        &fixture.fence,
-        now_ms(),
-    )?;
+    install(&fixture)?;
     for changed in 0..5 {
         let mut value = credential.clone();
         let mut authority = binding.clone();
@@ -295,8 +255,7 @@ fn inactive_wrong_generation_or_original_provenance_cannot_claim() -> AnchoredTe
 #[test]
 fn expired_predispatch_claim_can_be_read_and_released_but_not_used() -> AnchoredTestResult {
     let fixture = fixture();
-    let source = Source::new(&fixture, true)?;
-    let binding = activate(&fixture, &source)?;
+    let binding = install(&fixture)?;
     let (operation, lease, mut credential) = setup(&fixture, "approval-expiry")?;
     let expires = now_ms() / 1000 + 60;
     credential.expires_at_unix_secs = expires;

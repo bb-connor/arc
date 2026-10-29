@@ -42,6 +42,8 @@ pub enum OverloadResource {
 /// Invalid settlement-runtime installation or mutation.
 #[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
 pub enum SettlementRuntimeConfigError {
+    #[error("settlement drain trust does not contain the current receipt key")]
+    MissingCurrentReceiptKey,
     #[error("invalid settlement retry policy: {0}")]
     InvalidRetryPolicy(#[from] chio_settle::RetryPolicyError),
     #[error("settlement observer runtime requires a receipt store")]
@@ -61,6 +63,7 @@ pub enum SettlementRuntimeConfigError {
 impl SettlementRuntimeConfigError {
     const fn as_str(self) -> &'static str {
         match self {
+            Self::MissingCurrentReceiptKey => "missing_current_receipt_key",
             Self::InvalidRetryPolicy(_) => "invalid_retry_policy",
             Self::MissingReceiptStore => "missing_receipt_store",
             Self::UnsupportedAtomicProjection => "unsupported_atomic_projection",

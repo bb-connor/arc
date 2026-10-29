@@ -1546,11 +1546,12 @@ mod underwriting_and_support_tests {
             pending_settlement_receipts: 0,
             failed_settlement_receipts: 0,
             direct_evidence_export_supported: true,
-            child_receipt_scope: chio_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
+            child_receipt_scope:
+                chio_core::receipt::evidence::EvidenceChildReceiptScope::OmittedNoJoinPath,
             proofs_complete: true,
-            export_query: chio_kernel::EvidenceExportQuery {
+            export_query: chio_core::receipt::evidence::EvidenceExportQuery {
                 agent_subject: Some("subject-other".to_string()),
-                ..chio_kernel::EvidenceExportQuery::default()
+                ..chio_core::receipt::evidence::EvidenceExportQuery::default()
             },
             export_scope_note: None,
         };
@@ -1574,9 +1575,7 @@ mod underwriting_and_support_tests {
         TrustServiceConfig {
             transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_unwrap(),
-            service_token: "token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
+            access: crate::trust_control::caller_credentials::tests::test_access("token"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
@@ -1585,6 +1584,7 @@ mod underwriting_and_support_tests {
             authority_keyring_config_path: None,
             authority_keyring_receipt_anchor_root: None,
             budget_db_path: None,
+            cluster_peer_replay_db_path: None,
             joint_authority_db_path: None,
             fiscal_runtime: None,
             enterprise_providers_file: None,
@@ -1602,7 +1602,6 @@ mod underwriting_and_support_tests {
             advertise_url: None,
             allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
-            peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,

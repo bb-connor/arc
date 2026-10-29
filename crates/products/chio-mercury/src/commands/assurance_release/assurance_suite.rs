@@ -7,12 +7,13 @@ pub(in crate::commands) fn export_assurance_suite(
 
     let governance_dir = output.join("governance-workbench");
     let governance_summary = export_governance_workbench(&governance_dir)?;
+    let keys = run_kernel_key_set(&governance_summary.kernel_public_key);
     let proof_package_path =
         governance_dir.join("qualification/supervised-live/proof-package.json");
     let proof_package: MercuryProofPackage = read_json_file(&proof_package_path)?;
     proof_package
-        .verify_integrity_only(unix_now())
-        .map_err(|error| CliError::Other(error.to_string()))?;
+        .verify_with_trusted_kernel_keys(unix_now(), &keys)
+        .map_err(mercury_verify_error)?;
 
     let reviewer_package_path = governance_dir.join("qualification/reviewer-package.json");
     let qualification_report_path = governance_dir.join("qualification/qualification-report.json");
@@ -47,8 +48,8 @@ pub(in crate::commands) fn export_assurance_suite(
             config.verifier_equivalent,
         )?;
         let inquiry_report = inquiry_package
-            .verify_integrity_only(unix_now())
-            .map_err(|error| CliError::Other(error.to_string()))?;
+            .verify_with_trusted_kernel_keys(unix_now(), &keys)
+            .map_err(mercury_verify_error)?;
         let inquiry_package_path = population_dir.join("inquiry-package.json");
         let inquiry_verification_path = population_dir.join("inquiry-verification.json");
         write_json_file(&inquiry_package_path, &inquiry_package)?;
@@ -149,6 +150,7 @@ pub(in crate::commands) fn export_assurance_suite(
 
     let summary = MercuryAssuranceSuiteExportSummary {
         workflow_id: governance_summary.workflow_id,
+        kernel_public_key: governance_summary.kernel_public_key,
         reviewer_owner: MERCURY_ASSURANCE_REVIEWER_OWNER.to_string(),
         support_owner: MERCURY_ASSURANCE_SUPPORT_OWNER.to_string(),
         reviewer_populations,

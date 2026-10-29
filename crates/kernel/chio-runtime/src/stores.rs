@@ -1,5 +1,5 @@
 use serde::Serialize;
-mod replay_source;
+mod source_qualification;
 use std::{fmt, path::Path};
 
 use crate::{
@@ -11,9 +11,9 @@ use crate::{
 };
 
 pub trait ChioRuntimeAdmissionStore: Send + Sync {
-    fn verify_operation_owned_replay_source(
+    fn verify_operation_owned_runtime_source(
         &self,
-        _expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        _expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), ChioRuntimeError> {
         wrap_runtime(Err(RuntimeCoreError::Rejected {
             code: "operation_owned_runtime_source_unsupported",
@@ -31,42 +31,6 @@ pub trait ChioRuntimeAdmissionStore: Send + Sync {
         evidence_kind: &str,
         evidence_id: &str,
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError>;
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError>;
 
     fn runtime_trust_floor(
         &self,
@@ -138,90 +102,6 @@ impl ChioRuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
                 &self.inner,
                 evidence_kind,
                 evidence_id,
-            ),
-        )
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::consume_destructive_lease(
-                &self.inner,
-                lease_id,
-                admission_id,
-            ),
-        )
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::release_destructive_lease(
-                &self.inner,
-                lease_id,
-                admission_id,
-            ),
-        )
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::consume_treaty_continuation(
-                &self.inner,
-                continuation_id,
-                admission_id,
-            ),
-        )
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::release_treaty_continuation(
-                &self.inner,
-                continuation_id,
-                admission_id,
-            ),
-        )
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::consume_swarm_continuation(
-                &self.inner,
-                continuation_id,
-                admission_id,
-            ),
-        )
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::release_swarm_continuation(
-                &self.inner,
-                continuation_id,
-                admission_id,
             ),
         )
     }
@@ -582,11 +462,11 @@ impl SqliteRuntimeOrchestrationStore {
 macro_rules! impl_chio_runtime_admission_store_for_inner {
     ($type:ty) => {
         impl ChioRuntimeAdmissionStore for $type {
-            fn verify_operation_owned_replay_source(
+            fn verify_operation_owned_runtime_source(
                 &self,
-                expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+                expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
             ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::verify_operation_owned_replay_source(&self.inner, expected))
+                wrap_runtime(chio_runtime_core::RuntimeAdmissionStore::verify_operation_owned_runtime_source(&self.inner, expected))
             }
 
             fn bundle(
@@ -613,89 +493,11 @@ macro_rules! impl_chio_runtime_admission_store_for_inner {
                 )
             }
 
-            fn consume_destructive_lease(
-                &self,
-                lease_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::consume_destructive_lease(
-                        &self.inner,
-                        lease_id,
-                        admission_id,
-                    ),
-                )
-            }
 
-            fn release_destructive_lease(
-                &self,
-                lease_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::release_destructive_lease(
-                        &self.inner,
-                        lease_id,
-                        admission_id,
-                    ),
-                )
-            }
 
-            fn consume_treaty_continuation(
-                &self,
-                continuation_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::consume_treaty_continuation(
-                        &self.inner,
-                        continuation_id,
-                        admission_id,
-                    ),
-                )
-            }
 
-            fn release_treaty_continuation(
-                &self,
-                continuation_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::release_treaty_continuation(
-                        &self.inner,
-                        continuation_id,
-                        admission_id,
-                    ),
-                )
-            }
 
-            fn consume_swarm_continuation(
-                &self,
-                continuation_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::consume_swarm_continuation(
-                        &self.inner,
-                        continuation_id,
-                        admission_id,
-                    ),
-                )
-            }
 
-            fn release_swarm_continuation(
-                &self,
-                continuation_id: &str,
-                admission_id: &str,
-            ) -> Result<(), ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::release_swarm_continuation(
-                        &self.inner,
-                        continuation_id,
-                        admission_id,
-                    ),
-                )
-            }
 
             fn runtime_trust_floor(
                 &self,
@@ -758,60 +560,6 @@ impl ChioRuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
         self.admission_store
             .treaty_runtime_artifact(evidence_kind, evidence_id)
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .consume_destructive_lease(lease_id, admission_id)
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .release_destructive_lease(lease_id, admission_id)
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .consume_treaty_continuation(continuation_id, admission_id)
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .release_treaty_continuation(continuation_id, admission_id)
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .consume_swarm_continuation(continuation_id, admission_id)
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), ChioRuntimeError> {
-        self.admission_store
-            .release_swarm_continuation(continuation_id, admission_id)
     }
 
     fn runtime_trust_floor(
@@ -887,11 +635,11 @@ pub(crate) struct RuntimeCoreAdmissionStoreAdapter<'a> {
 }
 
 impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapter<'_> {
-    fn verify_operation_owned_replay_source(
+    fn verify_operation_owned_runtime_source(
         &self,
-        expected: &chio_kernel::admission_operation::RuntimeReplaySourceSnapshotV1,
+        expected: &chio_kernel::admission_operation::RuntimeSourceQualificationV1,
     ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(self.inner.verify_operation_owned_replay_source(expected))
+        unwrap_runtime(self.inner.verify_operation_owned_runtime_source(expected))
     }
 
     fn bundle(
@@ -909,66 +657,6 @@ impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapt
         unwrap_runtime(
             self.inner
                 .treaty_runtime_artifact(evidence_kind, evidence_id),
-        )
-    }
-
-    fn consume_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(self.inner.consume_destructive_lease(lease_id, admission_id))
-    }
-
-    fn release_destructive_lease(
-        &self,
-        lease_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(self.inner.release_destructive_lease(lease_id, admission_id))
-    }
-
-    fn consume_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(
-            self.inner
-                .consume_treaty_continuation(continuation_id, admission_id),
-        )
-    }
-
-    fn release_treaty_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(
-            self.inner
-                .release_treaty_continuation(continuation_id, admission_id),
-        )
-    }
-
-    fn consume_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(
-            self.inner
-                .consume_swarm_continuation(continuation_id, admission_id),
-        )
-    }
-
-    fn release_swarm_continuation(
-        &self,
-        continuation_id: &str,
-        admission_id: &str,
-    ) -> Result<(), RuntimeCoreError> {
-        unwrap_runtime(
-            self.inner
-                .release_swarm_continuation(continuation_id, admission_id),
         )
     }
 

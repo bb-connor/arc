@@ -1,6 +1,6 @@
 //! Signed readback of one call. It grants no authority and asserts no graph completion.
 
-use std::{collections::BTreeSet, io::Read, path::Path};
+use std::{collections::BTreeSet, path::Path};
 
 use chio_core::{
     capability::token::CapabilityToken,
@@ -95,18 +95,7 @@ fn hash<T: Serialize>(value: &T) -> Result<String, CliError> {
 }
 
 fn text(path: &Path) -> Result<String, CliError> {
-    let file = std::fs::File::open(path)?;
-    require(
-        file.metadata()?.is_file(),
-        "call evidence input must be a regular file",
-    )?;
-    let mut text = String::new();
-    file.take(LIMIT + 1).read_to_string(&mut text)?;
-    require(
-        text.len() as u64 <= LIMIT,
-        "call evidence input exceeds 32 MiB",
-    )?;
-    Ok(text)
+    Ok(crate::input::read_text_bounded(path, LIMIT as usize)?)
 }
 
 fn receipt(receipt: &ChioReceipt, key: &PublicKey) -> Result<(), CliError> {

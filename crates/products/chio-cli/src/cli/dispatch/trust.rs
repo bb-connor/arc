@@ -36,16 +36,14 @@ pub(crate) fn dispatch_trust(
             TrustCommands::Serve {
             transport,
                 listen,
-                service_token,
-                tenant_read_tokens,
-                authority_workload_token,
+                access_config,
                 authority_keyring_config,
                 authority_keyring_receipt_anchor_root,
                 receipt_query_snapshot_quota_bytes,
                 advertise_url,
-                peer_urls,
                 allow_local_peer_urls,
                 cluster_sync_interval_ms,
+                cluster_peer_replay_db,
                 authority_replication_max_future_skew_seconds,
                 policy,
                 enterprise_providers_file,
@@ -71,9 +69,7 @@ pub(crate) fn dispatch_trust(
             } => cmd_trust_serve(
             transport.into(),
                 listen,
-                &service_token,
-                &tenant_read_tokens,
-                authority_workload_token.as_deref(),
+                &access_config,
                 authority_keyring_config.as_deref(),
                 authority_keyring_receipt_anchor_root.as_deref(),
                 policy.as_deref(),
@@ -104,12 +100,38 @@ pub(crate) fn dispatch_trust(
                 advertise_url.as_deref(),
                 allow_local_peer_urls,
                 certification_public_metadata_ttl_seconds,
-                &peer_urls,
                 cluster_sync_interval_ms,
+                cluster_peer_replay_db.as_deref(),
                 authority_replication_max_future_skew_seconds,
                 roster_policy_file.as_deref(),
                 &capital_authority_keys,
             ),
+            TrustCommands::Config { command } => match command {
+                TrustConfigCommands::Check { access_config } => {
+                    crate::trust_config_check::cmd_trust_config_check(&access_config, json_output)
+                }
+                TrustConfigCommands::Credential {
+                    id,
+                    role,
+                    kind,
+                    deployment,
+                    secret_file,
+                    secret_env,
+                    scopes,
+                    tenant,
+                } => crate::trust_config_check::cmd_trust_config_credential(
+                    &crate::trust_config_check::CredentialEntryArgs {
+                        id: &id,
+                        role: role.as_deref(),
+                        kind: kind.as_deref(),
+                        deployment: &deployment,
+                        secret_file: secret_file.as_deref(),
+                        secret_env: secret_env.as_deref(),
+                        scopes: &scopes,
+                        tenant: tenant.as_deref(),
+                    },
+                ),
+            },
             TrustCommands::Provider { command } => match command {
                 TrustProviderCommands::List {
                     enterprise_providers_file,

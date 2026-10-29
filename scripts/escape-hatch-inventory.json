@@ -1,6 +1,9 @@
 {
   "schema": "chio.escape-hatch-inventory.v1",
   "hatches": {
+    "crates/kernel/chio-kernel-core/src/evidence_verify.rs::checkpoint_equivocation_inspection_count_for_test": 1,
+    "crates/kernel/chio-kernel-core/src/evidence_verify.rs::checkpoint_signature_verification_count_for_test": 1,
+    "crates/kernel/chio-kernel-core/src/evidence_verify.rs::subtree_count_for_test": 1,
     "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs::assume_single_normalized_tool_grant": 1,
     "crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs::assume_single_unconstrained_invoke_grant": 1,
     "crates/kernel/chio-kernel/src/admission_operation.rs::qualify_recovery_claim_for_test": 1,
@@ -14,9 +17,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::with_replay_receipt_id_for_test": 1,
     "crates/kernel/chio-kernel/src/admission_operation/retained_request/security_binding.rs::from_trusted_context": 1,
     "crates/kernel/chio-kernel/src/admission_operation/retained_request/security_binding.rs::from_trusted_selection": 1,
-    "crates/kernel/chio-kernel/src/checkpoint.rs::checkpoint_equivocation_inspection_count_for_test": 1,
-    "crates/kernel/chio-kernel/src/checkpoint.rs::checkpoint_signature_verification_count_for_test": 1,
-    "crates/kernel/chio-kernel/src/checkpoint.rs::subtree_count_for_test": 1,
     "crates/kernel/chio-kernel/src/dispatch_status.rs::qualify_dispatch_status_provider_for_test": 1,
     "crates/kernel/chio-kernel/src/dispatch_status.rs::qualify_sealed_dispatch_status_provider_for_test": 1,
     "crates/kernel/chio-kernel/src/dispatch_status.rs::with_cancellation_for_test": 1,
@@ -103,6 +103,7 @@
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::start_observed_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_entry_after_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_lineage_through_for_test": 1,
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs::wait_for_paused_extension_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs::await_waits_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service/recovery.rs::retry_requested_for_test": 1,
     "crates/platform/chio-store-sqlite/src/receipt_store.rs::reader_connection_for_test": 1,

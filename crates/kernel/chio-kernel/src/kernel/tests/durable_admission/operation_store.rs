@@ -527,17 +527,17 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.dpop_recovery.release(reference)
     }
 
-    fn load_governed_approval_activation(
+    fn load_governed_approval_authority(
         &self,
         binding: &crate::admission_operation::governed_approval_claim::GovernedApprovalAuthorityBindingV1,
         fence: &StoreMutationFence,
         _: u64,
     ) -> Result<
-        crate::admission_operation::governed_approval_replay::GovernedApprovalReplaySourceSnapshot,
+        crate::admission_operation::governed_approval_claim::GovernedApprovalAuthorityInstallV1,
         AdmissionOperationStoreError,
     > {
         self.require_fence(fence)?;
-        self.approval_recovery.activation(binding)
+        self.approval_recovery.authority(binding)
     }
 
     fn claim_governed_approval(
@@ -598,13 +598,13 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
         self.approval_recovery.release(reference)
     }
 
-    fn load_runtime_participant_activation(
+    fn load_runtime_source_qualification(
         &self,
         binding: &crate::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
         fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
     ) -> Result<
-        crate::admission_operation::RuntimeReplaySourceSnapshotV1,
+        crate::admission_operation::RuntimeSourceQualificationV1,
         AdmissionOperationStoreError,
     > {
         self.require_fence(fence)?;

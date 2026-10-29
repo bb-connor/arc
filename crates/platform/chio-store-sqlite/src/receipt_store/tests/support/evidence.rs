@@ -15,7 +15,7 @@ pub(in crate::receipt_store::tests) fn canonical_receipt_bytes(
 
 pub(in crate::receipt_store::tests) fn insert_checkpoint_row(
     store: &SqliteReceiptStore,
-    checkpoint: &chio_kernel::KernelCheckpoint,
+    checkpoint: &chio_core::receipt::checkpoint::KernelCheckpoint,
     batch_end_seq: u64,
 ) {
     insert_checkpoint_row_with_statement_json(
@@ -28,7 +28,7 @@ pub(in crate::receipt_store::tests) fn insert_checkpoint_row(
 
 pub(in crate::receipt_store::tests) fn insert_checkpoint_row_with_statement_json(
     store: &SqliteReceiptStore,
-    checkpoint: &chio_kernel::KernelCheckpoint,
+    checkpoint: &chio_core::receipt::checkpoint::KernelCheckpoint,
     batch_end_seq: u64,
     statement_json: &str,
 ) {

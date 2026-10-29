@@ -25,11 +25,15 @@ pub fn build_remote_budget_store(
 
 pub(crate) fn build_shared_remote_budget_store(
     control_url: &str,
+    control_internal_url: &str,
     control_token: &str,
     recovery_fence: chio_kernel::admission_operation::StoreMutationFence,
 ) -> Result<Arc<RemoteBudgetStore>, CliError> {
     let mut store = remote_budget_store(control_url, control_token)?;
-    store.recovery_fence = Some(recovery_fence);
+    store.recovery = Some(BudgetRecoveryAuthority {
+        client: build_client(control_internal_url, control_token)?,
+        fence: recovery_fence,
+    });
     Ok(Arc::new(store))
 }
 
@@ -39,7 +43,7 @@ fn remote_budget_store(
 ) -> Result<RemoteBudgetStore, CliError> {
     Ok(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
-        recovery_fence: None,
+        recovery: None,
         cached_usage: Mutex::new(HashMap::new()),
     })
 }

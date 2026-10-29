@@ -80,7 +80,7 @@ fn caller_observation_metadata_cannot_be_injected_before_dispatch() -> TestResul
             request,
             matched_grant_index: 0,
             extra_receipt_metadata: Some(metadata),
-            pre_invocation_guard_evidence: &[],
+            pre_invocation_guard_output: &crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
             verified_purchase: None,
             verified_recovery: None,
@@ -127,8 +127,8 @@ fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observat
         &fixture.kernel.receipt_signing_public_key()?
     );
     assert_eq!(
-        restored.pre_invocation_guard_evidence,
-        before.pre_invocation_guard_evidence
+        restored.pre_invocation_guard_output,
+        before.pre_invocation_guard_output
     );
     assert_eq!(restored.metadata_with_return_observation(None), metadata);
     assert_eq!(

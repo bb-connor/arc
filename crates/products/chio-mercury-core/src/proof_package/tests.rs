@@ -1,5 +1,10 @@
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, Signature};
 use chio_core::merkle::MerkleTree;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::evidence::{
+    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
+    EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, checkpoint::CheckpointPublicationIdentity,
     checkpoint::CheckpointPublicationIdentityKind,
@@ -8,14 +13,10 @@ use chio_core::receipt::{
     lineage::ChildRequestReceipt, lineage::ChildRequestReceiptBody,
 };
 use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
-    build_trust_anchored_checkpoint_publication, checkpoint_chain_leaf_hash,
-    validate_checkpoint_transparency, CheckpointTransparencySummary,
-};
-use chio_kernel::evidence_export::{
-    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
-    EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
+use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+use chio_kernel_core::evidence_verify::{
+    build_inclusion_proof, build_trust_anchored_checkpoint_publication, checkpoint_chain_leaf_hash,
+    validate_checkpoint_transparency,
 };
 
 use crate::fixtures::{sample_mercury_bundle_manifest, sample_mercury_receipt_metadata};
@@ -303,7 +304,6 @@ fn build_partial_checkpoint_sample_package() -> MercuryProofPackage {
     bundle.uncheckpointed_receipts = vec![EvidenceUncheckpointedReceipt { seq: 1, receipt_id }];
     let mut profile = MercuryPublicationProfile::pilot_default();
     profile.checkpoint_continuity = CHECKPOINT_CONTINUITY_AUDIT_ONLY.to_string();
-    profile.checkpoint_signatures_required = false;
     profile.inclusion_proofs_required = false;
     MercuryProofPackage::build(
         bundle,
@@ -435,7 +435,10 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         2,
         std::slice::from_ref(&second_canonical),
         &checkpoint_keypair,
-        Some(&first_checkpoint),
+        Some(
+            &chio_kernel_core::evidence_verify::validate_checkpoint(&first_checkpoint)
+                .expect("verified predecessor"),
+        ),
         &[first_chain_leaf],
     )
     .expect("second checkpoint");
@@ -1088,7 +1091,10 @@ fn proof_package_requires_explicitly_trusted_mercury_signers() {
         .verify_with_trusted_kernel_keys(1_775_137_901, &untrusted_keys)
         .expect_err("self-signed untrusted receipt");
     assert!(
-        error.to_string().contains("untrusted Mercury kernel key"),
+        matches!(
+            &error,
+            MercuryContractError::UntrustedKernelKey(subject) if subject.starts_with("tool receipt ")
+        ),
         "unexpected error: {error}"
     );
 
@@ -1328,9 +1334,8 @@ fn trusted_proof_verification_rejects_untrusted_checkpoint_signer() {
 }
 
 #[test]
-fn trusted_proof_verification_rejects_invalid_checkpoint_when_profile_flag_is_false() {
+fn trusted_proof_verification_rejects_invalid_checkpoint_signature() {
     let mut package = full_trusted_sample_package();
-    package.publication_profile.checkpoint_signatures_required = false;
     package.chio_bundle.checkpoints[0].signature = Keypair::generate()
         .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"invalid");
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);
@@ -1344,6 +1349,52 @@ fn trusted_proof_verification_rejects_invalid_checkpoint_when_profile_flag_is_fa
             .to_string()
             .contains("checkpoint transparency verification failed"),
         "unexpected error: {error}"
+    );
+}
+
+fn flip_checkpoint_signature_byte(package: &mut MercuryProofPackage) -> u64 {
+    let checkpoint = &mut package.chio_bundle.checkpoints[0];
+    let mut bytes = checkpoint.signature.to_bytes();
+    bytes[0] ^= 0x01;
+    checkpoint.signature = Signature::from_bytes(&bytes);
+    checkpoint.body.checkpoint_seq
+}
+
+#[test]
+fn untrusted_proof_verification_rejects_flipped_checkpoint_signature() {
+    let mut package = full_trusted_sample_package();
+    flip_checkpoint_signature_byte(&mut package);
+
+    let error = package
+        .verify(1_775_137_923)
+        .expect_err("flipped checkpoint signature");
+
+    assert_eq!(
+        error,
+        MercuryContractError::Validation(format!(
+            "checkpoint transparency verification failed: {}",
+            CheckpointError::InvalidSignature
+        ))
+    );
+}
+
+#[test]
+fn chio_bundle_verification_rejects_flipped_checkpoint_signature() {
+    let mut package = full_trusted_sample_package();
+    let checkpoint_seq = flip_checkpoint_signature_byte(&mut package);
+
+    let error = verify_chio_bundle(
+        &package.chio_bundle,
+        &package.publication_profile,
+        package.checkpoint_transparency.as_ref(),
+    )
+    .expect_err("flipped checkpoint signature");
+
+    assert_eq!(
+        error,
+        MercuryContractError::Validation(format!(
+            "checkpoint signature verification failed: {checkpoint_seq}"
+        ))
     );
 }
 
@@ -1365,7 +1416,6 @@ fn trusted_proof_verification_rejects_checkpoint_free_audit_only_package() {
     let trusted_keys = trusted_authority_keys(&bundle);
     let mut profile = MercuryPublicationProfile::pilot_default();
     profile.checkpoint_continuity = CHECKPOINT_CONTINUITY_AUDIT_ONLY.to_string();
-    profile.checkpoint_signatures_required = false;
     profile.inclusion_proofs_required = false;
     let package = MercuryProofPackage::build(
         bundle,

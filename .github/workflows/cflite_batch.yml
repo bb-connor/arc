@@ -2,7 +2,8 @@
 #
 # Rotates one fuzz target per night through the in-tree targets enumerated
 # in fuzz/target-map.toml, 30 minutes per run. Budget-checked against the
-# 1,800 min/30d cap before each rotation step.
+# ClusterFuzzLite envelope (cflite_pr + cflite_batch, 1,800 runner-min/30d)
+# before each rotation step.
 #
 # Storage backend: backbay-labs/chio-fuzz-corpus sibling private repo, wired as a
 # FUZZ_CORPUS_PAT-backed `storage-repo` action input when the secret is
@@ -38,19 +39,33 @@ jobs:
   budget-check:
     name: fuzz-budget
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Restore fuzz budget ledger
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
+          restore-keys: fuzz-budget-ledger-
       - name: Verify 30-day fuzz budget
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_FUZZ_BUDGET_RATE_LIMIT_MODE: warn
-          GH_FUZZ_BUDGET_CAP_MODE: warn
+          GH_FUZZ_BUDGET_LEDGER: ${{ runner.temp }}/fuzz-budget-ledger.json
+          GH_FUZZ_BUDGET_SCOPE: cflite
         run: |
           set -euo pipefail
-          # Cap is advisory (CAP_MODE=warn): this cron's own runs count
-          # toward the trailing 30-day window, so a hard halt would not
-          # clear on its own. The script emits used/cap/remaining.
+          # Hard halt at the ClusterFuzzLite cap. The trailing window drops
+          # runs older than 30 days, so the rotation resumes once usage is
+          # back under the cap.
           scripts/check-fuzz-budget.sh "${{ github.repository }}"
+
+      - name: Save fuzz budget ledger
+        if: always()
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ${{ runner.temp }}/fuzz-budget-ledger.json
+          key: fuzz-budget-ledger-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}-${{ strategy.job-index }}
 
   rotate:
     name: rotate
@@ -94,6 +109,7 @@ jobs:
           fi
           printf 'picked: %s (rotation cycle: %d targets)\n' \
             "${picked}" "${#targets[@]}"
+          printf '%s\n' "${picked}" > .clusterfuzzlite/selected-targets
           {
             echo "target=${picked}"
             echo "cycle_size=${#targets[@]}"
@@ -114,8 +130,6 @@ jobs:
       - name: Build ClusterFuzzLite batch fuzzer with corpus storage
         if: steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
           sanitizer: address
@@ -125,8 +139,6 @@ jobs:
       - name: Build ClusterFuzzLite batch fuzzer without corpus storage
         if: steps.corpus.outputs.enabled != 'true'
         uses: google/clusterfuzzlite/actions/build_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
           sanitizer: address
@@ -135,8 +147,6 @@ jobs:
       - name: Run ClusterFuzzLite batch with corpus storage
         if: steps.corpus.outputs.enabled == 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
           fuzz-seconds: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}
@@ -152,8 +162,6 @@ jobs:
       - name: Run ClusterFuzzLite batch without corpus storage
         if: steps.corpus.outputs.enabled != 'true'
         uses: google/clusterfuzzlite/actions/run_fuzzers@82652fb49e77bc29c35da1167bb286e93c6bcc05
-        env:
-          CHIO_CFLITE_TARGET: ${{ steps.pick.outputs.target }}
         with:
           language: rust
           fuzz-seconds: ${{ env.CHIO_FUZZ_DURATION_SECONDS }}

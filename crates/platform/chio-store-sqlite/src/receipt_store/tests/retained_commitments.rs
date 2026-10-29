@@ -1,28 +1,16 @@
 //! Authenticated retained-receipt lookup coverage.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_kernel::{ReceiptStore, ReceiptStoreError};
 
 use crate::SqliteReceiptStore;
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    let base = std::fs::canonicalize(std::env::temp_dir()).unwrap_or_else(|_| std::env::temp_dir());
-    base.join(format!(
-        "chio-{prefix}-{}-{nonce}.sqlite3",
-        std::process::id()
-    ))
-}
+use chio_test_support::temp_sqlite_path;
 
 #[test]
 fn retained_receipt_lookup_reads_only_from_a_trusted_archive(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retained-receipt-live");
-    let archive = unique_db_path("retained-receipt-archive");
+    let (_path_dir, path) = temp_sqlite_path("retained-receipt-live");
+    let (_archive_dir, archive) = temp_sqlite_path("retained-receipt-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = super::support::receipt_test_keypair();
 
@@ -68,7 +56,7 @@ fn retained_receipt_lookup_reads_only_from_a_trusted_archive(
 #[test]
 fn retained_receipt_commitment_rejects_an_uncheckpointed_live_tail(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("retained-receipt-uncheckpointed-tail");
+    let (_path_dir, path) = temp_sqlite_path("retained-receipt-uncheckpointed-tail");
     let keypair = super::support::receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     store.enable_background_checkpoints(super::support::signer(&keypair, 2))?;

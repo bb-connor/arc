@@ -193,7 +193,7 @@ fn mcp_authorization_negotiation_rejects_malformed_profiles_before_session_acqui
 }
 
 #[test]
-fn restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrade() {
+fn restored_mcp_authorization_profile_is_exact_and_profileless_sessions_do_not_upgrade() {
     use chio_core::capability::features::{
         CapabilityNegotiation, OPAQUE_SUPPLEMENTAL_AUTHORIZATION,
     };

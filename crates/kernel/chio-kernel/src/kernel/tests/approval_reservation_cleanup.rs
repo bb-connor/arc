@@ -114,6 +114,12 @@ fn failed_approval_reservation_releases_runtime_custody_when_the_budget_reverse_
             .as_ref()
             .ok_or("denial metadata")?;
         assert_eq!(
+            metadata["chio_kernel"]["rejection_code"],
+            KernelError::GovernedTransactionDenied(String::new())
+                .report()
+                .code,
+        );
+        assert_eq!(
             metadata["budget_authority"]["pre_dispatch_cleanup_unconfirmed"],
             true
         );

@@ -36,6 +36,8 @@ response_authority_protocol = ["dep:chio-control-plane"]
 response_lifecycle = ["dep:chio-quarantine"]
 
 [dependencies]
+chio-settle = { path = "../crates/economy/chio-settle" }
+chio-security-types = { path = "../crates/security/chio-security-types", features = ["std"] }
 zeroize = "1.8"
 chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }
 chio-quarantine = { path = "../crates/security/chio-quarantine", features = ["fuzz"], optional = true }
@@ -68,6 +70,7 @@ chio-openapi-mcp-bridge = { path = "../crates/protocol/chio-openapi-mcp-bridge",
 chio-store-sqlite = { path = "../crates/platform/chio-store-sqlite", features = ["fuzz"] }
 chio-conformance = { path = "../crates/tooling/chio-conformance", default-features = false, features = ["fuzz"] }
 chio-policy = { path = "../crates/guards/chio-policy" }
+chio-predicate-dag = { path = "../crates/guards/chio-predicate-dag" }
 chio-revocation-oracle = { path = "../crates/trust/chio-revocation-oracle" }
 chio-wasm-guards = { path = "../crates/guards/chio-wasm-guards", features = ["fuzz"] }
 libfuzzer-sys = "0.4"
@@ -327,6 +330,20 @@ bench = false
 [[bin]]
 name = "frost_round2_envelope"
 path = "fuzz_targets/frost_round2_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "settlement_approval_witness"
+path = "fuzz_targets/settlement_approval_witness.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "decision_model_artifact"
+path = "fuzz_targets/decision_model_artifact.rs"
 test = false
 doc = false
 bench = false

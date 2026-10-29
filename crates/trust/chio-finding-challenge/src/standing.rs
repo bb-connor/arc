@@ -19,7 +19,7 @@ use chio_finding::{
     FindingChallengeAuthorization, FindingChallengeStanding, FindingPurchaseRecord,
 };
 use chio_finding_verifier::{verify_checkpoint_membership, verify_receipt_strict};
-use chio_kernel::checkpoint::checkpoint_log_id;
+use chio_kernel_core::evidence_verify::checkpoint_log_id;
 use chio_open_market::bidding::{
     VerifiedReservationReceipt, ACCEPTED_BID_SCHEMA, BID_REQUEST_SCHEMA,
 };

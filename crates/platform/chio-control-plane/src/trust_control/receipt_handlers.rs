@@ -6,8 +6,8 @@
 use super::cluster::respond_after_leader_visible_write;
 use super::report_rendering::{forward_post_to_leader, receipt_decision_kind, terminal_state_kind};
 use super::report_validation::{
-    resolve_control_read_principal, validate_metered_billing_reconciliation_request,
-    validate_service_auth, ResolvedControlReadPrincipal,
+    resolve_control_read_principal, validate_caller,
+    validate_metered_billing_reconciliation_request, ResolvedControlReadPrincipal,
 };
 use chio_kernel::operator_report::ComptrollerSurfaceReport;
 
@@ -23,21 +23,22 @@ pub(crate) async fn handle_list_tool_receipts(
     Query(query): Query<ToolReceiptQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::ReceiptsRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     // Point-load by receipt id: resolve exactly one receipt from the durable
     // store (bounded to one row) so a bounded in-memory mirror eviction on the
     // kernel does not cause a false denial of a governed call-chain
-    // continuation. This endpoint retains its admin service contract and
-    // passes that authenticated context to the store. Tenant read tokens use
+    // continuation. A point load requires deployment tenant authority and
+    // passes that authenticated context to the store. Tenant credentials use
     // the tenant-filtered list surface.
     if let Some(receipt_id) = query.receipt_id.clone() {
         if !matches!(principal, ResolvedControlReadPrincipal::AdminService) {
             return plain_http_error(
                 StatusCode::FORBIDDEN,
-                "receipt point-load by id requires the admin service token",
+                "receipt point-load by id requires a deployment credential",
             );
         }
         return super::receipt_query_service::load_response(
@@ -121,10 +122,10 @@ pub(crate) async fn handle_append_tool_receipt(
     headers: HeaderMap,
     SignedJson(receipt): SignedJson<ChioReceipt>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReceiptsAppend) {
         return response;
     }
-    match forward_post_to_leader(&state, TOOL_RECEIPTS_PATH, &receipt).await {
+    match forward_post_to_leader(&state, &headers, TOOL_RECEIPTS_PATH, &receipt).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -173,24 +174,25 @@ pub(crate) async fn handle_list_child_receipts(
     Query(query): Query<ChildReceiptQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::ReceiptsRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     if matches!(principal, ResolvedControlReadPrincipal::TenantRead { .. }) {
         return plain_http_error(
             StatusCode::FORBIDDEN,
-            "tenant read token cannot list child receipts until child receipts carry tenant attribution",
+            "tenant credential cannot list child receipts until child receipts carry tenant attribution",
         );
     }
     let store = match state.receipt_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
-    // Point-load by receipt id (admin service only: tenant read tokens are
-    // already rejected above). Resolves exactly one child receipt from the
-    // durable store so bounded-mirror eviction on the kernel does not falsely
-    // deny a governed call-chain continuation.
+    // Point-load by receipt id (deployment tenant authority only: tenant
+    // credentials are already rejected above). Resolves exactly one child
+    // receipt from the durable store so bounded-mirror eviction on the kernel
+    // does not falsely deny a governed call-chain continuation.
     if let Some(receipt_id) = query.receipt_id.as_deref() {
         let receipts = match store.load_child_receipt(receipt_id) {
             Ok(Some(receipt)) => match serde_json::to_value(receipt) {
@@ -264,10 +266,11 @@ pub(crate) async fn handle_query_receipts(
     Query(query): Query<ReceiptQueryHttpQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::ReceiptsRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     let kernel_query = ReceiptQuery {
         capability_id: query.capability_id.clone(),
         tool_server: query.tool_server.clone(),
@@ -316,7 +319,7 @@ pub(crate) fn resolve_admin_report_read_context(
     config: &TrustServiceConfig,
     surface: &str,
 ) -> Result<ReceiptReadContext, Response> {
-    match resolve_control_read_principal(headers, config)? {
+    match resolve_control_read_principal(headers, config, Scope::ReportsRead)? {
         ResolvedControlReadPrincipal::AdminService => Ok(ReceiptReadContext::admin_service()),
         ResolvedControlReadPrincipal::TenantRead { .. } => Err(plain_http_error(
             StatusCode::FORBIDDEN,
@@ -350,10 +353,11 @@ pub(crate) async fn handle_evidence_export(
     headers: HeaderMap,
     Json(request): Json<evidence_export::RemoteEvidenceExportRequest>,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::EvidenceRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     match state.receipt_store() {
         Ok(_) => (),
         Err(response) => return response,
@@ -428,17 +432,21 @@ struct AuthenticatedEvidenceExportResponse {
 pub(crate) async fn handle_evidence_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    SignedJson(request): SignedJson<evidence_export::RemoteEvidenceImportRequest>,
+    SignedJson(body): SignedJson<serde_json::Value>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::EvidenceWrite) {
         return response;
     }
-    if let Err(error) =
-        evidence_export::validate_import_package_data(&request.package, &request.verification)
-    {
+    let request = match evidence_export::decode_remote_import_request(body) {
+        Ok(request) => request,
+        Err(error) => {
+            return plain_http_error(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string());
+        }
+    };
+    if let Err(error) = evidence_export::verify_import_package(&request.package, &request.trust) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
-    match forward_post_to_leader(&state, EVIDENCE_IMPORT_PATH, &request).await {
+    match forward_post_to_leader(&state, &headers, EVIDENCE_IMPORT_PATH, &request).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -622,7 +630,7 @@ pub(crate) async fn handle_record_settlement_reconciliation(
     headers: HeaderMap,
     Json(request): Json<SettlementReconciliationUpdateRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::SettlementWrite) {
         return response;
     }
 
@@ -809,7 +817,7 @@ pub(crate) async fn handle_record_metered_billing_reconciliation(
     headers: HeaderMap,
     Json(request): Json<MeteredBillingReconciliationUpdateRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::SettlementWrite) {
         return response;
     }
     if let Err(message) = validate_metered_billing_reconciliation_request(&request) {
@@ -868,10 +876,10 @@ pub(crate) async fn handle_record_lineage_snapshot(
     headers: HeaderMap,
     Json(payload): Json<RecordCapabilitySnapshotRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::LineageWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, LINEAGE_RECORD_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, LINEAGE_RECORD_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -928,7 +936,7 @@ pub(crate) async fn handle_get_lineage(
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::LineageRead) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -953,7 +961,7 @@ pub(crate) async fn handle_get_delegation_chain(
     AxumPath(capability_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::LineageRead) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -977,10 +985,11 @@ pub(crate) async fn handle_agent_receipts(
     Query(query): Query<AgentReceiptsHttpQuery>,
     headers: HeaderMap,
 ) -> Response {
-    let principal = match resolve_control_read_principal(&headers, &state.config) {
-        Ok(principal) => principal,
-        Err(response) => return response,
-    };
+    let principal =
+        match resolve_control_read_principal(&headers, &state.config, Scope::ReceiptsRead) {
+            Ok(principal) => principal,
+            Err(response) => return response,
+        };
     let kernel_query = ReceiptQuery {
         agent_subject: Some(subject_key),
         cursor: query.cursor,
@@ -996,10 +1005,10 @@ pub(crate) async fn handle_append_child_receipt(
     headers: HeaderMap,
     SignedJson(receipt): SignedJson<ChildRequestReceipt>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReceiptsAppend) {
         return response;
     }
-    match forward_post_to_leader(&state, CHILD_RECEIPTS_PATH, &receipt).await {
+    match forward_post_to_leader(&state, &headers, CHILD_RECEIPTS_PATH, &receipt).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,

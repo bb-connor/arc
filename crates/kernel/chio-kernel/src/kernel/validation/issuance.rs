@@ -146,7 +146,7 @@ impl ChioKernel {
         &self,
         capability: &CapabilityToken,
         parent_capability_id: &str,
-        ancestors: &[crate::capability_lineage::CapabilitySnapshot],
+        ancestors: &[chio_core::receipt::evidence::CapabilitySnapshot],
     ) -> Result<(), KernelError> {
         use chio_security_types::ports::{
             CapabilityIssuanceOperation, IssuanceFreezeAdmissionQuery, LineageId, RecordId,
@@ -193,7 +193,7 @@ impl ChioKernel {
     fn validate_delegation_ancestor_binding(
         &self,
         binding: Option<&chio_core::capability::caveat::CapabilitySecurityBinding>,
-        ancestors: &[crate::capability_lineage::CapabilitySnapshot],
+        ancestors: &[chio_core::receipt::evidence::CapabilitySnapshot],
     ) -> Result<(), KernelError> {
         let evidence_required =
             binding.is_some() || self.capability_issuance_admission_authority.is_some();

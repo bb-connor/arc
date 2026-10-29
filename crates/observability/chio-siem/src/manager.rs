@@ -8,7 +8,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::params;
 use tokio::sync::watch;
 
-use chio_kernel::{ReceiptReadBoundary, ReceiptReadContext};
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_kernel::ReceiptReadContext;
 
 use crate::dlq::{DeadLetterQueue, FailedEvent};
 use crate::event::SiemEvent;

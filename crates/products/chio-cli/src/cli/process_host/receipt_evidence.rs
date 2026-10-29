@@ -1,7 +1,8 @@
 //! Membership of the original call receipt in its owning host's signed log.
 
 use chio_core::{crypto::canonical_json_bytes, receipt::body::ChioReceipt, PublicKey};
-use chio_kernel::checkpoint::{validate_checkpoint, KernelCheckpoint, ReceiptInclusionProof};
+use chio_kernel_core::evidence_verify::validate_checkpoint;
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use serde::{Deserialize, Serialize};
 
 use super::state::error;
@@ -21,8 +22,9 @@ impl Evidence {
         key: &PublicKey,
         observed_at: u64,
     ) -> Result<(), CliError> {
-        validate_checkpoint(&self.checkpoint, std::slice::from_ref(key)).map_err(error)?;
-        let body = &self.checkpoint.body;
+        let checkpoint =
+            validate_checkpoint(&self.checkpoint, std::slice::from_ref(key)).map_err(error)?;
+        let body = &checkpoint.body;
         let proof = &self.inclusion;
         if body.issued_at < receipt.timestamp
             || body.issued_at > observed_at / 1000
@@ -50,7 +52,7 @@ pub(super) fn export(
     receipt: &ChioReceipt,
     observed_at: u64,
 ) -> Result<Evidence, CliError> {
-    use chio_kernel::evidence_export::EvidenceExportQuery;
+    use chio_core::receipt::evidence::EvidenceExportQuery;
 
     let bundle = host
         .receipts

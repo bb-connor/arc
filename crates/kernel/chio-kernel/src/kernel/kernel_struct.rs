@@ -767,6 +767,9 @@ pub struct ChioKernel {
     /// stored in this map and selected through a task-local evaluation key.
     /// Non-tool session operations use a namespaced request-key fallback.
     pub(super) receipt_tenant_ids: Arc<DashMap<String, String>>,
+    /// Evaluation-keyed session anchor for receipts, selected like the tenant.
+    pub(super) receipt_session_anchors:
+        Arc<DashMap<String, chio_core::session::SessionAnchorReference>>,
     /// Evaluation-keyed copy of the receipt-version admission snapshot.
     /// Async evaluate futures may resume on a different Tokio worker
     /// after dispatch. This map keeps the admitted version and peer state

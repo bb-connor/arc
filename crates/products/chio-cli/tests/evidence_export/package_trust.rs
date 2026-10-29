@@ -1,7 +1,7 @@
 use super::*;
 
 struct Fixture {
-    _directory: tempfile::TempDir,
+    directory: tempfile::TempDir,
     db: PathBuf,
     seed: PathBuf,
     package: PathBuf,
@@ -41,7 +41,7 @@ impl Fixture {
         .test_unwrap();
         store.store_checkpoint(&checkpoint).test_unwrap();
         Self {
-            _directory: directory,
+            directory,
             db,
             seed,
             package,
@@ -65,16 +65,19 @@ impl Fixture {
         self.verify_with_anchor(key, None)
     }
 
-    fn verify_with_anchor(&self, key: &str, anchor: Option<&Path>) -> std::process::Output {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_chio"));
-        command
+    fn verify_with_anchor(
+        &self,
+        key: &str,
+        anchor: Option<serde_json::Value>,
+    ) -> std::process::Output {
+        let trust = trust_file(&[key.to_owned()], anchor);
+        Command::new(env!("CARGO_BIN_EXE_chio"))
             .args(["--json", "evidence", "verify", "--input"])
             .arg(&self.package)
-            .args(["--trusted-kernel-pubkey", key]);
-        if let Some(anchor) = anchor {
-            command.arg("--trusted-anchor-file").arg(anchor);
-        }
-        command.output().test_unwrap()
+            .arg("--trust")
+            .arg(trust)
+            .output()
+            .test_unwrap()
     }
 }
 
@@ -95,7 +98,7 @@ fn package_cli_requires_trust_before_reading_input() {
         .output()
         .test_unwrap();
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("--trusted-kernel-pubkey"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--trust"));
 }
 
 #[test]
@@ -121,6 +124,7 @@ fn package_cli_pins_signer_and_rejects_omission_with_rewritten_manifest() {
     let wrong = fixture.verify(&Keypair::generate().public_key().to_hex());
     assert!(!wrong.status.success());
     assert!(String::from_utf8_lossy(&wrong.stderr).contains("trusted"));
+    assert_eq!(wrong.status.code(), Some(50));
 
     let receipts_path = fixture.package.join("receipts.ndjson");
     let receipts = fs::read_to_string(&receipts_path).test_unwrap();
@@ -140,6 +144,46 @@ fn package_cli_pins_signer_and_rejects_omission_with_rewritten_manifest() {
     let tampered = fixture.verify(&fixture.signer.public_key().to_hex());
     assert!(!tampered.status.success());
     assert!(String::from_utf8_lossy(&tampered.stderr).contains("manifest"));
+    assert_eq!(tampered.status.code(), Some(20));
+}
+
+#[test]
+fn package_cli_import_exits_with_the_verify_classes() {
+    let fixture = Fixture::new();
+    require_success(&fixture.export());
+    let import = |key: &str| {
+        let trust = trust_file(&[key.to_owned()], None);
+        let db = fixture.directory.path().join("imported.sqlite3");
+        Command::new(env!("CARGO_BIN_EXE_chio"))
+            .arg("--json")
+            .arg("--receipt-db")
+            .arg(&db)
+            .args(["evidence", "import", "--input"])
+            .arg(&fixture.package)
+            .arg("--trust")
+            .arg(trust)
+            .output()
+            .test_unwrap()
+    };
+    let wrong = import(&Keypair::generate().public_key().to_hex());
+    assert_eq!(wrong.status.code(), Some(50));
+
+    let manifest_path = fixture.package.join("manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).test_unwrap()).test_unwrap();
+    manifest["exportedAt"] = (manifest["exportedAt"].as_u64().test_unwrap() + 1).into();
+    fs::write(&manifest_path, serde_json::to_vec(&manifest).test_unwrap()).test_unwrap();
+    let tampered = import(&fixture.signer.public_key().to_hex());
+    assert_eq!(tampered.status.code(), Some(20));
+
+    let imported = fixture.directory.path().join("imported.sqlite3");
+    let share = imported.exists().then(|| {
+        SqliteReceiptStore::open(&imported)
+            .test_unwrap()
+            .get_federated_share_for_capability("cap-package-trust")
+            .test_unwrap()
+    });
+    assert!(share.flatten().is_none());
 }
 
 #[test]
@@ -151,7 +195,7 @@ fn package_cli_requires_exact_external_anchor_binding() {
     let binding = CheckpointPublicationTrustAnchorBinding {
         publication_identity: CheckpointPublicationIdentity::new(
             CheckpointPublicationIdentityKind::LocalLog,
-            chio_kernel::checkpoint::checkpoint_log_id(&checkpoint),
+            chio_kernel_core::evidence_verify::checkpoint_log_id(&checkpoint),
         ),
         trust_anchor_identity: CheckpointTrustAnchorIdentity::new(
             CheckpointTrustAnchorIdentityKind::OperatorRoot,
@@ -164,8 +208,7 @@ fn package_cli_requires_exact_external_anchor_binding() {
     store
         .record_checkpoint_publication_trust_anchor_binding(1, &binding)
         .test_unwrap();
-    let anchor = fixture._directory.path().join("trusted-anchor.json");
-    fs::write(&anchor, serde_json::to_vec(&binding).test_unwrap()).test_unwrap();
+    let anchor = serde_json::to_value(&binding).test_unwrap();
     require_success(&fixture.export());
 
     let key = fixture.signer.public_key().to_hex();
@@ -177,7 +220,7 @@ fn package_cli_requires_exact_external_anchor_binding() {
         "transparency_preview"
     );
 
-    let anchored = fixture.verify_with_anchor(&key, Some(&anchor));
+    let anchored = fixture.verify_with_anchor(&key, Some(anchor));
     require_success(&anchored);
     let report: serde_json::Value = serde_json::from_slice(&anchored.stdout).test_unwrap();
     assert_eq!(
@@ -187,8 +230,8 @@ fn package_cli_requires_exact_external_anchor_binding() {
 
     let mut wrong = binding;
     wrong.signer_cert_ref = "another-certificate".to_owned();
-    fs::write(&anchor, serde_json::to_vec(&wrong).test_unwrap()).test_unwrap();
-    let rejected = fixture.verify_with_anchor(&key, Some(&anchor));
+    let rejected =
+        fixture.verify_with_anchor(&key, Some(serde_json::to_value(&wrong).test_unwrap()));
     assert!(!rejected.status.success());
     assert!(String::from_utf8_lossy(&rejected.stderr).contains("anchor"));
 }
@@ -236,12 +279,13 @@ pub(super) fn verify_remote_import_boundary(
         "federationPolicy": read_json(&output.join("federation-policy.json")),
         "manifest": manifest
     });
-    let policy = chio_control_plane::evidence_export::EvidenceVerificationPolicy::new(
-        vec![fixture_keypair().public_key()],
-        None,
-    )
-    .test_unwrap();
-    let request = json!({"package": package, "verification": policy});
+    let trust = json!({
+        "schema": "chio.verifier-trust.v1",
+        "kernel_keys": [fixture_keypair().public_key().to_hex()],
+        "exchange_keys": [],
+        "root_policy_keys": [],
+    });
+    let request = json!({"package": package, "trust": trust});
     let _: chio_control_plane::evidence_export::RemoteEvidenceImportRequest =
         serde_json::from_value(request.clone()).test_unwrap();
     let endpoint = format!("{base_url}/v1/evidence/import");
@@ -253,16 +297,76 @@ pub(super) fn verify_remote_import_boundary(
         response.text().test_unwrap()
     );
 
-    let response = client
-        .post(&endpoint)
-        .bearer_auth(token)
-        .json(&json!({"package": request["package"]}))
-        .send()
-        .test_unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
-    assert_eq!(
-        response.json::<serde_json::Value>().test_unwrap(),
-        json!({ "error": "urn:chio:error:attest:signed-json-invalid-shape" })
+    const TRUST_INVALID: &str = "urn:chio:error:attest:bundle-trust-invalid [attest:error]";
+    const TRUST_INVALID_HELP: &str =
+        "Fix the trust file: schema const, key bounds, unique keys, no weak keys, no key in two roles.";
+    let store = SqliteReceiptStore::open(db).test_unwrap();
+    let refused = |body: String, status: reqwest::StatusCode, error: &str| {
+        let response = client
+            .post(&endpoint)
+            .bearer_auth(token)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .test_unwrap();
+        assert_eq!(response.status(), status);
+        let body: serde_json::Value = response.json().test_unwrap();
+        assert_eq!(body, json!({ "error": error }));
+        assert!(store
+            .get_federated_share_for_capability("cap-remote-federated")
+            .test_unwrap()
+            .is_none());
+    };
+    let encoded = serde_json::to_string(&request).test_unwrap();
+
+    refused(
+        json!({"package": request["package"]}).to_string(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+        &format!(
+            "{TRUST_INVALID}: evidence import request carries no trust file ({TRUST_INVALID_HELP})"
+        ),
+    );
+
+    let mut anchored = request.clone();
+    anchored["trust"]["checkpoint_trust_anchor"] = json!({
+        "publicationIdentity": {"kind": "local_log", "identity": "local-log-1"},
+        "trustAnchorIdentity": {"kind": "transparency_root", "identity": "root-set-1"},
+        "trustAnchorRef": "anchor-root-1",
+        "signerCertRef": "cert-chain-1",
+        "publicationProfileVersion": "profile-1",
+        "unverifiedHint": true
+    });
+    refused(
+        anchored.to_string(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+        &format!(
+            "{TRUST_INVALID}: verifier trust file: decoded value drops input fields \
+             ({TRUST_INVALID_HELP})"
+        ),
+    );
+
+    let duplicate_top = format!("{{\"trust\":{{}},{}", &encoded[1..]);
+    refused(
+        duplicate_top,
+        reqwest::StatusCode::BAD_REQUEST,
+        "urn:chio:error:attest:signed-json-invalid-input",
+    );
+    let duplicate_nested = encoded.replacen(
+        "\"toolReceipts\":",
+        "\"toolReceipts\":[],\"toolReceipts\":",
+        1,
+    );
+    assert_ne!(duplicate_nested, encoded);
+    refused(
+        duplicate_nested,
+        reqwest::StatusCode::BAD_REQUEST,
+        "urn:chio:error:attest:signed-json-invalid-input",
+    );
+
+    refused(
+        " ".repeat(64 * 1024 * 1024 + 1),
+        reqwest::StatusCode::PAYLOAD_TOO_LARGE,
+        "JSON request body exceeds its limit",
     );
 
     let mut forged = request.clone();
@@ -274,17 +378,19 @@ pub(super) fn verify_remote_import_boundary(
         .send()
         .test_unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(response.text().test_unwrap().contains("payload"));
+    let body: serde_json::Value = response.json().test_unwrap();
+    assert_eq!(
+        body,
+        json!({
+            "error": "urn:chio:error:attest:bundle-envelope-invalid [attest:error]: evidence \
+                      payload does not match its signed envelope commitment (Re-export the \
+                      bundle from the provider and verify it against the kernel key pinned in \
+                      the trust file.)"
+        })
+    );
 
     let mut wrong_trust = request.clone();
-    wrong_trust["verification"] = serde_json::to_value(
-        chio_control_plane::evidence_export::EvidenceVerificationPolicy::new(
-            vec![Keypair::generate().public_key()],
-            None,
-        )
-        .test_unwrap(),
-    )
-    .test_unwrap();
+    wrong_trust["trust"]["kernel_keys"] = json!([Keypair::generate().public_key().to_hex()]);
     let response = client
         .post(&endpoint)
         .bearer_auth(token)
@@ -292,9 +398,16 @@ pub(super) fn verify_remote_import_boundary(
         .send()
         .test_unwrap();
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
-    assert!(response.text().test_unwrap().contains("trusted kernel key"));
+    let body: serde_json::Value = response.json().test_unwrap();
+    assert_eq!(
+        body,
+        json!({
+            "error": "urn:chio:error:attest:bundle-trust-missing [attest:error]: evidence signer \
+                      is outside the trusted kernel key set (Pin the kernel key that signed the \
+                      bundle in the trust file, obtained independently of the bundle.)"
+        })
+    );
 
-    let store = SqliteReceiptStore::open(db).test_unwrap();
     assert!(store
         .get_federated_share_for_capability("cap-remote-federated")
         .test_unwrap()
@@ -308,8 +421,8 @@ pub(super) fn verify_remote_import_boundary(
             token,
             "evidence",
             "import",
-            "--trusted-kernel-pubkey",
-            &fixture_keypair().public_key().to_hex(),
+            "--trust",
+            fixture_trust_file().to_str().test_unwrap(),
             "--input",
         ])
         .arg(output)

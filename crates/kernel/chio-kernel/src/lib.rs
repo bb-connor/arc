@@ -150,7 +150,13 @@ mod settlement_ledger;
 #[cfg(not(loom))]
 pub use settlement_ledger::KernelSettlementLedgerHook;
 #[cfg(not(loom))]
+mod settlement_drain_trust;
+#[cfg(not(loom))]
 mod settlement_routing;
+#[cfg(not(loom))]
+pub use settlement_drain_trust::{
+    SettlementDrainTrust, SettlementDrainTrustError, MAX_SETTLEMENT_DRAIN_KEYS,
+};
 #[cfg(not(loom))]
 pub mod stop;
 #[cfg(not(loom))]
@@ -270,17 +276,9 @@ pub use authority::{
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 #[cfg(not(loom))]
-pub use capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
-    StoredCapabilitySnapshot,
-};
+pub use capability_lineage::{CapabilityLineageError, StoredCapabilitySnapshot};
 #[cfg(not(loom))]
-pub use checkpoint::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
-    checkpoint_body_sha256, is_supported_checkpoint_schema, verify_checkpoint_continuity,
-    verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
-    ReceiptInclusionProof, CHECKPOINT_SCHEMA,
-};
+pub use checkpoint::{build_checkpoint, build_checkpoint_with_previous};
 #[cfg(not(loom))]
 pub use chio_core::credit::{
     ensure_capital_execution_custodian_authority, ensure_capital_execution_owner_authority,
@@ -489,11 +487,7 @@ pub use dpop::{
     DpopProofBody, DPOP_SCHEMA,
 };
 #[cfg(not(loom))]
-pub use evidence_export::{
-    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
-    EvidenceUncheckpointedReceipt,
-};
+pub use evidence_export::{EvidenceExportError, EvidenceExportReceiptQuery};
 #[cfg(not(loom))]
 pub use execution_nonce::{
     is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
@@ -593,8 +587,7 @@ pub use receipt_analytics::{
 #[cfg(not(loom))]
 pub use receipt_query::{
     EffectiveReceiptReadScope, ReceiptQuery, ReceiptQueryResult, ReceiptQuerySnapshotError,
-    ReceiptReadBoundary, ReceiptReadContext, ReceiptReadContextSource, ReceiptSnapshotWatermark,
-    MAX_QUERY_LIMIT,
+    ReceiptReadContext, ReceiptReadContextSource, ReceiptSnapshotWatermark, MAX_QUERY_LIMIT,
 };
 #[cfg(not(loom))]
 pub use receipt_store::{
@@ -663,7 +656,9 @@ mod kernel;
 #[cfg(not(loom))]
 pub(crate) use kernel::{MatchingGrant, ReceiptContent};
 
-pub use chio_core::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+pub use chio_core::receipt::metadata::{
+    DecisionModelWitness, EvidenceDisclosure, GuardEvidenceDeclaration,
+};
 
 #[cfg(not(loom))]
 pub use kernel::{
@@ -695,16 +690,16 @@ pub use kernel::{
     HotPathStage, HybridSigningConfig, KernelBuildError, KernelConfig, KernelError,
     MemoryBudgetConfig, NativeSecurityAdmissionContext, NativeSecurityFlowJoinAuthority,
     NativeSecurityNoncePreflightJoinAuthority, NestedToolCallProofs, OverloadResource,
-    PreDispatchActiveResponseReconstruction, PreparedActiveResponseAdmission,
-    PreparedNativeSecurityEgress, PromptProvider, ProtocolRefusalReason, ProtocolRefusalSummary,
-    ProtocolRequestDigest, ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog,
-    ReplayClockDirection, ResourceProvider, ResponseDispatchPreparationRequest,
-    RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook,
-    RuntimeAdmissionReadinessToken, RuntimeAdmissionRevalidationContext,
-    RuntimeParticipantClaimAuthority, SecurityDispatchOutcome, SecurityDispatchOutcomeHandle,
-    SecurityDispatchOutcomeRecorder, SecurityInvocationContext, SecurityInvocationContextAuthority,
-    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
-    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
+    PreDispatchActiveResponseReconstruction, PreInvocationGuardOutput,
+    PreparedActiveResponseAdmission, PreparedNativeSecurityEgress, PromptProvider,
+    ProtocolRefusalReason, ProtocolRefusalSummary, ProtocolRequestDigest,
+    ProtocolRequestDigestSource, ReceiptDeliveryStep, ReceiptLog, ReplayClockDirection,
+    ResourceProvider, ResponseDispatchPreparationRequest, RuntimeAdmissionContext,
+    RuntimeAdmissionDecision, RuntimeAdmissionHook, RuntimeAdmissionReadinessToken,
+    RuntimeAdmissionRevalidationContext, RuntimeParticipantClaimAuthority, SecurityDispatchOutcome,
+    SecurityDispatchOutcomeHandle, SecurityDispatchOutcomeRecorder, SecurityInvocationContext,
+    SecurityInvocationContextAuthority, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ServerId,
     SettlementRuntimeConfigError, StructuredErrorReport, VerifiedActiveResponseBindings,
     VerifiedFederationTreatyMaterial, VerifiedResponseSimulationAuthorization,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,

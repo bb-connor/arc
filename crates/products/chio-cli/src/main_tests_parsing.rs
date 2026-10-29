@@ -463,27 +463,6 @@ fn chio_native_command_surfaces_parse_representative_operations() {
         vec![
             "chio",
             "runtime",
-            "admit",
-            "--request",
-            "request.json",
-            "--admission-profile",
-            "profile.json",
-            "--admission-bundle",
-            "bundle.json",
-            "--runtime-trust-input",
-            "runtime-trust.json",
-            "--trusted-verifiers",
-            "trusted-verifiers.json",
-            "--store",
-            "store.json",
-            "--now-unix-ms",
-            "1800000001000",
-            "--report",
-            "report.json",
-        ],
-        vec![
-            "chio",
-            "runtime",
             "policy",
             "sign",
             "--body",
@@ -674,7 +653,7 @@ fn inbound_authority_native_cli_accepts_operator_bound_agent_key() {
 
 #[test]
 fn server_transport_cli_flags_are_paired_and_explicit() {
-    for base in [vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"], vec!["chio", "trust", "serve", "--service-token", "test-token"]] {
+    for base in [vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"], vec!["chio", "trust", "serve", "--access-config", "access.toml"]] {
         let mut args = base.clone();
         args.extend(["--tls-cert", "cert.pem"]);
         assert!(parse_cli(args.clone()).is_err());

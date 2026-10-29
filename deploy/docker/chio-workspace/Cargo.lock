@@ -2334,7 +2334,6 @@ dependencies = [
  "tokio",
  "ureq 2.12.1",
  "url",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -2385,6 +2384,7 @@ dependencies = [
  "chio-core-types",
  "chio-cross-protocol",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-manifest",
  "chio-security-types",
  "serde",
@@ -2457,6 +2457,7 @@ dependencies = [
  "chio-core",
  "chio-egress-contract",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-metrics-spec",
  "chio-security-types",
  "chio-spec-validate",
@@ -2676,6 +2677,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-bundle-verify"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-errors",
+ "chio-kernel-core",
+ "chio-security-types",
+ "chio-test-support",
+ "clap 4.6.0",
+ "rustix",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "chio-cage"
 version = "0.1.0"
 dependencies = [
@@ -2731,6 +2748,7 @@ dependencies = [
  "chio-attest-buyer-core",
  "chio-attest-loopback",
  "chio-attest-verify",
+ "chio-bundle-verify",
  "chio-cage",
  "chio-commerce-order",
  "chio-conformance",
@@ -2756,6 +2774,7 @@ dependencies = [
  "chio-hosted-mcp",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-lineage",
  "chio-listing",
@@ -2859,6 +2878,7 @@ name = "chio-commerce-order"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "chio-credit",
  "chio-risk-comptroller",
  "chio-test-support",
  "chrono",
@@ -2973,6 +2993,7 @@ dependencies = [
  "chio-agent-web-interop",
  "chio-anchor",
  "chio-appraisal",
+ "chio-bundle-verify",
  "chio-commerce-order",
  "chio-conformance",
  "chio-core",
@@ -2998,6 +3019,7 @@ dependencies = [
  "chio-http-core",
  "chio-http-serve",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-keyring",
  "chio-link",
  "chio-log-redact",
@@ -3051,6 +3073,7 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "toml 0.8.23",
  "tower",
  "tower-http",
  "tracing",
@@ -3301,12 +3324,15 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "http 1.4.0",
+ "rcgen 0.13.2",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
+ "ureq 2.12.1",
  "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -3464,6 +3490,7 @@ dependencies = [
  "chio-finding",
  "chio-finding-verifier",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-open-market",
  "serde",
  "serde_json",
@@ -3558,6 +3585,7 @@ dependencies = [
  "chio-finding",
  "chio-fiscal",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-revocation-oracle",
  "hex",
  "serde",
@@ -3776,6 +3804,7 @@ dependencies = [
  "chio-core-types",
  "chio-credit",
  "chio-custody-hw",
+ "chio-egress-contract",
  "chio-federation",
  "chio-kernel",
  "chio-kernel-core",
@@ -3814,7 +3843,6 @@ dependencies = [
  "tokio",
  "toml 0.8.23",
  "tracing",
- "ureq 2.12.1",
  "url",
  "uuid",
 ]
@@ -4010,6 +4038,7 @@ dependencies = [
  "chio-file-custody",
  "chio-http-serve",
  "chio-kernel",
+ "chio-log-redact",
  "chio-manifest",
  "chio-mcp-adapter",
  "chio-metrics-spec",
@@ -4241,6 +4270,7 @@ dependencies = [
  "chio-cage-plan",
  "chio-core-types",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
@@ -4484,6 +4514,7 @@ dependencies = [
  "chio-store-sqlite",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -4623,6 +4654,7 @@ dependencies = [
  "chio-federation",
  "chio-finding",
  "chio-kernel",
+ "chio-kernel-core",
  "chio-link",
  "chio-open-market",
  "chio-security-types",
@@ -4741,7 +4773,6 @@ dependencies = [
  "criterion",
  "frost-ed25519",
  "hex",
- "hmac 0.12.1",
  "libc",
  "loom",
  "nix",
@@ -4755,7 +4786,6 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
- "subtle",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",

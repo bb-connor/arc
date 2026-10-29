@@ -18,9 +18,9 @@ use std::error::Error;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey};
 use chio_core_types::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core_types::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_core_types::receipt::decision::{Decision, ToolCallAction};
-use chio_core_types::receipt::kinds::TrustLevel;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::{kinds::TrustLevel, lineage::SignedExportEnvelope};
 use chio_core_types::{
     canonical_json_bytes, canonical_json_string, DeliveryContract, DeliveryResult, FindingDelivery,
     FindingDeliverySettlementMode, FindingMediaTypeCheck, FindingTransformProfile, MerkleTree,
@@ -62,9 +62,9 @@ use chio_finding_challenge::{
     FindingRetainedAuthorityPolicy, FindingRevokedKeyProof, FindingVenueAuditSelectionEvidence,
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_transparency, build_inclusion_proof, checkpoint_body_sha256,
-    checkpoint_log_id, CheckpointTransparencySummary, KernelCheckpoint,
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_transparency, build_inclusion_proof, checkpoint_body_sha256, checkpoint_log_id,
 };
 use chio_open_market::bidding::{
     AcceptedBid, BidRequest, RequestedScope, ReservationReceipt, SignedAcceptedBid,

@@ -47,6 +47,7 @@ members = [
     "crates/sdk/chio-guard-sdk-macros",
     "crates/guards/chio-guards",
     "crates/guards/chio-policy",
+    "crates/guards/chio-predicate-dag",
     "crates/guards/chio-wasm-guards",
     #
     # Protocol adapters & edges
@@ -181,6 +182,7 @@ members = [
     "crates/sdk/chio-binding-helpers",
     "crates/sdk/chio-bindings-ffi",
     "crates/sdk/chio-cpp-kernel-ffi",
+    "crates/tooling/chio-bundle-verify",
     "crates/tooling/chio-conformance",
     "crates/tooling/chio-reference-tools",
     "crates/tooling/chio-conformance/verdict_matrix/drivers/lambda",
@@ -504,10 +506,12 @@ chio-decision-model = { version = "=0.1.0", path = "crates/core/chio-decision-mo
 chio-cage = { version = "=0.1.0", path = "crates/security/chio-cage" }
 chio-cage-plan = { version = "=0.1.0", path = "crates/security/chio-cage-plan" }
 chio-cage-init = { version = "=0.1.0", path = "crates/security/chio-cage-init" }
+chio-predicate-dag = { version = "=0.1.0", path = "crates/guards/chio-predicate-dag" }
 chio-supervisor = { version = "=0.1.0", path = "crates/core/chio-supervisor" }
 chio-signing-remote = { version = "=0.1.0", path = "crates/trust/chio-signing-remote" }
 chio-cohere-tools-adapter = { version = "=0.1.0", path = "crates/protocol/chio-cohere-tools-adapter" }
 chio-config = { version = "=0.1.0", path = "crates/platform/chio-config" }
+chio-bundle-verify = { version = "=0.1.0", path = "crates/tooling/chio-bundle-verify" }
 chio-conformance = { version = "=0.1.0", path = "crates/tooling/chio-conformance" }
 chio-commerce-order = { version = "=0.1.0", path = "crates/platform/chio-commerce-order" }
 chio-control-plane = { version = "=0.1.0", path = "crates/platform/chio-control-plane" }

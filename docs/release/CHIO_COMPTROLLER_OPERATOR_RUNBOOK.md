@@ -60,7 +60,7 @@ Minimum persistent state for the economic plane:
 - `--receipt-db`
 - `--budget-db`
 - `--authority-db`
-- `--service-token`
+- `--access-config` (see `docs/reference/TRUST_CONTROL_ACCESS.md`)
 
 Additional deployment inputs depend on the lanes exercised:
 

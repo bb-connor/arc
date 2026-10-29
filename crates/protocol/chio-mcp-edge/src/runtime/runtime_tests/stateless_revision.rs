@@ -211,3 +211,51 @@ fn initialize_still_selects_the_handshake_revision() {
         .unwrap();
     assert_eq!(response["result"]["protocolVersion"], MCP_2025_11_25);
 }
+
+#[test]
+fn stateless_tool_results_carry_signed_execution_evidence() {
+    let mut edge = make_edge_with_config(10, false);
+    let discover = edge
+        .handle_jsonrpc(stateless_request(
+            1,
+            "server/discover",
+            json!({}),
+            MCP_2026_07_28,
+        ))
+        .unwrap();
+    let advertised =
+        &discover["result"]["capabilities"]["experimental"]["io.chio/execution-evidence"];
+    assert_eq!(advertised["version"], "1");
+    assert_eq!(
+        advertised["outputKinds"],
+        json!(["value", "stream", "none"])
+    );
+
+    let mut request = stateless_request(
+        2,
+        "tools/call",
+        json!({ "name": "read_file", "arguments": { "path": "/tmp/demo.txt" } }),
+        MCP_2026_07_28,
+    );
+    request["params"]["_meta"]["chioRequestId"] = json!("stateless-evidence-2");
+    let call = edge.handle_jsonrpc(request).unwrap();
+    let meta = &call["result"]["_meta"];
+    assert_eq!(meta[META_SERVER_INFO]["name"], "Chio MCP Edge");
+    let evidence = &meta["chioEvidence"];
+    assert_eq!(evidence["schema"], "chio.mcp.execution-evidence.v1");
+    assert_eq!(evidence["requestId"], "stateless-evidence-2");
+    assert_eq!(evidence["outputKind"], "value");
+    let receipt: chio_core::receipt::body::ChioReceipt =
+        serde_json::from_value(evidence["receipt"].clone()).unwrap();
+    assert!(receipt.verify_signature().unwrap());
+    assert_eq!(receipt.decision, Some(Decision::Allow));
+    assert_eq!(
+        receipt.metadata.as_ref().unwrap()["receipt_context"]["request_id"],
+        "stateless-evidence-2"
+    );
+    assert_eq!(
+        receipt.content_hash,
+        sha256_hex(&canonical_json_bytes(&evidence["output"]).unwrap())
+    );
+    assert_eq!(meta["chio"]["receiptId"], json!(receipt.id));
+}

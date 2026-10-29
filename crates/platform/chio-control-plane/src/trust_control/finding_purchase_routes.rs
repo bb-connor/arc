@@ -40,7 +40,8 @@ use chio_store_sqlite::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::report_validation::validate_service_auth;
+use super::caller_credentials::Scope;
+use super::report_validation::validate_caller;
 use super::{plain_http_error, TrustServiceState};
 
 #[path = "finding_purchase_routes/bounded_serving.rs"]
@@ -621,7 +622,7 @@ pub(crate) async fn handle_publish_live_finding_status(
     AxumPath(finding_id): AxumPath<String>,
     headers: axum::http::HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FindingsWrite) {
         return response;
     }
     if require_hex64(&finding_id, "finding_id").is_err() {
@@ -865,7 +866,8 @@ pub(crate) async fn handle_purchase_finding(
             None => return purchase_authentication_failed(),
         }
     } else {
-        if let Err(response) = validate_service_auth(request.headers(), &state.config.service_token)
+        if let Err(response) =
+            validate_caller(request.headers(), &state.config, Scope::FindingsWrite)
         {
             return if response.status() == StatusCode::UNAUTHORIZED {
                 purchase_authentication_failed()

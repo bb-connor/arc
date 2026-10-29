@@ -34,31 +34,21 @@ pub(super) fn configure_original_selection(
         // Recovery has no new signed admission inputs. This real hook preserves
         // the original authority selection but cannot authorize a new execution.
         kernel.set_federation_local_kernel_id("native-combined-runtime-kernel");
-        kernel.set_runtime_admission_hook(Arc::new(
-            ChioRuntimeAdmissionHook::new(
-                RuntimeAdmissionProfile {
-                    schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
-                    profile_id: "native-runtime-profile".into(),
-                    local_kernel_id: "native-combined-runtime-kernel".into(),
-                    verifier_id: "native-runtime-verifier".into(),
-                    issued_at_unix_ms: now,
-                    expires_at_unix_ms: now.checked_add(600_000).ok_or("time overflow")?,
-                },
-                source,
-            )
-            .with_operation_owned_runtime_replay(binding.clone()),
-        ));
+        kernel.set_runtime_admission_hook(Arc::new(ChioRuntimeAdmissionHook::new(
+            RuntimeAdmissionProfile {
+                schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
+                profile_id: "native-runtime-profile".into(),
+                local_kernel_id: "native-combined-runtime-kernel".into(),
+                verifier_id: "native-runtime-verifier".into(),
+                issued_at_unix_ms: now,
+                expires_at_unix_ms: now.checked_add(600_000).ok_or("time overflow")?,
+            },
+            source,
+            binding.clone(),
+        )));
     }
     if let Some(binding) = profile.approval() {
-        kernel.set_operation_owned_governed_approval_source(
-            binding.clone(),
-            Arc::new(
-                chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-                    witness.directory.join("native-approval.db"),
-                    witness.clock(),
-                )?,
-            ),
-        )?;
+        kernel.set_operation_owned_governed_approval_authority(binding.clone())?;
     }
     if let Some(binding) = profile.dpop() {
         kernel.set_operation_owned_dpop_authority(binding.clone())?;

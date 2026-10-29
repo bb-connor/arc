@@ -12,7 +12,6 @@ mod dispatch_launch;
 pub mod dpop_claim;
 mod execution_nonce;
 pub mod governed_approval_claim;
-pub mod governed_approval_replay;
 mod identity;
 mod native_caller_custody;
 mod native_dispatch_binding;
@@ -30,7 +29,8 @@ pub mod recovery;
 mod remote_projection;
 mod retained_request;
 pub mod runtime_participant;
-pub mod runtime_replay;
+pub mod runtime_resource;
+pub mod runtime_source;
 mod sequencer;
 mod state;
 mod store;
@@ -81,10 +81,9 @@ pub(crate) use retained_request::AdmissionSecurityBindingV1;
 pub use retained_request::{
     AdmittedReceiptMetadata, RetainedToolAdmissionRequestV1, ATTEMPT_SCOPED_RECEIPT_METADATA_PATHS,
 };
-pub use runtime_replay::{
-    RuntimeReplayParticipantKind, RuntimeReplaySourceMarkerV1, RuntimeReplaySourcePort,
-    RuntimeReplaySourceSnapshotV1, MAX_RUNTIME_REPLAY_SOURCE_BYTES,
-    MAX_RUNTIME_REPLAY_SOURCE_MARKERS,
+pub use runtime_resource::RuntimeParticipantKind;
+pub use runtime_source::{
+    RuntimeSourcePort, RuntimeSourceQualificationV1, MAX_RUNTIME_SOURCE_BYTES,
 };
 pub use sequencer::*;
 pub use store::*;

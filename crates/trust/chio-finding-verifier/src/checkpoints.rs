@@ -11,12 +11,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core_types::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_finding::{
     verify_signed_authority_status, FindingAuthorityKeyPolicy, FindingChallengeVerifierProfile,
 };
-use chio_kernel::checkpoint::{
+use chio_kernel_core::evidence_verify::{
     checkpoint_log_id, validate_checkpoint, verify_checkpoint_transparency_records,
-    CheckpointTransparencySummary, KernelCheckpoint,
 };
 
 use crate::verify::{policy_covers, FindingCheckpointSignerStatusTrust, ResolvedReceiptEvidence};
@@ -185,13 +185,12 @@ fn verify_checkpoint_membership_inner(
     let mut by_seq = BTreeMap::new();
     for checkpoint in checkpoints {
         let seq = checkpoint.body.checkpoint_seq;
-        if validate_checkpoint(checkpoint, &pinned_signer_keys).is_err() {
-            return Err(CheckpointMembershipError::CheckpointInvalid(seq));
-        }
-        if !has_strict_checkpoint_signature(checkpoint) {
+        let checkpoint = validate_checkpoint(checkpoint, &pinned_signer_keys)
+            .map_err(|_| CheckpointMembershipError::CheckpointInvalid(seq))?;
+        if !has_strict_checkpoint_signature(&checkpoint) {
             return Err(CheckpointMembershipError::CheckpointSignatureInvalid(seq));
         }
-        let log_id = checkpoint_log_id(checkpoint);
+        let log_id = checkpoint_log_id(&checkpoint);
         // Checkpoint-reference grammar: `<log_id>#<checkpoint_seq>`. Every
         // supplied checkpoint identity must equal the finding's single
         // evidence_checkpoint_ref; substitution denies.
@@ -382,7 +381,8 @@ mod tests {
     use chio_finding::{
         FindingAuthorityKeyPolicy, FindingAuthorityStatus, FINDING_AUTHORITY_STATUS_SCHEMA_V1,
     };
-    use chio_kernel::checkpoint::{build_checkpoint, verify_checkpoint_signature};
+    use chio_kernel::checkpoint::build_checkpoint;
+    use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
 
     use crate::verify::FindingCheckpointSignerStatusTrust;
 
@@ -401,15 +401,15 @@ mod tests {
         )?;
         let signer = Keypair::from_seed(&[7; 32]);
         let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
-        assert!(verify_checkpoint_signature(
-            &checkpoint,
-            &[signer.public_key()]
-        )?);
+        verify_checkpoint_signature(&checkpoint, &[signer.public_key()])?;
         assert!(has_strict_checkpoint_signature(&checkpoint));
         checkpoint.body.kernel_key = weak_key.clone();
         checkpoint.signature = forged_signature;
 
-        assert!(!verify_checkpoint_signature(&checkpoint, &[weak_key])?);
+        assert!(matches!(
+            verify_checkpoint_signature(&checkpoint, &[weak_key]),
+            Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
+        ));
         assert!(!has_strict_checkpoint_signature(&checkpoint));
         Ok(())
     }

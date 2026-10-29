@@ -32,7 +32,6 @@ pub(crate) use finding::*;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
 pub(crate) enum OutputFormat {
     #[default]
-    #[value(alias = "table")]
     Human,
     Json,
 }
@@ -148,6 +147,11 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     pub(crate) control_url: Option<String>,
 
+    /// Trust-control internal listener base URL, which a kernel host with
+    /// durable admission reaches the admission authority through.
+    #[arg(long, global = true, env = "CHIO_CONTROL_INTERNAL_URL")]
+    pub(crate) control_internal_url: Option<String>,
+
     /// Bearer token used to authenticate to the shared trust-control service.
     /// Prefer `CHIO_CONTROL_TOKEN` env over the argv form so the bearer does
     /// not leak via `ps` / `/proc/<pid>/cmdline`.
@@ -213,7 +217,7 @@ mod cli_env_tests {
 
     #[test]
     fn final_f11_authority_replication_skew_cli_is_explicit_and_bounded() {
-        let default = parse_cli(["chio", "trust", "serve", "--service-token", "test-token"])
+        let default = parse_cli(["chio", "trust", "serve", "--access-config", "access.toml"])
             .unwrap_or_else(|error| panic!("parse default authority skew: {error}"));
         assert!(matches!(
             default.command,
@@ -229,8 +233,8 @@ mod cli_env_tests {
                 "chio",
                 "trust",
                 "serve",
-                "--service-token",
-                "test-token",
+                "--access-config",
+                "access.toml",
                 "--authority-replication-max-future-skew-seconds",
                 skew,
             ])
@@ -241,8 +245,8 @@ mod cli_env_tests {
                 "chio",
                 "trust",
                 "serve",
-                "--service-token",
-                "test-token",
+                "--access-config",
+                "access.toml",
                 "--authority-replication-max-future-skew-seconds",
                 skew,
             ])
@@ -470,10 +474,8 @@ mod cli_env_tests {
             "/var/lib/chio/receipts.sqlite3",
             "trust",
             "serve",
-            "--service-token",
-            "service-secret",
-            "--authority-workload-token",
-            "authority-workload-secret",
+            "--access-config",
+            "/etc/chio/trust-access.toml",
             "--authority-keyring-config",
             "/etc/chio/keyring.yaml",
             "--authority-keyring-receipt-anchor-root",
@@ -487,7 +489,7 @@ mod cli_env_tests {
                     TrustCommands::Serve {
                         authority_keyring_config,
                         authority_keyring_receipt_anchor_root,
-                        authority_workload_token,
+                        access_config,
                         ..
                     },
             } => {
@@ -496,8 +498,8 @@ mod cli_env_tests {
                     Some(std::path::Path::new("/etc/chio/keyring.yaml"))
                 );
                 assert_eq!(
-                    authority_workload_token.as_deref(),
-                    Some("authority-workload-secret")
+                    access_config,
+                    std::path::Path::new("/etc/chio/trust-access.toml")
                 );
                 assert_eq!(
                     authority_keyring_receipt_anchor_root.as_deref(),
@@ -510,7 +512,7 @@ mod cli_env_tests {
 
     fn trust_serve_snapshot_quota(args: &[&str]) -> Result<u64, String> {
         use clap::CommandFactory;
-        let argv: Vec<String> = ["chio", "trust", "serve", "--service-token", "token"]
+        let argv: Vec<String> = ["chio", "trust", "serve", "--access-config", "/etc/chio/trust-access.toml"]
             .into_iter()
             .chain(args.iter().copied())
             .map(str::to_owned)
@@ -561,8 +563,8 @@ mod cli_env_tests {
             "chio",
             "trust",
             "serve",
-            "--service-token",
-            "token",
+            "--access-config",
+            "access.toml",
             "--receipt-query-snapshot-quota-bytes",
             "4294967296",
         ])

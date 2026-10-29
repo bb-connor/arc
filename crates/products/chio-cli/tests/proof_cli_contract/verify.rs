@@ -38,6 +38,30 @@ fn proof_verify_requires_commerce_claims_when_requested() {
 }
 
 #[test]
+fn proof_verify_accepts_commerce_order_with_its_pinned_escrow_ledger() {
+    let (_tempdir, bundle) = build_commerce_escrow_bundle(true);
+    let bundle = utf8_path(&bundle);
+
+    let output = chio(&["proof", "verify", bundle.as_str(), "--require", "commerce"]);
+
+    assert_success(&output);
+}
+
+#[test]
+fn proof_verify_refuses_pinned_escrow_digest_without_its_ledger_node() {
+    let (_tempdir, bundle) = build_commerce_escrow_bundle(false);
+    let bundle = utf8_path(&bundle);
+
+    let output = chio(&["proof", "verify", bundle.as_str(), "--require", "commerce"]);
+
+    assert_failure_exit_code(
+        &output,
+        "missing commerce escrow ledger for pinned digest",
+        20,
+    );
+}
+
+#[test]
 fn proof_verify_commerce_requires_dedicated_commerce_trust_roots() {
     let commerce_bundle =
         workspace_root().join("fixtures/proof-room/commerce-payments/offline-psp-valid");
@@ -1027,7 +1051,6 @@ fn write_runtime_regeneration_artifacts(bundle: &Path) {
 
     let source_record = serde_json::json!({
         "stepIndex": 0,
-        "admissionReportSha256": "a".repeat(64),
         "toolReceiptSha256": "b".repeat(64),
         "bilateralDsseSha256": "c".repeat(64),
         "workflowStepSha256": "d".repeat(64)
@@ -1054,13 +1077,11 @@ fn write_runtime_regeneration_artifacts(bundle: &Path) {
         "runId": "runtime-swarm-valid",
         "accepted": true,
         "generatedAtUnixMs": 1800000001000_u64,
-        "admissionReportSha256": "a".repeat(64),
         "evidencePaths": ["proof-regeneration-report.json"],
         "stepEvidence": [{
             "schema": "chio.runtime.step-evidence.v1",
             "stepIndex": 0,
             "admissionId": "runtime-swarm-admission",
-            "admissionReportSha256": "a".repeat(64),
             "toolReceiptId": "runtime-swarm-tool-receipt",
             "toolReceiptSha256": "b".repeat(64),
             "outputSha256": "e".repeat(64),
@@ -1102,7 +1123,6 @@ fn write_runtime_regeneration_artifacts(bundle: &Path) {
         "runId": "runtime-swarm-valid",
         "evidenceManifestSha256": evidence_manifest_sha256,
         "workflowRunReportSha256": workflow_report_sha256,
-        "admissionReportSha256": "a".repeat(64),
         "trustBundleSha256": "f".repeat(64),
         "verificationContextSha256": "1".repeat(64),
         "sourceRecords": [source_record]

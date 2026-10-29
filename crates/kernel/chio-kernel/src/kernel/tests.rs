@@ -14,7 +14,6 @@ use crate::approval::{
     ApprovalRequest, ApprovalStore, ApprovalToken, InMemoryApprovalStore,
 };
 use crate::compliance_score::{compliance_score, ComplianceScoreConfig, ComplianceScoreInputs};
-use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use crate::execution_nonce::{
     mint_execution_nonce, verify_execution_nonce, ExecutionNonceConfig, ExecutionNonceError,
     InMemoryExecutionNonceStore, NonceBinding,
@@ -61,6 +60,10 @@ use chio_core::credit::{
     CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
 };
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
+use chio_core::receipt::evidence::{
+    CapabilitySnapshot, EvidenceChildReceiptScope, EvidenceExportQuery,
+};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::GuardEvidence,
@@ -87,6 +90,7 @@ use chio_federation::{
     bilateral::InProcessCoSigner, trust_establishment::FederationPeer,
     trust_establishment::KernelTrustExchange, trust_establishment::PeerHandshakeEnvelope,
 };
+use chio_kernel_core::evidence_verify::build_inclusion_proof;
 use chio_link::{ExchangeRate, PriceOracle, PriceOracleError};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::BTreeMap;
@@ -169,6 +173,8 @@ use support_tool_approval::bind_test_tool_approval;
 mod capability_liveness;
 #[path = "tests/capability_validation.rs"]
 mod capability_validation;
+#[path = "tests/decision_model_witness.rs"]
+mod decision_model_witness;
 #[path = "tests/guard_pipeline.rs"]
 mod guard_pipeline;
 #[path = "tests/hot_path_deadlines.rs"]
@@ -194,6 +200,8 @@ mod budget_governed_fallback;
 mod budget_parent_expiry;
 #[path = "tests/constraint_variants.rs"]
 mod constraint_variants;
+#[path = "tests/continuation_session_anchor.rs"]
+mod continuation_session_anchor;
 #[path = "tests/emergency.rs"]
 mod emergency;
 #[path = "tests/inbound_authority.rs"]

@@ -15,7 +15,8 @@ use chio_core::web3::identity::{
     SignedWeb3IdentityBinding, Web3IdentityBindingCertificate, Web3KeyBindingPurpose,
     CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
 };
-use chio_kernel::checkpoint::{build_checkpoint, CheckpointError};
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::CheckpointError;
 
 use chio_test_support::prelude::*;
 

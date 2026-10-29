@@ -5,13 +5,16 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-#[cfg(test)]
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::crypto::{sha256_hex, Keypair, Signature};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    CapabilitySnapshot, EvidenceChildReceiptScope, EvidenceExportQuery,
+};
 use chio_core::receipt::security::ActiveDefenseReceiptBody;
 use chio_core::receipt::{
     body::ChioReceipt, crypto_floor::ReceiptCryptoFloor, decision::Decision,
@@ -22,7 +25,6 @@ use chio_core::receipt::{
 use chio_core::session::{
     OperationTerminalState, RequestLineageMode, RequestLineageRecord, SessionAnchorReference,
 };
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint, KernelCheckpointBody};
 use chio_kernel::cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
     CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
@@ -59,28 +61,28 @@ use chio_kernel::receipt_analytics::{
     ReceiptAnalyticsResponse, TimeAnalyticsRow, ToolAnalyticsRow, MAX_ANALYTICS_GROUP_LIMIT,
 };
 use chio_kernel::receipt_query::{
-    ReceiptQuery, ReceiptQueryResult, ReceiptReadBoundary, ReceiptReadContext, MAX_QUERY_LIMIT,
+    ReceiptQuery, ReceiptQueryResult, ReceiptReadContext, MAX_QUERY_LIMIT,
 };
 use chio_kernel::receipt_store::{ReceiptLineageStatementLink, ReceiptLineageVerification};
 use chio_kernel::{
-    AtomicReceiptProjection, AuthorizationReceiptConsumption, CapabilitySnapshot,
-    CreditBondDisposition, CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport,
-    CreditBondListSummary, CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
+    AtomicReceiptProjection, AuthorizationReceiptConsumption, CreditBondDisposition,
+    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondListSummary,
+    CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
     CreditFacilityListQuery, CreditFacilityListReport, CreditFacilityListSummary,
     CreditFacilityRow, CreditLossLifecycleEventKind, CreditLossLifecycleListQuery,
     CreditLossLifecycleListReport, CreditLossLifecycleListSummary, CreditLossLifecycleRow,
-    EvidenceChildReceiptScope, EvidenceExportQuery, ExposureLedgerQuery,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore,
-    LiabilityAutoBindDisposition, LiabilityClaimPayoutReconciliationState,
-    LiabilityClaimResponseDisposition, LiabilityClaimSettlementReconciliationState,
-    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
-    LiabilityClaimWorkflowSummary, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
-    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState,
-    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
-    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
-    LiabilityQuoteDisposition, PendingSettlementObservation, ReceiptCheckpointCreateReport,
-    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
-    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    ExposureLedgerQuery, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
+    IndexedSecurityEvidenceStore, LiabilityAutoBindDisposition,
+    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
+    LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
+    LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary,
+    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow,
+    LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
+    LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
+    LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
+    PendingSettlementObservation, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
+    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
+    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     RetainedReceiptCommitment, RetentionConfig, SignedCreditBond, SignedCreditFacility,
     SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
     SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
@@ -98,6 +100,7 @@ use chio_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 use chio_security_types::ports::OpaqueReceiptRef;
 use chio_supervisor::{
     HealthFlag, HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig,
@@ -2236,19 +2239,26 @@ fn maybe_build_checkpoint(
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
         // O(b) Merkle build over the batch, plus O(log n) over the chain
         // frontier; the predecessor digest comes from the cached head.
-        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier_at(
-            checkpoint_seq,
-            start_seq,
-            end_seq,
-            &receipt_bytes,
-            chio_kernel::checkpoint::CheckpointSigningContext {
-                keypair: &signer.keypair,
-                issued_at: clock.unix_millis()?,
-            },
-            head.latest_checkpoint.as_ref(),
-            &chain_frontier,
-        )
-        .map_err(checkpoint_error_to_receipt_store)?;
+        let predecessor = head
+            .latest_checkpoint
+            .as_ref()
+            .map(chio_kernel_core::evidence_verify::validate_checkpoint)
+            .transpose()
+            .map_err(checkpoint_error_to_receipt_store)?;
+        let checkpoint =
+            chio_kernel_core::evidence_verify::build_checkpoint_with_chain_frontier_at(
+                checkpoint_seq,
+                start_seq,
+                end_seq,
+                &receipt_bytes,
+                chio_kernel_core::evidence_verify::CheckpointSigningContext {
+                    keypair: &signer.keypair,
+                    issued_at: clock.unix_millis()?,
+                },
+                predecessor.as_ref(),
+                &chain_frontier,
+            )
+            .map_err(checkpoint_error_to_receipt_store)?;
         #[cfg(test)]
         if test_hooks::panic_during_checkpoint_build(signer.max_batch) {
             panic!("injected test panic during background checkpoint build");
@@ -2666,13 +2676,13 @@ fn verify_head_against_latest_checkpoint(
                 ));
             };
             // Body-only deserialize: parse_persisted_checkpoint_row would run
-            // chio_kernel::checkpoint::validate_checkpoint and re-verify the
+            // chio_kernel_core::evidence_verify::validate_checkpoint and re-verify the
             // signature, putting one Ed25519 verify back on every append. The
             // cached head was signature-checked at seed time.
             let persisted_body: KernelCheckpointBody = serde_json::from_str(&row.statement_json)?;
-            let persisted_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&persisted_body)
+            let persisted_digest = chio_kernel_core::evidence_verify::checkpoint_body_sha256(&persisted_body)
                 .map_err(checkpoint_error_to_receipt_store)?;
-            let cached_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&cached.body)
+            let cached_digest = chio_kernel_core::evidence_verify::checkpoint_body_sha256(&cached.body)
                 .map_err(checkpoint_error_to_receipt_store)?;
             if persisted_digest != cached_digest {
                 return Err(ReceiptStoreError::Conflict(
@@ -2758,7 +2768,7 @@ fn catch_up_verified_head_to(
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         match head.latest_checkpoint.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::verify_integrity_embedded_key_predecessor(
+                chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(
                     predecessor,
                     &checkpoint,
                 )
@@ -4673,14 +4683,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn earlier_success_does_not_clear_a_later_queued_timeout(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-timeout-ordering-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-timeout-ordering");
         let store = SqliteReceiptStore::open(&path)?;
         let baseline = store.receipt_commit_actor.writer_counters();
         let writer_a = store.writer_handle();
@@ -4947,14 +4950,7 @@ mod receipt_commit_actor_tests {
         // exited) is the first observation that the writer is gone. It must flip
         // liveness to Dead now, so the pre-dispatch gate denies admission before
         // a later append reconfirms the death.
-        let path = std::env::temp_dir().join(format!(
-            "chio-reseed-dead-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-reseed-dead");
         let mut store = SqliteReceiptStore::open(&path)?;
 
         // Replace the live commit actor with one whose receiver is dropped, so
@@ -4987,14 +4983,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn run_write_executes_jobs_serially_on_the_writer_thread(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-run-write-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-run-write");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -5071,14 +5060,7 @@ mod receipt_commit_actor_tests {
     /// holds the count until the job completes, mirroring the Append path.
     #[test]
     fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-inflight");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -5159,14 +5141,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn write_decrements_inflight_before_returning_to_caller(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-order-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-inflight-order");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 

@@ -353,7 +353,7 @@ below is an illustrative minimal build. There is no `http-server`, `s3-policy`,
 runtime subcommand of the single `chio` binary, not a compile-time feature.
 
 ```dockerfile
-FROM rust:1.82-slim AS builder
+FROM rust:1.95.0-slim AS builder
 
 WORKDIR /build
 COPY . .

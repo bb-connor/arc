@@ -6,11 +6,14 @@ use std::collections::BTreeMap;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use chio_core::capability::scope::MonetaryAmount;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{
+    sign_canonical_with_backend_for_identity, Keypair, PublicKey, SigningBackend,
+};
 use chio_core::merkle::MerkleTree;
 use chio_core::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 use chio_core::receipt::authoritative_spend::BudgetAuthorityReceiptRef;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::SignedExportEnvelope;
@@ -40,9 +43,9 @@ use chio_finding_verifier::{
     FindingNonceResolver, FindingVerifierTrustRoots, ResolvedReceiptEvidence,
     SignedFindingBondStoreSnapshot, FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1,
 };
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_transparency, build_inclusion_proof, checkpoint_log_id,
-    KernelCheckpoint, ReceiptInclusionProof,
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_transparency, build_inclusion_proof, checkpoint_log_id,
 };
 use chio_open_market::fee_schedule::{
     build_open_market_fee_schedule_artifact, OpenMarketBondClass, OpenMarketBondRequirement,
@@ -243,7 +246,8 @@ impl FindingVerifiedFixDraft {
         let replay_recipe = canonical_json_bytes(&recipe).map_err(string_error)?;
         let replay_recipe_sha256 = sha256_hex(&replay_recipe);
 
-        let receipts = build_evidence_receipts(&keys.production_kernel, input.issued_at, &payload)?;
+        let receipts =
+            build_evidence_receipts(keys.production_kernel.as_ref(), input.issued_at, &payload)?;
         let receipt_bytes = receipts
             .iter()
             .map(|receipt| canonical_json_bytes(receipt).map_err(string_error))
@@ -280,7 +284,7 @@ impl FindingVerifiedFixDraft {
             .collect::<Result<Vec<_>, String>>()?;
         let execution_nonces = receipts
             .iter()
-            .map(|receipt| signed_nonce(receipt, &keys.production_kernel))
+            .map(|receipt| signed_nonce(receipt, keys.production_kernel.as_ref()))
             .collect::<Result<Vec<_>, _>>()?;
 
         let finding = build_finding(
@@ -476,7 +480,7 @@ impl FindingVerifiedFixDraft {
         chio_finding_verifier::verify_checkpoint_membership(
             &resolved,
             std::slice::from_ref(&self.evidence_checkpoint),
-            &chio_kernel::checkpoint::build_checkpoint_transparency(
+            &chio_kernel_core::evidence_verify::build_checkpoint_transparency(
                 std::slice::from_ref(&self.evidence_checkpoint),
                 &pinned_checkpoint_signers(&self.verifier_profile.body),
             )
@@ -874,6 +878,7 @@ fn build_profile(
     issued_at: u64,
     expires_at: u64,
 ) -> Result<SignedFindingChallengeVerifierProfile, String> {
+    let production_key = keys.production_kernel.public_key().map_err(string_error)?;
     let mut body = FindingChallengeVerifierProfile {
         schema: FINDING_CHALLENGE_VERIFIER_PROFILE_SCHEMA_V1.to_owned(),
         profile_id: String::new(),
@@ -884,7 +889,7 @@ fn build_profile(
                 role: FindingReceiptRole::Production,
                 policy: local_policy(
                     "verified-fix-production",
-                    &keys.production_kernel,
+                    production_key.clone(),
                     issued_at,
                     expires_at,
                 ),
@@ -893,7 +898,7 @@ fn build_profile(
                 role: FindingReceiptRole::Delivery,
                 policy: local_policy(
                     "verified-fix-delivery",
-                    &keys.delivery_receipt,
+                    keys.delivery_receipt.public_key(),
                     issued_at,
                     expires_at,
                 ),
@@ -902,7 +907,7 @@ fn build_profile(
                 role: FindingReceiptRole::Replay,
                 policy: local_policy(
                     "verified-fix-replay",
-                    &keys.replay_receipt,
+                    keys.replay_receipt.public_key(),
                     issued_at,
                     expires_at,
                 ),
@@ -913,14 +918,14 @@ fn build_profile(
                 .map_err(string_error)?,
             signer: local_policy(
                 "verified-fix-checkpoint",
-                checkpoint_key,
+                checkpoint_key.public_key(),
                 issued_at,
                 expires_at,
             ),
         }],
         bbs_projection_issuer: FindingBbsIssuerPolicy {
             issuer_fingerprint: "local-cognition-market-bbs".to_owned(),
-            key_hex: keys.production_kernel.public_key().to_hex(),
+            key_hex: production_key.to_hex(),
             registry_ref: "local/cognition-market/bbs".to_owned(),
             key_epoch: 1,
             valid_from: issued_at,
@@ -1274,12 +1279,13 @@ fn build_listing(
 }
 
 fn build_evidence_receipts(
-    kernel: &Keypair,
+    kernel: &dyn SigningBackend,
     issued_at: u64,
     payload: &VerifiedFixPayload,
 ) -> Result<Vec<ChioReceipt>, String> {
     let baseline_sha256 = digest(&payload.baseline)?;
     let candidate_sha256 = digest(&payload.candidate)?;
+    let kernel_key = kernel.public_key().map_err(string_error)?;
     [
         ("verified_fix.baseline", baseline_sha256),
         ("verified_fix.candidate", candidate_sha256),
@@ -1312,10 +1318,10 @@ fn build_evidence_receipts(
             metadata: Some(mediated_spend_metadata(index)),
             trust_level: TrustLevel::Mediated,
             tenant_id: None,
-            kernel_key: kernel.public_key(),
+            kernel_key: kernel_key.clone(),
             bbs_projection_version: None,
         };
-        ChioReceipt::sign(body, kernel).map_err(string_error)
+        ChioReceipt::sign_with_backend(body, kernel).map_err(string_error)
     })
     .collect()
 }
@@ -1355,7 +1361,10 @@ fn mediated_spend_metadata(index: u32) -> serde_json::Value {
     })
 }
 
-fn signed_nonce(receipt: &ChioReceipt, kernel: &Keypair) -> Result<SignedExecutionNonce, String> {
+fn signed_nonce(
+    receipt: &ChioReceipt,
+    kernel: &dyn SigningBackend,
+) -> Result<SignedExecutionNonce, String> {
     let budget = BudgetAuthorityReceiptRef::from_receipt(receipt)
         .ok_or_else(|| "receipt budget authority metadata is missing".to_owned())?;
     let nonce = ExecutionNonce {
@@ -1376,13 +1385,11 @@ fn signed_nonce(receipt: &ChioReceipt, kernel: &Keypair) -> Result<SignedExecuti
         reserved_hold_id: Some(budget.hold_id),
         reserving_request_id: None,
     };
+    let (outcome, _) =
+        sign_canonical_with_backend_for_identity(kernel, &receipt.kernel_key, &nonce)
+            .map_err(string_error)?;
     Ok(SignedExecutionNonce {
-        signature: kernel
-            .sign_wrapped(
-                chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
-                &chio_core::CanonicalBytes::from_serializable(&nonce).map_err(string_error)?,
-            )
-            .map_err(string_error)?,
+        signature: outcome.signature,
         nonce,
     })
 }
@@ -1544,13 +1551,13 @@ fn pin_policy(pin: &FindingAuthorityPin) -> Result<FindingAuthorityKeyPolicy, St
 
 fn local_policy(
     authority_id: &str,
-    key: &Keypair,
+    key: PublicKey,
     valid_from: u64,
     valid_until: u64,
 ) -> FindingAuthorityKeyPolicy {
     FindingAuthorityKeyPolicy {
         authority_id: authority_id.to_owned(),
-        key: key.public_key(),
+        key,
         key_epoch: 1,
         valid_from,
         valid_until,
@@ -1709,3 +1716,7 @@ mod ordering_tests {
         assert!(post_checkpoint_issued_at(10, 20, 20).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "finding_verified_fix_signing_tests.rs"]
+mod signing_tests;

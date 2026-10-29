@@ -16,6 +16,7 @@
 //! cargo xtask check formal-mirrors [--bless]
 //! cargo xtask check web3-free-closure [--mode <name>]... [--root <crate>]...
 //! cargo xtask gen proof-coverage [--check]
+//! cargo xtask gen decision-model --rules <json> --thresholds <json> --out <cdm> [--check]
 //! cargo xtask formal itf-to-regression --trace <path> --spec <family>
 //! ```
 //!
@@ -98,6 +99,7 @@ mod cage_vectors;
 mod cli;
 mod codegen;
 mod crate_paths;
+mod decision_model_compile;
 mod dispatch;
 mod error;
 mod eval_receipt_regen;

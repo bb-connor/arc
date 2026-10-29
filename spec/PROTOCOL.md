@@ -1167,6 +1167,39 @@ a signed receipt-lineage statement, or a verified continuation token scoped by
 the relevant session anchor. Reports and exports must preserve that evidence
 class boundary instead of silently upgrading caller input into proof.
 
+A receipt the kernel signs for an evaluation inside a session carries the
+top-level `session_anchor` block (schema `chio.receipt-session-anchor.v1`).
+The block is `{ schema, session_anchor_commitment }`, where the commitment is
+the lowercase hex SHA-256 of the bytes `chio.receipt-session-anchor.v1`, one
+zero byte, and the canonical JSON of the session anchor reference
+`{ sessionAnchorHash, sessionAnchorId }` current when the evaluation began.
+Only the session scope writes it: metadata reaching the signing path that
+already names `session_anchor` is refused, and a receipt signed outside a
+session carries no block. The block shape is
+`spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json`.
+
+A continuation token that names `parent_session_anchor` while no live parent
+session context is available is verified against its persisted parent
+receipt, and the token is accepted only when all of these hold:
+
+- the token carries `parent_receipt_hash` and it equals the SHA-256 of the
+  parent receipt's canonical JSON
+- the parent receipt signature verifies under the receipt crypto floor and
+  its `kernel_key` is this kernel's current receipt-signing key; capability
+  authority keys (including the trust-control authority set and configured
+  CA keys) and the receipt's own embedded key are not trusted for this purpose
+- the parent is a mediated, preventive `allow` decision receipt
+- the parent carries a well-formed `session_anchor` block whose commitment
+  equals the commitment recomputed from the token's `parent_session_anchor`
+
+Any other outcome denies the request. The accepted `sessionAnchorId` is the
+token's anchor id, now bound to the parent receipt's signed block.
+
+A receipt signed outside an evaluation scope, including one the kernel signs
+while recovering an admission after a restart, carries no `session_anchor`
+block even when the admission ran in a session. Such a receipt is refused as
+a persisted parent, so continuing from it needs a live parent session.
+
 ### 5.3 Verification Rules
 
 The kernel and trust surfaces verify, at minimum:
@@ -1375,6 +1408,12 @@ of complete live-credential verification. Generic and split native capture
 remain forbidden. Native serving, nonce/declassification and outcome/recovery
 activation remain separate work.
 
+#### Runtime Source Qualification
+
+Operation-owned runtime admission MUST verify its configured source against the destination's retained v1 qualification. The qualification MUST bind source and runtime authority IDs, destination authority ID, and the actual opened SQLite file's device, inode and single-link identity. A decoded descriptor alone MUST NOT authorize claims.
+
+A changed physical identity, including copy, restore, replacement, or device/inode change on remount, MUST refuse with `runtime_source_qualification_invalid`. Installed bindings are immutable for their lifetime. Replacement requires independently provisioned new source and runtime authority IDs; a destination exhausted at 128 installed records requires a new provisioned authority. No migration, adoption, deletion or supersession interface is defined by this profile. No operator requalification interface is defined.
+
 #### Native Atomic Capture Checkpoint
 
 The dedicated capture path borrows the original live evaluation's credential
@@ -1421,7 +1460,9 @@ The current launch-candidate safety inventory is:
 - `P7` receipt-lineage soundness: a `verified` receipt edge implies both
   receipts verify and the linkage was signed by a trusted kernel
 - `P8` session continuity soundness: continued provenance can only claim
-  session continuity through a valid session anchor and continuation artifact
+  session continuity through a valid session anchor and continuation artifact;
+  for a persisted parent, the anchor is the one committed in the parent
+  receipt's signed `session_anchor` block
 - `P9` delegation/provenance consistency: verified call-chain subjects and
   parent capability references remain consistent with capability lineage
 - `P10` report truthfulness: enterprise/report/export surfaces never label
@@ -1821,6 +1862,7 @@ unsupported schema versions fail closed.
 | `caller_delivery` | Chio signer | committed-safe | `chio.authenticated-caller-observation.v1` | Authenticated caller observation report and authorization digests, executor and claim identity and times; no raw output. Read by the kernel's return-context, terminal and replay paths. |
 | `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
 | `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
+| `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, and the receipt itself does not carry it. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
 | `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
 | `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
 | `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |
@@ -1830,6 +1872,7 @@ unsupported schema versions fail closed.
 | `finding_recovery` | Chio signer | committed-safe | `chio.finding.recovery.v1` | Finding-recovery binding: recovery and finding ids, the original capability and delivery receipt ids and the purchase key. Read by the kernel's terminal and recovery-gate paths. |
 | `finding_purchase_replay_snapshot` | Chio signer | committed-safe |  | Admission-verified purchase binding and status proof frozen for terminal replay. Read by the kernel's purchase gate and replay paths. |
 | `finding_recovery_replay_snapshot` | Chio signer | committed-safe |  | Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths. |
+| `decision_model_witness` | Chio signer | committed-safe | `chio.decision-model-witness.v1` | Decision-model witness: model card and artifact digests, outcome (the verdict class), evaluated-or-fallback tag, closed fallback reason and the model-constant work count. No argument, result, atom or rule selection, or margin. Read by the kernel's replay path and the offline verifier. |
 | `findingDenial` | Chio signer | unsafe |  | Finding-market denial family code. No production reader. |
 | `stream` | Chio signer | unsafe |  | Streamed-output chunk counts and byte totals. chunk_hashes are unsalted SHA-256 digests of each output chunk. |
 | `threshold_approval` | Chio signer | committed-safe |  | Threshold approval proposal id and hash, deadline and state for a pending call. The CLI response verifier reads the state. |
@@ -1855,7 +1898,6 @@ unsupported schema versions fail closed.
 | `active_defense_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant id and plan identifiers. |
 | `occurred_at_unix_ms` | Chio signer | committed-safe |  | Active-defense event time, bound by the lineage ingest and the native evidence reader. |
 | `response_simulation_evidence_id` | Chio signer | unsafe |  | Unsalted domain hash over the raw tenant and action ids. |
-| `active_defense_backfill_v1` | Chio signer | unsafe |  | Active-defense migration marker with unaudited contents. |
 | `scimLifecycle` | Chio signer | unsafe |  | SCIM provider, user ids, user names, principal, subject key and entitlements. |
 | `mercury` | Chio signer | unsafe |  | Raw business identifiers such as account and desk. |
 | `authorizationContext` | Chio signer | unsafe |  | Wall request actor and requested domains. |
@@ -2189,11 +2231,55 @@ references. AP2, x402, ACP-Commerce, or PSP payloads are accepted only as
 digest-bound protocol payload evidence named by the mandate or payment
 artifact; they do not replace Chio receipts or widen payment authority.
 
+An order context MAY pin `escrow_digest`, the sha256 of the canonical JSON of a
+`chio.commerce.escrow-ledger.v1` custody ledger. The field is optional only
+because an order without escrow is a valid v1 order context; an escrow-backed
+order always pins it. The ledger's custody account
+MUST be `chio:commerce:escrow:custody`, its depositor, beneficiary, and custody
+accounts MUST be pairwise distinct, and its legs MUST be exactly the lock leg
+(depositor to custody) and, once `released`, the release leg (custody to
+beneficiary), each for the full ledger amount. A verifier rejects a pinned
+digest without a supplied ledger, a supplied ledger without a pinned digest, a
+ledger whose canonical digest differs from the pin, and a ledger whose order id,
+amount, currency, depositor, or beneficiary differ from the order id, quote
+amount, quote currency, buyer subject, or merchant subject of the order
+context. A ledger is `locked` from `settlement_packet_assembled` through
+`settlement_observed` and `released` from `settlement_reconciled` on; earlier
+states MUST NOT pin a digest. An order in `failed_closed` may retain either the
+`locked` or the `released` pinned ledger, and pins no digest when the order has
+no escrow. A ledger is locked only against a
+`chio.commerce.escrow-acceptance.v1` signed by the offer token subject and a
+`chio.commerce.reservation-receipt.v1` that a pinned reservation authority
+signed for the order, the exact offer token and the depositor account, and
+released only against a
+matched capital execution instruction that a pinned execution authority signed
+over the depositor's reserve for the ledger amount, beneficiary, and settlement
+reconciliation reference. The order context presented at release MUST carry
+every accepted order context field unchanged except `id`, `issued_at`,
+`current_state`, `event_log_sha256`, and `payment_lifecycle_sha256`.
+
+The offer token issuer MUST be the order merchant: lock refuses an offer
+unless `merchant_subject` is `did:chio:` followed by the offer token issuer
+public key hex.
+
+The acceptance binds `order_id`, `quote_sha256` (which covers the quote amount
+and currency), `buyer_subject`, the offer token id and canonical digest, and
+`accepted_at`. Lock refuses, in order, an unsupported acceptance schema, an
+acceptance signer other than the offer token subject, an invalid acceptance
+signature, any bound field that differs from the order context or offer token,
+and an `accepted_at` outside the offer token validity window. The reservation
+receipt's `depositor_account` MUST equal the order `buyer_subject`, which the
+acceptance also binds. The reservation authority's signature over it ties the
+accepting key to the account the lock debits, so an offer subject cannot sign
+for another buyer's account. Release additionally binds the depositor to the
+signed execution instruction's `subject_key`.
+
 Commerce verification fails closed on currency drift, amount drift,
 merchant/provider mismatch, untrusted provider evidence, expired or overused
 mandates, missing authority receipts, PSP status that does not support the
-claimed state, settlement packet mismatch, duplicate completion, or a public
-order passport whose summary digests do not match the private order context.
+claimed state, settlement packet mismatch, escrow ledger drift, duplicate
+completion, or a public order passport whose summary digests do not match the
+private order context.
 
 ### 6.4.5 Disclosure And Lineage Family
 
@@ -2947,6 +3033,51 @@ The finding family registers `chio.finding.v1`, the eighteen signed
 artifacts above, the five unsigned carriers, and the open-market penalty
 envelope at this stage.
 
+### 6.4.8 Decision Model Witness
+
+A tool call judged by a pinned decision model carries a
+`decision_model_witness` block whose schema is
+`chio.decision-model-witness.v1`. Like the delivery block it carries no
+signature of its own and is authenticated by the enclosing receipt.
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `schema` | `chio.decision-model-witness.v1` | Pinned schema identifier. |
+| `model_card_digest` | 64 lowercase hex | Digest of the pinned model card. |
+| `artifact_digest` | 64 lowercase hex | Digest of the pinned model artifact. |
+| `outcome` | `allow`, `hold`, `deny` | The decision-model guard's own outcome. A later guard can deny a call this guard allowed, so `outcome` need not equal the receipt verdict. |
+| `evaluation` | `evaluated`, `fallback` | Whether the model evaluated the call or the guard fell back to deny. |
+| `fallback_reason` | `empty_proposal`, `proposal_infeasible`, `scorer_error`, `work_exhausted`, `policy_unavailable` | Present exactly when `evaluation` is `fallback`. |
+| `work_ops` | integer, 0 to 4294967295 | Work charged: the pinned artifact's op count when evaluated, 0 on fallback. |
+
+The evaluation contract is closed. With `evaluation = evaluated`,
+`fallback_reason` is absent, `work_ops` equals the op count of the pinned
+artifact, and `outcome` is any of `allow`, `hold` or `deny`. With
+`evaluation = fallback`, `fallback_reason` is present, `outcome` is `deny`,
+`work_ops` is 0, and no selection commitment is written. Every other
+combination is malformed and fails closed.
+
+The block is a function of the tuple (`model_card_digest`, `artifact_digest`,
+`outcome`, `evaluation`, `fallback_reason`) and the artifact's fixed op count.
+It carries no argument, result, atom bitmap, per-atom margin, or fired or
+unknown rule set. Those argument-derived selections are reserved for one
+metadata commitment under `salt_ref = "metadata.decision_model.selection"`,
+whose opening carries `atoms_pos_hex`, `atoms_neg_hex`, `rules_fired_hex`,
+`rules_unknown_hex` and `min_margin_q16`; no selection data is written until
+that commitment is defined. A decision-model deny carries the fixed evidence
+text `action=deny; reason=decision-model` and no rule id.
+
+A verifier holding the artifact and the opened selection commitment recomputes
+the fired and unknown rule sets and `outcome`, and checks that an evaluated
+`deny` has a fired deny rule, an evaluated `hold` has a fired hold rule or an
+unknown deny or hold rule, and an evaluated `allow` has neither. A verifier
+without the opening checks the digests, the shape, `work_ops` against the
+artifact and the committed-field half of the contract only. The
+machine-readable contract is registered at
+`spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json`;
+unknown fields, a non-pinned schema, non-hex digests and malformed evaluation
+combinations fail closed.
+
 ### 6.5 Checkpoints
 
 Receipt batches can be committed to a Merkle checkpoint. Issuers use:
@@ -3274,6 +3405,68 @@ that currently covers:
 
 Compatibility claims are grounded in checked-in conformance scenarios, live JS
 and Python peers, and the release-qualification wave corpus.
+
+The edge serves MCP revision 2025-11-25 through `initialize` and the stateless
+revision 2026-07-28 through per-request `_meta`. One edge session serves one
+revision family and refuses requests from the other.
+
+#### 8.2.1 Tool Result Execution Evidence
+
+Every `tools/call` result the edge returns carries kernel evidence in the
+result `_meta`. The edge advertises it in
+`capabilities.experimental["io.chio/execution-evidence"]` as `{"version": "1",
+"schema": "chio.mcp.execution-evidence.v1", "resultMetaField": "chioEvidence",
+"contextMethod": "chio/execution-context", "outputKinds": ["value", "stream",
+"none"]}`, in both the `initialize` result and the `server/discover` result.
+
+`_meta.chioEvidence` is an object with these members:
+
+| Member | Value |
+|--------|-------|
+| `schema` | `"chio.mcp.execution-evidence.v1"` |
+| `requestId` | `metadata.receipt_context.request_id` of the signed receipt (the caller's `_meta.chioRequestId` when supplied), or `null` |
+| `receipt` | The complete signed `ChioReceipt` for this call |
+| `outputKind` | `"value"`, `"stream"` or `"none"` |
+| `output` | For `"value"`, the exact kernel output whose RFC 8785 canonical bytes hash to `receipt.content_hash`; otherwise `null` |
+| `terminalState` | `"completed"`, `"cancelled"` or `"incomplete"`; diagnostic only |
+
+`outputKind` is `"value"` only for an allowed, completed value result. A
+streamed result is `"stream"` with `output: null`; its receipt commits to the
+stream, not to a single value. Every other result (a denial, an incomplete or
+cancelled call, a pending approval) is `"none"` with `output: null`.
+
+`_meta.chio` carries `decision` (`"allow"`, `"deny"` or `"pending_approval"`),
+the same signed `receipt`, its `receiptId` and the kernel `terminalState`.
+
+The rendered MCP `content` and `structuredContent` are projections and are not
+the signed commitment. `outputKind` and `output` are not signed. A verifier
+MUST check the receipt signature against the operator-pinned kernel key, the
+tool, server and argument hash, and the request ID it supplied. It MUST bind
+`outputKind` to the signed decision: it accepts `"value"` only when
+`receipt.decision.verdict` is `"allow"` and `receipt.content_hash` equals the
+SHA-256 of the canonical `output`. A receipt whose decision is not `"allow"`
+never yields tool output, whatever `outputKind` and `output` claim; a
+relabeled signed denial MUST be rejected or treated as that denial. When the
+receipt carries a signed `metadata.admission_operation` block (section 6.4), a
+verifier that accepts `"value"` MUST also require the block's `request_id` to
+equal the supplied request ID, `projected_state` to be `"completed"`,
+`projected_dispatch_state` to be `"terminal"` and `tool_outcome_id` to be
+present. A verifier MUST fail closed when the evidence is absent or the receipt
+does not verify, and MUST NOT retry an uncertain external effect on that basis
+alone.
+
+The edge overwrites any upstream `_meta.chio` or `_meta.chioEvidence`, and
+replaces a non-object upstream `_meta` with an object, before it installs the
+kernel evidence. Other upstream `_meta` members are preserved. Under 2026-07-28
+the result also carries `resultType` and
+`_meta["io.modelcontextprotocol/serverInfo"]` alongside the evidence.
+
+#### 8.2.2 List Cursors
+
+Paginated list results carry `nextCursor` as a string only while another page
+remains. An exhausted listing omits `nextCursor`; it is never JSON `null`. A
+cursor is opaque to the client. A cursor past the end of the listing is refused
+with JSON-RPC invalid params.
 
 ### 8.3 Hosted Remote Admin
 
@@ -4925,6 +5118,29 @@ autonomous insurer-rate setting beyond the documented bounded autonomous-pricing
 surface, claim or dispute adjudication beyond the documented liability-market
 surface, or theorem-prover completion beyond the boundary and assumptions
 defined in Section 5.4.
+
+### 9.2 Cluster Peer Request Freshness
+
+A trust-control node authenticates each cluster peer request with the
+`chio.cluster.peer-signature.v1` Ed25519 signature from the key pinned for the
+sender's node id. The signature covers the deployment, the recipient and sender
+node ids, the method, path and query, the SHA-256 of the body, a single-use
+32-byte nonce, the integer `issuedAt` (Unix seconds) and the sender's term.
+
+The receiver MUST refuse a peer request whose `issuedAt` is more than 60
+seconds behind or more than 5 seconds ahead of the highest receiver time it has
+observed, and a request whose `(node id, nonce)` it has already accepted inside
+that window.
+
+Each receiver MUST keep a durable per-peer high-water mark: the highest
+`issuedAt` it has accepted from that peer. `issuedAt` from one peer is
+monotonic across receiver restarts: after a restart the receiver MUST refuse
+every request issued at or before its peer's stored mark, whatever its clock
+reads. The receiver MUST raise the stored mark to a request's `issuedAt` before
+the request has any effect, and MUST refuse the request when the mark cannot be
+read or raised. Within one receiver process, distinct nonces with the same
+`issuedAt` are admitted. For a peer without a stored mark the receiver MUST
+refuse every request issued at or before its start time plus 5 seconds.
 
 ## 10. Portable Trust And Federation
 

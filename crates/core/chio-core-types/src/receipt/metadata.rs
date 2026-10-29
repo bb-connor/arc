@@ -620,7 +620,18 @@ pub struct ReceiptAttributionMetadata {
     pub grant_index: Option<u32>,
 }
 
+mod decision_model;
 mod key_registry;
+mod session_anchor;
+
+pub use session_anchor::{
+    ReceiptSessionAnchorV1, RECEIPT_SESSION_ANCHOR_SCHEMA, SESSION_ANCHOR_METADATA_KEY,
+};
+
+pub use decision_model::{
+    DecisionModelEvaluation, DecisionModelFallbackReason, DecisionModelOutcome,
+    DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY, DECISION_MODEL_WITNESS_SCHEMA,
+};
 
 pub use key_registry::{
     check_internal_receipt_metadata, metadata_key_spec, reserved_receipt_metadata_keys,

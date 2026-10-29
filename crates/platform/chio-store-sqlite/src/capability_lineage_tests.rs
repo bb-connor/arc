@@ -1,5 +1,4 @@
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::capability::{
     aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
@@ -12,13 +11,7 @@ use rusqlite::{params, Connection};
 
 use crate::receipt_store::SqliteReceiptStore;
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 /// Build a test CapabilityToken with the given ID and subject/issuer keypairs.
 fn make_token(
@@ -85,7 +78,7 @@ fn make_delegated_token(
 
 #[test]
 fn record_and_get_lineage_returns_matching_fields() {
-    let path = unique_db_path("cl-persist");
+    let (_path_dir, path) = temp_sqlite_path("cl-persist");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let subject_kp = Keypair::generate();
@@ -114,7 +107,7 @@ fn delegated_bounded_snapshot_reads_parent_depth_inside_the_writer_job() {
     // out, a delegated bounded snapshot must still resolve the parent depth
     // and persist quickly, proving the read no longer sits unbounded on the
     // pre-dispatch hot path where an exhausted pool would stall it.
-    let path = unique_db_path("cl-bounded-parent-read");
+    let (_path_dir, path) = temp_sqlite_path("cl-bounded-parent-read");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let kp_root = Keypair::generate();
@@ -209,7 +202,7 @@ fn qualified_capability_snapshots_advance_the_external_rollback_generation(
 
 #[test]
 fn record_capability_snapshot_is_idempotent() {
-    let path = unique_db_path("cl-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("cl-idempotent");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let subject_kp = Keypair::generate();
@@ -236,7 +229,7 @@ fn record_capability_snapshot_is_idempotent() {
 
 #[test]
 fn grants_json_round_trips_without_field_loss() {
-    let path = unique_db_path("cl-json-rt");
+    let (_path_dir, path) = temp_sqlite_path("cl-json-rt");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let subject_kp = Keypair::generate();
@@ -257,8 +250,8 @@ fn grants_json_round_trips_without_field_loss() {
 
 #[test]
 fn signed_capability_round_trips_through_replication() -> Result<(), Box<dyn std::error::Error>> {
-    let source_path = unique_db_path("cl-signed-source");
-    let destination_path = unique_db_path("cl-signed-destination");
+    let (_source_path_dir, source_path) = temp_sqlite_path("cl-signed-source");
+    let (_destination_path_dir, destination_path) = temp_sqlite_path("cl-signed-destination");
     let source = SqliteReceiptStore::open(&source_path)?;
     let destination = SqliteReceiptStore::open(&destination_path)?;
     let subject = Keypair::generate();
@@ -298,7 +291,7 @@ fn signed_capability_round_trips_through_replication() -> Result<(), Box<dyn std
 
 #[test]
 fn lineage_delta_rejects_cursor_and_limit_overflow() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cl-delta-overflow");
+    let (_path_dir, path) = temp_sqlite_path("cl-delta-overflow");
     let store = SqliteReceiptStore::open(&path)?;
 
     assert!(store
@@ -318,7 +311,7 @@ fn lineage_delta_rejects_cursor_and_limit_overflow() -> Result<(), Box<dyn std::
 #[test]
 fn reopen_does_not_normalize_synthetic_anchor_with_signed_token(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cl-corrupt-synthetic-signed");
+    let (_path_dir, path) = temp_sqlite_path("cl-corrupt-synthetic-signed");
     let store = SqliteReceiptStore::open(&path)?;
     let token = make_token(
         "cap-corrupt-synthetic",
@@ -354,7 +347,7 @@ fn reopen_does_not_normalize_synthetic_anchor_with_signed_token(
 #[test]
 fn record_rechecks_conflicts_after_waiting_for_an_external_writer(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cl-cross-process-conflict");
+    let (_path_dir, path) = temp_sqlite_path("cl-cross-process-conflict");
     let waiting_store = SqliteReceiptStore::open(&path)?;
     let observer = SqliteReceiptStore::open(&path)?;
     let issuer = Keypair::generate();
@@ -421,7 +414,7 @@ fn record_rechecks_conflicts_after_waiting_for_an_external_writer(
 #[test]
 fn replication_rejects_signed_capability_downgrade_conflict_and_mismatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("cl-signed-conflicts");
+    let (_path_dir, path) = temp_sqlite_path("cl-signed-conflicts");
     let store = SqliteReceiptStore::open(&path)?;
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -462,7 +455,7 @@ fn replication_rejects_signed_capability_downgrade_conflict_and_mismatch(
 #[test]
 fn record_rejects_parent_that_disagrees_with_signed_token() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("cl-signed-parent-mismatch");
+    let (_path_dir, path) = temp_sqlite_path("cl-signed-parent-mismatch");
     let store = SqliteReceiptStore::open(&path)?;
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -479,7 +472,7 @@ fn record_rejects_parent_that_disagrees_with_signed_token() -> Result<(), Box<dy
 
 #[test]
 fn get_lineage_returns_none_for_missing_capability() {
-    let path = unique_db_path("cl-missing");
+    let (_path_dir, path) = temp_sqlite_path("cl-missing");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let result = store.get_lineage("nonexistent-cap").unwrap();
@@ -490,7 +483,7 @@ fn get_lineage_returns_none_for_missing_capability() {
 
 #[test]
 fn get_lineage_rejects_negative_persisted_unsigned_fields() {
-    let path = unique_db_path("cl-corrupt-read");
+    let (_path_dir, path) = temp_sqlite_path("cl-corrupt-read");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let connection = store.connection().unwrap();
     connection
@@ -529,7 +522,7 @@ fn get_lineage_rejects_negative_persisted_unsigned_fields() {
 
 #[test]
 fn record_child_snapshot_rejects_negative_parent_depth() {
-    let path = unique_db_path("cl-corrupt-parent");
+    let (_path_dir, path) = temp_sqlite_path("cl-corrupt-parent");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let connection = store.connection().unwrap();
     connection
@@ -581,7 +574,7 @@ fn record_child_snapshot_rejects_negative_parent_depth() {
 
 #[test]
 fn lineage_replication_rejects_negative_snapshot_fields() {
-    let path = unique_db_path("cl-corrupt-repl");
+    let (_path_dir, path) = temp_sqlite_path("cl-corrupt-repl");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let connection = store.connection().unwrap();
     connection
@@ -622,7 +615,7 @@ fn lineage_replication_rejects_negative_snapshot_fields() {
 
 #[test]
 fn get_delegation_chain_returns_root_first_for_three_level_chain() {
-    let path = unique_db_path("cl-chain-3");
+    let (_path_dir, path) = temp_sqlite_path("cl-chain-3");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let kp_root = Keypair::generate();
@@ -657,7 +650,7 @@ fn get_delegation_chain_returns_root_first_for_three_level_chain() {
 
 #[test]
 fn get_delegation_chain_returns_single_entry_for_root_capability() {
-    let path = unique_db_path("cl-chain-root");
+    let (_path_dir, path) = temp_sqlite_path("cl-chain-root");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let kp = Keypair::generate();
@@ -674,7 +667,7 @@ fn get_delegation_chain_returns_single_entry_for_root_capability() {
 
 #[test]
 fn receipt_store_authority_chain_rejects_missing_signed_ancestor() {
-    let path = unique_db_path("cl-missing-signed-ancestor");
+    let (_path_dir, path) = temp_sqlite_path("cl-missing-signed-ancestor");
     let store = SqliteReceiptStore::open(&path).unwrap();
     let delegator = Keypair::generate();
     let subject = Keypair::generate();
@@ -714,7 +707,7 @@ fn receipt_store_authority_chain_rejects_missing_signed_ancestor() {
 
 #[test]
 fn get_delegation_chain_enforces_max_depth_guard() {
-    let path = unique_db_path("cl-depth-guard");
+    let (_path_dir, path) = temp_sqlite_path("cl-depth-guard");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // Build a chain of 25 entries (exceeds the level < 20 guard).
@@ -748,7 +741,7 @@ fn get_delegation_chain_enforces_max_depth_guard() {
 
 #[test]
 fn capability_lineage_table_created_by_open() {
-    let path = unique_db_path("cl-table-exists");
+    let (_path_dir, path) = temp_sqlite_path("cl-table-exists");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // Query the table to verify it exists; COUNT(*) fails if the table is absent.
@@ -765,7 +758,7 @@ fn capability_lineage_table_created_by_open() {
 
 #[test]
 fn subject_key_index_exists() {
-    let path = unique_db_path("cl-index-check");
+    let (_path_dir, path) = temp_sqlite_path("cl-index-check");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // PRAGMA index_list returns rows for each index on the table.

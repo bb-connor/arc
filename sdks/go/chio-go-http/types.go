@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 9d6fd2e6c535f43b77f687ee211486c833d164dc6f3bfafd49a1d8837555a5ca
+// Schema content SHA-256: e5fbaf4c2ab7fc303cdb723cab7f8c289a09a3219460d4ee18cfcef5085c8658
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -543,6 +543,35 @@ const (
 // Defines values for ErrorToolServerErrorCode.
 const (
 	ErrorToolServerErrorCodeToolServerError ErrorToolServerErrorCode = "tool_server_error"
+)
+
+// Defines values for ExportBundleVerifyReportExitClass.
+const (
+	ExportBundleVerifyReportExitClassN0  ExportBundleVerifyReportExitClass = 0
+	ExportBundleVerifyReportExitClassN10 ExportBundleVerifyReportExitClass = 10
+)
+
+// Defines values for ExportBundleVerifyReportSchema.
+const (
+	ExportBundleVerifyReportSchemaChioBundleVerifyReportV1 ExportBundleVerifyReportSchema = "chio.bundle-verify-report.v1"
+)
+
+// Defines values for ExportBundleVerifyReportColumn.
+const (
+	ExportBundleVerifyReportColumnContent         ExportBundleVerifyReportColumn = "content"
+	ExportBundleVerifyReportColumnDecision        ExportBundleVerifyReportColumn = "decision"
+	ExportBundleVerifyReportColumnDelegationChain ExportBundleVerifyReportColumn = "delegation_chain"
+	ExportBundleVerifyReportColumnIdentityRoot    ExportBundleVerifyReportColumn = "identity_root"
+	ExportBundleVerifyReportColumnSettlement      ExportBundleVerifyReportColumn = "settlement"
+)
+
+// Defines values for ExportBundleVerifyReportEvidenceClass.
+const (
+	ExportBundleVerifyReportEvidenceClassAsserted     ExportBundleVerifyReportEvidenceClass = "asserted"
+	ExportBundleVerifyReportEvidenceClassObserved     ExportBundleVerifyReportEvidenceClass = "observed"
+	ExportBundleVerifyReportEvidenceClassRejected     ExportBundleVerifyReportEvidenceClass = "rejected"
+	ExportBundleVerifyReportEvidenceClassUnverifiable ExportBundleVerifyReportEvidenceClass = "unverifiable"
+	ExportBundleVerifyReportEvidenceClassVerified     ExportBundleVerifyReportEvidenceClass = "verified"
 )
 
 // Defines values for FederationBilateralSignatureSliceType.
@@ -1578,6 +1607,33 @@ const (
 	ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKindContainer ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind = "container"
 )
 
+// Defines values for ReceiptDecisionModelWitnessEvaluation.
+const (
+	ReceiptDecisionModelWitnessEvaluationEvaluated ReceiptDecisionModelWitnessEvaluation = "evaluated"
+	ReceiptDecisionModelWitnessEvaluationFallback  ReceiptDecisionModelWitnessEvaluation = "fallback"
+)
+
+// Defines values for ReceiptDecisionModelWitnessFallbackReason.
+const (
+	ReceiptDecisionModelWitnessFallbackReasonEmptyProposal      ReceiptDecisionModelWitnessFallbackReason = "empty_proposal"
+	ReceiptDecisionModelWitnessFallbackReasonPolicyUnavailable  ReceiptDecisionModelWitnessFallbackReason = "policy_unavailable"
+	ReceiptDecisionModelWitnessFallbackReasonProposalInfeasible ReceiptDecisionModelWitnessFallbackReason = "proposal_infeasible"
+	ReceiptDecisionModelWitnessFallbackReasonScorerError        ReceiptDecisionModelWitnessFallbackReason = "scorer_error"
+	ReceiptDecisionModelWitnessFallbackReasonWorkExhausted      ReceiptDecisionModelWitnessFallbackReason = "work_exhausted"
+)
+
+// Defines values for ReceiptDecisionModelWitnessOutcome.
+const (
+	ReceiptDecisionModelWitnessOutcomeAllow ReceiptDecisionModelWitnessOutcome = "allow"
+	ReceiptDecisionModelWitnessOutcomeDeny  ReceiptDecisionModelWitnessOutcome = "deny"
+	ReceiptDecisionModelWitnessOutcomeHold  ReceiptDecisionModelWitnessOutcome = "hold"
+)
+
+// Defines values for ReceiptDecisionModelWitnessSchema.
+const (
+	ReceiptDecisionModelWitnessSchemaChioDecisionModelWitnessV1 ReceiptDecisionModelWitnessSchema = "chio.decision-model-witness.v1"
+)
+
 // Defines values for ReceiptDeliveryContractResult.
 const (
 	ReceiptDeliveryContractResultMatched    ReceiptDeliveryContractResult = "matched"
@@ -1742,6 +1798,11 @@ const (
 // Defines values for ReceiptRecordDecision3Verdict.
 const (
 	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptSessionAnchorMetadataSchema.
+const (
+	ReceiptSessionAnchorMetadataSchemaChioReceiptSessionAnchorV1 ReceiptSessionAnchorMetadataSchema = "chio.receipt-session-anchor.v1"
 )
 
 // Defines values for ReceiptSettlementClosureRail.
@@ -4177,6 +4238,23 @@ const (
 // Defines values for RootAuthorityVerifierTrustSchema.
 const (
 	RootAuthorityVerifierTrustSchemaChioVerifierTrustV1 RootAuthorityVerifierTrustSchema = "chio.verifier-trust.v1"
+)
+
+// Defines values for RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind.
+const (
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKindChainAnchor         RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind = "chain_anchor"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKindImmutableRecord     RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind = "immutable_record"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKindLocalLog            RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind = "local_log"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKindTransparencyService RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind = "transparency_service"
+)
+
+// Defines values for RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind.
+const (
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKindChainRoot        RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind = "chain_root"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKindDid              RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind = "did"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKindOperatorRoot     RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind = "operator_root"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKindTransparencyRoot RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind = "transparency_root"
+	RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKindX509Root         RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind = "x509_root"
 )
 
 // Defines values for RuntimeAttackSimulationReportSignatureSchema.
@@ -10984,6 +11062,48 @@ type ErrorToolServerError struct {
 
 // ErrorToolServerErrorCode defines model for ErrorToolServerError.Code.
 type ErrorToolServerErrorCode string
+
+// ExportBundleVerifyReport `chio.bundle-verify-report.v1`: the unsigned per-receipt column report an offline bundle verifier prints. Every class is computed from the bundle and the verifier-owned trust file.
+type ExportBundleVerifyReport struct {
+	// EnvelopeSigner The kernel key that signed the export envelope, in `PublicKey::to_hex` form.
+	EnvelopeSigner  string                                  `json:"envelope_signer"`
+	ExitClass       ExportBundleVerifyReportExitClass       `json:"exit_class"`
+	ManifestSha256  string                                  `json:"manifest_sha256"`
+	Receipts        []ExportBundleVerifyReportReceiptReport `json:"receipts"`
+	RequiredColumns []ExportBundleVerifyReportColumn        `json:"required_columns"`
+	Schema          ExportBundleVerifyReportSchema          `json:"schema"`
+}
+
+// ExportBundleVerifyReportExitClass defines model for ExportBundleVerifyReport.ExitClass.
+type ExportBundleVerifyReportExitClass int64
+
+// ExportBundleVerifyReportSchema defines model for ExportBundleVerifyReport.Schema.
+type ExportBundleVerifyReportSchema string
+
+// ExportBundleVerifyReportColumn defines model for ExportBundleVerifyReportColumn.
+type ExportBundleVerifyReportColumn string
+
+// ExportBundleVerifyReportColumnResult defines model for ExportBundleVerifyReportColumnResult.
+type ExportBundleVerifyReportColumnResult struct {
+	Class  ExportBundleVerifyReportEvidenceClass `json:"class"`
+	Reason *string                               `json:"reason,omitempty"`
+}
+
+// ExportBundleVerifyReportEvidenceClass defines model for ExportBundleVerifyReportEvidenceClass.
+type ExportBundleVerifyReportEvidenceClass string
+
+// ExportBundleVerifyReportReceiptReport defines model for ExportBundleVerifyReportReceiptReport.
+type ExportBundleVerifyReportReceiptReport struct {
+	Columns struct {
+		Content         ExportBundleVerifyReportColumnResult `json:"content"`
+		Decision        ExportBundleVerifyReportColumnResult `json:"decision"`
+		DelegationChain ExportBundleVerifyReportColumnResult `json:"delegation_chain"`
+		IdentityRoot    ExportBundleVerifyReportColumnResult `json:"identity_root"`
+		Settlement      ExportBundleVerifyReportColumnResult `json:"settlement"`
+	} `json:"columns"`
+	ReceiptId string `json:"receipt_id"`
+	Seq       int64  `json:"seq"`
+}
 
 // FederationBilateralSignatureSlice Bounded in-toto Statement payload for Chio bilateral DSSE signature slices. This is not the strict treaty-bound bilateral invocation predicate.
 type FederationBilateralSignatureSlice struct {
@@ -24364,6 +24484,32 @@ type ReceiptChildRequestReceipt struct {
 	Timestamp int64 `json:"timestamp"`
 }
 
+// ReceiptDecisionModelWitness defines model for ReceiptDecisionModelWitness.
+type ReceiptDecisionModelWitness struct {
+	ArtifactDigest  ReceiptDecisionModelWitnessDigest          `json:"artifact_digest"`
+	Evaluation      ReceiptDecisionModelWitnessEvaluation      `json:"evaluation"`
+	FallbackReason  *ReceiptDecisionModelWitnessFallbackReason `json:"fallback_reason,omitempty"`
+	ModelCardDigest ReceiptDecisionModelWitnessDigest          `json:"model_card_digest"`
+	Outcome         ReceiptDecisionModelWitnessOutcome         `json:"outcome"`
+	Schema          ReceiptDecisionModelWitnessSchema          `json:"schema"`
+	WorkOps         int64                                      `json:"work_ops"`
+}
+
+// ReceiptDecisionModelWitnessEvaluation defines model for ReceiptDecisionModelWitness.Evaluation.
+type ReceiptDecisionModelWitnessEvaluation string
+
+// ReceiptDecisionModelWitnessFallbackReason defines model for ReceiptDecisionModelWitness.FallbackReason.
+type ReceiptDecisionModelWitnessFallbackReason string
+
+// ReceiptDecisionModelWitnessOutcome defines model for ReceiptDecisionModelWitness.Outcome.
+type ReceiptDecisionModelWitnessOutcome string
+
+// ReceiptDecisionModelWitnessSchema defines model for ReceiptDecisionModelWitness.Schema.
+type ReceiptDecisionModelWitnessSchema string
+
+// ReceiptDecisionModelWitnessDigest defines model for ReceiptDecisionModelWitnessDigest.
+type ReceiptDecisionModelWitnessDigest = string
+
 // ReceiptDeliveryContract defines model for ReceiptDeliveryContract.
 type ReceiptDeliveryContract struct {
 	ExpectedDigest ReceiptDeliveryContractDigest `json:"expected_digest"`
@@ -25984,6 +26130,15 @@ type ReceiptRecordToolCallAction struct {
 	// Parameters The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).
 	Parameters interface{} `json:"parameters"`
 }
+
+// ReceiptSessionAnchorMetadata defines model for ReceiptSessionAnchorMetadata.
+type ReceiptSessionAnchorMetadata struct {
+	Schema                  ReceiptSessionAnchorMetadataSchema `json:"schema"`
+	SessionAnchorCommitment string                             `json:"session_anchor_commitment"`
+}
+
+// ReceiptSessionAnchorMetadataSchema defines model for ReceiptSessionAnchorMetadata.Schema.
+type ReceiptSessionAnchorMetadataSchema string
 
 // ReceiptSettlementClosure `chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
 type ReceiptSettlementClosure struct {
@@ -33090,8 +33245,11 @@ type RootAuthorityRootPolicyToolDisclosure struct {
 
 // RootAuthorityVerifierTrust `chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
 type RootAuthorityVerifierTrust struct {
-	CheckpointKeys *[]RootAuthorityRootAnchorPublicKeyHex `json:"checkpoint_keys,omitempty"`
-	ExchangeKeys   []RootAuthorityRootAnchorPublicKeyHex  `json:"exchange_keys"`
+	CheckpointKeys        *[]RootAuthorityRootAnchorPublicKeyHex                  `json:"checkpoint_keys,omitempty"`
+	CheckpointTrustAnchor *RootAuthorityVerifierTrustCheckpointTrustAnchorBinding `json:"checkpoint_trust_anchor,omitempty"`
+
+	// ExchangeKeys Keys that may sign anchored roots.
+	ExchangeKeys []RootAuthorityRootAnchorPublicKeyHex `json:"exchange_keys"`
 
 	// IdpKeys Issuer to the identity-provider keys the verifier pins itself.
 	IdpKeys    *map[string][]RootAuthorityRootAnchorJwk `json:"idp_keys,omitempty"`
@@ -33100,8 +33258,10 @@ type RootAuthorityVerifierTrust struct {
 	// PepKeys Policy enforcement point id to its pinned key.
 	PepKeys         *map[string]RootAuthorityRootAnchorPublicKeyHex `json:"pep_keys,omitempty"`
 	RequiredColumns *[]RootAuthorityVerifierTrustRequiredColumns    `json:"required_columns,omitempty"`
-	RootPolicyKeys  []RootAuthorityRootAnchorPublicKeyHex           `json:"root_policy_keys"`
-	Schema          RootAuthorityVerifierTrustSchema                `json:"schema"`
+
+	// RootPolicyKeys Keys that may sign root policies.
+	RootPolicyKeys []RootAuthorityRootAnchorPublicKeyHex `json:"root_policy_keys"`
+	Schema         RootAuthorityVerifierTrustSchema      `json:"schema"`
 }
 
 // RootAuthorityVerifierTrustRequiredColumns defines model for RootAuthorityVerifierTrust.RequiredColumns.
@@ -33109,6 +33269,27 @@ type RootAuthorityVerifierTrustRequiredColumns string
 
 // RootAuthorityVerifierTrustSchema defines model for RootAuthorityVerifierTrust.Schema.
 type RootAuthorityVerifierTrustSchema string
+
+// RootAuthorityVerifierTrustCheckpointTrustAnchorBinding defines model for RootAuthorityVerifierTrustCheckpointTrustAnchorBinding.
+type RootAuthorityVerifierTrustCheckpointTrustAnchorBinding struct {
+	PublicationIdentity struct {
+		Identity string                                                                        `json:"identity"`
+		Kind     RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind `json:"kind"`
+	} `json:"publicationIdentity"`
+	PublicationProfileVersion string `json:"publicationProfileVersion"`
+	SignerCertRef             string `json:"signerCertRef"`
+	TrustAnchorIdentity       struct {
+		Identity string                                                                        `json:"identity"`
+		Kind     RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind `json:"kind"`
+	} `json:"trustAnchorIdentity"`
+	TrustAnchorRef string `json:"trustAnchorRef"`
+}
+
+// RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind defines model for RootAuthorityVerifierTrustCheckpointTrustAnchorBinding.PublicationIdentity.Kind.
+type RootAuthorityVerifierTrustCheckpointTrustAnchorBindingPublicationIdentityKind string
+
+// RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind defines model for RootAuthorityVerifierTrustCheckpointTrustAnchorBinding.TrustAnchorIdentity.Kind.
+type RootAuthorityVerifierTrustCheckpointTrustAnchorBindingTrustAnchorIdentityKind string
 
 // RuntimeAttackSimulationReportSignature defines model for RuntimeAttackSimulationReportSignature.
 type RuntimeAttackSimulationReportSignature struct {

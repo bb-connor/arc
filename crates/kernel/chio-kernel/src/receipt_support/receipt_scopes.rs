@@ -5,6 +5,8 @@ use chio_appraisal::VerifiedRuntimeAttestationRecord;
 use chio_core::capability::governance::GovernedUpstreamCallChainProof;
 use chio_core::receipt::metadata::GuardEvidence;
 
+use crate::kernel::PreInvocationGuardOutput;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct GovernedCallChainReceiptEvidence {
     pub(crate) local_parent_request_id: Option<String>,
@@ -21,8 +23,13 @@ thread_local! {
         const { RefCell::new(None) };
     static GOVERNED_RUNTIME_ATTESTATION_RECORD: RefCell<Option<VerifiedRuntimeAttestationRecord>> =
         const { RefCell::new(None) };
-    static PRE_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
-        const { RefCell::new(Vec::new()) };
+    static PRE_INVOCATION_GUARD_OUTPUT: RefCell<PreInvocationGuardOutput> =
+        const {
+            RefCell::new(PreInvocationGuardOutput {
+                evidence: Vec::new(),
+                witness: None,
+            })
+        };
     static POST_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
         const { RefCell::new(Vec::new()) };
     static FIXED_RUNTIME_RECEIPT_IDS: RefCell<Option<FixedRuntimeReceiptIds>> =
@@ -32,6 +39,7 @@ thread_local! {
 struct FixedRuntimeReceiptIds {
     ids: VecDeque<String>,
     counter: u64,
+    episode_counter: u64,
 }
 
 pub struct ReceiptIdScope {
@@ -56,6 +64,7 @@ pub fn scope_receipt_ids_for_current_thread(
         slot.replace(Some(FixedRuntimeReceiptIds {
             ids: receipt_ids.into_iter().collect(),
             counter: 0,
+            episode_counter: 0,
         }))
     });
     ReceiptIdScope {
@@ -114,28 +123,28 @@ pub(super) fn current_governed_runtime_attestation_record(
     GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| slot.borrow().clone())
 }
 
-pub(crate) struct ScopedPreInvocationGuardEvidence {
-    previous: Vec<GuardEvidence>,
+pub(crate) struct ScopedPreInvocationGuardOutput {
+    previous: PreInvocationGuardOutput,
 }
 
-impl Drop for ScopedPreInvocationGuardEvidence {
+impl Drop for ScopedPreInvocationGuardOutput {
     fn drop(&mut self) {
         let previous = core::mem::take(&mut self.previous);
-        PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| {
+        PRE_INVOCATION_GUARD_OUTPUT.with(|slot| {
             slot.replace(previous);
         });
     }
 }
 
-pub(crate) fn scope_pre_invocation_guard_evidence(
-    evidence: Vec<GuardEvidence>,
-) -> ScopedPreInvocationGuardEvidence {
-    let previous = PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.replace(evidence));
-    ScopedPreInvocationGuardEvidence { previous }
+pub(crate) fn scope_pre_invocation_guard_output(
+    output: PreInvocationGuardOutput,
+) -> ScopedPreInvocationGuardOutput {
+    let previous = PRE_INVOCATION_GUARD_OUTPUT.with(|slot| slot.replace(output));
+    ScopedPreInvocationGuardOutput { previous }
 }
 
-pub(crate) fn current_pre_invocation_guard_evidence() -> Vec<GuardEvidence> {
-    PRE_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.borrow().clone())
+pub(crate) fn current_pre_invocation_guard_output() -> PreInvocationGuardOutput {
+    PRE_INVOCATION_GUARD_OUTPUT.with(|slot| slot.borrow().clone())
 }
 
 pub(crate) struct ScopedPostInvocationGuardEvidence {
@@ -183,9 +192,46 @@ pub(super) fn next_fixed_runtime_receipt_id(
     })
 }
 
+pub(crate) fn next_fixed_runtime_episode_id() -> Result<Option<String>, crate::KernelError> {
+    FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
+        let mut fixed = slot.borrow_mut();
+        let Some(fixed) = fixed.as_mut() else {
+            return Ok(None);
+        };
+        let id = format!("runtime-episode-fixed-{}", fixed.episode_counter);
+        fixed.episode_counter = fixed.episode_counter.checked_add(1).ok_or_else(|| {
+            crate::KernelError::ReceiptSigningFailed(
+                "fixed runtime episode counter exhausted".into(),
+            )
+        })?;
+        Ok(Some(id))
+    })
+}
+
 #[cfg(test)]
 mod counter_tests {
     use super::*;
+    #[test]
+    fn runtime_episode_counter_preserves_receipt_seed_and_refuses_exhaustion() {
+        let _scope = scope_receipt_ids_for_current_thread(["receipt-seed".to_owned()]);
+        assert_eq!(
+            next_fixed_runtime_episode_id().expect("episode"),
+            Some("runtime-episode-fixed-0".to_owned())
+        );
+        assert_eq!(
+            next_fixed_runtime_receipt_id("receipt").expect("receipt"),
+            Some("receipt-seed".to_owned())
+        );
+        FIXED_RUNTIME_RECEIPT_IDS.with(|slot| {
+            slot.borrow_mut()
+                .as_mut()
+                .expect("scoped IDs")
+                .episode_counter = u64::MAX;
+        });
+        assert!(matches!(next_fixed_runtime_episode_id(),
+            Err(crate::KernelError::ReceiptSigningFailed(message)) if message == "fixed runtime episode counter exhausted"));
+    }
+
     #[test]
     fn deterministic_receipt_counter_refuses_exhaustion() {
         let _scope = scope_receipt_ids_for_current_thread([]);

@@ -1,5 +1,24 @@
 use super::*;
 
+pub(super) fn parse_pem_certificates(
+    pem: &str,
+    field_name: &str,
+) -> Result<Vec<ureq::rustls::pki_types::CertificateDer<'static>>, String> {
+    use ureq::rustls::pki_types::pem::PemObject as _;
+    ureq::rustls::pki_types::CertificateDer::pem_slice_iter(pem.as_bytes())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("failed to parse {field_name}: {error}"))
+}
+
+pub(super) fn parse_pem_private_key(
+    pem: &str,
+    field_name: &str,
+) -> Result<ureq::rustls::pki_types::PrivateKeyDer<'static>, String> {
+    use ureq::rustls::pki_types::pem::PemObject as _;
+    ureq::rustls::pki_types::PrivateKeyDer::from_pem_slice(pem.as_bytes())
+        .map_err(|error| format!("failed to parse {field_name}: {error}"))
+}
+
 pub(super) fn ensure_rustls_crypto_provider() {
     static INIT: Once = Once::new();
     INIT.call_once(|| {

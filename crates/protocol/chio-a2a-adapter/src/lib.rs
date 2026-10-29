@@ -11,7 +11,6 @@ use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, ClockRead
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
-use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -25,7 +24,10 @@ use clock::ClockSource;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
 use chio_core::sha256_hex;
-use chio_egress_contract::HttpEgressContract;
+use chio_egress_contract::{
+    BlockingContractAgent, BlockingContractRequest, BlockingContractStream, BlockingContractTls,
+    ClientIdentityPem, HttpEgressContract, HttpEgressError,
+};
 use chio_kernel::{
     KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream, ToolDispatchContext,
     ToolServerConnection, ToolServerStreamResult,
@@ -33,7 +35,6 @@ use chio_kernel::{
 use chio_manifest::{validate_manifest, LatencyHint, ToolDefinition, ToolManifest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
-use ureq::rustls::pki_types::pem::PemObject as _;
 use url::form_urlencoded::{byte_serialize, Serializer as UrlFormSerializer};
 use url::Url;
 

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 936f01fbaf15ccab5bca50203cf95936a2749b0ba2b385cfb06c969d36078471
+// Schema SHA: a1b76989f1d5b006f1ef3c0e609d0b111c7d0a3041042a9ff0227e6d85669f60
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -5633,6 +5633,52 @@ export namespace Error_ToolServerError {
   export interface ChioToolCallErrorToolServerError {
     code: "tool_server_error";
     detail: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/export/bundle-verify-report.schema.json
+export namespace Export_BundleVerifyReport {
+  export type Column = "identity_root" | "delegation_chain" | "decision" | "content" | "settlement";
+  export type EvidenceClass = "verified" | "observed" | "asserted" | "unverifiable" | "rejected";
+
+  /**
+   * `chio.bundle-verify-report.v1`: the unsigned per-receipt column report an offline bundle verifier prints. Every class is computed from the bundle and the verifier-owned trust file.
+   */
+  export interface ChioBundleVerifyReport {
+    schema: "chio.bundle-verify-report.v1";
+    /**
+     * The kernel key that signed the export envelope, in `PublicKey::to_hex` form.
+     */
+    envelope_signer: string;
+    manifest_sha256: string;
+    /**
+     * @maxItems 5
+     */
+    required_columns:
+      | []
+      | [Column]
+      | [Column, Column]
+      | [Column, Column, Column]
+      | [Column, Column, Column, Column]
+      | [Column, Column, Column, Column, Column];
+    receipts: ReceiptReport[];
+    exit_class: 0 | 10;
+  }
+  export interface ReceiptReport {
+    receipt_id: string;
+    seq: number;
+    columns: {
+      identity_root: ColumnResult;
+      delegation_chain: ColumnResult;
+      decision: ColumnResult;
+      content: ColumnResult;
+      settlement: ColumnResult;
+    };
+  }
+  export interface ColumnResult {
+    class: EvidenceClass;
+    reason?: string;
   }
 }
 
@@ -19531,6 +19577,23 @@ export namespace Receipt_ChildRequestReceipt {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json
+export namespace Receipt_DecisionModelWitness {
+  export type ChioDecisionModelWitnessReceiptMetadata = {
+    [k: string]: unknown;
+  } & {
+    schema: "chio.decision-model-witness.v1";
+    model_card_digest: Digest;
+    artifact_digest: Digest;
+    outcome: "allow" | "hold" | "deny";
+    evaluation: "evaluated" | "fallback";
+    fallback_reason?: "empty_proposal" | "proposal_infeasible" | "scorer_error" | "work_exhausted" | "policy_unavailable";
+    work_ops: number;
+  };
+  export type Digest = string;
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/receipt/delivery-contract.schema.json
 export namespace Receipt_DeliveryContract {
   export type Digest = string;
@@ -21122,6 +21185,15 @@ export namespace Receipt_Record {
     issuer_public_key_hex: string;
     message_count: 14;
     signature_hex: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/session-anchor-metadata.schema.json
+export namespace Receipt_SessionAnchorMetadata {
+  export interface ChioReceiptSessionAnchorMetadata {
+    schema: "chio.receipt-session-anchor.v1";
+    session_anchor_commitment: string;
   }
 }
 
@@ -66624,15 +66696,19 @@ export namespace RootAuthority_VerifierTrust {
      */
     kernel_keys: [string, ...string[]];
     /**
-     * @minItems 1
+     * Keys that may sign anchored roots.
+     *
+     * @minItems 0
      * @maxItems 64
      */
-    exchange_keys: [string, ...string[]];
+    exchange_keys: string[];
     /**
-     * @minItems 1
+     * Keys that may sign root policies.
+     *
+     * @minItems 0
      * @maxItems 64
      */
-    root_policy_keys: [string, ...string[]];
+    root_policy_keys: string[];
     /**
      * Issuer to the identity-provider keys the verifier pins itself.
      */
@@ -66655,6 +66731,7 @@ export namespace RootAuthority_VerifierTrust {
      * @maxItems 64
      */
     checkpoint_keys?: string[];
+    checkpoint_trust_anchor?: CheckpointTrustAnchorBinding;
     /**
      * @maxItems 5
      */
@@ -66683,6 +66760,22 @@ export namespace RootAuthority_VerifierTrust {
           "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
           "identity_root" | "delegation_chain" | "decision" | "content" | "settlement"
         ];
+  }
+  /**
+   * The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews.
+   */
+  export interface CheckpointTrustAnchorBinding {
+    publicationIdentity: {
+      kind: "local_log" | "transparency_service" | "immutable_record" | "chain_anchor";
+      identity: string;
+    };
+    trustAnchorIdentity: {
+      kind: "operator_root" | "did" | "x509_root" | "transparency_root" | "chain_root";
+      identity: string;
+    };
+    trustAnchorRef: string;
+    signerCertRef: string;
+    publicationProfileVersion: string;
   }
 }
 

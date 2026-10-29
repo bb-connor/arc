@@ -20,16 +20,37 @@ fn lean_abstraction_anchor_is_review_metadata() {
 }
 
 #[test]
-fn current_mapping_parses_without_warnings() {
-    let parsed = parse_mapping(include_str!("../../../../formal/MAPPING.md"));
+fn current_mapping_parses_every_property_row() {
+    let mapping = include_str!("../../../../formal/MAPPING.md");
+    let parsed = parse_mapping(mapping);
 
     assert!(parsed.warnings.is_empty(), "{:?}", parsed.warnings);
-    assert_eq!(parsed.rows.len(), 113);
+    let property_lines = mapping
+        .lines()
+        .filter(|line| line.trim_start().starts_with("| `"))
+        .count();
+    assert_eq!(parsed.rows.len(), property_lines);
+    let properties = parsed
+        .rows
+        .iter()
+        .map(|row| row.property.as_str())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        properties.len(),
+        parsed.rows.len(),
+        "duplicate property rows"
+    );
+    for row in &parsed.rows {
+        assert!(
+            !row.source.is_empty() && !row.rust_paths.is_empty(),
+            "{row:?}"
+        );
+    }
     for property in [
         "verify_captured_invocation_count_monotonic",
         "verify_replay_fingerprint_uniqueness",
     ] {
-        assert!(parsed.rows.iter().any(|row| row.property == property));
+        assert!(properties.contains(property), "{property}");
     }
 }
 

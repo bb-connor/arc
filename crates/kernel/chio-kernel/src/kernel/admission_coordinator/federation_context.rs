@@ -117,8 +117,6 @@ impl ChioKernel {
         outcome: &ToolOutcomeRecordV1,
     ) -> Result<Option<ScopedKernelReceiptFederationAdmission>, KernelError> {
         let Some(bytes) = raw.federation_context_json() else {
-            // Legacy outcomes have no invented snapshot. Their existing
-            // in-flight scope may still be used, but no history is synthesized.
             return Ok(None);
         };
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;

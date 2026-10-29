@@ -10,10 +10,10 @@
 use alloc::format;
 
 use super::{
-    BUDGET_AUTHORITY_METADATA_KEY, CHANNEL_METADATA_KEY, DELIVERY_CONTRACT_METADATA_KEY,
-    DELIVERY_CONTRACT_SCHEMA, FINANCIAL_METADATA_KEY, FINDING_DELIVERY_METADATA_KEY,
-    FINDING_DELIVERY_SCHEMA, FINDING_RECOVERY_METADATA_KEY, FINDING_RECOVERY_SCHEMA,
-    GOVERNED_TRANSACTION_METADATA_KEY,
+    BUDGET_AUTHORITY_METADATA_KEY, CHANNEL_METADATA_KEY, DECISION_MODEL_WITNESS_METADATA_KEY,
+    DECISION_MODEL_WITNESS_SCHEMA, DELIVERY_CONTRACT_METADATA_KEY, DELIVERY_CONTRACT_SCHEMA,
+    FINANCIAL_METADATA_KEY, FINDING_DELIVERY_METADATA_KEY, FINDING_DELIVERY_SCHEMA,
+    FINDING_RECOVERY_METADATA_KEY, FINDING_RECOVERY_SCHEMA, GOVERNED_TRANSACTION_METADATA_KEY,
 };
 use crate::error::{Error, Result};
 use crate::receipt::signing::{
@@ -162,6 +162,13 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         "Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit.",
     ),
     spec(
+        super::SESSION_ANCHOR_METADATA_KEY,
+        ChioInternal,
+        CommittedSafe,
+        Some(super::RECEIPT_SESSION_ANCHOR_SCHEMA),
+        "The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, and the receipt itself does not carry it. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier.",
+    ),
+    spec(
         "receipt_context",
         ChioInternal,
         Unsafe,
@@ -223,6 +230,13 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         CommittedSafe,
         None,
         "Durable recovery binding and the live-status floor admitted before dispatch. Read by the kernel's recovery gate and replay paths.",
+    ),
+    spec(
+        DECISION_MODEL_WITNESS_METADATA_KEY,
+        ChioInternal,
+        CommittedSafe,
+        Some(DECISION_MODEL_WITNESS_SCHEMA),
+        "Decision-model witness: model card and artifact digests, outcome (the verdict class), evaluated-or-fallback tag, closed fallback reason and the model-constant work count. No argument, result, atom or rule selection, or margin. Read by the kernel's replay path and the offline verifier.",
     ),
     spec(
         "findingDenial",
@@ -398,13 +412,6 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         None,
         "Unsalted domain hash over the raw tenant and action ids.",
-    ),
-    spec(
-        "active_defense_backfill_v1",
-        ChioInternal,
-        Unsafe,
-        None,
-        "Active-defense migration marker with unaudited contents.",
     ),
     spec(
         "scimLifecycle",

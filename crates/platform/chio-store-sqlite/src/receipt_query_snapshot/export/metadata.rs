@@ -4,16 +4,15 @@
 //! bounded, decoded or validated.
 use std::collections::{BTreeMap, BTreeSet};
 
-use chio_core::receipt::lineage::ChildRequestReceipt;
-use chio_kernel::capability_lineage::CapabilitySnapshot;
-use chio_kernel::checkpoint::{
-    validate_checkpoint_transparency, CheckpointTransparencySummary, KernelCheckpoint,
-};
-use chio_kernel::evidence_export::{
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
+use chio_core::receipt::evidence::CapabilitySnapshot;
+use chio_core::receipt::evidence::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
     EvidenceToolReceiptRecord,
 };
+use chio_core::receipt::lineage::ChildRequestReceipt;
 use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
+use chio_kernel_core::evidence_verify::validate_checkpoint_transparency;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{checkpoint_digest, invalid, Lease};
@@ -446,7 +445,9 @@ pub(super) fn lineage(
                             crate::capability_lineage::snapshot_from_row,
                         )
                         .map(Some)
-                        .map_err(|error| refused_by_reader(error, &capability));
+                        .map_err(|error| {
+                            crate::capability_lineage::lineage_reader_error(error, &capability)
+                        });
                 }
                 let snapshot = live
                     .query_row(
@@ -455,7 +456,9 @@ pub(super) fn lineage(
                         crate::capability_lineage::snapshot_columns_from_row,
                     )
                     .map_err(|error| metadata_row_error(error, INVALID_LINEAGE_METADATA))?;
-                snapshot.validate().map_err(lineage_validation_error)?;
+                snapshot
+                    .validate()
+                    .map_err(|error| lineage_validation_error(ReceiptStoreError::from(error)))?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {
@@ -557,21 +560,6 @@ fn lineage_validation_error(error: ReceiptStoreError) -> ReceiptStoreError {
             metadata_refusal(INVALID_LINEAGE_METADATA)
         }
         other => other,
-    }
-}
-
-/// A lineage row the canonical local reader refuses, for a capability with a
-/// held receipt that takes its attribution from it. The reason is the one the
-/// extension reports for the same row.
-fn refused_by_reader(error: rusqlite::Error, capability: &str) -> ReceiptStoreError {
-    match error {
-        rusqlite::Error::FromSqlConversionFailure(..)
-        | rusqlite::Error::InvalidColumnType(..)
-        | rusqlite::Error::IntegralValueOutOfRange(..)
-        | rusqlite::Error::Utf8Error(..) => invalid(format!(
-            "capability lineage of {capability} is refused by the local reader: {error}"
-        )),
-        other => other.into(),
     }
 }
 

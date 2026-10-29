@@ -3,8 +3,14 @@
 #[path = "federated_issue/enterprise_provider_fixtures.rs"]
 mod enterprise_provider_fixtures;
 
+#[path = "federated_issue/evidence_fixtures.rs"]
+mod evidence_fixtures;
+use evidence_fixtures::{create_evidence_federation_policy, write_kernel_trust_file};
+
 #[path = "support/private_fixture.rs"]
 mod private_fixture;
+#[path = "support/trust_access.rs"]
+mod trust_access;
 use private_fixture::write_private_file;
 
 #[path = "support/fixture_paths.rs"]
@@ -103,8 +109,8 @@ fn spawn_trust_service_with_verifier(
         &listen.to_string(),
         "--advertise-url",
         advertise_url,
-        "--service-token",
-        service_token,
+        "--access-config",
+        &trust_access::write_access_config(service_token, &[]),
     ]);
     if let Some(path) = enterprise_providers_file {
         command.args([
@@ -852,43 +858,6 @@ fn create_federated_delegation_policy(
     assert!(
         output.status.success(),
         "chio trust federated-delegation-policy-create failed\nstdout:\n{}\nstderr:\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-}
-
-fn create_evidence_federation_policy(
-    output_path: &Path,
-    signing_seed_path: &Path,
-    issuer: &str,
-    partner: &str,
-    capability_id: &str,
-) {
-    let output = Command::new(env!("CARGO_BIN_EXE_chio"))
-        .current_dir(workspace_root())
-        .args([
-            "evidence",
-            "federation-policy",
-            "create",
-            "--output",
-            output_path.to_str().expect("federation policy path"),
-            "--signing-seed-file",
-            signing_seed_path.to_str().expect("signing seed path"),
-            "--issuer",
-            issuer,
-            "--partner",
-            partner,
-            "--capability",
-            capability_id,
-            "--admin-all",
-            "--expires-at",
-            "1900000000",
-        ])
-        .output()
-        .expect("run evidence federation policy create");
-    assert!(
-        output.status.success(),
-        "chio evidence federation-policy create failed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
@@ -1734,6 +1703,7 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
     );
     wait_for_trust_service(&client, &base_url_b);
 
+    let import_trust_path = write_kernel_trust_file(&authority_public_key);
     let import = Command::new(env!("CARGO_BIN_EXE_chio"))
         .current_dir(workspace_root())
         .args([
@@ -1744,8 +1714,8 @@ fn trust_service_federated_issue_supports_multi_hop_imported_upstream_parent() {
             service_token_b,
             "evidence",
             "import",
-            "--trusted-kernel-pubkey",
-            &authority_public_key,
+            "--trust",
+            import_trust_path.to_str().expect("import trust path"),
             "--input",
             evidence_package_dir
                 .to_str()

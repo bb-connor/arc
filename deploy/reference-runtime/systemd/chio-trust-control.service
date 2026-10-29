@@ -1,8 +1,10 @@
 # Chio trust-control service: the shared receipt store, capability authority
 # and joint admission authority the remote MCP edge depends on.
 #
-# Secrets arrive as credential files the manager reads as root and exposes to
-# this service alone; nothing else is configured through the environment.
+# Callers authenticate against the access configuration, which holds only
+# SHA-256 digests of their secrets. It arrives as a credential file the
+# manager reads as root and exposes to this service alone; nothing is
+# configured through the environment.
 # Readiness is the /health route answering, so dependants wait for a service
 # that serves.
 
@@ -21,11 +23,7 @@ StateDirectoryMode=0700
 RuntimeDirectory=chio-trust-control
 RuntimeDirectoryMode=0700
 WorkingDirectory=/var/lib/chio-trust-control
-# The administrative service bearer and the workload bearer stay distinct:
-# the workload credential can read authority status and request issuance
-# but cannot use the administrative trust-control routes.
-LoadCredential=trust-service-token:/etc/chio/credentials/trust-service-token
-LoadCredential=trust-authority-workload-token:/etc/chio/credentials/trust-authority-workload-token
+LoadCredential=trust-access-config:/etc/chio/credentials/trust-access.toml
 # Refuse to start on a damaged store rather than rebuild silently.
 ExecStartPre=/usr/local/bin/chio \
   --receipt-db /var/lib/chio-trust-control/receipts.sqlite3 \
@@ -33,8 +31,6 @@ ExecStartPre=/usr/local/bin/chio \
   --session-db /var/lib/chio-trust-control/sessions.sqlite3 \
   security preflight
 ExecStart=/usr/local/bin/chio security supervise \
-  --credential-env CHIO_TRUST_SERVICE_TOKEN=trust-service-token \
-  --credential-env CHIO_TRUST_AUTHORITY_WORKLOAD_TOKEN=trust-authority-workload-token \
   --ready-http http://127.0.0.1:8940/health \
   --ready-timeout 60 \
   --stop-grace 30 \
@@ -43,7 +39,8 @@ ExecStart=/usr/local/bin/chio security supervise \
   --authority-db /var/lib/chio-trust-control/authority.sqlite3 \
   --session-db /var/lib/chio-trust-control/sessions.sqlite3 \
   trust serve \
-  --listen 127.0.0.1:8940
+  --listen 127.0.0.1:8940 \
+  --access-config %d/trust-access-config
 Restart=on-failure
 RestartSec=5s
 # SIGTERM starts the bounded drain (25s); the supervisor forwards it and

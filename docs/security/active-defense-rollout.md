@@ -16,10 +16,10 @@ not claims that those operational stages have run.
 - Only signed `chio.manifest.v1` manifests may opt into flow enforcement.
 - Every constructor serving an opted-in tool installs one complete `SecurityRuntime` authority bundle atomically.
 - Unknown historical information is `Top`. It is never inferred as `Bottom`.
-- Principal and capability-lineage taint survives legacy session closure. Only a verified isolation-epoch transition starts an isolated successor.
+- Principal and capability-lineage taint survives closure of a session that predates enablement. Only a verified isolation-epoch transition starts an isolated successor.
 - Only verified internal security events may produce an automatic-response finding.
 - Truncated causal scope, an unavailable authority, an unverified receipt, or an incomplete rollback denies automatic promotion.
-- Once a tool, provider, or server is marked enforced, an operational failure denies service. It never selects the legacy path.
+- Once a tool, provider, or server is marked enforced, an operational failure denies service. It never falls back to unenforced service.
 - Permanent revocation remains manual.
 
 ## Inventory and migration report
@@ -32,8 +32,7 @@ Before shadow mode, run the Chio security migration command against every regist
 - every adapter that cannot preserve the exact flow declaration and authenticated security extensions;
 - every direct credential environment or file grant that must move behind the secret broker;
 - every native server selected for cage enforcement and its independent operator ceiling;
-- counts of principal, lineage, and session records backfilled from verified receipts;
-- counts assigned `Top` because verified evidence was absent;
+- every pre-enablement principal, lineage, and session record, each assigned `Top`;
 - every manifest requiring operator re-signing.
 
 The report passes only when unsupported adapters and undeclared effective egress are zero for the proposed enforcement cohort. Migration never signs on behalf of an operator.
@@ -46,7 +45,7 @@ chio security shadow-migrate \
   --output active-defense-migration-report.json
 ```
 
-The input schema identifier is `chio.active-defense.shadow-migration-input.v1`. Its top-level fields are `manifest_public_keys`, `receipt_public_keys`, `manifests`, `backfill_targets`, `backfill_receipts`, and `shadow_observations`. Every nested object is closed. Duplicate JSON members, unknown fields, unsafe JSON numbers, duplicate key identities, duplicate registry identities, and incomplete per-tool deployment inventories reject the complete input.
+The input schema identifier is `chio.active-defense.shadow-migration-input.v1`. Its top-level fields are `manifest_public_keys`, `manifests`, `backfill_targets`, and `shadow_observations`. Every nested object is closed. Duplicate JSON members, unknown fields, unsafe JSON numbers, duplicate key identities, duplicate registry identities, and incomplete per-tool deployment inventories reject the complete input.
 
 Each manifest entry contains:
 
@@ -57,9 +56,9 @@ Each manifest entry contains:
 
 The verifier refuses any body whose schema id is not `chio.manifest.v1`, then parses the body as the closed normative type, so an older shape carrying that id is refused by structure. The parsed manifest is verified against the registered key through the manifest verifier. The command has no conversion path and no signing input.
 
-Backfill evidence is accepted only from the signed receipt metadata member `active_defense_backfill_v1`, whose schema is `chio.active-defense.backfill-evidence.v1`. The receipt key must match a registered receipt key, the receipt signature and parameter hash must verify, and the evidence must name the exact digest of a registered, successfully verified signed `chio.manifest.v1` manifest containing the receipt's server and tool. A target without that evidence is assigned `Top`. If any inventoried legacy session for a principal or lineage lacks evidence, the durable principal or lineage record is also assigned `Top`, including when another signed receipt says that a legacy session closed.
+Every backfill target is assigned `Top`, and so is the durable record of each principal and lineage that a target names.
 
-The report is canonical JSON written by file synchronization plus atomic rename. No output file is changed until the complete input, every manifest, and every backfill receipt verifies. The report emits these metric names without embedding promotion thresholds:
+The report is canonical JSON written by file synchronization plus atomic rename. No output file is changed until the complete input and every manifest verify. The report emits these metric names without embedding promotion thresholds:
 
 - `chio_active_defense_shadow_unknown_labels_total`
 - `chio_active_defense_shadow_store_errors_total`

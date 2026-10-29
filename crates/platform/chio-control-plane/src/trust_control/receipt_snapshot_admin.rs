@@ -1,7 +1,8 @@
 //! Node-local operator recovery of the authenticated receipt query snapshot.
 //!
-//! `POST /v1/receipts/query/snapshot/recovery` with the service token may
-//! raise this node's snapshot quota and requests an immediate resource retry.
+//! `POST /v1/receipts/query/snapshot/recovery` with a credential with
+//! deployment tenant authority holding `receipts:admin` may raise this node's
+//! snapshot quota and requests an immediate resource retry.
 //! The body is `{}` (retry only) or `{"quotaBytes": <u64>}`; the route's JSON
 //! contract bounds it to 256 bytes and authenticates before reading it. The
 //! request is never forwarded to a leader: each node owns its projection.
@@ -15,7 +16,7 @@
 //! A raised quota is runtime-only: it is lost on restart, which applies the
 //! configured `--receipt-query-snapshot-quota-bytes` again. Change that setting
 //! to keep the larger quota.
-use super::report_validation::validate_service_auth;
+use super::report_validation::validate_caller;
 use super::*;
 use chio_store_sqlite::receipt_query_snapshot::{
     ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
@@ -40,7 +41,7 @@ pub(crate) async fn handle_receipt_query_snapshot_recovery(
     headers: HeaderMap,
     Json(request): Json<ReceiptQuerySnapshotRecoveryRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReceiptsAdmin) {
         return response;
     }
     let Some(snapshots) = state.receipt_query_snapshots.as_ref() else {

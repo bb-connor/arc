@@ -1,149 +1,31 @@
 use std::cmp::{max, min};
-use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use chio_core::receipt::{
-    body::ChioReceipt, crypto_floor::ReceiptCryptoFloor, kinds::BoundaryClass, kinds::ReceiptKind,
+use chio_bundle_verify::federation::merge_read_boundary;
+use chio_bundle_verify::package::{write_package, PackageContents, PolicyAttachment};
+use chio_bundle_verify::verify::{
+    verify_package, verify_transparency, EmbeddedHttpError, EmbeddedHttpReceiptVerifier,
+    VerifiedPackage,
 };
-use chio_core::{
-    canonical_json_bytes, receipt::body::chio_receipt_id, sha256_hex, PublicKey, Signature,
+use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::evidence::{
+    EvidenceChildReceiptScope, EvidenceDisclosureNotice, EvidenceExportBundle, EvidenceExportQuery,
+    EvidenceImportPackage, EvidenceReceiptSemanticSummary, EvidenceTransparencyClaims,
+    EvidenceUncheckpointedReceipt, FederationPolicyBody, FederationPolicyDocument,
+    PolicyAttachmentMetadata, ReceiptReadBoundary, FEDERATED_EVIDENCE_SHARE_SCHEMA,
+    FEDERATION_POLICY_SCHEMA,
 };
-use chio_kernel::checkpoint::{
-    checkpoint_body_sha256, validate_checkpoint_transparency, CheckpointConsistencyProof,
-    CheckpointEquivocation, CheckpointPublication, CheckpointTransparencySummary,
-    CheckpointWitness,
-};
-use chio_kernel::evidence_export::{
-    build_evidence_transparency_claims, EvidenceTransparencyClaims,
-};
-use chio_kernel::{
-    is_supported_checkpoint_schema, verify_checkpoint_signature, CapabilitySnapshot,
-    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportQuery, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
-    KernelCheckpoint, ReceiptInclusionProof, ReceiptReadBoundary,
-};
+use chio_core::{canonical_json_bytes, sha256_hex};
+use chio_core_types::root_authority::VerifierTrust;
+use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
 use chio_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::load_policy;
 use crate::{load_or_create_authority_keypair, CliError};
-
-mod envelope;
-mod package_io;
-mod package_read;
-mod package_write;
-mod verification;
-
-pub use crate::evidence_export::envelope::EvidenceVerificationPolicy;
-use crate::evidence_export::package_read::load_verified_evidence_package;
-use crate::evidence_export::package_write::write_evidence_package;
-
-pub use crate::evidence_export::package_read::load_verified_evidence_package_summary;
-pub(crate) use verification::{build_federated_share_import, validate_import_package_data};
-use verification::{
-    evidence_receipt_semantic_summary, validate_checkpoint_transparency_summary,
-    verify_checkpoint_transparency_records,
-};
-
-const EVIDENCE_EXPORT_MANIFEST_SCHEMA: &str = "chio.evidence_export_manifest.v1";
-const FEDERATION_POLICY_SCHEMA: &str = "chio.federation-policy.v1";
-const FEDERATED_EVIDENCE_SHARE_SCHEMA: &str = "chio.federated-evidence-share.v1";
-
-fn is_supported_evidence_export_manifest_schema(schema: &str) -> bool {
-    schema == EVIDENCE_EXPORT_MANIFEST_SCHEMA
-}
-
-fn is_supported_federation_policy_schema(schema: &str) -> bool {
-    schema == FEDERATION_POLICY_SCHEMA
-}
-
-fn federated_evidence_share_schema_for_manifest(_schema: &str) -> &'static str {
-    FEDERATED_EVIDENCE_SHARE_SCHEMA
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EvidenceExportCounts {
-    tool_receipts: u64,
-    child_receipts: u64,
-    checkpoints: u64,
-    capability_lineage: u64,
-    inclusion_proofs: u64,
-    uncheckpointed_receipts: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EvidenceProofCoverage {
-    checkpointed_receipts: u64,
-    uncheckpointed_receipts: u64,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EvidenceReceiptSemanticSummary {
-    mediated_decisions: u64,
-    trace_observations: u64,
-    advisory_evaluations: u64,
-    prevent: u64,
-    detect_only: u64,
-    advisory_only: u64,
-    cannot_see: u64,
-    authorized: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EvidenceExportFileHash {
-    path: String,
-    sha256: String,
-    bytes: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct PolicyAttachmentMetadata {
-    format: String,
-    source_hash: String,
-    runtime_hash: String,
-    source_path: String,
-    source_bytes: u64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct FederationPolicyAttachmentMetadata {
-    issuer: String,
-    partner: String,
-    signer_public_key: PublicKey,
-    created_at: u64,
-    expires_at: u64,
-    require_proofs: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct FederationPolicyBody {
-    schema: String,
-    issuer: String,
-    partner: String,
-    signer_public_key: PublicKey,
-    created_at: u64,
-    expires_at: u64,
-    query: EvidenceExportQuery,
-    require_proofs: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    purpose: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct FederationPolicyDocument {
-    body: FederationPolicyBody,
-    signature: Signature,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -168,22 +50,10 @@ pub struct RemoteEvidenceExportResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct EvidenceImportPackage {
-    envelope: envelope::PackageEnvelope,
-    manifest: EvidenceExportManifest,
-    bundle: EvidenceExportBundle,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    transparency: Option<CheckpointTransparencySummary>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    federation_policy: Option<FederationPolicyDocument>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RemoteEvidenceImportRequest {
     pub package: EvidenceImportPackage,
     /// Explicit administrative trust input, independent of package contents.
-    pub verification: EvidenceVerificationPolicy,
+    pub trust: VerifierTrust,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,116 +63,10 @@ pub struct RemoteEvidenceImportResponse {
 }
 
 #[derive(Debug, Clone)]
-pub struct VerifiedEvidencePackage {
-    pub bundle: EvidenceExportBundle,
-    pub transparency: Option<CheckpointTransparencySummary>,
-    pub manifest_schema: String,
-    pub exported_at: u64,
-    pub manifest_hash: String,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct PreparedEvidenceExport {
     pub query: EvidenceExportQuery,
     pub require_proofs: bool,
     pub federation_policy: Option<FederationPolicyDocument>,
-}
-
-/// Documented metadata disclosure attached to tenant-scoped exports.
-///
-/// Tenant-scoped evidence exports inherit kernel-signed checkpoint bodies and
-/// their inclusion proofs. Those signed artifacts cover the full per-batch
-/// Merkle tree, which is shared across tenants by design. This notice lists
-/// which cross-tenant fields the exported checkpoint set inherently reveals,
-/// so receiving parties can audit the disclosure boundary without parsing
-/// every signed body manually. Admin-all exports do not carry the notice
-/// because the operator already requested a cross-tenant view.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct EvidenceDisclosureNotice {
-    /// Stable identifier for the notice format so downstream parsers can
-    /// branch deterministically when the disclosure list changes.
-    schema: String,
-    /// Concise summary describing why this disclosure is unavoidable in the
-    /// current protocol version.
-    summary: String,
-    /// Names of fields on each exported `KernelCheckpointBody` (in
-    /// `checkpoints.ndjson`) that describe the full per-batch Merkle tree and
-    /// therefore reveal cross-tenant aggregate information.
-    disclosed_checkpoint_body_fields: Vec<String>,
-    /// Names of derived publication / witness fields (in
-    /// `checkpoint-*.ndjson`) that mirror the signed body and are therefore
-    /// equivalent disclosures.
-    disclosed_publication_fields: Vec<String>,
-    /// Specific metadata that is intentionally narrowed for tenant-scoped
-    /// exports compared to admin-all exports.
-    narrowed_metadata: Vec<String>,
-    /// Stable reference to the docs section describing why the disclosure
-    /// cannot be eliminated without protocol-level changes.
-    protocol_reference: String,
-}
-
-const EVIDENCE_DISCLOSURE_NOTICE_SCHEMA: &str = "chio.evidence_export_disclosure_notice.v1";
-
-fn tenant_scoped_disclosure_notice() -> EvidenceDisclosureNotice {
-    EvidenceDisclosureNotice {
-        schema: EVIDENCE_DISCLOSURE_NOTICE_SCHEMA.to_string(),
-        summary: "Kernel-signed checkpoint bodies and their derived publication records cover the full per-batch Merkle tree shared across tenants. Tenant-scoped exports therefore reveal aggregate batch metadata for receipts they do not contain. This disclosure is unavoidable without protocol-level per-tenant subtree proofs.".to_string(),
-        disclosed_checkpoint_body_fields: vec![
-            "batch_start_seq".to_string(),
-            "batch_end_seq".to_string(),
-            "tree_size".to_string(),
-            "merkle_root".to_string(),
-            "checkpoint_seq".to_string(),
-            "issued_at".to_string(),
-            "previous_checkpoint_sha256".to_string(),
-        ],
-        disclosed_publication_fields: vec![
-            "entry_start_seq".to_string(),
-            "entry_end_seq".to_string(),
-            "log_tree_size".to_string(),
-        ],
-        narrowed_metadata: vec![
-            "retention.liveDbSizeBytes is omitted (admin-all only)".to_string(),
-            "retention.oldestLiveReceiptTimestamp is restricted to the requesting tenant"
-                .to_string(),
-        ],
-        protocol_reference:
-            "docs/release/COMPLIANCE_EVIDENCE_EXPORT_PLAN.md#tenant-scoped-disclosure".to_string(),
-    }
-}
-
-#[must_use]
-fn maybe_build_disclosure_notice(query: &EvidenceExportQuery) -> Option<EvidenceDisclosureNotice> {
-    match &query.read_boundary {
-        Some(ReceiptReadBoundary::TenantScoped { .. }) => Some(tenant_scoped_disclosure_notice()),
-        Some(ReceiptReadBoundary::AdminAll) | None => None,
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct EvidenceExportManifest {
-    schema: String,
-    exported_at: u64,
-    query: EvidenceExportQuery,
-    counts: EvidenceExportCounts,
-    proof_coverage: EvidenceProofCoverage,
-    #[serde(default)]
-    receipt_semantics: EvidenceReceiptSemanticSummary,
-    child_receipt_scope: EvidenceChildReceiptScope,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    claim_boundary: Option<EvidenceTransparencyClaims>,
-    files: Vec<EvidenceExportFileHash>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    policy: Option<PolicyAttachmentMetadata>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    federation_policy: Option<FederationPolicyAttachmentMetadata>,
-    /// Per-tenant disclosure notice attached when the export is tenant-scoped.
-    /// Documents which signed-checkpoint fields inherently reveal aggregate
-    /// cross-tenant metadata so the disclosure boundary stays auditable.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    disclosure_notice: Option<EvidenceDisclosureNotice>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -326,6 +90,8 @@ struct EvidenceVerificationResult {
     claim_boundary: EvidenceTransparencyClaims,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disclosure_notice: Option<EvidenceDisclosureNotice>,
+    required_columns: Vec<chio_core_types::root_authority::ReportColumn>,
+    columns: Vec<chio_bundle_verify::ReceiptReport>,
 }
 
 fn unix_now() -> Result<u64, chio_security_types::clock::ClockError> {
@@ -373,98 +139,6 @@ fn ensure_clean_output_dir(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
-fn ensure_existing_dir(path: &Path, label: &str) -> Result<(), CliError> {
-    if !path.exists() {
-        return Err(CliError::attest_error(format!(
-            "{label} directory does not exist: {}",
-            path.display()
-        )));
-    }
-    if !path.is_dir() {
-        return Err(CliError::attest_error(format!(
-            "{label} path must be a directory: {}",
-            path.display()
-        )));
-    }
-    Ok(())
-}
-
-fn write_bytes_file(
-    output_dir: &Path,
-    relative_path: &str,
-    bytes: &[u8],
-    file_hashes: &mut Vec<EvidenceExportFileHash>,
-) -> Result<(), CliError> {
-    let path = output_dir.join(relative_path);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&path, bytes)?;
-    file_hashes.push(EvidenceExportFileHash {
-        path: relative_path.to_string(),
-        sha256: sha256_hex(bytes),
-        bytes: crate::integer::count(bytes.len()),
-    });
-    Ok(())
-}
-
-fn write_json_file<T: Serialize>(
-    output_dir: &Path,
-    relative_path: &str,
-    value: &T,
-    file_hashes: &mut Vec<EvidenceExportFileHash>,
-) -> Result<(), CliError> {
-    let bytes = serde_json::to_vec_pretty(value)?;
-    write_bytes_file(output_dir, relative_path, &bytes, file_hashes)
-}
-
-fn write_ndjson_file<T: Serialize>(
-    output_dir: &Path,
-    relative_path: &str,
-    records: &[T],
-    file_hashes: &mut Vec<EvidenceExportFileHash>,
-) -> Result<(), CliError> {
-    let mut bytes = Vec::new();
-    for record in records {
-        bytes.extend_from_slice(serde_json::to_string(record)?.as_bytes());
-        bytes.push(b'\n');
-    }
-    write_bytes_file(output_dir, relative_path, &bytes, file_hashes)
-}
-
-fn read_json_file<T: for<'de> Deserialize<'de>>(
-    input_dir: &Path,
-    relative_path: &str,
-) -> Result<T, CliError> {
-    Ok(chio_core::canonical::UntrustedJsonText::from_wire(
-        &package_io::read_bytes(input_dir, relative_path)?,
-        package_io::MAX_FILE_BYTES,
-    )
-    .and_then(|input| input.decode_signed())?)
-}
-
-fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
-    input_dir: &Path,
-    relative_path: &str,
-) -> Result<Vec<T>, CliError> {
-    let bytes = package_io::read_bytes(input_dir, relative_path)?;
-    if bytes.is_empty() {
-        return Ok(Vec::new());
-    }
-    String::from_utf8(bytes)
-        .map_err(|error| {
-            CliError::attest_error(format!("{} is not valid UTF-8: {error}", relative_path))
-        })?
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            chio_core::canonical::UntrustedJsonText::from_wire((line).as_bytes(), 64 * 1024 * 1024)
-                .and_then(|input| input.decode_signed())
-                .map_err(CliError::from)
-        })
-        .collect()
-}
-
 fn render_readme(
     bundle: &EvidenceExportBundle,
     transparency: &CheckpointTransparencySummary,
@@ -502,9 +176,9 @@ Chio evidence export
 This directory is a local SQLite export assembled by `chio evidence export`.
 export-envelope.json authenticates the manifest and complete decoded payload.
 Verify with an independently obtained kernel public key:
-  chio evidence verify --input <directory> --trusted-kernel-pubkey <key>
-Repeat the key flag for every trusted receipt/checkpoint and package signer.
-Without --trusted-anchor-file, publication metadata is only a transparency preview.
+  chio evidence verify --input <directory> --trust <trust-file>
+The chio.verifier-trust.v1 file pins every trusted receipt/checkpoint and package signer.
+Without its checkpoint_trust_anchor, publication metadata is only a transparency preview.
 It contains signed receipts, checkpoints, inclusion proofs, capability lineage,
 and retention metadata for offline review.
 
@@ -554,10 +228,6 @@ fn policy_source_relative_path(policy_file: &Path) -> String {
     format!("policy/source.{extension}")
 }
 
-fn federation_policy_relative_path() -> &'static str {
-    "federation-policy.json"
-}
-
 fn policy_metadata(
     policy_file: &Path,
     source_path: &str,
@@ -596,83 +266,9 @@ pub(crate) fn render_missing_proofs_error(records: &[EvidenceUncheckpointedRecei
 }
 
 pub(crate) fn verify_federation_policy(policy: &FederationPolicyDocument) -> Result<(), CliError> {
-    if !is_supported_federation_policy_schema(&policy.body.schema) {
-        return Err(CliError::attest_error(format!(
-            "unsupported federation policy schema: expected {}, got {}",
-            FEDERATION_POLICY_SCHEMA, policy.body.schema
-        )));
-    }
-    if policy.body.created_at > policy.body.expires_at {
-        return Err(CliError::attest_error(
-            "federation policy created_at must be less than or equal to expires_at".to_string(),
-        ));
-    }
-    if chio_core::crypto::verify_wrapped(
-        &policy.body.signer_public_key,
-        FEDERATION_POLICY_SCHEMA,
-        &policy.body,
-        &policy.signature,
-    )
-    .is_err()
-    {
-        return Err(CliError::attest_error(
-            "federation policy signature verification failed".to_string(),
-        ));
-    }
-    match &policy.body.query.read_boundary {
-        Some(ReceiptReadBoundary::TenantScoped { tenant }) => {
-            if tenant.trim().is_empty() {
-                return Err(CliError::attest_error(
-                    "federation policy tenant read boundary requires a non-empty tenant"
-                        .to_string(),
-                ));
-            }
-            if policy
-                .body
-                .query
-                .tenant
-                .as_deref()
-                .is_some_and(|query_tenant| query_tenant != tenant)
-            {
-                return Err(CliError::attest_error(
-                    "federation policy tenant scope must match its read boundary".to_string(),
-                ));
-            }
-        }
-        Some(ReceiptReadBoundary::AdminAll) => {
-            if policy
-                .body
-                .query
-                .tenant
-                .as_deref()
-                .is_some_and(|tenant| !tenant.trim().is_empty())
-            {
-                return Err(CliError::attest_error(
-                    "federation policy admin-all read boundary must not include tenant scope"
-                        .to_string(),
-                ));
-            }
-        }
-        None => {
-            return Err(CliError::attest_error(
-                "federation policy must bind an explicit receipt read boundary".to_string(),
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn federation_policy_metadata(
-    policy: &FederationPolicyDocument,
-) -> FederationPolicyAttachmentMetadata {
-    FederationPolicyAttachmentMetadata {
-        issuer: policy.body.issuer.clone(),
-        partner: policy.body.partner.clone(),
-        signer_public_key: policy.body.signer_public_key.clone(),
-        created_at: policy.body.created_at,
-        expires_at: policy.body.expires_at,
-        require_proofs: policy.body.require_proofs,
-    }
+    Ok(chio_bundle_verify::federation::verify_federation_policy(
+        policy,
+    )?)
 }
 
 pub(crate) fn merge_export_query(
@@ -697,7 +293,8 @@ pub(crate) fn merge_export_query(
     let read_boundary = merge_read_boundary(
         policy_query.read_boundary.as_ref(),
         cli_query.read_boundary.as_ref(),
-    )?;
+    )
+    .map_err(CliError::from)?;
     let since = match (policy_query.since, cli_query.since) {
         (Some(policy), Some(cli)) => Some(max(policy, cli)),
         (Some(policy), None) => Some(policy),
@@ -755,90 +352,6 @@ fn merge_exact_scope(
     }
 }
 
-fn merge_read_boundary(
-    policy_value: Option<&ReceiptReadBoundary>,
-    cli_value: Option<&ReceiptReadBoundary>,
-) -> Result<Option<ReceiptReadBoundary>, CliError> {
-    match (policy_value, cli_value) {
-        (
-            Some(ReceiptReadBoundary::TenantScoped { tenant: policy }),
-            Some(ReceiptReadBoundary::TenantScoped { tenant: cli }),
-        ) if policy != cli => Err(CliError::attest_error(format!(
-            "requested export tenant scope '{cli}' falls outside the signed federation policy \
-             tenant scope '{policy}'"
-        ))),
-        (Some(ReceiptReadBoundary::TenantScoped { .. }), Some(ReceiptReadBoundary::AdminAll)) => {
-            Err(CliError::attest_error(
-                "requested admin-all export exceeds tenant-scoped federation policy".to_string(),
-            ))
-        }
-        (Some(boundary), _) => Ok(Some(boundary.clone())),
-        (None, Some(_)) | (None, None) => Err(CliError::attest_error(
-            "signed federation policy must bind an explicit receipt read boundary".to_string(),
-        )),
-    }
-}
-
-pub(crate) fn ensure_query_within_federation_policy(
-    policy_query: &EvidenceExportQuery,
-    export_query: &EvidenceExportQuery,
-) -> Result<(), CliError> {
-    let merged_boundary = merge_read_boundary(
-        policy_query.read_boundary.as_ref(),
-        export_query.read_boundary.as_ref(),
-    )?;
-    if merged_boundary != export_query.read_boundary {
-        return Err(CliError::attest_error(
-            "evidence package read boundary exceeds federation policy scope".to_string(),
-        ));
-    }
-    if let Some(ReceiptReadBoundary::TenantScoped { tenant }) = &export_query.read_boundary {
-        if export_query
-            .tenant
-            .as_deref()
-            .is_some_and(|query_tenant| query_tenant != tenant)
-        {
-            return Err(CliError::attest_error(
-                "evidence package read boundary tenant conflicts with query tenant".to_string(),
-            ));
-        }
-    }
-    if policy_query.capability_id.is_some()
-        && policy_query.capability_id != export_query.capability_id
-    {
-        return Err(CliError::attest_error(
-            "evidence package query exceeds federation policy capability scope".to_string(),
-        ));
-    }
-    if policy_query.agent_subject.is_some()
-        && policy_query.agent_subject != export_query.agent_subject
-    {
-        return Err(CliError::attest_error(
-            "evidence package query exceeds federation policy agent scope".to_string(),
-        ));
-    }
-    if policy_query.tenant.is_some() && policy_query.tenant != export_query.tenant {
-        return Err(CliError::attest_error(
-            "evidence package query exceeds federation policy tenant scope".to_string(),
-        ));
-    }
-    if let Some(policy_since) = policy_query.since {
-        if export_query.since.unwrap_or(0) < policy_since {
-            return Err(CliError::attest_error(
-                "evidence package query starts before the federation policy window".to_string(),
-            ));
-        }
-    }
-    if let Some(policy_until) = policy_query.until {
-        if export_query.until.unwrap_or(u64::MAX) > policy_until {
-            return Err(CliError::attest_error(
-                "evidence package query ends after the federation policy window".to_string(),
-            ));
-        }
-    }
-    Ok(())
-}
-
 pub(crate) fn prepare_evidence_export(
     query: EvidenceExportQuery,
     require_proofs: bool,
@@ -874,29 +387,6 @@ pub(crate) fn validate_evidence_bundle_requirements(
         return Err(render_missing_proofs_error(&bundle.uncheckpointed_receipts));
     }
     Ok(())
-}
-
-fn safe_relative_path(relative_path: &str) -> Result<PathBuf, CliError> {
-    let path = Path::new(relative_path);
-    if path.is_absolute() {
-        return Err(CliError::attest_error(format!(
-            "evidence package manifest path must be relative: {relative_path}"
-        )));
-    }
-    for component in path.components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir
-            | Component::ParentDir
-            | Component::RootDir
-            | Component::Prefix(_) => {
-                return Err(CliError::attest_error(format!(
-                    "evidence package manifest path escapes the package root: {relative_path}"
-                )));
-            }
-        }
-    }
-    Ok(path.to_path_buf())
 }
 
 pub struct EvidenceFederationPolicyCreateArgs<'a> {
@@ -1084,6 +574,86 @@ pub fn cmd_evidence_export(
     )
 }
 
+/// Verifies the HTTP receipts tool receipts embed, for the package verifier.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct HttpReceiptProjection;
+
+impl EmbeddedHttpReceiptVerifier for HttpReceiptProjection {
+    fn verify_projection(
+        &self,
+        embedded: &serde_json::Value,
+        receipt: &ChioReceipt,
+    ) -> Result<bool, EmbeddedHttpError> {
+        let http: chio_http_core::HttpReceipt = serde_json::from_value(embedded.clone())
+            .map_err(|error| EmbeddedHttpError::Decode(error.to_string()))?;
+        http.verify_chio_receipt_projection(receipt)
+            .map_err(|error| EmbeddedHttpError::Projection(error.to_string()))
+    }
+}
+
+/// Verify an exported package directory with the verifier-owned `trust`.
+pub fn load_verified_evidence_package(
+    input: &Path,
+    trust: &VerifierTrust,
+) -> Result<VerifiedPackage, CliError> {
+    Ok(verify_package(input, trust, Some(&HttpReceiptProjection))?)
+}
+
+/// Decode a remote import request. `value` comes from the route's
+/// `SignedJson` extractor, which read the original bounded bytes through
+/// `decode_signed` and refused duplicate keys at every depth. The trust section loads
+/// through `VerifierTrust::load` exactly as a trust file does, and the whole
+/// request must reserialize to its input, so no member is dropped.
+pub(crate) fn decode_remote_import_request(
+    value: serde_json::Value,
+) -> Result<RemoteEvidenceImportRequest, CliError> {
+    use chio_bundle_verify::BundleVerifyError;
+
+    let trust_value = value.get("trust").ok_or_else(|| {
+        BundleVerifyError::trust_invalid("evidence import request carries no trust file")
+    })?;
+    let trust_bytes = serde_json::to_vec(trust_value)?;
+    VerifierTrust::load(&trust_bytes)
+        .map_err(|error| BundleVerifyError::trust_invalid(error.to_string()))?;
+    let request = chio_security_types::strict_serde::lossless(
+        value,
+        "RemoteEvidenceImportRequest",
+        serde_json::from_value::<RemoteEvidenceImportRequest>,
+        |typed: &RemoteEvidenceImportRequest| serde_json::to_value(typed),
+    )
+    .map_err(|error| {
+        BundleVerifyError::schema(format!(
+            "evidence import request does not match its schema: {error}"
+        ))
+    })?;
+    Ok(request)
+}
+
+/// Verify a decoded package with the verifier-owned `trust` and refuse it
+/// unless every column the trust file requires is verified.
+pub(crate) fn verify_import_package(
+    package: &EvidenceImportPackage,
+    trust: &VerifierTrust,
+) -> Result<(), CliError> {
+    chio_bundle_verify::verify_decoded_bundle(package, trust, Some(&HttpReceiptProjection))?
+        .require_columns(trust)?;
+    Ok(())
+}
+
+/// Verify an exported package directory with the verifier-owned `trust` and
+/// report its columns, refusing a required column this verifier cannot
+/// verify.
+fn verify_evidence_bundle(
+    input: &Path,
+    trust: &VerifierTrust,
+) -> Result<chio_bundle_verify::VerifiedBundle, CliError> {
+    Ok(chio_bundle_verify::verify_bundle(
+        input,
+        trust,
+        Some(&HttpReceiptProjection),
+    )?)
+}
+
 #[allow(
     clippy::print_stdout,
     reason = "This CLI command emits its requested report to standard output."
@@ -1094,9 +664,11 @@ pub fn cmd_evidence_import(
     control_url: Option<&str>,
     control_token: Option<&str>,
     json_output: bool,
-    verification: &EvidenceVerificationPolicy,
+    trust: &VerifierTrust,
 ) -> Result<(), CliError> {
-    let package = load_verified_evidence_package(input, verification)?;
+    let verified = verify_evidence_bundle(input, trust)?;
+    verified.report.require_columns(trust)?;
+    let package = verified.package.package;
     let share_import = build_federated_share_import(&package)?;
 
     let share = match (receipt_db, control_url) {
@@ -1117,7 +689,7 @@ pub fn cmd_evidence_import(
             client
                 .import_evidence(&RemoteEvidenceImportRequest {
                     package,
-                    verification: verification.clone(),
+                    trust: trust.clone(),
                 })?
                 .share
         }
@@ -1150,29 +722,18 @@ pub fn cmd_evidence_import(
 )]
 pub fn cmd_evidence_verify(
     input: &Path,
-    verification: &EvidenceVerificationPolicy,
+    trust: &VerifierTrust,
     json_output: bool,
 ) -> Result<(), CliError> {
     let clock_now = unix_now()?;
-    let package = load_verified_evidence_package(input, verification)?;
-    let manifest = package.manifest;
-    let transparency = match package.transparency.as_ref() {
-        Some(summary) => chio_kernel::checkpoint::verify_checkpoint_transparency_records(
-            &package.bundle.checkpoints,
-            summary,
-            verification.trusted_kernel_keys(),
-        )
-        .map_err(|error| {
-            CliError::attest_error(format!(
-                "checkpoint transparency verification failed: {error}"
-            ))
-        })?,
-        None => validate_checkpoint_transparency_summary(
-            &package.bundle.checkpoints,
-            verification.trusted_kernel_keys(),
-        )?,
-    };
-    let claim_boundary = verification.claims(&package.bundle, &transparency)?;
+    let chio_bundle_verify::VerifiedBundle {
+        package: verified,
+        report,
+    } = verify_evidence_bundle(input, trust)?;
+    let required_columns = report.require_columns(trust);
+    let manifest = verified.package.manifest;
+    let transparency = verified.transparency;
+    let claim_boundary = verified.claims;
 
     let result = EvidenceVerificationResult {
         schema: manifest.schema,
@@ -1192,6 +753,8 @@ pub fn cmd_evidence_verify(
         child_receipt_scope: manifest.child_receipt_scope,
         claim_boundary,
         disclosure_notice: manifest.disclosure_notice,
+        required_columns: report.required_columns.clone(),
+        columns: report.receipts,
     };
 
     if json_output {
@@ -1255,6 +818,100 @@ pub fn cmd_evidence_verify(
         }
     }
 
+    required_columns.map_err(CliError::from)
+}
+
+/// The federated share an import records: the verified receipts and lineage
+/// under the package's signed federation policy.
+pub(crate) fn build_federated_share_import(
+    package: &EvidenceImportPackage,
+) -> Result<chio_kernel::FederatedEvidenceShareImport, CliError> {
+    let federation_policy = package.federation_policy.as_ref().ok_or_else(|| {
+        CliError::attest_error(
+            "evidence import requires a signed attached federation policy so remote receipt sharing stays bilateral and explicit".to_string(),
+        )
+    })?;
+    let share_descriptor = serde_json::json!({
+        "schema": FEDERATED_EVIDENCE_SHARE_SCHEMA,
+        "manifest": &package.manifest,
+        "federationPolicy": federation_policy,
+    });
+    let share_id = format!(
+        "share-{}",
+        sha256_hex(&canonical_json_bytes(&share_descriptor)?)
+    );
+    let manifest_hash = sha256_hex(&canonical_json_bytes(&package.manifest)?);
+    Ok(chio_kernel::FederatedEvidenceShareImport {
+        share_id,
+        manifest_hash,
+        exported_at: package.manifest.exported_at,
+        issuer: federation_policy.body.issuer.clone(),
+        partner: federation_policy.body.partner.clone(),
+        signer_public_key: federation_policy.body.signer_public_key.to_hex(),
+        require_proofs: federation_policy.body.require_proofs,
+        query_json: serde_json::to_string(&package.bundle.query)?,
+        tool_receipts: package
+            .bundle
+            .tool_receipts
+            .iter()
+            .map(|record| chio_kernel::StoredToolReceipt {
+                seq: record.seq,
+                receipt: record.receipt.clone(),
+            })
+            .collect(),
+        capability_lineage: package.bundle.capability_lineage.clone(),
+    })
+}
+
+/// Verify the transparency records of an export, then write and sign the
+/// package into the empty directory `output`.
+fn write_evidence_package(
+    output: &Path,
+    bundle: EvidenceExportBundle,
+    transparency: Option<CheckpointTransparencySummary>,
+    policy_file: Option<&Path>,
+    federation_policy: Option<&FederationPolicyDocument>,
+    signing_key: &chio_core::Keypair,
+) -> Result<(), CliError> {
+    let exported_at = unix_now()?;
+    ensure_clean_output_dir(output)?;
+    let transparency = verify_transparency(&bundle.checkpoints, transparency.as_ref())?;
+    let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
+    let disclosure_notice = EvidenceDisclosureNotice::for_query(&bundle.query);
+    let readme = render_readme(
+        &bundle,
+        &transparency,
+        &claim_boundary,
+        disclosure_notice.as_ref(),
+    );
+    let policy_source = policy_file.map(fs::read).transpose()?;
+    let policy = match (policy_file, policy_source.as_deref()) {
+        (Some(policy_file), Some(source)) => {
+            let source_path = policy_source_relative_path(policy_file);
+            Some(PolicyAttachment {
+                metadata: policy_metadata(
+                    policy_file,
+                    &source_path,
+                    crate::integer::count(source.len()),
+                )?,
+                source,
+            })
+        }
+        _ => None,
+    };
+    write_package(
+        output,
+        PackageContents {
+            bundle: &bundle,
+            transparency: &transparency,
+            claim_boundary,
+            readme: &readme,
+            policy,
+            federation_policy,
+            exported_at,
+        },
+        signing_key,
+    )?;
     Ok(())
 }
 

@@ -55,13 +55,13 @@ pub(super) fn projection_reference_digest(
                 connection, key, sequence,
             )
         }
-        "governed_approval_replay_migration" => {
-            crate::admission_operation_store::governed_approval_replay_projection_reference(
+        "governed_approval_authority" => {
+            crate::admission_operation_store::governed_approval_authority_projection_reference(
                 connection, key, sequence,
             )
         }
-        "runtime_replay_migration" => {
-            crate::admission_operation_store::runtime_replay_projection_reference(
+        "runtime_source_qualification" => {
+            crate::admission_operation_store::runtime_source_projection_reference(
                 connection, key, sequence,
             )
         }

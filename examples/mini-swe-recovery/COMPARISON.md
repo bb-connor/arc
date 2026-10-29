@@ -63,7 +63,7 @@ gh workflow run process-workers.yml --ref YOUR_BRANCH -f optimized_comparison=tr
 ```
 
 Select a branch containing this lane. The workflow checks out the dispatch's
-immutable commit and builds the standard release profile with Rust 1.94.1:
+immutable commit and builds the standard release profile with Rust 1.95.0:
 optimization level 3, fat LTO, one codegen unit, stripped symbols and unwind
 panics. The full checkout supplies the CLI's embedded fixtures. Cargo artifact
 metadata must confirm an optimized binary without debug assertions, and the

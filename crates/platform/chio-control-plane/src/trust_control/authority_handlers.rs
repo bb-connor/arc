@@ -11,7 +11,7 @@ use super::report_validation::{
     enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
     load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
     run_authority_commit, validate_authority_issue_auth, validate_authority_mutation_auth,
-    validate_authority_mutation_term, validate_authority_workload_auth, validate_service_auth,
+    validate_authority_mutation_term, validate_caller,
 };
 use super::*;
 
@@ -19,7 +19,7 @@ pub(crate) async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_authority_workload_auth(&headers, &state.config) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::AuthorityRead) {
         return response;
     }
     match inspect_authority_state(&state, load_authority_status_for_state).await {
@@ -33,7 +33,7 @@ pub(crate) async fn handle_authority_key_log_sync(
     headers: HeaderMap,
     Json(request): Json<AuthorityKeyLogSyncRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::AuthorityAdmin) {
         return response;
     }
     let Some(keyring) = state.authority_keyring.as_ref() else {
@@ -64,17 +64,17 @@ pub(crate) async fn handle_rotate_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    let forwarded = match validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
+    let forwarded = match validate_authority_mutation_auth(&headers, &state) {
         Ok(forwarded) => forwarded,
         Err(response) => return response,
     };
-    match forward_authority_post_to_leader(&state, AUTHORITY_PATH, &json!({})).await {
+    match forward_authority_post_to_leader(&state, &headers, AUTHORITY_PATH, &json!({})).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
     run_authority_commit(&state, move |state| {
-        validate_authority_mutation_term(state, forwarded.as_ref())?;
+        validate_authority_mutation_term(state, forwarded)?;
         Ok(rotate_authority_blocking(state))
     })
     .await
@@ -114,17 +114,18 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    let forwarded = match validate_authority_issue_auth(&headers, &state, ISSUE_CAPABILITY_PATH) {
+    let forwarded = match validate_authority_issue_auth(&headers, &state) {
         Ok(forwarded) => forwarded,
         Err(response) => return response,
     };
-    match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
+    match forward_authority_post_to_leader(&state, &headers, ISSUE_CAPABILITY_PATH, &payload).await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
     inspect_authority_state(&state, move |state| {
-        validate_authority_mutation_term(state, forwarded.as_ref())?;
+        validate_authority_mutation_term(state, forwarded)?;
         Ok(issue_capability_blocking(state, payload))
     })
     .await
@@ -180,10 +181,10 @@ pub(crate) async fn handle_scim_create_user(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ScimWrite) {
         return response;
     }
-    match forward_scim_post_to_leader(&state, SCIM_USERS_PATH, &payload).await {
+    match forward_scim_post_to_leader(&state, &headers, SCIM_USERS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -223,10 +224,10 @@ pub(crate) async fn handle_scim_delete_user(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ScimWrite) {
         return response;
     }
-    match forward_scim_delete_to_leader(&state, &scim_user_location(&user_id)).await {
+    match forward_scim_delete_to_leader(&state, &headers, &scim_user_location(&user_id)).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -306,7 +307,7 @@ pub(crate) async fn handle_list_enterprise_providers(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationRead) {
         return response;
     }
     match load_enterprise_provider_registry_for_admin(&state.config) {
@@ -325,7 +326,7 @@ pub(crate) async fn handle_get_enterprise_provider(
     AxumPath(provider_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationRead) {
         return response;
     }
     let registry = match load_enterprise_provider_registry_for_admin(&state.config) {
@@ -347,7 +348,7 @@ pub(crate) async fn handle_upsert_enterprise_provider(
     headers: HeaderMap,
     Json(mut record): Json<EnterpriseProviderRecord>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
     use super::registry_write_lane::{
@@ -376,7 +377,7 @@ pub(crate) async fn handle_delete_enterprise_provider(
     AxumPath(provider_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
     use super::registry_write_lane::{
@@ -407,7 +408,7 @@ pub(crate) async fn handle_list_federation_policies(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationRead) {
         return response;
     }
     match load_federation_policy_registry_for_admin(&state.config) {
@@ -426,7 +427,7 @@ pub(crate) async fn handle_get_federation_policy(
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationRead) {
         return response;
     }
     let registry = match load_federation_policy_registry_for_admin(&state.config) {
@@ -448,7 +449,7 @@ pub(crate) async fn handle_upsert_federation_policy(
     headers: HeaderMap,
     Json(record): Json<FederationAdmissionPolicyRecord>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
     if record.policy.body.policy_id != policy_id {
@@ -481,7 +482,7 @@ pub(crate) async fn handle_delete_federation_policy(
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
     let (path, mut registry) = match load_federation_policy_registry_for_admin(&state.config) {
@@ -504,10 +505,11 @@ pub(crate) async fn handle_evaluate_federation_policy(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FEDERATION_POLICY_EVALUATE_PATH, &request).await {
+    match forward_post_to_leader(&state, &headers, FEDERATION_POLICY_EVALUATE_PATH, &request).await
+    {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -527,7 +529,7 @@ pub(crate) async fn handle_list_revocations(
     Query(query): Query<RevocationQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsRead) {
         return response;
     }
     let store = match state.revocation_store() {
@@ -569,10 +571,10 @@ pub(crate) async fn handle_revoke_capability(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, REVOCATIONS_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, REVOCATIONS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,

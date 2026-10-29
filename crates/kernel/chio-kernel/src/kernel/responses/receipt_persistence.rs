@@ -1,5 +1,6 @@
 use super::*;
 use crate::kernel::effect_obligation::publication::{ReceiptAppendFailure, ReceiptCommit};
+use chio_core::receipt::metadata::{ReceiptSessionAnchorV1, SESSION_ANCHOR_METADATA_KEY};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 fn require_receipt_body_fields_coupled(
@@ -179,9 +180,36 @@ impl ChioKernel {
                 }
             })
         });
-        let metadata = merge_metadata_objects(params.metadata, request_metadata);
+        if params
+            .metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.get(SESSION_ANCHOR_METADATA_KEY).is_some())
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "receipt metadata already carries a session anchor block".into(),
+            ));
+        }
+        let session_anchor_metadata = self
+            .receipt_session_anchor_for_request(params.request_id)
+            .map(|reference| {
+                ReceiptSessionAnchorV1::commit(&reference)
+                    .and_then(|block| block.to_metadata_value())
+                    .map(|block| serde_json::json!({ SESSION_ANCHOR_METADATA_KEY: block }))
+                    .map_err(|error| {
+                        KernelError::ReceiptSigningFailed(format!(
+                            "session anchor block could not be encoded: {error}"
+                        ))
+                    })
+            })
+            .transpose()?;
+        let metadata = merge_metadata_objects(
+            merge_metadata_objects(params.metadata, request_metadata),
+            session_anchor_metadata,
+        );
+        let pre_invocation = current_pre_invocation_guard_output();
+        let metadata = bind_decision_model_witness(metadata, pre_invocation.witness.as_ref())?;
 
-        let mut evidence = current_pre_invocation_guard_evidence();
+        let mut evidence = pre_invocation.evidence;
         evidence.extend(current_post_invocation_guard_evidence());
 
         let body = ChioReceiptBody {

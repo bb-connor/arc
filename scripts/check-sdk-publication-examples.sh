@@ -74,15 +74,16 @@ control_url="http://127.0.0.1:${control_port}"
 mcp_url="http://127.0.0.1:${mcp_port}"
 
 cargo build -p chio-cli --bin chio >/dev/null
+source "${repo_root}/examples/_shared/trust-access.sh"
 
+write_trust_access_config "${chio_bin}" "${work_dir}/trust-access.toml" "${control_token}" "${workload_token}"
 "${chio_bin}" \
   --receipt-db "${work_dir}/receipts.sqlite" \
   --authority-db "${work_dir}/authority.sqlite" \
   --session-db "${work_dir}/trust-sessions.sqlite" \
   trust serve \
-  --authority-workload-token "${workload_token}" \
   --listen "127.0.0.1:${control_port}" \
-  --service-token "${control_token}" \
+  --access-config "${work_dir}/trust-access.toml" \
   >"${work_dir}/control.log" 2>&1 &
 control_pid=$!
 

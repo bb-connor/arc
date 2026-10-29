@@ -56,6 +56,7 @@ const AUTHORIZATION_STATEMENT_CACHE_CAPACITY: usize = 64;
 
 pub mod admission_operation_store;
 mod agent_web_replay_store;
+mod approval_replay_store;
 pub mod approval_store;
 pub mod authority;
 pub mod budget_store;
@@ -66,6 +67,7 @@ pub mod channel_release_publisher_store;
 pub mod clearing_lifecycle_store;
 #[cfg(test)]
 mod clock_consumer_tests;
+pub mod cluster_peer_replay_store;
 pub mod dead_letters;
 pub mod delegation_store;
 pub mod economic_state_cache;
@@ -122,8 +124,8 @@ pub mod tool_outcome_store;
 pub mod work_graph_store;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
+pub use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
-pub use chio_kernel::{EvidenceChildReceiptScope, EvidenceExportQuery};
 
 /// Default SQLite reader pool size.
 ///
@@ -398,14 +400,14 @@ pub fn sqlite_filesystem_path(text: &str) -> PathBuf {
 
 pub use admission_operation_store::{
     CreditExposureAccountSnapshot, DpopReplayMigrationRecordV1, DurableObligationV1,
-    GovernedApprovalReplayMigrationRecordV1, RuntimeReplayMigrationRecordV1,
-    SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
+    RuntimeSourceRecordV1, SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantMigrationPhase, SecurityParticipantMigrationRecord,
     SecurityParticipantStateInitialization, SqliteAdmissionOperationStore,
 };
 pub use agent_web_replay_store::{
     SqliteAgentWebReplayReservationState, SqliteAgentWebReplayStore, SqliteAgentWebReplayStoreError,
 };
+pub use approval_replay_store::{SqliteApprovalReplayStore, SqliteApprovalReplayStoreError};
 pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
 pub use budget_store::{BudgetStoreSnapshot, SqliteBudgetStore};
@@ -419,6 +421,9 @@ pub use channel_release_publisher_store::{
     SqliteChannelReleasePublisherStore, VerifiedChannelReleasePublicationV1,
 };
 pub use clearing_lifecycle_store::{ClearingLifecycleStoreError, SqliteClearingLifecycleStore};
+pub use cluster_peer_replay_store::{
+    ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore, CLUSTER_PEER_REPLAY_MAX_PEERS,
+};
 pub use economic_state_cache::{
     admission_terminal_projection_effect_result, EconomicOperationStageBinding,
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
@@ -512,8 +517,6 @@ pub use frost_store::{
     StagedFrostRotation, StoredFrostCeremonyCompletion,
 };
 pub use governed_approval_replay_store::{
-    GovernedApprovalReplaySourceBinding, GovernedApprovalReplaySourceSeal,
-    GovernedApprovalReplaySourceSnapshot, SqliteGovernedApprovalReplaySource,
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use iou_store::SqliteIouEnvelopeStore;

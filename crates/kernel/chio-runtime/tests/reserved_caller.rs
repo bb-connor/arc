@@ -164,20 +164,12 @@ impl Fixture {
         let fence = authority.mutation_fence();
         let source_id = AdmissionIdentifier::try_new("source_id", "facade-source")?;
         let runtime_id = AdmissionIdentifier::try_new("runtime_id", "facade-runtime")?;
-        let expected =
-            store.expect_runtime_replay_source(&source_id, &runtime_id, &source, &fence, NOW)?;
-        store.import_runtime_replay_source(
-            &runtime_id,
-            expected.expectation_id(),
-            &source,
-            &fence,
-            NOW,
-        )?;
+        let installed =
+            store.install_runtime_source(&source_id, &runtime_id, &source, &fence, NOW)?;
         let binding = RuntimeParticipantAuthorityBindingV1::new(
             runtime_id,
-            expected.expectation_id().clone(),
+            installed.qualification_id().clone(),
         );
-        store.activate_runtime_replay_source(&binding, &source, &fence, NOW)?;
         Ok(Self {
             directory,
             authority,
@@ -194,8 +186,8 @@ impl Fixture {
         Ok(ChioRuntimeAdmissionHook::new(
             profile(),
             SqliteRuntimeOrchestrationStore::open(self.directory.path().join("runtime.sqlite3"))?,
-        )
-        .with_operation_owned_runtime_replay(binding))
+            binding,
+        ))
     }
 
     fn kernel(&self) -> TestResult<ChioKernel> {
@@ -332,14 +324,14 @@ fn public_facade_reserved_revalidation_preserves_binding_and_source_refusals() -
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,
         )?;
     let wrong_binding = RuntimeParticipantAuthorityBindingV1::new(
         fixture.binding.runtime_authority_id().clone(),
-        AdmissionIdentifier::try_new("expectation_id", "different-expectation")?,
+        AdmissionIdentifier::try_new("qualification_id", "different-qualification")?,
     );
     let error = match fixture.hook(wrong_binding)?.revalidate_reserved_operation(
         &fixture.context(&fixture.request),
@@ -355,13 +347,16 @@ fn public_facade_reserved_revalidation_preserves_binding_and_source_refusals() -
     );
     let other =
         SqliteRuntimeOrchestrationStore::open(fixture.directory.path().join("other.sqlite3"))?;
-    other.seal_legacy_replay_source(&chio_runtime::RuntimeReplaySourceBinding::new(
-        source.source_id(),
-        source.runtime_authority_id(),
-        source.destination_authority_id(),
-    )?)?;
-    let hook = ChioRuntimeAdmissionHook::new(profile(), other)
-        .with_operation_owned_runtime_replay(fixture.binding.clone());
+    chio_kernel::admission_operation::RuntimeSourcePort::qualify(
+        &other,
+        &AdmissionIdentifier::try_new("source_id", source.source_id())?,
+        &AdmissionIdentifier::try_new("runtime_id", source.runtime_authority_id())?,
+        &AdmissionIdentifier::try_new(
+            "destination_authority_id",
+            source.destination_authority_id(),
+        )?,
+    )?;
+    let hook = ChioRuntimeAdmissionHook::new(profile(), other, fixture.binding.clone());
     let error = match hook.revalidate_reserved_operation(
         &fixture.context(&fixture.request),
         &source,
@@ -371,13 +366,13 @@ fn public_facade_reserved_revalidation_preserves_binding_and_source_refusals() -
         Err(error) => error,
     };
     let expected =
-        match chio_runtime::ChioRuntimeAdmissionStore::verify_operation_owned_replay_source(
+        match chio_runtime::ChioRuntimeAdmissionStore::verify_operation_owned_runtime_source(
             &SqliteRuntimeOrchestrationStore::open(fixture.directory.path().join("other.sqlite3"))?,
             &source,
         ) {
             Ok(()) => return Err("different source unexpectedly verified".into()),
             Err(error) => {
-                assert_eq!(error.code(), "runtime_replay_source_invalid");
+                assert_eq!(error.code(), "runtime_source_qualification_invalid");
                 error.to_string()
             }
         };
@@ -408,7 +403,7 @@ fn public_facade_reserved_revalidation_rejects_changed_prepared_plan() -> TestRe
     let source = fixture
         .authority
         .admission_operation_store()
-        .load_runtime_participant_activation(
+        .load_runtime_source_qualification(
             &fixture.binding,
             &fixture.authority.mutation_fence(),
             NOW,
@@ -418,8 +413,8 @@ fn public_facade_reserved_revalidation_rejects_changed_prepared_plan() -> TestRe
     let hook = ChioRuntimeAdmissionHook::new(
         changed_profile,
         SqliteRuntimeOrchestrationStore::open(fixture.directory.path().join("runtime.sqlite3"))?,
-    )
-    .with_operation_owned_runtime_replay(fixture.binding.clone());
+        fixture.binding.clone(),
+    );
     let error = match hook.revalidate_reserved_operation(
         &fixture.context(&fixture.request),
         &source,

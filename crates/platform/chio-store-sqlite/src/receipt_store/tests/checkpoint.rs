@@ -3,7 +3,7 @@ use super::support::*;
 
 #[test]
 fn store_and_load_checkpoint_by_seq() {
-    let path = unique_db_path("chio-receipts-cp-store");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-store");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     // Append 5 receipts.
@@ -41,7 +41,7 @@ fn store_and_load_checkpoint_by_seq() {
 
 #[test]
 fn store_checkpoint_rejects_first_checkpoint_that_skips_committed_prefix() {
-    let path = unique_db_path("chio-receipts-cp-skipped-prefix");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-skipped-prefix");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let first_receipt = sample_receipt_with_id("rcpt-prefix-1");
@@ -76,7 +76,7 @@ fn store_checkpoint_rejects_first_checkpoint_that_skips_committed_prefix() {
 
 #[test]
 fn load_checkpoint_by_seq_returns_none_for_missing() {
-    let path = unique_db_path("chio-receipts-cp-missing");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-missing");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let result = store.load_checkpoint_by_seq(999).test_unwrap();
     assert!(result.is_none());
@@ -85,7 +85,7 @@ fn load_checkpoint_by_seq_returns_none_for_missing() {
 
 #[test]
 fn store_checkpoint_rejects_contiguous_successor_without_predecessor_digest() {
-    let path = unique_db_path("chio-receipts-cp-missing-predecessor-digest");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-missing-predecessor-digest");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let mut seqs = Vec::new();
@@ -132,7 +132,7 @@ fn store_checkpoint_rejects_contiguous_successor_without_predecessor_digest() {
 
 #[test]
 fn trait_store_checkpoint_enforces_predecessor_continuity() {
-    let path = unique_db_path("chio-receipts-cp-continuity");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-continuity");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let mut seqs = Vec::new();
@@ -175,7 +175,7 @@ fn trait_store_checkpoint_enforces_predecessor_continuity() {
 
 #[test]
 fn trait_store_checkpoint_installs_immutable_checkpoint_triggers() {
-    let path = unique_db_path("chio-receipts-cp-immutable");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-immutable");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let receipt = sample_receipt_with_id("rcpt-immutable-1");
@@ -213,7 +213,7 @@ fn trait_store_checkpoint_installs_immutable_checkpoint_triggers() {
 
 #[test]
 fn frontier_rebuild_rejects_merkle_root_mirror_divergence() {
-    let path = unique_db_path("chio-receipts-frontier-mirror");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-frontier-mirror");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt_seq = store
         .append_chio_receipt_returning_seq(&sample_receipt_with_id("frontier-mirror-receipt"))
@@ -230,7 +230,8 @@ fn frontier_rebuild_rejects_merkle_root_mirror_divergence() {
     ReceiptStore::store_checkpoint(&store, &checkpoint).test_unwrap();
 
     let signed_leaf =
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body).test_unwrap();
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
+            .test_unwrap();
     assert_eq!(
         load_checkpoint_chain_leaf_hashes(&store.connection().test_unwrap()).test_unwrap(),
         vec![signed_leaf],
@@ -263,7 +264,7 @@ fn frontier_rebuild_rejects_merkle_root_mirror_divergence() {
 
 #[test]
 fn create_next_receipt_checkpoint_respects_max_batch() {
-    let path = unique_db_path("chio-receipts-cp-create-next-max-batch");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-create-next-max-batch");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     for index in 0..5 {
         store
@@ -302,7 +303,7 @@ fn create_next_receipt_checkpoint_respects_max_batch() {
 
 #[test]
 fn concurrent_create_next_receipt_checkpoint_produces_one_checkpoint() {
-    let path = unique_db_path("chio-receipts-cp-create-next-concurrent");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-create-next-concurrent");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     for index in 0..3 {
         store
@@ -351,7 +352,7 @@ fn concurrent_create_next_receipt_checkpoint_produces_one_checkpoint() {
 
 #[test]
 fn store_checkpoint_accepts_contiguous_predecessor() {
-    let path = unique_db_path("chio-receipts-cp-predecessor");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cp-predecessor");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let kp = receipt_test_keypair();
 
@@ -381,8 +382,11 @@ fn store_checkpoint_accepts_contiguous_predecessor() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
-        Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     ReceiptStore::store_checkpoint(&store, &second).test_unwrap();
@@ -401,7 +405,7 @@ fn store_checkpoint_accepts_contiguous_predecessor() {
 
 #[test]
 fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
-    let path = unique_db_path("chio-receipts-tree-heads");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-tree-heads");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let mut seqs = Vec::new();
@@ -432,8 +436,11 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &checkpoint_kp,
-        Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     store.store_checkpoint(&second).test_unwrap();
@@ -513,7 +520,7 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
 #[test]
 fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_in_export_summary()
 {
-    let path = unique_db_path("chio-receipts-publication-binding");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-publication-binding");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let first_receipt = sample_receipt_with_id("publication-binding-first");
     let second_receipt = sample_receipt_with_id("publication-binding-second");
@@ -538,8 +545,11 @@ fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_
         second_seq,
         &canonical_receipt_bytes(&store, second_seq, second_seq),
         &checkpoint_kp,
-        Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
 

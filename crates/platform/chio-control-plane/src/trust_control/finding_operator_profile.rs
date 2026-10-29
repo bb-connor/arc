@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 use std::net::SocketAddr;
 use std::path::{Component, Path};
 
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Ed25519Backend, Keypair, SigningBackend};
 use serde::{Deserialize, Serialize};
 
 use super::finding_operator_purchase::{
@@ -140,7 +140,7 @@ pub struct FindingOperatorAuthoringKeys {
     pub verifier_report: Keypair,
     pub collateral: Keypair,
     pub fee_schedule_operator: Keypair,
-    pub production_kernel: Keypair,
+    pub production_kernel: Box<dyn SigningBackend>,
     pub delivery_receipt: Keypair,
     pub replay_receipt: Keypair,
     pub checkpoint: Keypair,
@@ -301,7 +301,10 @@ impl FindingOperatorProfile {
                 &self.secrets.fee_schedule_operator,
                 "fee schedule operator",
             )?,
-            production_kernel: canonical_keypair(&self.secrets.kernel, "kernel")?,
+            production_kernel: Box::new(Ed25519Backend::new(canonical_keypair(
+                &self.secrets.kernel,
+                "kernel",
+            )?)),
             delivery_receipt: canonical_keypair(&self.secrets.audit_authority, "delivery receipt")?,
             replay_receipt: canonical_keypair(
                 &self.secrets.audit_randomness_witness,

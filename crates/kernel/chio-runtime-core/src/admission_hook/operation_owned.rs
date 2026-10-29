@@ -1,6 +1,3 @@
-//! One atomic replay claim for the exact prepared runtime plan. Every legacy
-//! consume/release callback is excluded from this path.
-
 use super::preparation::PreparedHookAdmission;
 use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
@@ -8,7 +5,7 @@ use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantPhase, RuntimeParticipantResourceV1,
 };
 use chio_kernel::admission_operation::{
-    AdmissionDigest, AdmissionIdentifier, RuntimeReplayParticipantKind,
+    AdmissionDigest, AdmissionIdentifier, RuntimeParticipantKind,
 };
 use chio_kernel::RuntimeParticipantClaimAuthority;
 
@@ -32,7 +29,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         let bundle_digest = self.core.bundle_digest.clone();
         self.hook
             .store
-            .verify_operation_owned_replay_source(authority.source_snapshot())
+            .verify_operation_owned_runtime_source(authority.source_qualification())
             .map_err(runtime_error)?;
         let report = self
             .core
@@ -84,11 +81,9 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         intent: &RuntimeParticipantClaimIntentV1,
         now_unix_ms: u64,
     ) -> Result<RuntimeDispatchValidity, KernelError> {
-        let binding = self.hook.operation_owned_binding.as_ref().ok_or_else(|| {
-            KernelError::DurableAdmission("native runtime source is not configured".into())
-        })?;
+        let binding = &self.hook.operation_owned_binding;
         if intent.runtime_authority_id() != binding.runtime_authority_id()
-            || intent.expectation_id() != binding.expectation_id()
+            || intent.qualification_id() != binding.qualification_id()
             || intent.phase() != RuntimeParticipantPhase::Dispatch
             || intent.plan_digest().as_str()
                 != self.operation_owned_plan_digest(
@@ -157,19 +152,19 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         let mut resources = Vec::new();
         if let Some((id, digest)) = self.core.destructive_resource() {
             resources.push(resource(
-                RuntimeReplayParticipantKind::DestructiveLease,
+                RuntimeParticipantKind::DestructiveLease,
                 id,
                 digest,
             )?);
         }
         for (kind, id, digest) in [
             (
-                RuntimeReplayParticipantKind::TreatyContinuation,
+                RuntimeParticipantKind::TreatyContinuation,
                 self.treaty_continuation_id_to_consume.as_deref(),
                 self.treaty_artifact_digest.as_deref(),
             ),
             (
-                RuntimeReplayParticipantKind::SwarmContinuation,
+                RuntimeParticipantKind::SwarmContinuation,
                 self.swarm_continuation_id_to_consume.as_deref(),
                 self.swarm_artifact_digest.as_deref(),
             ),
@@ -202,7 +197,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             &self.verified_swarm_request_binding,
             &self.hook.swarm_witness_keys,
             binding.runtime_authority_id(),
-            binding.expectation_id(),
+            binding.qualification_id(),
             request_binding_hash,
             grant_index,
             phase,
@@ -212,7 +207,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
 }
 
 fn resource(
-    kind: RuntimeReplayParticipantKind,
+    kind: RuntimeParticipantKind,
     id: &str,
     digest: &str,
 ) -> Result<RuntimeParticipantResourceV1, KernelError> {
@@ -247,7 +242,7 @@ pub(super) fn verify_revalidation_material(
             KernelError::DurableAdmission("destructive runtime bundle lost its lease".into())
         })?;
         resources.push(resource(
-            RuntimeReplayParticipantKind::DestructiveLease,
+            RuntimeParticipantKind::DestructiveLease,
             id,
             &bundle_digest,
         )?);
@@ -263,7 +258,7 @@ pub(super) fn verify_revalidation_material(
                     )
                 })?;
             resources.push(resource(
-                RuntimeReplayParticipantKind::TreatyContinuation,
+                RuntimeParticipantKind::TreatyContinuation,
                 id,
                 digest,
             )?);
@@ -272,7 +267,7 @@ pub(super) fn verify_revalidation_material(
     if let Some(swarm) = swarm {
         if let Some(id) = &swarm.continuation_id_to_consume {
             resources.push(resource(
-                RuntimeReplayParticipantKind::SwarmContinuation,
+                RuntimeParticipantKind::SwarmContinuation,
                 id,
                 &swarm.continuation_artifact_digest,
             )?);

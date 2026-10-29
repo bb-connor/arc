@@ -5,7 +5,7 @@ pub use active_response_simulation::{
 use std::sync::Arc;
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
-use chio_core::receipt::metadata::{GuardEvidence, GuardEvidenceDeclaration};
+use chio_core::receipt::metadata::{DecisionModelWitness, GuardEvidence, GuardEvidenceDeclaration};
 use dashmap::DashMap;
 
 use crate::budget_store::BudgetCommitMetadata;
@@ -137,7 +137,7 @@ pub(crate) use kernel_scopes::{
     current_scoped_receipt_tenant_id, extract_tenant_id_from_auth_context,
     scope_async_receipt_context, scope_receipt_federation_admission, scope_receipt_tenant_id,
     ReceiptFederationAdmission, ScopedKernelReceiptFederationAdmission,
-    ScopedKernelReceiptTenantId,
+    ScopedKernelReceiptSessionAnchor, ScopedKernelReceiptTenantId,
 };
 pub(crate) use kernel_struct::{
     capability_crypto_floor, receipt_crypto_floor, ReservedSiblingShare, RestartReservedHoldGate,
@@ -181,6 +181,69 @@ fn hook_metadata_names_forbidden_key(metadata: Option<&serde_json::Value>) -> bo
     metadata
         .and_then(serde_json::Value::as_object)
         .is_some_and(|object| object.keys().any(|key| !is_hook_metadata_key(key)))
+}
+
+/// Refusal reason for runtime-admission hook metadata whose `chio_runtime`
+/// block names a field only the kernel writes.
+const HOOK_KERNEL_OWNED_RUNTIME_FIELD_REFUSAL: &str =
+    "runtime admission hook metadata names a kernel-owned chio_runtime field";
+
+/// Names of the `chio_runtime` fields only the kernel writes. Every kernel
+/// write site and [`KERNEL_OWNED_RUNTIME_FIELDS`] use these constants.
+pub(crate) mod runtime_field {
+    pub(crate) const RETAINED_DESTRUCTIVE_LEASE_ID: &str = "retained_destructive_lease_id";
+    pub(crate) const RETAINED_TREATY_CONTINUATION_ID: &str = "retained_treaty_continuation_id";
+    pub(crate) const RETAINED_SWARM_CONTINUATION_ID: &str = "retained_swarm_continuation_id";
+    pub(crate) const RESERVATIONS_RETAINED_FAIL_CLOSED: &str = "reservations_retained_fail_closed";
+    pub(crate) const RESERVATION_RETAINED: &str = "reservation_retained";
+    pub(crate) const IDENTITY_DISPOSITION: &str = "identity_disposition";
+    pub(crate) const RETRYABLE_AFTER_RESUME: &str = "retryable_after_resume";
+    pub(crate) const PRE_DISPATCH_CLEANUP_FAILED: &str = "pre_dispatch_cleanup_failed";
+    pub(crate) const PRE_DISPATCH_CLEANUP_FAULTS: &str = "pre_dispatch_cleanup_faults";
+    pub(crate) const PRE_DISPATCH_CLEANUP_REASON: &str = "pre_dispatch_cleanup_reason";
+    pub(crate) const POST_EFFECT_FAULT: &str = "post_effect_fault";
+    pub(crate) const EVALUATION_STARTED_AT: &str = "evaluation_started_at";
+    pub(crate) const PAYMENT_CREDENTIAL_DISPOSITION: &str = "payment_credential_disposition";
+    pub(crate) const DISPATCH_CREDENTIAL_DISPOSITION: &str = "dispatch_credential_disposition";
+    pub(crate) const DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN: &str =
+        "dispatch_credential_retention_outcome_unknown";
+    pub(crate) const PRE_DISPATCH_PAYMENT_UNWIND: &str = "pre_dispatch_payment_unwind";
+    pub(crate) const FEDERATION_TREATY_DSSE: &str = "federation_treaty_dsse";
+}
+
+/// `chio_runtime` fields only the kernel writes: reservation retention,
+/// identity disposition, cleanup and post-effect faults, payment credential
+/// disposition and verified treaty evidence. A hook decision naming one is
+/// refused, so a signed receipt never carries a hook-asserted kernel record.
+const KERNEL_OWNED_RUNTIME_FIELDS: [&str; 17] = [
+    runtime_field::RETAINED_DESTRUCTIVE_LEASE_ID,
+    runtime_field::RETAINED_TREATY_CONTINUATION_ID,
+    runtime_field::RETAINED_SWARM_CONTINUATION_ID,
+    runtime_field::RESERVATIONS_RETAINED_FAIL_CLOSED,
+    runtime_field::RESERVATION_RETAINED,
+    runtime_field::IDENTITY_DISPOSITION,
+    runtime_field::RETRYABLE_AFTER_RESUME,
+    runtime_field::PRE_DISPATCH_CLEANUP_FAILED,
+    runtime_field::PRE_DISPATCH_CLEANUP_FAULTS,
+    runtime_field::PRE_DISPATCH_CLEANUP_REASON,
+    runtime_field::POST_EFFECT_FAULT,
+    runtime_field::EVALUATION_STARTED_AT,
+    runtime_field::PAYMENT_CREDENTIAL_DISPOSITION,
+    runtime_field::DISPATCH_CREDENTIAL_DISPOSITION,
+    runtime_field::DISPATCH_CREDENTIAL_RETENTION_OUTCOME_UNKNOWN,
+    runtime_field::PRE_DISPATCH_PAYMENT_UNWIND,
+    runtime_field::FEDERATION_TREATY_DSSE,
+];
+
+/// The first kernel-owned field, in list order, that hook `chio_runtime`
+/// metadata names.
+fn hook_kernel_owned_runtime_field(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let runtime = metadata
+        .and_then(|metadata| metadata.get(RUNTIME_ADMISSION_METADATA_KEY))
+        .and_then(serde_json::Value::as_object)?;
+    KERNEL_OWNED_RUNTIME_FIELDS
+        .into_iter()
+        .find(|field| runtime.contains_key(*field))
 }
 
 /// The first reserved key, in registry order, that caller metadata names.
@@ -870,15 +933,15 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
 pub struct GuardDecision {
     pub verdict: Verdict,
     pub evidence: Vec<GuardEvidence>,
+    /// Decision-model witness the kernel binds into the receipt. The kernel
+    /// refuses a call whose guards return more than one.
+    pub witness: Option<DecisionModelWitness>,
 }
 
 impl GuardDecision {
     #[must_use]
     pub fn allow() -> Self {
-        Self {
-            verdict: Verdict::Allow,
-            evidence: Vec::new(),
-        }
+        Self::allow_with_evidence(Vec::new())
     }
 
     #[must_use]
@@ -886,6 +949,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::Allow,
             evidence,
+            witness: None,
         }
     }
 
@@ -894,6 +958,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::Deny,
             evidence,
+            witness: None,
         }
     }
 
@@ -902,6 +967,7 @@ impl GuardDecision {
         Self {
             verdict: Verdict::PendingApproval,
             evidence,
+            witness: None,
         }
     }
 
@@ -913,6 +979,22 @@ impl GuardDecision {
             Verdict::PendingApproval => Self::pending_approval(Vec::new()),
         }
     }
+
+    #[must_use]
+    pub fn with_witness(mut self, witness: DecisionModelWitness) -> Self {
+        self.witness = Some(witness);
+        self
+    }
+}
+
+/// Pre-invocation guard output the kernel carries to the receipt, including
+/// across a frozen durable return context: the guards' evidence and at most
+/// one validated decision-model witness.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreInvocationGuardOutput {
+    pub evidence: Vec<GuardEvidence>,
+    pub witness: Option<DecisionModelWitness>,
 }
 
 impl PartialEq<Verdict> for GuardDecision {
@@ -1342,7 +1424,7 @@ fn extract_guard_name(message: &str) -> Option<String> {
 }
 
 fn scope_from_capability_snapshot(
-    snapshot: &crate::capability_lineage::CapabilitySnapshot,
+    snapshot: &chio_core::receipt::evidence::CapabilitySnapshot,
 ) -> Result<ChioScope, KernelError> {
     chio_core::canonical::UntrustedJsonText::from_wire(
         snapshot.grants_json.as_bytes(),

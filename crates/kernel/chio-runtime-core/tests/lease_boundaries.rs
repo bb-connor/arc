@@ -203,9 +203,14 @@ fn a_late_scheduler_write_failure_rolls_back_expirations_claims_and_tick() -> Te
     );
     assert_eq!(snapshot(&path)?, before);
     drop(store);
-    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    refused(
+        SqliteRuntimeOrchestrationStore::open(&path).map(|_| ()),
+        "runtime_store_schema_mismatch",
+    );
     assert_eq!(snapshot(&path)?, before);
     connection.execute_batch("DROP TRIGGER fail_late_claim;")?;
+    let reopened = SqliteRuntimeOrchestrationStore::open(&path)?;
+    assert_eq!(snapshot(&path)?, before);
     let report = reopened.scheduler_tick_report(&early_profile(), "owner", 10, 2)?;
     assert_eq!(report.claimed_run_ids, ["a-good", "z-bad"]);
     assert_eq!(report.expired_run_ids, ["old"]);

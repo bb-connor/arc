@@ -32,6 +32,7 @@ use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::{sha256_hex, Keypair, PublicKey};
 use chio_core::merkle::{leaf_hash, MerkleTree};
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::SignedExportEnvelope;
@@ -81,9 +82,9 @@ use chio_finding_challenge::{
     FindingResolvedReproduction,
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_transparency, build_inclusion_proof, checkpoint_body_sha256,
-    checkpoint_log_id, CheckpointTransparencySummary, KernelCheckpoint,
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_transparency, build_inclusion_proof, checkpoint_body_sha256, checkpoint_log_id,
 };
 use chio_open_market::bidding::{
     AcceptedBid, BidRequest, RequestedScope, ReservationReceipt, SignedAcceptedBid,

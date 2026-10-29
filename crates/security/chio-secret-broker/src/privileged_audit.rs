@@ -46,11 +46,11 @@ use crate::authority_ipc::{
     verify_authority_exchange, SignedAuthorityRequest, SignedAuthorityResponse,
     VerifiedAuthorityExchange,
 };
-#[cfg(unix)]
-use crate::lifecycle_lock::LifecycleLock;
 use crate::protocol::{BrokerExecuteRequest, MAX_BODY_BYTES, MAX_WIRE_BYTES};
 use crate::provision::AdminAuthorization;
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
+#[cfg(unix)]
+use chio_secure_ipc::LifecycleLock;
 
 #[path = "privileged_audit/audit_input_error.rs"]
 mod audit_input_error;
@@ -1628,6 +1628,31 @@ mod tests {
         let nonce = generate_session_nonce().test_expect("nonce");
         validate_digest(&nonce, "session nonce").test_expect("digest-shaped nonce");
         assert_ne!(nonce, "0".repeat(64));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn audit_lifecycle_lock_releases_on_drop_while_a_duplicate_descriptor_stays_open() {
+        let directory = crate::private_tempdir().test_expect("audit socket directory");
+        let socket_path = directory.path().join("audit.sock");
+        let uid = rustix::process::geteuid().as_raw();
+        let held =
+            acquire_audit_lifecycle_lock(&socket_path, uid).test_expect("acquire lifecycle lock");
+        let inherited = held
+            .file()
+            .try_clone()
+            .test_expect("duplicate lock descriptor");
+        assert!(matches!(
+            acquire_audit_lifecycle_lock(&socket_path, uid),
+            Err(BrokerError::AuthorityUnavailable(_))
+        ));
+
+        drop(held);
+
+        let reacquired = acquire_audit_lifecycle_lock(&socket_path, uid)
+            .test_expect("released lock is reacquired while the duplicate stays open");
+        drop(reacquired);
+        drop(inherited);
     }
 }
 

@@ -3,7 +3,7 @@ use super::support::*;
 
 #[test]
 fn receipts_canonical_bytes_range_returns_correct_count() {
-    let path = unique_db_path("chio-receipts-canon-range");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-canon-range");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     for i in 0..10usize {
@@ -31,7 +31,7 @@ fn receipts_canonical_bytes_range_returns_correct_count() {
 
 #[test]
 fn receipt_log_includes_child_receipts_in_unified_surface() {
-    let path = unique_db_path("chio-receipts-claim-log");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-claim-log");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let tool_before = sample_receipt_with_id_and_timestamp("claim-tool-1", 10);
@@ -69,7 +69,7 @@ fn receipt_log_includes_child_receipts_in_unified_surface() {
 
 #[test]
 fn append_receipt_sequences_follow_unified_claim_log() {
-    let path = unique_db_path("chio-receipts-claim-log-seq");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-claim-log-seq");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let first_tool = sample_receipt_with_id_and_timestamp("claim-seq-tool-1", 10);
@@ -108,7 +108,7 @@ fn append_receipt_sequences_follow_unified_claim_log() {
 
 #[test]
 fn receipt_log_includes_child_receipts_in_tree() {
-    let path = unique_db_path("chio-receipts-claim-tree");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-claim-tree");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     let checkpoint_kp = receipt_test_keypair();
@@ -192,7 +192,7 @@ fn receipt_log_includes_child_receipts_in_tree() {
 
 #[test]
 fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
-    let path = unique_db_path("chio-receipts-lineage-links");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-lineage-links");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -514,7 +514,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
 
 #[test]
 fn receipt_lineage_statement_links_parent_and_child_receipts() {
-    let path = unique_db_path("chio-receipts-lineage-link");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-lineage-link");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt_kp = Keypair::generate();
 

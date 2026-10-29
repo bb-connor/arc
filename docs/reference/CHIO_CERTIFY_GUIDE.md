@@ -171,14 +171,15 @@ operator and returns:
 
 `chio certify registry publish-network` fans one signed artifact out to all
 selected operators that explicitly allow publication and have a configured
-service token.
+`controlToken`: the secret of a credential holding `certifications:write` on
+that operator's trust-control, such as its `operator` credential.
 
 Trust-control can host the same discovery behavior:
 
 ```bash
 chio trust serve \
   --listen 127.0.0.1:8940 \
-  --service-token "$CHIO_CONTROL_TOKEN" \
+  --access-config .chio/trust-access.toml \
   --certification-registry-file .chio/certifications.json \
   --certification-discovery-file .chio/certification-network.json
 ```
@@ -223,8 +224,9 @@ Treat that file as an operator trust root:
 - rotate it deliberately, not per run
 
 If you expose registry operations through `chio trust serve`, configure a
-dedicated `--certification-registry-file` on that service and keep the bearer
-token explicit with `--service-token`. The same trust-control process can also
+dedicated `--certification-registry-file` on that service and declare its bearer
+credentials with `--access-config` (see
+[Trust-Control Access Configuration](TRUST_CONTROL_ACCESS.md)). The same trust-control process can also
 host `--passport-statuses-file` when operators want both portable identity
 status and certification status on one service boundary.
 

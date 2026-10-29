@@ -6,6 +6,8 @@ use crate::treaty::{insert_runtime_loopback_treaty_context, RuntimeLoopbackTreat
 use crate::RuntimeLoopbackError;
 
 pub(crate) struct RuntimeLoopbackExecution {
+    pub(crate) accepted: bool,
+    pub(crate) failure_code: Option<String>,
     pub(crate) receipt: chio_core::receipt::body::ChioReceipt,
     pub(crate) treaty: Option<RuntimeLoopbackTreatyContext>,
 }
@@ -271,6 +273,7 @@ pub(crate) fn execute_runtime_loopback_step(
     authority: &chio_store_sqlite::SqliteAuthorityStore,
     receipt_store: &std::sync::Arc<chio_store_sqlite::SqliteReceiptStore>,
     now_unix_ms: u64,
+    out_dir: &std::path::Path,
 ) -> Result<RuntimeLoopbackExecution, RuntimeLoopbackError> {
     let (expected_kernel_id, expected_server_id, expected_tool_name) =
         chio_attest_loopback::runtime_vendor_binding(step_index).map_err(|error| {
@@ -356,7 +359,7 @@ pub(crate) fn execute_runtime_loopback_step(
             ))
         })?;
     kernel
-        .set_durable_admission_store(admission_store, outcome_store, fence)
+        .set_durable_admission_store(admission_store.clone(), outcome_store, fence.clone())
         .map_err(|error| {
             RuntimeLoopbackError::message(format!(
                 "Chio runtime loopback admission store install: {error}"
@@ -407,7 +410,31 @@ pub(crate) fn execute_runtime_loopback_step(
             ),
         ));
     }
-    let hook_store = chio_runtime_core::InMemoryRuntimeAdmissionStore::new();
+    let hook_store = chio_runtime_core::SqliteRuntimeOrchestrationStore::open_with_clock(
+        out_dir.join(format!("runtime-source-{step_index}.sqlite")),
+        std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(
+            now_unix_ms,
+        )),
+    )
+    .map_err(|error| RuntimeLoopbackError::message(format!("Chio runtime source open: {error}")))?;
+    let source_id = chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+        "source_id",
+        format!("runtime-loopback-source-{step_index}"),
+    )
+    .map_err(|error| RuntimeLoopbackError::message(error.to_string()))?;
+    let runtime_id = chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+        "runtime_id",
+        step.request.host_kernel_id.clone(),
+    )
+    .map_err(|error| RuntimeLoopbackError::message(error.to_string()))?;
+    let installed = admission_store
+        .install_runtime_source(&source_id, &runtime_id, &hook_store, &fence, now_unix_ms)
+        .map_err(|error| {
+            RuntimeLoopbackError::message(format!("Chio runtime source install: {error}"))
+        })?;
+    let binding = chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1::new(
+        runtime_id, installed.qualification_id().clone(),
+    );
     hook_store
         .insert_bundle(step.admission_bundle.clone())
         .map_err(|error| {
@@ -432,11 +459,11 @@ pub(crate) fn execute_runtime_loopback_step(
         chio_runtime_core::ChioRuntimeAdmissionHook::new(
             step.admission_profile.clone(),
             hook_store,
+            binding,
         )
         .with_runtime_trust_input(signed_trust, trusted_keys)
         .with_pheromone_query_report(query_report)
-        .with_runtime_pheromone_policy(signed_policy, signed_weights)
-        .with_fixed_now_unix_ms(now_unix_ms),
+        .with_runtime_pheromone_policy(signed_policy, signed_weights),
     ));
     kernel.register_tool_server(Box::new(RuntimeLoopbackToolServer {
         id: step.request.server_id.clone(),
@@ -514,28 +541,20 @@ pub(crate) fn execute_runtime_loopback_step(
                 step_index
             ))
         })?;
-    if !matches!(response.verdict, chio_kernel::Verdict::Allow) {
-        let failure_code = response
+    let accepted = matches!(response.verdict, chio_kernel::Verdict::Allow);
+    let failure_code = (!accepted).then(|| {
+        response
             .receipt
             .metadata
             .as_ref()
-            .and_then(|metadata| {
-                metadata
-                    .pointer("/chio_runtime/failure_code")
-                    .or_else(|| metadata.pointer("/chio_runtime/failure_code"))
-            })
+            .and_then(|metadata| metadata.pointer("/chio_runtime/failure_code"))
             .and_then(serde_json::Value::as_str)
-            .unwrap_or("unknown_runtime_loopback_failure");
-        return Err(RuntimeLoopbackError::message(format!(
-            "Chio runtime loopback kernel denied step {}: {} ({failure_code})",
-            step_index,
-            response
-                .reason
-                .as_deref()
-                .unwrap_or("unknown_runtime_loopback_denial")
-        )));
-    }
+            .unwrap_or("runtime_kernel_denied")
+            .to_owned()
+    });
     Ok(RuntimeLoopbackExecution {
+        accepted,
+        failure_code,
         receipt: response.receipt,
         treaty: chio_treaty,
     })

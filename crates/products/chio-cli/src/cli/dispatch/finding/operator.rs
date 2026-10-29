@@ -1,6 +1,5 @@
 use super::*;
 
-use std::collections::BTreeMap;
 use std::fs::{self, OpenOptions};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -595,6 +594,8 @@ fn post_operator_bytes(
     bytes: &[u8],
 ) -> Result<serde_json::Value, FindingSellerSubmissionError> {
     let endpoint = format!("{}{path}", base_url.trim_end_matches('/'));
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the --control-url venue the
+    // operator named
     let response = match ureq::post(&endpoint)
         .timeout(std::time::Duration::from_secs(30))
         .set("authorization", &format!("Bearer {token}"))
@@ -1106,7 +1107,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     );
     let challenge_runtime = FindingChallengeSubmissionRuntime::new(authority, challenge)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    let config = trust_config(&profile, &paths);
+    let config = trust_config(&profile, &paths)?;
     chio_control_plane::trust_control::serve_with_finding_operator_market_runtime(
         config,
         challenge_runtime,
@@ -1181,13 +1182,18 @@ impl ResolvedOperatorPaths {
 fn trust_config(
     profile: &FindingOperatorProfile,
     paths: &ResolvedOperatorPaths,
-) -> TrustServiceConfig {
-    TrustServiceConfig {
+) -> Result<TrustServiceConfig, CliError> {
+    let access =
+        chio_control_plane::trust_control::caller_credentials::TrustAccess::single_client(
+            "finding-operator",
+            "finding-operator",
+            &profile.service_token,
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    Ok(TrustServiceConfig {
         transport: Default::default(),
         listen: profile.listen,
-        service_token: profile.service_token.clone(),
-        tenant_read_tokens: BTreeMap::new(),
-        authority_workload_token: None,
+        access: std::sync::Arc::new(access),
         receipt_db_path: None,
         receipt_query_snapshot_quota_bytes: 2_147_483_648,
         revocation_db_path: None,
@@ -1196,6 +1202,7 @@ fn trust_config(
         authority_keyring_config_path: None,
         authority_keyring_receipt_anchor_root: None,
         budget_db_path: None,
+        cluster_peer_replay_db_path: None,
         joint_authority_db_path: Some(paths.authority_database.clone()),
         fiscal_runtime: None,
         enterprise_providers_file: None,
@@ -1213,14 +1220,13 @@ fn trust_config(
         advertise_url: Some(format!("http://{}", profile.listen)),
         allow_local_peer_urls: true,
         certification_public_metadata_ttl_seconds: 300,
-        peer_urls: Vec::new(),
         cluster_sync_interval: Duration::from_millis(250),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
         capital_authority: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: Some(profile.market.clone()),
-    }
+    })
 }
 
 pub(super) fn load_profile(path: &Path) -> Result<(FindingOperatorProfile, PathBuf), CliError> {

@@ -3,7 +3,6 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 
-use chio_core::receipt::body::ChioReceipt;
 use chio_core::{canonical_json_bytes, sha256_hex, PublicKey, Signature, SigningAlgorithm};
 use chio_manifest::{
     verify_manifest, DeclassificationPurpose, NativeSyscallProfile, NetworkDestination,
@@ -18,8 +17,6 @@ use crate::CliError;
 pub(crate) const SHADOW_MIGRATION_INPUT_SCHEMA: &str =
     "chio.active-defense.shadow-migration-input.v1";
 const SHADOW_MIGRATION_REPORT_SCHEMA: &str = "chio.active-defense.shadow-migration-report.v1";
-pub(crate) const BACKFILL_EVIDENCE_SCHEMA: &str = "chio.active-defense.backfill-evidence.v1";
-pub(crate) const BACKFILL_METADATA_KEY: &str = "active_defense_backfill_v1";
 const MAX_INPUT_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Debug, thiserror::Error)]
@@ -43,10 +40,8 @@ type MigrationResult<T> = Result<T, ShadowMigrationError>;
 pub(crate) struct ShadowMigrationInput {
     pub(crate) schema: String,
     pub(crate) manifest_public_keys: Vec<RegisteredPublicKey>,
-    pub(crate) receipt_public_keys: Vec<RegisteredPublicKey>,
     pub(crate) manifests: Vec<ManifestRegistration>,
     pub(crate) backfill_targets: Vec<BackfillTarget>,
-    pub(crate) backfill_receipts: Vec<RegisteredBackfillReceipt>,
     pub(crate) shadow_observations: Vec<ShadowObservation>,
 }
 
@@ -131,43 +126,6 @@ pub(crate) struct BackfillTarget {
     pub(crate) isolation_epoch_id: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RegisteredBackfillReceipt {
-    pub(crate) registered_key_id: String,
-    pub(crate) receipt: serde_json::Value,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct BackfillEvidence {
-    pub(crate) schema: String,
-    pub(crate) manifest_registry_id: String,
-    pub(crate) manifest_digest: String,
-    pub(crate) tenant_id: String,
-    pub(crate) principal_id: String,
-    pub(crate) lineage_id: String,
-    pub(crate) session_id: String,
-    pub(crate) isolation_epoch_id: String,
-    pub(crate) principal_label: InformationLabel,
-    pub(crate) lineage_label: InformationLabel,
-    pub(crate) session_label: InformationLabel,
-    pub(crate) context_generation: u64,
-    pub(crate) legacy_session_closed: bool,
-}
-
-impl BackfillEvidence {
-    fn target(&self) -> BackfillTarget {
-        BackfillTarget {
-            tenant_id: self.tenant_id.clone(),
-            principal_id: self.principal_id.clone(),
-            lineage_id: self.lineage_id.clone(),
-            session_id: self.session_id.clone(),
-            isolation_epoch_id: self.isolation_epoch_id.clone(),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ShadowMetric {
@@ -235,7 +193,6 @@ pub(crate) struct ShadowMigrationReport {
     pub(crate) unsupported_adapters: Vec<UnsupportedAdapterFinding>,
     pub(crate) direct_credential_grants: Vec<DirectCredentialFinding>,
     pub(crate) native_cage_inventory: Vec<NativeCageInventoryReport>,
-    pub(crate) verified_receipts: Vec<VerifiedReceiptReport>,
     pub(crate) backfill: BackfillReport,
     pub(crate) shadow_metrics: Vec<ShadowMetricReport>,
 }
@@ -328,25 +285,7 @@ pub(crate) struct NativeCageInventoryReport {
 
 #[derive(Debug, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct VerifiedReceiptReport {
-    receipt_id: String,
-    registered_key_id: String,
-    signer_public_key: String,
-    canonical_receipt_digest: String,
-    manifest_registry_id: String,
-    manifest_digest: String,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(deny_unknown_fields)]
 pub(crate) struct BackfillReport {
-    verified_evidence_receipts: usize,
-    pub(crate) principal_records_from_verified_evidence: usize,
-    pub(crate) principal_records_assigned_top: usize,
-    lineage_records_from_verified_evidence: usize,
-    lineage_records_assigned_top: usize,
-    session_records_from_verified_evidence: usize,
-    pub(crate) session_records_assigned_top: usize,
     pub(crate) principals: Vec<PrincipalBackfillRecord>,
     lineages: Vec<LineageBackfillRecord>,
     pub(crate) sessions: Vec<SessionBackfillRecord>,
@@ -358,9 +297,6 @@ pub(crate) struct PrincipalBackfillRecord {
     tenant_id: String,
     principal_id: String,
     pub(crate) label: InformationLabel,
-    context_generation: u64,
-    evidence_receipt_ids: Vec<String>,
-    pub(crate) assigned_top_due_to_missing_evidence: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -369,9 +305,6 @@ struct LineageBackfillRecord {
     tenant_id: String,
     lineage_id: String,
     label: InformationLabel,
-    context_generation: u64,
-    evidence_receipt_ids: Vec<String>,
-    assigned_top_due_to_missing_evidence: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -382,11 +315,7 @@ pub(crate) struct SessionBackfillRecord {
     lineage_id: String,
     session_id: String,
     isolation_epoch_id: String,
-    label: InformationLabel,
-    context_generation: u64,
-    evidence_receipt_ids: Vec<String>,
-    assigned_top_due_to_missing_evidence: bool,
-    pub(crate) legacy_session_closed: bool,
+    pub(crate) label: InformationLabel,
 }
 
 #[derive(Debug, Serialize)]
@@ -404,15 +333,6 @@ struct VerifiedManifest {
     source_schema: String,
     source_manifest_digest: String,
     signed_envelope_digest: String,
-}
-
-#[derive(Debug)]
-struct VerifiedBackfillEvidence {
-    registered_key_id: String,
-    receipt_id: String,
-    signer_public_key: String,
-    canonical_receipt_digest: String,
-    evidence: BackfillEvidence,
 }
 
 pub(crate) fn cmd_shadow_migrate(input_path: &Path, output_path: &Path) -> Result<(), CliError> {
@@ -458,7 +378,6 @@ fn build_shadow_migration_report(
 
     let input_digest = digest(&input, "migration input")?;
     let manifest_keys = validate_key_registry(&input.manifest_public_keys, "manifest")?;
-    let receipt_keys = validate_key_registry(&input.receipt_public_keys, "receipt")?;
 
     let mut verified_manifests = Vec::with_capacity(input.manifests.len());
     let mut seen_registry_ids = BTreeSet::new();
@@ -495,12 +414,6 @@ fn build_shadow_migration_report(
     });
 
     let targets = validate_backfill_targets(input.backfill_targets)?;
-    let verified_receipt_evidence = verify_backfill_receipts(
-        input.backfill_receipts,
-        &receipt_keys,
-        &verified_manifests,
-        &targets,
-    )?;
     let shadow_metrics = aggregate_shadow_metrics(input.shadow_observations)?;
 
     let mut manifests = Vec::new();
@@ -544,18 +457,7 @@ fn build_shadow_migration_report(
         (&left.registry_id, &left.server_id).cmp(&(&right.registry_id, &right.server_id))
     });
 
-    let verified_receipts = verified_receipt_evidence
-        .iter()
-        .map(|verified| VerifiedReceiptReport {
-            receipt_id: verified.receipt_id.clone(),
-            registered_key_id: verified.registered_key_id.clone(),
-            signer_public_key: verified.signer_public_key.clone(),
-            canonical_receipt_digest: verified.canonical_receipt_digest.clone(),
-            manifest_registry_id: verified.evidence.manifest_registry_id.clone(),
-            manifest_digest: verified.evidence.manifest_digest.clone(),
-        })
-        .collect();
-    let backfill = build_backfill_report(&targets, &verified_receipt_evidence)?;
+    let backfill = build_backfill_report(&targets);
 
     Ok(ShadowMigrationReport {
         schema: SHADOW_MIGRATION_REPORT_SCHEMA,
@@ -567,7 +469,6 @@ fn build_shadow_migration_report(
         unsupported_adapters,
         direct_credential_grants,
         native_cage_inventory,
-        verified_receipts,
         backfill,
         shadow_metrics,
     })
@@ -1009,321 +910,45 @@ fn validate_backfill_targets(
     Ok(validated)
 }
 
-fn verify_backfill_receipts(
-    receipts: Vec<RegisteredBackfillReceipt>,
-    receipt_keys: &BTreeMap<String, PublicKey>,
-    manifests: &[VerifiedManifest],
-    targets: &BTreeSet<BackfillTarget>,
-) -> MigrationResult<Vec<VerifiedBackfillEvidence>> {
-    let manifest_by_id = manifests
+fn build_backfill_report(targets: &BTreeSet<BackfillTarget>) -> BackfillReport {
+    let principals = targets
         .iter()
-        .map(|manifest| (manifest.registration.registry_id.as_str(), manifest))
-        .collect::<BTreeMap<_, _>>();
-    let mut verified = Vec::with_capacity(receipts.len());
-    let mut seen_receipt_ids = BTreeSet::new();
-    for registered in receipts {
-        let registered_key = receipt_keys
-            .get(&registered.registered_key_id)
-            .ok_or_else(|| {
-                ShadowMigrationError::Invalid(format!(
-                    "backfill receipt references unknown key {}",
-                    registered.registered_key_id
-                ))
-            })?;
-        let receipt: ChioReceipt = strict_typed_value(&registered.receipt, "backfill receipt")?;
-        if receipt.kernel_key != *registered_key {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} signer does not match registered key {}",
-                receipt.id, registered.registered_key_id
-            )));
-        }
-        let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
-            ShadowMigrationError::Invalid(format!(
-                "receipt {} signature verification failed: {error}",
-                receipt.id
-            ))
-        })?;
-        if !signature_valid {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} signature is invalid",
-                receipt.id
-            )));
-        }
-        if !receipt.action.verify_hash().map_err(|error| {
-            ShadowMigrationError::Invalid(format!(
-                "receipt {} parameter hash verification failed: {error}",
-                receipt.id
-            ))
-        })? {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} parameter hash is invalid",
-                receipt.id
-            )));
-        }
-        if !seen_receipt_ids.insert(receipt.id.clone()) {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "duplicate backfill receipt {}",
-                receipt.id
-            )));
-        }
-        let evidence_value = receipt
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.get(BACKFILL_METADATA_KEY))
-            .ok_or_else(|| {
-                ShadowMigrationError::Invalid(format!(
-                    "receipt {} has no signed backfill evidence",
-                    receipt.id
-                ))
-            })?;
-        let evidence: BackfillEvidence =
-            strict_typed_value(evidence_value, "signed backfill evidence")?;
-        if evidence.schema != BACKFILL_EVIDENCE_SCHEMA {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} has unsupported backfill evidence schema {}",
-                receipt.id, evidence.schema
-            )));
-        }
-        validate_backfill_evidence_identifiers(&evidence)?;
-        if receipt.tenant_id.as_deref() != Some(evidence.tenant_id.as_str()) {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} tenant does not match signed backfill evidence",
-                receipt.id
-            )));
-        }
-        if !targets.contains(&evidence.target()) {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} references an unregistered backfill target",
-                receipt.id
-            )));
-        }
-        let source_manifest = manifest_by_id
-            .get(evidence.manifest_registry_id.as_str())
-            .ok_or_else(|| {
-                ShadowMigrationError::Invalid(format!(
-                    "receipt {} references unknown manifest {}",
-                    receipt.id, evidence.manifest_registry_id
-                ))
-            })?;
-
-        if evidence.manifest_digest != source_manifest.source_manifest_digest {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} manifest digest does not match the verified registry entry",
-                receipt.id
-            )));
-        }
-        if receipt.tool_server != source_manifest.manifest.server_id
-            || !source_manifest
-                .manifest
-                .tools
-                .iter()
-                .any(|tool| tool.name == receipt.tool_name)
-        {
-            return Err(ShadowMigrationError::Invalid(format!(
-                "receipt {} tool identity is absent from its verified manifest",
-                receipt.id
-            )));
-        }
-        let canonical_receipt_digest = digest(&receipt, "backfill receipt")?;
-        verified.push(VerifiedBackfillEvidence {
-            registered_key_id: registered.registered_key_id,
-            receipt_id: receipt.id,
-            signer_public_key: registered_key.to_hex(),
-            canonical_receipt_digest,
-            evidence,
-        });
-    }
-    verified.sort_by(|left, right| left.receipt_id.cmp(&right.receipt_id));
-    Ok(verified)
-}
-
-fn validate_backfill_evidence_identifiers(evidence: &BackfillEvidence) -> MigrationResult<()> {
-    validate_identifier(
-        "backfill manifest registry id",
-        &evidence.manifest_registry_id,
-    )?;
-    validate_digest("backfill manifest digest", &evidence.manifest_digest)?;
-    validate_identifier("backfill tenant id", &evidence.tenant_id)?;
-    validate_identifier("backfill principal id", &evidence.principal_id)?;
-    validate_identifier("backfill lineage id", &evidence.lineage_id)?;
-    validate_identifier("backfill session id", &evidence.session_id)?;
-    validate_identifier("backfill isolation epoch id", &evidence.isolation_epoch_id)
-}
-
-fn build_backfill_report(
-    targets: &BTreeSet<BackfillTarget>,
-    evidence: &[VerifiedBackfillEvidence],
-) -> MigrationResult<BackfillReport> {
-    let mut by_target: BTreeMap<BackfillTarget, Vec<&VerifiedBackfillEvidence>> = targets
-        .iter()
-        .cloned()
-        .map(|target| (target, Vec::new()))
-        .collect();
-    for item in evidence {
-        let target = item.evidence.target();
-        let entries = by_target.get_mut(&target).ok_or_else(|| {
-            ShadowMigrationError::Invalid("verified evidence lost its backfill target".to_string())
-        })?;
-        entries.push(item);
-    }
-
-    let mut principal_groups: BTreeMap<(String, String), Vec<&BackfillTarget>> = BTreeMap::new();
-    let mut lineage_groups: BTreeMap<(String, String), Vec<&BackfillTarget>> = BTreeMap::new();
-    for target in targets {
-        principal_groups
-            .entry((target.tenant_id.clone(), target.principal_id.clone()))
-            .or_default()
-            .push(target);
-        lineage_groups
-            .entry((target.tenant_id.clone(), target.lineage_id.clone()))
-            .or_default()
-            .push(target);
-    }
-
-    let mut principals = Vec::with_capacity(principal_groups.len());
-    for ((tenant_id, principal_id), group_targets) in principal_groups {
-        let missing = group_targets
-            .iter()
-            .any(|target| by_target.get(*target).is_none_or(Vec::is_empty));
-        let group_evidence = group_targets
-            .iter()
-            .filter_map(|target| by_target.get(*target))
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        let label = if missing {
-            InformationLabel::Top
-        } else {
-            join_labels(
-                group_evidence
-                    .iter()
-                    .map(|item| &item.evidence.principal_label),
-            )?
-        };
-        principals.push(PrincipalBackfillRecord {
+        .map(|target| (target.tenant_id.clone(), target.principal_id.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(tenant_id, principal_id)| PrincipalBackfillRecord {
             tenant_id,
             principal_id,
-            label,
-            context_generation: max_context_generation(&group_evidence),
-            evidence_receipt_ids: evidence_ids(&group_evidence),
-            assigned_top_due_to_missing_evidence: missing,
-        });
-    }
-
-    let mut lineages = Vec::with_capacity(lineage_groups.len());
-    for ((tenant_id, lineage_id), group_targets) in lineage_groups {
-        let missing = group_targets
-            .iter()
-            .any(|target| by_target.get(*target).is_none_or(Vec::is_empty));
-        let group_evidence = group_targets
-            .iter()
-            .filter_map(|target| by_target.get(*target))
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        let label = if missing {
-            InformationLabel::Top
-        } else {
-            join_labels(
-                group_evidence
-                    .iter()
-                    .map(|item| &item.evidence.lineage_label),
-            )?
-        };
-        lineages.push(LineageBackfillRecord {
+            label: InformationLabel::Top,
+        })
+        .collect();
+    let lineages = targets
+        .iter()
+        .map(|target| (target.tenant_id.clone(), target.lineage_id.clone()))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|(tenant_id, lineage_id)| LineageBackfillRecord {
             tenant_id,
             lineage_id,
-            label,
-            context_generation: max_context_generation(&group_evidence),
-            evidence_receipt_ids: evidence_ids(&group_evidence),
-            assigned_top_due_to_missing_evidence: missing,
-        });
-    }
-
-    let mut sessions = Vec::with_capacity(targets.len());
-    for target in targets {
-        let target_evidence = by_target.get(target).ok_or_else(|| {
-            ShadowMigrationError::Invalid("backfill target inventory changed".to_string())
-        })?;
-        let missing = target_evidence.is_empty();
-        let label = if missing {
-            InformationLabel::Top
-        } else {
-            join_labels(
-                target_evidence
-                    .iter()
-                    .map(|item| &item.evidence.session_label),
-            )?
-        };
-        sessions.push(SessionBackfillRecord {
+            label: InformationLabel::Top,
+        })
+        .collect();
+    let sessions = targets
+        .iter()
+        .map(|target| SessionBackfillRecord {
             tenant_id: target.tenant_id.clone(),
             principal_id: target.principal_id.clone(),
             lineage_id: target.lineage_id.clone(),
             session_id: target.session_id.clone(),
             isolation_epoch_id: target.isolation_epoch_id.clone(),
-            label,
-            context_generation: max_context_generation(target_evidence),
-            evidence_receipt_ids: evidence_ids(target_evidence),
-            assigned_top_due_to_missing_evidence: missing,
-            legacy_session_closed: target_evidence
-                .iter()
-                .any(|item| item.evidence.legacy_session_closed),
-        });
-    }
-
-    let principal_records_assigned_top = principals
-        .iter()
-        .filter(|record| record.assigned_top_due_to_missing_evidence)
-        .count();
-    let lineage_records_assigned_top = lineages
-        .iter()
-        .filter(|record| record.assigned_top_due_to_missing_evidence)
-        .count();
-    let session_records_assigned_top = sessions
-        .iter()
-        .filter(|record| record.assigned_top_due_to_missing_evidence)
-        .count();
-    Ok(BackfillReport {
-        verified_evidence_receipts: evidence.len(),
-        principal_records_from_verified_evidence: principals.len() - principal_records_assigned_top,
-        principal_records_assigned_top,
-        lineage_records_from_verified_evidence: lineages.len() - lineage_records_assigned_top,
-        lineage_records_assigned_top,
-        session_records_from_verified_evidence: sessions.len() - session_records_assigned_top,
-        session_records_assigned_top,
+            label: InformationLabel::Top,
+        })
+        .collect();
+    BackfillReport {
         principals,
         lineages,
         sessions,
-    })
-}
-
-fn join_labels<'a>(
-    labels: impl IntoIterator<Item = &'a InformationLabel>,
-) -> MigrationResult<InformationLabel> {
-    let mut joined = InformationLabel::bottom();
-    for label in labels {
-        joined = joined.join_restrictions(label).map_err(|error| {
-            ShadowMigrationError::Invalid(format!("backfill label join failed: {error}"))
-        })?;
     }
-    Ok(joined)
-}
-
-fn max_context_generation(evidence: &[&VerifiedBackfillEvidence]) -> u64 {
-    evidence
-        .iter()
-        .map(|item| item.evidence.context_generation)
-        .max()
-        .unwrap_or(0)
-}
-
-fn evidence_ids(evidence: &[&VerifiedBackfillEvidence]) -> Vec<String> {
-    let mut ids = evidence
-        .iter()
-        .map(|item| item.receipt_id.clone())
-        .collect::<Vec<_>>();
-    ids.sort();
-    ids
 }
 
 fn aggregate_shadow_metrics(
@@ -1372,19 +997,6 @@ fn digest<T: Serialize>(value: &T, label: &str) -> MigrationResult<String> {
         ShadowMigrationError::Invalid(format!("{label} canonicalization failed: {error}"))
     })?;
     Ok(sha256_hex(&canonical))
-}
-
-fn validate_digest(label: &str, value: &str) -> MigrationResult<()> {
-    if value.len() != 64
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Err(ShadowMigrationError::Invalid(format!(
-            "{label} is not a lowercase SHA-256 digest"
-        )));
-    }
-    Ok(())
 }
 
 fn validate_identifier(label: &str, value: &str) -> MigrationResult<()> {

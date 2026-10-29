@@ -313,6 +313,8 @@ jobs:
           run_gate cargo metadata --manifest-path fuzz/Cargo.toml --locked --no-deps --format-version 1
           run_gate bash ./scripts/check-corpus-metadata.sh
           run_gate bash ./scripts/tests/fuzz-budget-hard-halt.test.sh
+          run_gate python3 ./scripts/tests/check-fuzz-budget.test.py
+          run_gate bash ./scripts/tests/cflite-build-selection.test.sh
           run_gate bash ./scripts/tests/check-proof-report.test.sh
           run_gate bash ./scripts/tests/lane-gate.test.sh
           run_gate bash ./scripts/check-liability-roster-enforcement.sh
@@ -328,6 +330,8 @@ jobs:
           run_gate python3 scripts/tests/check-enterprise-subject-census.test.py
           run_gate python3 scripts/check-security-clocks.py
           run_gate python3 scripts/tests/check-security-clocks.test.py
+          run_gate bash -c "cargo metadata --format-version 1 --locked > \"\$RUNNER_TEMP/offline-verifier-metadata.json\" && python3 scripts/check-offline-verifier-deps.py --metadata \"\$RUNNER_TEMP/offline-verifier-metadata.json\""
+          run_gate python3 scripts/tests/check-offline-verifier-deps.test.py
           run_gate python3 scripts/check-escape-hatches.py
           run_gate python3 scripts/tests/check-escape-hatches.test.py
           run_gate python3 scripts/check-trust-boundaries.py

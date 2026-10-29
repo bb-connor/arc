@@ -480,7 +480,7 @@ fn drop_guard_reverse_failure_records_cleanup_fault() {
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         false,
@@ -575,7 +575,7 @@ fn drop_pre_dispatch_releases_reservations_no_receipt() -> Result<(), Box<dyn st
         None,
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,
@@ -654,7 +654,7 @@ fn drop_pre_dispatch_monetary_unwinds_without_receipt() -> Result<(), Box<dyn st
         Some(&authorization),
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,
@@ -717,7 +717,7 @@ fn drop_pre_dispatch_reverses_invocation_budget() -> Result<(), Box<dyn std::err
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,
@@ -774,7 +774,7 @@ fn drop_pre_dispatch_releases_admitted_child_budget() -> Result<(), Box<dyn std:
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         // Genuinely-new admission (child_a inserted above): the drop MUST
@@ -851,7 +851,7 @@ fn drop_pre_dispatch_overlapping_readmit_keeps_sibling_denied(
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,
@@ -922,7 +922,7 @@ fn drop_pre_dispatch_records_receipt_on_cleanup_fault() -> Result<(), Box<dyn st
         None,
         PostAdmissionReceiptContext {
             extra_metadata: Some(metadata),
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,
@@ -1015,7 +1015,7 @@ fn drop_pre_dispatch_cleanup_fault_receipt_includes_monetary_hold_id(
         None,
         PostAdmissionReceiptContext {
             extra_metadata: None,
-            pre_invocation_guard_evidence: Vec::new(),
+            pre_invocation_guard_output: crate::kernel::PreInvocationGuardOutput::default(),
             verified_payee_binding: None,
         },
         true,

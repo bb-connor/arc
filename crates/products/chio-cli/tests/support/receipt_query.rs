@@ -53,6 +53,7 @@ pub(crate) use chio_core::credit::{
     CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
 };
 pub(crate) use chio_core::crypto::Keypair;
+pub(crate) use chio_core::receipt::evidence::CapabilitySnapshot;
 pub(crate) use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     economics::FinancialBudgetAuthorityReceiptMetadata,
@@ -66,7 +67,7 @@ pub(crate) use chio_core::receipt::{
 };
 pub(crate) use chio_kernel::{
     build_checkpoint, AuthorizationContextReport, BudgetStore, BudgetUsageRecord,
-    CapabilitySnapshot, CreditBacktestReport, CreditBondListReport, CreditBondReport,
+    CreditBacktestReport, CreditBondListReport, CreditBondReport,
     CreditBondedExecutionSimulationReport, CreditFacilityListReport, CreditFacilityReport,
     CreditLossLifecycleListReport, FederatedEvidenceShareImport, LiabilityMarketWorkflowReport,
     LiabilityProviderListReport, LiabilityProviderResolutionReport, ReceiptStore,
@@ -312,8 +313,8 @@ pub(crate) fn spawn_trust_service(
             "serve",
             "--listen",
             &listen.to_string(),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &super::trust_access::write_access_config(service_token, &[]),
             "--policy",
             policy_path.to_str().expect("policy path"),
         ])
@@ -350,8 +351,8 @@ pub(crate) fn spawn_trust_service_without_receipt_db(
             "serve",
             "--listen",
             &listen.to_string(),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &super::trust_access::write_access_config(service_token, &[]),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -434,7 +435,7 @@ pub(crate) fn assert_trust_service_auth_required(client: &Client, base_url: &str
     assert!(body["error"]
         .as_str()
         .unwrap_or_else(|| panic!("extract unauthenticated error string for {path}"))
-        .contains("missing or invalid control bearer token"));
+        .contains("missing or invalid trust-control credential"));
 }
 
 pub(crate) fn assert_trust_service_get_error(

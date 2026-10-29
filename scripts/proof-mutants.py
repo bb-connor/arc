@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = "chio.proof-mutants-report.v1"
 EXPECTED_CARGO_MUTANTS = "cargo-mutants 25.3.1"
 EXPECTED_KANI = "0.68.0"
-EXPECTED_RUSTC = "1.93.0"
+EXPECTED_RUSTC = "1.95.0"
 CONFIG = Path("formal/rust-verification/formal-mutants.toml")
 FILES = (
     Path("crates/kernel/chio-kernel-core/src/formal_core.rs"),

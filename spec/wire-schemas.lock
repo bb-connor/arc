@@ -50,11 +50,6 @@ files = ["crates/protocol/chio-a2a-adapter/src/lib.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.active-defense.backfill-evidence.v1"
-files = ["crates/products/chio-cli/src/active_defense_migration.rs"]
-first_seen = "6a12a69155"
-
-[[schema]]
 value = "chio.active-defense.deployment-config.v1"
 files = ["crates/security/chio-active-response-authority/src/config.rs"]
 first_seen = "28d826e3e6"
@@ -645,6 +640,11 @@ files = ["crates/security/chio-secret-broker/src/protocol.rs"]
 first_seen = "38d8cd4341"
 
 [[schema]]
+value = "chio.bundle-verify-report.v1"
+files = ["crates/tooling/chio-bundle-verify/src/report.rs"]
+first_seen = "34d9e6bcf3"
+
+[[schema]]
 value = "chio.cage-migration-posture.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
@@ -906,27 +906,27 @@ first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.checkpoint_consistency_proof.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_equivocation.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_publication.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_statement.v1"
-files = ["crates/economy/chio-web3/src/anchors.rs", "crates/kernel/chio-kernel/src/checkpoint.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs", "crates/economy/chio-web3/src/anchors.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
 first_seen = "041db5c226"
 
 [[schema]]
 value = "chio.checkpoint_witness.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1055,9 +1055,19 @@ files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "9019771960"
 
 [[schema]]
-value = "chio.cluster.peer.v1"
-files = ["crates/platform/chio-control-plane/src/trust_control/service_types/paths.rs"]
-first_seen = "11e573d2d7"
+value = "chio.cluster.peer-signature.v1"
+files = ["crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs"]
+first_seen = "869751bc7a"
+
+[[schema]]
+value = "chio.commerce.escrow-acceptance.v1"
+files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+first_seen = "34d9e6bcf3"
+
+[[schema]]
+value = "chio.commerce.escrow-ledger.v1"
+files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+first_seen = "34d9e6bcf3"
 
 [[schema]]
 value = "chio.commerce.event-log.v1"
@@ -1113,6 +1123,11 @@ first_seen = "1b9620751d"
 value = "chio.commerce.reputation-snapshot.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-commerce-order/src/ids.rs"]
 first_seen = "2a36f21acf"
+
+[[schema]]
+value = "chio.commerce.reservation-receipt.v1"
+files = ["crates/platform/chio-commerce-order/src/ids.rs"]
+first_seen = "34d9e6bcf3"
 
 [[schema]]
 value = "chio.commerce.settlement-packet.v1"
@@ -1345,6 +1360,11 @@ files = ["crates/core/chio-core-types/src/capability/cumulative_approval.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.decision-model-witness.v1"
+files = ["crates/core/chio-core-types/src/receipt/metadata/decision_model.rs"]
+first_seen = "34d9e6bcf3"
+
+[[schema]]
 value = "chio.declassification-grant.v1"
 files = ["crates/core/chio-core-types/src/declassification.rs"]
 first_seen = "82ae081052"
@@ -1556,22 +1576,22 @@ first_seen = "2d6c8ed146"
 
 [[schema]]
 value = "chio.evidence_export_commitment.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export/envelope.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "0a455ac2c0"
 
 [[schema]]
 value = "chio.evidence_export_disclosure_notice.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "0acd05adbf"
 
 [[schema]]
 value = "chio.evidence_export_manifest.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.evidence_transparency_claims.v1"
-files = ["crates/kernel/chio-kernel/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1646,7 +1666,7 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.federated-evidence-share.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1666,7 +1686,7 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.federation-policy.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -2808,11 +2828,6 @@ first_seen = "7e54c14a60"
 value = "chio.governance-receipt.v1"
 files = ["crates/trust/chio-governance/src/authorization.rs"]
 first_seen = "769c627445"
-
-[[schema]]
-value = "chio.governed-approval-replay-source-seal.v1"
-files = ["crates/kernel/chio-kernel/src/admission_operation/governed_approval_replay.rs"]
-first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.governed-approval-token.v1"
@@ -4585,6 +4600,11 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.receipt-session-anchor.v1"
+files = ["crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs"]
+first_seen = "34d9e6bcf3"
+
+[[schema]]
 value = "chio.receipt.bbs_signature.v1"
 files = ["crates/core/chio-core-types/src/receipt/signing.rs"]
 first_seen = "d65bf20886"
@@ -5125,9 +5145,9 @@ files = ["crates/platform/chio-control-plane/src/policy/util.rs"]
 first_seen = "de519d7776"
 
 [[schema]]
-value = "chio.runtime-replay-source-seal.v1"
-files = ["crates/core/chio-core-types/src/runtime_replay.rs"]
-first_seen = "7e54c14a60"
+value = "chio.runtime-source-qualification.v1"
+files = ["crates/core/chio-core-types/src/runtime_source.rs"]
+first_seen = "34d9e6bcf3"
 
 [[schema]]
 value = "chio.runtime.admission-bundle.v1"
@@ -5880,6 +5900,11 @@ files = ["crates/tooling/chio-conformance/verdict_matrix/drivers/lambda/src/lib.
 first_seen = "4221ec5d89"
 
 [[schema]]
+value = "chio.verifier-trust.v1"
+files = ["crates/core/chio-core-types/src/root_authority/verifier_trust.rs"]
+first_seen = "61607d31ad"
+
+[[schema]]
 value = "chio.wall.authorization_context.v1"
 files = ["crates/products/chio-wall-core/src/control_path.rs"]
 first_seen = "11e573d2d7"
@@ -6023,6 +6048,11 @@ first_seen = "e057afb02a"
 value = "chio_finding_market_spend_period_ceiling_v1"
 files = ["crates/platform/chio-finding-market-store-postgres/src/spend.rs"]
 first_seen = "f9b04c8f9d"
+
+[[schema]]
+value = "chio_http_receipt_v1"
+files = ["crates/tooling/chio-bundle-verify/src/verify.rs"]
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio_link_runtime_v1"

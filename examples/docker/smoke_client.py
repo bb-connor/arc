@@ -11,7 +11,7 @@ BASE_URL = os.environ.get("CHIO_BASE_URL", "http://127.0.0.1:8931")
 CONTROL_URL = os.environ.get("CHIO_CONTROL_URL", "http://127.0.0.1:8940")
 TOKEN = os.environ.get("CHIO_AUTH_TOKEN", "demo-token")
 ADMIN_TOKEN = os.environ.get("CHIO_ADMIN_TOKEN", "demo-admin-token")
-SERVICE_TOKEN = os.environ.get("CHIO_SERVICE_TOKEN", "demo-control-token")
+KERNEL_HOST_TOKEN = os.environ.get("CHIO_KERNEL_HOST_TOKEN", "demo-control-token")
 PROTOCOL_VERSION = "2025-11-25"
 
 
@@ -81,7 +81,7 @@ def query_receipts(capability_id):
     query = urllib.parse.urlencode({"capabilityId": capability_id, "limit": 10})
     payload = request_json(
         f"{CONTROL_URL}/v1/receipts/query?{query}",
-        headers={"Authorization": f"Bearer {SERVICE_TOKEN}"},
+        headers={"Authorization": f"Bearer {KERNEL_HOST_TOKEN}"},
     )
     receipts = payload.get("receipts", [])
     if not receipts:

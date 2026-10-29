@@ -5,8 +5,6 @@
 //! cost grows with history. Measuring it on an empty table would report the cost
 //! of preparing four statements.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::crypto::Keypair;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
@@ -34,13 +32,7 @@ fn fail_bench(message: &str) -> ! {
     std::process::exit(1);
 }
 
-fn unique_db_path() -> std::path::PathBuf {
-    let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
-        Ok(elapsed) => elapsed.as_nanos(),
-        Err(error) => fail_bench(&format!("time before epoch: {error}")),
-    };
-    std::env::temp_dir().join(format!("chio-bench-receipt-analytics-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 fn subject_key(index: u64) -> String {
     format!("bench-agent-{}", index % SUBJECTS as u64)
@@ -158,7 +150,7 @@ fn analytics_query() -> ReceiptAnalyticsQuery {
 }
 
 fn bench_receipt_analytics_report(c: &mut Criterion) {
-    let path = unique_db_path();
+    let (_path_dir, path) = temp_sqlite_path("chio-bench-receipt-analytics");
     let store = populated_store(&path);
 
     let window_start = FIRST_TIMESTAMP + POPULATED_RECEIPTS / 2;

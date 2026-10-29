@@ -103,47 +103,15 @@ fn assert_combined_completion(fixture: &Fixture, egress: bool) -> TestResult {
 
 impl Fixture {
     fn configure_native_capture_approval(&mut self) -> TestResult {
-        let path = self._directory.path().join("native-approval.db");
-        drop(
-            chio_store_sqlite::SqliteGovernedApprovalReplayStore::open_with_clock(
-                &path,
-                16,
-                self.clock.clone(),
-            )?,
-        );
-        let source = Arc::new(
-            chio_store_sqlite::SqliteGovernedApprovalReplaySource::open_with_clock(
-                &path,
-                self.clock.clone(),
-            )?,
-        );
         let store = self.authority.admission_operation_store();
         let fence = self.authority.mutation_fence();
-        let authority = AdmissionIdentifier::try_new("authority", "native-combined-approval")?;
-        let expected = store.expect_governed_approval_replay_source(
-            &AdmissionIdentifier::try_new("source", "native-combined-approval-source")?,
-            &authority,
-            source.as_ref(),
-            &fence,
-            now_ms()?,
-        )?;
-        let imported = store.import_governed_approval_replay_source(
-            &authority,
-            expected.expectation_id(),
-            source.as_ref(),
-            &fence,
-            now_ms()?,
-        )?;
-        let binding =
-            GovernedApprovalAuthorityBindingV1::new(authority, imported.expectation_id().clone());
-        store.activate_governed_approval_replay_source(
-            &binding,
-            source.as_ref(),
-            &fence,
-            now_ms()?,
-        )?;
+        let binding = GovernedApprovalAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("authority", "native-combined-approval")?,
+            AdmissionIdentifier::try_new("expectation", "native-combined-approval-generation")?,
+        );
+        store.install_governed_approval_authority(&binding, 16, &fence, now_ms()?)?;
         self.kernel
-            .set_operation_owned_governed_approval_source(binding, source)?;
+            .set_operation_owned_governed_approval_authority(binding)?;
         self.request.governed_intent = Some(self.kernel.bind_tool_approval_intent(&self.request)?);
         let approver = native_approval_keypair();
         let intent = self

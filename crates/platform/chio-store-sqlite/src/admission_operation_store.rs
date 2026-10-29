@@ -65,7 +65,7 @@ mod errors;
 mod execution_nonce;
 mod governed_approval_claim;
 pub(crate) use dpop_claim::{verify_dpop_budget_selection_tx, verify_fresh_dpop_tx};
-mod governed_approval_replay;
+mod governed_approval_authority;
 mod native_capture_readback;
 pub use native_capture_readback::NativeDispatchCaptureWitness;
 mod native_capture_diagnostic;
@@ -105,7 +105,7 @@ pub(crate) use recovery_records::{
 };
 mod retained_request;
 mod runtime_participant;
-mod runtime_replay;
+mod runtime_source;
 mod schema;
 #[cfg(test)]
 pub(crate) use schema::admission_operation_schema_sql;
@@ -202,10 +202,9 @@ pub use factor_assignment::{
     FactorAssignmentSigningAuthorityV1, FactorAssignmentVerificationAuthorityV1,
     SqliteFactorAssignmentStore, StoredFactorAssignmentResultV1,
 };
-pub use governed_approval_replay::GovernedApprovalReplayMigrationRecordV1;
-pub(crate) use governed_approval_replay::{
-    governed_approval_replay_projection_reference, verify_governed_approval_replay_pristine,
-    verify_governed_approval_replay_projection_coverage,
+pub(crate) use governed_approval_authority::{
+    governed_approval_authority_projection_reference, verify_governed_approval_authority_pristine,
+    verify_governed_approval_authority_projection_coverage,
 };
 use obligation::load_durable_obligation;
 pub(crate) use participant::{
@@ -226,10 +225,10 @@ use projection::{
     verify_exact_terminal_replay, verify_stored_terminal_projection,
 };
 pub(crate) use runtime_participant::verify_runtime_budget_selection_tx;
-pub use runtime_replay::RuntimeReplayMigrationRecordV1;
-pub(crate) use runtime_replay::{
-    runtime_replay_projection_reference, verify_runtime_replay_pristine,
-    verify_runtime_replay_projection_coverage,
+pub use runtime_source::RuntimeSourceRecordV1;
+pub(crate) use runtime_source::{
+    runtime_source_projection_reference, verify_runtime_source_pristine,
+    verify_runtime_source_projection_coverage,
 };
 use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use schema::{
@@ -261,10 +260,9 @@ const COMBINED_CAPTURE_OPERATION_MUTATION_KIND: &str = "compare_and_swap";
 const ADMISSION_OPERATION_SCHEMA: &str = include_str!("admission_operation_store.sql");
 const GOVERNED_APPROVAL_CLAIM_SCHEMA: &str =
     include_str!("admission_operation_governed_approval_claim.sql");
-const RUNTIME_REPLAY_MIGRATION_SCHEMA: &str =
-    include_str!("admission_operation_runtime_replay.sql");
-const GOVERNED_APPROVAL_REPLAY_MIGRATION_SCHEMA: &str =
-    include_str!("admission_operation_governed_approval_replay.sql");
+const RUNTIME_SOURCE_SCHEMA: &str = include_str!("admission_operation_runtime_source.sql");
+const GOVERNED_APPROVAL_AUTHORITY_SCHEMA: &str =
+    include_str!("admission_operation_governed_approval_authority.sql");
 const DPOP_REPLAY_MIGRATION_SCHEMA: &str = include_str!("admission_operation_dpop_replay.sql");
 const DPOP_AUTHORITY_SCHEMA: &str = include_str!("admission_operation_dpop_authority.sql");
 const DPOP_CLAIM_SCHEMA: &str = include_str!("admission_operation_dpop_claim.sql");

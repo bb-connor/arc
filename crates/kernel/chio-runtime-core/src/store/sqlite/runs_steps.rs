@@ -151,14 +151,13 @@ fn write_step(
             r#"
                 INSERT INTO runtime_step_states (
                     run_id, step_index, admission_id, state, destructive,
-                    admission_report_sha256, tool_receipt_sha256, lease_id
+                    tool_receipt_sha256, lease_id
                 )
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
                 ON CONFLICT(run_id, step_index) DO UPDATE SET
                     admission_id = excluded.admission_id,
                     state = excluded.state,
                     destructive = excluded.destructive,
-                    admission_report_sha256 = excluded.admission_report_sha256,
                     tool_receipt_sha256 = excluded.tool_receipt_sha256,
                     lease_id = excluded.lease_id
                 "#,
@@ -168,7 +167,6 @@ fn write_step(
                 state.admission_id,
                 state.state,
                 if state.destructive { 1_i64 } else { 0_i64 },
-                state.admission_report_sha256,
                 state.tool_receipt_sha256,
                 state.lease_id
             ],
