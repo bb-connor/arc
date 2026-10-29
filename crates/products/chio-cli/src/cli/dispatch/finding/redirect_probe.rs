@@ -7,6 +7,7 @@ const PROBE_PATH: &str = "/probe";
 
 pub(super) struct RedirectProbe {
     pub(super) venue_url: String,
+    venue_address: SocketAddr,
     venue: JoinHandle<()>,
     second_address: SocketAddr,
     second: JoinHandle<bool>,
@@ -36,7 +37,8 @@ impl RedirectProbe {
             !head.contains(&format!(" {PROBE_PATH} "))
         });
         let venue_listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
-        let venue_url = format!("http://{}", venue_listener.local_addr().unwrap());
+        let venue_address = venue_listener.local_addr().unwrap();
+        let venue_url = format!("http://{venue_address}");
         let reply = format!(
             "HTTP/1.1 {status}\r\nLocation: http://{second_address}/redirected\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         );
@@ -47,6 +49,7 @@ impl RedirectProbe {
         });
         Self {
             venue_url,
+            venue_address,
             venue,
             second_address,
             second,
@@ -54,11 +57,15 @@ impl RedirectProbe {
     }
 
     /// Whether the client followed the redirect to the second authority.
+    /// Each listener that is still waiting gets a probe request, so a client
+    /// refused before it connected does not leave the call blocked.
     pub(super) fn followed(self) -> bool {
-        self.venue.join().unwrap();
-        if let Ok(mut probe) = TcpStream::connect(self.second_address) {
-            let _ = probe.write_all(format!("GET {PROBE_PATH} HTTP/1.1\r\n\r\n").as_bytes());
+        for address in [self.venue_address, self.second_address] {
+            if let Ok(mut probe) = TcpStream::connect(address) {
+                let _ = probe.write_all(format!("GET {PROBE_PATH} HTTP/1.1\r\n\r\n").as_bytes());
+            }
         }
+        self.venue.join().unwrap();
         self.second.join().unwrap()
     }
 }
