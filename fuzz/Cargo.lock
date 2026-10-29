@@ -1368,9 +1368,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
- "ureq",
  "url",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -1898,6 +1896,7 @@ dependencies = [
  "tokio",
  "ureq",
  "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]

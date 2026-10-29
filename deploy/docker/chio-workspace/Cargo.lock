@@ -2334,7 +2334,6 @@ dependencies = [
  "tokio",
  "ureq 2.12.1",
  "url",
- "webpki-roots 0.26.11",
 ]
 
 [[package]]
@@ -3324,6 +3323,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "http 1.4.0",
+ "rcgen 0.13.2",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -3331,6 +3331,7 @@ dependencies = [
  "tokio",
  "ureq 2.12.1",
  "url",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]
