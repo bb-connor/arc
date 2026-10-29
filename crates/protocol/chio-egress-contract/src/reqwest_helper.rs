@@ -507,3 +507,7 @@ mod single_attempt_tests;
 #[cfg(test)]
 #[path = "tests/resolver_refusal.rs"]
 mod resolver_refusal_tests;
+
+#[cfg(test)]
+#[path = "tests/port_bound_resolver.rs"]
+mod port_bound_resolver_tests;
