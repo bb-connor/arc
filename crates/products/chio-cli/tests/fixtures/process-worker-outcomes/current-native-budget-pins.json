@@ -1,9 +1,9 @@
 {
   "launch_policy_signers": {
-    "alice-probe": "903be9627381bf0ddd5905cb5ec59995b69273b8cb0be56f4dc0bc87369e8103",
-    "bob-probe": "3f2fba44aea90fc36151bb7049e5755e793a9becd0ec208edde3218b88f83531",
-    "carol-probe": "40cc67c9d0b3760eb1c08157e8760b8a6325f5a62cf20b7020b87c7e8e1c30bb",
-    "dave-probe": "bc1969703e3742177f534d33c48f467104ddcae03aa948602f79525d44965731"
+    "alice-probe": "491f23776202f0a7ff1c23d2ef6c34921b42543536c22f18f7f7c1f449a68ae6",
+    "bob-probe": "d60ff92fb87e8201c67efad19415d433ffe3e52a6676e6c10f511ad84a7a4b47",
+    "carol-probe": "5e1ff44af4a98d10f000b781c3d45d523bb7fcf690cf17cf725e72e3b620609a",
+    "dave-probe": "481837c696eb891260b0d486eda5f800cf129f129181de7bb5326158ade04ed5"
   },
-  "runtime_id": "f2b73bf3-bb85-4768-b0b8-d3d0fee5aec8"
+  "runtime_id": "f10dd002-fb88-4e08-ab17-2f34ab467223"
 }
