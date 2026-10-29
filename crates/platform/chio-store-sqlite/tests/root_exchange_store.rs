@@ -699,3 +699,64 @@ fn non_jws_roots_pass_the_row_check_without_context_artifact_digest() -> TestRes
     }
     Ok(())
 }
+
+/// A mint whose trusted time trails the authority clock, as when the request
+/// waited for the connection: the clock reads `clock`, the caller says `caller`.
+fn mint_behind_clock(
+    env: &Env,
+    case: &Case,
+    caller: u64,
+    clock: u64,
+) -> TestResult<Result<MintOutcome, E>> {
+    let built = case.build()?;
+    env.fixture.at(support::ms(clock));
+    Ok(env.store.mint_anchored_root(
+        &built.request(case),
+        &Admit,
+        &env.fence,
+        support::ms(caller),
+    ))
+}
+
+#[test]
+fn delayed_mint_judges_root_expiry_at_authority_time() -> TestResult {
+    let env = Env::new()?;
+    let mut case = Case::id_jag("cap-1")?;
+    case.expires_at = NOW + 3;
+    assert_eq!(
+        mint_behind_clock(&env, &case, NOW, NOW + 5)?.err(),
+        Some(E::InvalidMintRequest(MintRequestRefusal::RootExpired))
+    );
+    Ok(())
+}
+
+#[test]
+fn delayed_retry_does_not_recover_an_expired_root() -> TestResult {
+    let env = Env::new()?;
+    let mut case = Case::static_bearer("cap-1")?;
+    case.expires_at = NOW + 50;
+    env.minted(&case, &Admit, NOW)?;
+    let mut retry = Case::static_bearer("cap-2")?;
+    retry.expires_at = NOW + 50;
+    assert_eq!(
+        mint_behind_clock(&env, &retry, NOW + 48, NOW + 52)?.err(),
+        Some(E::AnchoredRootExpired {
+            capability_id: "cap-1".into()
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn delayed_bearer_lookup_judges_expiry_at_authority_time() -> TestResult {
+    let env = Env::new()?;
+    let mut case = Case::static_bearer("cap-1")?;
+    case.expires_at = NOW + 50;
+    env.minted(&case, &Admit, NOW)?;
+    env.fixture.at(support::ms(NOW + 52));
+    assert!(matches!(
+        env.store.bearer_root(&digest(0x44), support::ms(NOW + 48))?,
+        BearerLookup::Expired { capability_id } if capability_id == "cap-1"
+    ));
+    Ok(())
+}
