@@ -93,9 +93,9 @@ pub(super) fn key(seed: u8) -> Keypair {
 pub(super) fn relay_client(
     directory: PeerDirectory,
     keypair: Keypair,
-    _profile: RelayProfile,
+    profile: RelayProfile,
 ) -> PheromoneRelayClient {
-    PheromoneRelayClient::new(directory, keypair, NOW, 2_000).unwrap()
+    PheromoneRelayClient::new(directory, keypair, NOW, 2_000, profile)
 }
 
 pub(super) fn sample_batch() -> PheromoneGossipBatch {

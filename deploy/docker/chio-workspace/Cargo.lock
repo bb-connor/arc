@@ -4204,6 +4204,7 @@ dependencies = [
  "async-trait",
  "axum",
  "chio-core-types",
+ "chio-egress-contract",
  "chio-federation",
  "chio-http-serve",
  "chio-pheromone",

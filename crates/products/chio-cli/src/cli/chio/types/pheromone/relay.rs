@@ -198,7 +198,7 @@ pub(crate) enum ChioPheromoneRelayCommands {
         peer_directory_state: Option<PathBuf>,
 
         /// Relay operational profile.
-        #[arg(long, value_enum, default_value = "local-dev")]
+        #[arg(long, value_enum, default_value = "production")]
         profile: RelayProfileArg,
 
         /// Trusted peer-directory issuer config for signed bundles.
