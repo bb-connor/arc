@@ -73,11 +73,15 @@ amount allocation, and verified FROST authorization before EVM preparation.
 ## Trust and invariants
 
 `SettlementChainConfig::validate` requires nonempty fields, amount policy,
-evidence flags, a nonempty and duplicate-free `kernel_authority.trusted_keys`
-set, and a dispatchable pinned-DNS `HttpEgressContract` matching the RPC URL.
+evidence flags, nonempty and duplicate-free `kernel_authority.trusted_keys`
+and `capital_authority.trusted_keys` sets, and a dispatchable pinned-DNS
+`HttpEgressContract` matching the RPC URL.
 `prepare_dual_sign_release` and `prepare_merkle_release` refuse a receipt
 whose `kernel_key` is not in `kernel_authority.trusted_keys` before they
-verify the receipt or its anchor proof. RPC helpers use the contract-aware
+verify the receipt or its anchor proof. `prepare_bond_lock` and
+`prepare_web3_escrow_dispatch` refuse a credit bond or capital execution
+instruction whose `signer_key` is not in `capital_authority.trusted_keys`
+before they verify it. RPC helpers use the contract-aware
 HTTP client. Evidence flags express required integration posture; setting them
 does not create or inspect durable receipts, checkpoints, or signer equality.
 

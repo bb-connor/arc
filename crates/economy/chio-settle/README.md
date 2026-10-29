@@ -69,11 +69,16 @@ watchdog, and CCIP helpers share the `web3` gate.
 ## Guarantees
 
 - `SettlementChainConfig::validate` checks required configuration, evidence
-  flags, amount policy, a nonempty trusted kernel key set, and the
-  dispatchable pinned-DNS RPC egress contract.
+  flags, amount policy, nonempty trusted kernel and capital authority key
+  sets, and the dispatchable pinned-DNS RPC egress contract.
 - `prepare_dual_sign_release` and `prepare_merkle_release` only prepare a
   release for a receipt whose `kernel_key` is a member of
   `kernel_authority.trusted_keys`, then verify it.
+- `prepare_bond_lock` and `prepare_web3_escrow_dispatch` refuse a credit bond
+  or capital execution instruction whose `signer_key` is not a member of
+  `capital_authority.trusted_keys`, then verify it against that member.
+  Operators provision `capital_authority.trusted_keys` from the trust-control
+  `GET /v1/authority` `trustedPublicKeys` list.
 - `prepare_solana_settlement` requires a nonempty
   `SolanaSettlementConfig::kernel_authority`, refuses a receipt whose
   `kernel_key` is outside it, and accepts only a binding certificate naming

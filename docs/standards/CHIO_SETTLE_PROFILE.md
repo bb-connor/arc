@@ -117,14 +117,21 @@ The shipped settlement lanes are:
   for receipts signed by a kernel key in the configured
   `kernel_authority.trusted_keys` set
 - EVM timeout refund after the configured deadline elapses
-- EVM bond lifecycle observation for active, released, impaired, and expired
-  vault state
+- EVM escrow dispatch for capital execution instructions signed by a key in
+  the configured `capital_authority.trusted_keys` set
+- EVM bond lock for credit bonds signed by a key in
+  `capital_authority.trusted_keys`, and bond lifecycle observation for active,
+  released, impaired, and expired vault state
 - integrated FX-backed dual-sign execution plus recovery qualification over the
   generated `target/web3-e2e-qualification/` artifact family
 - Solana-native Ed25519 settlement preparation and commitment-parity checks,
   for receipts signed by a kernel key in the Solana config
   `kernel_authority.trusted_keys` set, with a binding certificate naming that
   same key
+
+`capital_authority.trusted_keys` is provisioned from the trust-control
+`GET /v1/authority` `trustedPublicKeys` list. The settlement config refuses
+an absent or empty set at load.
 
 ## Failure Posture
 
