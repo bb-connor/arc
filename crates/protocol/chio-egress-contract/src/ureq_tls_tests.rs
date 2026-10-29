@@ -86,6 +86,9 @@ fn server_config(materials: &Materials, require_client: bool) -> Arc<ureq::rustl
     )
 }
 
+const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
+const REQUEST_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Serves one TLS connection. The thread reports whether a request arrived.
 fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::JoinHandle<bool>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -94,6 +97,9 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
         let Ok((tcp, _)) = listener.accept() else {
             return false;
         };
+        if tcp.set_read_timeout(Some(REQUEST_READ_TIMEOUT)).is_err() {
+            return false;
+        }
         let Ok(connection) = ureq::rustls::ServerConnection::new(config) else {
             return false;
         };
@@ -106,7 +112,11 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
                 _ => return false,
             }
         }
-        let mut body = vec![0_u8; content_length(&request)];
+        let length = content_length(&request);
+        if length > MAX_REQUEST_BODY_BYTES {
+            return false;
+        }
+        let mut body = vec![0_u8; length];
         if stream.read_exact(&mut body).is_err() {
             return false;
         }
