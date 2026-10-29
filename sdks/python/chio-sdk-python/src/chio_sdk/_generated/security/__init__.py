@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f98e61fca1094fc6e2763340dae554e56c34e2d18e5720c6f3a7f9b589406726
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -65,16 +65,16 @@ from .effect_transition_receipt_body_v1_schema import ChioEffectTransitionReceip
 from .flow_denial_receipt_body_v1_schema import ChioFlowDenialReceiptBodyV1, Digest, DigestItem, Header, Identifier, Policy, Time
 from .information_label_schema import FlowIdentifier, InformationLabel, InformationLabel1, InformationLabel2
 from .key_log_activation_commit_body_v1_schema import ChioKeyLogActivationCommitBodyV1, Hash, KeyLogIdentifier
-from .key_log_activation_commit_envelope_v1_schema import ChioSignedKeyLogActivationCommitEnvelopeV1, OperatorAlgorithm
+from .key_log_activation_commit_envelope_v1_schema import ChioSignedKeyLogActivationCommitEnvelopeV1
 from .key_log_artifact_time_anchor_body_v1_schema import Anchor, CheckpointAnchor, ChioKeyLogArtifactTimeAnchorBodyV1, ExternalAnchor, Hash, Identifier, Type, U64
 from .key_log_artifact_time_anchor_envelope_v1_schema import ChioSignedKeyLogArtifactTimeAnchorV1, Hash, Signature
 from .key_log_audit_readiness_body_v1_schema import ChioKeyLogAuditServiceReadinessBodyV1, Count, Hash, Identifier, KeyLogPin, Nonce, PositiveU64, WitnessView
 from .key_log_audit_readiness_proof_v1_schema import ChioSignedKeyLogAuditServiceReadinessProofV1, Signature
 from .key_log_checkpoint_body_schema import ChioKeyLogCheckpointV1SignedBody
 from .key_log_checkpoint_body_v1_schema import ChioKeyLogCheckpointBodyV1, Hash
-from .key_log_checkpoint_envelope_v1_schema import ChioSignedKeyLogCheckpointEnvelopeV1, OperatorAlgorithm, Signature
+from .key_log_checkpoint_envelope_v1_schema import ChioSignedKeyLogCheckpointEnvelopeV1, Signature
 from .key_log_enterprise_receipt_body_v1_schema import ChioKeyLogEnterpriseReceiptBodyV1, ChioKeyLogEnterpriseReceiptBodyV11, ChioKeyLogEnterpriseReceiptBodyV12, EventSigner, EventSigner1, EventSigner2, EventSigner3, EventSigner4, Hash, KeyLogIdentifier, Outcome, Stage
-from .key_log_enterprise_receipt_envelope_v1_schema import ChioSignedKeyLogEnterpriseReceiptEnvelopeV1, OperatorAlgorithm
+from .key_log_enterprise_receipt_envelope_v1_schema import ChioSignedKeyLogEnterpriseReceiptEnvelopeV1
 from .key_log_event_body_v1_schema import Algorithm, ChioKeyLogEventBodyV1, Hash, KeyLogIdentifier, Operation, Operation13, Operation14, Operation15, Operation16, Operation17, Operation18, PublicKey
 from .key_log_event_envelope_v1_schema import Authorizations, ChioSignedKeyLogEventEnvelopeV1, Hash, KeyAuthorization, KeyLogIdentifier, RecoveryAuthorization, Signature
 from .key_log_sync_response_v1_schema import ChioKeyLogSynchronizationResponseV1, ConsistencyProof, Hash
@@ -370,7 +370,6 @@ __all__ = [
     "Operation17",
     "Operation18",
     "Operation4",
-    "OperatorAlgorithm",
     "OperatorCapability",
     "OperatorCeilings",
     "Options",

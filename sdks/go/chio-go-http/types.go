@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: b2a55ecd2e0767541bb01f4288d5035d84d7fc126d213e552b5ece742fc06f03
+// Schema content SHA-256: 6a4f02054dab3f55b85533fd4f33677ec67db525b20471b63cbd2ab1264c0d90
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -5215,14 +5215,6 @@ const (
 	SecurityKeyLogActivationCommitBodyV1SchemaChioKeyLogActivationCommitV1 SecurityKeyLogActivationCommitBodyV1Schema = "chio.key-log.activation-commit.v1"
 )
 
-// Defines values for SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm.
-const (
-	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "ed25519"
-	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "hybrid"
-	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "p256"
-	SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm = "p384"
-)
-
 // Defines values for SecurityKeyLogArtifactTimeAnchorBodyV1Schema.
 const (
 	SecurityKeyLogArtifactTimeAnchorBodyV1SchemaChioKeyLogArtifactTimeAnchorV1 SecurityKeyLogArtifactTimeAnchorBodyV1Schema = "chio.key-log.artifact-time-anchor.v1"
@@ -5252,14 +5244,6 @@ const (
 // Defines values for SecurityKeyLogCheckpointBodyV1Schema.
 const (
 	SecurityKeyLogCheckpointBodyV1SchemaChioKeyLogCheckpointV1 SecurityKeyLogCheckpointBodyV1Schema = "chio.key-log.checkpoint.v1"
-)
-
-// Defines values for SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm.
-const (
-	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "ed25519"
-	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "hybrid"
-	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "p256"
-	SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm = "p384"
 )
 
 // Defines values for SecurityKeyLogEnterpriseReceiptBodyV1Outcome.
@@ -5317,14 +5301,6 @@ const (
 // Defines values for SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role.
 const (
 	SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3RoleRecovery SecurityKeyLogEnterpriseReceiptBodyV1EventSigner3Role = "recovery"
-)
-
-// Defines values for SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm.
-const (
-	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmEd25519 SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "ed25519"
-	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmHybrid  SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "hybrid"
-	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmP256    SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "p256"
-	SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithmP384    SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm = "p384"
 )
 
 // Defines values for SecurityKeyLogEventBodyV1Schema.
@@ -36341,14 +36317,10 @@ type SecurityKeyLogActivationCommitBodyV1KeyLogIdentifier = string
 
 // SecurityKeyLogActivationCommitEnvelopeV1 defines model for SecurityKeyLogActivationCommitEnvelopeV1.
 type SecurityKeyLogActivationCommitEnvelopeV1 struct {
-	Body              SecurityKeyLogActivationCommitBodyV1                      `json:"body"`
-	OperatorAlgorithm SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
-	OperatorKeyId     string                                                    `json:"operator_key_id"`
-	OperatorSignature string                                                    `json:"operator_signature"`
+	Body              SecurityKeyLogActivationCommitBodyV1 `json:"body"`
+	OperatorKeyId     string                               `json:"operator_key_id"`
+	OperatorSignature string                               `json:"operator_signature"`
 }
-
-// SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogActivationCommitEnvelopeV1.OperatorAlgorithm.
-type SecurityKeyLogActivationCommitEnvelopeV1OperatorAlgorithm string
 
 // SecurityKeyLogArtifactTimeAnchorBodyV1 defines model for SecurityKeyLogArtifactTimeAnchorBodyV1.
 type SecurityKeyLogArtifactTimeAnchorBodyV1 struct {
@@ -36502,15 +36474,11 @@ type SecurityKeyLogCheckpointBodyV1Hash = string
 
 // SecurityKeyLogCheckpointEnvelopeV1 defines model for SecurityKeyLogCheckpointEnvelopeV1.
 type SecurityKeyLogCheckpointEnvelopeV1 struct {
-	Body              SecurityKeyLogCheckpointBodyV1                      `json:"body"`
-	OperatorAlgorithm SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
-	OperatorKeyId     string                                              `json:"operator_key_id"`
-	OperatorSignature SecurityKeyLogCheckpointEnvelopeV1Signature         `json:"operator_signature"`
-	WitnessSignatures *[]SecurityKeyLogWitnessSignatureV1                 `json:"witness_signatures,omitempty"`
+	Body              SecurityKeyLogCheckpointBodyV1              `json:"body"`
+	OperatorKeyId     string                                      `json:"operator_key_id"`
+	OperatorSignature SecurityKeyLogCheckpointEnvelopeV1Signature `json:"operator_signature"`
+	WitnessSignatures *[]SecurityKeyLogWitnessSignatureV1         `json:"witness_signatures,omitempty"`
 }
-
-// SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogCheckpointEnvelopeV1.OperatorAlgorithm.
-type SecurityKeyLogCheckpointEnvelopeV1OperatorAlgorithm string
 
 // SecurityKeyLogCheckpointEnvelopeV1Signature defines model for SecurityKeyLogCheckpointEnvelopeV1Signature.
 type SecurityKeyLogCheckpointEnvelopeV1Signature = string
@@ -36628,14 +36596,10 @@ type SecurityKeyLogEnterpriseReceiptBodyV1KeyLogIdentifier = string
 
 // SecurityKeyLogEnterpriseReceiptEnvelopeV1 defines model for SecurityKeyLogEnterpriseReceiptEnvelopeV1.
 type SecurityKeyLogEnterpriseReceiptEnvelopeV1 struct {
-	Body              SecurityKeyLogEnterpriseReceiptBodyV1                      `json:"body"`
-	OperatorAlgorithm SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm `json:"operator_algorithm"`
-	OperatorKeyId     string                                                     `json:"operator_key_id"`
-	OperatorSignature string                                                     `json:"operator_signature"`
+	Body              SecurityKeyLogEnterpriseReceiptBodyV1 `json:"body"`
+	OperatorKeyId     string                                `json:"operator_key_id"`
+	OperatorSignature string                                `json:"operator_signature"`
 }
-
-// SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm defines model for SecurityKeyLogEnterpriseReceiptEnvelopeV1.OperatorAlgorithm.
-type SecurityKeyLogEnterpriseReceiptEnvelopeV1OperatorAlgorithm string
 
 // SecurityKeyLogEventBodyV1 defines model for SecurityKeyLogEventBodyV1.
 type SecurityKeyLogEventBodyV1 struct {

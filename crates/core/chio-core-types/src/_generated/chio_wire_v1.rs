@@ -459,92 +459,6 @@ pub mod shared {
                 })
         }
     }
-    ///`Algorithm`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "ed25519",
-    ///    "p256",
-    ///    "p384",
-    ///    "hybrid"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum Algorithm {
-        #[serde(rename = "ed25519")]
-        Ed25519,
-        #[serde(rename = "p256")]
-        P256,
-        #[serde(rename = "p384")]
-        P384,
-        #[serde(rename = "hybrid")]
-        Hybrid,
-    }
-    impl ::std::convert::From<&Self> for Algorithm {
-        fn from(value: &Algorithm) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for Algorithm {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::Ed25519 => f.write_str("ed25519"),
-                Self::P256 => f.write_str("p256"),
-                Self::P384 => f.write_str("p384"),
-                Self::Hybrid => f.write_str("hybrid"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for Algorithm {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "ed25519" => Ok(Self::Ed25519),
-                "p256" => Ok(Self::P256),
-                "p384" => Ok(Self::P384),
-                "hybrid" => Ok(Self::Hybrid),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for Algorithm {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for Algorithm {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for Algorithm {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
     ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
@@ -206538,7 +206452,6 @@ pub mod security_key_log_enterprise_receipt_envelope_v1 {
     ///  "type": "object",
     ///  "required": [
     ///    "body",
-    ///    "operator_algorithm",
     ///    "operator_key_id",
     ///    "operator_signature"
     ///  ],
@@ -206716,9 +206629,6 @@ pub mod security_key_log_enterprise_receipt_envelope_v1 {
     ///      },
     ///      "additionalProperties": false
     ///    },
-    ///    "operator_algorithm": {
-    ///      "$ref": "#/$defs/Algorithm"
-    ///    },
     ///    "operator_key_id": {
     ///      "type": "string",
     ///      "pattern": "^0x[0-9a-f]{64}$"
@@ -206736,7 +206646,6 @@ pub mod security_key_log_enterprise_receipt_envelope_v1 {
     #[serde(deny_unknown_fields)]
     pub struct ChioSignedKeyLogEnterpriseReceiptEnvelopeV1 {
         pub body: ChioKeyLogEnterpriseReceiptBodyV1,
-        pub operator_algorithm: super::shared::Algorithm,
         pub operator_key_id: ChioSignedKeyLogEnterpriseReceiptEnvelopeV1OperatorKeyId,
         pub operator_signature: ChioSignedKeyLogEnterpriseReceiptEnvelopeV1OperatorSignature,
     }
@@ -207206,6 +207115,92 @@ pub mod security_key_log_sync_response_v1 {
             }
         }
     }
+    ///`Algorithm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "ed25519",
+    ///    "p256",
+    ///    "p384",
+    ///    "hybrid"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Algorithm {
+        #[serde(rename = "ed25519")]
+        Ed25519,
+        #[serde(rename = "p256")]
+        P256,
+        #[serde(rename = "p384")]
+        P384,
+        #[serde(rename = "hybrid")]
+        Hybrid,
+    }
+    impl ::std::convert::From<&Self> for Algorithm {
+        fn from(value: &Algorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Algorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ed25519 => f.write_str("ed25519"),
+                Self::P256 => f.write_str("p256"),
+                Self::P384 => f.write_str("p384"),
+                Self::Hybrid => f.write_str("hybrid"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Algorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ed25519" => Ok(Self::Ed25519),
+                "p256" => Ok(Self::P256),
+                "p384" => Ok(Self::P384),
+                "hybrid" => Ok(Self::Hybrid),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Algorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
     ///`ChioKeyLogActivationCommitBodyV1`
     ///
     /// <details><summary>JSON schema</summary>
@@ -207479,7 +207474,7 @@ pub mod security_key_log_sync_response_v1 {
     ///  ],
     ///  "properties": {
     ///    "algorithm": {
-    ///      "$ref": "#/$defs/Algorithm"
+    ///      "$ref": "#/$defs/algorithm"
     ///    },
     ///    "authority_id": {
     ///      "$ref": "#/$defs/keyLogIdentifier"
@@ -207535,7 +207530,7 @@ pub mod security_key_log_sync_response_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioKeyLogEventBodyV1 {
-        pub algorithm: super::shared::Algorithm,
+        pub algorithm: Algorithm,
         pub authority_id: KeyLogIdentifier,
         pub effective_at: u64,
         pub event_id: KeyLogIdentifier,
@@ -207664,7 +207659,6 @@ pub mod security_key_log_sync_response_v1 {
     ///        "type": "object",
     ///        "required": [
     ///          "body",
-    ///          "operator_algorithm",
     ///          "operator_key_id",
     ///          "operator_signature"
     ///        ],
@@ -207739,9 +207733,6 @@ pub mod security_key_log_sync_response_v1 {
     ///            },
     ///            "additionalProperties": false
     ///          },
-    ///          "operator_algorithm": {
-    ///            "$ref": "#/$defs/Algorithm"
-    ///          },
     ///          "operator_key_id": {
     ///            "type": "string",
     ///            "pattern": "^0x[0-9a-f]{64}$"
@@ -207766,7 +207757,6 @@ pub mod security_key_log_sync_response_v1 {
     ///        "type": "object",
     ///        "required": [
     ///          "body",
-    ///          "operator_algorithm",
     ///          "operator_key_id",
     ///          "operator_signature"
     ///        ],
@@ -207812,9 +207802,6 @@ pub mod security_key_log_sync_response_v1 {
     ///              }
     ///            },
     ///            "additionalProperties": false
-    ///          },
-    ///          "operator_algorithm": {
-    ///            "$ref": "#/$defs/Algorithm"
     ///          },
     ///          "operator_key_id": {
     ///            "type": "string",
@@ -207888,7 +207875,7 @@ pub mod security_key_log_sync_response_v1 {
     ///            ],
     ///            "properties": {
     ///              "algorithm": {
-    ///                "$ref": "#/$defs/Algorithm"
+    ///                "$ref": "#/$defs/algorithm"
     ///              },
     ///              "authority_id": {
     ///                "$ref": "#/$defs/keyLogIdentifier"
@@ -207978,7 +207965,6 @@ pub mod security_key_log_sync_response_v1 {
     ///  "type": "object",
     ///  "required": [
     ///    "body",
-    ///    "operator_algorithm",
     ///    "operator_key_id",
     ///    "operator_signature"
     ///  ],
@@ -208053,9 +208039,6 @@ pub mod security_key_log_sync_response_v1 {
     ///      },
     ///      "additionalProperties": false
     ///    },
-    ///    "operator_algorithm": {
-    ///      "$ref": "#/$defs/Algorithm"
-    ///    },
     ///    "operator_key_id": {
     ///      "type": "string",
     ///      "pattern": "^0x[0-9a-f]{64}$"
@@ -208073,7 +208056,6 @@ pub mod security_key_log_sync_response_v1 {
     #[serde(deny_unknown_fields)]
     pub struct ChioSignedKeyLogActivationCommitEnvelopeV1 {
         pub body: ChioKeyLogActivationCommitBodyV1,
-        pub operator_algorithm: super::shared::Algorithm,
         pub operator_key_id: ChioSignedKeyLogActivationCommitEnvelopeV1OperatorKeyId,
         pub operator_signature: ChioSignedKeyLogActivationCommitEnvelopeV1OperatorSignature,
     }
@@ -208271,7 +208253,6 @@ pub mod security_key_log_sync_response_v1 {
     ///  "type": "object",
     ///  "required": [
     ///    "body",
-    ///    "operator_algorithm",
     ///    "operator_key_id",
     ///    "operator_signature"
     ///  ],
@@ -208318,9 +208299,6 @@ pub mod security_key_log_sync_response_v1 {
     ///      },
     ///      "additionalProperties": false
     ///    },
-    ///    "operator_algorithm": {
-    ///      "$ref": "#/$defs/Algorithm"
-    ///    },
     ///    "operator_key_id": {
     ///      "type": "string",
     ///      "pattern": "^0x[0-9a-f]{64}$"
@@ -208344,7 +208322,6 @@ pub mod security_key_log_sync_response_v1 {
     #[serde(deny_unknown_fields)]
     pub struct ChioSignedKeyLogCheckpointEnvelopeV1 {
         pub body: ChioKeyLogCheckpointBodyV1,
-        pub operator_algorithm: super::shared::Algorithm,
         pub operator_key_id: ChioSignedKeyLogCheckpointEnvelopeV1OperatorKeyId,
         pub operator_signature: super::shared::Sharedqvtswxsqhmifn,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
@@ -208493,7 +208470,7 @@ pub mod security_key_log_sync_response_v1 {
     ///      ],
     ///      "properties": {
     ///        "algorithm": {
-    ///          "$ref": "#/$defs/Algorithm"
+    ///          "$ref": "#/$defs/algorithm"
     ///        },
     ///        "authority_id": {
     ///          "$ref": "#/$defs/keyLogIdentifier"

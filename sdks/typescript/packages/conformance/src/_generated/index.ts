@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 8bc4c1e402f7daec8f37f660a8baab850d36eb631417d0ba61fd8fb6d507f615
+// Schema SHA: 3e8e51422168badb635820e4894962c4ca99733a4e9e31eede7818a2f0ec0ba3
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -72741,7 +72741,6 @@ export namespace Security_KeyLogActivationCommitEnvelopeV1 {
   export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
     body: ChioKeyLogActivationCommitBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogActivationCommitBodyV1 {
@@ -72994,7 +72993,6 @@ export namespace Security_KeyLogCheckpointEnvelopeV1 {
   export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
     body: ChioKeyLogCheckpointBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: Signature;
     /**
      * @maxItems 64
@@ -73199,7 +73197,6 @@ export namespace Security_KeyLogEnterpriseReceiptEnvelopeV1 {
   export interface ChioSignedKeyLogEnterpriseReceiptEnvelopeV1 {
     body: ChioKeyLogEnterpriseReceiptBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogWitnessSignatureV1 {
@@ -73363,7 +73360,6 @@ export namespace Security_KeyLogSyncResponseV1 {
   export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
     body: ChioKeyLogCheckpointBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
     /**
      * @maxItems 64
@@ -73451,7 +73447,6 @@ export namespace Security_KeyLogSyncResponseV1 {
   export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
     body: ChioKeyLogActivationCommitBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogActivationCommitBodyV1 {
