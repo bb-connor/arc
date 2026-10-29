@@ -13,6 +13,9 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 
 use crate::store_connection::{StoreConnection, StoreGuard};
 
+mod targets;
+pub use targets::TargetRevocation;
+
 #[derive(Clone)]
 pub struct SqliteRevocationStore {
     clock: crate::store_clock::StoreClock,

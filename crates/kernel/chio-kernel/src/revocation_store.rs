@@ -21,6 +21,26 @@ pub enum RevocationStoreError {
         expected_epoch: u64,
         actual_epoch: Option<u64>,
     },
+
+    #[error("anchored root matches revocation entry {entry_id}")]
+    TargetRevoked {
+        entry_id: chio_core_types::root_authority::RevocationEntryId,
+    },
+
+    #[error("anchored root row missing for {capability_id}")]
+    AnchoredRootMissing { capability_id: String },
+
+    #[error("revocation coverage requires the serving-owner state directory")]
+    CoverageRequiresServingOwner,
+
+    #[error("a {kind} revocation requires the serving-owner state directory")]
+    TargetRequiresServingOwner { kind: &'static str },
+
+    #[error("revocation target tags are invalid: {0}")]
+    InvalidTargetTags(&'static str),
+
+    #[error("revocation entry {entry_id} has inconsistent tag rows")]
+    InconsistentTagRows { entry_id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

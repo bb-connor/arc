@@ -84,6 +84,8 @@ pub enum RootExchangeStoreError {
     },
     #[error("{TAG_GENERATION_MISSING}")]
     TagGenerationMissing { key_id: Sha256Digest },
+    #[error("tenant index key generation {key_id} referenced by a revocation entry is not loaded")]
+    RevocationTagGenerationMissing { key_id: Sha256Digest },
     #[error("tenant index key {key_id} is not loaded")]
     TenantIndexKeyUnknown { key_id: Sha256Digest },
     #[error("root tags do not verify")]

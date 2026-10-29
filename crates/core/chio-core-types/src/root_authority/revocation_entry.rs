@@ -2,6 +2,7 @@
 //! id derived from the target alone.
 
 use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 use core::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -285,6 +286,21 @@ impl RevocationEntry {
         }
         check_revoked_at(self.revoked_at)
     }
+}
+
+/// One anchored root an export carries and the capability ids under it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationCoverageRoot {
+    pub root_capability_id: String,
+    pub capability_ids: Vec<String>,
+}
+
+/// An entry that covers an exported root or capability ids under it.
+/// `covered_capability_ids` is sorted and holds each id once.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RevocationCoverage {
+    pub entry: RevocationEntry,
+    pub covered_capability_ids: Vec<String>,
 }
 
 #[derive(Deserialize)]
