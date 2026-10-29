@@ -167,6 +167,7 @@ fn child_token(
     }
     let receipt = delegate(
         root,
+        &root.issuer,
         &child_scope,
         root_subject,
         &delegatee.public_key(),
@@ -383,6 +384,7 @@ fn cumulative_approval_delegation_rejects_omission() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &tool_scope(false, None),
             &root_subject,
             &Keypair::generate().public_key(),
@@ -408,6 +410,7 @@ fn cumulative_approval_delegation_rejects_binding_mutation() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &child_scope,
             &root_subject,
             &Keypair::generate().public_key(),
@@ -438,6 +441,7 @@ fn cumulative_approval_delegation_rejects_fresh_constraint() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &child_scope,
             &root_subject,
             &Keypair::generate().public_key(),
@@ -741,6 +745,7 @@ fn cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating(
     intermediate_scope.grants[0].server_id = "server-a".to_string();
     let first = delegate(
         &root,
+        &root.issuer,
         &intermediate_scope,
         &root_subject,
         &intermediate.public_key(),
@@ -765,6 +770,7 @@ fn cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating(
     chronology_scope.grants[0].server_id = "server-a".to_string();
     let projected = delegate(
         &intermediate_token,
+        &intermediate_token.issuer,
         &chronology_scope,
         &intermediate,
         &delegatee.public_key(),
@@ -868,6 +874,7 @@ fn cumulative_approval_marker_is_bounded_sorted_and_deduplicated() -> TestResult
     )?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &root.scope,
         &subject,
         &delegatee.public_key(),
@@ -936,6 +943,7 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
     let child_scope = bound_tool_scope(&root, false, 80)?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
@@ -1065,6 +1073,7 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
     };
     let first = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &intermediate.public_key(),
@@ -1074,6 +1083,7 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
     )?;
     let other = delegate(
         &other_root,
+        &other_root.issuer,
         &other_child_scope,
         &other_subject,
         &delegatee.public_key(),

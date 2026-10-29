@@ -73,6 +73,7 @@ pub(super) fn child_capability(
     let scope = select_scope(&parent.scope, child, manifests)?;
     let delegation = delegate(
         parent,
+        &issuer.public_key(),
         &scope,
         parent_key,
         &subject.public_key(),

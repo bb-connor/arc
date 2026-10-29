@@ -266,6 +266,7 @@ mod tests {
         let parent = parent_token(&issuer, &subject);
         delegate(
             &parent,
+            &parent.issuer,
             &child_scope(),
             &subject,
             &delegatee.public_key(),
@@ -274,6 +275,24 @@ mod tests {
             nonce,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn delegate_refuses_a_parent_under_another_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let parent = parent_token(&issuer, &subject);
+        let result = delegate(
+            &parent,
+            &Keypair::generate().public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            1500,
+            [3_u8; 16],
+        );
+        assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
     }
 
     #[test]
