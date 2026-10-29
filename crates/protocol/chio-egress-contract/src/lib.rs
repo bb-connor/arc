@@ -117,6 +117,19 @@ pub enum HttpEgressError {
     },
     #[error("cloud metadata egress target denied: {host}")]
     ReservedAddressDenied { host: String },
+    #[error("loopback name resolved off host: {host}")]
+    LoopbackNameResolvedOffHost { host: String },
+}
+
+/// Who chose a [`HttpEgressContract::single_endpoint`] URL.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EndpointSource {
+    /// The operator named the URL, for example on the command line. A
+    /// loopback URL may use plaintext `http`.
+    Operator,
+    /// A remote party chose the URL. Only `https` to a non-loopback host is
+    /// admitted.
+    Remote,
 }
 
 impl HttpEgressContract {
@@ -283,7 +296,7 @@ impl HttpEgressContract {
     }
 
     fn enforce_loopback_hostname(&self, normalized: &str) -> Result<(), HttpEgressError> {
-        if self.deny_loopback && matches!(normalized, "localhost" | "localhost.localdomain") {
+        if self.deny_loopback && is_loopback_name(normalized) {
             return Err(HttpEgressError::LoopbackDenied {
                 host: normalized.to_string(),
             });
@@ -316,12 +329,18 @@ impl HttpEgressContract {
 
     /// Enforce the contract on one address `host` resolved to. The port
     /// selects the private network allowance that pins `host`, if any.
+    /// A loopback name such as `localhost` must resolve only to loopback.
     pub fn enforce_resolved_address(
         &self,
         host: &str,
         address: SocketAddr,
     ) -> Result<(), HttpEgressError> {
         let ip = allowance::canonical_ip(address.ip());
+        if is_loopback_name(&normalize_domain_name(host)) && !ip.is_loopback() {
+            return Err(HttpEgressError::LoopbackNameResolvedOffHost {
+                host: format!("{host} resolved to {ip}"),
+            });
+        }
         self.enforce_address(
             host,
             Some(address.port()),
@@ -695,6 +714,10 @@ fn normalize_domain_name(host: &str) -> String {
     host.trim_end_matches('.').to_ascii_lowercase()
 }
 
+fn is_loopback_name(normalized: &str) -> bool {
+    matches!(normalized, "localhost" | "localhost.localdomain")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum IpAddressClass {
     Global,
@@ -834,6 +857,48 @@ pub use reqwest_helper::{
 };
 
 impl HttpEgressContract {
+    /// Contract for the single endpoint `url` names: that URL's scheme and
+    /// authority only, no redirects, and `max_response_bytes`. An
+    /// [`EndpointSource::Operator`] URL may be `https`, or plaintext `http`
+    /// to a loopback host; an [`EndpointSource::Remote`] URL must be `https`
+    /// to a non-loopback host. Link-local, unique-local, private and
+    /// special-use addresses are refused. `url` itself is enforced before the
+    /// contract is returned, and resolved addresses are enforced at connect.
+    pub fn single_endpoint(
+        source: EndpointSource,
+        tenant_egress_namespace: &str,
+        url: &str,
+        max_response_bytes: u64,
+    ) -> Result<Self, HttpEgressError> {
+        let parsed =
+            Url::parse(url).map_err(|error| HttpEgressError::InvalidUrl(error.to_string()))?;
+        let loopback_host = match parsed.host() {
+            Some(Host::Domain(domain)) => is_loopback_name(&normalize_domain_name(domain)),
+            Some(Host::Ipv4(address)) => address.is_loopback(),
+            Some(Host::Ipv6(address)) => address.is_loopback(),
+            None => return Err(HttpEgressError::MissingAuthority),
+        };
+        let loopback = source == EndpointSource::Operator && loopback_host;
+        let scheme = parsed.scheme();
+        if scheme != "https" && !(scheme == "http" && loopback) {
+            return Err(HttpEgressError::SchemeDenied {
+                scheme: scheme.to_owned(),
+            });
+        }
+        let contract = Self {
+            tenant_egress_namespace: tenant_egress_namespace.to_owned(),
+            allowed_schemes: BTreeSet::from([scheme.to_owned()]),
+            allowed_authority_set: BTreeSet::from([normalized_url_authority(&parsed)?]),
+            deny_loopback: !loopback,
+            deny_link_local: true,
+            deny_ipv6_ula: true,
+            max_redirect_chain: 0,
+            max_response_bytes,
+        };
+        contract.enforce_url(url, 0)?;
+        Ok(contract)
+    }
+
     /// Construct a permissive contract suitable for tests that exercise a
     /// wiremock or other local loopback HTTP server. Production code MUST NOT
     /// use this; production always builds a contract from tenant-scoped
