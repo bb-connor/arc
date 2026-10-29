@@ -293,6 +293,7 @@ impl GovernedUpstreamCallChainProof {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.signer, pinned)?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(
             pinned,
@@ -508,6 +509,7 @@ impl CallChainContinuationToken {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.signer, pinned)?;
         ensure_schema_matches(
             &self.schema,
             CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
@@ -1531,6 +1533,7 @@ impl GovernedApprovalToken {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.approver, pinned)?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(
             pinned,
@@ -1829,6 +1832,7 @@ impl ThresholdApprovalProposal {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.body.policy_authority, pinned)?;
         self.body.validate()?;
         wrapped_verdict(verify_wrapped(
             pinned,

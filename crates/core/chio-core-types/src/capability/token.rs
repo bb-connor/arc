@@ -874,6 +874,7 @@ impl CapabilityToken {
     /// trusts. A carried issuer that differs from `pinned` is refused before
     /// the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.issuer, pinned)?;
         self.validate_schema()?;
         wrapped_verdict(verify_wrapped(
             pinned,
@@ -927,6 +928,8 @@ impl CapabilityToken {
         pinned: &PublicKey,
         floor: CapabilityCryptoFloor,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
+        crate::crypto::ensure_pinned_signer(&self.issuer, pinned)
+            .map_err(CapabilityFloorVerifyError::Crypto)?;
         let signature_algorithm = pinned.algorithm();
 
         // Floor enforcement. Reject any combination that the

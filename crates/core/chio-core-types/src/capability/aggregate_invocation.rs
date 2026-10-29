@@ -144,6 +144,7 @@ impl AggregateBudgetRootBinding {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.body.root_issuer, pinned)?;
         if self.body.schema != AGGREGATE_BUDGET_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported aggregate budget root schema {}",

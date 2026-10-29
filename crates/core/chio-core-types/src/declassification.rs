@@ -53,6 +53,7 @@ impl SignedDeclassificationGrant {
     /// Verify the signature under `pinned`, a key the caller trusts. A carried
     /// signer key that differs from `pinned` is refused before the signature check.
     pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.authority_key, pinned)?;
         self.body
             .validate()
             .map_err(|error| Error::InvalidSignature(error.to_string()))?;
