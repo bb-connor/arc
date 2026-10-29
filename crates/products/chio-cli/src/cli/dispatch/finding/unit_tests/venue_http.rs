@@ -152,12 +152,12 @@ fn venue_reads_do_not_follow_a_redirect_to_a_second_authority() {
     }
     let probe = super::super::redirect_probe::RedirectProbe::start("302 Found");
     assert!(fetch_finding_bytes(&probe.venue_url, GOLDEN_FINDING_ID, &NONE).is_err());
-    assert!(!probe.followed(), "the finding fetch followed a venue redirect");
+    probe.assert_redirect_not_followed("the finding fetch");
 
     let probe = super::super::redirect_probe::RedirectProbe::start("302 Found");
     let venue = Some(probe.venue_url.as_str());
     assert!(cmd_finding_search("repo:", None, None, None, true, venue, &NONE).is_err());
-    assert!(!probe.followed(), "the finding search followed a venue redirect");
+    probe.assert_redirect_not_followed("the finding search");
 }
 
 #[test]
@@ -171,5 +171,5 @@ fn venue_publish_does_not_follow_a_redirect_to_a_second_authority() {
     let probe = super::super::redirect_probe::RedirectProbe::start("303 See Other");
     let venue = Some(probe.venue_url.as_str());
     assert!(cmd_finding_publish(&path, true, venue, Some("venue-token"), &NONE).is_err());
-    assert!(!probe.followed(), "the finding publish followed a venue redirect");
+    probe.assert_redirect_not_followed("the finding publish");
 }

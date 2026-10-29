@@ -183,5 +183,5 @@ fn package_failures_are_reclaimable_while_admission_failures_remain_retryable() 
 fn operator_posts_do_not_follow_a_redirect_to_a_second_authority() {
     let probe = super::super::redirect_probe::RedirectProbe::start("303 See Other");
     assert!(post_operator_bytes(&probe.venue_url, "/v1/status", "token", b"{}", &NONE).is_err());
-    assert!(!probe.followed(), "the operator post followed a venue redirect");
+    probe.assert_redirect_not_followed("the operator post");
 }
