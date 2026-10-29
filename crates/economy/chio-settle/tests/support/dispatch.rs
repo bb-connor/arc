@@ -19,6 +19,6 @@ pub fn set_capability(dispatch: &mut Web3SettlementDispatchArtifact, capability:
         SignedCapitalExecutionInstruction::sign(body, &Keypair::from_seed(&[73; 32])).test_unwrap();
     assert!(dispatch
         .capital_instruction
-        .verify_signature()
+        .verify_signature(&Keypair::from_seed(&[73; 32]).public_key())
         .test_unwrap());
 }
