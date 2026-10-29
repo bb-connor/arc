@@ -230,6 +230,7 @@ fn delegated_capability_passes_verification_and_is_denied() -> TestResult {
     let now = FIXTURE_NOW;
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &inspect_scope(),
         &root_subject,
         &agent.public_key(),

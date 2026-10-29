@@ -230,6 +230,7 @@ fn delegate_rejects_child_grant_without_delegate_on_covering_parent_grant() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),

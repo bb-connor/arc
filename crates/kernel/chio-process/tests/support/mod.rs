@@ -307,6 +307,7 @@ pub fn child(
 ) -> Result<CapabilityToken> {
     let receipt = delegate(
         parent,
+        &parent.issuer,
         &scope,
         parent_key,
         &child_key.public_key(),

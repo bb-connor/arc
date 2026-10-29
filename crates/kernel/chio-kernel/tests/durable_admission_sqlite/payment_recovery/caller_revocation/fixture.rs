@@ -206,6 +206,7 @@ fn prepare_caller(
         let child_scope = scope();
         let link = delegate(
             &parent,
+            &parent.issuer,
             &child_scope,
             &parent_subject,
             &subject.public_key(),

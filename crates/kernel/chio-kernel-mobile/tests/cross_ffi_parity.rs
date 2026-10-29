@@ -102,6 +102,7 @@ fn aggregate_family_fixture() -> TestResult<(
     child_body.id = "cap-cross-ffi-aggregate-child".to_string();
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_body.scope,
         &root_subject,
         &delegatee.public_key(),
@@ -153,6 +154,7 @@ fn cumulative_family_fixture(
         .push(cumulative_constraint(80, Some(binding)));
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_body.scope,
         &root_subject,
         &delegatee.public_key(),

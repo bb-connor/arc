@@ -1816,6 +1816,7 @@ fn delegate_mints_signed_link_for_subset_scope() {
 
     let receipt = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -1855,6 +1856,7 @@ fn delegate_rejects_widening_scope() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &widened,
         &subject,
         &delegatee.public_key(),
@@ -1879,6 +1881,7 @@ fn delegate_rejects_parent_without_delegate_operation() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &parent_scope,
         &subject,
         &delegatee.public_key(),
@@ -1913,6 +1916,7 @@ fn delegate_rejects_extending_expiry() {
     };
     let err = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &subject,
         &delegatee.public_key(),
@@ -1926,6 +1930,7 @@ fn delegate_rejects_extending_expiry() {
     // sanity: at-or-below parent expiry is accepted.
     let ok = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &subject,
         &delegatee.public_key(),
@@ -1959,6 +1964,7 @@ fn delegate_rejects_wrong_delegator_key() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &imposter, // not parent.subject
         &delegatee.public_key(),
@@ -1989,6 +1995,7 @@ fn delegate_rejects_tampered_parent_signature() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &subject,
         &delegatee.public_key(),
@@ -2019,6 +2026,7 @@ fn delegate_rejects_parent_before_issued_at() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &subject,
         &delegatee.public_key(),
@@ -2052,6 +2060,7 @@ fn delegate_rejects_signed_at_at_or_after_parent_expiry() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &scope,
         &subject,
         &delegatee.public_key(),
@@ -2384,6 +2393,7 @@ fn delegate_accepts_valid_narrowing_step() {
 
     let receipt = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2433,6 +2443,7 @@ fn delegate_rejects_widening_step() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2470,6 +2481,7 @@ fn delegate_rejects_step_for_unknown_tool() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2526,6 +2538,7 @@ fn delegate_rejects_cost_step_currency_switch() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2583,6 +2596,7 @@ fn delegate_enforces_parent_relative_budget_share() {
     };
     let err = delegate(
         &attenuated_parent,
+        &attenuated_parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2601,6 +2615,7 @@ fn delegate_enforces_parent_relative_budget_share() {
     };
     let ok = delegate(
         &attenuated_parent,
+        &attenuated_parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2661,6 +2676,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
     };
     let err = delegate(
         &attenuated_parent,
+        &attenuated_parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2679,6 +2695,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
     };
     let ok = delegate(
         &attenuated_parent,
+        &attenuated_parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2732,6 +2749,7 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
 
     let receipt = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2803,6 +2821,7 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
     };
     let ok = delegate(
         &full_share_parent,
+        &full_share_parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2855,6 +2874,7 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
 
     let receipt = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2898,6 +2918,7 @@ fn delegate_rejects_step_not_reflected_in_child() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2949,6 +2970,7 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -2997,6 +3019,7 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
 
     let receipt = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
@@ -3057,6 +3080,7 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),

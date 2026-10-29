@@ -113,6 +113,7 @@ fn retained_capability_liveness_rejects_revoked_delegation_ancestors(
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &scope,
         &parent_subject,
         &child_subject,
