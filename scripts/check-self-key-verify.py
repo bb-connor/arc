@@ -199,7 +199,6 @@ SELF_KEY_SITES: dict[tuple[str, str], tuple[str, int]] = {
     ("crates/trust/chio-pheromone-runtime/src/lib.rs", "runtime_policy_from_json"): ("GUARDED", 1),
 }
 EMBEDDED_KEY_CALLERS: dict[tuple[str, str], tuple[str, int]] = {
-    ("crates/core/chio-core-types/src/capability/attenuation.rs", "delegate"): ("INTEGRITY-ONLY", 1),
     ("crates/core/chio-core-types/src/capability/attenuation.rs", "validate_delegation_chain"): ("INTEGRITY-ONLY", 1),
     ("crates/core/chio-core-types/src/capability/cumulative_approval.rs", "delegation_binding_marker"): ("INTEGRITY-ONLY", 1),
     ("crates/core/chio-core-types/src/capability/cumulative_approval.rs", "validate_scope_shape"): ("INTEGRITY-ONLY", 1),
