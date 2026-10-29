@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 const NOW: u64 = 1_766_000_000_000;
 const MISSING_EVENTS: &str = "no such table: chio_pheromone_relay_events";
+const MISSING_OUTBOX: &str = "no such table: chio_pheromone_relay_outbox";
 const OPERATOR_DIAGNOSTIC: &str = "operator token is required for relay observability";
 
 struct UnusedReceiver;
@@ -78,7 +79,9 @@ async fn operator_trace_survives_both_report_destination_failures() {
     let store = Arc::new(SqlitePheromoneRelayStore::open(&path).unwrap());
     rusqlite::Connection::open(&path)
         .unwrap()
-        .execute_batch("DROP TABLE chio_pheromone_relay_events")
+        .execute_batch(
+            "DROP TABLE chio_pheromone_relay_events; DROP TABLE chio_pheromone_relay_outbox;",
+        )
         .unwrap();
     std::fs::write(root.path().join("reports"), "occupied").unwrap();
     let service = PheromoneRelayService::new(
@@ -100,20 +103,33 @@ async fn operator_trace_survives_both_report_destination_failures() {
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(service.serve(listener));
 
-    let denied = reqwest::Client::new()
-        .get(format!(
-            "http://{address}{PHEROMONE_RELAY_OBSERVABILITY_PATH}"
-        ))
+    let client = reqwest::Client::new();
+    let url = format!("http://{address}{PHEROMONE_RELAY_OBSERVABILITY_PATH}");
+    let denied = client.get(&url).send().await.unwrap();
+    let failed = client
+        .get(&url)
+        .bearer_auth("operator-secret")
         .send()
         .await
         .unwrap();
     server.abort();
 
     assert_eq!(denied.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(failed.status(), reqwest::StatusCode::INTERNAL_SERVER_ERROR);
+    let body = failed.text().await.unwrap();
+    assert!(body.contains("relay internal error"), "body: {body}");
+    assert!(
+        !body.contains(MISSING_OUTBOX),
+        "internal detail reached the response body: {body}"
+    );
     let text = logs.text();
     assert!(
         text.contains(OPERATOR_DIAGNOSTIC),
         "original operator diagnostic missing: {text}"
+    );
+    assert!(
+        text.contains(MISSING_OUTBOX),
+        "internal store diagnostic missing: {text}"
     );
     assert!(
         text.contains(MISSING_EVENTS),
