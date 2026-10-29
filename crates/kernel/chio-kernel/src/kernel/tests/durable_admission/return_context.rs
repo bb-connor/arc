@@ -550,3 +550,85 @@ fn completed_replay_returns_the_retained_decision_model_witness() -> TestResult 
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[test]
+fn completed_in_session_replay_returns_the_session_anchor_and_the_witness() -> TestResult {
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, ReceiptSessionAnchorV1,
+        DECISION_MODEL_WITNESS_METADATA_KEY, SESSION_ANCHOR_METADATA_KEY,
+    };
+
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("completed-anchor-dm-witness-replay");
+    let witness = DecisionModelWitness::evaluated(
+        chio_core::crypto::sha256_hex(b"decision-model-card"),
+        chio_core::crypto::sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1_413,
+    )?;
+    kernel.add_guard(Box::new(DecisionModelWitnessGuard(witness.clone())));
+    let session_id =
+        kernel.open_session(request.agent_id.clone(), vec![request.capability.clone()])?;
+    kernel.activate_session(&session_id)?;
+    let anchor = kernel.with_session(&session_id, |session| {
+        Ok(session.session_anchor().reference())
+    })?;
+    let anchor_block = ReceiptSessionAnchorV1::commit(&anchor)?.to_metadata_value()?;
+    let evaluate =
+        |owner_request_id: &str| -> Result<ToolCallResponse, Box<dyn std::error::Error>> {
+            let owner = make_operation_context(&session_id, owner_request_id, &request.agent_id);
+            kernel.begin_session_request(&owner, OperationKind::ToolCall, true)?;
+            let response = kernel.evaluate_tool_call_with_nested_flow_client(
+                &owner,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )?;
+            kernel.complete_session_request(&session_id, &owner.request_id)?;
+            Ok(response)
+        };
+
+    let response = evaluate("completed-anchor-dm-witness-owner")?;
+    assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
+    let metadata = response
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("original receipt carries no metadata")?;
+    assert_eq!(
+        metadata.get(SESSION_ANCHOR_METADATA_KEY),
+        Some(&anchor_block)
+    );
+    assert_eq!(
+        serde_json::from_value::<DecisionModelWitness>(
+            metadata
+                .get(DECISION_MODEL_WITNESS_METADATA_KEY)
+                .cloned()
+                .ok_or("original receipt carries no witness")?
+        )?,
+        witness
+    );
+
+    let replay = evaluate("completed-anchor-dm-witness-replay-owner")?;
+    assert_same_receipt(&replay.receipt, &response.receipt);
+    let replayed = replay
+        .receipt
+        .metadata
+        .as_ref()
+        .ok_or("replayed receipt carries no metadata")?;
+    assert_eq!(
+        replayed.get(SESSION_ANCHOR_METADATA_KEY),
+        Some(&anchor_block)
+    );
+    assert_eq!(
+        replayed.get(DECISION_MODEL_WITNESS_METADATA_KEY),
+        metadata.get(DECISION_MODEL_WITNESS_METADATA_KEY)
+    );
+    assert_eq!(replay.output, response.output);
+    assert_eq!(
+        store.operation().state(),
+        AdmissionOperationState::Completed
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
