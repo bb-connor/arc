@@ -1,7 +1,6 @@
 use super::*;
 use crate::project_tool_result as value_to_tool_result;
-
-pub(in crate::runtime) const GOVERNED_DENIAL_TEXT: &str = "Governed transaction denied";
+use chio_kernel::ClientDenialCode;
 
 pub(in crate::runtime) struct KernelResponseToToolResultArgs<'a> {
     pub pending_notifications: &'a mut Vec<Value>,
@@ -9,6 +8,7 @@ pub(in crate::runtime) struct KernelResponseToToolResultArgs<'a> {
     pub output: Option<ToolCallOutput>,
     pub reason: Option<String>,
     pub verdict: Verdict,
+    pub denial_code: Option<ClientDenialCode>,
     pub receipt: &'a chio_core::receipt::body::ChioReceipt,
     pub terminal_state: &'a OperationTerminalState,
     pub execution_nonce: Option<&'a SignedExecutionNonce>,
@@ -24,6 +24,7 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         output,
         reason,
         verdict,
+        denial_code,
         receipt,
         terminal_state,
         execution_nonce,
@@ -49,20 +50,8 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         chio_cross_protocol::execution::pending_approval_result(verdict, output.as_ref())
     {
         json!({"content":[], "structuredContent":pending, "isError":false})
-    } else if verdict == Verdict::Deny
-        && receipt
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.pointer("/chio_kernel/rejection_code"))
-            .and_then(Value::as_str)
-            == Some(
-                chio_kernel::KernelError::GovernedTransactionDenied(String::new())
-                    .report()
-                    .code
-                    .as_str(),
-            )
-    {
-        governed_denial_tool_result()
+    } else if verdict == Verdict::Deny && terminal_state.is_completed() {
+        denial_tool_result(denial_code.unwrap_or(ClientDenialCode::Denied))
     } else {
         match output {
             Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),
@@ -271,10 +260,12 @@ pub(in crate::runtime) fn tool_error_result(reason: &str) -> Value {
     })
 }
 
-pub(in crate::runtime) fn governed_denial_tool_result() -> Value {
+/// The client projection of a kernel denial: a fixed code and text. The
+/// denial detail stays in the signed receipt.
+pub(in crate::runtime) fn denial_tool_result(code: ClientDenialCode) -> Value {
     json!({
-        "content": [{"type": "text", "text": GOVERNED_DENIAL_TEXT}],
-        "structuredContent": {"code": "governed_transaction_denied"},
+        "content": [{"type": "text", "text": code.text()}],
+        "structuredContent": {"code": code.code()},
         "isError": true,
     })
 }

@@ -69,6 +69,20 @@ pub(crate) struct DeliveryDenial {
     pub(crate) guard: &'static str,
 }
 
+impl DeliveryDenial {
+    pub(crate) fn client_code(&self) -> crate::ClientDenialCode {
+        use crate::admission_operation::DeliveryDenialReason;
+        match self.reason {
+            DeliveryDenialReason::DigestMismatch
+            | DeliveryDenialReason::EnvelopeMalformed
+            | DeliveryDenialReason::MediaTypeMismatch => {
+                crate::ClientDenialCode::DeliveryContractUnsupported
+            }
+            DeliveryDenialReason::FindingStatusChanged => crate::ClientDenialCode::GuardDenied,
+        }
+    }
+}
+
 pub(crate) fn finding_status_delivery_denial() -> DeliveryDenial {
     DeliveryDenial {
         reason: crate::admission_operation::DeliveryDenialReason::FindingStatusChanged,

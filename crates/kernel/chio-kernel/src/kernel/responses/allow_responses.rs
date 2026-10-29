@@ -51,11 +51,13 @@ impl ChioKernel {
     ) -> Result<PreparedResponse, KernelError> {
         let cap = &request.capability;
         if let Err(error) = self.check_revocation(cap) {
-            let reason =
-                format!("capability authorization changed before allow finalization: {error}");
+            let denial = Denial::new(
+                error.client_denial_code(),
+                format!("capability authorization changed before allow finalization: {error}"),
+            );
             return self.prepare_deny_response_with_metadata_and_payee_binding(
                 request,
-                &reason,
+                &denial,
                 timestamp,
                 matched_grant_index,
                 RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Terminal),
@@ -131,6 +133,7 @@ impl ChioKernel {
                 terminal_state: OperationTerminalState::Completed,
                 receipt,
                 execution_nonce: None,
+                denial_code: None,
             },
             memory_action_kind,
             nonce,
@@ -282,6 +285,7 @@ impl ChioKernel {
             },
             receipt,
             execution_nonce,
+            denial_code: None,
         })
     }
 

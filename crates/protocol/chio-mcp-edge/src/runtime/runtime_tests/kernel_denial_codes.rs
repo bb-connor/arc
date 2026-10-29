@@ -109,6 +109,53 @@ fn kernel_error_families() -> Vec<(KernelError, &'static str, &'static str)> {
     .collect()
 }
 
+/// The client-visible fields of a tool result: everything except the signed
+/// receipts carried under `_meta`.
+fn client_fields_without_receipts(result: &Value) -> String {
+    let mut client = result.clone();
+    for pointer in ["/_meta/chio/receipt", "/_meta/chioEvidence/receipt"] {
+        if let Some(receipt) = client.pointer_mut(pointer) {
+            *receipt = Value::Null;
+        }
+    }
+    client.to_string()
+}
+
+fn assert_no_detail_outside_receipts(result: &Value, details: &[&str]) {
+    let client = client_fields_without_receipts(result);
+    for detail in details.iter().filter(|detail| !detail.is_empty()) {
+        assert!(
+            !client.contains(detail),
+            "denial detail {detail:?} reached a client field: {client}"
+        );
+    }
+}
+
+#[test]
+fn kernel_error_projection_never_carries_the_error_detail() {
+    let _metrics_guard = metrics_test_guard();
+    let mut edge = make_edge_with_config(10, true);
+    for (error, _, _) in kernel_error_families() {
+        let variant = format!("{error:?}");
+        let detail = error.to_string();
+        let outcome =
+            edge.tool_call_error_outcome(&SessionId::new("kernel-denial-leak"), error, None);
+        let ToolCallEdgeOutcome::Result(result) = outcome else {
+            panic!("{variant} did not produce a tool result");
+        };
+        assert_no_detail_outside_receipts(&result, &[PRIVATE_DETAIL, &detail]);
+        let notifications = Value::from(edge.take_pending_notifications()).to_string();
+        assert!(
+            notifications.contains("tool_failed"),
+            "{variant} emitted no failure notification"
+        );
+        assert!(
+            !notifications.contains(PRIVATE_DETAIL),
+            "{variant} leaked its detail into a client notification: {notifications}"
+        );
+    }
+}
+
 #[test]
 fn kernel_errors_project_only_their_family_code_and_text() {
     let _metrics_guard = metrics_test_guard();
@@ -176,11 +223,7 @@ fn assert_signed_denial(result: &Value, code: &str, text: &str, detail: &str) {
         reason.contains(detail),
         "receipt lost the denial detail: {decision}"
     );
-    let client_text = result["content"].to_string();
-    assert!(
-        !client_text.contains(detail),
-        "denial detail reached the client text: {client_text}"
-    );
+    assert_no_detail_outside_receipts(result, &[detail, reason]);
 }
 
 fn edge_over(
@@ -251,6 +294,10 @@ fn emergency_stop_denial_projects_emergency_stop() {
         result["structuredContent"],
         json!({"code": "emergency_stop"})
     );
+    let reason = result["_meta"]["chio"]["receipt"]["decision"]["reason"]
+        .as_str()
+        .unwrap_or_default();
+    assert_no_detail_outside_receipts(&result, &[PRIVATE_DETAIL, reason]);
 }
 
 #[test]

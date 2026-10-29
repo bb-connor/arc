@@ -166,13 +166,14 @@ impl ChioKernel {
     pub fn sign_planned_deny_response(
         &self,
         request: &ToolCallRequest,
+        code: ClientDenialCode,
         reason: &str,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         validate_caller_receipt_metadata(extra_metadata.as_ref())?;
         self.build_deny_response_with_metadata(
             request,
-            reason,
+            &Denial::new(code, reason),
             self.read_authority_time()?.as_secs(),
             None,
             RefusalReceiptMetadata::new(extra_metadata, IdentityDisposition::Reusable),
@@ -237,6 +238,7 @@ impl ChioKernel {
     pub fn sign_planned_deny_response_with_manifest_security(
         &self,
         request: &ToolCallRequest,
+        code: ClientDenialCode,
         reason: &str,
         registry: &chio_manifest::VerifiedManifestRegistry,
         security: &chio_manifest::BridgeSecurityMetadata,
@@ -250,7 +252,7 @@ impl ChioKernel {
         )?;
         self.build_deny_response_with_metadata(
             request,
-            reason,
+            &Denial::new(code, reason),
             self.read_authority_time()?.as_secs(),
             None,
             RefusalReceiptMetadata::new(Some(metadata), IdentityDisposition::Reusable),

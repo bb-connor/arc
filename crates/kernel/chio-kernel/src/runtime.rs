@@ -225,6 +225,9 @@ pub struct ToolCallResponse {
     pub output: Option<ToolCallOutput>,
     /// Denial reason (populated when verdict is Deny).
     pub reason: Option<String>,
+    /// Client-safe denial family for a completed deny. Never signed or
+    /// persisted; the receipt carries the denial detail.
+    pub denial_code: Option<crate::ClientDenialCode>,
     /// Explicit terminal lifecycle state for this request.
     pub terminal_state: OperationTerminalState,
     /// Signed receipt attesting to this decision.

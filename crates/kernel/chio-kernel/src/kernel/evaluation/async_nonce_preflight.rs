@@ -77,10 +77,11 @@ impl ChioKernel {
             let reason =
                 "output-digest delivery cannot be enforced on a no-output authorization path";
             warn!(request_id = %request.request_id, reason, "delivery contract denied");
+            let denial = Denial::new(ClientDenialCode::DeliveryContractUnsupported, reason);
             return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason,
+                    denial: &denial,
                     timestamp: now,
                     matched_grant_index,
                     cap,
@@ -126,10 +127,11 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "reserve-for-caller credential reservation denied"
                 );
+                let denial = Denial::new(error.client_denial_code(), reason);
                 return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                         request,
-                        reason: &reason,
+                        denial: &denial,
                         timestamp: now,
                         matched_grant_index,
                         cap,
@@ -211,10 +213,11 @@ impl ChioKernel {
                 reason = %redacted!(&reason),
                 "reserve-for-caller revalidation denied"
             );
+            let denial = Denial::new(error.client_denial_code(), reason);
             return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
-                let denial = PreDispatchCleanupDeny {
+                let cleanup = PreDispatchCleanupDeny {
                     request,
-                    reason: &reason,
+                    denial: &denial,
                     timestamp: revalidation_now_unix_ms / 1000,
                     matched_grant_index,
                     cap,
@@ -229,11 +232,11 @@ impl ChioKernel {
                 };
                 if credential_disposition == PaymentCredentialDisposition::RetentionOutcomeUnknown {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
-                        denial,
+                        cleanup,
                         credential_disposition,
                     )
                 } else {
-                    self.build_pre_dispatch_cleanup_deny_response(denial)
+                    self.build_pre_dispatch_cleanup_deny_response(cleanup)
                 }
             });
         }
@@ -245,10 +248,11 @@ impl ChioKernel {
             if let Err(rollback_error) = credential_reservation.rollback_before_dispatch() {
                 reason = format!("{reason}; {rollback_error}");
             }
+            let denial = Denial::new(ClientDenialCode::PaymentUnavailable, reason);
             return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                 self.build_pre_dispatch_cleanup_deny_response(PreDispatchCleanupDeny {
                     request,
-                    reason: &reason,
+                    denial: &denial,
                     timestamp: revalidation_now_unix_ms / 1000,
                     matched_grant_index,
                     cap,
@@ -323,10 +327,11 @@ impl ChioKernel {
                     metadata,
                     credential_disposition,
                 );
+                let denial = Denial::new(ClientDenialCode::PaymentUnavailable, reason);
                 return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_deny_response_with_metadata_and_payee_binding(
                         request,
-                        &reason,
+                        &denial,
                         revalidation_now_unix_ms / 1000,
                         Some(matched_grant_index),
                         RefusalReceiptMetadata::new(metadata, IdentityDisposition::Retained),
@@ -362,11 +367,12 @@ impl ChioKernel {
                     reason = %redacted!(&reason),
                     "reserve-for-caller prepayment gate denied"
                 );
+                let denial = Denial::new(error.client_denial_code(), reason);
                 return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                         PreDispatchCleanupDeny {
                             request,
-                            reason: &reason,
+                            denial: &denial,
                             timestamp: revalidation_now_unix_ms / 1000,
                             matched_grant_index,
                             cap,
@@ -393,11 +399,12 @@ impl ChioKernel {
                 let reason = format!(
                     "reserve-for-caller credential retention failed before authorization: {error}"
                 );
+                let denial = Denial::new(ClientDenialCode::PaymentUnavailable, reason);
                 return self.with_pre_invocation_guard_output(pre_invocation_guard_output, || {
                     self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                         PreDispatchCleanupDeny {
                             request,
-                            reason: &reason,
+                            denial: &denial,
                             timestamp: self
                                 .read_authority_time()
                                 .map(|time| time.as_secs())

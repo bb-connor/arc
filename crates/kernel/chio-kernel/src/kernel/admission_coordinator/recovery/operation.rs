@@ -57,7 +57,10 @@ impl ChioKernel {
                         now,
                         None,
                         DurableRefusalResponse {
-                            reason: "dispatch outcome is unknown after recovery",
+                            denial: &Denial::new(
+                                ClientDenialCode::KernelUnavailable,
+                                "dispatch outcome is unknown after recovery",
+                            ),
                             cancelled: false,
                             matched_grant_index: None,
                             metadata: None,
@@ -86,7 +89,7 @@ impl ChioKernel {
                 terminalized_without_caller(self.compensate_durable_admission_before_dispatch(operation,
                     serde_json::json!({"authority": "startup-recovery", "cause": "no-authoritative-budget-participant"}), now, None,
                     DurableRefusalResponse {
-                        reason: "admission recovered before dispatch",
+                        denial: &Denial::new(ClientDenialCode::Denied, "admission recovered before dispatch"),
                         cancelled: true,
                         matched_grant_index: None,
                         metadata: None,
@@ -104,7 +107,7 @@ impl ChioKernel {
                 terminalized_without_caller(self.compensate_durable_admission_before_dispatch(operation,
                     serde_json::json!({"authority": "startup-recovery", "cause": "approval-deadline-elapsed", "proposal_deadline_unix_ms": deadline}), now, None,
                     DurableRefusalResponse {
-                        reason: "approval proposal deadline elapsed before dispatch",
+                        denial: &Denial::new(ClientDenialCode::GovernedTransactionDenied, "approval proposal deadline elapsed before dispatch"),
                         cancelled: false,
                         matched_grant_index: None,
                         metadata: None,

@@ -62,7 +62,7 @@ impl ChioKernel {
     pub(crate) fn build_monetary_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matching_grants: &[MatchingGrant<'_>],
         cap: &CapabilityToken,
@@ -102,7 +102,7 @@ impl ChioKernel {
                 tool_name: &request.tool_name,
                 server_id: &request.server_id,
                 decision: Decision::Deny {
-                    reason: reason.to_string(),
+                    reason: denial.detail().to_string(),
                     guard: "kernel".to_string(),
                 },
                 action,
@@ -120,7 +120,8 @@ impl ChioKernel {
                 request_id: request.request_id.clone(),
                 verdict: Verdict::Deny,
                 output: None,
-                reason: Some(reason.to_string()),
+                reason: Some(denial.detail().to_string()),
+                denial_code: Some(denial.code()),
                 terminal_state: OperationTerminalState::Completed,
                 receipt,
                 execution_nonce: None,
@@ -128,7 +129,7 @@ impl ChioKernel {
         }
 
         // No monetary grant -- standard deny.
-        self.build_deny_response_with_metadata(request, reason, timestamp, None, extra_metadata)
+        self.build_deny_response_with_metadata(request, denial, timestamp, None, extra_metadata)
     }
 
     #[allow(
@@ -138,7 +139,7 @@ impl ChioKernel {
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
@@ -148,7 +149,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_pre_execution_monetary_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             charge,
             committed_cost_after_release,
@@ -203,7 +204,7 @@ impl ChioKernel {
     fn build_pre_execution_monetary_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         charge: &BudgetChargeResult,
         committed_cost_after_release: u64,
@@ -237,7 +238,7 @@ impl ChioKernel {
             tool_name: &request.tool_name,
             server_id: &request.server_id,
             decision: Decision::Deny {
-                reason: reason.to_string(),
+                reason: denial.detail().to_string(),
                 guard: "kernel".to_string(),
             },
             action,
@@ -261,7 +262,8 @@ impl ChioKernel {
             request_id: request.request_id.clone(),
             verdict: Verdict::Deny,
             output: None,
-            reason: Some(reason.to_string()),
+            reason: Some(denial.detail().to_string()),
+            denial_code: Some(denial.code()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
             execution_nonce: None,
@@ -271,7 +273,7 @@ impl ChioKernel {
     fn build_local_v1_failclosed_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
@@ -300,7 +302,7 @@ impl ChioKernel {
             tool_name: &request.tool_name,
             server_id: &request.server_id,
             decision: Decision::Deny {
-                reason: reason.to_string(),
+                reason: denial.detail().to_string(),
                 guard: guard.to_string(),
             },
             action,
@@ -329,7 +331,8 @@ impl ChioKernel {
             request_id: request.request_id.clone(),
             verdict: Verdict::Deny,
             output: None,
-            reason: Some(reason.to_string()),
+            reason: Some(denial.detail().to_string()),
+            denial_code: Some(denial.code()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
             execution_nonce: None,
@@ -345,7 +348,7 @@ impl ChioKernel {
     pub(crate) fn build_negotiation_failclosed_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
@@ -355,7 +358,7 @@ impl ChioKernel {
         // lost. The fail-closed deny is intentionally non-federated.
         self.build_local_v1_failclosed_deny_response_with_metadata(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -370,7 +373,7 @@ impl ChioKernel {
     pub(crate) fn build_emergency_stop_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
@@ -393,7 +396,7 @@ impl ChioKernel {
         }
         self.build_local_v1_failclosed_deny_response_with_metadata(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             Some(serde_json::Value::Object(metadata)),
@@ -419,13 +422,15 @@ impl ChioKernel {
         timestamp: u64,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<(), KernelError> {
-        let reason =
-            format!("kernel shed load to stay within its memory budget (resource: {resource:?})");
+        let denial = Denial::new(
+            ClientDenialCode::Overloaded,
+            format!("kernel shed load to stay within its memory budget (resource: {resource:?})"),
+        );
         // Local, non-federated v1 deny receipt: the shed runs before receipt
         // negotiation and peer pinning, exactly like the emergency-stop path.
         let _response = self.build_local_v1_failclosed_deny_response_with_metadata(
             request,
-            &reason,
+            &denial,
             timestamp,
             None,
             extra_metadata,
@@ -440,14 +445,14 @@ impl ChioKernel {
     pub(crate) fn build_receipt_persistence_failclosed_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_local_v1_failclosed_deny_response_with_metadata(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -458,14 +463,14 @@ impl ChioKernel {
     pub(crate) fn build_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -481,7 +486,7 @@ impl ChioKernel {
     pub(crate) fn build_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -489,7 +494,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -501,14 +506,14 @@ impl ChioKernel {
     pub(crate) fn build_runtime_admission_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -524,7 +529,7 @@ impl ChioKernel {
     fn build_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -533,7 +538,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let prepared = self.prepare_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -546,14 +551,14 @@ impl ChioKernel {
     pub(in crate::kernel) fn prepare_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
     ) -> Result<PreparedResponse, KernelError> {
         self.prepare_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -569,7 +574,7 @@ impl ChioKernel {
     pub(in crate::kernel) fn prepare_deny_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -577,7 +582,7 @@ impl ChioKernel {
     ) -> Result<PreparedResponse, KernelError> {
         self.prepare_deny_response_with_recording(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -593,7 +598,7 @@ impl ChioKernel {
     fn prepare_deny_response_with_recording(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -622,7 +627,7 @@ impl ChioKernel {
             tool_name: &request.tool_name,
             server_id: &request.server_id,
             decision: Decision::Deny {
-                reason: reason.to_string(),
+                reason: denial.detail().to_string(),
                 guard: "kernel".to_string(),
             },
             action,
@@ -645,7 +650,8 @@ impl ChioKernel {
                 request_id: request.request_id.clone(),
                 verdict: Verdict::Deny,
                 output: None,
-                reason: Some(reason.to_string()),
+                reason: Some(denial.detail().to_string()),
+                denial_code: Some(denial.code()),
                 terminal_state: OperationTerminalState::Completed,
                 receipt,
                 execution_nonce: None,

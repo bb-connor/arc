@@ -228,6 +228,7 @@ pub(super) fn fault_response(receipt: ChioReceipt, request_id: &str) -> Prepared
             terminal_state: OperationTerminalState::Cancelled { reason },
             receipt,
             execution_nonce: None,
+            denial_code: None,
         },
         crate::kernel::responses::ReceiptRecordMode::WithFederation,
     )

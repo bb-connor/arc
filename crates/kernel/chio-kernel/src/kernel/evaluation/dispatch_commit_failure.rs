@@ -10,12 +10,12 @@ impl ChioKernel {
     /// denial, preserving prior payment or irreversible nonce retention.
     pub(super) fn build_pre_commit_credential_rejection_response(
         &self,
-        denial: PreDispatchCleanupDeny<'_>,
+        cleanup: PreDispatchCleanupDeny<'_>,
         credentials: DispatchCredentialReservation<'_>,
         evidence: &crate::kernel::PreInvocationGuardOutput,
     ) -> Result<ToolCallResponse, KernelError> {
-        let mut reason = denial.reason.to_owned();
-        let disposition = if denial.payment_authorization.is_some() {
+        let mut reason = cleanup.denial.detail().to_owned();
+        let disposition = if cleanup.payment_authorization.is_some() {
             credentials.retention_disposition()
         } else {
             match credentials.rollback_before_dispatch_with_disposition() {
@@ -29,8 +29,8 @@ impl ChioKernel {
         self.with_pre_invocation_guard_output(evidence, || {
             self.build_pre_dispatch_cleanup_deny_response_with_credentials(
                 PreDispatchCleanupDeny {
-                    reason: &reason,
-                    ..denial
+                    denial: &Denial::new(cleanup.denial.code(), reason),
+                    ..cleanup
                 },
                 disposition,
             )
@@ -40,7 +40,7 @@ impl ChioKernel {
     pub(super) fn build_durable_dispatch_failure_response(
         &self,
         failure: DurableDispatchCommitError,
-        denial: PreDispatchCleanupDeny<'_>,
+        cleanup: PreDispatchCleanupDeny<'_>,
         credentials: DispatchCredentialReservation<'_>,
         evidence: &crate::kernel::PreInvocationGuardOutput,
         security_outcome: Option<SecurityDispatchOutcomeHandle>,
@@ -48,25 +48,25 @@ impl ChioKernel {
         let response = self.with_pre_invocation_guard_output(evidence, || {
             match failure {
                 DurableDispatchCommitError::RejectedBeforeCommit(_) => self
-                    .build_pre_commit_credential_rejection_response(denial, credentials, evidence),
+                    .build_pre_commit_credential_rejection_response(cleanup, credentials, evidence),
                 DurableDispatchCommitError::CommitUnconfirmed(_) => {
                     // Do not infer nonexecution from an error returned after
                     // entering the store. Original holds and credentials remain
                     // owned for authoritative recovery, never optimistic refund.
                     self.build_deny_response_with_metadata_and_payee_binding(
-                        denial.request,
-                        denial.reason,
-                        denial.timestamp,
-                        Some(denial.matched_grant_index),
+                        cleanup.request,
+                        cleanup.denial,
+                        cleanup.timestamp,
+                        Some(cleanup.matched_grant_index),
                         RefusalReceiptMetadata::new(
                             self.ambiguous_dispatch_receipt_metadata(
-                                denial.budget_mutation,
-                                denial.payment_authorization,
-                                denial.runtime_admission_metadata,
+                                cleanup.budget_mutation,
+                                cleanup.payment_authorization,
+                                cleanup.runtime_admission_metadata,
                             ),
                             IdentityDisposition::Retained,
                         ),
-                        denial.verified_payee_binding,
+                        cleanup.verified_payee_binding,
                     )
                 }
             }

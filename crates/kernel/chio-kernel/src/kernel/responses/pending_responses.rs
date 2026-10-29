@@ -72,6 +72,7 @@ impl ChioKernel {
             },
             receipt,
             execution_nonce: None,
+            denial_code: None,
         })
     }
 }

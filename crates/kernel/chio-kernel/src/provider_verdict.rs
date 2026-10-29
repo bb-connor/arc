@@ -443,6 +443,7 @@ mod tests {
             terminal_state: OperationTerminalState::Completed,
             receipt: synthetic_receipt("rcpt_allow", Decision::Allow),
             execution_nonce: None,
+            denial_code: None,
         }
     }
 
@@ -459,6 +460,7 @@ mod tests {
             terminal_state: OperationTerminalState::Completed,
             receipt: synthetic_receipt("rcpt_deny", dec),
             execution_nonce: None,
+            denial_code: Some(crate::ClientDenialCode::GuardDenied),
         }
     }
 
@@ -473,6 +475,7 @@ mod tests {
             },
             receipt: synthetic_receipt("rcpt_pending", Decision::Allow),
             execution_nonce: None,
+            denial_code: None,
         }
     }
 
@@ -487,6 +490,7 @@ mod tests {
             },
             receipt: synthetic_receipt("rcpt_preflight", Decision::Allow),
             execution_nonce: None,
+            denial_code: None,
         }
     }
 

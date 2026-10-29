@@ -462,6 +462,7 @@ impl ChioKernel {
             terminal_state: OperationTerminalState::Completed,
             receipt,
             execution_nonce: None,
+            denial_code: None,
         })
     }
 }
