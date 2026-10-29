@@ -128,3 +128,33 @@ fn seed_file_signer_refuses_a_root_with_a_foreign_issuer() {
         ExchangeSignerError::IssuerNotExchangeKey
     );
 }
+
+#[test]
+fn seed_file_with_a_seed_one_hex_digit_short_or_long_refuses() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = seed_file(&dir, 0o600);
+    let seed = Keypair::from_seed(&SEED).seed_hex();
+    assert_eq!(seed.len(), 64);
+    let long = format!("{seed}0");
+    for (text, reason) in [
+        (
+            &seed[..63],
+            "crypto hex input has an incorrect encoded length",
+        ),
+        (&long[..], "crypto hex input exceeds its encoded size limit"),
+    ] {
+        std::fs::write(&path, format!("{text}\n")).unwrap();
+        let expected = CliError::from(Keypair::from_seed_hex(text).unwrap_err()).to_string();
+        assert!(
+            expected.contains(reason),
+            "{} hex digits: {expected}",
+            text.len()
+        );
+        assert_eq!(
+            ExchangeSigner::seed_file(&path).unwrap_err(),
+            ExchangeSignerError::SeedFileRefused(expected),
+            "{} hex digits",
+            text.len()
+        );
+    }
+}
