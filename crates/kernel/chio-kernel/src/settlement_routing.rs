@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chio_log_redact::redacted;
 use chio_settle::{
     RetryPolicy, RetryPolicyError, SettlementAttemptClaim, SettlementFailureClass, SettlementHook,
     SettlementOutcome, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
@@ -140,7 +141,7 @@ impl SettlementObserverRuntime {
         if let Err(error) = self.complete_claim(claim, status, observed_at_ms) {
             tracing::debug!(
                 receipt_id = claim.receipt_id.as_str(),
-                error = %error,
+                error = %redacted!(&error),
                 "inline settlement completion left the attempt for the drain"
             );
         }

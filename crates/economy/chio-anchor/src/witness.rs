@@ -123,8 +123,8 @@ pub enum AnchorWitnessError {
     Clock(#[from] chio_security_types::clock::ClockError),
     #[error("witness transport failed")]
     Transport(#[source] WitnessTransportError),
-    #[error("witness network error: {0}")]
-    Network(String),
+    #[error("witness egress refused: {0}")]
+    Egress(#[from] chio_egress_contract::HttpEgressError),
     #[error("witness HTTP {status}: {body}")]
     Http { status: u16, body: String },
     #[error("witness body-hash mismatch: lane committed to {lane}, batch body hashes to {batch}")]

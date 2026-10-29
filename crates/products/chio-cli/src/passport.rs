@@ -125,7 +125,8 @@ fn load_oid4vci_token(path: &Path) -> Result<Oid4vciTokenResponse, CliError> {
 
 #[path = "passport/http.rs"]
 mod http;
-use http::{fetch_json_url, fetch_text_url, post_form_url, post_json_url};
+use chio_egress_contract::EndpointSource;
+use http::{fetch_json_url, fetch_text_url, post_form_url, post_json_url, verifier_chosen_source};
 
 fn load_text_file(path: &Path) -> Result<String, CliError> {
     let bytes = crate::input::read(path)?;

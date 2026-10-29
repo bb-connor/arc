@@ -162,8 +162,10 @@ fn valid_node_id(node_id: &str) -> bool {
     !node_id.is_empty() && node_id.len() <= MAX_NODE_ID_BYTES
 }
 
-/// Read every stored mark. The row count and each column's type and size are
-/// bounded in SQL, so a corrupt row is refused before any of it is copied out.
+/// Read every stored mark. The row count and each column's type and stored
+/// size are bounded in SQL, so a corrupt row is refused before any of it is
+/// copied out. The decoded UTF-8 node id is bounded again before it is owned:
+/// a UTF-16 database stores up to 2048 octets that decode to more UTF-8 bytes.
 fn read_high_waters(
     connection: &Connection,
 ) -> Result<BTreeMap<String, i64>, ClusterPeerReplayStoreError> {
@@ -184,7 +186,7 @@ fn read_high_waters(
     let mut high_waters = BTreeMap::new();
     while let Some(row) = rows.next()? {
         let node_id = match row.get_ref(0)? {
-            ValueRef::Text(bytes) => std::str::from_utf8(bytes)
+            ValueRef::Text(bytes) if bytes.len() <= MAX_NODE_ID_BYTES => std::str::from_utf8(bytes)
                 .map_err(|_| ClusterPeerReplayStoreError::InvalidRow)?
                 .to_owned(),
             _ => return Err(ClusterPeerReplayStoreError::InvalidRow),

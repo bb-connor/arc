@@ -1050,7 +1050,7 @@ fn chio_native_runtime_admission_schema_emits_chio_report() -> Result<(), Box<dy
     let crate::admission::RuntimeAdmissionPreparation::Prepared(prepared) = preparation else {
         return Err("valid report inputs did not prepare".into());
     };
-    let report = prepared.commit_operation_owned(&store)?;
+    let report = prepared.commit_operation_owned(&store, None)?;
 
     assert!(report.accepted);
     assert_eq!(report.schema, "chio.runtime.admission-report.v1");
@@ -1088,7 +1088,7 @@ fn signed_runtime_admission_report_detects_tampering() -> Result<(), Box<dyn std
     let crate::admission::RuntimeAdmissionPreparation::Prepared(prepared) = preparation else {
         return Err("valid report inputs did not prepare".into());
     };
-    let report = prepared.commit_operation_owned(&store)?;
+    let report = prepared.commit_operation_owned(&store, None)?;
     let signer = Keypair::generate();
     let mut signed = sign_runtime_admission_report(report, &signer)?;
     assert!(verify_signed_runtime_admission_report(

@@ -90,9 +90,11 @@ BUDGETS: dict[str, Budget] = {
         manifest="crates/security/chio-secret-broker/Cargo.toml",
         binary="chio-secret-brokerd",
         # 480 -> 481: add cage-plan and cage-init, remove upstream nono.
+        # 481 -> 482: chio-semantic-contracts, which chio-store-sqlite needs to
+        # install bounded semantic registries; it brings no external package.
         # Other shared platform dependencies remain in the broker's graph.
-        ceiling=481,
-        measured="2026-09-29",
+        ceiling=482,
+        measured="2026-10-29",
         features=(),
         deny=COMMON_DENY,
     ),

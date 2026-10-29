@@ -1412,7 +1412,7 @@ activation remain separate work.
 
 Operation-owned runtime admission MUST verify its configured source against the destination's retained v1 qualification. The qualification MUST bind source and runtime authority IDs, destination authority ID, and the actual opened SQLite file's device, inode and single-link identity. A decoded descriptor alone MUST NOT authorize claims.
 
-A changed physical identity, including copy, restore, replacement, or device/inode change on remount, MUST refuse with `runtime_source_qualification_invalid`. Installed bindings are immutable for their lifetime. Replacement requires independently provisioned new source and runtime authority IDs; a destination exhausted at 128 installed records requires a new provisioned authority. No migration, adoption, deletion or supersession interface is defined by this profile. No operator requalification interface is defined.
+A changed physical identity, including copy, restore, replacement, or device/inode change on remount, MUST refuse with `runtime_source_qualification_invalid`. Installed bindings remain immutable. Fenced operator requalification MUST append a superseded record for the exact prior qualification and install an independently qualified source with unused source and runtime authority IDs in one destination transaction. Both records MUST be authenticated by the global commit log. Supersession MUST preserve prior qualification and claim history while refusing fresh authorization through the prior source. The destination limit is 128 non-superseded sources; retained superseded records MUST NOT count toward this limit. Separately, the destination MUST bound retained history to 1,024 supersessions and 1,152 qualifications, checking SQL row counts before decoding stored records. At supersession capacity, new requalification MUST refuse before source callbacks without deleting history; an identical retry MUST still verify its retained replacement. Requalification MUST NOT adopt a copied binding, delete prior authority or reuse its identities.
 
 #### Native Atomic Capture Checkpoint
 
@@ -1863,7 +1863,7 @@ unsupported schema versions fail closed.
 | `protocol_refusal` | Chio signer | unsafe |  | Session protocol refusal event. request_digest.sha256 is an unsalted digest of the original wire request, and method_sha256 and target_sha256 are unsalted digests of low-entropy values. |
 | `chio_runtime` | Chio signer | committed-safe |  | Runtime admission reservations and federation runtime evidence: Chio-minted admission, workflow, lease and governance ids, trust digests and reservation flags. The only key a runtime-admission hook writes. Read by kernel dispatch, the drop guard and the ledger audit. |
 | `session_anchor` | Chio signer | committed-safe | `chio.receipt-session-anchor.v1` | The receipt's own session anchor as a domain-separated SHA-256 commitment over the anchor id and hash. The raw anchor hash is an unsalted digest of the session auth context, and the receipt itself does not carry it. Every receipt signed under one session anchor carries the same commitment, which links them. Read by the persisted-parent continuation verifier. |
-| `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call. |
+| `receipt_context` | Chio signer | unsafe |  | Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP-Client form adds authorization_resource taken from the tool call. |
 | `governed_transaction_diagnostics` | Chio signer | unsafe |  | Governed-transaction diagnostics. Carries the caller-asserted call chain and its lineage references verbatim. |
 | `model_metadata` | Chio signer | unsafe |  | Model id, provider, safety tier and provenance class the request declared: caller values. |
 | `channel` | Chio signer | unsafe |  | Streamed-output channel accounting. No production writer. |
@@ -1883,7 +1883,7 @@ unsupported schema versions fail closed.
 | `runtime_admission` | Chio signer | unsafe |  | The kernel's runtime-admission refusal record: hook name, acceptance flag and failure code. Never accepted from a hook. No production reader. |
 | `active_response_terminal_evidence` | Chio signer | committed-safe |  | Executor receipt id, hash and key behind an active-response terminal receipt, read back by the kernel's admission terminal receipt check. |
 | `chio_http_receipt_v1` | Chio signer | unsafe |  | Embedded HTTP receipt written by the HTTP receipt projection, with raw request and session ids and nested metadata. |
-| `chio_receipt_signing_nonce` | Chio signer | unsafe |  | The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP producer embeds an unsalted content hash in it. |
+| `chio_receipt_signing_nonce` | Chio signer | unsafe |  | The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP-Client producer embeds an unsalted content hash in it. |
 | `original_metadata` | Chio signer | unsafe |  | Written by the signing path to wrap a non-object metadata value verbatim. |
 | `finding_pool_mutation` | Chio signer | unsafe |  | Finding-pool ledger mutation evidence. Duplicates the action parameters. |
 | `session_report` | Chio signer | unsafe |  | Session report event. operation_sha256 is an unsalted digest of the whole operation, arguments included. |
@@ -1904,7 +1904,7 @@ unsupported schema versions fail closed.
 | `guardOutcome` | Chio signer | unsafe |  | Wall guard outcome text. |
 | `deniedAccessRecord` | Chio signer | unsafe |  | Wall record of the denied request. |
 | `policySnapshot` | Chio signer | unsafe |  | Wall policy identity snapshot. No production reader. |
-| `acp` | Chio signer | unsafe |  | ACP session and tool-call ids. authorizationResource is taken from the tool call. |
+| `acp` | Chio signer | unsafe |  | ACP-Client session and tool-call ids. authorizationResource is taken from the tool call. |
 | `agent_web_receipt_ref` | Chio signer | unsafe |  | Agent Web receipt reference read only by the proof fixture. No production writer. |
 | `parent_receipt_ids` | Chio signer | unsafe |  | Parent receipt ids. No production writer; only the CLI explain display reads it. |
 | `batch_witness` | Chio signer | unsafe |  | Batch witness reference with unaudited contents. No production writer; only the CLI explain display reads it. |
@@ -4626,6 +4626,47 @@ and receipt-lineage statements keep `verified`, `observed`, `asserted`,
 packets may bind budget references, but they do not claim settlement. A buyer
 packet is accepted only when the packet hashes match verified lineage and the
 lineage remains verified rather than asserted.
+
+Treaty execution authority uses `chio.treaty-epoch.v1`, signed through
+`SignedExportEnvelope<TreatyEpochRecordV1>`. The scope's
+`revocationEpochSha256` commits the canonical epoch body, excluding the
+envelope and the scope itself. An operator provisions an immutable signer pin
+for each verifier and treaty; peer input cannot choose or replace that pin.
+Signed updates append history and advance the current head with an exact
+predecessor and sequence compare-and-swap.
+Participants and `trustBundleSha256` are fixed for a treaty id. An update
+whose participants or trust bundle digest differ from its authenticated
+predecessor is refused with `treaty_epoch_binding_mismatch`; rotating either
+requires a new treaty id.
+A revoked or withdrawn treaty epoch is reactivated only by a higher-sequence
+update signed under the same pin, and participants and the trust bundle stay
+fixed through every status change. An update whose `issuedAtUnixMs` is below
+its predecessor's is refused with `treaty_epoch_update_conflict`.
+
+Fresh admission compares the authenticated active epoch, retains authorization
+for the exact operation claim, plan, request binding and phase, and applies any
+trust-floor update in one runtime-source transaction. The epoch check is
+required when no floor update exists. The earlier destination claim remains a
+separate fenced transaction and is released on refusal. Historical replay
+verifies its retained signed epoch and authorization without requiring that
+epoch to remain current. A nonce-preflight authorization never substitutes for
+a fresh dispatch authorization after revocation.
+
+| Treaty epoch v1 bound | Limit |
+| --- | ---: |
+| `MAX_TREATY_EPOCH_BYTES`, original and canonical signed input | 1,048,576 bytes |
+| `MAX_TREATY_EPOCH_PARTICIPANTS`, aligned participant tuples | 64 |
+| `MAX_TREATY_EPOCH_INTEGER`, sequence and timestamps | 9,007,199,254,740,991 |
+| `MAX_TREATY_EPOCH_AUTHORITIES`, pins and current heads | 128 each |
+| `MAX_TREATY_EPOCH_RECORDS`, retained signed epochs | 4,096 |
+| `MAX_TREATY_EPOCH_AUTHORIZATIONS`, retained operation authorizations | 65,536 |
+
+Byte and table-count bounds are checked before decoding. Excess capacity,
+malformed storage, missing authority, stale epochs, revoked or withdrawn
+status, and conflicting retained authorization fail closed. Physical source
+qualification rejects copied or replaced databases. These checks do not detect
+an in-place restore of an older valid database image preserving physical
+identity; an external monotonic witness is a separate requirement.
 
 Chio treaty-to-buyer review adds a local buyer-facing loop over the
 treaty-bound evidence. A buyer review package binds the buyer packet, admission

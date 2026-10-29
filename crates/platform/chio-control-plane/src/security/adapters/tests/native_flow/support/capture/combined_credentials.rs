@@ -4,6 +4,7 @@ use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedTransactionIntent,
 };
+use chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition;
 use chio_kernel::admission_operation::governed_approval_claim::{
     GovernedApprovalAuthorityBindingV1, GovernedApprovalClaimDisposition,
 };
@@ -205,34 +206,54 @@ fn assert_combined_participant_history(
         (runtime.len(), approval.len(), dpop.len()),
         (expected, expected, expected)
     );
-    if preflight == 1 {
-        assert_eq!(
-            runtime[0].disposition,
-            RuntimeParticipantDisposition::ReleasedBeforeDispatch
-        );
-        assert_eq!(
-            approval[0].disposition,
-            GovernedApprovalClaimDisposition::ReleasedBeforeDispatch
-        );
-        assert_eq!(
-            dpop[0].disposition,
-            chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReleasedBeforeDispatch
-        );
-    }
-    assert_eq!(runtime[preflight].intent.resources().len(), 1);
+    // History is ordered by episode id, which carries no claim order within one
+    // trusted-clock millisecond, so each claim is found by its disposition.
     assert_eq!(
-        runtime[preflight].disposition,
-        RuntimeParticipantDisposition::RetainedAfterDispatchCommit
+        runtime
+            .iter()
+            .filter(
+                |claim| claim.disposition == RuntimeParticipantDisposition::ReleasedBeforeDispatch
+            )
+            .count(),
+        preflight
     );
     assert_eq!(
-        approval[preflight].disposition,
-        GovernedApprovalClaimDisposition::RetainedAfterDispatchCommit
+        approval
+            .iter()
+            .filter(|claim| claim.disposition
+                == GovernedApprovalClaimDisposition::ReleasedBeforeDispatch)
+            .count(),
+        preflight
     );
-    assert_eq!(dpop[preflight].disposition, chio_kernel::admission_operation::dpop_claim::DpopReplayClaimDisposition::RetainedAfterDispatchCommit);
-    assert_eq!(runtime[preflight].intent.grant_index(), 0);
-    assert_eq!(approval[preflight].intent.grant_index(), 0);
-    assert_eq!(dpop[preflight].intent.grant_index(), 0);
+    assert_eq!(
+        dpop.iter()
+            .filter(|claim| claim.disposition == DpopReplayClaimDisposition::ReleasedBeforeDispatch)
+            .count(),
+        preflight
+    );
+    let runtime = only(runtime.iter().filter(|claim| {
+        claim.disposition == RuntimeParticipantDisposition::RetainedAfterDispatchCommit
+    }))?;
+    let approval = only(approval.iter().filter(|claim| {
+        claim.disposition == GovernedApprovalClaimDisposition::RetainedAfterDispatchCommit
+    }))?;
+    let dpop = only(dpop.iter().filter(|claim| {
+        claim.disposition == DpopReplayClaimDisposition::RetainedAfterDispatchCommit
+    }))?;
+    assert_eq!(runtime.intent.resources().len(), 1);
+    assert_eq!(runtime.intent.grant_index(), 0);
+    assert_eq!(approval.intent.grant_index(), 0);
+    assert_eq!(dpop.intent.grant_index(), 0);
     Ok(())
+}
+
+/// The single item `items` yields.
+fn only<T>(mut items: impl Iterator<Item = T>) -> TestResult<T> {
+    let item = items.next().ok_or("no matching claim")?;
+    if items.next().is_some() {
+        return Err("more than one matching claim".into());
+    }
+    Ok(item)
 }
 
 #[test]

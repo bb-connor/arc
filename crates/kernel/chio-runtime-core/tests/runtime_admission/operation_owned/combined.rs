@@ -10,6 +10,15 @@ use chio_kernel::admission_operation::runtime_participant::{
 use chio_kernel::admission_operation::{AdmissionOperationV1, RuntimeParticipantKind};
 use chio_store_sqlite::SqliteReceiptStore;
 
+#[path = "combined/epoch_ordering.rs"]
+mod epoch_ordering;
+
+#[path = "combined/authority_commit.rs"]
+mod authority_commit;
+
+#[path = "combined/treaty_epoch.rs"]
+mod treaty_epoch;
+
 #[path = "combined/lifecycle.rs"]
 mod lifecycle;
 
@@ -43,6 +52,18 @@ impl CombinedFixture {
         prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
         swarm: SwarmAuthorityBundle,
     ) -> TestResult<Self> {
+        Self::with_epoch_authority(prepare, swarm, true)
+    }
+
+    fn without_epoch_authority() -> TestResult<Self> {
+        Self::with_epoch_authority(|_, _, _| Ok(()), runtime_swarm_bundle(false)?, false)
+    }
+
+    fn with_epoch_authority(
+        prepare: impl FnOnce(&mut TreatyRuntimeFixture, &Keypair, &Keypair) -> TestResult,
+        swarm: SwarmAuthorityBundle,
+        install_epoch: bool,
+    ) -> TestResult<Self> {
         let origin_key = Keypair::generate();
         let local_key = Keypair::generate();
         let mut treaty = treaty_runtime_fixture_with_signers(
@@ -58,6 +79,15 @@ impl CombinedFixture {
             let hash = runtime_admission_bundle_sha256(&admission)?;
             source.insert_bundle(admission)?;
             insert_treaty_runtime_fixture(source, &treaty)?;
+            if install_epoch {
+                source.provision_treaty_epoch_authority(
+                    treaty.epoch_update.body().verifier_id.clone(),
+                    treaty.epoch_update.body().treaty_id.clone(),
+                    treaty.epoch_authority.clone(),
+                )?;
+                source.apply_treaty_epoch_update(None, &treaty.epoch_update)?;
+            }
+
             issue_root(authority, &swarm)?;
             let mut request =
                 chio_swarm_runtime_request(args, hash, swarm_runtime_context(&swarm)?)?;
@@ -106,8 +136,10 @@ impl CombinedFixture {
             _directory.path().join("locks"),
             chio_test_support::clock::clock(),
         )?;
-        let source =
-            SqliteRuntimeOrchestrationStore::open(_directory.path().join("runtime.sqlite3"))?;
+        let source = SqliteRuntimeOrchestrationStore::open_with_clock(
+            _directory.path().join("runtime.sqlite3"),
+            chio_test_support::clock::clock(),
+        )?;
         Ok(Self {
             inner: Fixture {
                 _directory,

@@ -1,3 +1,4 @@
+use crate::transport_failure::contract_refusal;
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract, RequestFailure};
 use reqwest::header::{
     HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST,
@@ -465,7 +466,7 @@ async fn collect_capped_response(
 }
 
 fn map_reqwest_error(error: reqwest::Error) -> HttpEgressError {
-    RequestFailure::new(error.without_url()).into()
+    contract_refusal(&error).unwrap_or_else(|| RequestFailure::new(error.without_url()).into())
 }
 
 #[cfg(test)]
@@ -501,3 +502,7 @@ mod producer_tests {
 #[cfg(test)]
 #[path = "tests/single_attempt.rs"]
 mod single_attempt_tests;
+
+#[cfg(test)]
+#[path = "tests/resolver_refusal.rs"]
+mod resolver_refusal_tests;

@@ -5815,6 +5815,11 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/
 first_seen = "3e05970851"
 
 [[schema]]
+value = "chio.treaty-epoch.v1"
+files = ["crates/kernel/chio-runtime-core/src/treaty_epoch.rs"]
+first_seen = "4c2ca7f948"
+
+[[schema]]
 value = "chio.trust.key-state.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/trust/chio-selective-disclosure/src/crypto_context/types.rs"]
 first_seen = "1b9620751d"

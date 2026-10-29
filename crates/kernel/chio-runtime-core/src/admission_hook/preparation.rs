@@ -19,6 +19,8 @@ pub(super) struct PreparedHookAdmission<'a, S> {
     pub(super) federation_treaty_material: Option<chio_kernel::VerifiedFederationTreatyMaterial>,
     pub(super) treaty_artifact_digest: Option<String>,
     pub(super) treaty_evidence_digest: Option<String>,
+    pub(super) treaty_scope: Option<TreatyScope>,
+    pub(super) admission_now_unix_ms: u64,
     pub(super) swarm_artifact_digest: Option<String>,
     pub(super) swarm_evidence_digest: Option<String>,
     pub(super) valid_until_unix_ms: u64,
@@ -122,6 +124,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
         let mut runtime_action_class_id = None;
         let mut treaty_artifact_digest = None;
         let mut treaty_evidence_digest = None;
+        let mut treaty_scope = None;
         let mut swarm_artifact_digest = None;
         let mut swarm_evidence_digest = None;
         let mut valid_until_unix_ms = self.profile.expires_at_unix_ms;
@@ -174,6 +177,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
                         valid_until_unix_ms = valid_until_unix_ms.min(verified.valid_until_unix_ms);
                         treaty_artifact_digest = verified.continuation_artifact_digest;
                         treaty_evidence_digest = Some(verified.evidence_digest);
+                        treaty_scope = Some(verified.treaty_scope);
                         treaty_continuation_id_to_consume = verified.continuation_id;
                         federation_treaty_material = verified.federation_treaty_material;
                     }
@@ -259,6 +263,8 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
                 federation_treaty_material,
                 treaty_artifact_digest,
                 treaty_evidence_digest,
+                treaty_scope,
+                admission_now_unix_ms,
                 swarm_artifact_digest,
                 swarm_evidence_digest,
                 valid_until_unix_ms,

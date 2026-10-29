@@ -18,6 +18,8 @@ pub struct TrustClient {
 impl TrustClient {
     pub fn new(base_url: &str, service_bearer: &str) -> Result<Self, reqwest::Error> {
         Ok(Self {
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: operator-run example reaching the
+            // trust-control service of its own reference stack.
             http: Client::builder()
                 .timeout(std::time::Duration::from_secs(15))
                 .build()?,
@@ -29,6 +31,7 @@ impl TrustClient {
     pub fn healthy(&self) -> bool {
         self.http
             .get(format!("{}/health", self.base_url))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()
             .is_ok_and(|response| response.status().is_success())
     }
@@ -40,6 +43,7 @@ impl TrustClient {
             .get(format!("{}/v1/receipts/query", self.base_url))
             .query(&[("capabilityId", capability_id), ("limit", "200")])
             .header(AUTHORIZATION, format!("Bearer {}", self.bearer))
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?
             .error_for_status()?
             .json()?;

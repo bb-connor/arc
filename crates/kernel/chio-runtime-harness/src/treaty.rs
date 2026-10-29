@@ -20,6 +20,7 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
     step_index: usize,
     step: &RuntimeLoopbackStep,
     vendor_key: &chio_core::Keypair,
+    epoch_backend: &dyn chio_core_types::crypto::SigningBackend,
     arguments: &serde_json::Value,
 ) -> Result<RuntimeLoopbackTreatyContext, RuntimeLoopbackError> {
     let source_kernel_id = step.request.origin_kernel_id.clone().ok_or_else(|| {
@@ -36,6 +37,63 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
         chio_core::sha256_hex(format!("runtime-loopback:{source_kernel_id}:manifest").as_bytes()),
         chio_core::sha256_hex(format!("runtime-loopback:{target_kernel_id}:manifest").as_bytes()),
     ];
+    let epoch = (|| -> Result<_, Box<dyn std::error::Error>> {
+        use chio_kernel::admission_operation::{AdmissionDigest, AdmissionIdentifier};
+        use chio_runtime_core::treaty_epoch::{
+            sign_treaty_epoch_record, TreatyEpochParticipantV1, TreatyEpochRecordV1,
+            TreatyEpochStatusV1, CHIO_TREATY_EPOCH_SCHEMA,
+        };
+        let pin = epoch_backend.public_key()?;
+        let participants = [
+            (&source_kernel_id, origin_key.public_key()),
+            (&target_kernel_id, vendor_key.public_key()),
+        ]
+        .into_iter()
+        .zip(&manifest_hashes)
+        .map(|((id, key), ladder)| {
+            Ok::<_, Box<dyn std::error::Error>>(TreatyEpochParticipantV1 {
+                kernel_id: AdmissionIdentifier::try_new("participant", id)?,
+                public_key: key,
+                ladder_manifest_sha256: AdmissionDigest::try_new("ladder", ladder)?,
+            })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+        let update = sign_treaty_epoch_record(
+            TreatyEpochRecordV1 {
+                schema: CHIO_TREATY_EPOCH_SCHEMA.into(),
+                verifier_id: AdmissionIdentifier::try_new(
+                    "verifier",
+                    &step.admission_profile.verifier_id,
+                )?,
+                treaty_id: AdmissionIdentifier::try_new(
+                    "treaty",
+                    format!("treaty:runtime-loopback:{step_index}"),
+                )?,
+                sequence: 1,
+                previous_record_sha256: None,
+                status: TreatyEpochStatusV1::Active,
+                participants,
+                trust_bundle_sha256: AdmissionDigest::try_new(
+                    "trust",
+                    &step.admission_bundle.trust_bundle_sha256,
+                )?,
+                issued_at_unix_ms,
+                expires_at_unix_ms,
+            },
+            epoch_backend,
+            &pin,
+        )?;
+        hook_store.provision_treaty_epoch_authority(
+            update.body().verifier_id.clone(),
+            update.body().treaty_id.clone(),
+            pin,
+        )?;
+        hook_store.apply_treaty_epoch_update(None, &update)?;
+        Ok(update)
+    })()
+    .map_err(|error| {
+        RuntimeLoopbackError::message(format!("Chio runtime treaty epoch provisioning: {error}"))
+    })?;
     let treaty_scope = chio_runtime_core::TreatyScope {
         schema: chio_runtime_core::CHIO_FEDERATION_TREATY_SCOPE_SCHEMA.to_string(),
         treaty_id: format!("treaty:runtime-loopback:{step_index}"),
@@ -45,9 +103,7 @@ pub(crate) fn insert_runtime_loopback_treaty_context(
         allowed_action_classes: vec![action_class_id.clone()],
         issued_at_unix_ms,
         expires_at_unix_ms,
-        revocation_epoch_sha256: chio_core::sha256_hex(
-            format!("runtime-loopback:{step_index}:revocations").as_bytes(),
-        ),
+        revocation_epoch_sha256: epoch.body_digest().as_str().into(),
         trust_bundle_sha256: step.admission_bundle.trust_bundle_sha256.clone(),
     };
     let treaty_scope_sha256 =
@@ -532,6 +588,9 @@ mod tests {
             2,
             &step,
             &vendor_key,
+            &chio_core_types::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(
+                &[1_u8; 32],
+            )),
             step.arguments.as_ref().ok_or_else(|| {
                 crate::RuntimeLoopbackError::message(
                     "runtime loopback test step missing arguments".to_string(),
@@ -641,6 +700,9 @@ mod tests {
             0,
             &step,
             &vendor_key,
+            &chio_core_types::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(
+                &[1_u8; 32],
+            )),
             step.arguments.as_ref().ok_or_else(|| {
                 crate::RuntimeLoopbackError::message(
                     "runtime loopback test step missing arguments".to_string(),

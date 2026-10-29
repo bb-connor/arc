@@ -1,8 +1,9 @@
 use super::preparation::PreparedHookAdmission;
 use super::*;
 use chio_kernel::admission_operation::runtime_participant::{
-    RuntimeDispatchValidity, RuntimeParticipantAuthorityBindingV1, RuntimeParticipantClaimIntentV1,
-    RuntimeParticipantPhase, RuntimeParticipantResourceV1,
+    RuntimeDispatchValidity, RuntimeParticipantAuthorityBindingV1,
+    RuntimeParticipantClaimIntentInput, RuntimeParticipantClaimIntentV1,
+    RuntimeParticipantClaimReferenceV1, RuntimeParticipantPhase, RuntimeParticipantResourceV1,
 };
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, RuntimeParticipantKind,
@@ -24,8 +25,26 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         let resources_digest = crate::hash::canonical_sha256(&resources).map_err(runtime_error)?;
         let reference = authority.claim(
             AdmissionDigest::try_new("runtime_plan_digest", &plan_digest)?,
-            resources,
+            resources.clone(),
         )?;
+        let intent = RuntimeParticipantClaimIntentV1::new(RuntimeParticipantClaimIntentInput {
+            episode_id: authority.episode_id().clone(),
+            runtime_authority_id: authority.binding().runtime_authority_id().clone(),
+            qualification_id: authority.binding().qualification_id().clone(),
+            request_binding_hash: authority.request_binding_hash().clone(),
+            grant_index: authority.grant_index(),
+            phase: authority.phase(),
+            plan_digest: AdmissionDigest::try_new("runtime_plan_digest", &plan_digest)?,
+            resources,
+        })
+        .map_err(|error| KernelError::DurableAdmission(error.to_string()))?;
+        let treaty = self
+            .treaty_authorization_binding(&reference, &intent)?
+            .map(|binding| RuntimeTreatyAuthorizationRequest {
+                binding,
+                now_unix_ms: self.admission_now_unix_ms,
+                source_qualification: authority.source_qualification().clone(),
+            });
         let bundle_digest = self.core.bundle_digest.clone();
         self.hook
             .store
@@ -33,7 +52,7 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             .map_err(runtime_error)?;
         let report = self
             .core
-            .commit_operation_owned(&self.hook.store)
+            .commit_operation_owned(&self.hook.store, treaty)
             .map_err(runtime_error)?;
         if !report.accepted {
             return Ok(KernelRuntimeAdmissionDecision::deny(
@@ -108,12 +127,13 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
         now: u64,
     ) -> Result<KernelRuntimeAdmissionDecision, KernelError> {
         self.verify_owned_dispatch(&claim.intent, now)?;
+        let treaty = self.treaty_authorization_binding(&claim.reference, &claim.intent)?;
         let resources_digest = crate::hash::canonical_sha256(&self.operation_owned_resources()?)
             .map_err(runtime_error)?;
         let bundle_digest = self.core.bundle_digest.clone();
         let report = self
             .core
-            .resume_operation_owned(&self.hook.store)
+            .resume_operation_owned(&self.hook.store, treaty.as_ref())
             .map_err(runtime_error)?;
         let mut metadata = report.receipt_metadata;
         let runtime_fields = metadata
@@ -146,6 +166,27 @@ impl<S: RuntimeAdmissionStore + Send + Sync> PreparedHookAdmission<'_, S> {
             ),
             None => KernelRuntimeAdmissionDecision::allow(Some(metadata)),
         })
+    }
+
+    fn treaty_authorization_binding(
+        &self,
+        reference: &RuntimeParticipantClaimReferenceV1,
+        intent: &RuntimeParticipantClaimIntentV1,
+    ) -> Result<Option<RuntimeTreatyAuthorizationBinding>, KernelError> {
+        self.treaty_scope
+            .as_ref()
+            .map(|scope| {
+                Ok(RuntimeTreatyAuthorizationBinding {
+                    verifier_id: AdmissionIdentifier::try_new(
+                        "verifier_id",
+                        &self.hook.profile.verifier_id,
+                    )?,
+                    scope: scope.clone(),
+                    reference: reference.clone(),
+                    intent: intent.clone(),
+                })
+            })
+            .transpose()
     }
 
     fn operation_owned_resources(&self) -> Result<Vec<RuntimeParticipantResourceV1>, KernelError> {

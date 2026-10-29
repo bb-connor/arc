@@ -117,7 +117,7 @@ fn blocked_source_keeps_destination_readable_and_concurrent_import_nonblocking(
             &fixture.fence,
             now_ms(),
         );
-        let shared = store.serving_owner.begin_replay_source_migration();
+        let shared = store.serving_owner.begin_source_installation();
         release_tx.send(())?;
         assert_eq!(retained?, Some(expected.clone()));
         assert!(concurrent
@@ -126,7 +126,7 @@ fn blocked_source_keeps_destination_readable_and_concurrent_import_nonblocking(
             .contains("already in progress"));
         assert!(
             shared.is_err(),
-            "all replay migration workflows share the same owner guard"
+            "all source installation workflows share the same owner guard"
         );
         assert!(running.join().expect("import worker")?.imported_inactive());
         Ok(())

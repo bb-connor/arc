@@ -586,7 +586,7 @@ fn canonical_unknown_receipts_reject_missing_duplicate_and_substituted_history(
             .push(fixture.operation.history[0].clone());
         fixture.assert_runtime_rejected("substituted or duplicate continuation episode");
         let mut fixture = SemanticRefusal::with_runtime(reference_in_receipt)?;
-        fixture.operation.history[0].claim["intent"]["expectationId"] = json!("foreign-generation");
+        fixture.operation.history[0].claim["intent"]["qualificationId"] = json!("foreign-generation");
         fixture.assert_runtime_rejected("admission operation invariant failed: runtime claim commitment differs from its history");
     }
     let mut fixture = SemanticRefusal::with_runtime(true)?;

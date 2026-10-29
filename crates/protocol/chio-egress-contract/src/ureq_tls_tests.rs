@@ -86,6 +86,9 @@ fn server_config(materials: &Materials, require_client: bool) -> Arc<ureq::rustl
     )
 }
 
+const MAX_REQUEST_BODY_BYTES: usize = 64 * 1024;
+const REQUEST_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 /// Serves one TLS connection. The thread reports whether a request arrived.
 fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::JoinHandle<bool>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -94,6 +97,9 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
         let Ok((tcp, _)) = listener.accept() else {
             return false;
         };
+        if tcp.set_read_timeout(Some(REQUEST_READ_TIMEOUT)).is_err() {
+            return false;
+        }
         let Ok(connection) = ureq::rustls::ServerConnection::new(config) else {
             return false;
         };
@@ -106,6 +112,14 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
                 _ => return false,
             }
         }
+        let length = content_length(&request);
+        if length > MAX_REQUEST_BODY_BYTES {
+            return false;
+        }
+        let mut body = vec![0_u8; length];
+        if stream.read_exact(&mut body).is_err() {
+            return false;
+        }
         stream
             .write_all(
                 b"HTTP/1.1 204 No Content\r\nX-Egress: pinned\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
@@ -113,6 +127,34 @@ fn serve_tls_once(config: Arc<ureq::rustls::ServerConfig>) -> (String, thread::J
             .is_ok()
     });
     (authority, handle)
+}
+
+/// The request body must be read before the reply: closing a socket with unread
+/// bytes sends a reset that can reach the client before the response does.
+fn content_length(head: &[u8]) -> usize {
+    String::from_utf8_lossy(head)
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            if name.trim().eq_ignore_ascii_case("content-length") {
+                value.trim().parse().ok()
+            } else {
+                None
+            }
+        })
+        .unwrap_or(0)
+}
+
+/// Every layer of an error, outermost first: the opaque transport class hides
+/// the ureq, rustls or I/O error that caused it.
+fn source_chain(error: &(dyn std::error::Error + 'static)) -> String {
+    let mut chain = format!("{error:?}");
+    let mut source = error.source();
+    while let Some(inner) = source {
+        chain.push_str(&format!(" <- {inner:?}"));
+        source = inner.source();
+    }
+    chain
 }
 
 fn tls_agent(authority: &str) -> BlockingContractAgent {
@@ -132,7 +174,7 @@ fn an_agent_trusts_a_server_signed_by_its_configured_root() {
         .delete(&format!("https://{authority}/task"))
         .expect("allowed")
         .call()
-        .expect("response");
+        .unwrap_or_else(|error| panic!("response: {}", source_chain(&error)));
     assert_eq!(response.status(), 204);
     assert_eq!(response.header("x-egress"), Some("pinned"));
     assert!(server.join().expect("server"));
@@ -149,7 +191,8 @@ fn an_agent_refuses_a_server_its_roots_do_not_sign() {
         .expect_err("an unknown issuer is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 
@@ -164,7 +207,8 @@ fn an_agent_refuses_a_server_its_roots_do_not_sign() {
         .expect_err("a root that did not sign the server is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }
@@ -185,7 +229,7 @@ fn a_mutual_tls_server_admits_only_the_configured_identity() {
         .post(&format!("https://{authority}/"))
         .expect("allowed")
         .send_bytes(b"{}")
-        .expect("response");
+        .unwrap_or_else(|error| panic!("response: {}", source_chain(&error)));
     assert_eq!(response.status(), 204);
     assert!(server.join().expect("server"));
 
@@ -200,7 +244,8 @@ fn a_mutual_tls_server_admits_only_the_configured_identity() {
         .expect_err("no client identity is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }
@@ -240,7 +285,8 @@ fn an_agent_refuses_a_trusted_certificate_issued_for_another_name() {
         .expect_err("a certificate for another name is refused");
     assert!(
         matches!(refusal, HttpEgressError::Transport(_)),
-        "{refusal:?}"
+        "{}",
+        source_chain(&refusal)
     );
     assert!(!server.join().expect("server"));
 }

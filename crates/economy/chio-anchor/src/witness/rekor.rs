@@ -26,7 +26,8 @@
 //! key already authenticated. Any malformed, truncated, or mismatched
 //! proof fails closed.
 //!
-//! This module makes a real HTTP call (via `reqwest`). The negative
+//! This module makes a real HTTP call (via `reqwest` under the client's
+//! `HttpEgressContract`). The negative
 //! conformance test
 //! `crates/tooling/chio-conformance/tests/anchor_batch_witness_impersonation_rejected.rs`
 //! exercises the full surface against a `tiny_http` mock server.
@@ -41,6 +42,9 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use chio_core::canonical_json_bytes;
 use chio_core::hashing::{sha256, Hash};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 use p256::ecdsa::signature::Verifier;
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey};
 use p256::pkcs8::DecodePublicKey;
@@ -65,7 +69,8 @@ pub const REKOR_PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
 #[derive(Debug, Clone)]
 pub struct RekorClient {
     endpoint: String,
-    http: reqwest::Client,
+    contract: HttpEgressContract,
+    http: ContractClient,
     /// Maximum age in seconds for a witness receipt. Receipts older
     /// than this are reported as `AnchorWitnessError::Stale` on
     /// `verify_inclusion`.
@@ -85,14 +90,21 @@ impl RekorClient {
     /// override (e.g. for test mocks).
     pub fn new(
         endpoint: impl Into<String>,
+        contract: &HttpEgressContract,
         max_witness_age_seconds: i64,
     ) -> Result<Self, AnchorWitnessError> {
-        Self::new_with_clock(endpoint, max_witness_age_seconds, Arc::new(SystemClock))
+        Self::new_with_clock(
+            endpoint,
+            contract,
+            max_witness_age_seconds,
+            Arc::new(SystemClock),
+        )
     }
 
     /// Construct with an explicit authority clock. Client clones share its fence.
     pub fn new_with_clock(
         endpoint: impl Into<String>,
+        contract: &HttpEgressContract,
         max_witness_age_seconds: i64,
         clock: Arc<dyn Clock>,
     ) -> Result<Self, AnchorWitnessError> {
@@ -107,17 +119,19 @@ impl RekorClient {
                 "max_witness_age_seconds must be non-negative".to_string(),
             ));
         }
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: Sigstore Rekor witness lane;
-        // HttpEgressContract is not yet threaded through RekorClient::new.
-        let http = reqwest::Client::builder()
+        let endpoint = endpoint.trim_end_matches('/').to_string();
+        contract.enforce_url(&format!("{endpoint}/api/v1/log/entries"), 0)?;
+        let mut contract = contract.clone();
+        contract.max_response_bytes = contract
+            .max_response_bytes
+            .min(input::MAX_RESPONSE_BYTES as u64);
+        let http = client_builder_with_contract(&contract)
             .timeout(Duration::from_secs(15))
-            .https_only(false)
-            .redirect(reqwest::redirect::Policy::none())
-            .no_proxy()
             .build()
             .map_err(|error| AnchorWitnessError::Config(error.to_string()))?;
         Ok(RekorClient {
-            endpoint: endpoint.trim_end_matches('/').to_string(),
+            endpoint,
+            contract,
             http,
             max_witness_age_seconds,
             trusted_keys: vec![REKOR_PUBLIC_KEY_PEM.to_string()],
@@ -687,15 +701,14 @@ impl AnchorWitnessClient for RekorClient {
             },
         };
 
-        let response = self
+        let request = self
             .http
             .post(self.entries_url())
             .json(&request)
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
-            .send()
-            .await
+            .build()
             .map_err(AnchorWitnessError::transport)?;
-        let parsed = input::response(response).await?;
+        let response = send_with_contract(&self.contract, &self.http, request).await?;
+        let parsed = input::response(&response)?;
         let (uuid, entry) = parsed.entries.into_iter().next().ok_or_else(|| {
             AnchorWitnessError::Decode("rekor publish returned no entries".to_string())
         })?;
@@ -749,14 +762,13 @@ impl AnchorWitnessClient for RekorClient {
                 receipt.kind
             )));
         }
-        let response = self
+        let request = self
             .http
             .get(self.entry_by_uuid_url(&receipt.external_uuid))
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
-            .send()
-            .await
+            .build()
             .map_err(AnchorWitnessError::transport)?;
-        let parsed = input::response(response).await?;
+        let response = send_with_contract(&self.contract, &self.http, request).await?;
+        let parsed = input::response(&response)?;
         let entry = parsed.entries.get(&receipt.external_uuid).ok_or_else(|| {
             AnchorWitnessError::Decode(format!(
                 "rekor returned no entry for uuid {}",
@@ -1043,7 +1055,12 @@ mod tests {
 
     #[test]
     fn rekor_client_rejects_blank_endpoint() {
-        let err = RekorClient::new("", 60).unwrap_err();
+        let err = RekorClient::new(
+            "",
+            &chio_egress_contract::HttpEgressContract::permissive_for_tests("127.0.0.1:9"),
+            60,
+        )
+        .unwrap_err();
         assert!(matches!(err, AnchorWitnessError::Config(_)));
     }
 

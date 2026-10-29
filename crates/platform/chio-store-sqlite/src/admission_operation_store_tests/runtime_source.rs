@@ -9,6 +9,9 @@ use std::sync::Mutex;
 #[path = "runtime_source/claims.rs"]
 mod claims;
 
+#[path = "runtime_source/requalification.rs"]
+mod requalification;
+
 const SOURCE_ID: &str = "runtime-source";
 const RUNTIME_ID: &str = "runtime-authority";
 
@@ -202,7 +205,7 @@ fn reentrant_source_installation_refuses_without_destination_mutation() {
     assert_eq!(
         install(&fixture, &source),
         Err(AdmissionOperationStoreError::Invariant(
-            "invalid sqlite authority store: replay source migration is already in progress".into(),
+            "invalid sqlite authority store: source installation is already in progress".into(),
         ))
     );
     assert_eq!(source.calls.load(Ordering::SeqCst), 1);

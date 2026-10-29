@@ -39,6 +39,12 @@ use chio_core::Keypair;
 use p256::ecdsa::SigningKey;
 use tiny_http::{Method, Response, Server};
 
+fn loopback_contract(endpoint: &str) -> chio_egress_contract::HttpEgressContract {
+    chio_egress_contract::HttpEgressContract::permissive_for_tests(
+        endpoint.trim_start_matches("http://"),
+    )
+}
+
 struct MockServer {
     base_url: String,
     shutdown: Option<mpsc::Sender<()>>,
@@ -160,7 +166,7 @@ fn rekor_publish_round_trips_a_batch_against_a_faithful_mock() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0)
+    let client = RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0)
         .unwrap()
         .with_trusted_keys(vec![pem]);
     let receipt = runtime
@@ -196,7 +202,8 @@ fn rekor_publish_rejects_lane_that_returns_a_forged_body_hash() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0).unwrap();
+    let client =
+        RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0).unwrap();
     let err = runtime
         .block_on(client.publish(&batch))
         .expect_err("publish must reject lane-side body-hash mismatch");
@@ -241,7 +248,8 @@ fn rekor_verify_inclusion_rejects_lane_that_returns_a_substituted_entry() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0).unwrap();
+    let client =
+        RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0).unwrap();
     let err = runtime
         .block_on(client.verify_inclusion(&receipt))
         .expect_err("verify_inclusion must reject lane substitution");
@@ -288,7 +296,8 @@ fn rekor_verify_inclusion_rejects_uuid_substitution() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0).unwrap();
+    let client =
+        RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0).unwrap();
     let err = runtime
         .block_on(client.verify_inclusion(&receipt))
         .expect_err("verify_inclusion must reject uuid substitution");
@@ -360,7 +369,7 @@ fn rekor_verify_inclusion_rejects_set_signed_by_untrusted_key() {
     // not verify under it.
     let trusted = fresh_test_rekor_key();
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0)
+    let client = RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0)
         .unwrap()
         .with_trusted_keys(vec![trusted.pem.clone()]);
     let err = runtime
@@ -423,7 +432,7 @@ fn rekor_verify_inclusion_accepts_set_signed_by_trusted_key() {
     });
 
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let client = RekorClient::new(server.base_url.clone(), 0)
+    let client = RekorClient::new(&server.base_url, &loopback_contract(&server.base_url), 0)
         .unwrap()
         .with_trusted_keys(vec![test_key.pem.clone()]);
     runtime
@@ -465,7 +474,12 @@ fn require_public_witness_rejects_ots_marker_without_trusted_bitcoin_evidence() 
         require_public_witness: true,
         stale_window_seconds: 60 * 60,
     };
-    let client = OtsClient::new("http://127.0.0.1:9", 0).unwrap();
+    let client = OtsClient::new(
+        "http://127.0.0.1:9",
+        &loopback_contract("http://127.0.0.1:9"),
+        0,
+    )
+    .unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let err = runtime
         .block_on(verify_anchor_batch_with_witness_policy_async(

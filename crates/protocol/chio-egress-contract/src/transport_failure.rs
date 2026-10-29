@@ -1,4 +1,6 @@
+use crate::HttpEgressError;
 use std::error::Error;
+use std::io;
 use std::sync::Arc;
 
 /// Cloneable local source. Public formatting never exposes request URLs or bodies.
@@ -36,3 +38,23 @@ impl PartialEq for RequestFailure {
 }
 
 impl Eq for RequestFailure {}
+
+/// The contract refusal a transport error carries in its source chain. A
+/// resolver reports a refusal directly or wrapped in `io::Error`.
+pub(crate) fn contract_refusal(error: &(dyn Error + 'static)) -> Option<HttpEgressError> {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if let Some(refusal) = error.downcast_ref::<HttpEgressError>() {
+            return Some(refusal.clone());
+        }
+        if let Some(refusal) = error
+            .downcast_ref::<io::Error>()
+            .and_then(io::Error::get_ref)
+            .and_then(|inner| inner.downcast_ref::<HttpEgressError>())
+        {
+            return Some(refusal.clone());
+        }
+        current = error.source();
+    }
+    None
+}

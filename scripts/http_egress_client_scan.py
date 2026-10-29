@@ -38,6 +38,7 @@ _spec.loader.exec_module(lexer)
 
 CONTRACT_OWNER = "crates/protocol/chio-egress-contract/"
 KERNEL_ROOT = "crates/kernel/"
+SCAN_ROOTS = ("crates", "examples")
 UREQ_MARKER = "CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ:"
 HYPER_MARKER = "CHIO_EGRESS_LINT_ALLOW_DIRECT_HYPER_CLIENT:"
 UREQ_FUNCTIONS = frozenset(
@@ -66,9 +67,10 @@ def dependency_tables(manifest: dict):
 
 def manifests(root: Path):
     paths = [root / "Cargo.toml"] if (root / "Cargo.toml").is_file() else []
-    crates = root / "crates"
-    if crates.is_dir():
-        paths += sorted(p for p in crates.rglob("Cargo.toml") if "target" not in p.parts)
+    for scan_root in SCAN_ROOTS:
+        base = root / scan_root
+        if base.is_dir():
+            paths += sorted(p for p in base.rglob("Cargo.toml") if "target" not in p.parts)
     return paths
 
 
@@ -294,8 +296,12 @@ def main(argv: list[str]) -> int:
     root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[1]
     findings: list[str] = []
     roots = crate_roots(root, findings)
-    crates = root / "crates"
-    sources = sorted(crates.rglob("*.rs")) if crates.is_dir() else []
+    sources = sorted(
+        path
+        for scan_root in SCAN_ROOTS
+        if (root / scan_root).is_dir()
+        for path in (root / scan_root).rglob("*.rs")
+    )
     all_roots = roots["ureq"] | roots["hyper"]
     for path in sources:
         rel = path.relative_to(root).as_posix()

@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use arc_swap::ArcSwap;
 use chio_core_types::StoreMutationFence;
+use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
 use crate::admission_operation::AdmissionOperationStoreError;
@@ -650,7 +651,7 @@ impl StopControl {
         let (durability, head) = match store.load_stop_head(StopScope::Kernel) {
             Ok(head) => (StopDurability::Durable, head),
             Err(error) => {
-                tracing::error!(error = %error, "stop chain unverified; failing closed");
+                tracing::error!(error = %redacted!(&error), "stop chain unverified; failing closed");
                 (
                     StopDurability::Unverified {
                         reason: "stop_chain_unverified".to_owned(),
@@ -718,7 +719,7 @@ impl StopControl {
                 Ok(self.status())
             }
             Err(error) => {
-                tracing::error!(error = %error, "durable stop append failed; holding the stop in this process");
+                tracing::error!(error = %redacted!(&error), "durable stop append failed; holding the stop in this process");
                 Err(StopControlError::NotDurable {
                     detail: error.to_string(),
                     status: Box::new(self.status()),
@@ -768,7 +769,7 @@ impl StopControl {
                 ))
             }
             Err(error) => {
-                tracing::error!(error = %error, "durable resume append failed");
+                tracing::error!(error = %redacted!(&error), "durable resume append failed");
                 Err(StopControlError::Refused(error.to_string()))
             }
         }
@@ -819,7 +820,7 @@ impl StopControl {
         match store.withheld_operations() {
             Ok(count) => Some(count),
             Err(error) => {
-                tracing::error!(error = %error, "withheld operation count is unavailable");
+                tracing::error!(error = %redacted!(&error), "withheld operation count is unavailable");
                 None
             }
         }

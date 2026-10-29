@@ -666,6 +666,28 @@ pub fn agent() -> Http {
 }
 EOF
 
+http_client_case reqwest_mcp_adapter_not_exempt crates/protocol/chio-mcp-adapter/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    let _ = reqwest::blocking::get(url);
+}
+EOF
+http_client_case reqwest_example_unclassified examples/chio-fake-example/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    let _ = reqwest::blocking::get(url);
+}
+EOF
+http_client_case reqwest_example_classified examples/chio-fake-example/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: self-test example caller.
+    let _ = reqwest::blocking::get(url);
+}
+EOF
+http_client_case ureq_example_unclassified examples/chio-fake-example/src/lib.rs <<'EOF'
+pub fn fetch(url: &str) {
+    let _ = ureq::get(url).call();
+}
+EOF
+
 for expectation in \
     reject:ureq_builder reject:ureq_top_level reject:ureq_imported_builder \
     reject:ureq_imported_fn reject:ureq_aliased reject:ureq_v3_agent \
@@ -683,7 +705,9 @@ for expectation in \
     reject:ureq_self_qualified_alias reject:ureq_trait_generic_qualified \
     reject:ureq_alias_trait_generic_qualified accept:ureq_agent_in_turbofish \
     reject:ureq_parenthesized_qualified reject:ureq_parenthesized_alias_qualified \
-    reject:ureq_parenthesized_type_alias reject:ureq_parenthesized_alias_chain; do
+    reject:ureq_parenthesized_type_alias reject:ureq_parenthesized_alias_chain \
+    reject:reqwest_mcp_adapter_not_exempt reject:reqwest_example_unclassified \
+    accept:reqwest_example_classified reject:ureq_example_unclassified; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0
@@ -696,4 +720,4 @@ for expectation in \
     fi
 done
 
-echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients under renamed imports, aliases, globs and renamed dependencies, any ureq in kernel crates, and unscanned HTTP client crates."
+echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms), unclassified ureq and hyper clients under renamed imports, aliases, globs and renamed dependencies, any ureq in kernel crates, unscanned HTTP client crates, unclassified clients under examples/, and the retired chio-mcp-adapter exemption."

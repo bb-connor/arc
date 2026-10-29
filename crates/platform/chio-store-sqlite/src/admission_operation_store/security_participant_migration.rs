@@ -133,9 +133,9 @@ impl SqliteAdmissionOperationStore {
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
     ) -> Result<SecurityParticipantMigrationRecord, AdmissionOperationStoreError> {
-        let _migration = self
+        let _installation = self
             .serving_owner
-            .begin_replay_source_migration()
+            .begin_source_installation()
             .map_err(map_owner_error)?;
         let expected = self
             .load_security_participant_migration(security_authority_id, fence, trusted_now_unix_ms)?

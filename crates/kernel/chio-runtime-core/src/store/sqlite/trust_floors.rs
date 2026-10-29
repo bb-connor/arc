@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
 
 use super::{sqlite_error, sqlite_i64, sqlite_u64, SqliteRuntimeOrchestrationStore};
 use crate::admission::validate_runtime_trust_floor_transition;
@@ -92,6 +92,19 @@ impl SqliteRuntimeOrchestrationStore {
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(sqlite_error)?;
+        Self::validate_and_store_runtime_trust_floor_in_transaction(
+            &tx,
+            entry,
+            previous_hash_sha256,
+        )?;
+        tx.commit().map_err(sqlite_error)
+    }
+
+    pub(super) fn validate_and_store_runtime_trust_floor_in_transaction(
+        tx: &Transaction<'_>,
+        entry: RuntimeTrustFloorEntry,
+        previous_hash_sha256: Option<&str>,
+    ) -> Result<(), ChioRuntimeError> {
         let existing: Option<(String, String, i64, String, String)> = tx
             .query_row(
                 r#"
@@ -157,6 +170,6 @@ impl SqliteRuntimeOrchestrationStore {
             ],
         )
         .map_err(sqlite_error)?;
-        tx.commit().map_err(sqlite_error)
+        Ok(())
     }
 }

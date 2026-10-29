@@ -3,6 +3,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn loopback_contract(endpoint: &str) -> chio_egress_contract::HttpEgressContract {
+    chio_egress_contract::HttpEgressContract::permissive_for_tests(
+        endpoint.trim_start_matches("http://"),
+    )
+}
+
 async fn serve(
     body: Vec<u8>,
     status: &str,
@@ -55,7 +61,8 @@ fn signed_response(
 async fn original_rekor_rejects_authenticated_future_time() -> TestResult {
     let (response, key, receipt) = signed_response(i64::MAX)?;
     let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
-    let client = RekorClient::new(endpoint, 0)?.with_trusted_keys(vec![key]);
+    let client =
+        RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?.with_trusted_keys(vec![key]);
     let result = client.verify_inclusion(&receipt).await;
     task.await?;
     assert!(matches!(result, Err(error) if error.to_string().contains("not yet valid")));
@@ -67,7 +74,8 @@ async fn original_rekor_receipt_timestamp_is_bound_to_signed_entry() -> TestResu
     let (response, key, mut receipt) = signed_response(1_700_000_000)?;
     receipt.published_at += 1;
     let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
-    let client = RekorClient::new(endpoint, 0)?.with_trusted_keys(vec![key]);
+    let client =
+        RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?.with_trusted_keys(vec![key]);
     let result = client.verify_inclusion(&receipt).await;
     task.await?;
     assert!(matches!(result, Err(error) if error.to_string().contains("timestamp")));
@@ -79,10 +87,40 @@ async fn original_rekor_response_budget_precedes_projection() -> TestResult {
     let (mut response, key, receipt) = signed_response(1_700_000_000)?;
     response["entry-1"]["ignored"] = serde_json::Value::String("x".repeat(4 * 1024 * 1024));
     let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
-    let client = RekorClient::new(endpoint, 0)?.with_trusted_keys(vec![key]);
+    let client =
+        RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?.with_trusted_keys(vec![key]);
     let result = client.verify_inclusion(&receipt).await;
     task.await?;
-    assert!(matches!(result, Err(error) if error.to_string().contains("too-large")));
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                chio_egress_contract::HttpEgressError::ResponseTooLarge { max, .. }
+            )) if *max == input::MAX_RESPONSE_BYTES as u64
+        ),
+        "{result:?}"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn rekor_response_read_keeps_a_lower_contract_ceiling() -> TestResult {
+    let (response, key, receipt) = signed_response(1_700_000_000)?;
+    let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
+    let mut contract = loopback_contract(&endpoint);
+    contract.max_response_bytes = 64;
+    let client = RekorClient::new(&endpoint, &contract, 0)?.with_trusted_keys(vec![key]);
+    let result = client.verify_inclusion(&receipt).await;
+    task.await?;
+    assert!(
+        matches!(
+            &result,
+            Err(AnchorWitnessError::Egress(
+                chio_egress_contract::HttpEgressError::ResponseTooLarge { max: 64, .. }
+            ))
+        ),
+        "{result:?}"
+    );
     Ok(())
 }
 
@@ -128,7 +166,12 @@ async fn witness_clock_failure_denies_before_network() -> TestResult {
     let clock = Arc::new(ScriptClock(std::sync::Mutex::new(
         [Err(ClockError::Unavailable)].into(),
     )));
-    let client = RekorClient::new_with_clock("http://127.0.0.1:9", 30, clock)?;
+    let client = RekorClient::new_with_clock(
+        "http://127.0.0.1:9",
+        &loopback_contract("http://127.0.0.1:9"),
+        30,
+        clock,
+    )?;
     assert!(matches!(
         client.verify_inclusion(&receipt).await,
         Err(AnchorWitnessError::Clock(ClockError::Unavailable))
@@ -147,7 +190,9 @@ async fn witness_client_clones_share_both_clock_fences() -> TestResult {
         let clock = Arc::new(ScriptClock(std::sync::Mutex::new(
             [reading(100, 10), reading(101, 11), last].into(),
         )));
-        let client = RekorClient::new_with_clock(endpoint, 30, clock)?.with_trusted_keys(vec![key]);
+        let client =
+            RekorClient::new_with_clock(&endpoint, &loopback_contract(&endpoint), 30, clock)?
+                .with_trusted_keys(vec![key]);
         let clone = client.clone();
         client.verify_inclusion(&receipt).await?;
         task.await?;
@@ -164,13 +209,14 @@ async fn witness_rejects_ambiguous_entry_maps_and_redacts_http_failures() -> Tes
     let (mut response, key, receipt) = signed_response(100)?;
     response["entry-2"] = response["entry-1"].clone();
     let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
-    let client = RekorClient::new(endpoint, 0)?.with_trusted_keys(vec![key]);
+    let client =
+        RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?.with_trusted_keys(vec![key]);
     assert!(
         matches!(client.verify_inclusion(&receipt).await, Err(AnchorWitnessError::Decode(message)) if message.contains("exactly one"))
     );
     task.await?;
     let (endpoint, task) = serve(b"private-marker".to_vec(), "503 Unavailable").await?;
-    let client = RekorClient::new(endpoint, 0)?;
+    let client = RekorClient::new(&endpoint, &loopback_contract(&endpoint), 0)?;
     let result = client.verify_inclusion(&receipt).await;
     task.await?;
     assert!(matches!(
@@ -202,7 +248,8 @@ async fn witness_publish_authenticates_and_binds_receipt_at_injected_time() -> T
     let response = build_rekor_publish_response_with_set("entry-1", &body, 100, 0, &set);
     let (endpoint, task) = serve(serde_json::to_vec(&response)?, "200 OK").await?;
     let client = RekorClient::new_with_clock(
-        endpoint,
+        &endpoint,
+        &loopback_contract(&endpoint),
         30,
         Arc::new(chio_security_types::clock::FixedClock::new(100)),
     )?
@@ -215,6 +262,7 @@ async fn witness_publish_authenticates_and_binds_receipt_at_injected_time() -> T
     assert_eq!(receipt.witness_root, batch.body.tree_root);
     let client = RekorClient::new_with_clock(
         "http://127.0.0.1:9",
+        &loopback_contract("http://127.0.0.1:9"),
         30,
         Arc::new(ScriptClock(std::sync::Mutex::new(
             [Err(ClockError::Unavailable)].into(),

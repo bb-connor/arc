@@ -173,7 +173,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP form adds authorization_resource taken from the tool call.",
+        "Request id, request namespace digest and evaluation id. The request id can be caller-chosen, and the ACP-Client form adds authorization_resource taken from the tool call.",
     ),
     spec(
         "governed_transaction_diagnostics",
@@ -313,7 +313,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP producer embeds an unsalted content hash in it.",
+        "The pre-binding receipt id the signing path folds into the signed body of every receipt. The ACP-Client producer embeds an unsalted content hash in it.",
     ),
     spec(
         CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
@@ -460,7 +460,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "ACP session and tool-call ids. authorizationResource is taken from the tool call.",
+        "ACP-Client session and tool-call ids. authorizationResource is taken from the tool call.",
     ),
     spec(
         "agent_web_receipt_ref",

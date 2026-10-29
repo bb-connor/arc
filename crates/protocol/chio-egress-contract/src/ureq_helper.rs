@@ -1,8 +1,8 @@
 //! Blocking ureq transport that dispatches only under an [`HttpEgressContract`].
 
+use crate::transport_failure::contract_refusal;
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract, RequestFailure};
 use std::collections::BTreeMap;
-use std::error::Error;
 use std::io::{self, Read};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, PoisonError};
@@ -629,26 +629,6 @@ fn open_capped_response(
 
 fn transport_failure(transport: ureq::Transport) -> HttpEgressError {
     contract_refusal(&transport).unwrap_or_else(|| RequestFailure::new(transport).into())
-}
-
-/// The resolver reports a refusal through `io::Error`, which ureq keeps as
-/// the transport source.
-fn contract_refusal(error: &(dyn Error + 'static)) -> Option<HttpEgressError> {
-    let mut current = Some(error);
-    while let Some(error) = current {
-        if let Some(refusal) = error.downcast_ref::<HttpEgressError>() {
-            return Some(refusal.clone());
-        }
-        if let Some(refusal) = error
-            .downcast_ref::<io::Error>()
-            .and_then(io::Error::get_ref)
-            .and_then(|inner| inner.downcast_ref::<HttpEgressError>())
-        {
-            return Some(refusal.clone());
-        }
-        current = error.source();
-    }
-    None
 }
 
 fn target_host_and_port(url: &str) -> Result<(String, u16), HttpEgressError> {

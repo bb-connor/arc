@@ -283,6 +283,9 @@ pub(super) fn signed_policy_inputs(
 
 #[derive(Clone)]
 pub(super) struct TreatyRuntimeFixture {
+    pub(super) epoch_key: Keypair,
+    pub(super) epoch_authority: chio_core_types::PublicKey,
+    pub(super) epoch_update: runtime_api::treaty_epoch::VerifiedTreatyEpochUpdate,
     pub(super) treaty_scope: TreatyScope,
     pub(super) treaty_scope_sha256: String,
     pub(super) ladder_intersection: runtime_api::LadderIntersection,
@@ -345,6 +348,56 @@ pub(super) fn treaty_runtime_fixture_with_signers(
         runtime_api::governance_ladder_manifest_sha256(&buyer)?,
         runtime_api::governance_ladder_manifest_sha256(&vendor)?,
     ];
+    let epoch_key = Keypair::generate();
+    let epoch_backend = chio_core_types::crypto::Ed25519Backend::new(epoch_key.clone());
+    let epoch_authority = chio_core_types::crypto::SigningBackend::public_key(&epoch_backend)?;
+    let epoch_update = runtime_api::treaty_epoch::sign_treaty_epoch_record(
+        runtime_api::treaty_epoch::TreatyEpochRecordV1 {
+            schema: runtime_api::treaty_epoch::CHIO_TREATY_EPOCH_SCHEMA.into(),
+            verifier_id: chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "verifier",
+                "did:chio:buyer-verifier",
+            )?,
+            treaty_id: chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "treaty",
+                &treaty_scope.treaty_id,
+            )?,
+            sequence: 1,
+            previous_record_sha256: None,
+            status: runtime_api::treaty_epoch::TreatyEpochStatusV1::Active,
+            participants: treaty_scope
+                .participant_kernel_ids
+                .iter()
+                .zip(&treaty_scope.participant_public_keys)
+                .zip(&treaty_scope.ladder_manifest_sha256s)
+                .map(|((id, key), ladder)| {
+                    Ok::<_, Box<dyn std::error::Error>>(
+                        runtime_api::treaty_epoch::TreatyEpochParticipantV1 {
+                            kernel_id:
+                                chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                                    "participant",
+                                    id,
+                                )?,
+                            public_key: key.clone(),
+                            ladder_manifest_sha256:
+                                chio_kernel::admission_operation::AdmissionDigest::try_new(
+                                    "ladder", ladder,
+                                )?,
+                        },
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+            trust_bundle_sha256: chio_kernel::admission_operation::AdmissionDigest::try_new(
+                "trust",
+                &treaty_scope.trust_bundle_sha256,
+            )?,
+            issued_at_unix_ms: treaty_scope.issued_at_unix_ms,
+            expires_at_unix_ms: treaty_scope.expires_at_unix_ms,
+        },
+        &epoch_backend,
+        &epoch_authority,
+    )?;
+    treaty_scope.revocation_epoch_sha256 = epoch_update.body_digest().as_str().into();
     let treaty_scope_sha256 = runtime_api::treaty_scope_sha256(&treaty_scope)?;
     let ladder_intersection =
         compute_ladder_intersection(&treaty_scope, &[buyer, vendor], 1_800_000_001_000)?;
@@ -507,6 +560,9 @@ pub(super) fn treaty_runtime_fixture_with_signers(
         &chio_core_types::crypto::canonical_json_bytes(&bilateral_dsse)?,
     );
     Ok(TreatyRuntimeFixture {
+        epoch_key,
+        epoch_authority,
+        epoch_update,
         treaty_scope,
         treaty_scope_sha256,
         ladder_intersection,
@@ -888,4 +944,33 @@ pub(super) fn runtime_swarm_bundle(
     }
 
     Ok(bundle)
+}
+
+#[test]
+fn treaty_fixture_epoch_is_signed_by_its_independent_operator_and_bound_to_scope(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = treaty_runtime_fixture_with_signers(
+        allow_policy_evaluation_summary(),
+        Keypair::generate(),
+        Keypair::generate(),
+    )?;
+    assert_eq!(fixture.epoch_key.public_key(), fixture.epoch_authority);
+    assert!(!fixture
+        .treaty_scope
+        .participant_public_keys
+        .contains(&fixture.epoch_authority));
+    let verified = runtime_api::treaty_epoch::verify_treaty_epoch_update(
+        fixture.epoch_update.envelope().clone(),
+        &fixture.epoch_authority,
+    )?;
+    assert_eq!(verified.body_digest(), fixture.epoch_update.body_digest());
+    assert_eq!(
+        verified.body_digest().as_str(),
+        fixture.treaty_scope.revocation_epoch_sha256
+    );
+    assert_eq!(
+        verified.body().treaty_id.as_str(),
+        fixture.treaty_scope.treaty_id
+    );
+    Ok(())
 }

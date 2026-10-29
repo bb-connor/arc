@@ -4381,6 +4381,12 @@
       "payloadSchemaFile": "spec/schemas/chio-wire/v1/transaction/transaction-passport-body.schema.json"
     },
     {
+      "schema": "chio.treaty-epoch.v1",
+      "artifactKind": "treaty_epoch",
+      "introducedBy": "treaty-epoch-commit-v1",
+      "schemaFile": "spec/schemas/chio-runtime/v1/treaty-epoch.schema.json"
+    },
+    {
       "schema": "chio.trust.passport-revocation-root.v1",
       "artifactKind": "trust_passport_revocation_root",
       "introducedBy": "federated-passport-revocation-v1",

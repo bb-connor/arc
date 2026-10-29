@@ -76,11 +76,10 @@ capabilities:
     for authority in authorities["graphs"]:
         assert authority["joinReceipts"] == authority["terminalReceipts"] == []
     with sqlite3.connect(state / "swarm-runtime.db") as db:
-        try:
-            db.execute("INSERT INTO runtime_consumed_swarm_continuations VALUES ('forged', 'forged')")
-            raise AssertionError("sealed source accepted a write")
-        except sqlite3.IntegrityError as failure:
-            assert "sealed" in str(failure), failure
+        retired = db.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'runtime_consumed_swarm_continuations'"
+        ).fetchone()[0]
+    assert retired == 0, "swarm source retained the legacy continuation table"
     original_source = (state / "swarm-profile.json").read_bytes()
     original_bootstrap = (state / "swarm-bootstrap.json").read_bytes()
     calls = json.loads((state / "swarm-calls.json").read_text())
