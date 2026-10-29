@@ -2524,7 +2524,7 @@
         },
         {
           "kind": "rust_test",
-          "ref": "crates/economy/chio-web3/src/tests.rs::public_settlement_proof_rejects_refunded_posture_without_reversal"
+          "ref": "crates/economy/chio-web3/src/tests/settlement_finality.rs::public_settlement_proof_rejects_refunded_posture_without_reversal"
         },
         {
           "kind": "positive_fixture",
@@ -3000,7 +3000,7 @@
       "evidence": [
         {
           "kind": "rust_test",
-          "ref": "crates/trust/chio-finding-verifier/tests/verifier.rs::portable_status_proof_verifies_and_is_pinned_into_signed_report"
+          "ref": "crates/trust/chio-finding-verifier/tests/verifier/portable_status.rs::portable_status_proof_verifies_and_is_pinned_into_signed_report"
         },
         {
           "kind": "rust_test",

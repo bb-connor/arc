@@ -285,7 +285,7 @@ fn persisted_parent_signed_by_an_untrusted_key_is_refused() {
     });
     assert_denied(
         &response,
-        "governed call_chain continuation parent receipt signer is not trusted",
+        "governed call_chain parent receipt signer is not trusted",
     );
 }
 

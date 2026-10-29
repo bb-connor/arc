@@ -1704,8 +1704,12 @@ fn derive_publication_materials_with_summary(
     ),
     MercuryContractError,
 > {
-    let carried_kernel_keys = verify_integrity_embedded_key_set(&bundle.checkpoints)
-        .map_err(|error| MercuryContractError::Validation(error.to_string()))?;
+    let carried_kernel_keys =
+        verify_integrity_embedded_key_set(&bundle.checkpoints).map_err(|error| {
+            MercuryContractError::Validation(format!(
+                "checkpoint transparency verification failed: {error}"
+            ))
+        })?;
     let normalized_transparency = match checkpoint_transparency {
         Some(summary) => Some(
             verify_checkpoint_transparency_records(
