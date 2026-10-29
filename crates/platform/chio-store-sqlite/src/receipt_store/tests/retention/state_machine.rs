@@ -75,8 +75,8 @@ fn prop_retention_preserves_append_invariant() -> Result<(), Box<dyn std::error:
             if trace { eprintln!("retention case={case} phase={name}"); }
         };
         phase("begin");
-        let path = unique_db_path("prop-retention");
-        let archive = unique_db_path("prop-archive");
+        let (_path_dir, path) = temp_sqlite_path("prop-retention");
+        let (_archive_dir, archive) = temp_sqlite_path("prop-archive");
         let keypair = super::super::support::receipt_test_keypair();
         let archive_path = archive.to_str().ok_or_else(|| TestCaseError::fail("archive path"))?;
 

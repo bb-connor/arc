@@ -404,7 +404,7 @@ mod tests {
         ChioReceipt::sign(body, kp).unwrap()
     }
 
-    fn open_store() -> SqliteIouEnvelopeStore {
+    fn open_store() -> (tempfile::TempDir, SqliteIouEnvelopeStore) {
         let dir = tempdir().unwrap();
         let path = dir.path().join("iou.sqlite");
         drop(crate::SqliteReceiptStore::open(&path).unwrap());
@@ -413,9 +413,7 @@ mod tests {
             .max_size(2)
             .build(manager)
             .unwrap();
-        // Leak the tempdir so the file outlives the test.
-        std::mem::forget(dir);
-        SqliteIouEnvelopeStore::open_with_pool(pool).unwrap()
+        (dir, SqliteIouEnvelopeStore::open_with_pool(pool).unwrap())
     }
 
     #[test]
@@ -427,7 +425,7 @@ mod tests {
         );
         let receipt = make_priced_receipt(&kp, "rcpt-store-1", 250);
         let envelope = account.evaluate(&receipt).unwrap().unwrap();
-        let store = open_store();
+        let (_dir, store) = open_store();
         assert!(store.insert(&envelope).unwrap());
         let fetched = store
             .get_by_receipt_id(&receipt.id)
@@ -512,7 +510,7 @@ mod tests {
         );
         let receipt = make_priced_receipt(&kp, "rcpt-store-2", 100);
         let envelope = account.evaluate(&receipt).unwrap().unwrap();
-        let store = open_store();
+        let (_dir, store) = open_store();
         assert!(store.insert(&envelope).unwrap());
         assert!(!store.insert(&envelope).unwrap());
     }
@@ -538,7 +536,7 @@ mod tests {
         .unwrap();
         assert_eq!(env_a.body.receipt_id, env_b.body.receipt_id);
         assert_ne!(env_a.body.issuer_key, env_b.body.issuer_key);
-        let store = open_store();
+        let (_dir, store) = open_store();
         assert!(store.insert(&env_a).unwrap());
         match store.insert(&env_b) {
             Err(IouEnvelopeStoreError::Conflict(_)) => {}
@@ -548,7 +546,7 @@ mod tests {
 
     #[test]
     fn get_missing_returns_none() {
-        let store = open_store();
+        let (_dir, store) = open_store();
         assert!(store.get_by_receipt_id("nope").unwrap().is_none());
     }
 
@@ -577,7 +575,6 @@ mod tests {
             .unwrap()
             .expect("envelope was inserted");
         assert_eq!(fetched, envelope);
-        std::mem::forget(dir);
     }
 
     #[test]
@@ -690,6 +687,5 @@ mod tests {
             failed_before + 1,
             "a failed IOU insert must increment the receipt writer failed_total"
         );
-        std::mem::forget(dir);
     }
 }

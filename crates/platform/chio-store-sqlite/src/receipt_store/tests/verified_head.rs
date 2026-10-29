@@ -82,8 +82,16 @@ fn qualified_reader_and_reopen_reject_live_rollback_after_writer_routed_receipt(
 fn open_seeded_store(
     prefix: &str,
     receipts: usize,
-) -> Result<(std::path::PathBuf, SqliteReceiptStore, Keypair), Box<dyn std::error::Error>> {
-    let path = unique_db_path(prefix);
+) -> Result<
+    (
+        tempfile::TempDir,
+        std::path::PathBuf,
+        SqliteReceiptStore,
+        Keypair,
+    ),
+    Box<dyn std::error::Error>,
+> {
+    let (directory, path) = temp_sqlite_path(prefix);
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..receipts {
@@ -92,12 +100,12 @@ fn open_seeded_store(
         store.append_chio_receipt_returning_seq(&receipt)?;
     }
     store.flush_receipt_writes()?;
-    Ok((path, store, keypair))
+    Ok((directory, path, store, keypair))
 }
 
 #[test]
 fn seed_verified_head_matches_persisted_state() -> Result<(), Box<dyn std::error::Error>> {
-    let (path, store, keypair) = open_seeded_store("chio-head-seed", 5)?;
+    let (_directory, path, store, keypair) = open_seeded_store("chio-head-seed", 5)?;
     store.create_next_receipt_checkpoint(3, &keypair)?;
 
     let connection = store.connection()?;
@@ -114,7 +122,7 @@ fn seed_verified_head_matches_persisted_state() -> Result<(), Box<dyn std::error
 #[test]
 fn verify_head_accepts_matching_head_and_catches_up_forward(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (path, store, keypair) = open_seeded_store("chio-head-accept", 4)?;
+    let (_directory, path, store, keypair) = open_seeded_store("chio-head-accept", 4)?;
     let connection = store.connection()?;
     let mut head = seed_verified_head(&connection)?;
 
@@ -135,7 +143,7 @@ fn verify_head_accepts_matching_head_and_catches_up_forward(
 #[test]
 fn verify_head_rejects_tampered_latest_checkpoint_with_conflict(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (path, store, keypair) = open_seeded_store("chio-head-tamper", 3)?;
+    let (_directory, path, store, keypair) = open_seeded_store("chio-head-tamper", 3)?;
     store.create_next_receipt_checkpoint(3, &keypair)?;
     let connection = store.connection()?;
     let mut head = seed_verified_head(&connection)?;
@@ -167,7 +175,7 @@ fn verify_head_rejects_tampered_latest_checkpoint_with_conflict(
 
 #[test]
 fn claim_log_delta_aggregate_is_scoped_to_the_floor() -> Result<(), Box<dyn std::error::Error>> {
-    let (path, store, _keypair) = open_seeded_store("chio-head-delta", 6)?;
+    let (_directory, path, store, _keypair) = open_seeded_store("chio-head-delta", 6)?;
     let connection = store.connection()?;
     assert_eq!(claim_log_delta_count_and_max_seq(&connection, 0)?, (6, 6));
     assert_eq!(claim_log_delta_count_and_max_seq(&connection, 4)?, (2, 6));
@@ -180,7 +188,7 @@ fn claim_log_delta_aggregate_is_scoped_to_the_floor() -> Result<(), Box<dyn std:
 #[test]
 fn incremental_append_updates_the_head_and_stays_correct() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-head-incremental");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-incremental");
     let store = SqliteReceiptStore::open(&path)?; // default: incremental on
     assert!(store.incremental_verification_enabled());
     let keypair = receipt_test_keypair();
@@ -203,7 +211,7 @@ fn incremental_append_updates_the_head_and_stays_correct() -> Result<(), Box<dyn
 
 #[test]
 fn append_denies_when_head_diverges() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-deny");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-deny");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -258,7 +266,7 @@ fn append_denies_when_head_diverges() -> Result<(), Box<dyn std::error::Error>> 
 #[test]
 fn writer_routed_inserts_do_not_false_conflict_the_next_append(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-resync");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-resync");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     let receipt = sample_receipt_with_keypair("rcpt-resync-0", 1, &keypair);
@@ -292,7 +300,7 @@ fn writer_routed_inserts_do_not_false_conflict_the_next_append(
 #[test]
 fn full_verification_fallback_still_catches_projection_drift(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-fallback");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-fallback");
     let keypair = receipt_test_keypair();
     // `ChioReceipt::sign` overwrites `body.id` with the authoritative
     // `chio_receipt_id` (an RFC 8785 canonical-body sha256), discarding the
@@ -332,7 +340,7 @@ fn full_verification_fallback_still_catches_projection_drift(
 #[test]
 fn reseed_clears_a_poisoned_head_after_repairing_the_database(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-reseed");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-reseed");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -397,7 +405,7 @@ fn reseed_clears_a_poisoned_head_after_repairing_the_database(
 /// the success path; this test proves the fail-closed path.
 #[test]
 fn reseed_on_still_corrupt_store_stays_poisoned() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-reseed-fail");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-reseed-fail");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -656,7 +664,7 @@ fn poisoned_head_reads_store_unhealthy() -> Result<(), Box<dyn std::error::Error
 /// error even though the reseed revalidated the DB.
 #[test]
 fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-reseed-clears-flush-error");
+    let (_path_dir, path) = temp_sqlite_path("chio-reseed-clears-flush-error");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -725,7 +733,7 @@ fn reseed_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
 /// even though the repair reseeded a revalidated head.
 #[test]
 fn retention_repair_clears_stale_flush_error() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-repair-clears-flush-error");
+    let (_path_dir, path) = temp_sqlite_path("chio-repair-clears-flush-error");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -802,7 +810,7 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
     // that trigger out of band before the external insert to leave the projection
     // rows missing (the exact state full verify_checkpoint_chain_integrity
     // rejects).
-    let path = unique_db_path("chio-catchup-bad-projections");
+    let (_path_dir, path) = temp_sqlite_path("chio-catchup-bad-projections");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..6 {
@@ -856,7 +864,7 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
 
     // ADOPT: a valid extension (projection rows written by the store's own
     // checkpoint builder) is still caught up.
-    let good_path = unique_db_path("chio-catchup-good-projections");
+    let (_good_path_dir, good_path) = temp_sqlite_path("chio-catchup-good-projections");
     let good_store = SqliteReceiptStore::open(&good_path)?;
     for i in 0..6 {
         let receipt =
@@ -888,7 +896,7 @@ fn catch_up_validates_checkpoint_projections() -> Result<(), Box<dyn std::error:
 #[test]
 fn catch_up_rejects_divergent_chain_root_before_advancing_head(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-catchup-divergent-chain-root");
+    let (_path_dir, path) = temp_sqlite_path("chio-catchup-divergent-chain-root");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..6 {
@@ -982,7 +990,7 @@ fn catch_up_rejects_divergent_chain_root_before_advancing_head(
 #[test]
 fn writer_routed_fallback_append_catches_uncheckpointed_drift(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-fallback-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-fallback-drift");
     let keypair = receipt_test_keypair();
     // Seed one tool receipt on the default (incremental) store; capture the
     // authoritative persisted receipt id.
@@ -1032,7 +1040,7 @@ fn writer_routed_fallback_append_catches_uncheckpointed_drift(
 /// string compare, no crypto) catches the column tamper fail-closed.
 #[test]
 fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-sig-column-tamper");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-sig-column-tamper");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -1107,7 +1115,7 @@ fn tampered_checkpoint_signature_column_denies_append() -> Result<(), Box<dyn st
 #[test]
 fn divergent_newly_projected_row_is_rejected_before_head_advance(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-head-newproj-drift");
+    let (_path_dir, path) = temp_sqlite_path("chio-head-newproj-drift");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {
@@ -1268,7 +1276,7 @@ fn divergent_newly_projected_row_is_rejected_before_head_advance(
 #[test]
 fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-reseed-nonincremental-fullverify");
+    let (_path_dir, path) = temp_sqlite_path("chio-reseed-nonincremental-fullverify");
     let keypair = receipt_test_keypair();
     let receipt_id = {
         let store = SqliteReceiptStore::open(&path)?;
@@ -1327,7 +1335,7 @@ fn reseed_runs_full_verification_in_non_incremental_mode() -> Result<(), Box<dyn
 /// at zero.
 #[test]
 fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-routed-accepted");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-routed-accepted");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
 
@@ -1364,7 +1372,7 @@ fn writer_routed_write_increments_accepted_total() -> Result<(), Box<dyn std::er
 #[test]
 fn writer_routed_write_outcome_updates_committed_and_failed(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-routed-outcome");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-routed-outcome");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
 
@@ -1424,7 +1432,7 @@ fn writer_routed_write_outcome_updates_committed_and_failed(
 /// projection lookups, no batch/leaf scan). A valid projection still passes.
 #[test]
 fn seq_unchanged_recheck_catches_projection_tamper() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-seq-unchanged-projection-tamper");
+    let (_path_dir, path) = temp_sqlite_path("chio-seq-unchanged-projection-tamper");
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     for i in 0..3 {

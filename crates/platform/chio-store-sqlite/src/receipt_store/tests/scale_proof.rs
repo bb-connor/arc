@@ -8,7 +8,7 @@ fn mean_append_nanos_at_history(
     history: usize,
     label: &str,
 ) -> Result<f64, Box<dyn std::error::Error>> {
-    let path = unique_db_path(&format!("chio-scale-{label}"));
+    let (_path_dir, path) = temp_sqlite_path(&format!("chio-scale-{label}"));
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;
     // Background checkpoints on at the ADR-0008 default batch size, so the

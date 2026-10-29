@@ -16,7 +16,7 @@ use support::*;
 
 #[test]
 fn sqlite_budget_store_persists_across_reopen() {
-    let path = unique_db_path("chio-budgets");
+    let (_path_dir, path) = temp_sqlite_path("chio-budgets");
     {
         let store = SqliteBudgetStore::open(&path).unwrap();
         assert!(store.try_increment("cap-1", 0, Some(2)).unwrap());
@@ -69,7 +69,7 @@ mod authority_replay;
 
 #[test]
 fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
-    let path = unique_db_path("chio-settle-charge-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-settle-charge-idempotent");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-1-0";
     let authorize_event_id = "hold-cap-1-0:authorize";
@@ -127,7 +127,7 @@ fn budget_store_settle_with_ids_is_idempotent_and_append_only_sqlite() {
 
 #[test]
 fn budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite() {
-    let path = unique_db_path("chio-reduce-charge-zero-invocations");
+    let (_path_dir, path) = temp_sqlite_path("chio-reduce-charge-zero-invocations");
     let store = SqliteBudgetStore::open(&path).unwrap();
     install_usage_anchor(&store, &usage_record("cap-zero", 0, 0, 10, 10, 40, 0));
 
@@ -150,7 +150,7 @@ fn budget_store_reduce_charge_cost_allows_zero_invocation_release_sqlite() {
 
 #[test]
 fn budget_store_list_mutation_events_preserves_append_order_sqlite() {
-    let path = unique_db_path("chio-budget-event-order");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-event-order");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     assert!(store
@@ -299,7 +299,7 @@ fn budget_store_hold_authority_requires_exact_lease_inmemory() {
 
 #[test]
 fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
-    let path = unique_db_path("chio-hold-authority-event-reuse");
+    let (_path_dir, path) = temp_sqlite_path("chio-hold-authority-event-reuse");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-lease-0";
     let event_id = "hold-cap-lease-0:authorize";
@@ -382,7 +382,7 @@ fn budget_store_event_id_retry_rejects_authority_rollover_sqlite() {
 
 #[test]
 fn budget_store_compensated_identity_is_terminal_and_fresh_identity_succeeds_sqlite() {
-    let path = unique_db_path("chio-hold-authority-rollback-retry");
+    let (_path_dir, path) = temp_sqlite_path("chio-hold-authority-rollback-retry");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-lease-0";
     let event_id = "hold-cap-lease-0:authorize";
@@ -466,7 +466,7 @@ fn budget_store_compensated_identity_is_terminal_and_fresh_identity_succeeds_sql
 
 #[test]
 fn import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite() {
-    let path = unique_db_path("chio-budget-import-release-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-import-release-idempotent");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-import-0";
     let authorize_event_id = "hold-cap-import-0:authorize";
@@ -525,8 +525,8 @@ fn import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite() {
 
 #[test]
 fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite() {
-    let source_path = unique_db_path("chio-budget-import-replay-source");
-    let target_path = unique_db_path("chio-budget-import-replay-target");
+    let (_source_path_dir, source_path) = temp_sqlite_path("chio-budget-import-replay-source");
+    let (_target_path_dir, target_path) = temp_sqlite_path("chio-budget-import-replay-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
 
     assert!(source
@@ -588,7 +588,7 @@ fn import_snapshot_records_replay_is_idempotent_when_peer_cursor_is_lost_sqlite(
 
 #[test]
 fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
-    let path = unique_db_path("chio-budget-explicit-anchor-only");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-explicit-anchor-only");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let usage = usage_record("cap-anchor-only", 0, 7, 1_717_171_717, 42, 550, 375);
 
@@ -635,7 +635,7 @@ fn caller_provided_snapshot_anchor_cannot_create_usage_or_coverage() {
 
 #[test]
 fn elected_leader_provenance_bootstraps_a_fresh_follower() {
-    let path = unique_db_path("chio-budget-verified-anchor-bootstrap");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-verified-anchor-bootstrap");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let usage = usage_record("cap-verified-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     let snapshot = BudgetStoreSnapshot {
@@ -691,7 +691,7 @@ fn elected_leader_provenance_bootstraps_a_fresh_follower() {
 
 #[test]
 fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
-    let path = unique_db_path("chio-budget-anchor-wrong-root");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-anchor-wrong-root");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let usage = usage_record("cap-forged-anchor", 0, 1, 10, 1, 0, 0);
     let snapshot = BudgetStoreSnapshot {
@@ -746,7 +746,7 @@ fn anchor_provenance_rejects_wrong_cluster_root_before_install() {
 
 #[test]
 fn identical_local_anchor_is_idempotent_but_does_not_prove_coverage() {
-    let path = unique_db_path("chio-budget-local-anchor");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-local-anchor");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let usage = usage_record("cap-local-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     install_usage_anchor(&store, &usage);
@@ -772,7 +772,7 @@ fn identical_local_anchor_is_idempotent_but_does_not_prove_coverage() {
 
 #[test]
 fn full_snapshot_rejects_an_unproved_claimed_head_atomically() {
-    let path = unique_db_path("chio-budget-forged-snapshot-head");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-forged-snapshot-head");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     let error = store
@@ -795,7 +795,7 @@ fn full_snapshot_rejects_an_unproved_claimed_head_atomically() {
 
 #[test]
 fn full_snapshot_proves_holes_only_with_atomic_abandoned_ranges() {
-    let path = unique_db_path("chio-budget-snapshot-hole-proof");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-snapshot-hole-proof");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let events = [
         ack_head_event(1, "snapshot-head-1", "http://origin"),
@@ -837,7 +837,7 @@ fn full_snapshot_proves_holes_only_with_atomic_abandoned_ranges() {
 
 #[test]
 fn full_snapshot_rejects_forged_origin_heads_atomically() {
-    let path = unique_db_path("chio-budget-forged-origin-head");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-forged-origin-head");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let snapshot = BudgetStoreSnapshot {
         usages: Vec::new(),
@@ -863,7 +863,7 @@ fn full_snapshot_rejects_forged_origin_heads_atomically() {
 
 #[test]
 fn full_snapshot_rejects_local_history_missing_from_payload_atomically() {
-    let path = unique_db_path("chio-budget-snapshot-local-history");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-snapshot-local-history");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let retained = [
         ack_head_event(1, "retained-event-1", "http://origin"),
@@ -893,7 +893,7 @@ fn full_snapshot_rejects_local_history_missing_from_payload_atomically() {
 
 #[test]
 fn full_snapshot_proves_coverage_from_payload_without_local_rows() {
-    let path = unique_db_path("chio-budget-snapshot-isolated-proof");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-snapshot-isolated-proof");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let retained = [
         ack_head_event(1, "isolated-event-1", "http://origin"),
@@ -922,7 +922,7 @@ fn full_snapshot_proves_coverage_from_payload_without_local_rows() {
 
 #[test]
 fn full_snapshot_requires_the_exact_immutable_anchor_set() {
-    let path = unique_db_path("chio-budget-snapshot-anchor-set");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-snapshot-anchor-set");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let anchor = usage_record("cap-local-anchor-extra", 0, 2, 20, 2, 10, 3);
     install_usage_anchor(&store, &anchor);
@@ -951,7 +951,7 @@ fn full_snapshot_requires_the_exact_immutable_anchor_set() {
 
 #[test]
 fn reopen_rebuilds_forged_snapshot_proof_caches_from_genesis() {
-    let path = unique_db_path("chio-budget-forged-proof-cache");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-forged-proof-cache");
     {
         let store = SqliteBudgetStore::open(&path).unwrap();
         let connection = store.connection().unwrap();
@@ -998,7 +998,7 @@ fn reopen_rebuilds_forged_snapshot_proof_caches_from_genesis() {
 
 #[test]
 fn snapshot_export_keeps_every_same_sequence_usage_in_identity_order() {
-    let path = unique_db_path("chio-budget-same-seq-snapshot");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-same-seq-snapshot");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let records = (0..1_025)
         .map(|index| usage_record(&format!("cap-{index:04}"), 0, 1, 1_717_171_717, 42, 1, 0))
@@ -1020,7 +1020,7 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Barrier};
 
-    let path = unique_db_path("chio-budget-concurrent-snapshot");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-concurrent-snapshot");
     let reader = SqliteBudgetStore::open(&path).unwrap();
     let writer = SqliteBudgetStore::open(&path).unwrap();
     let started = Arc::new(Barrier::new(2));
@@ -1084,7 +1084,7 @@ fn snapshot_export_is_consistent_while_another_connection_commits() {
 
 #[test]
 fn usage_anchor_does_not_bootstrap_coverage_over_later_events() {
-    let path = unique_db_path("chio-budget-anchor-plus-events");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-anchor-plus-events");
     let anchor = usage_record("cap-anchor", 0, 7, 1_717_171_717, 42, 550, 375);
     let events = [
         ack_head_event(43, "snapshot-head-43", "http://origin"),
@@ -1128,8 +1128,8 @@ fn usage_anchor_does_not_bootstrap_coverage_over_later_events() {
 
 #[test]
 fn import_snapshot_records_duplicate_event_rejects_peer_transport_sequence_injection_sqlite() {
-    let source_path = unique_db_path("chio-budget-import-transport-source");
-    let target_path = unique_db_path("chio-budget-import-transport-target");
+    let (_source_path_dir, source_path) = temp_sqlite_path("chio-budget-import-transport-source");
+    let (_target_path_dir, target_path) = temp_sqlite_path("chio-budget-import-transport-target");
     let source = SqliteBudgetStore::open(&source_path).unwrap();
 
     assert!(source
@@ -1186,7 +1186,7 @@ fn import_snapshot_records_duplicate_event_rejects_peer_transport_sequence_injec
 
 #[test]
 fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite() {
-    let path = unique_db_path("chio-budget-import-atomic");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-import-atomic");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let initial_authority = authority("budget-primary", "lease-1", 1);
     let conflicting_authority = authority("budget-primary", "lease-2", 2);
@@ -1232,7 +1232,7 @@ fn import_snapshot_records_rolls_back_usage_rows_when_mutation_conflicts_sqlite(
 
 #[test]
 fn budget_store_open_hold_rejects_missing_authorize_event_sqlite() {
-    let path = unique_db_path("chio-hold-authority-recover-missing-event");
+    let (_path_dir, path) = temp_sqlite_path("chio-hold-authority-recover-missing-event");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-recover-0";
     let event_id = "hold-cap-recover-0:authorize";
@@ -1278,7 +1278,7 @@ fn budget_store_open_hold_rejects_missing_authorize_event_sqlite() {
 
 #[test]
 fn upsert_usage_preserves_newer_split_cost_state() {
-    let path = unique_db_path("chio-budget-upsert-cost");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-upsert-cost");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     // Higher-seq record written first
@@ -1299,7 +1299,7 @@ fn upsert_usage_preserves_newer_split_cost_state() {
 
 #[test]
 fn upsert_usage_does_not_resurrect_split_cost_state_from_stale_seq() {
-    let path = unique_db_path("chio-budget-upsert-split");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-upsert-split");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     install_usage_anchor(&store, &usage_record("cap-1", 0, 1, 20, 20, 0, 75));
@@ -1325,8 +1325,8 @@ fn upsert_usage_does_not_resurrect_split_cost_state_from_stale_seq() {
 /// This test asserts the bound holds for a simulated 2-node split-brain.
 #[test]
 fn concurrent_charge_overrun_bound() {
-    let path_a = unique_db_path("chio-overrun-node-a");
-    let path_b = unique_db_path("chio-overrun-node-b");
+    let (_path_a_dir, path_a) = temp_sqlite_path("chio-overrun-node-a");
+    let (_path_b_dir, path_b) = temp_sqlite_path("chio-overrun-node-b");
 
     let max_per_invocation: u64 = 100;
     let total_budget: u64 = 150; // Tight: allows 1 full invocation + small buffer
@@ -1404,7 +1404,7 @@ fn budget_store_zero_max_total_denies_any_charge_inmemory() {
 
 #[test]
 fn budget_store_zero_max_total_denies_any_charge_sqlite() {
-    let path = unique_db_path("chio-zero-budget-sqlite");
+    let (_path_dir, path) = temp_sqlite_path("chio-zero-budget-sqlite");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let ok = store
         .try_charge_cost("cap-zero-budget", 0, None, 1, None, Some(0))
@@ -1441,7 +1441,7 @@ fn budget_store_zero_cost_invocation_succeeds_and_records_zero_inmemory() {
 
 #[test]
 fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
-    let path = unique_db_path("chio-zero-cost-sqlite");
+    let (_path_dir, path) = temp_sqlite_path("chio-zero-cost-sqlite");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let ok = store
         .try_charge_cost("cap-zero-cost", 0, None, 0, None, Some(1000))
@@ -1589,7 +1589,7 @@ fn open_hold_stays_reserved_without_reap() {
 
 #[test]
 fn max_mutation_event_seq_reports_head() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-head");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-head");
     let store = SqliteBudgetStore::open(&path)?;
     assert_eq!(store.max_mutation_event_seq()?, 0);
     // A single authorize charge allocates event_seq 1.
@@ -1601,7 +1601,7 @@ fn max_mutation_event_seq_reports_head() -> Result<(), Box<dyn std::error::Error
 
 #[test]
 fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-ack-heads");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-heads");
     let store = SqliteBudgetStore::open(&path)?;
 
     // Import events {40, 42} for origin O (41 skipped) via the snapshot path,
@@ -1668,7 +1668,7 @@ fn budget_ack_heads_reports_contiguous_prefix_only() -> Result<(), Box<dyn std::
 
 #[test]
 fn budget_ack_heads_caps_partial_head_at_interior_gap() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-ack-heads-partial");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-heads-partial");
     let store = SqliteBudgetStore::open(&path)?;
 
     let event = |seq: u64| BudgetMutationRecord {
@@ -1737,7 +1737,7 @@ fn budget_ack_heads_stays_pinned_at_a_post_watermark_gap() -> Result<(), Box<dyn
     // (a) keep returning W across repeated polls (never advance over the gap) and
     // (b) advance correctly the moment the gap is filled - the result must match
     // the genesis-anchored gaps-and-islands computation exactly.
-    let path = unique_db_path("chio-ack-heads-post-watermark-gap");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-heads-post-watermark-gap");
     let store = SqliteBudgetStore::open(&path)?;
 
     let origin = "http://origin-g";
@@ -1818,7 +1818,7 @@ fn list_abandoned_event_seqs_in_range_bounds_upper_and_limit(
     // BOTH an upper bound (<= page_max) and a row cap in SQL, so a rollback storm
     // cannot materialize millions of tombstones into one response and blow past
     // the peer-response byte cap.
-    let path = unique_db_path("chio-abandoned-in-range");
+    let (_path_dir, path) = temp_sqlite_path("chio-abandoned-in-range");
     let store = SqliteBudgetStore::open(&path)?;
 
     let seqs: Vec<u64> = (1..=1000).collect();
@@ -1855,7 +1855,7 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     };
 
     // Enumerated form -> range-encoded runs: {2,3,4},{7},{9,10} collapse to 3 pairs.
-    let source_path = unique_db_path("chio-abandoned-ranges-source");
+    let (_source_path_dir, source_path) = temp_sqlite_path("chio-abandoned-ranges-source");
     let source = SqliteBudgetStore::open(&source_path)?;
     source.record_abandoned_event_seqs(&[2, 3, 4, 7, 9, 10])?;
     assert_eq!(
@@ -1865,7 +1865,7 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
     );
 
     // Range form -> enumerated set on a fresh follower (lossless expansion).
-    let follower_path = unique_db_path("chio-abandoned-ranges-follower");
+    let (_follower_path_dir, follower_path) = temp_sqlite_path("chio-abandoned-ranges-follower");
     let follower = SqliteBudgetStore::open(&follower_path)?;
     follower.record_abandoned_event_seq_ranges(&[(2, 4), (7, 7), (9, 10)])?;
     assert_eq!(
@@ -1876,7 +1876,7 @@ fn abandoned_seq_ranges_round_trip_and_advance_the_head() -> Result<(), Box<dyn 
 
     // A single LARGE contiguous run collapses to ONE pair (the rollback-storm case):
     // recorded cheaply via the range insert (a recursive CTE, not per-seq round-trips).
-    let storm_path = unique_db_path("chio-abandoned-ranges-storm");
+    let (_storm_path_dir, storm_path) = temp_sqlite_path("chio-abandoned-ranges-storm");
     let storm = SqliteBudgetStore::open(&storm_path)?;
     storm.record_abandoned_event_seq_ranges(&[(2, 50_001)])?;
     let ranges = storm.list_abandoned_event_seq_ranges()?;
@@ -1916,7 +1916,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     // one global stream and an origin's events are a sparse subsequence of it.
     // budget_ack_heads must anchor on the GLOBAL contiguous head, not a per-origin
     // island.
-    let path = unique_db_path("chio-ack-heads-multi");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-heads-multi");
     let store = SqliteBudgetStore::open(&path)?;
 
     let event = |seq: u64, origin: &str| BudgetMutationRecord {
@@ -1992,7 +1992,7 @@ fn budget_ack_heads_recognizes_multi_authority_global_contiguity(
     // Global hole: A owns {1,2}, B owns {4,5} -> global seq 3 missing.
     // The global head is 2, so A -> 2 and B is ABSENT. A naive MAX-per-origin
     // ack head would over-report B = 5 past the hole (a double-spend risk).
-    let path = unique_db_path("chio-ack-heads-multi-hole");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-heads-multi-hole");
     let store = SqliteBudgetStore::open(&path)?;
     store.import_snapshot_records(&[], &[event(1, a), event(2, a), event(4, b), event(5, b)])?;
     let heads = store.budget_ack_heads()?;
@@ -2055,7 +2055,7 @@ fn mutation_event_witness_returns_this_events_seq_not_authority_max(
     // The quorum-witness token must wait on THIS write's own event_seq (looked up
     // by event_id), not MAX(event_seq) for the authority, which a later
     // same-authority commit raises.
-    let path = unique_db_path("chio-event-seq-by-id");
+    let (_path_dir, path) = temp_sqlite_path("chio-event-seq-by-id");
     let store = SqliteBudgetStore::open(&path)?;
     // Two events under the SAME authority: e1 at seq 1, e2 at seq 2.
     store.import_snapshot_records(
@@ -2089,7 +2089,7 @@ fn budget_ack_head_watermark_recomputes_after_delete_caps_below_hole(
     // O(new rows) cost, but a DELETE that punches a hole
     // below the watermark must reset it so the next call re-verifies and caps the
     // head below the hole (never a stale-high head that over-counts).
-    let path = unique_db_path("chio-ack-watermark-delete");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-watermark-delete");
     let store = SqliteBudgetStore::open(&path)?;
     let head_for = |heads: &[(String, u64)], origin: &str| {
         heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
@@ -2141,7 +2141,7 @@ fn budget_mutation_events_delete_trigger_resets_watermark_even_without_manual_ca
     // Without the trigger this test fails: head_seq would stay stale-high at 3
     // and budget_ack_heads would over-count origin "http://o" up to a seq (3)
     // whose row 2 no longer exists - a witness over-count / data-loss double-spend.
-    let path = unique_db_path("chio-ack-watermark-trigger-raw-delete");
+    let (_path_dir, path) = temp_sqlite_path("chio-ack-watermark-trigger-raw-delete");
     let store = SqliteBudgetStore::open(&path)?;
     let head_for = |heads: &[(String, u64)], origin: &str| {
         heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
@@ -2215,7 +2215,7 @@ fn ack_head_reset_trigger_is_idempotent_across_reopens_and_concurrent_opens(
     // concurrent opens must not error (no "trigger
     // already exists" race) and must not churn the trigger, while it still exists
     // exactly once with the current per-origin-clearing body.
-    let path = unique_db_path("chio-trigger-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-trigger-idempotent");
     // First open creates the trigger.
     {
         let _ = SqliteBudgetStore::open(&path)?;
@@ -2290,7 +2290,7 @@ fn abandoned_seqs_advance_the_head_but_genuine_gaps_still_cap(
     // seq) is treated as FILLED so the global contiguous ack head advances past it
     // (no permanent stall). A GENUINELY missing seq (never recorded abandoned) still
     // caps the head (never over-counts a data-losing node).
-    let path = unique_db_path("chio-abandoned-fills-hole");
+    let (_path_dir, path) = temp_sqlite_path("chio-abandoned-fills-hole");
     let store = SqliteBudgetStore::open(&path)?;
     let head_for = |heads: &[(String, u64)], origin: &str| {
         heads.iter().find(|(o, _)| o == origin).map(|(_, seq)| *seq)
@@ -2337,7 +2337,7 @@ fn mutation_event_witness_returns_stored_origin_authority() -> Result<(), Box<dy
     // The witness identity for an idempotent retry comes from the event's STORED
     // origin authority, not the current lease, so a retry
     // after leadership moved targets the origin peers advertise it under.
-    let path = unique_db_path("chio-stored-witness");
+    let (_path_dir, path) = temp_sqlite_path("chio-stored-witness");
     let store = SqliteBudgetStore::open(&path)?;
     let old_leader = authority("http://old-leader", "http://old-leader#term-3", 3);
     store.try_charge_cost_with_ids_and_authority(
@@ -2377,3 +2377,21 @@ mod statement_caching;
 
 #[path = "tests/capability_usage_index.rs"]
 mod capability_usage_index;
+
+#[test]
+fn budget_test_database_leaves_no_files_behind() {
+    let prefix = format!("chio-leak-probe-{}", uuid::Uuid::now_v7());
+    {
+        let (_path_dir, path) = temp_sqlite_path(&prefix);
+        let store = SqliteBudgetStore::open(&path).unwrap();
+        drop(store);
+    }
+    let root = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+    let leftovers: Vec<String> = std::fs::read_dir(&root)
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(&prefix))
+        .collect();
+    assert_eq!(leftovers, Vec::<String>::new());
+}

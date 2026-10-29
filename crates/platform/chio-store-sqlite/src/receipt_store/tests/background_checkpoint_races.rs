@@ -737,7 +737,7 @@ fn cache_miss_adopts_valid_different_batch_winner_frontier(
 fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let (temp_dir, path) = temp_db("chio-checkpoint-archived-winner")?;
-    let archive = unique_db_path("chio-checkpoint-archived-winner-archive");
+    let (_archive_dir, archive) = temp_sqlite_path("chio-checkpoint-archived-winner-archive");
     let archive_path = archive.to_str().ok_or("archive path invalid")?;
     let keypair = receipt_test_keypair();
     let store = SqliteReceiptStore::open(&path)?;

@@ -1,17 +1,9 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use chio_core::crypto::Keypair;
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
 };
 
-pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+pub(super) use chio_test_support::temp_sqlite_path;
 
 fn valid_tool_action(parameters: serde_json::Value) -> ToolCallAction {
     ToolCallAction::from_parameters(parameters).unwrap()

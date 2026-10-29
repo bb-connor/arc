@@ -51,7 +51,7 @@ fn receipt_commit_actor_append_fails_closed_when_queue_is_full(
 #[test]
 fn writer_handle_keeps_actor_alive_until_last_owner_drops() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-writer-drop");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-drop");
     let wal_path = std::path::PathBuf::from(format!("{}-wal", path.display()));
     let shm_path = std::path::PathBuf::from(format!("{}-shm", path.display()));
 
@@ -76,7 +76,7 @@ fn writer_handle_keeps_actor_alive_until_last_owner_drops() -> Result<(), Box<dy
 
 #[test]
 fn last_owner_drop_drains_queued_append() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-writer-drain");
+    let (_path_dir, path) = temp_sqlite_path("chio-writer-drain");
     let store = SqliteReceiptStore::open(&path)?;
     let blocker = store.writer_handle();
     let queued = store.writer_handle();

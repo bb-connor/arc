@@ -52,13 +52,7 @@ pub(super) use super::super::*;
 
 pub(super) use chio_test_support::prelude::*;
 
-pub(super) fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("time before epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+pub(super) use chio_test_support::temp_sqlite_path;
 
 pub(super) fn temp_db(prefix: &str) -> std::io::Result<(tempfile::TempDir, std::path::PathBuf)> {
     let directory = tempfile::Builder::new().prefix(prefix).tempdir()?;

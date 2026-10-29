@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn capability_usage_listing_searches_the_primary_key() {
-    let path = unique_db_path("chio-budget-usage-plan");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-usage-plan");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let connection = store.connection().unwrap();
     let mut plan = connection
@@ -31,7 +31,7 @@ fn capability_usage_listing_searches_the_primary_key() {
 
 #[test]
 fn budget_usage_query_rejects_negative_persisted_counter() {
-    let path = unique_db_path("chio-budget-negative-usage");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-negative-usage");
     let store = SqliteBudgetStore::open(&path).unwrap();
     install_usage_anchor(&store, &usage_record("cap-negative", 0, 1, 10, 1, 0, 0));
     {

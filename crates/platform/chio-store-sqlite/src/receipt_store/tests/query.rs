@@ -4,7 +4,7 @@ use chio_kernel::ReceiptStore;
 
 #[test]
 fn bounded_cost_page_and_count_queries_use_scope_appropriate_indexes() {
-    let path = unique_db_path("chio-receipts-cost-query-plan");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cost-query-plan");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let query = ReceiptQuery {
         min_cost: Some(100),
@@ -68,7 +68,7 @@ fn bounded_cost_page_and_count_queries_use_scope_appropriate_indexes() {
 
 #[test]
 fn sqlite_receipt_store_lists_filtered_receipts() {
-    let path = unique_db_path("chio-receipts-filtered");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-filtered");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
 
     store.append_chio_receipt(&sample_receipt()).test_unwrap();
@@ -108,7 +108,7 @@ fn sqlite_receipt_store_lists_filtered_receipts() {
 
 #[test]
 fn receipt_analytics_groups_by_agent_tool_and_time() {
-    let path = unique_db_path("chio-receipts-analytics");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-analytics");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let keypair = Keypair::generate();
 
@@ -271,7 +271,7 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
 
 #[test]
 fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
-    let path = unique_db_path("chio-receipts-cost-attribution");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-cost-attribution");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer_kp = Keypair::generate();
     let root_kp = Keypair::generate();
@@ -496,7 +496,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
 
 #[test]
 fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_state() {
-    let path = unique_db_path("chio-receipts-economic-projection");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-economic-projection");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer_kp = Keypair::generate();
     let subject_kp = Keypair::generate();
@@ -791,7 +791,7 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
 
 #[test]
 fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_artifacts() {
-    let path = unique_db_path("chio-receipts-economic-flow");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-economic-flow");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let receipt_kp = Keypair::generate();
     let subject_key = "subject-flow";
@@ -1055,7 +1055,7 @@ fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_arti
 
 #[test]
 fn compliance_report_counts_proof_and_lineage_coverage() {
-    let path = unique_db_path("chio-receipts-compliance");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-compliance");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let issuer_kp = Keypair::generate();
     let subject_kp = Keypair::generate();
@@ -1218,7 +1218,7 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
 
 #[test]
 fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_as_sender_bound() {
-    let path = unique_db_path("chio-receipts-auth-asserted-call-chain");
+    let (_path_dir, path) = temp_sqlite_path("chio-receipts-auth-asserted-call-chain");
     let store = SqliteReceiptStore::open(&path).test_unwrap();
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();

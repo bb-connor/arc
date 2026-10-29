@@ -1,5 +1,4 @@
 use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_kernel::budget_store::BudgetEventAuthority;
 use chio_kernel::{BudgetStore, RevocationRecord};
@@ -7,13 +6,7 @@ use chio_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevo
 
 use chio_test_support::prelude::*;
 
-fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .test_expect("system time before unix epoch")
-        .as_nanos();
-    std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-}
+use chio_test_support::temp_sqlite_path;
 
 /// Authority custody accepts only a parent directory owned by the effective
 /// user with mode 0700, so each authority database gets its own private
@@ -94,8 +87,8 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
 
 #[test]
 fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
-    let budget_path = unique_db_path("chio-budget-store");
-    let revocation_path = unique_db_path("chio-revocation-store");
+    let (_budget_path_dir, budget_path) = temp_sqlite_path("chio-budget-store");
+    let (_revocation_path_dir, revocation_path) = temp_sqlite_path("chio-revocation-store");
     let budget_store = SqliteBudgetStore::open(&budget_path).test_expect("open budget store");
     let revocation_store =
         SqliteRevocationStore::open(&revocation_path).test_expect("open revocation store");
@@ -174,7 +167,7 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
 
 #[test]
 fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
-    let path = unique_db_path("chio-budget-authority-lease");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-authority-lease");
     let hold_id = "hold-cap-lease-0";
     let authorize_event_id = "hold-cap-lease-0:authorize";
     let release_event_id = "hold-cap-lease-0:release";
@@ -265,7 +258,7 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
 
 #[test]
 fn sqlite_budget_authorize_idempotency_persists_across_reopen() {
-    let path = unique_db_path("chio-budget-authority-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-authority-idempotent");
     let hold_id = "hold-cap-idempotent-0";
     let authorize_event_id = "hold-cap-idempotent-0:authorize";
     let authority = authority("budget-primary", "lease-12", 12);

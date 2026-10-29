@@ -92,7 +92,7 @@ where
 #[test]
 fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-rich-authority-replay");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-rich-authority-replay");
     let expected = authority("budget-primary", "lease-7", 7);
     {
         let store = SqliteBudgetStore::open(&path)?;
@@ -216,7 +216,7 @@ fn sqlite_rich_replays_require_the_persisted_authority_after_reopen(
 #[test]
 fn sqlite_held_reconciliation_requires_invocation_capture() -> Result<(), Box<dyn std::error::Error>>
 {
-    let path = unique_db_path("chio-budget-held-reconcile-capture-fence");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-held-reconcile-capture-fence");
     let store = SqliteBudgetStore::open(&path)?;
     let case = "capture-fence";
     let expected = authority("budget-primary", "lease-7", 7);
@@ -274,7 +274,7 @@ fn assert_replay_refused(
 #[test]
 fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-renewed-lease-replay");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-renewed-lease-replay");
     let store = SqliteBudgetStore::open(&path)?;
     let original = authority("budget-primary", "budget-primary#term-2", 2);
     let renewed = authority("budget-primary", "budget-primary#term-3", 3);
@@ -358,7 +358,7 @@ fn sqlite_renewed_lease_replays_an_authorization_under_its_original_authority(
 #[test]
 fn sqlite_renewed_lease_replays_a_charge_without_hold_through_the_charge_path(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-renewed-lease-charge-replay");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-renewed-lease-charge-replay");
     let store = SqliteBudgetStore::open(&path)?;
     let original = authority("budget-primary", "budget-primary#term-2", 2);
     let renewed = authority("budget-primary", "budget-primary#term-3", 3);

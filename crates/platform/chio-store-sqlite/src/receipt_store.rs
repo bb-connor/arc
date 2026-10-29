@@ -5,8 +5,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{mpsc, Arc, Condvar, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
-#[cfg(test)]
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
@@ -4685,14 +4683,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn earlier_success_does_not_clear_a_later_queued_timeout(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-timeout-ordering-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|duration| duration.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-timeout-ordering");
         let store = SqliteReceiptStore::open(&path)?;
         let baseline = store.receipt_commit_actor.writer_counters();
         let writer_a = store.writer_handle();
@@ -4959,14 +4950,7 @@ mod receipt_commit_actor_tests {
         // exited) is the first observation that the writer is gone. It must flip
         // liveness to Dead now, so the pre-dispatch gate denies admission before
         // a later append reconfirms the death.
-        let path = std::env::temp_dir().join(format!(
-            "chio-reseed-dead-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-reseed-dead");
         let mut store = SqliteReceiptStore::open(&path)?;
 
         // Replace the live commit actor with one whose receiver is dropped, so
@@ -4999,14 +4983,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn run_write_executes_jobs_serially_on_the_writer_thread(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-run-write-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-run-write");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -5083,14 +5060,7 @@ mod receipt_commit_actor_tests {
     /// holds the count until the job completes, mirroring the Append path.
     #[test]
     fn write_job_holds_inflight_for_its_duration() -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-inflight");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 
@@ -5171,14 +5141,7 @@ mod receipt_commit_actor_tests {
     #[test]
     fn write_decrements_inflight_before_returning_to_caller(
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let path = std::env::temp_dir().join(format!(
-            "chio-write-inflight-order-{}-{}.sqlite3",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_nanos())
-                .unwrap_or(0)
-        ));
+        let (_path_dir, path) = chio_test_support::temp_sqlite_path("chio-write-inflight-order");
         let store = SqliteReceiptStore::open(&path)?;
         let writer = store.writer_handle();
 

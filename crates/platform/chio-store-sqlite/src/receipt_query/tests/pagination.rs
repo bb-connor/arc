@@ -4,10 +4,10 @@ use chio_kernel::{ReceiptStore, MAX_QUERY_LIMIT};
 
 use crate::receipt_store::SqliteReceiptStore;
 
-use super::support::{make_receipt, unique_db_path};
+use super::support::{make_receipt, temp_sqlite_path};
 #[test]
 fn test_query_cursor_pagination() {
-    let path = unique_db_path("rq-cursor");
+    let (_path_dir, path) = temp_sqlite_path("rq-cursor");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..5usize {
@@ -61,7 +61,7 @@ fn test_query_cursor_pagination() {
 
 #[test]
 fn test_query_cursor_pagination_pages() {
-    let path = unique_db_path("rq-cursor-pages");
+    let (_path_dir, path) = temp_sqlite_path("rq-cursor-pages");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..7usize {
@@ -117,7 +117,7 @@ fn test_query_cursor_pagination_pages() {
 
 #[test]
 fn test_query_next_cursor_some_when_more() {
-    let path = unique_db_path("rq-next-cursor-some");
+    let (_path_dir, path) = temp_sqlite_path("rq-next-cursor-some");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..5usize {
@@ -154,7 +154,7 @@ fn test_query_next_cursor_some_when_more() {
 
 #[test]
 fn test_query_next_cursor_none_when_last_page() {
-    let path = unique_db_path("rq-next-cursor-none");
+    let (_path_dir, path) = temp_sqlite_path("rq-next-cursor-none");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..3usize {
@@ -190,7 +190,7 @@ fn test_query_next_cursor_none_when_last_page() {
 
 #[test]
 fn test_query_total_count() {
-    let path = unique_db_path("rq-total-count");
+    let (_path_dir, path) = temp_sqlite_path("rq-total-count");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..10usize {
@@ -226,7 +226,7 @@ fn test_query_total_count() {
 
 #[test]
 fn test_query_limit_capped() {
-    let path = unique_db_path("rq-limit-capped");
+    let (_path_dir, path) = temp_sqlite_path("rq-limit-capped");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // Insert MAX_QUERY_LIMIT + 10 receipts.
@@ -269,7 +269,7 @@ fn test_query_limit_capped() {
 fn test_query_cursor_u64_max_returns_empty() {
     // Querying with cursor=u64::MAX means "return receipts with seq > u64::MAX",
     // which is impossible -- the result must always be empty.
-    let path = unique_db_path("rq-cursor-u64max");
+    let (_path_dir, path) = temp_sqlite_path("rq-cursor-u64max");
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     // Insert a few receipts so the store is non-empty.

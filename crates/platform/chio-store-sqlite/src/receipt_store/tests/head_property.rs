@@ -29,7 +29,7 @@ proptest! {
     /// computes by full verification.
     #[test]
     fn prop_incremental_head_matches_full_audit(ops in proptest::collection::vec(head_op_strategy(), 1..16)) {
-        let path = unique_db_path("chio-head-prop");
+        let (_path_dir, path) = temp_sqlite_path("chio-head-prop");
         let keypair = receipt_test_keypair();
         let store = SqliteReceiptStore::open(&path)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;

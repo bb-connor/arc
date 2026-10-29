@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn sqlite_event_only_authorization_replays_once_with_invocation_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-event-replay");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-event-replay");
     let store = SqliteBudgetStore::open(&path)?;
     for _ in 0..2 {
         assert!(store.try_charge_cost_with_ids_and_authority(
@@ -33,7 +33,7 @@ fn sqlite_event_only_authorization_replays_once_with_invocation_limit(
 
 #[test]
 fn sqlite_invocation_count_overflow_is_atomic() -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-invocation-overflow");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-invocation-overflow");
     let store = SqliteBudgetStore::open(&path)?;
     store.connection()?.execute(
         r#"
@@ -68,7 +68,7 @@ fn sqlite_oversized_grant_index_fails_before_mutation() -> Result<(), Box<dyn st
     let Ok(grant_index) = usize::try_from(u64::from(u32::MAX) + 1) else {
         return Ok(());
     };
-    let path = unique_db_path("chio-budget-grant-index-overflow");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-grant-index-overflow");
     let store = SqliteBudgetStore::open(&path)?;
     let results = [
         store.try_increment_with_event_id(
@@ -110,7 +110,7 @@ fn sqlite_oversized_grant_index_fails_before_mutation() -> Result<(), Box<dyn st
 #[test]
 fn independent_plain_opens_reject_composite_authorization_without_mutation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-composite-durable");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-composite-durable");
     let first = SqliteBudgetStore::open(&path)?;
     let second = SqliteBudgetStore::open(&path)?;
     let request = BudgetAuthorizeHoldRequest {
@@ -159,7 +159,7 @@ fn independent_plain_opens_reject_composite_authorization_without_mutation(
 #[test]
 fn sqlite_budget_store_rejects_unsupported_imported_mutation_atomically(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-composite-import-unsupported");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-composite-import-unsupported");
     let store = SqliteBudgetStore::open(&path)?;
     let mut event = ack_head_event(1, "event-composite", "http://origin");
     event.kind = BudgetMutationKind::ReserveInvocation;
@@ -180,7 +180,7 @@ fn sqlite_budget_store_rejects_unsupported_imported_mutation_atomically(
 #[test]
 fn sqlite_budget_store_rejects_unrepresentable_authorization_without_mutation(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-authorization-sqlite-overflow");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-authorization-sqlite-overflow");
     let store = SqliteBudgetStore::open(&path)?;
     let error = store
         .authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -214,7 +214,7 @@ fn sqlite_budget_store_rejects_unrepresentable_authorization_without_mutation(
 #[test]
 fn sqlite_budget_store_rolls_back_snapshot_when_event_exceeds_integer_range(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-import-sqlite-overflow");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-import-sqlite-overflow");
     let store = SqliteBudgetStore::open(&path)?;
     let usage = usage_record("cap-import-overflow", 0, 1, 1, 1, 10, 0);
     let mut event = ack_head_event(2, "event-import-overflow", "budget-primary");
@@ -234,7 +234,7 @@ fn sqlite_budget_store_rolls_back_snapshot_when_event_exceeds_integer_range(
 #[test]
 fn sqlite_budget_store_capture_overflow_rolls_back_hold_transition(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-capture-sqlite-overflow");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-capture-sqlite-overflow");
     let store = SqliteBudgetStore::open(&path)?;
     assert!(store.try_charge_cost_with_ids(
         "cap-capture-overflow",
@@ -365,7 +365,7 @@ fn sqlite_budget_store_refuses_incomplete_stamp_one_with_open_liability(
 #[test]
 fn rollback_shaped_unrelated_event_cannot_reopen_budget_hold(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-fake-rollback-fence");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-fake-rollback-fence");
     let store = SqliteBudgetStore::open(&path)?;
     let request = BudgetAuthorizeHoldRequest {
         capability_id: "cap-fake-rollback".to_string(),
@@ -422,7 +422,7 @@ fn rollback_shaped_unrelated_event_cannot_reopen_budget_hold(
 #[test]
 fn compensated_kernel_budget_holds_require_fresh_request_identity(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-nonce-preflight-terminal");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-nonce-preflight-terminal");
     let store = SqliteBudgetStore::open(&path)?;
     for (prefix, capability_id) in [
         ("nonce-preflight-budget-hold", "cap-preflight"),
@@ -502,7 +502,7 @@ fn compensated_kernel_budget_holds_require_fresh_request_identity(
 #[test]
 fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-rich-kernel-reverse");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-rich-kernel-reverse");
     let store = SqliteBudgetStore::open(&path)?;
     let hold_id = "nonce-preflight-budget-hold:req-1:cap-preflight:0";
     store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
@@ -564,7 +564,7 @@ fn sqlite_rich_reverse_supports_kernel_cleanup_with_durable_projection(
 #[test]
 fn sqlite_live_hold_blocks_unheld_generic_mutations_without_state_drift(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-budget-live-hold-generic-fence");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-live-hold-generic-fence");
     let store = SqliteBudgetStore::open(&path)?;
     let hold_id = "hold-live-generic-fence";
     assert!(store.try_charge_cost_with_ids(
@@ -661,7 +661,7 @@ fn sqlite_budget_store_refuses_missing_capture_column_without_mutation(
 
 #[test]
 fn sqlite_budget_store_upsert_usage_keeps_newer_seq_state() {
-    let path = unique_db_path("chio-budget-upsert");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-upsert");
     let store = SqliteBudgetStore::open(&path).unwrap();
     install_usage_anchor(&store, &usage_record("cap-1", 0, 3, 10, 3, 300, 0));
     let error = store
@@ -679,7 +679,7 @@ fn sqlite_budget_store_upsert_usage_keeps_newer_seq_state() {
 
 #[test]
 fn sqlite_budget_store_uses_seq_for_same_key_delta_queries() {
-    let path = unique_db_path("chio-budget-seq-delta");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-seq-delta");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     assert!(store.try_increment("cap-1", 0, Some(5)).unwrap());
@@ -700,7 +700,7 @@ fn sqlite_budget_store_uses_seq_for_same_key_delta_queries() {
 
 #[test]
 fn sqlite_budget_store_preserves_imported_seq_across_failover_writes() {
-    let path = unique_db_path("chio-budget-seq-floor");
+    let (_path_dir, path) = temp_sqlite_path("chio-budget-seq-floor");
     let store = SqliteBudgetStore::open(&path).unwrap();
 
     install_usage_anchor(&store, &usage_record("cap-1", 0, 3, 10, 42, 0, 0));
@@ -719,7 +719,7 @@ fn sqlite_budget_store_preserves_imported_seq_across_failover_writes() {
 
 #[test]
 fn budget_store_try_charge_cost_within_limits_returns_true_sqlite() {
-    let path = unique_db_path("chio-charge-cost-ok");
+    let (_path_dir, path) = temp_sqlite_path("chio-charge-cost-ok");
     let store = SqliteBudgetStore::open(&path).unwrap();
     // 100 units, cap is 200 per invocation, total cap is 1000
     let ok = store
@@ -736,7 +736,7 @@ fn budget_store_try_charge_cost_within_limits_returns_true_sqlite() {
 
 #[test]
 fn budget_store_try_charge_cost_exceeds_per_invocation_cap_sqlite() {
-    let path = unique_db_path("chio-charge-cost-per-inv");
+    let (_path_dir, path) = temp_sqlite_path("chio-charge-cost-per-inv");
     let store = SqliteBudgetStore::open(&path).unwrap();
     // 500 units > max_cost_per_invocation of 200
     let ok = store
@@ -753,7 +753,7 @@ fn budget_store_try_charge_cost_exceeds_per_invocation_cap_sqlite() {
 
 #[test]
 fn budget_store_try_charge_cost_exceeds_total_cap_sqlite() {
-    let path = unique_db_path("chio-charge-cost-total");
+    let (_path_dir, path) = temp_sqlite_path("chio-charge-cost-total");
     let store = SqliteBudgetStore::open(&path).unwrap();
     // First charge 900 of 1000 budget
     assert!(store
@@ -773,7 +773,7 @@ fn budget_store_try_charge_cost_exceeds_total_cap_sqlite() {
 
 #[test]
 fn budget_store_try_charge_cost_atomic_increment_sqlite() {
-    let path = unique_db_path("chio-charge-cost-atomic");
+    let (_path_dir, path) = temp_sqlite_path("chio-charge-cost-atomic");
     let store = SqliteBudgetStore::open(&path).unwrap();
     assert!(store
         .try_charge_cost("cap-1", 0, None, 100, Some(200), Some(1000))
@@ -849,7 +849,7 @@ fn budget_store_reverse_charge_cost_restores_prior_state_inmemory() {
 
 #[test]
 fn budget_store_reverse_charge_cost_restores_prior_state_sqlite() {
-    let path = unique_db_path("chio-reverse-charge");
+    let (_path_dir, path) = temp_sqlite_path("chio-reverse-charge");
     let store = SqliteBudgetStore::open(&path).unwrap();
     assert!(store
         .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
@@ -880,7 +880,7 @@ fn budget_store_reduce_charge_cost_releases_exposure_only_inmemory() {
 
 #[test]
 fn budget_store_reduce_charge_cost_releases_exposure_only_sqlite() {
-    let path = unique_db_path("chio-reduce-charge");
+    let (_path_dir, path) = temp_sqlite_path("chio-reduce-charge");
     let store = SqliteBudgetStore::open(&path).unwrap();
     assert!(store
         .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
@@ -911,7 +911,7 @@ fn budget_store_settle_charge_cost_moves_exposure_to_realized_inmemory() {
 
 #[test]
 fn budget_store_settle_charge_cost_moves_exposure_to_realized_sqlite() {
-    let path = unique_db_path("chio-settle-charge");
+    let (_path_dir, path) = temp_sqlite_path("chio-settle-charge");
     let store = SqliteBudgetStore::open(&path).unwrap();
     assert!(store
         .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
@@ -973,7 +973,7 @@ fn budget_store_try_charge_cost_with_ids_is_idempotent_inmemory() {
 
 #[test]
 fn budget_store_try_charge_cost_with_ids_is_idempotent_sqlite() {
-    let path = unique_db_path("chio-charge-cost-idempotent");
+    let (_path_dir, path) = temp_sqlite_path("chio-charge-cost-idempotent");
     let store = SqliteBudgetStore::open(&path).unwrap();
     let hold_id = "hold-cap-1-0";
     let event_id = "hold-cap-1-0:authorize";
@@ -1022,7 +1022,7 @@ fn budget_store_try_charge_cost_with_ids_is_idempotent_sqlite() {
 #[test]
 fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-capture-invocation");
+    let (_path_dir, path) = temp_sqlite_path("chio-capture-invocation");
     let hold_id = "hold-cap-capture-0";
     let authorize_event_id = "hold-cap-capture-0:authorize";
     let capture_event_id = "hold-cap-capture-0:capture-invocation";
@@ -1274,8 +1274,8 @@ fn budget_store_capture_invocation_is_atomic_idempotent_and_persistent_sqlite(
 #[test]
 fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let source_path = unique_db_path("chio-capture-import-source");
-    let target_path = unique_db_path("chio-capture-import-target");
+    let (_source_path_dir, source_path) = temp_sqlite_path("chio-capture-import-source");
+    let (_target_path_dir, target_path) = temp_sqlite_path("chio-capture-import-target");
     let hold_id = "hold-cap-capture-import-0";
     let authority = authority("budget-primary", "lease-9", 9);
     let source = SqliteBudgetStore::open(&source_path)?;
@@ -1320,7 +1320,8 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
             "counters do not follow the durable usage chain",
         ),
     ] {
-        let malformed_path = unique_db_path(&format!("chio-capture-import-{suffix}-mismatch"));
+        let (_malformed_path_dir, malformed_path) =
+            temp_sqlite_path(&format!("chio-capture-import-{suffix}-mismatch"));
         let malformed_target = SqliteBudgetStore::open(&malformed_path)?;
         let mut malformed_events = events.clone();
         malformed_events
@@ -1368,7 +1369,7 @@ fn budget_store_import_reconstructs_captured_before_dispatch_cancellation_sqlite
 #[test]
 fn sqlite_captured_reconciled_hold_rejects_generic_mutations_without_hold_id(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-captured-reconciled-no-hold-id");
+    let (_path_dir, path) = temp_sqlite_path("chio-captured-reconciled-no-hold-id");
     let store = SqliteBudgetStore::open(&path)?;
     let hold_id = "hold-captured-reconciled";
     assert!(store.try_charge_cost_with_ids(
@@ -1441,7 +1442,7 @@ fn sqlite_captured_reconciled_hold_rejects_generic_mutations_without_hold_id(
 #[test]
 fn historical_captured_hold_does_not_block_fresh_specific_hold_cleanup(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-historical-capture-fresh-cleanup");
+    let (_path_dir, path) = temp_sqlite_path("chio-historical-capture-fresh-cleanup");
     let store = SqliteBudgetStore::open(&path)?;
     assert!(store.try_charge_cost_with_ids(
         "cap-cross-hold",
@@ -1514,7 +1515,7 @@ fn historical_captured_hold_does_not_block_fresh_specific_hold_cleanup(
 #[test]
 fn sqlite_partial_release_replay_preserves_event_time_state(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-partial-release-event-time");
+    let (_path_dir, path) = temp_sqlite_path("chio-partial-release-event-time");
     let store = SqliteBudgetStore::open(&path)?;
     let hold_id = "hold-partial-release";
     assert!(store.try_charge_cost_with_ids(
@@ -1563,7 +1564,7 @@ fn sqlite_partial_release_replay_preserves_event_time_state(
 #[test]
 fn sqlite_captured_before_dispatch_cancellation_rejects_partial_exposure(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let path = unique_db_path("chio-captured-cancel-partial-exposure");
+    let (_path_dir, path) = temp_sqlite_path("chio-captured-cancel-partial-exposure");
     let store = SqliteBudgetStore::open(&path)?;
     let hold_id = "hold-captured-cancel-partial";
     assert!(store.try_charge_cost_with_ids(

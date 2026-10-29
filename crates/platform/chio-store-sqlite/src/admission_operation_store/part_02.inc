@@ -26,20 +26,14 @@ mod tests {
         }
     }
 
-    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-    }
+    use chio_test_support::temp_sqlite_path;
 
     #[cfg(unix)]
     #[test]
     fn sqlite_admission_operation_store_creates_private_database_file() {
         use std::os::unix::fs::PermissionsExt;
 
-        let path = unique_db_path("chio-admission-operation-private");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-private");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o777;
 
@@ -91,7 +85,7 @@ mod tests {
 
     #[test]
     fn admission_operation_survives_restart_and_exact_create_retry() {
-        let path = unique_db_path("chio-admission-operation-restart");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-restart");
         let operation = operation();
         {
             let store = SqliteAdmissionOperationStore::open(&path).unwrap();
@@ -118,7 +112,7 @@ mod tests {
 
     #[test]
     fn admission_operation_kind_request_owner_is_unique_and_exact_retryable() {
-        let path = unique_db_path("chio-admission-operation-request-owner");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-request-owner");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let first = operation_with_binding("request-owner", "hold-owner-a");
         assert!(matches!(
@@ -147,7 +141,7 @@ mod tests {
 
     #[test]
     fn budget_hold_lookup_survives_restart_and_rejects_duplicate_owners() {
-        let path = unique_db_path("chio-admission-operation-hold-index");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-hold-index");
         let operation = operation();
         {
             let store = SqliteAdmissionOperationStore::open(&path).unwrap();
@@ -187,7 +181,7 @@ mod tests {
 
     #[test]
     fn admission_operation_compare_and_swap_is_durable_and_fenced() {
-        let path = unique_db_path("chio-admission-operation-cas");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-cas");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let operation = operation();
         let operation_id = operation.operation_id().to_string();
@@ -233,7 +227,7 @@ mod tests {
 
     #[test]
     fn caller_reservation_handoff_actions_enforce_atomic_edge_and_intent_state() {
-        let path = unique_db_path("chio-admission-caller-handoff-edge");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-caller-handoff-edge");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let prepared = operation();
         store.create_prepared(prepared.clone()).unwrap();
@@ -363,7 +357,7 @@ mod tests {
 
     #[test]
     fn recovery_inventory_and_epoch_claim_survive_restart() {
-        let path = unique_db_path("chio-admission-operation-recovery-claim");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-recovery-claim");
         let operation = operation();
         let operation_id = operation.operation_id().to_string();
         {
@@ -396,7 +390,7 @@ mod tests {
 
     #[test]
     fn unresolved_authority_count_includes_unknown_post_dispatch_outcome() {
-        let path = unique_db_path("chio-admission-operation-unresolved-authority");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-unresolved-authority");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let operation = governed_response_operation();
         let operation_id = operation.operation_id().to_string();
@@ -479,7 +473,7 @@ mod tests {
 
     #[test]
     fn advanced_admission_operation_accepts_deterministic_create_retry() {
-        let path = unique_db_path("chio-admission-operation-advanced-retry");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-advanced-retry");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let prepared = operation();
         let operation_id = prepared.operation_id().to_string();
@@ -510,7 +504,7 @@ mod tests {
 
     #[test]
     fn participant_stages_survive_restart_and_resume_linearly() {
-        let path = unique_db_path("chio-admission-operation-participant-restart");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-participant-restart");
         let operation = operation();
         let operation_id = operation.operation_id().to_string();
         {
@@ -564,7 +558,7 @@ mod tests {
 
     #[test]
     fn admission_operation_rejects_corrupted_state() {
-        let path = unique_db_path("chio-admission-operation-corrupt");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-operation-corrupt");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let operation = operation();
         let operation_id = operation.operation_id().to_string();
@@ -586,7 +580,7 @@ mod tests {
 
     #[test]
     fn cleanup_action_retries_require_the_exact_payload_and_state() {
-        let path = unique_db_path("chio-admission-cleanup-exact-retry");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-cleanup-exact-retry");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let operation = operation();
         store.create_prepared(operation.clone()).unwrap();
@@ -669,7 +663,7 @@ mod tests {
 
     #[test]
     fn completed_terminal_action_cannot_finalize_compensation_pending_operation() {
-        let path = unique_db_path("chio-admission-terminal-action-state");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-terminal-action-state");
         let store = SqliteAdmissionOperationStore::open(&path).unwrap();
         let operation = operation();
         store.create_prepared(operation.clone()).unwrap();
@@ -729,7 +723,7 @@ mod tests {
 
     #[test]
     fn cleanup_journal_survives_each_participant_crash_window() {
-        let path = unique_db_path("chio-admission-cleanup-restart");
+        let (_path_dir, path) = temp_sqlite_path("chio-admission-cleanup-restart");
         let operation = operation();
         let kinds = [
             AdmissionCleanupActionKind::Budget,
