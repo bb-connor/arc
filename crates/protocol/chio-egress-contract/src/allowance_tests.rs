@@ -515,8 +515,32 @@ fn allowance_digest_is_tagged_ordered_and_content_bound() {
 
 #[cfg(feature = "reqwest-egress")]
 #[test]
-fn portless_resolver_refuses_a_pinned_host() {
+fn portless_resolver_applies_the_pin_of_the_only_admitted_port() {
     let contract = facilitator_contract();
+    assert_eq!(
+        contract
+            .enforce_resolved_address_without_port(FACILITATOR, "10.20.0.5".parse().expect("ip")),
+        Ok(())
+    );
+    assert_eq!(
+        contract
+            .enforce_resolved_address_without_port(FACILITATOR, "34.1.2.3".parse().expect("ip")),
+        Err(HttpEgressError::PrivateNetworkAllowanceMismatch {
+            host: FACILITATOR.to_string(),
+            port: 8443,
+            address: "34.1.2.3".parse().expect("ip"),
+        })
+    );
+}
+
+#[cfg(feature = "reqwest-egress")]
+#[test]
+fn portless_resolver_refuses_a_pinned_host_admitted_on_two_ports() {
+    let mut contract = facilitator_contract();
+    contract
+        .allowed_authority_set
+        .insert(format!("{FACILITATOR}:9443"));
+    contract.validate().expect("both ports are authorities");
     assert_eq!(
         contract
             .enforce_resolved_address_without_port(FACILITATOR, "10.20.0.5".parse().expect("ip")),

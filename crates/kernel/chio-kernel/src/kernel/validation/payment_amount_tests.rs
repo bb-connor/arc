@@ -91,3 +91,82 @@ fn journal_refuses_a_malformed_allowance_digest() {
         "{error}"
     );
 }
+
+struct DelegatingRail {
+    inner: AcpPaymentAdapter,
+}
+
+impl PaymentAdapter for DelegatingRail {
+    fn rail_id(&self) -> &'static str {
+        self.inner.rail_id()
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        self.inner.rail_mode()
+    }
+
+    fn authorize(
+        &self,
+        request: &crate::payment::PaymentAuthorizeRequest,
+    ) -> Result<crate::payment::PaymentAuthorization, PaymentError> {
+        self.inner.authorize(request)
+    }
+
+    fn capture(
+        &self,
+        authorization_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<crate::payment::PaymentResult, PaymentError> {
+        self.inner
+            .capture(authorization_id, amount_units, currency, reference)
+    }
+
+    fn release(
+        &self,
+        authorization_id: &str,
+        reference: &str,
+    ) -> Result<crate::payment::PaymentResult, PaymentError> {
+        self.inner.release(authorization_id, reference)
+    }
+
+    fn refund(
+        &self,
+        transaction_id: &str,
+        amount_units: u64,
+        currency: &str,
+        reference: &str,
+    ) -> Result<crate::payment::PaymentResult, PaymentError> {
+        self.inner
+            .refund(transaction_id, amount_units, currency, reference)
+    }
+
+    fn replayed_authorization_metadata(
+        &self,
+        authorization_id: &str,
+    ) -> Result<serde_json::Value, PaymentError> {
+        self.inner.replayed_authorization_metadata(authorization_id)
+    }
+}
+
+fn vpc_rail_on(cidr: &str) -> AcpPaymentAdapter {
+    AcpPaymentAdapter::new("https://facilitator.vpc.internal:8443")
+        .with_private_network_allowances(
+            &EgressAllowanceSet::new([PrivateNetworkAllowance {
+                host: "facilitator.vpc.internal".to_owned(),
+                port: 8443,
+                cidr: cidr.parse().expect("cidr"),
+            }])
+            .expect("valid allowance set"),
+        )
+        .expect("allowance for the rail's own authority")
+}
+
+#[test]
+fn delegating_rail_reports_its_inner_allowance_digest() {
+    let inner = vpc_rail_on("10.20.0.0/24");
+    let expected = inner.egress_allowance_digest().to_owned();
+    let wrapper = DelegatingRail { inner };
+    assert_eq!(wrapper.egress_allowance_digest(), expected);
+}
