@@ -1352,7 +1352,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `321a887470d27cf143e94b834498ab8e16182eac9aa074e26ad15e155d0b96d2`
+- Input digest: `167439aed2c9d53e19768b748945bd9d7c203fa97b98ca0f87f7a330235d6ba6`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1558,7 +1558,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/post_dispatch_retention.rs`: `9c146e956904c8437aebad60c6b7b1b5830b90bbdb7e128173daf68df8bcdd48`
 - `crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/pre_dispatch_cleanup.rs`: `f5026b50f9cde97f03feb59285ce79ba1b48098e9ecedcc6cfa5c045b9d4d569`
 - `crates/kernel/chio-kernel/src/kernel/tests/drop_guard_proptest.rs`: `dee334da8a6f8b7b4e792d1aa6a9e9fb1a2e63c7dd9cd2d6e255de8606aa2137`
-- `crates/kernel/chio-kernel/src/kernel/validation.rs`: `21555c80bc0af5f956f1feb8ac22249d509b01db4c900881a373bf3ffb865dbe`
+- `crates/kernel/chio-kernel/src/kernel/validation.rs`: `b902ae13ff217ac9af8b556075e3e0d80f9f7acc2f32956d6bf35185a14ed88e`
 - `crates/kernel/chio-kernel/tests/dst_drop_injection.rs`: `e8bcf4fabef8849958ff7297ae8a0e6164dc9f999d42568a6586dcbc8b89e52a`
 - `crates/kernel/chio-kernel/tests/loom_concurrency.rs`: `cec9c72a822fd5350d43e9919ec2ff3367e3996cd9951703af090c3e72579451`
 - `crates/kernel/chio-kernel/tests/property_reservation_ledger.rs`: `b534ae17634c13d727141f2813e335bb640cd94415bf76461e4c153c332047d7`
@@ -1676,7 +1676,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `d038b734481964f5f8f817a3e13cd5ff6e38d1fb54bfc6d99305a60c700d22d6`
 - `fuzz/target-map.toml`: `c717aa1f5b7c0939baef981c1809401e344f38bb6df4f3f802a70141f2e03680`
-- `git-worktree://rust-files`: `69f4d5d7d7a8556eb5a744bbc0074304c6116b21cb543bab5280514d7955d419`
+- `git-worktree://rust-files`: `70062d3bc870f1cce6c0ce3e0bbf553f21a1439016baa074f34cd7a10d38ebe0`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
