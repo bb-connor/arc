@@ -333,7 +333,7 @@ fn trusted_capital_member<'a>(
     capital_authority
         .iter()
         .find(|member| *member == signer_key)
-        .ok_or_else(|| Web3ContractError::settlement_signature_invalid(refusal))
+        .ok_or_else(|| Web3ContractError::invalid_settlement(refusal))
 }
 
 pub fn validate_web3_settlement_execution_receipt(

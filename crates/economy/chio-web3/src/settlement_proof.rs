@@ -71,6 +71,7 @@ pub fn verify_public_settlement_proof(
     validate_bundle_header(bundle)?;
     validate_public_settlement_receipt_schema(bundle)?;
     validate_public_settlement_bundle_signature(bundle, trust)?;
+    validate_public_settlement_capital_signers(bundle, trust)?;
     validate_web3_settlement_execution_receipt(
         &bundle.settlement_receipt,
         &trust.trusted_capital_signer_keys,
@@ -996,6 +997,26 @@ fn validate_expected_trust_market_context(
             "public settlement trust-market ref mismatch".to_string(),
         )),
     }
+}
+
+fn validate_public_settlement_capital_signers(
+    bundle: &PublicSettlementProofBundle,
+    trust: &PublicSettlementVerifierTrust,
+) -> Result<(), Web3ContractError> {
+    let dispatch = &bundle.settlement_receipt.dispatch;
+    require_trusted_public_settlement_key(
+        "capital signer",
+        &dispatch.capital_instruction.signer_key,
+        &trust.trusted_capital_signer_keys,
+    )?;
+    if let Some(bond) = dispatch.bond.as_ref() {
+        require_trusted_public_settlement_key(
+            "bond signer",
+            &bond.signer_key,
+            &trust.trusted_capital_signer_keys,
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_public_settlement_trust(
