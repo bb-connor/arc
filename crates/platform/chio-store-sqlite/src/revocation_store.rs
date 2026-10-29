@@ -426,12 +426,14 @@ impl SqliteRevocationStore {
     }
 
     /// One page of entries with `entry_seq` above `after_seq`, in sequence
-    /// order, and the highest stored `entry_seq`, read from one snapshot.
+    /// order and of `kind` when one is named, each with its `entry_seq`, and
+    /// the highest stored `entry_seq`, read from one snapshot.
     pub fn list_revocation_entries_after(
         &self,
         after_seq: u64,
         limit: usize,
-    ) -> Result<(Vec<RevocationEntry>, u64), RevocationStoreError> {
+        kind: Option<RevocationTargetKind>,
+    ) -> Result<(Vec<(u64, RevocationEntry)>, u64), RevocationStoreError> {
         let after_seq = i64::try_from(after_seq).map_err(|_| {
             RevocationStoreError::Sync("revocation entry cursor exceeds SQLite range".to_string())
         })?;
@@ -439,23 +441,28 @@ impl SqliteRevocationStore {
             let rows = {
                 let mut statement = transaction.prepare(
                     r#"
-                    SELECT entry_id, target_kind, target_value, revoked_at, reason
+                    SELECT entry_seq, entry_id, target_kind, target_value, revoked_at, reason
                     FROM revocation_entries
-                    WHERE entry_seq > ?1
+                    WHERE entry_seq > ?1 AND (?3 IS NULL OR target_kind = ?3)
                     ORDER BY entry_seq ASC
                     LIMIT ?2
                     "#,
                 )?;
                 let rows = statement
                     .query_map(
-                        params![after_seq, crate::integer::checked::<_, i64>(limit)?],
+                        params![
+                            after_seq,
+                            crate::integer::checked::<_, i64>(limit)?,
+                            kind.map(RevocationTargetKind::as_str)
+                        ],
                         |row| {
                             Ok((
-                                row.get::<_, String>(0)?,
+                                row.get::<_, i64>(0)?,
                                 row.get::<_, String>(1)?,
                                 row.get::<_, String>(2)?,
-                                row.get::<_, i64>(3)?,
-                                row.get::<_, String>(4)?,
+                                row.get::<_, String>(3)?,
+                                row.get::<_, i64>(4)?,
+                                row.get::<_, String>(5)?,
                             ))
                         },
                     )?
@@ -464,10 +471,13 @@ impl SqliteRevocationStore {
             };
             let entries = rows
                 .into_iter()
-                .map(|(entry_id, kind, value, revoked_at, reason)| {
-                    stored_entry(&entry_id, &kind, &value, revoked_at, &reason)
+                .map(|(entry_seq, entry_id, kind, value, revoked_at, reason)| {
+                    Ok((
+                        stored_index(entry_seq)?,
+                        stored_entry(&entry_id, &kind, &value, revoked_at, &reason)?,
+                    ))
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, RevocationStoreError>>()?;
             let head = transaction.query_row(
                 "SELECT COALESCE(MAX(entry_seq), 0) FROM revocation_entries",
                 [],

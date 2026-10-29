@@ -27,12 +27,21 @@ struct AdminChildReceiptQuery {
     limit: Option<usize>,
 }
 
+/// `GET /admin/revocations`: a page of entries after `after`, of `kind`
+/// when named, or with `capability_id` the check of one capability. Members
+/// are parsed by the handler, so every malformed value answers the fixed
+/// refusal.
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct AdminRevocationQuery {
     #[serde(default)]
     capability_id: Option<String>,
     #[serde(default)]
-    limit: Option<usize>,
+    after: Option<String>,
+    #[serde(default)]
+    limit: Option<String>,
+    #[serde(default)]
+    kind: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -43,9 +52,18 @@ struct AdminBudgetQuery {
     limit: Option<usize>,
 }
 
+/// `POST /admin/revocations`.
 #[derive(Debug, Deserialize)]
-struct AdminRevokeCapabilityRequest {
-    capability_id: String,
+#[serde(deny_unknown_fields)]
+struct AdminRevokeRequest {
+    target: AdminRevocationTarget,
+    reason: chio_core::root_authority::RevocationReason,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum AdminRevocationTarget {
+    CapabilityId { capability_id: String },
 }
 
 #[derive(Clone, Debug, Deserialize)]

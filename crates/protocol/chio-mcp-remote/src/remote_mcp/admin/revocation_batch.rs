@@ -54,7 +54,17 @@ impl Backend {
                 }
                 Ok(response.newly_revoked)
             }
-            Self::Local(store) => Ok(store.revoke(id)?),
+            Self::Local(store) => {
+                let target = chio_core::root_authority::RevocationTarget::capability(id)
+                    .map_err(|_| Failure::InvalidConfirmation)?;
+                let revocation = store.revoke_target(
+                    &target,
+                    &[],
+                    None,
+                    chio_core::root_authority::RevocationReason::OperatorRequest,
+                )?;
+                Ok(revocation.roots_revoked > 0)
+            }
         }
     }
     fn readback(&self, id: &str) -> Result<bool, Failure> {
