@@ -82,7 +82,7 @@ const CONSTRUCTOR_SITES: &[ConstructorSite] = &[
     ConstructorSite {
         path: VERIFIED_FIX_SOURCE,
         function: "signed_nonce",
-        backend_signer: "sign_canonical_with_backend_for_identity",
+        backend_signer: "sign_wrapped_for_identity",
     },
 ];
 
@@ -309,7 +309,7 @@ mod tests {
             (
                 VERIFIED_FIX_SOURCE,
                 "fn signed_nonce(receipt: &ChioReceipt, kernel: &dyn SigningBackend) {
-                    let (outcome, _) = sign_canonical_with_backend_for_identity(kernel, &receipt.kernel_key, &nonce)?;
+                    let (outcome, _) = sign_wrapped_for_identity(kernel, &receipt.kernel_key, CHIO_EXECUTION_NONCE_SCHEMA, &nonce)?;
                     Ok(SignedExecutionNonce { signature: outcome.signature, nonce })
                 }"
                 .to_owned(),

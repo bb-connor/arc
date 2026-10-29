@@ -6,11 +6,11 @@ use std::collections::BTreeMap;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use chio_core::capability::scope::MonetaryAmount;
-use chio_core::crypto::{
-    sign_canonical_with_backend_for_identity, Keypair, PublicKey, SigningBackend,
-};
+use chio_core::crypto::{sign_wrapped_for_identity, Keypair, PublicKey, SigningBackend};
 use chio_core::merkle::MerkleTree;
-use chio_core::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
+use chio_core::message::{
+    ExecutionNonce, NonceBinding, SignedExecutionNonce, CHIO_EXECUTION_NONCE_SCHEMA,
+};
 use chio_core::receipt::authoritative_spend::BudgetAuthorityReceiptRef;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
@@ -1385,9 +1385,13 @@ fn signed_nonce(
         reserved_hold_id: Some(budget.hold_id),
         reserving_request_id: None,
     };
-    let (outcome, _) =
-        sign_canonical_with_backend_for_identity(kernel, &receipt.kernel_key, &nonce)
-            .map_err(string_error)?;
+    let (outcome, _) = sign_wrapped_for_identity(
+        kernel,
+        &receipt.kernel_key,
+        CHIO_EXECUTION_NONCE_SCHEMA,
+        &nonce,
+    )
+    .map_err(string_error)?;
     Ok(SignedExecutionNonce {
         signature: outcome.signature,
         nonce,
