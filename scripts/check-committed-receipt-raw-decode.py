@@ -418,15 +418,6 @@ ALLOWED = (
         ),
     },
     {
-        "path": "crates/products/chio-cli/src/active_defense_migration.rs",
-        "owner": "verify_backfill_receipts",
-        "call": "strict_typed_value(&registered.receipt,)",
-        "custody": (
-            ("crates/products/chio-cli/src/active_defense_migration.rs", "load_and_build_report", "parse_shadow_migration_input("),
-            ("crates/products/chio-cli/src/active_defense_migration.rs", "parse_shadow_migration_input", "decode_signed("),
-        ),
-    },
-    {
         "path": "crates/products/chio-cli/src/cli/replay/verify.rs",
         "owner": "verify_receipt",
         "call": "serde_json::from_value(value.clone())",
@@ -1957,19 +1948,32 @@ def fixture_self_test() -> None:
             if len(matched) != expected:
                 raise SystemExit(f"self-test {label}: expected {expected} findings, got {matched}")
         write_fixture(target, "\n", encoding="utf-8")
-        helper_entry = next(entry for entry in ALLOWED if entry["owner"] == "verify_backfill_receipts")
+        helper_entry = next(
+            entry for entry in ALLOWED
+            if entry["call"] == "crate::input::project(signed.action.parameters.clone())"
+        )
         target = root / helper_entry["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
+        verifier = root / "crates/products/chio-cli/src/cli/receipt_verify.rs"
+        verifier.parent.mkdir(parents=True, exist_ok=True)
+        write_fixture(verifier,
+            "fn verify_original_receipt(raw: &str) -> Result<ChioReceipt, E> { crate::input::decode(raw) }\n",
+            encoding="utf-8",
+        )
+        write_fixture(target,
+            f"fn {helper_entry['owner']}(raw: &str) -> Result<(), E> {{\n"
+            "    let signed = verify_original_receipt(raw)?;\n"
+            f"    let parameters: ChioReceipt = {helper_entry['call']}?;\n    Ok(())\n}}\n",
+            encoding="utf-8",
+        )
+        helper = root / "crates/products/chio-cli/src/cli/input.rs"
         for label, reader, expected in (
-            ("approved Value helper", "serde_json::from_value(value.clone())", 0),
+            ("approved Value helper", "serde_json::from_value(value)", 0),
             ("approved helper reading text", "serde_json::from_str(value.as_str())", 2),
         ):
-            write_fixture(target,
-                "fn load_and_build_report(bytes: &[u8]) { parse_shadow_migration_input(bytes); }\n"
-                "fn parse_shadow_migration_input(bytes: &[u8]) -> R { UntrustedJsonText::from_wire(bytes, 1)?.decode_signed() }\n"
-                f"fn strict_typed_value<T: DeserializeOwned>(value: &Value, label: &str) -> Result<T, E> {{ Ok({reader}?) }}\n"
-                f"fn {helper_entry['owner']}(registered: Registered) -> Result<(), E> {{\n"
-                f"    let receipt: ChioReceipt = strict_typed_value(&registered.receipt, \"label\")?;\n    Ok(())\n}}\n",
+            write_fixture(helper,
+                "fn decode<T: DeserializeOwned>(raw: &str) -> Result<T, E> { UntrustedJsonText::new(raw).decode_signed() }\n"
+                f"fn project<T: DeserializeOwned>(value: Value) -> Result<T, E> {{ Ok({reader}?) }}\n",
                 encoding="utf-8",
             )
             found = len(scan(root)) - (len(ALLOWED) - 1)

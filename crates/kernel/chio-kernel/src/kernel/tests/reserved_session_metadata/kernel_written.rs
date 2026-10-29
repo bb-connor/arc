@@ -417,7 +417,6 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "active_defense_evidence_id",
             "occurred_at_unix_ms",
             "response_simulation_evidence_id",
-            "active_defense_backfill_v1",
             "scimLifecycle",
             "mercury",
             "authorizationContext",
