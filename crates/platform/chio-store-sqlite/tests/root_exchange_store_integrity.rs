@@ -242,6 +242,29 @@ fn replace_cannot_substitute_or_restore_an_opening() -> TestResult {
 }
 
 #[test]
+fn opening_present_after_its_erasure_refuses_open() -> TestResult {
+    let env = minted_env()?;
+    env.store
+        .erase_root_openings("cap-1", &env.fence, env.at(NOW + 1))?;
+    let (_, reopened) = env.tamper_and_reopen(
+        Some("root_exchange_openings_no_replace"),
+        &format!(
+            "INSERT OR REPLACE INTO root_exchange_openings VALUES
+             ('cap-1', 'anchor.sub', 'present', x'{}', {});",
+            hex(0x01),
+            NOW + 2
+        ),
+    )?;
+    assert_eq!(
+        reopened,
+        I::ErasedOpeningPresent {
+            capability_id: "cap-1".into()
+        }
+    );
+    Ok(())
+}
+
+#[test]
 fn retained_bytes_mutated_under_their_digest_refuse_open() -> TestResult {
     let cases = [
         (
