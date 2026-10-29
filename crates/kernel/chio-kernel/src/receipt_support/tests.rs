@@ -787,3 +787,51 @@ fn later_metadata_overrides_earlier_kernel_blocks() {
     );
     assert_eq!(merged["stream"], serde_json::json!({"forged": true}));
 }
+
+#[test]
+fn bind_decision_model_witness_refuses_a_carried_witness_key_without_a_witness() {
+    let key = chio_core::receipt::metadata::DECISION_MODEL_WITNESS_METADATA_KEY;
+    let carried = serde_json::json!({ key: {"forged": true} });
+    let Err(KernelError::Internal(reason)) = bind_decision_model_witness(Some(carried), None)
+    else {
+        panic!("metadata carrying {key} without a witness was accepted");
+    };
+    assert_eq!(reason, format!("receipt metadata already carries {key}"));
+}
+
+#[test]
+fn bind_decision_model_witness_refuses_a_carried_witness_key_with_a_witness() {
+    use chio_core::receipt::metadata::{
+        DecisionModelOutcome, DecisionModelWitness, DECISION_MODEL_WITNESS_METADATA_KEY,
+    };
+    let witness = DecisionModelWitness::evaluated(
+        sha256_hex(b"decision-model-card"),
+        sha256_hex(b"decision-model-artifact"),
+        DecisionModelOutcome::Allow,
+        1,
+    )
+    .expect("witness");
+    let carried = serde_json::json!({ DECISION_MODEL_WITNESS_METADATA_KEY: {"forged": true} });
+    let Err(KernelError::Internal(reason)) =
+        bind_decision_model_witness(Some(carried), Some(&witness))
+    else {
+        panic!("metadata carrying {DECISION_MODEL_WITNESS_METADATA_KEY} was accepted");
+    };
+    assert_eq!(
+        reason,
+        format!("receipt metadata already carries {DECISION_MODEL_WITNESS_METADATA_KEY}")
+    );
+}
+
+#[test]
+fn bind_decision_model_witness_without_a_witness_leaves_other_metadata_unchanged() {
+    let metadata = Some(serde_json::json!({"receipt_context": {"request_id": "req-1"}}));
+    assert_eq!(
+        bind_decision_model_witness(metadata.clone(), None).expect("metadata without a witness"),
+        metadata
+    );
+    assert_eq!(
+        bind_decision_model_witness(None, None).expect("no metadata and no witness"),
+        None
+    );
+}
