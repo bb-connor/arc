@@ -62,3 +62,16 @@ impl RedirectProbe {
         self.second.join().unwrap()
     }
 }
+
+#[test]
+fn followed_returns_when_the_client_never_reaches_the_venue() {
+    let probe = RedirectProbe::start("302 Found");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(probe.followed());
+    });
+    assert_eq!(
+        receiver.recv_timeout(std::time::Duration::from_secs(10)),
+        Ok(false)
+    );
+}
