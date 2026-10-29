@@ -99,6 +99,17 @@ fn retry_with_changed_request_refuses_replay() -> TestResult {
 }
 
 #[test]
+fn bearer_straddle_with_changed_request_refuses_replay() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    let mut straddle = Case::static_bearer("cap-2")?;
+    straddle.replay = 0x66;
+    straddle.request = 0x98;
+    assert_eq!(env.refused(&straddle, &Admit, NOW + 1)?, E::AssertionReplay);
+    Ok(())
+}
+
+#[test]
 fn refusing_checker_denies_with_entry_id_and_binds_nothing() -> TestResult {
     let env = Env::new()?;
     let case = Case::id_jag("cap-1")?;

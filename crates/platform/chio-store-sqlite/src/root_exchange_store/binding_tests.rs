@@ -62,6 +62,22 @@ fn unexpired_bearer_mapping_deletion_refuses_the_next_intake() -> TestResult {
 }
 
 #[test]
+fn original_binding_deletion_refuses_bearer_straddle_recovery() -> TestResult {
+    let env = Env::new()?;
+    env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
+    delete_through_owner(&env, "DELETE FROM root_exchange_replay;")?;
+    let mut straddle = Case::static_bearer("cap-2")?;
+    straddle.replay = 0x66;
+    assert_eq!(
+        env.refused(&straddle, &Admit, NOW + 1)?,
+        E::ReplayBindingMissing {
+            replay_key_digest: digest(0x11)
+        }
+    );
+    Ok(())
+}
+
+#[test]
 fn bearer_retry_still_recovers_and_explicit_repeat_still_refuses() -> TestResult {
     let env = Env::new()?;
     env.minted(&Case::static_bearer("cap-1")?, &Admit, NOW)?;
