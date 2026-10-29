@@ -536,3 +536,156 @@ fn unknown_dispatch_exact_replay_ignores_later_allocation_totals() {
         Some(10)
     );
 }
+
+struct ForkWorld {
+    directory: tempfile::TempDir,
+    anchors: tempfile::TempDir,
+    domain: String,
+}
+
+impl ForkWorld {
+    fn new(domain: &str) -> Self {
+        let directory = tempfile::tempdir().test_expect("create fork database root");
+        let anchors = tempfile::Builder::new()
+            .prefix("chio-finding-pool-fork-")
+            .tempdir_in("/dev/shm")
+            .test_expect("create fork anchor root");
+        #[cfg(unix)]
+        for root in [directory.path(), anchors.path()] {
+            use std::os::unix::fs::PermissionsExt as _;
+            std::fs::set_permissions(root, std::fs::Permissions::from_mode(0o700))
+                .test_expect("secure fork root");
+        }
+        Self {
+            directory,
+            anchors,
+            domain: domain.to_owned(),
+        }
+    }
+
+    fn database(&self) -> std::path::PathBuf {
+        self.directory.path().join("pool.sqlite3")
+    }
+
+    fn open(&self) -> Result<SqliteFindingPoolLedger, FindingPoolLedgerError> {
+        let identity = Ed25519Backend::new(Keypair::from_seed(&[70_u8; 32]));
+        SqliteFindingPoolLedger::open_qualified(
+            self.database(),
+            self.domain.clone(),
+            &identity,
+            self.anchors.path(),
+        )
+    }
+
+    fn snapshot(&self, name: &str) -> (std::path::PathBuf, std::path::PathBuf) {
+        let connection = rusqlite::Connection::open(self.database()).test_expect("open database");
+        connection
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .test_expect("checkpoint wal");
+        let root = self.directory.path().join(format!("snapshot-{name}"));
+        let anchors = root.join("anchors");
+        std::fs::create_dir_all(&anchors).test_expect("create snapshot");
+        let database = root.join("pool.sqlite3");
+        std::fs::copy(self.database(), &database).test_expect("copy database");
+        for entry in std::fs::read_dir(self.anchors.path()).test_expect("list anchors") {
+            let entry = entry.test_expect("anchor entry");
+            std::fs::copy(entry.path(), anchors.join(entry.file_name())).test_expect("copy anchor");
+        }
+        (database, anchors)
+    }
+
+    fn restore_database(&self, database: &Path) {
+        for suffix in ["-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", self.database().display()));
+        }
+        std::fs::copy(database, self.database()).test_expect("restore database");
+    }
+
+    fn restore_anchors(&self, anchors: &Path) {
+        for entry in std::fs::read_dir(self.anchors.path()).test_expect("list anchors") {
+            std::fs::remove_file(entry.test_expect("anchor entry").path())
+                .test_expect("clear anchor");
+        }
+        for entry in std::fs::read_dir(anchors).test_expect("list snapshot anchors") {
+            let entry = entry.test_expect("snapshot anchor entry");
+            std::fs::copy(entry.path(), self.anchors.path().join(entry.file_name()))
+                .test_expect("restore anchor");
+        }
+    }
+}
+
+#[test]
+fn genesis_head_default_matches_the_head_domain() {
+    assert!(super::schema::SCHEMA.contains(&format!(
+        "store_head_sha256 TEXT NOT NULL DEFAULT '{}'",
+        crate::store_head::genesis_head_hex()
+    )));
+}
+
+#[test]
+fn a_ledger_fork_at_the_anchored_generation_is_refused() {
+    let world = ForkWorld::new("ledger:test-fork-generation");
+    {
+        let ledger = world.open().test_expect("open ledger");
+        ledger.advance_trusted_time_floor(10).test_expect("seed");
+    }
+    let base = world.snapshot("base");
+
+    {
+        let ledger = world.open().test_expect("reopen ledger");
+        ledger
+            .advance_trusted_time_floor(1_000)
+            .test_expect("branch a");
+    }
+    let branch_a = world.snapshot("a");
+
+    world.restore_database(&base.0);
+    world.restore_anchors(&base.1);
+    {
+        let ledger = world.open().test_expect("reopen base ledger");
+        ledger
+            .advance_trusted_time_floor(2_000)
+            .test_expect("branch b");
+    }
+    let branch_b = world.snapshot("b");
+
+    world.restore_anchors(&branch_a.1);
+    world.restore_database(&branch_a.0);
+    world.open().test_expect("the anchored branch opens");
+
+    world.restore_anchors(&branch_a.1);
+    world.restore_database(&branch_b.0);
+    let error = world
+        .open()
+        .err()
+        .test_expect("a ledger that forked at the anchored generation was accepted");
+    assert!(
+        matches!(&error, FindingPoolLedgerError::Storage(message) if message.contains("rollback head")),
+        "unexpected fork error: {error}"
+    );
+}
+
+#[test]
+fn flipping_the_ledger_head_in_the_database_alone_is_refused() {
+    let world = ForkWorld::new("ledger:test-fork-head-flip");
+    {
+        let ledger = world.open().test_expect("open ledger");
+        ledger.advance_trusted_time_floor(10).test_expect("seed");
+    }
+    let connection = rusqlite::Connection::open(world.database()).test_expect("open database");
+    connection
+        .execute(
+            "UPDATE finding_pool_ledger_metadata SET store_head_sha256 = ?1",
+            [format!("{:064x}", 1)],
+        )
+        .test_expect("flip head");
+    drop(connection);
+    let error = world
+        .open()
+        .err()
+        .test_expect("a ledger with a rewritten head was accepted");
+    assert!(
+        matches!(&error, FindingPoolLedgerError::Storage(message) if message.contains("rollback head")),
+        "unexpected head-flip error: {error}"
+    );
+}

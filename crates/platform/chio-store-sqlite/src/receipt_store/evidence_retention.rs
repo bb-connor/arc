@@ -1087,15 +1087,12 @@ pub(super) fn delete_archived_prefix_in_tx(
     let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     let rollback_generation = rollback_anchor
         .map(|anchor| {
-            let generation = super::load_receipt_rollback_generation(&tx)?;
-            anchor
-                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
-                .map_err(|error| {
-                    ReceiptStoreError::Conflict(format!(
-                        "receipt rollback protection failed: {error}"
-                    ))
-                })?;
-            Ok::<_, ReceiptStoreError>(generation)
+            super::begin_receipt_change_log(&tx)?;
+            let current = super::load_receipt_store_head(&tx)?;
+            anchor.verify(&current).map_err(|error| {
+                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+            })?;
+            Ok::<_, ReceiptStoreError>(current)
         })
         .transpose()?;
     // The archive copy and its completeness check ran before this transaction
@@ -1184,29 +1181,13 @@ pub(super) fn delete_archived_prefix_in_tx(
     )?;
     ensure_transparency_projection_guards(&tx)?; // recreate all reject-delete/update guards
     match (rollback_anchor, rollback_generation) {
-        (Some(anchor), Some(generation)) => {
-            let next = generation.checked_add(1).ok_or_else(|| {
-                ReceiptStoreError::Conflict("receipt rollback generation overflowed".to_owned())
-            })?;
-            let changed = tx.execute(
-                "UPDATE chio_receipt_sink_generation SET store_generation = ?1 \
-                 WHERE singleton = 1 AND store_generation = ?2",
-                params![next.to_string(), generation.to_string()],
-            )?;
-            if changed != 1 {
-                return Err(ReceiptStoreError::Conflict(
-                    "receipt rollback generation compare-and-set failed".to_owned(),
-                ));
-            }
+        (Some(anchor), Some(current)) => {
+            let next = super::advance_receipt_store_head(&tx, &current)?;
             anchor
-                .advance_while(
-                    &chio_rollback_anchor::StoreHead::counter_only(generation),
-                    &chio_rollback_anchor::StoreHead::counter_only(next),
-                    || {
-                        tx.commit()
-                            .map_err(|error| format!("SQLite commit failed: {error}"))
-                    },
-                )
+                .advance_while(&current, &next, || {
+                    tx.commit()
+                        .map_err(|error| format!("SQLite commit failed: {error}"))
+                })
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"

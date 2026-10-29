@@ -140,19 +140,91 @@ const RECEIPT_GROUP_COMMIT_FLUSH_DELAY: Duration = Duration::from_micros(500);
 const RECEIPT_COMMIT_ACTOR_CHANNEL_CAPACITY: usize = RECEIPT_GROUP_COMMIT_MAX_BATCH * 16;
 const RECEIPT_APPEND_TIMEOUT_MARKER: &str = "sqlite receipt commit append timed out";
 const RECEIPT_WRITE_TIMEOUT_MARKER: &str = "sqlite receipt commit write timed out";
-const RECEIPT_ROLLBACK_GENERATION_SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS chio_receipt_sink_generation (
-    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    store_generation TEXT NOT NULL
-) STRICT;
-INSERT OR IGNORE INTO chio_receipt_sink_generation (singleton, store_generation)
-VALUES (1, '0');
-"#;
+const RECEIPT_ROLLBACK_GENERATION_TABLE: &str = "chio_receipt_sink_generation";
+
+fn receipt_rollback_generation_schema() -> String {
+    format!(
+        "CREATE TABLE IF NOT EXISTS {RECEIPT_ROLLBACK_GENERATION_TABLE} (\
+             singleton INTEGER PRIMARY KEY CHECK (singleton = 1), \
+             store_generation TEXT NOT NULL, \
+             head_sha256 TEXT NOT NULL \
+         ) STRICT; \
+         INSERT OR IGNORE INTO {RECEIPT_ROLLBACK_GENERATION_TABLE} \
+             (singleton, store_generation, head_sha256) VALUES (1, '0', '{}');",
+        crate::store_head::genesis_head_hex()
+    )
+}
+
+/// Row-change logging for an anchored receipt transaction. The generation row
+/// is rewritten by the commit itself, so it is not logged.
+fn begin_receipt_change_log(connection: &Connection) -> Result<(), ReceiptStoreError> {
+    crate::store_head::begin_change_log(
+        connection,
+        &crate::store_head::ChangeLogScope {
+            skip_tables: &[RECEIPT_ROLLBACK_GENERATION_TABLE],
+            excluded_columns: &[],
+        },
+    )
+    .map_err(ReceiptStoreError::Sqlite)
+}
+
+fn load_receipt_store_head(
+    connection: &Connection,
+) -> Result<chio_rollback_anchor::StoreHead, ReceiptStoreError> {
+    let generation = load_receipt_rollback_generation(connection)?;
+    let head = connection.query_row(
+        "SELECT head_sha256 FROM chio_receipt_sink_generation WHERE singleton = 1",
+        [],
+        |row| row.get::<_, String>(0),
+    )?;
+    if !crate::store_head::canonical_head(&head) {
+        return Err(ReceiptStoreError::Conflict(
+            "receipt store head is not canonical".to_string(),
+        ));
+    }
+    Ok(chio_rollback_anchor::StoreHead::chained(generation, head))
+}
+
+/// Extend the head with this transaction's logged row changes and advance the
+/// generation row, compare-and-set against `current`.
+fn advance_receipt_store_head(
+    tx: &Connection,
+    current: &chio_rollback_anchor::StoreHead,
+) -> Result<chio_rollback_anchor::StoreHead, ReceiptStoreError> {
+    let chio_rollback_anchor::AnchorHead::Chained(previous_head) = &current.head else {
+        return Err(ReceiptStoreError::Conflict(
+            "receipt store head is not content-bound".to_string(),
+        ));
+    };
+    let next_generation = current.generation.checked_add(1).ok_or_else(|| {
+        ReceiptStoreError::Conflict("receipt rollback generation overflowed".to_string())
+    })?;
+    let next_head = crate::store_head::next_head_hex(tx, previous_head)?;
+    let changed = tx.execute(
+        "UPDATE chio_receipt_sink_generation SET store_generation = ?1, head_sha256 = ?2 \
+         WHERE singleton = 1 AND store_generation = ?3 AND head_sha256 = ?4",
+        params![
+            next_generation.to_string(),
+            next_head,
+            current.generation.to_string(),
+            previous_head
+        ],
+    )?;
+    if changed != 1 {
+        return Err(ReceiptStoreError::Conflict(
+            "receipt rollback generation compare-and-set failed".to_string(),
+        ));
+    }
+    Ok(chio_rollback_anchor::StoreHead::chained(
+        next_generation,
+        next_head,
+    ))
+}
 
 fn initialize_receipt_rollback_generation(
     connection: &Connection,
 ) -> Result<u64, ReceiptStoreError> {
-    connection.execute_batch(RECEIPT_ROLLBACK_GENERATION_SCHEMA)?;
+    connection.execute_batch(&receipt_rollback_generation_schema())?;
     load_receipt_rollback_generation(connection)
 }
 
@@ -2852,15 +2924,12 @@ fn append_receipt_batch(
         .map_err(ReceiptStoreError::Sqlite)?;
     let rollback_generation = rollback_anchor
         .map(|anchor| {
-            let generation = load_receipt_rollback_generation(&tx)?;
-            anchor
-                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
-                .map_err(|error| {
-                    ReceiptStoreError::Conflict(format!(
-                        "receipt rollback protection failed: {error}"
-                    ))
-                })?;
-            Ok::<_, ReceiptStoreError>(generation)
+            begin_receipt_change_log(&tx)?;
+            let current = load_receipt_store_head(&tx)?;
+            anchor.verify(&current).map_err(|error| {
+                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+            })?;
+            Ok::<_, ReceiptStoreError>(current)
         })
         .transpose()?;
     if !incremental_verification {
@@ -2968,29 +3037,13 @@ fn append_receipt_batch(
     let next_claim_count = checked_claim_count(head.claim_log_count, &[pre_delta, delta_count])?;
     // A duplicate can still mutate lineage, so anchor every successful write.
     match (rollback_anchor, rollback_generation, database_mutated) {
-        (Some(anchor), Some(generation), true) => {
-            let next = generation.checked_add(1).ok_or_else(|| {
-                ReceiptStoreError::Conflict("receipt rollback generation overflowed".to_string())
-            })?;
-            let changed = tx.execute(
-                "UPDATE chio_receipt_sink_generation SET store_generation = ?1 \
-                 WHERE singleton = 1 AND store_generation = ?2",
-                params![next.to_string(), generation.to_string()],
-            )?;
-            if changed != 1 {
-                return Err(ReceiptStoreError::Conflict(
-                    "receipt rollback generation compare-and-set failed".to_string(),
-                ));
-            }
+        (Some(anchor), Some(current), true) => {
+            let next = advance_receipt_store_head(&tx, &current)?;
             anchor
-                .advance_while(
-                    &chio_rollback_anchor::StoreHead::counter_only(generation),
-                    &chio_rollback_anchor::StoreHead::counter_only(next),
-                    || {
-                        tx.commit()
-                            .map_err(|error| format!("SQLite commit failed: {error}"))
-                    },
-                )
+                .advance_while(&current, &next, || {
+                    tx.commit()
+                        .map_err(|error| format!("SQLite commit failed: {error}"))
+                })
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"
@@ -3051,15 +3104,14 @@ fn execute_anchored_receipt_write(
     let generation = match pre_check.and_then(|()| {
         rollback_anchor
             .map(|anchor| {
-                let generation = load_receipt_rollback_generation(&tx)?;
-                anchor
-                    .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
-                    .map_err(|error| {
-                        ReceiptStoreError::Conflict(format!(
-                            "receipt rollback protection failed: {error}"
-                        ))
-                    })?;
-                Ok::<_, ReceiptStoreError>(generation)
+                begin_receipt_change_log(&tx)?;
+                let current = load_receipt_store_head(&tx)?;
+                anchor.verify(&current).map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "receipt rollback protection failed: {error}"
+                    ))
+                })?;
+                Ok::<_, ReceiptStoreError>(current)
             })
             .transpose()
     }) {
@@ -3079,43 +3131,19 @@ fn execute_anchored_receipt_write(
         return (respond, ReceiptWriterJobState::Failed);
     }
     let commit = match (rollback_anchor, generation) {
-        (Some(anchor), Some(generation)) => {
-            let next = match generation.checked_add(1) {
-                Some(next) => next,
-                None => {
-                    return (
-                        respond,
-                        ReceiptWriterJobState::CommitFailed(ReceiptStoreError::Conflict(
-                            "receipt rollback generation overflowed".to_string(),
-                        )),
-                    );
-                }
-            };
-            match tx.execute(
-                "UPDATE chio_receipt_sink_generation SET store_generation = ?1 \
-                 WHERE singleton = 1 AND store_generation = ?2",
-                params![next.to_string(), generation.to_string()],
-            ) {
-                Ok(1) => anchor
-                    .advance_while(
-                        &chio_rollback_anchor::StoreHead::counter_only(generation),
-                        &chio_rollback_anchor::StoreHead::counter_only(next),
-                        || {
-                            tx.commit()
-                                .map_err(|error| format!("SQLite commit failed: {error}"))
-                        },
-                    )
-                    .map_err(|error| {
-                        ReceiptStoreError::Conflict(format!(
-                            "receipt rollback protection failed: {error}"
-                        ))
-                    }),
-                Ok(_) => Err(ReceiptStoreError::Conflict(
-                    "receipt rollback generation compare-and-set failed".to_string(),
-                )),
-                Err(error) => Err(ReceiptStoreError::Sqlite(error)),
-            }
-        }
+        (Some(anchor), Some(current)) => match advance_receipt_store_head(&tx, &current) {
+            Ok(next) => anchor
+                .advance_while(&current, &next, || {
+                    tx.commit()
+                        .map_err(|error| format!("SQLite commit failed: {error}"))
+                })
+                .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "receipt rollback protection failed: {error}"
+                    ))
+                }),
+            Err(error) => Err(error),
+        },
         _ => tx.commit().map_err(ReceiptStoreError::Sqlite),
     };
     match commit {
@@ -3300,9 +3328,7 @@ impl SqliteReceiptStore {
         if let Some(anchor) = self.rollback_anchor.as_deref() {
             anchor
                 .verify_while(|| {
-                    load_receipt_rollback_generation(&connection)
-                        .map(chio_rollback_anchor::StoreHead::counter_only)
-                        .map_err(|error| error.to_string())
+                    load_receipt_store_head(&connection).map_err(|error| error.to_string())
                 })
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(

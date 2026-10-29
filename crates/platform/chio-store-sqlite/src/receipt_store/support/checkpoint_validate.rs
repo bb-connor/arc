@@ -132,32 +132,16 @@ pub(crate) fn checkpoint_guarded_immediate<T>(
 fn commit_checkpoint_transaction(
     tx: rusqlite::Transaction<'_>,
     rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
-    generation: Option<u64>,
+    generation: Option<chio_rollback_anchor::StoreHead>,
 ) -> Result<(), ReceiptStoreError> {
     match (rollback_anchor, generation) {
-        (Some(anchor), Some(generation)) => {
-            let next = generation.checked_add(1).ok_or_else(|| {
-                ReceiptStoreError::Conflict("receipt rollback generation overflowed".to_owned())
-            })?;
-            let changed = tx.execute(
-                "UPDATE chio_receipt_sink_generation SET store_generation = ?1 \
-                 WHERE singleton = 1 AND store_generation = ?2",
-                params![next.to_string(), generation.to_string()],
-            )?;
-            if changed != 1 {
-                return Err(ReceiptStoreError::Conflict(
-                    "receipt rollback generation compare-and-set failed".to_owned(),
-                ));
-            }
+        (Some(anchor), Some(current)) => {
+            let next = advance_receipt_store_head(&tx, &current)?;
             anchor
-                .advance_while(
-                    &chio_rollback_anchor::StoreHead::counter_only(generation),
-                    &chio_rollback_anchor::StoreHead::counter_only(next),
-                    || {
-                        tx.commit()
-                            .map_err(|error| format!("SQLite commit failed: {error}"))
-                    },
-                )
+                .advance_while(&current, &next, || {
+                    tx.commit()
+                        .map_err(|error| format!("SQLite commit failed: {error}"))
+                })
                 .map_err(|error| {
                     ReceiptStoreError::Conflict(format!(
                         "receipt rollback protection failed: {error}"
@@ -178,15 +162,12 @@ fn checkpoint_guarded_anchored_immediate<T>(
     ensure_transparency_projection_guards(&tx)?;
     let generation = rollback_anchor
         .map(|anchor| {
-            let generation = load_receipt_rollback_generation(&tx)?;
-            anchor
-                .verify(&chio_rollback_anchor::StoreHead::counter_only(generation))
-                .map_err(|error| {
-                    ReceiptStoreError::Conflict(format!(
-                        "receipt rollback protection failed: {error}"
-                    ))
-                })?;
-            Ok::<_, ReceiptStoreError>(generation)
+            begin_receipt_change_log(&tx)?;
+            let current = load_receipt_store_head(&tx)?;
+            anchor.verify(&current).map_err(|error| {
+                ReceiptStoreError::Conflict(format!("receipt rollback protection failed: {error}"))
+            })?;
+            Ok::<_, ReceiptStoreError>(current)
         })
         .transpose()?;
     let savepoint = tx.savepoint()?;

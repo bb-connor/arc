@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS finding_pool_ledger_metadata (
     receipt_authority_json TEXT,
     ledger_store_binding_sha256 TEXT,
     store_generation TEXT NOT NULL DEFAULT '0',
+    store_head_sha256 TEXT NOT NULL DEFAULT '7ad49584fc20b1dfe29ddfe1f3a7e66c5585bf97ff3cf4e1de80435b7a2b305c',
     outbox_lease_epoch INTEGER NOT NULL DEFAULT 0,
     trusted_time_high_water_unix_ms TEXT NOT NULL DEFAULT '0'
 ) STRICT;

@@ -10,6 +10,8 @@ mod bootstrap;
 mod canonical_readback;
 #[path = "tests/checkpoint.rs"]
 mod checkpoint;
+#[path = "tests/content_bound_anchor.rs"]
+mod content_bound_anchor;
 #[path = "tests/errors.rs"]
 mod errors;
 #[path = "tests/federated_lineage.rs"]

@@ -10,7 +10,9 @@ use rand_core::{OsRng, RngCore};
 use rusqlite::{Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 
-use chio_rollback_anchor::{RollbackGenerationAnchor, StoreHead};
+use chio_rollback_anchor::{AnchorHead, RollbackGenerationAnchor, StoreHead};
+
+const LEDGER_METADATA_TABLE: &str = "finding_pool_ledger_metadata";
 
 pub(super) struct FindingPoolDomainLease {
     database_identity: PathBuf,
@@ -90,7 +92,7 @@ impl QualifiedDatabaseIdentity {
 pub(super) struct AnchoredLedgerTransaction<'connection> {
     transaction: Transaction<'connection>,
     anchor: Arc<RollbackGenerationAnchor>,
-    generation: u64,
+    current: StoreHead,
 }
 
 impl<'connection> AnchoredLedgerTransaction<'connection> {
@@ -101,29 +103,55 @@ impl<'connection> AnchoredLedgerTransaction<'connection> {
         let transaction = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-        let generation = load_store_generation(&transaction)?;
-        anchor
-            .verify(&StoreHead::counter_only(generation))
-            .map_err(rollback_anchor_error)?;
+        crate::store_head::begin_change_log(
+            &transaction,
+            &crate::store_head::ChangeLogScope {
+                skip_tables: &[],
+                excluded_columns: &[
+                    (LEDGER_METADATA_TABLE, "store_generation"),
+                    (LEDGER_METADATA_TABLE, "store_head_sha256"),
+                ],
+            },
+        )
+        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
+        let current = load_store_head(&transaction)?;
+        anchor.verify(&current).map_err(rollback_anchor_error)?;
         Ok(Self {
             transaction,
             anchor,
-            generation,
+            current,
         })
     }
 
     pub(super) fn commit(self) -> Result<(), FindingPoolLedgerError> {
-        let next = self.generation.checked_add(1).ok_or_else(|| {
+        let Self {
+            transaction,
+            anchor,
+            current,
+        } = self;
+        let AnchorHead::Chained(previous_head) = &current.head else {
+            return Err(FindingPoolLedgerError::Storage(
+                "finding pool store head is not content-bound".to_string(),
+            ));
+        };
+        let next_generation = current.generation.checked_add(1).ok_or_else(|| {
             FindingPoolLedgerError::Storage(
                 "finding pool rollback generation overflowed".to_string(),
             )
         })?;
-        let changed = self
-            .transaction
+        let next_head = crate::store_head::next_head_hex(&transaction, previous_head)
+            .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
+        let changed = transaction
             .execute(
-                "UPDATE finding_pool_ledger_metadata SET store_generation = ?1 \
-                 WHERE singleton = 1 AND store_generation = ?2",
-                rusqlite::params![next.to_string(), self.generation.to_string()],
+                "UPDATE finding_pool_ledger_metadata \
+                 SET store_generation = ?1, store_head_sha256 = ?2 \
+                 WHERE singleton = 1 AND store_generation = ?3 AND store_head_sha256 = ?4",
+                rusqlite::params![
+                    next_generation.to_string(),
+                    next_head,
+                    current.generation.to_string(),
+                    previous_head
+                ],
             )
             .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
         if changed != 1 {
@@ -131,21 +159,13 @@ impl<'connection> AnchoredLedgerTransaction<'connection> {
                 "finding pool rollback generation compare-and-set failed".to_string(),
             ));
         }
-        let Self {
-            transaction,
-            anchor,
-            generation,
-        } = self;
+        let next = StoreHead::chained(next_generation, next_head);
         anchor
-            .advance_while(
-                &StoreHead::counter_only(generation),
-                &StoreHead::counter_only(next),
-                || {
-                    transaction
-                        .commit()
-                        .map_err(|error| format!("SQLite commit failed: {error}"))
-                },
-            )
+            .advance_while(&current, &next, || {
+                transaction
+                    .commit()
+                    .map_err(|error| format!("SQLite commit failed: {error}"))
+            })
             .map_err(rollback_anchor_error)
     }
 }
@@ -266,8 +286,7 @@ pub(super) fn bind_rollback_anchor(
 ) -> Result<(), FindingPoolLedgerError> {
     anchor
         .bind_initial_while(|| {
-            let generation =
-                load_store_generation(connection).map_err(|error| error.to_string())?;
+            let current = load_store_head(connection).map_err(|error| error.to_string())?;
             let populated = connection
                 .query_row(
                     "SELECT EXISTS(SELECT 1 FROM finding_pool_allocations LIMIT 1) \
@@ -277,7 +296,7 @@ pub(super) fn bind_rollback_anchor(
                     |row| row.get::<_, bool>(0),
                 )
                 .map_err(|error| error.to_string())?;
-            Ok((StoreHead::counter_only(generation), !populated))
+            Ok((current, !populated))
         })
         .map_err(rollback_anchor_error)
 }
@@ -287,11 +306,7 @@ pub(super) fn verify_rollback_anchor(
     anchor: &RollbackGenerationAnchor,
 ) -> Result<(), FindingPoolLedgerError> {
     anchor
-        .verify_while(|| {
-            load_store_generation(connection)
-                .map(StoreHead::counter_only)
-                .map_err(|error| error.to_string())
-        })
+        .verify_while(|| load_store_head(connection).map_err(|error| error.to_string()))
         .map_err(rollback_anchor_error)
 }
 
@@ -729,6 +744,23 @@ fn load_store_generation(connection: &rusqlite::Connection) -> Result<u64, Findi
             "finding pool rollback generation is invalid: {error}"
         ))
     })
+}
+
+fn load_store_head(connection: &rusqlite::Connection) -> Result<StoreHead, FindingPoolLedgerError> {
+    let generation = load_store_generation(connection)?;
+    let head = connection
+        .query_row(
+            "SELECT store_head_sha256 FROM finding_pool_ledger_metadata WHERE singleton = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
+    if !crate::store_head::canonical_head(&head) {
+        return Err(FindingPoolLedgerError::Storage(
+            "finding pool store head is not canonical".to_string(),
+        ));
+    }
+    Ok(StoreHead::chained(generation, head))
 }
 
 fn rollback_anchor_error(error: String) -> FindingPoolLedgerError {

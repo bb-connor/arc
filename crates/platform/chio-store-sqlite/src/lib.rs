@@ -117,6 +117,7 @@ pub mod serving_owner;
 pub mod settle_attempts;
 mod store_clock;
 mod store_connection;
+mod store_head;
 #[cfg(test)]
 mod text_bounds_tests;
 pub mod tool_outcome_store;
