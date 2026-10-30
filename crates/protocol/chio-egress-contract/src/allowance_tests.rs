@@ -152,7 +152,7 @@ fn mapped_ipv6_answer_is_compared_as_ipv4() {
 fn metadata_addresses_are_refused_whatever_the_flags() {
     let mut open = HttpEgressContract::permissive_for_tests("metadata.test:80");
     open.deny_link_local = false;
-    for address in ["169.254.169.254", "::ffff:169.254.169.254"] {
+    for address in ["169.254.169.254", "fd00:ec2::254", "::ffff:169.254.169.254"] {
         let ip: IpAddr = address.parse().expect("ip");
         let shown = match ip {
             IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(ip, IpAddr::V4),
@@ -166,15 +166,6 @@ fn metadata_addresses_are_refused_whatever_the_flags() {
             "{address}"
         );
     }
-    assert_eq!(
-        open.enforce_resolved_address(
-            "metadata.test",
-            SocketAddr::new("fd00:ec2::254".parse().expect("ip"), 80)
-        ),
-        Err(HttpEgressError::Ipv6UlaDenied {
-            host: "metadata.test resolved to fd00:ec2::254".to_string()
-        })
-    );
     assert_eq!(
         open.enforce_resolved_address(
             "metadata.test",
@@ -205,7 +196,7 @@ fn metadata_addresses_are_refused_whatever_the_flags() {
     );
     assert_eq!(
         open.enforce_url("http://[fd00:ec2::254]/latest/meta-data", 0),
-        Err(HttpEgressError::Ipv6UlaDenied {
+        Err(HttpEgressError::ReservedAddressDenied {
             host: "fd00:ec2::254".to_string()
         })
     );
@@ -839,5 +830,39 @@ fn contract_refuses_a_unique_local_opt_out() {
     assert!(
         error.to_string().contains("unknown field `deny_ipv6_ula`"),
         "{error}"
+    );
+}
+
+#[test]
+fn unpinned_unique_local_metadata_reports_the_reserved_range() {
+    let unpinned = ula_contract(serde_json::json!([]));
+    assert_eq!(
+        unpinned
+            .enforce_resolved_address("ula.example", "[fd00:ec2::254]:8443".parse().expect("addr")),
+        Err(HttpEgressError::ReservedAddressDenied {
+            host: "ula.example resolved to fd00:ec2::254".to_string()
+        })
+    );
+}
+
+#[test]
+fn one_host_port_pinned_under_both_schemes_is_a_scheme_conflict() {
+    let contract = dual_scheme(vpc_contract(&[
+        allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+        http_allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+    ]));
+    let error = contract.validate().expect_err("both schemes");
+    assert_eq!(
+        error.to_string(),
+        "invalid private network allowance: allowance for fd12:3456::7:8443 names both http and https"
+    );
+    let error = EgressAllowanceSet::new([
+        allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+        http_allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+    ])
+    .expect_err("both schemes");
+    assert_eq!(
+        error.to_string(),
+        "allowance for fd12:3456::7:8443 names both http and https"
     );
 }

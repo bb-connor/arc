@@ -3558,8 +3558,10 @@ Plaintext reaches a private address only through an entry that names `http`.
 When a pinned host resolves, every address in the answer, public or private,
 MUST lie inside the CIDR, or the request is refused. Cloud metadata addresses
 (169.254.169.254, 100.100.100.200, fd00:ec2::/32) are refused for every
-contract: by their address class when its flags deny it, and otherwise as
-`ReservedAddressDenied`. Each allowance set has a SHA-256 digest over its
+contract: the IPv4 ones by their address class when its flags deny it, and
+otherwise as `ReservedAddressDenied`; fd00:ec2::/32 always as
+`ReservedAddressDenied`. Two allowances for one `host:port` are refused at
+load, as `SchemeConflict` when one names `http` and the other `https`. Each allowance set has a SHA-256 digest over its
 RFC 8785 canonical form tagged `chio.egress.private-network-allowance.v1`; a payment
 journal records the digest its rail was dialed under, and recovery refuses a
 rail whose digest changed. Dispatchers check each resolved address with the

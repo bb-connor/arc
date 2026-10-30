@@ -375,6 +375,9 @@ impl HttpEgressContract {
             IpAddr::V4(address) => classify_ipv4_address(&address),
             IpAddr::V6(address) => classify_ipv6_address(&address),
         };
+        if class == IpAddressClass::Ipv6Ula && allowance::is_metadata_address(address) {
+            return Err(HttpEgressError::ReservedAddressDenied { host: label });
+        }
         self.enforce_ip_address_class(label.clone(), class)?;
         if allowance::is_metadata_address(address) {
             return Err(HttpEgressError::ReservedAddressDenied { host: label });

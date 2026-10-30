@@ -892,6 +892,17 @@ mod tests {
         assert!(contract.enforce_url(endpoint, 0).is_ok());
     }
 
+    #[test]
+    fn unique_local_metadata_endpoint_is_refused_at_load() {
+        match siem_endpoint_egress_contract("webhook", "https://[fd00:ec2::254]:8443/hook") {
+            Err(ExportError::HttpError(message)) => assert!(
+                message.contains("includes the reserved range fd00:ec2::/32"),
+                "{message}"
+            ),
+            other => panic!("metadata endpoint must be refused, got {other:?}"),
+        }
+    }
+
     /// The production serve wiring passes the operator
     /// `CHIO_SIEM_ALERT_*_ENDPOINT` value straight to `with_endpoint`, so a
     /// plaintext http:// endpoint must fail closed the same way the webhook SOC

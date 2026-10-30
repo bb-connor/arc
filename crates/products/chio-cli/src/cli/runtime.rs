@@ -1961,6 +1961,46 @@ mod runtime_local_error_domain_tests {
         );
         assert!(contract.enforce_url(introspection, 0).is_ok());
     }
+
+    #[test]
+    fn remote_mcp_auth_contract_refuses_a_unique_local_metadata_url() {
+        let error = remote_mcp_auth_egress_contract(
+            "edge-ula",
+            None,
+            Some("https://[fd00:ec2::254]:8443/introspect"),
+            None,
+            None,
+            None,
+        )
+        .expect_err("metadata range");
+        assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
+        assert!(
+            error
+                .to_string()
+                .contains("includes the reserved range fd00:ec2::/32"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn remote_mcp_auth_contract_refuses_one_unique_local_endpoint_under_both_schemes() {
+        let error = remote_mcp_auth_egress_contract(
+            "edge-ula",
+            None,
+            Some("https://[fd12:3456:789a::7]:8443/introspect"),
+            None,
+            None,
+            Some("http://[fd12:3456:789a::7]:8443/jwks.json"),
+        )
+        .expect_err("both schemes");
+        assert_registry_error(&error, "urn:chio:error:cli:other", "cli");
+        assert!(
+            error
+                .to_string()
+                .contains("allowance for fd12:3456:789a::7:8443 names both http and https"),
+            "{error}"
+        );
+    }
 }
 
 #[cfg(test)]
