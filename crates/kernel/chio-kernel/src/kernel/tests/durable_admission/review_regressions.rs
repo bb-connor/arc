@@ -186,13 +186,39 @@ fn durable_tool_reported_cancellation_signs_a_kernel_reason() {
         request_id: request.request_id.clone(),
     }));
 
-    let _ = kernel.evaluate_tool_call_blocking(&request);
-    assert_original_unknown_incident(
+    let first = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("a reported cancellation signs a terminal refusal");
+    assert_eq!(
+        first.denial_code,
+        Some(crate::ClientDenialCode::RequestCancelled)
+    );
+    let retained = assert_original_unknown_incident(
         &store,
         &request,
         &chio_core::receipt::decision::Decision::Cancelled {
             reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
         },
+    );
+    assert_eq!(
+        first
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_kernel/client_denial_code")),
+        Some(&serde_json::json!("request_cancelled"))
+    );
+    assert_unknown_replay(
+        kernel.evaluate_tool_call_blocking(&request),
+        &retained,
+        &store,
+    );
+    let replay = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("the retained cancellation replays");
+    assert_eq!(
+        replay.denial_code,
+        Some(crate::ClientDenialCode::RequestCancelled)
     );
     let receipt = store
         .state

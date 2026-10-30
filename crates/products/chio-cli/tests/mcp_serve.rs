@@ -4077,10 +4077,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
         task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"],
         task_id
     );
-    assert!(task_result["result"]["content"][0]["text"]
-        .as_str()
-        .expect("cancelled task result text")
-        .contains("task cancelled by client"));
+    assert_closed_denial(&task_result["result"], "request_cancelled");
     assert!(
         notifications.iter().any(|notification| {
             notification["method"] == "notifications/tasks/status"
