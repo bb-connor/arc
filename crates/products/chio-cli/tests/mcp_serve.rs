@@ -20,6 +20,23 @@ mod mcp_security;
 mod test_directory;
 use test_directory::unique_test_dir;
 
+/// A kernel denial reaches the client as its closed code and fixed text only;
+/// the detail stays in the signed receipt.
+fn assert_closed_denial(result: &Value, code: &str) {
+    let denial = chio_kernel::ClientDenialCode::from_code(code).expect("closed denial code");
+    assert_eq!(result["isError"], true, "{result:#}");
+    assert_eq!(
+        result["structuredContent"]["code"].as_str(),
+        Some(code),
+        "{result:#}"
+    );
+    assert_eq!(
+        result["content"][0]["text"].as_str(),
+        Some(denial.text()),
+        "{result:#}"
+    );
+}
+
 fn write_mock_server_script(dir: &Path) -> PathBuf {
     let script = concat!(
         include_str!("support/native_mcp_stdio.py"),
@@ -3274,11 +3291,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
         read_response_with_nested_flow_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_eq!(cancelled["result"]["isError"], true);
-    assert!(cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text")
-        .contains("cancelled by client"));
+    assert_closed_denial(&cancelled["result"], "session_unsupported");
 
     let progress = cancelled_notifications
         .iter()
@@ -3368,12 +3381,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
         read_response_with_parent_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_eq!(cancelled["result"]["isError"], true);
-    let cancelled_text = cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text");
-    assert!(cancelled_text.contains("cancelled by client"));
-    assert!(cancelled_text.contains("user aborted tool"));
+    assert_closed_denial(&cancelled["result"], "session_unsupported");
 
     let progress = cancelled_notifications
         .iter()
@@ -3470,11 +3478,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
 
     let (cancelled, cancelled_notifications) = read_response(&mut stdout, 2);
     assert!(cancelled_notifications.is_empty());
-    assert_eq!(cancelled["result"]["isError"], true);
-    assert!(cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text")
-        .contains("cancelled by client: user aborted slow tool"));
+    assert_closed_denial(&cancelled["result"], "denied");
 
     drop(stdin);
 
@@ -3949,10 +3953,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
         task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"],
         task_id
     );
-    assert!(task_result["result"]["content"][0]["text"]
-        .as_str()
-        .expect("cancelled task result text")
-        .contains("cancelled by client: user aborted sample"));
+    assert_closed_denial(&task_result["result"], "session_unsupported");
     assert!(
         notifications.iter().any(|notification| {
             notification["method"] == "notifications/tasks/status"
