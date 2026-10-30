@@ -1646,7 +1646,7 @@ pub(crate) enum TrustConfigCommands {
         role: Option<String>,
         /// `caller` or `deployment`, for a credential without a role.
         #[arg(long, required_unless_present = "role", conflicts_with = "role")]
-        kind: Option<String>,
+        kind: Option<chio_control_plane::trust_control::caller_credentials::CredentialKind>,
         /// Deployment the credential belongs to.
         #[arg(long)]
         deployment: String,

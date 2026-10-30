@@ -3,9 +3,10 @@ use std::collections::BTreeSet;
 use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
+use zeroize::Zeroizing;
 
 use super::access::TrustAccessError;
 use super::scope::Scope;
@@ -18,35 +19,87 @@ const MAX_TENANT_ID_BYTES: usize = 256;
 /// Who holds a caller credential. Deployment-kind routes (receipt append,
 /// budgets, capability issue, settlement, authority reads, admission
 /// authority) refuse a caller-kind credential whatever its scopes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum CredentialKind {
     Caller,
     Deployment,
 }
 
-/// The tenants a credential may act for inside its deployment.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// The tenants a credential may act for inside its deployment: the keyword
+/// `"deployment"` or `{ tenant = ".." }`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum TenantAuthority {
     Deployment,
     Tenant(String),
 }
 
-#[derive(Debug, Deserialize)]
+/// A caller credential secret: non-empty, without surrounding whitespace or
+/// control characters. Zeroized on drop and never printed.
+pub struct CredentialSecret(Zeroizing<String>);
+
+impl CredentialSecret {
+    pub fn parse(value: String) -> Result<Self, InvalidCredentialSecret> {
+        let value = Zeroizing::new(value);
+        if !is_clean_text(&value, usize::MAX) {
+            return Err(InvalidCredentialSecret);
+        }
+        Ok(Self(value))
+    }
+
+    #[must_use]
+    pub fn sha256(&self) -> [u8; 32] {
+        Sha256::digest(self.0.as_bytes()).into()
+    }
+}
+
+impl std::fmt::Debug for CredentialSecret {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("CredentialSecret([REDACTED])")
+    }
+}
+
+#[derive(Clone, Copy, Debug, thiserror::Error, PartialEq, Eq)]
+#[error(
+    "credential secret must be non-empty, without surrounding whitespace or control characters"
+)]
+pub struct InvalidCredentialSecret;
+
+/// One `[[credentials]]` entry of an access configuration document, before
+/// validation.
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct CredentialEntry {
+pub struct CredentialEntry {
     id: String,
     kind: CredentialKind,
     secret_sha256: String,
     scopes: Vec<String>,
     deployment: String,
-    tenant_authority: serde_json::Value,
+    tenant_authority: TenantAuthority,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct TenantAuthorityTable {
-    tenant: String,
+impl CredentialEntry {
+    /// The entry granting the holder of `secret` these scopes, identified by
+    /// the secret's SHA-256 digest only.
+    #[must_use]
+    pub fn new(
+        id: String,
+        kind: CredentialKind,
+        secret: &CredentialSecret,
+        scopes: Vec<String>,
+        deployment: String,
+        tenant_authority: TenantAuthority,
+    ) -> Self {
+        Self {
+            id,
+            kind,
+            secret_sha256: hex::encode(secret.sha256()),
+            scopes,
+            deployment,
+            tenant_authority,
+        }
+    }
 }
 
 fn valid_credential_id(value: &str) -> bool {
@@ -63,29 +116,6 @@ pub(super) fn parse_secret_digest(id: &str, value: &str) -> Result<[u8; 32], Tru
         return Err(TrustAccessError::InvalidSecretDigest(id.to_string()));
     }
     Ok(digest)
-}
-
-fn parse_tenant_authority(
-    id: &str,
-    value: serde_json::Value,
-) -> Result<TenantAuthority, TrustAccessError> {
-    match value {
-        serde_json::Value::String(keyword) if keyword == "deployment" => {
-            Ok(TenantAuthority::Deployment)
-        }
-        table @ serde_json::Value::Object(_) => {
-            let TenantAuthorityTable { tenant } = serde_json::from_value(table)
-                .map_err(|_| TrustAccessError::InvalidTenantAuthority(id.to_string()))?;
-            if !is_clean_text(&tenant, MAX_TENANT_ID_BYTES) {
-                return Err(TrustAccessError::InvalidTenant {
-                    credential: id.to_string(),
-                    tenant,
-                });
-            }
-            Ok(TenantAuthority::Tenant(tenant))
-        }
-        _ => Err(TrustAccessError::InvalidTenantAuthority(id.to_string())),
-    }
 }
 
 struct CredentialRecord {
@@ -174,13 +204,20 @@ impl CallerCredentials {
                     });
                 }
             }
-            let tenant_authority = parse_tenant_authority(&entry.id, entry.tenant_authority)?;
+            if let TenantAuthority::Tenant(tenant) = &entry.tenant_authority {
+                if !is_clean_text(tenant, MAX_TENANT_ID_BYTES) {
+                    return Err(TrustAccessError::InvalidTenant {
+                        credential: entry.id,
+                        tenant: tenant.clone(),
+                    });
+                }
+            }
             records.push(CredentialRecord {
                 id: entry.id,
                 kind: entry.kind,
                 secret_sha256,
                 scopes,
-                tenant_authority,
+                tenant_authority: entry.tenant_authority,
             });
         }
         Ok(Self {
@@ -193,20 +230,17 @@ impl CallerCredentials {
     pub(super) fn single_client(
         deployment: &str,
         credential_id: &str,
-        secret: &str,
+        secret: &CredentialSecret,
     ) -> Result<Self, TrustAccessError> {
         if !valid_credential_id(credential_id) {
             return Err(TrustAccessError::InvalidCredentialId(
                 credential_id.to_string(),
             ));
         }
-        if !is_clean_text(secret, usize::MAX) {
-            return Err(TrustAccessError::InvalidSecret(credential_id.to_string()));
-        }
         let record = CredentialRecord {
             id: credential_id.to_string(),
             kind: CredentialKind::Deployment,
-            secret_sha256: Sha256::digest(secret.as_bytes()).into(),
+            secret_sha256: secret.sha256(),
             scopes: Scope::ALL
                 .iter()
                 .copied()

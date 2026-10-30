@@ -1585,10 +1585,6 @@
       "semantics": "Local YAML/TOML configuration controls policy, identity, attestation or keyring composition and is subject to the existing typed validation in load_passport_verifier_policy.",
       "remaining_risk": "Format-specific duplicate keys, aliases and numeric conversion are not enforced by the JSON reader. Configuration provenance and parser semantics require separate qualification."
     },
-    "crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs": {
-      "semantics": "Local TOML trust-control access configuration (deployment, internal listener, caller credentials and pinned cluster peers) is decoded with deny_unknown_fields at every level and validated in TrustAccessConfig::from_toml_str before any credential is admitted; removed keys and unknown scopes refuse.",
-      "remaining_risk": "TOML parser semantics (duplicate keys are refused by the format; integer and string conversion) belong to the toml crate. Configuration file provenance and permissions are qualified where the file is read."
-    },
     "crates/products/chio-cli/src/cli/input/config.rs": {
       "semantics": "YAML/TOML configuration or guard manifests are read by local CLI/build/load operations: yaml.",
       "remaining_risk": "These local configuration/build inputs retain their existing parser and semantic checks; this packet does not qualify alternate-format duplicate or resource bounds."
@@ -1596,6 +1592,10 @@
     "crates/products/chio-cli/src/cli/mcp/manifest.rs": {
       "semantics": "YAML/TOML configuration or guard manifests are read by local CLI/build/load operations: load_manifest_allowlist.",
       "remaining_risk": "These local configuration/build inputs retain their existing parser and semantic checks; this packet does not qualify alternate-format duplicate or resource bounds."
+    },
+    "crates/products/chio-cli/src/cli/trust_access_file.rs": {
+      "semantics": "Local TOML trust-control access configuration (deployment, internal listener, caller credentials and pinned cluster peers) is read through the Trusted regular-file reader with a 1 MiB cap, decoded into AccessConfigDocument with deny_unknown_fields at every level and validated by TrustAccessConfig::from_document before any credential is admitted; unknown keys, unknown scopes and malformed tenant authorities refuse.",
+      "remaining_risk": "TOML parser semantics (duplicate keys are refused by the format; integer and string conversion) belong to the toml crate."
     },
     "crates/products/chio-cli/src/doctor/chio_yaml.rs": {
       "semantics": "YAML/TOML configuration or guard manifests are read by local CLI/build/load operations: validate_body.",

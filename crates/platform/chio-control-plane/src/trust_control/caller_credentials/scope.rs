@@ -1,51 +1,11 @@
-/// The closed trust-control scope set. A name outside it never parses.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Scope {
-    AdminEmergency,
-    AdmissionAuthorityWrite,
-    AttestationWrite,
-    AuthorityAdmin,
-    AuthorityRead,
-    BudgetsRead,
-    BudgetsWrite,
-    CapabilitiesIssue,
-    CertificationsRead,
-    CertificationsWrite,
-    ClusterReplicate,
-    ClusterOpeningsReplicate,
-    CreditRead,
-    CreditWrite,
-    EvidenceRead,
-    EvidenceWrite,
-    FederationRead,
-    FederationWrite,
-    FindingsRead,
-    FindingsWrite,
-    FiscalRead,
-    FiscalWrite,
-    LineageRead,
-    LineageWrite,
-    MetricsRead,
-    PassportRead,
-    PassportWrite,
-    ReceiptOpeningsErase,
-    ReceiptOpeningsRead,
-    ReceiptsAdmin,
-    ReceiptsAppend,
-    ReceiptsRead,
-    RegistryWrite,
-    ReportsRead,
-    ReputationRead,
-    ReputationWrite,
-    RevocationsRead,
-    RootExchangeSign,
-    RevocationsWrite,
-    ScimWrite,
-    SettlementWrite,
-}
-
 macro_rules! scopes {
     ($($variant:ident => $name:literal,)+) => {
+        /// The closed trust-control scope set. A name outside it never parses.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Scope {
+            $($variant,)+
+        }
+
         impl Scope {
             pub const ALL: &'static [Scope] = &[$(Scope::$variant,)+];
 

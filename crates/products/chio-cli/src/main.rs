@@ -191,6 +191,8 @@ pub(crate) use runtime_cli::{
 };
 #[path = "cli/runtime/trust_reports.rs"]
 mod runtime_trust_reports;
+#[path = "cli/trust_access_file.rs"]
+mod trust_access_file;
 #[path = "cli/trust_commands.rs"]
 mod trust_commands_cli;
 #[path = "cli/trust_config_check.rs"]

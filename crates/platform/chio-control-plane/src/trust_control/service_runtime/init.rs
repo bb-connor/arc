@@ -73,7 +73,7 @@ async fn serve_async_inner(
         payload_maintenance_config,
     )?;
     let transport = crate::server_transport::prepare(&config.transport, config.listen)?;
-    let internal_listen = config.access.config().internal_listen;
+    let internal_listen = config.access.config().internal_listen();
     let internal_transport = crate::server_transport::prepare(&config.transport, internal_listen)?;
     // Co-located startup stores may need the space held by abandoned snapshots.
     // Reclaim one bounded window before any of those stores opens or writes.

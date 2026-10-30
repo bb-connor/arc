@@ -305,7 +305,7 @@ fn authorizer_for(listener: Listener, text: &str) -> RouteAuthorizer {
 }
 
 fn authorizer_from(listener: Listener, config: TrustAccessConfig) -> RouteAuthorizer {
-    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let node_keypair = config.peers().identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = test_nonce_cache(
         &test_peer_replay_store(),
@@ -330,7 +330,7 @@ fn fixture_access(node_b: &Keypair, node_c: &Keypair) -> TrustAccessConfig {
     let mut config =
         crate::trust_control::caller_credentials::tests::parse(&fixture_config(node_b, node_c))
             .test_unwrap();
-    withhold_peer_scope(&mut config.peers, NODE_C, Scope::ClusterOpeningsReplicate);
+    withhold_peer_scope(config.peers_mut(), NODE_C, Scope::ClusterOpeningsReplicate);
     config
 }
 
@@ -1091,7 +1091,7 @@ async fn finding_buyer_routes_hold_caller_credentials_to_caller_rules() {
 
 fn mounted_with_nonce_capacity(listener: Listener, text: &str, capacity: usize) -> Router {
     let config = crate::trust_control::caller_credentials::tests::parse(text).test_unwrap();
-    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let node_keypair = config.peers().identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = PeerNonceCache::with_capacity(
         test_peer_replay_store(),
@@ -1181,7 +1181,7 @@ async fn peer_request_signed_at_the_authorizer_start_refuses_as_stale() {
     let config =
         crate::trust_control::caller_credentials::tests::parse(&fixture_config(&node_b, &node_c))
             .test_unwrap();
-    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let node_keypair = config.peers().identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = test_nonce_cache(
         &test_peer_replay_store(),
@@ -1210,7 +1210,7 @@ async fn peer_route_refuses_with_503_when_the_receiver_clock_is_unavailable() {
     let config =
         crate::trust_control::caller_credentials::tests::parse(&fixture_config(&node_b, &node_c))
             .test_unwrap();
-    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let node_keypair = config.peers().identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let nonces = test_nonce_cache(
         &test_peer_replay_store(),
@@ -1239,7 +1239,7 @@ async fn peer_route_without_a_replay_store_refuses_with_503() {
     let config =
         crate::trust_control::caller_credentials::tests::parse(&fixture_config(&node_b, &node_c))
             .test_unwrap();
-    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let node_keypair = config.peers().identity().map(|_| Keypair::generate());
     let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
     let internal = mounted_router(RouteAuthorizer::new(
         Listener::Internal,

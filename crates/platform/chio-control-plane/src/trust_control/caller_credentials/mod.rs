@@ -13,7 +13,8 @@ mod scope;
 
 pub use access::{AccessConfigDocument, TrustAccess, TrustAccessConfig, TrustAccessError};
 pub use caller::{
-    AuthenticatedCaller, CallerAuthError, CallerCredentials, CredentialKind, TenantAuthority,
+    AuthenticatedCaller, CallerAuthError, CallerCredentials, CredentialEntry, CredentialKind,
+    CredentialSecret, InvalidCredentialSecret, TenantAuthority,
 };
 pub use peer::{
     sign_cluster_peer_request, AuthenticatedPeer, ClusterNodeIdentity, ClusterPeer,

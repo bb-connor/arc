@@ -96,9 +96,11 @@ fn reader() -> String {
 
 /// Decode an access configuration TOML document and validate it.
 pub(crate) fn parse(text: &str) -> Result<TrustAccessConfig, TrustAccessError> {
-    let document: AccessConfigDocument = toml::from_str(text)
-        .map_err(|error| TrustAccessError::Malformed(error.message().to_string()))?;
-    TrustAccessConfig::from_document(document)
+    TrustAccessConfig::from_document(toml::from_str(text).test_unwrap())
+}
+
+fn decode_refused(text: &str) -> bool {
+    toml::from_str::<AccessConfigDocument>(text).is_err()
 }
 
 fn refusal(text: &str) -> TrustAccessError {
@@ -135,10 +137,7 @@ fn old_config_keys_refuse_at_startup() {
         "service_token = \"t\"",
         "tenant_read_tokens = { tenant-a = \"t\" }",
     ] {
-        assert!(matches!(
-            refusal(&config(&format!("{key}\n{}", reader()))),
-            TrustAccessError::Malformed(_)
-        ));
+        assert!(decode_refused(&config(&format!("{key}\n{}", reader()))));
     }
 }
 
@@ -242,21 +241,13 @@ fn credential_shape_refusals_name_their_rule() {
         ))),
         TrustAccessError::InvalidCredentialId("bad id".to_string())
     );
-    let keyword = reader().replace("\"deployment\"\n", "\"tenant\"\n");
-    assert_eq!(
-        refusal(&config(&keyword)),
-        TrustAccessError::InvalidTenantAuthority("reader".to_string())
-    );
-    assert!(matches!(
-        refusal(&config(
-            &reader().replace("kind = \"caller\"", "kind = \"admin\"")
-        )),
-        TrustAccessError::Malformed(_)
-    ));
-    assert!(matches!(
-        refusal(&config(&format!("{}extra = 1\n", reader()))),
-        TrustAccessError::Malformed(_)
-    ));
+    for text in [
+        reader().replace("\"deployment\"\n", "\"tenant\"\n"),
+        reader().replace("kind = \"caller\"", "kind = \"admin\""),
+        format!("{}extra = 1\n", reader()),
+    ] {
+        assert!(decode_refused(&config(&text)), "{text}");
+    }
 }
 
 #[test]
@@ -282,7 +273,7 @@ fn peer_shape_refusals_name_their_rule() {
     let replica = parse(&with_peer(peer(node, &keypair, REPLICA_SCOPES))).test_unwrap();
     assert_eq!(
         replica
-            .peers
+            .peers()
             .iter()
             .map(|pin| pin.scopes.iter().copied().collect::<Vec<_>>())
             .collect::<Vec<_>>(),
@@ -348,7 +339,7 @@ fn internal_listener_must_not_share_the_public_address() {
 fn validate_caller_requires_scope_and_known_secret() {
     let access = parse(&config(&reader())).test_unwrap();
     let caller = access
-        .credentials
+        .credentials()
         .validate_caller(&bearer("reader-secret"), Scope::ReceiptsRead)
         .test_unwrap();
     assert_eq!(caller.credential_id, "reader");
@@ -356,21 +347,21 @@ fn validate_caller_requires_scope_and_known_secret() {
     assert_eq!(caller.tenant_authority, TenantAuthority::Deployment);
     assert_eq!(
         access
-            .credentials
+            .credentials()
             .validate_caller(&bearer("reader-secret"), Scope::ReportsRead)
             .test_unwrap_err(),
         CallerAuthError::MissingScope(Scope::ReportsRead)
     );
     assert_eq!(
         access
-            .credentials
+            .credentials()
             .validate_caller(&bearer("other-secret"), Scope::ReceiptsRead)
             .test_unwrap_err(),
         CallerAuthError::Unauthenticated
     );
     assert_eq!(
         access
-            .credentials
+            .credentials()
             .validate_caller(&HeaderMap::new(), Scope::ReceiptsRead)
             .test_unwrap_err(),
         CallerAuthError::Unauthenticated
@@ -382,7 +373,7 @@ fn validate_caller_requires_scope_and_known_secret() {
     );
     assert_eq!(
         access
-            .credentials
+            .credentials()
             .validate_caller(&doubled, Scope::ReceiptsRead)
             .test_unwrap_err(),
         CallerAuthError::Unauthenticated
@@ -400,7 +391,7 @@ fn tenant_credential_limited_to_its_tenant() {
     ));
     let access = parse(&text).test_unwrap();
     let caller = access
-        .credentials
+        .credentials()
         .validate_caller(&bearer("tenant-a-secret"), Scope::ReceiptsRead)
         .test_unwrap();
     assert_eq!(
@@ -444,7 +435,7 @@ fn verify(
     nonces: &PeerNonceCache,
 ) -> Result<AuthenticatedPeer, PeerAuthError> {
     access
-        .peers
+        .peers()
         .verify(headers, target, now, Scope::ClusterReplicate, nonces)
 }
 
@@ -511,7 +502,7 @@ fn partition_target() -> PeerRequestTarget<'static> {
 fn peer_signature_binds_node_path_query_body_and_time() {
     let keypair = Keypair::generate();
     let mut access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
-    withhold_peer_scope(&mut access.peers, NODE_B, Scope::ClusterOpeningsReplicate);
+    withhold_peer_scope(access.peers_mut(), NODE_B, Scope::ClusterOpeningsReplicate);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/revocations/delta",
@@ -563,7 +554,7 @@ fn peer_signature_binds_node_path_query_body_and_time() {
     );
     assert_eq!(
         access
-            .peers
+            .peers()
             .verify(
                 &headers,
                 &target,
@@ -1490,21 +1481,17 @@ fn peer_pinning_this_nodes_key_refuses() {
 }
 
 #[test]
-fn single_client_secret_must_be_clean() {
+fn credential_secret_must_be_clean() {
     for secret in ["", " padded", "padded ", "bell\u{7}"] {
-        let error =
-            TrustAccess::single_client(DEPLOYMENT, "finding-operator", secret).test_unwrap_err();
         assert_eq!(
-            error,
-            TrustAccessError::InvalidSecret("finding-operator".to_string()),
+            CredentialSecret::parse(secret.to_string()).test_unwrap_err(),
+            InvalidCredentialSecret,
             "{secret:?}"
         );
-        assert_eq!(
-            error.to_string(),
-            "credential \"finding-operator\" secret must be non-empty, without surrounding whitespace or control characters"
-        );
     }
-    TrustAccess::single_client(DEPLOYMENT, "finding-operator", "operator-secret").test_unwrap();
+    let secret = CredentialSecret::parse("operator-secret".to_string()).test_unwrap();
+    assert_eq!(format!("{secret:?}"), "CredentialSecret([REDACTED])");
+    TrustAccess::single_client(DEPLOYMENT, "finding-operator", &secret).test_unwrap();
 }
 
 #[test]

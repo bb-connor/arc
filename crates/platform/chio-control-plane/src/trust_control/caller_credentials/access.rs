@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use chio_core::crypto::Keypair;
 use serde::Deserialize;
 
-use super::caller::{CallerCredentials, CredentialEntry};
+use super::caller::{CallerCredentials, CredentialEntry, CredentialSecret};
 use super::is_clean_text;
 use super::peer::{
     sign_cluster_peer_request, ClusterPeerPins, ClusterSection, PeerAddressing,
@@ -15,8 +15,6 @@ const MAX_DEPLOYMENT_ID_BYTES: usize = 128;
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum TrustAccessError {
-    #[error("trust-control access configuration is invalid: {0}")]
-    Malformed(String),
     #[error("trust-control access configuration declares no credentials")]
     NoCredentials,
     #[error(
@@ -29,8 +27,6 @@ pub enum TrustAccessError {
     DuplicateCredentialId(String),
     #[error("credential \"{0}\" secret_sha256 must be 64 lowercase hex characters")]
     InvalidSecretDigest(String),
-    #[error("credential \"{0}\" secret must be non-empty, without surrounding whitespace or control characters")]
-    InvalidSecret(String),
     #[error("credentials \"{0}\" and \"{1}\" share one secret")]
     DuplicateSecret(String, String),
     #[error("credential \"{0}\" declares no scopes")]
@@ -47,8 +43,6 @@ pub enum TrustAccessError {
         credential_deployment: String,
         deployment: String,
     },
-    #[error("credential \"{0}\" tenant_authority must be \"deployment\" or {{ tenant = \"..\" }}")]
-    InvalidTenantAuthority(String),
     #[error("credential \"{credential}\" names an invalid tenant id {tenant:?}")]
     InvalidTenant { credential: String, tenant: String },
     #[error("cluster peer node id {0:?} is invalid")]
@@ -98,15 +92,32 @@ pub struct AccessConfigDocument {
     cluster: ClusterSection,
 }
 
+impl AccessConfigDocument {
+    /// An unclustered document declaring `credentials`.
+    #[must_use]
+    pub fn unclustered(
+        deployment: String,
+        internal_listen: SocketAddr,
+        credentials: Vec<CredentialEntry>,
+    ) -> Self {
+        Self {
+            deployment,
+            internal_listen,
+            credentials,
+            cluster: ClusterSection::default(),
+        }
+    }
+}
+
 /// Validated trust-control access configuration: the deployment this
 /// trust-control serves, the internal listener address, the caller
 /// credentials and the pinned cluster peers.
 #[derive(Debug)]
 pub struct TrustAccessConfig {
-    pub deployment: String,
-    pub internal_listen: SocketAddr,
-    pub credentials: CallerCredentials,
-    pub peers: ClusterPeerPins,
+    deployment: String,
+    internal_listen: SocketAddr,
+    credentials: CallerCredentials,
+    peers: ClusterPeerPins,
 }
 
 impl TrustAccessConfig {
@@ -122,6 +133,31 @@ impl TrustAccessConfig {
             credentials,
             peers,
         })
+    }
+
+    #[must_use]
+    pub fn deployment(&self) -> &str {
+        &self.deployment
+    }
+
+    #[must_use]
+    pub fn internal_listen(&self) -> SocketAddr {
+        self.internal_listen
+    }
+
+    #[must_use]
+    pub fn credentials(&self) -> &CallerCredentials {
+        &self.credentials
+    }
+
+    #[must_use]
+    pub fn peers(&self) -> &ClusterPeerPins {
+        &self.peers
+    }
+
+    #[cfg(test)]
+    pub(crate) fn peers_mut(&mut self) -> &mut ClusterPeerPins {
+        &mut self.peers
     }
 
     /// The internal listener never shares the public listener's address. Port
@@ -165,7 +201,7 @@ impl TrustAccess {
     pub fn single_client(
         deployment: &str,
         credential_id: &str,
-        secret: &str,
+        secret: &CredentialSecret,
     ) -> Result<Self, TrustAccessError> {
         let deployment = validate_deployment(deployment)?;
         let config = TrustAccessConfig {
