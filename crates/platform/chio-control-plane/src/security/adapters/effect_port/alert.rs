@@ -3,7 +3,7 @@ use super::{
     AlertDeliveryStatus, Arc, CanonicalBody, Clock, Digest32, EffectExecutionStatus, EffectId,
     EffectOperation, EffectRequest, EffectResult, EffectResultQuery, PortError, PortResult,
     RecordId, ResponseEffectBackend, ResponseEffectKind, ResponseTarget, SecurityAlert,
-    SecurityAlertPort, Serialize, SqliteSiemOutbox, SystemClock, TenantId,
+    SecurityAlertOutbox, SecurityAlertPort, Serialize, SystemClock, TenantId,
 };
 
 pub(super) const ESCALATE_ALERT_SCHEMA_VERSION: u8 = 1;
@@ -29,7 +29,7 @@ pub trait EscalateAlertStore: SecurityAlertPort {
     ) -> PortResult<Option<(SecurityAlert, AlertDeliveryStatus)>>;
 }
 
-impl EscalateAlertStore for SqliteSiemOutbox {
+impl EscalateAlertStore for SecurityAlertOutbox {
     fn load_persisted_alert(
         &self,
         tenant_id: &TenantId,
@@ -308,6 +308,7 @@ pub(super) fn validate_alert_delivery_status(status: AlertDeliveryStatus) -> Por
             attempts,
             delivered_at_unix_ms,
         } => attempts != 0 && delivered_at_unix_ms != 0,
+        AlertDeliveryStatus::Parked { attempts } => attempts != 0,
     };
     if !valid {
         return Err(PortError::integrity_failure());

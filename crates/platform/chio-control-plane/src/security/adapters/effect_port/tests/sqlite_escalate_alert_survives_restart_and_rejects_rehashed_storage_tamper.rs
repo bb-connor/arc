@@ -12,12 +12,15 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
     };
     let request = alert_request();
     let outbox = Arc::new(
-        SqliteSiemOutbox::open(
-            &path,
-            vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
-            config,
-        )
-        .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
+        SqliteSecurityAlertOutboxStore::open(&path)
+            .and_then(|store| {
+                SecurityAlertOutbox::new(
+                    Arc::new(store),
+                    vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
+                    config,
+                )
+            })
+            .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = outbox.clone();
     let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));
@@ -29,12 +32,15 @@ fn sqlite_escalate_alert_survives_restart_and_rejects_rehashed_storage_tamper() 
     drop(outbox);
 
     let reopened = Arc::new(
-        SqliteSiemOutbox::open(
-            &path,
-            vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
-            config,
-        )
-        .unwrap_or_else(|error| panic!("reopen alert outbox: {error}")),
+        SqliteSecurityAlertOutboxStore::open(&path)
+            .and_then(|store| {
+                SecurityAlertOutbox::new(
+                    Arc::new(store),
+                    vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
+                    config,
+                )
+            })
+            .unwrap_or_else(|error| panic!("reopen alert outbox: {error}")),
     );
     let alert_store: Arc<dyn EscalateAlertStore> = reopened.clone();
     let backend: Arc<dyn ResponseEffectBackend> = Arc::new(EscalateAlertBackend::new(alert_store));

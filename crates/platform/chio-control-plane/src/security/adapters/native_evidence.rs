@@ -19,21 +19,18 @@ use chio_security_types::ports::{
     AlertDeliveryQuery, AlertDeliveryStatus, Digest32, ExactReceiptRecord,
     ExactSecurityReceiptSink, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest,
     RecordId, ResponsePlanKey, ResponseStore, SchedulerHealthPageRequest, SchedulerHealthPort,
-    SecurityAlert, SecurityAlertPort, SecurityReceiptSink, TenantId,
+    SecurityAlert, SecurityAlertOutboxBacklog, SecurityAlertOutboxStore, SecurityAlertPort,
+    SecurityReceiptSink, TenantId,
 };
 use chio_siem::{Alert, AlertBackend, AlertSeverity};
-use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
-use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
+use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 
 mod delivery;
 
 const ALERT_OUTBOX_SCHEMA_VERSION: u8 = 1;
-const OUTBOX_TABLE: &str = "chio_security_alert_outbox";
-const BACKEND_DELIVERY_TABLE: &str = "chio_security_alert_outbox_backend";
 
 /// Signs validated Chio-native active-defense bodies and persists the signed
 /// Chio receipt through the configured authoritative receipt store.
@@ -704,13 +701,14 @@ impl AlertOutboxConfig {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AlertDispatchReport {
-    /// Due rows processed by the call; always `delivered + failed`.
+    /// Due rows dispatched by the call; always `delivered + failed`.
     pub attempted: usize,
     /// Rows confirmed by every configured backend.
     pub delivered: usize,
     /// Rows left pending because at least one backend dispatch failed.
     pub failed: usize,
-    /// Failed rows that reached `max_attempts` and are no longer due.
+    /// Rows parked by the call: a failed row whose attempts reached
+    /// `max_attempts`, or a due row already at `max_attempts`.
     pub parked: usize,
     /// Backend dispatches issued, at most one per row and unconfirmed backend.
     pub backend_dispatches: usize,
@@ -718,115 +716,43 @@ pub struct AlertDispatchReport {
     pub backend_failures: usize,
 }
 
-/// Undelivered rows of the security paging outbox.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct AlertOutboxBacklog {
-    /// Rows that are due now or will be retried under backoff.
-    pub pending: u64,
-    /// Rows that exhausted their delivery attempts. They are never dispatched
-    /// again and stay parked until an operator resolves them.
-    pub parked: u64,
-}
-
-/// SQLite-backed security paging outbox. `page` means durable admission only;
-/// actual backend delivery advances the row from pending to delivered.
+/// Security paging outbox. `page` means durable admission only; actual
+/// backend delivery advances the row from pending to delivered.
 ///
 /// A row becomes delivered only after every configured backend has confirmed
 /// it. Each backend outcome is recorded durably per row, so a retry dispatches
 /// only to the backends that have not confirmed the row.
-pub struct SqliteSiemOutbox {
-    connection: Arc<Mutex<Connection>>,
+pub struct SecurityAlertOutbox {
+    store: Arc<dyn SecurityAlertOutboxStore>,
     backends: Vec<Arc<dyn AlertBackend>>,
     config: AlertOutboxConfig,
     delivery_lock: Arc<AsyncMutex<()>>,
 }
 
-impl SqliteSiemOutbox {
-    pub fn open(
-        path: impl AsRef<Path>,
+impl SecurityAlertOutbox {
+    pub fn new(
+        store: Arc<dyn SecurityAlertOutboxStore>,
         backends: Vec<Arc<dyn AlertBackend>>,
         config: AlertOutboxConfig,
     ) -> PortResult<Self> {
         let config = config.validate()?;
         validate_backends(&backends)?;
-        let connection = Connection::open(path).map_err(|_| PortError::unavailable())?;
-        connection
-            .busy_timeout(std::time::Duration::from_secs(5))
-            .map_err(|_| PortError::unavailable())?;
-        verify_backend_table(&connection)?;
-        connection
-            .execute_batch(&outbox_schema_sql())
-            .map_err(|_| PortError::unavailable())?;
         Ok(Self {
-            connection: Arc::new(Mutex::new(connection)),
+            store,
             backends,
             config,
             delivery_lock: Arc::new(AsyncMutex::new(())),
         })
     }
 
-    fn connection(&self) -> PortResult<MutexGuard<'_, Connection>> {
-        self.connection.lock().map_err(|_| PortError::unavailable())
-    }
-
     fn ensure_ready(&self) -> PortResult<()> {
         validate_backends(&self.backends)?;
-        let connection = self.connection()?;
-        delivery::store::ensure_ready(&connection)
+        self.store.ensure_ready()
     }
 
     fn page_alert(&self, alert: &SecurityAlert) -> PortResult<AlertDeliveryStatus> {
         validate_alert(alert)?;
-        let canonical = canonical_json_bytes(alert).map_err(|_| PortError::invalid_data())?;
-        let command_hash = chio_core::sha256(&canonical);
-        let occurred_at = sqlite_time(alert.occurred_at_unix_ms)?;
-        let mut connection = self.connection()?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|_| PortError::unavailable())?;
-        let existing = load_status(
-            &transaction,
-            alert.idempotency_key.as_str(),
-            &canonical,
-            command_hash.as_bytes(),
-        )?;
-        let status = match existing {
-            Some(status) => status,
-            None => {
-                transaction
-                    .execute(
-                        &format!(
-                            "INSERT INTO {OUTBOX_TABLE}
-                             (idempotency_key, command_json, command_hash, status, attempts,
-                              next_attempt_at_unix_ms, delivered_at_unix_ms)
-                             VALUES (?1, ?2, ?3, 'pending', 0, ?4, NULL)"
-                        ),
-                        params![
-                            alert.idempotency_key.as_str(),
-                            canonical.as_slice(),
-                            command_hash.as_bytes().as_slice(),
-                            occurred_at
-                        ],
-                    )
-                    .map_err(|_| PortError::unavailable())?;
-                let expected = AlertDeliveryStatus::Pending {
-                    attempts: 0,
-                    next_attempt_at_unix_ms: alert.occurred_at_unix_ms,
-                };
-                if load_status(
-                    &transaction,
-                    alert.idempotency_key.as_str(),
-                    &canonical,
-                    command_hash.as_bytes(),
-                )? != Some(expected)
-                {
-                    return Err(PortError::integrity_failure());
-                }
-                expected
-            }
-        };
-        transaction.commit().map_err(|_| PortError::unavailable())?;
-        Ok(status)
+        self.store.admit(alert)
     }
 
     fn load_alert_delivery(
@@ -834,16 +760,7 @@ impl SqliteSiemOutbox {
         query: &AlertDeliveryQuery,
     ) -> PortResult<Option<AlertDeliveryStatus>> {
         validate_alert(&query.alert)?;
-        let canonical =
-            canonical_json_bytes(&query.alert).map_err(|_| PortError::invalid_data())?;
-        let command_hash = chio_core::sha256(&canonical);
-        let connection = self.connection()?;
-        load_status(
-            &*connection,
-            query.alert.idempotency_key.as_str(),
-            &canonical,
-            command_hash.as_bytes(),
-        )
+        self.store.load_status(&query.alert)
     }
 
     pub(super) fn load_persisted_alert_command(
@@ -851,104 +768,38 @@ impl SqliteSiemOutbox {
         tenant_id: &TenantId,
         idempotency_key: &RecordId,
     ) -> PortResult<Option<(SecurityAlert, AlertDeliveryStatus)>> {
-        let connection = self.connection()?;
-        let Some((command_json, command_hash, _, _, _, _)) =
-            query_status_connection(&connection, idempotency_key.as_str())
-                .map_err(|_| PortError::unavailable())?
-        else {
+        let Some((alert, status)) = self.store.load_command(idempotency_key)? else {
             return Ok(None);
         };
-        let alert: SecurityAlert =
-            chio_core::canonical::UntrustedJsonText::from_wire(&command_json, 64 * 1024 * 1024)
-                .and_then(|input| input.decode_signed())
-                .map_err(|error| {
-                    PortError::with_source(
-                        chio_security_types::ports::PortErrorKind::IntegrityFailure,
-                        error.code(),
-                        error,
-                    )
-                })?;
-        let canonical = canonical_json_bytes(&alert).map_err(|_| PortError::integrity_failure())?;
-        let actual_hash = chio_core::sha256(&canonical);
-        if canonical != command_json
-            || actual_hash.as_bytes().as_slice() != command_hash
-            || &alert.tenant_id != tenant_id
+        if &alert.tenant_id != tenant_id
             || &alert.idempotency_key != idempotency_key
             || validate_alert(&alert).is_err()
         {
             return Err(PortError::integrity_failure());
         }
-        let status = load_status(
-            &*connection,
-            idempotency_key.as_str(),
-            &canonical,
-            actual_hash.as_bytes(),
-        )?
-        .ok_or_else(PortError::integrity_failure)?;
         Ok(Some((alert, status)))
     }
 
     /// Per-backend outcome of a paged alert, keyed by backend name. A backend
     /// appears once it has been dispatched to: `Delivered` after it confirmed
-    /// the alert, otherwise `Pending` with its dispatch count and the row's next
-    /// attempt time (`i64::MAX` once the row is parked or no longer retried).
+    /// the alert, `Pending` with its dispatch count and the row's next attempt
+    /// time while the row is pending, and `Parked` once the row is no longer
+    /// retried.
     pub fn load_backend_deliveries(
         &self,
         query: &AlertDeliveryQuery,
     ) -> PortResult<Option<BTreeMap<String, AlertDeliveryStatus>>> {
         validate_alert(&query.alert)?;
-        let canonical =
-            canonical_json_bytes(&query.alert).map_err(|_| PortError::invalid_data())?;
-        let command_hash = chio_core::sha256(&canonical);
-        let idempotency_key = query.alert.idempotency_key.as_str();
-        let connection = self.connection()?;
-        let Some(status) = load_status(
-            &*connection,
-            idempotency_key,
-            &canonical,
-            command_hash.as_bytes(),
-        )?
-        else {
-            return Ok(None);
-        };
-        let retry_at_unix_ms = match status {
-            AlertDeliveryStatus::Pending {
-                next_attempt_at_unix_ms,
-                ..
-            } => next_attempt_at_unix_ms,
-            AlertDeliveryStatus::Delivered { .. } => parked_at_unix_ms()?,
-        };
-        let records = load_backend_records(&connection, idempotency_key, command_hash.as_bytes())?;
-        Ok(Some(
-            records
-                .into_iter()
-                .map(|(backend, record)| {
-                    let status = match record.delivered_at_unix_ms {
-                        Some(delivered_at_unix_ms) => AlertDeliveryStatus::Delivered {
-                            attempts: record.attempts,
-                            delivered_at_unix_ms,
-                        },
-                        None => AlertDeliveryStatus::Pending {
-                            attempts: record.attempts,
-                            next_attempt_at_unix_ms: retry_at_unix_ms,
-                        },
-                    };
-                    (backend, status)
-                })
-                .collect(),
-        ))
+        self.store.load_backend_deliveries(&query.alert)
     }
 
-    /// Durable count of undelivered rows. A row is parked once it reached
-    /// `max_attempts` or carries the parked retry time, so rows parked under an
-    /// earlier configuration stay counted after a restart.
-    pub fn backlog(&self) -> PortResult<AlertOutboxBacklog> {
-        let connection = self.connection()?;
-        delivery::store::backlog(&connection, self.config)
+    /// Durable count of pending and parked rows.
+    pub fn backlog(&self) -> PortResult<SecurityAlertOutboxBacklog> {
+        self.store.backlog()
     }
 }
 
-impl SecurityAlertPort for SqliteSiemOutbox {
+impl SecurityAlertPort for SecurityAlertOutbox {
     fn ensure_alerts_ready(&self) -> PortResult<()> {
         self.ensure_ready()
     }
@@ -962,7 +813,7 @@ impl SecurityAlertPort for SqliteSiemOutbox {
     }
 }
 
-impl SchedulerHealthPort for SqliteSiemOutbox {
+impl SchedulerHealthPort for SecurityAlertOutbox {
     fn ensure_scheduler_health_ready(&self) -> PortResult<()> {
         self.ensure_ready()
     }
@@ -985,160 +836,6 @@ impl SchedulerHealthPort for SqliteSiemOutbox {
     fn load_delivery(&self, query: &AlertDeliveryQuery) -> PortResult<Option<AlertDeliveryStatus>> {
         self.load_alert_delivery(query)
     }
-}
-
-struct OutboxRow {
-    alert: SecurityAlert,
-    command_hash: Vec<u8>,
-    attempts: u32,
-}
-
-struct BackendRecord {
-    attempts: u32,
-    delivered_at_unix_ms: Option<u64>,
-}
-
-fn load_backend_records(
-    connection: &Connection,
-    idempotency_key: &str,
-    command_hash: &[u8],
-) -> PortResult<BTreeMap<String, BackendRecord>> {
-    let mut statement = connection
-        .prepare(&format!(
-            "SELECT backend_name, command_hash, status, attempts, delivered_at_unix_ms
-             FROM {BACKEND_DELIVERY_TABLE} WHERE idempotency_key = ?1"
-        ))
-        .map_err(|_| PortError::unavailable())?;
-    let mut rows = statement
-        .query([idempotency_key])
-        .map_err(|_| PortError::unavailable())?;
-    let mut records = BTreeMap::new();
-    while let Some(row) = rows.next().map_err(|_| PortError::unavailable())? {
-        let backend: String = row.get(0).map_err(|_| PortError::invalid_data())?;
-        let stored_hash: Vec<u8> = row.get(1).map_err(|_| PortError::invalid_data())?;
-        let status: String = row.get(2).map_err(|_| PortError::invalid_data())?;
-        let attempts: i64 = row.get(3).map_err(|_| PortError::invalid_data())?;
-        let delivered_at: Option<i64> = row.get(4).map_err(|_| PortError::invalid_data())?;
-        if stored_hash != command_hash {
-            return Err(PortError::integrity_failure());
-        }
-        let attempts = u32::try_from(attempts)
-            .ok()
-            .filter(|attempts| *attempts > 0)
-            .ok_or_else(PortError::integrity_failure)?;
-        let delivered_at_unix_ms = match (status.as_str(), delivered_at) {
-            ("pending", None) => None,
-            ("delivered", Some(delivered_at)) => {
-                Some(u64::try_from(delivered_at).map_err(|_| PortError::integrity_failure())?)
-            }
-            _ => return Err(PortError::integrity_failure()),
-        };
-        if records
-            .insert(
-                backend,
-                BackendRecord {
-                    attempts,
-                    delivered_at_unix_ms,
-                },
-            )
-            .is_some()
-        {
-            return Err(PortError::integrity_failure());
-        }
-    }
-    Ok(records)
-}
-
-type CatalogEntry = (String, String, String, Option<String>);
-
-fn outbox_schema_sql() -> String {
-    format!(
-        "PRAGMA foreign_keys = ON;
-                 PRAGMA journal_mode = WAL;
-                 CREATE TABLE IF NOT EXISTS {OUTBOX_TABLE} (
-                    idempotency_key TEXT PRIMARY KEY NOT NULL,
-                    command_json BLOB NOT NULL,
-                    command_hash BLOB NOT NULL CHECK(typeof(command_hash) = 'blob' AND length(command_hash) = 32),
-                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
-                    attempts INTEGER NOT NULL CHECK(attempts >= 0),
-                    next_attempt_at_unix_ms INTEGER NOT NULL CHECK(next_attempt_at_unix_ms >= 0),
-                    delivered_at_unix_ms INTEGER,
-                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
-                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
-                 );
-                 CREATE INDEX IF NOT EXISTS idx_chio_security_alert_outbox_due
-                 ON {OUTBOX_TABLE}(status, next_attempt_at_unix_ms, idempotency_key);
-                 CREATE TABLE IF NOT EXISTS {BACKEND_DELIVERY_TABLE} (
-                    idempotency_key TEXT NOT NULL
-                        REFERENCES {OUTBOX_TABLE}(idempotency_key),
-                    backend_name TEXT NOT NULL CHECK(typeof(backend_name) = 'text' AND length(backend_name) > 0 AND instr(backend_name, char(0)) = 0),
-                    command_hash BLOB NOT NULL CHECK(typeof(command_hash) = 'blob' AND length(command_hash) = 32),
-                    status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
-                    attempts INTEGER NOT NULL CHECK(attempts > 0),
-                    delivered_at_unix_ms INTEGER,
-                    PRIMARY KEY (idempotency_key, backend_name),
-                    CHECK((status = 'pending' AND delivered_at_unix_ms IS NULL)
-                       OR (status = 'delivered' AND delivered_at_unix_ms IS NOT NULL))
-                 );"
-    )
-}
-
-/// Reports whether the backend outcome table exists. Any schema object under
-/// its name must match the declared table exactly (columns, composite key,
-/// foreign key, checks and indexes), so a foreign table is refused before it
-/// can hold confirmations.
-fn verify_backend_table(connection: &Connection) -> PortResult<bool> {
-    let catalog = backend_table_catalog(connection)?;
-    if catalog.is_empty() {
-        return Ok(false);
-    }
-    if catalog != expected_backend_table_catalog()? {
-        return Err(PortError::integrity_failure());
-    }
-    Ok(true)
-}
-
-fn expected_backend_table_catalog() -> PortResult<&'static [CatalogEntry]> {
-    static EXPECTED: OnceLock<PortResult<Vec<CatalogEntry>>> = OnceLock::new();
-    EXPECTED
-        .get_or_init(|| {
-            let reference = Connection::open_in_memory().map_err(|_| PortError::unavailable())?;
-            reference
-                .execute_batch(&outbox_schema_sql())
-                .map_err(|_| PortError::unavailable())?;
-            backend_table_catalog(&reference)
-        })
-        .as_ref()
-        .map(Vec::as_slice)
-        .map_err(Clone::clone)
-}
-
-fn backend_table_catalog(connection: &Connection) -> PortResult<Vec<CatalogEntry>> {
-    let mut statement = connection
-        .prepare(
-            "SELECT type, name, tbl_name, sql FROM sqlite_master
-             WHERE lower(name) = ?1 OR lower(tbl_name) = ?1
-             ORDER BY type, name, tbl_name
-             LIMIT 8",
-        )
-        .map_err(|_| PortError::unavailable())?;
-    let mut rows = statement
-        .query([BACKEND_DELIVERY_TABLE])
-        .map_err(|_| PortError::unavailable())?;
-    let mut catalog = Vec::new();
-    while let Some(row) = rows.next().map_err(|_| PortError::unavailable())? {
-        catalog.push((
-            row.get(0).map_err(|_| PortError::invalid_data())?,
-            row.get(1).map_err(|_| PortError::invalid_data())?,
-            row.get(2).map_err(|_| PortError::invalid_data())?,
-            row.get(3).map_err(|_| PortError::invalid_data())?,
-        ));
-    }
-    Ok(catalog)
-}
-
-fn parked_at_unix_ms() -> PortResult<u64> {
-    u64::try_from(i64::MAX).map_err(|_| PortError::integrity_failure())
 }
 
 fn increment(counter: &mut usize) -> PortResult<()> {
@@ -1170,101 +867,11 @@ fn validate_alert(alert: &SecurityAlert) -> PortResult<()> {
     {
         return Err(PortError::invalid_data());
     }
-    sqlite_time(alert.occurred_at_unix_ms)?;
     Ok(())
 }
 
 fn digest_is_zero(digest: &Digest32) -> bool {
     digest.as_bytes().iter().all(|byte| *byte == 0)
-}
-
-fn sqlite_time(value: u64) -> PortResult<i64> {
-    i64::try_from(value).map_err(|_| PortError::invalid_data())
-}
-
-type AlertDeliveryStatusRow = (Vec<u8>, Vec<u8>, String, i64, i64, Option<i64>);
-
-trait StatusConnection {
-    fn query_status(
-        &self,
-        idempotency_key: &str,
-    ) -> rusqlite::Result<Option<AlertDeliveryStatusRow>>;
-}
-
-impl StatusConnection for Connection {
-    fn query_status(
-        &self,
-        idempotency_key: &str,
-    ) -> rusqlite::Result<Option<AlertDeliveryStatusRow>> {
-        query_status_connection(self, idempotency_key)
-    }
-}
-
-impl<'connection> StatusConnection for Transaction<'connection> {
-    fn query_status(
-        &self,
-        idempotency_key: &str,
-    ) -> rusqlite::Result<Option<AlertDeliveryStatusRow>> {
-        query_status_connection(self, idempotency_key)
-    }
-}
-
-fn query_status_connection(
-    connection: &Connection,
-    idempotency_key: &str,
-) -> rusqlite::Result<Option<AlertDeliveryStatusRow>> {
-    connection
-        .query_row(
-            &format!(
-                "SELECT command_json, command_hash, status, attempts,
-                        next_attempt_at_unix_ms, delivered_at_unix_ms
-                 FROM {OUTBOX_TABLE} WHERE idempotency_key = ?1"
-            ),
-            [idempotency_key],
-            |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                    row.get(4)?,
-                    row.get(5)?,
-                ))
-            },
-        )
-        .optional()
-}
-
-fn load_status(
-    connection: &impl StatusConnection,
-    idempotency_key: &str,
-    expected_json: &[u8],
-    expected_hash: &[u8],
-) -> PortResult<Option<AlertDeliveryStatus>> {
-    let Some((command_json, command_hash, status, attempts, next_attempt, delivered_at)) =
-        connection
-            .query_status(idempotency_key)
-            .map_err(|_| PortError::unavailable())?
-    else {
-        return Ok(None);
-    };
-    if command_json != expected_json || command_hash != expected_hash {
-        return Err(PortError::conflict());
-    }
-    let attempts = u32::try_from(attempts).map_err(|_| PortError::integrity_failure())?;
-    match (status.as_str(), delivered_at) {
-        ("pending", None) => Ok(Some(AlertDeliveryStatus::Pending {
-            attempts,
-            next_attempt_at_unix_ms: u64::try_from(next_attempt)
-                .map_err(|_| PortError::integrity_failure())?,
-        })),
-        ("delivered", Some(delivered_at)) => Ok(Some(AlertDeliveryStatus::Delivered {
-            attempts,
-            delivered_at_unix_ms: u64::try_from(delivered_at)
-                .map_err(|_| PortError::integrity_failure())?,
-        })),
-        _ => Err(PortError::integrity_failure()),
-    }
 }
 
 fn retry_delay(config: AlertOutboxConfig, attempts: u32) -> u64 {
@@ -1329,37 +936,6 @@ mod tests {
 
     fn record(value: &str) -> RecordId {
         RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
-    }
-
-    #[test]
-    fn outbox_command_hash_refuses_nul_padded_text() -> Result<(), Box<dyn std::error::Error>> {
-        let connection = Connection::open_in_memory()?;
-        connection.execute_batch(&outbox_schema_sql())?;
-        let insert = format!(
-            "INSERT INTO {OUTBOX_TABLE} (idempotency_key, command_json, command_hash, status, \
-             attempts, next_attempt_at_unix_ms) VALUES ('key', x'7b7d', ?1, 'pending', 0, 0)"
-        );
-        let padded = connection.execute(
-            &insert,
-            [rusqlite::types::Value::Text(format!(
-                "{}\0{}",
-                "a".repeat(32),
-                "a".repeat(1 << 20)
-            ))],
-        );
-        assert!(
-            matches!(
-                &padded,
-                Err(rusqlite::Error::SqliteFailure(error, Some(_)))
-                    if error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_CHECK
-            ),
-            "{padded:?}"
-        );
-        assert_eq!(
-            connection.execute(&insert, [rusqlite::types::Value::Blob(vec![1; 32])])?,
-            1
-        );
-        Ok(())
     }
 
     #[test]

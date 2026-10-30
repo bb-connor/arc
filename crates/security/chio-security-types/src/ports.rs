@@ -18,9 +18,12 @@ use core::fmt;
 use serde::de::{SeqAccess, Visitor};
 use serde::{de, Deserialize, Deserializer, Serialize};
 mod alerts;
+pub use alerts::{
+    AlertBackendOutcome, AlertDeliveryQuery, AlertDeliveryStatus, DueSecurityAlert, SecurityAlert,
+    SecurityAlertOutboxBacklog, SECURITY_ALERT_MAX_CANONICAL_BYTES,
+};
 #[cfg(feature = "std")]
-pub use alerts::SecurityAlertPort;
-pub use alerts::{AlertDeliveryQuery, AlertDeliveryStatus, SecurityAlert};
+pub use alerts::{SecurityAlertOutboxStore, SecurityAlertPort};
 
 mod approval;
 #[cfg(feature = "std")]

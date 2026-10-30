@@ -113,6 +113,7 @@ pub mod schema_version;
 pub mod sealed_decoy_registry;
 #[cfg(any(test, feature = "security-admission-test-support"))]
 pub mod security_admission_operation_store;
+pub mod security_alert_outbox_store;
 pub mod security_state;
 pub mod serving_owner;
 pub mod settle_attempts;
@@ -534,6 +535,7 @@ pub use schema_version::{
 pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
 #[cfg(any(test, feature = "security-admission-test-support"))]
 pub use security_admission_operation_store::SqliteAdmissionOperationStore as SqliteSecurityAdmissionOperationStore;
+pub use security_alert_outbox_store::SqliteSecurityAlertOutboxStore;
 pub use security_state::SqliteSecurityStateStore;
 pub use serving_owner::{
     scope_fixed_authority_ids_for_current_thread, FixedAuthorityIdScope, RelocationImport,
