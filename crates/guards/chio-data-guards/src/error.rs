@@ -10,7 +10,7 @@ use thiserror::Error;
 
 /// Reason [`SqlQueryGuard::try_new`](crate::sql_guard::SqlQueryGuard::try_new)
 /// refuses a [`SqlGuardConfig`](crate::config::SqlGuardConfig).
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
+#[derive(Clone, Debug, Error, PartialEq)]
 pub enum SqlGuardConfigError {
     /// Two `column_allowlist` keys name the same table ignoring case.
     #[error("sql_query.column_allowlist names table `{table}` more than once (table names are case-insensitive)")]
