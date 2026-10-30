@@ -13,7 +13,6 @@ use chio_core::capability::anchor::AnchorKind;
 use chio_core::capability::scope::ChioScope;
 use chio_core::crypto::{sign_wrapped, verify_wrapped, PublicKey, Signature, SigningBackend};
 use chio_core::root_authority::{HolderClass, Identifier, Sha256Digest};
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -38,8 +37,7 @@ pub const MAX_OPERATOR_ROOT_REQUEST_BYTES: usize = 64 * 1024;
 pub struct OperatorRootRequest {
     pub request_id: Identifier,
     pub principal: Identifier,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tenant_value: Option<Identifier>,
+    pub tenant_value: Identifier,
     pub scope: ChioScope,
     pub holder: HolderClass,
     pub expires_at: u64,
@@ -47,9 +45,21 @@ pub struct OperatorRootRequest {
 
 impl OperatorRootRequest {
     /// Decode a request body strictly: a body over the size bound, a
-    /// repeated member, or an unknown or ill-typed member refuses.
+    /// repeated member, an absent `tenant_value`, or an unknown or ill-typed
+    /// member refuses.
     pub fn parse(body: &[u8]) -> Result<Self, RootExchangeError> {
-        decode_document(body)
+        Self::from_members(decode_document(body)?)
+    }
+
+    /// The request held by an admitted JSON object; an absent `tenant_value`
+    /// refuses with its own typed refusal before the object is decoded.
+    fn from_members(members: Map<String, Value>) -> Result<Self, RootExchangeError> {
+        if !members.contains_key("tenant_value") {
+            return Err(RootExchangeError::OperatorRootRequestMissingTenant);
+        }
+        serde_json::from_value::<OperatorRootRequest>(Value::Object(members)).map_err(|_| {
+            RootExchangeError::OperatorRootRequestMalformed("body does not have the request shape")
+        })
     }
 
     fn signing_body(&self) -> OperatorRootRequestSigningBody<'_> {
@@ -57,7 +67,7 @@ impl OperatorRootRequest {
             schema: CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
             request_id: &self.request_id,
             principal: &self.principal,
-            tenant_value: self.tenant_value.as_ref(),
+            tenant_value: &self.tenant_value,
             scope: &self.scope,
             holder: self.holder,
             expires_at: self.expires_at,
@@ -65,7 +75,7 @@ impl OperatorRootRequest {
     }
 }
 
-fn decode_document<T: DeserializeOwned>(body: &[u8]) -> Result<T, RootExchangeError> {
+fn decode_document(body: &[u8]) -> Result<Map<String, Value>, RootExchangeError> {
     crate::input::document(body, MAX_OPERATOR_ROOT_REQUEST_BYTES).map_err(|error| {
         RootExchangeError::OperatorRootRequestMalformed(match error {
             UntrustedJsonError::TooLarge { .. } => "body exceeds the size bound",
@@ -82,8 +92,7 @@ struct OperatorRootRequestSigningBody<'a> {
     schema: &'static str,
     request_id: &'a Identifier,
     principal: &'a Identifier,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tenant_value: Option<&'a Identifier>,
+    tenant_value: &'a Identifier,
     scope: &'a ChioScope,
     holder: HolderClass,
     expires_at: u64,
@@ -94,8 +103,7 @@ struct SignedOperatorRootRequestWire<'a> {
     schema: &'static str,
     request_id: &'a Identifier,
     principal: &'a Identifier,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tenant_value: Option<&'a Identifier>,
+    tenant_value: &'a Identifier,
     scope: &'a ChioScope,
     holder: HolderClass,
     expires_at: u64,
@@ -111,15 +119,11 @@ pub struct SignedOperatorRootRequest {
 }
 
 impl SignedOperatorRootRequest {
-    /// Sign `request` with the operator key `backend` holds. A request
-    /// without `tenant_value` refuses before any signing call.
+    /// Sign `request` with the operator key `backend` holds.
     pub fn sign(
         request: OperatorRootRequest,
         backend: &dyn SigningBackend,
     ) -> Result<Self, RootExchangeError> {
-        if request.tenant_value.is_none() {
-            return Err(RootExchangeError::OperatorRootRequestMissingTenant);
-        }
         let (outcome, _) = sign_wrapped(
             backend,
             CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
@@ -136,7 +140,7 @@ impl SignedOperatorRootRequest {
     /// JSON, a `schema` member equal to `chio.operator-root-request.v1`, a
     /// canonical hex `signature`, and the request members with no other.
     pub fn parse(body: &[u8]) -> Result<Self, RootExchangeError> {
-        let mut members: Map<String, Value> = decode_document(body)?;
+        let mut members = decode_document(body)?;
         match members.remove("schema") {
             Some(Value::String(schema)) if schema == CHIO_OPERATOR_ROOT_REQUEST_SCHEMA => {}
             _ => {
@@ -159,12 +163,7 @@ impl SignedOperatorRootRequest {
         .ok_or(RootExchangeError::OperatorRootRequestMalformed(
             "signature is not a canonical hex signature",
         ))?;
-        let request = serde_json::from_value::<OperatorRootRequest>(Value::Object(members))
-            .map_err(|_| {
-                RootExchangeError::OperatorRootRequestMalformed(
-                    "body does not have the request shape",
-                )
-            })?;
+        let request = OperatorRootRequest::from_members(members)?;
         Ok(Self { request, signature })
     }
 
@@ -175,7 +174,7 @@ impl SignedOperatorRootRequest {
             schema: CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
             request_id: &request.request_id,
             principal: &request.principal,
-            tenant_value: request.tenant_value.as_ref(),
+            tenant_value: &request.tenant_value,
             scope: &request.scope,
             holder: request.holder,
             expires_at: request.expires_at,
@@ -249,18 +248,11 @@ impl VerifiedOperatorRootRequest {
 }
 
 /// Evidence of a verified operator root request at `now` (Unix seconds).
-///
-/// A request without `tenant_value` refuses: the delegation context commits
-/// a tenant for every root.
 pub fn verify(
     verified: &VerifiedOperatorRootRequest,
     now: u64,
 ) -> Result<AnchorEvidence, RootExchangeError> {
     let request = &verified.request;
-    let tenant = request
-        .tenant_value
-        .as_ref()
-        .ok_or(RootExchangeError::OperatorRootRequestMissingTenant)?;
     if request.expires_at <= now {
         return Err(RootExchangeError::RootLifetimeEmpty);
     }
@@ -273,7 +265,7 @@ pub fn verify(
         },
         issuer: OPERATOR_KEY_ISSUER.to_owned(),
         principal: request.principal.as_str().to_owned(),
-        tenant: tenant.as_str().to_owned(),
+        tenant: request.tenant_value.as_str().to_owned(),
         token_iat: now,
         token_exp: request.expires_at,
         jws: None,

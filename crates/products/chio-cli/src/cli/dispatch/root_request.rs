@@ -26,7 +26,7 @@ pub(super) fn dispatch_root_request(command: McpRootRequestCommands) -> Result<(
 /// Sign the operator root request JSON read from `input` with the seed at
 /// `operator_seed_file`, returning the canonical JSON of the signed request.
 /// The seed file must already exist with private custody; a request without
-/// `tenant_value` refuses before any signing call.
+/// `tenant_value` refuses at parse, before any signing call.
 fn sign_root_request(operator_seed_file: &Path, input: impl Read) -> Result<Vec<u8>, CliError> {
     let operator = Ed25519Backend::new(crate::load_existing_authority_keypair(operator_seed_file)?);
     let body = crate::input::read_stream(input, MAX_OPERATOR_ROOT_REQUEST_BYTES)?;
@@ -36,8 +36,21 @@ fn sign_root_request(operator_seed_file: &Path, input: impl Read) -> Result<Vec<
         .map_err(refused)
 }
 
+/// A request refusal under the registered cli-json code, with a fixed public
+/// message and the typed refusal kept as the inspectable source.
 fn refused(error: RootExchangeError) -> CliError {
-    CliError::cli_json_error(error.to_string())
+    let message = match &error {
+        RootExchangeError::OperatorRootRequestMalformed(reason) => *reason,
+        RootExchangeError::OperatorRootRequestMissingTenant => {
+            "operator root request names no tenant_value"
+        }
+        _ => "operator root request could not be signed",
+    };
+    CliError::with_public_source(
+        &chio_errors::_generated::error_codes::CLI_JSON,
+        message,
+        error,
+    )
 }
 
 #[cfg(test)]
