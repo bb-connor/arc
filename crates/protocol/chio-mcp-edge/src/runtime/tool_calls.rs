@@ -734,12 +734,10 @@ impl ChioMcpEdge {
             related_task_id,
         );
         match error {
-            chio_kernel::KernelError::RequestCancelled { reason, .. } => {
-                ToolCallEdgeOutcome::Cancelled {
-                    result: tool_error_result(&reason),
-                    reason,
-                }
-            }
+            chio_kernel::KernelError::RequestCancelled { .. } => ToolCallEdgeOutcome::Cancelled {
+                reason: code.text().to_owned(),
+                result: denial_tool_result(code),
+            },
             chio_kernel::KernelError::UrlElicitationsRequired {
                 message,
                 elicitations,

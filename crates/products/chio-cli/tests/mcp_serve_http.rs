@@ -3808,7 +3808,7 @@ fn mcp_serve_http_parent_cancellation_during_tasks_result_marks_task_cancelled()
             .expect("owner request id")
             .starts_with("mcp-edge-req-")
     );
-    assert_closed_denial(&task_result["result"], "denied");
+    assert_closed_denial(&task_result["result"], "session_unsupported");
     assert!(
         task_messages.iter().any(|message| {
             message["method"] == "notifications/tasks/status"
