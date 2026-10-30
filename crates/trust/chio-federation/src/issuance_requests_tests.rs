@@ -38,3 +38,34 @@ fn list_page_size_is_clamped() {
     assert_eq!(query(10).page_size(), 10);
     assert_eq!(query(10_000).page_size(), MAX_ISSUANCE_LIST_PAGE);
 }
+
+#[test]
+fn in_memory_repository_conforms() {
+    conformance::all(&|pending_cap| {
+        std::sync::Arc::new(memory::InMemoryIssuanceRequestRepository::with_pending_cap(
+            pending_cap,
+        )) as std::sync::Arc<dyn IssuanceRequestRepository>
+    });
+}
+
+#[test]
+fn summaries_never_carry_presentation_or_challenge_payloads() {
+    let page = IssuanceRequestPage {
+        requests: vec![IssuanceRequestSummary {
+            challenge_id: "c7".into(),
+            subject: "did:chio:abc".into(),
+            verifier: "https://b.example".into(),
+            submitted_at: 100,
+            expires_at: 1_000,
+            status: IssuanceRequestStatus::Pending,
+            decided_at: None,
+            capability_id: None,
+            decision_reason: None,
+        }],
+        next_after: None,
+    };
+    let json = serde_json::to_string(&page).unwrap_or_default();
+    assert!(json.contains("\"challengeId\":\"c7\""), "{json}");
+    assert!(!json.contains("presentation"), "{json}");
+    assert!(!json.contains("challengeJson"), "{json}");
+}

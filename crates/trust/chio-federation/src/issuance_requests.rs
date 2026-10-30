@@ -204,6 +204,11 @@ pub trait IssuanceRequestRepository: Send + Sync {
     fn release(&self, challenge_id: &str) -> Result<(), IssuanceStoreError>;
 }
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod conformance;
+#[cfg(any(test, feature = "test-support"))]
+pub mod memory;
+
 #[cfg(test)]
 #[path = "issuance_requests_tests.rs"]
 mod tests;
