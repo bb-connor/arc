@@ -9,9 +9,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false }
+chio-core-types = { version = "=0.2.0-alpha.1", path = "../../core/chio-core-types", default-features = false }
 chio-security-types = { workspace = true }
-chio-semantic-contracts = { version = "=0.1.0", path = "../chio-semantic-contracts", default-features = false }
+chio-semantic-contracts = { version = "=0.2.0-alpha.1", path = "../chio-semantic-contracts", default-features = false }
 serde = { version = "1", default-features = false }
 
 [features]

@@ -14,7 +14,7 @@ name = "chio_a2a_adapter"
 [dependencies]
 async-trait = { workspace = true }
 base64 = "0.22"
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-egress-contract = { workspace = true, features = ["ureq-egress"] }
 chio-kernel = { workspace = true }
 chio-security-types = { workspace = true }

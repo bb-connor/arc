@@ -18,7 +18,7 @@ name = "chio_cohere_tools_adapter"
 cohere_api_version = "2025-04"
 
 [dependencies]
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true }
 chio-tool-call-fabric = { workspace = true }

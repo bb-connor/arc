@@ -13,7 +13,7 @@ chio-provider-adapter-core = { workspace = true }
 tokio = { workspace = true, features = ["rt", "process", "io-util", "time"] }
 rustix = { workspace = true, features = ["fs", "process"] }
 tempfile = { workspace = true }
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-anthropic-tools-adapter = { workspace = true, features = ["computer-use"], optional = true }
 chio-bedrock-converse-adapter = { workspace = true, optional = true }
 chio-cohere-tools-adapter = { workspace = true, optional = true }
@@ -22,7 +22,7 @@ chio-groq-tools-adapter = { workspace = true, optional = true }
 chio-manifest = { workspace = true, optional = true }
 chio-mistral-tools-adapter = { workspace = true, optional = true }
 chio-ollama-tools-adapter = { workspace = true, optional = true }
-chio-openai = { version = "=0.1.0", package = "chio-openai-adapter", path = "../chio-openai-adapter", features = ["provider-adapter"], optional = true }
+chio-openai = { version = "=0.2.0-alpha.1", package = "chio-openai-adapter", path = "../chio-openai-adapter", features = ["provider-adapter"], optional = true }
 chio-tool-call-fabric = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 clap = { version = "4", features = ["derive"] }

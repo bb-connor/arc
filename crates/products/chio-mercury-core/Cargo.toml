@@ -12,7 +12,7 @@ publish = false
 name = "chio_mercury_core"
 
 [dependencies]
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-kernel = { workspace = true }
 chio-kernel-core = { workspace = true }
 serde = { workspace = true }

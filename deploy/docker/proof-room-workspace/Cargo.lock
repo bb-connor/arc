@@ -2066,7 +2066,7 @@ dependencies = [
 
 [[package]]
 name = "chio-adversarial-suite"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "hex",
  "serde",
@@ -2077,7 +2077,7 @@ dependencies = [
 
 [[package]]
 name = "chio-agent-web-interop"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64 0.22.1",
  "chio-commerce-order",
@@ -2094,7 +2094,7 @@ dependencies = [
 
 [[package]]
 name = "chio-anchor"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -2123,7 +2123,7 @@ dependencies = [
 
 [[package]]
 name = "chio-anthropic-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2139,7 +2139,7 @@ dependencies = [
 
 [[package]]
 name = "chio-appraisal"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-fiscal",
@@ -2151,7 +2151,7 @@ dependencies = [
 
 [[package]]
 name = "chio-attest-buyer-core"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-federation",
@@ -2166,7 +2166,7 @@ dependencies = [
 
 [[package]]
 name = "chio-attest-verify"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-adversarial-suite",
  "chio-core-types",
@@ -2198,7 +2198,7 @@ dependencies = [
 
 [[package]]
 name = "chio-autonomy"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-market",
@@ -2210,7 +2210,7 @@ dependencies = [
 
 [[package]]
 name = "chio-bedrock-converse-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "aws-sdk-bedrockruntime",
  "aws-sdk-sts",
@@ -2235,7 +2235,7 @@ dependencies = [
 
 [[package]]
 name = "chio-bounded"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "loom",
  "proptest",
@@ -2243,7 +2243,7 @@ dependencies = [
 
 [[package]]
 name = "chio-cage-plan"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "libc",
@@ -2254,7 +2254,7 @@ dependencies = [
 
 [[package]]
 name = "chio-cohere-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2271,7 +2271,7 @@ dependencies = [
 
 [[package]]
 name = "chio-commerce-order"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-credit",
@@ -2287,7 +2287,7 @@ dependencies = [
 
 [[package]]
 name = "chio-core"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-appraisal",
  "chio-autonomy",
@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "chio-core-types"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "aws-lc-rs",
  "chio-security-types",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "chio-credit"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
@@ -2367,7 +2367,7 @@ dependencies = [
 
 [[package]]
 name = "chio-cross-protocol"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "chio-custody-hw"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64ct",
  "chio-core-types",
@@ -2412,7 +2412,7 @@ dependencies = [
 
 [[package]]
 name = "chio-data-guards-redactors-default"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "regex",
  "serde",
@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "chio-did"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "arbitrary",
  "bs58",
@@ -2435,7 +2435,7 @@ dependencies = [
 
 [[package]]
 name = "chio-disclosure-lineage"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "serde",
@@ -2444,7 +2444,7 @@ dependencies = [
 
 [[package]]
 name = "chio-egress-contract"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "http 1.4.0",
@@ -2461,7 +2461,7 @@ dependencies = [
 
 [[package]]
 name = "chio-enterprise-export"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-risk-comptroller",
@@ -2474,7 +2474,7 @@ dependencies = [
 
 [[package]]
 name = "chio-federation"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64 0.22.1",
  "chio-core-types",
@@ -2498,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "chio-federation-authority"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "aws-lc-rs",
  "chacha20poly1305",
@@ -2520,14 +2520,14 @@ dependencies = [
 
 [[package]]
 name = "chio-file-custody"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "chio-fincred"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "serde",
@@ -2536,7 +2536,7 @@ dependencies = [
 
 [[package]]
 name = "chio-finding"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64 0.22.1",
  "chio-core-types",
@@ -2550,7 +2550,7 @@ dependencies = [
 
 [[package]]
 name = "chio-finding-verifier"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
@@ -2567,7 +2567,7 @@ dependencies = [
 
 [[package]]
 name = "chio-fiscal"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-listing",
@@ -2580,7 +2580,7 @@ dependencies = [
 
 [[package]]
 name = "chio-gemini-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2596,7 +2596,7 @@ dependencies = [
 
 [[package]]
 name = "chio-governance"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-listing",
@@ -2607,7 +2607,7 @@ dependencies = [
 
 [[package]]
 name = "chio-groq-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2624,7 +2624,7 @@ dependencies = [
 
 [[package]]
 name = "chio-http-serve"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -2641,7 +2641,7 @@ dependencies = [
 
 [[package]]
 name = "chio-kernel"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -2697,7 +2697,7 @@ dependencies = [
 
 [[package]]
 name = "chio-kernel-core"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "arbitrary",
  "arc-swap",
@@ -2712,7 +2712,7 @@ dependencies = [
 
 [[package]]
 name = "chio-lineage"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "serde",
@@ -2722,7 +2722,7 @@ dependencies = [
 
 [[package]]
 name = "chio-link"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "alloy-contract",
  "alloy-json-rpc",
@@ -2744,7 +2744,7 @@ dependencies = [
 
 [[package]]
 name = "chio-listing"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-spec-validate",
@@ -2755,7 +2755,7 @@ dependencies = [
 
 [[package]]
 name = "chio-log-redact"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-data-guards-redactors-default",
  "thiserror 1.0.69",
@@ -2765,7 +2765,7 @@ dependencies = [
 
 [[package]]
 name = "chio-manifest"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-cage-plan",
  "chio-core",
@@ -2780,7 +2780,7 @@ dependencies = [
 
 [[package]]
 name = "chio-market"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
@@ -2795,11 +2795,11 @@ dependencies = [
 
 [[package]]
 name = "chio-metrics-spec"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 
 [[package]]
 name = "chio-mistral-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2816,7 +2816,7 @@ dependencies = [
 
 [[package]]
 name = "chio-ollama-tools-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-manifest",
@@ -2830,7 +2830,7 @@ dependencies = [
 
 [[package]]
 name = "chio-open-market"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64 0.22.1",
  "chio-core-types",
@@ -2847,7 +2847,7 @@ dependencies = [
 
 [[package]]
 name = "chio-openai-adapter"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2868,7 +2868,7 @@ dependencies = [
 
 [[package]]
 name = "chio-pheromone"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "base64 0.22.1",
  "chio-core-types",
@@ -2881,7 +2881,7 @@ dependencies = [
 
 [[package]]
 name = "chio-proof-room"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "axum",
  "chio-agent-web-interop",
@@ -2915,7 +2915,7 @@ dependencies = [
 
 [[package]]
 name = "chio-provider-adapter-core"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "chio-core-types",
@@ -2931,7 +2931,7 @@ dependencies = [
 
 [[package]]
 name = "chio-provider-conformance"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-anthropic-tools-adapter",
  "chio-bedrock-converse-adapter",
@@ -2957,7 +2957,7 @@ dependencies = [
 
 [[package]]
 name = "chio-quarantine"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-kernel",
@@ -2973,7 +2973,7 @@ dependencies = [
 
 [[package]]
 name = "chio-response-model"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-security-types",
@@ -2985,7 +2985,7 @@ dependencies = [
 
 [[package]]
 name = "chio-revocation-oracle"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-federation",
@@ -3004,7 +3004,7 @@ dependencies = [
 
 [[package]]
 name = "chio-risk-comptroller"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-test-support",
@@ -3017,7 +3017,7 @@ dependencies = [
 
 [[package]]
 name = "chio-runtime-proof-parity"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "serde",
@@ -3027,7 +3027,7 @@ dependencies = [
 
 [[package]]
 name = "chio-security-types"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "jsonschema",
  "serde",
@@ -3037,7 +3037,7 @@ dependencies = [
 
 [[package]]
 name = "chio-selective-disclosure"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "affinidi-bbs",
  "chio-core-types",
@@ -3053,7 +3053,7 @@ dependencies = [
 
 [[package]]
 name = "chio-semantic-contracts"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-security-types",
@@ -3063,7 +3063,7 @@ dependencies = [
 
 [[package]]
 name = "chio-settle"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -3097,7 +3097,7 @@ dependencies = [
 
 [[package]]
 name = "chio-spec-codegen"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "jsonschema",
  "prettyplease",
@@ -3111,7 +3111,7 @@ dependencies = [
 
 [[package]]
 name = "chio-spec-validate"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "jsonschema",
  "serde_json",
@@ -3119,7 +3119,7 @@ dependencies = [
 
 [[package]]
 name = "chio-sqlite-file-identity"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "libc",
  "rusqlite",
@@ -3128,7 +3128,7 @@ dependencies = [
 
 [[package]]
 name = "chio-store-sqlite"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -3180,7 +3180,7 @@ dependencies = [
 
 [[package]]
 name = "chio-supervisor"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "loom",
  "proptest",
@@ -3191,7 +3191,7 @@ dependencies = [
 
 [[package]]
 name = "chio-swarm-authority"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-test-support",
@@ -3203,7 +3203,7 @@ dependencies = [
 
 [[package]]
 name = "chio-test-support"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-security-types",
  "serde",
@@ -3213,7 +3213,7 @@ dependencies = [
 
 [[package]]
 name = "chio-tool-call-fabric"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3228,7 +3228,7 @@ dependencies = [
 
 [[package]]
 name = "chio-transaction-passport"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-finding",
@@ -3247,7 +3247,7 @@ dependencies = [
 
 [[package]]
 name = "chio-trust-market-context"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core-types",
  "chio-risk-comptroller",
@@ -3260,7 +3260,7 @@ dependencies = [
 
 [[package]]
 name = "chio-underwriting"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-appraisal",
  "chio-core-types",
@@ -3271,7 +3271,7 @@ dependencies = [
 
 [[package]]
 name = "chio-web3"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "alloy-primitives",
  "chio-core-types",
@@ -3285,7 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "chio-web3-bindings"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "alloy",
  "chio-core",
@@ -3296,7 +3296,7 @@ dependencies = [
 
 [[package]]
 name = "chio-weights"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-attest-verify",
  "chio-core-types",
@@ -3313,7 +3313,7 @@ dependencies = [
 
 [[package]]
 name = "chio-workflow"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
@@ -3325,7 +3325,7 @@ dependencies = [
 
 [[package]]
 name = "chio-workflow-preflight"
-version = "0.1.0"
+version = "0.2.0-alpha.1"
 dependencies = [
  "serde",
  "serde_json",

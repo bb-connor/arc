@@ -19,7 +19,7 @@ anthropic_version = "2023-06-01"
 computer_use_beta = "computer-use-2025-01-24"
 
 [dependencies]
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-manifest = { workspace = true }
 chio-provider-adapter-core = { workspace = true }
 chio-tool-call-fabric = { workspace = true }

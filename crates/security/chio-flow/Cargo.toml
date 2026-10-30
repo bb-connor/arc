@@ -13,7 +13,7 @@ name = "chio_flow"
 
 [dependencies]
 chio-security-types = { workspace = true }
-chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false }
+chio-core-types = { version = "=0.2.0-alpha.1", path = "../../core/chio-core-types", default-features = false }
 serde_json = { version = "1", default-features = false, features = ["alloc", "float_roundtrip"] }
 sha2 = { version = "0.10", default-features = false }
 

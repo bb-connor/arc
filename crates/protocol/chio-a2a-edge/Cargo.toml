@@ -17,7 +17,7 @@ otel = ["chio-kernel/otel", "chio-mcp-edge/otel"]
 
 [dependencies]
 chio-security-types = { workspace = true }
-chio-core = { version = "=0.1.0", package = "chio-core-types", path = "../../core/chio-core-types" }
+chio-core = { version = "=0.2.0-alpha.1", package = "chio-core-types", path = "../../core/chio-core-types" }
 chio-cross-protocol = { workspace = true }
 chio-edge-metrics = { workspace = true }
 chio-kernel = { workspace = true }
