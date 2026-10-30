@@ -103,7 +103,7 @@ fn sample_batch() -> chio_anchor::AnchorBatch {
     let kp = Keypair::generate();
     let witness = AnchorBatchWitness {
         kind: AnchorBatchWitnessKind::Rekor,
-        witness_id: "rekor:placeholder".to_string(),
+        witness_id: "rekor:example-witness-1".to_string(),
         root: Hash::zero(),
         observed_at: Some(1_700_000_000),
     };

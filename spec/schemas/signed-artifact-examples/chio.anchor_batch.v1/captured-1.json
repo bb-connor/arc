@@ -35,7 +35,7 @@
     "kind": "rekor",
     "observedAt": 1700000000,
     "root": "0x5f26e6ce872a020390d33043f3aae127d8bd11cd871fcb6eb3445514c4e82bfb",
-    "witnessId": "rekor:placeholder"
+    "witnessId": "rekor:example-witness-1"
   },
   "witnessState": {
     "kind": "witnessed",
