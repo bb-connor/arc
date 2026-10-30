@@ -367,10 +367,42 @@ pub(crate) const STEPS: &[Step] = &[
         owns: &["tests/bindings/vectors/security/signed-wire/positive/signed-security-event-*"],
     },
     Step {
+        name: "broker positive vectors",
+        regenerate: cargo(&[
+            "test",
+            "-p",
+            "chio-secret-broker",
+            "--lib",
+            "--",
+            "--ignored",
+            "--exact",
+            "audit::broker_positive_vector_tests::regenerate_broker_positive_vectors",
+        ]),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-secret-broker",
+            "--lib",
+            "audit::broker_positive_vector_tests",
+        ]),
+        owns: &[
+            "tests/bindings/vectors/security/broker/positive/broker-capability-envelope-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-execute-failure-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-execute-request-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-execution-failure-receipt-envelope-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-privileged-audit-*",
+            "tests/bindings/vectors/security/broker/positive/broker-register-attempt-authorization-envelope-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-request-proof-envelope-v1.json",
+        ],
+    },
+    Step {
         name: "broker receipt vectors",
         regenerate: Invocation::Internal(InternalGenerator::BrokerReceiptVectors),
         check: Invocation::Internal(InternalGenerator::BrokerReceiptVectors),
-        owns: &["tests/bindings/vectors/security/broker/**"],
+        owns: &[
+            "tests/bindings/vectors/security/broker/positive/broker-execute-response-v1.json",
+            "tests/bindings/vectors/security/broker/positive/broker-execution-receipt-envelope-v1.json",
+        ],
     },
     Step {
         name: "cage vectors",

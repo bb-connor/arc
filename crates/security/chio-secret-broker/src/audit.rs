@@ -1521,3 +1521,6 @@ mod tests {
 
 #[cfg(test)]
 mod signed_wire_vector_tests;
+
+#[cfg(test)]
+mod broker_positive_vector_tests;
