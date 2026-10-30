@@ -2,7 +2,7 @@ use std::io::ErrorKind;
 use std::os::unix::fs::PermissionsExt;
 
 use super::OpenPolicy::{Authenticated, Private, Trusted};
-use super::RegularFileError::{Exposed, ForeignOwner, Writable};
+use super::RegularFileError::{Exposed, ForeignOwner, MultiplyLinked, Writable};
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -21,27 +21,36 @@ fn private_file(directory: &Path, bytes: &[u8]) -> std::io::Result<std::path::Pa
 fn ownership_rules_by_policy() {
     const EUID: u32 = 1000;
     let cases = [
-        (Trusted, EUID, 0o100644, None),
-        (Trusted, 0, 0o100644, None),
-        (Trusted, 0, 0o100444, None),
-        (Trusted, 1001, 0o100644, Some(ForeignOwner { uid: 1001 })),
-        (Trusted, 0, 0o100664, Some(Writable { mode: 0o664 })),
-        (Trusted, EUID, 0o100646, Some(Writable { mode: 0o646 })),
-        (Private, EUID, 0o100600, None),
-        (Private, EUID, 0o100400, None),
-        (Private, 0, 0o100600, Some(ForeignOwner { uid: 0 })),
-        (Private, EUID, 0o100640, Some(Exposed { mode: 0o640 })),
-        (Private, EUID, 0o100604, Some(Exposed { mode: 0o604 })),
-        (Authenticated, EUID, 0o100666, None),
-        (Authenticated, 1001, 0o100600, None),
-        (Authenticated, 0, 0o100777, None),
-        (Authenticated, 1001, 0o104755, None),
+        (Trusted, EUID, 0o100644, 1, None),
+        (Trusted, 0, 0o100644, 1, None),
+        (Trusted, 0, 0o100444, 1, None),
+        (Trusted, 1001, 0o100644, 1, Some(ForeignOwner { uid: 1001 })),
+        (Trusted, 0, 0o100664, 1, Some(Writable { mode: 0o664 })),
+        (Trusted, EUID, 0o100646, 1, Some(Writable { mode: 0o646 })),
+        (Private, EUID, 0o100600, 1, None),
+        (Private, EUID, 0o100400, 1, None),
+        (Private, 0, 0o100600, 1, Some(ForeignOwner { uid: 0 })),
+        (Private, EUID, 0o100640, 1, Some(Exposed { mode: 0o640 })),
+        (Private, EUID, 0o100604, 1, Some(Exposed { mode: 0o604 })),
+        (
+            Private,
+            EUID,
+            0o100600,
+            2,
+            Some(MultiplyLinked { links: 2 }),
+        ),
+        (Trusted, EUID, 0o100644, 2, None),
+        (Authenticated, EUID, 0o100600, 3, None),
+        (Authenticated, EUID, 0o100666, 1, None),
+        (Authenticated, 1001, 0o100600, 1, None),
+        (Authenticated, 0, 0o100777, 1, None),
+        (Authenticated, 1001, 0o104755, 1, None),
     ];
-    for (policy, uid, mode, expected) in cases {
+    for (policy, uid, mode, links, expected) in cases {
         assert_eq!(
-            check_ownership(policy, uid, mode, EUID).err(),
+            check_ownership(policy, uid, mode, links, EUID).err(),
             expected,
-            "{policy:?} uid {uid} mode {mode:o}"
+            "{policy:?} uid {uid} mode {mode:o} links {links}"
         );
     }
 }
@@ -75,6 +84,19 @@ fn symlink_directory_and_missing_paths_are_refused_under_every_policy() -> TestR
         assert_eq!(read(directory.path()), Err(RegularFileError::NotRegular));
         assert_eq!(read(&absent), Err(RegularFileError::Missing));
     }
+    Ok(())
+}
+
+#[test]
+fn a_hard_linked_secret_is_refused_only_as_private() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = private_file(directory.path(), b"{}")?;
+    std::fs::hard_link(&path, directory.path().join("second.json"))?;
+    assert_eq!(
+        read_regular_file(&path, LIMIT, Private),
+        Err(MultiplyLinked { links: 2 })
+    );
+    assert_eq!(read_regular_file(&path, LIMIT, Trusted)?, b"{}");
     Ok(())
 }
 
