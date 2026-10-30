@@ -211,11 +211,11 @@ const REJECTIONS: &[(&str, &str)] = &[
     ("revocation-entry.padding.json", "unknown field `note`"),
     (
         "revocation-entry.unknown-kind.json",
-        "`target_kind` is not a revocation target kind",
+        "unknown variant `session_id`",
     ),
     (
         "revocation-entry.unknown-reason.json",
-        "`reason` is not a revocation reason",
+        "unknown variant `because`",
     ),
     (
         "revocation-entry.zero-time.json",
