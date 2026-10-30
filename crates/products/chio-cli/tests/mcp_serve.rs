@@ -3291,7 +3291,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
         read_response_with_nested_flow_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_closed_denial(&cancelled["result"], "session_unsupported");
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     let progress = cancelled_notifications
         .iter()
@@ -3381,7 +3381,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
         read_response_with_parent_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_closed_denial(&cancelled["result"], "session_unsupported");
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     let progress = cancelled_notifications
         .iter()
@@ -3953,7 +3953,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
         task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"],
         task_id
     );
-    assert_closed_denial(&task_result["result"], "session_unsupported");
+    assert_closed_denial(&task_result["result"], "request_cancelled");
     assert!(
         notifications.iter().any(|notification| {
             notification["method"] == "notifications/tasks/status"

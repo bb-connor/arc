@@ -305,6 +305,7 @@ mod tests {
                 "operation_conflict",
                 "Request id is bound to a different retained operation",
             ),
+            ("request_cancelled", "Request was cancelled"),
             ("denied", "Request denied"),
         ];
         assert_eq!(pinned.len(), CLIENT_DENIAL_CODES.len());
@@ -337,6 +338,15 @@ mod tests {
         for unknown in ["", "Denied", "guard_denied ", "Request denied", "unknown"] {
             assert_eq!(ClientDenialCode::from_code(unknown), None, "{unknown:?}");
         }
+    }
+
+    #[test]
+    fn a_cancelled_request_reports_request_cancelled() {
+        let error = KernelError::RequestCancelled {
+            request_id: chio_core::session::RequestId::new("cancelled-request"),
+            reason: "cancelled by client: user aborted sample".to_string(),
+        };
+        assert_eq!(error.client_denial_code().code(), "request_cancelled");
     }
 
     #[test]
