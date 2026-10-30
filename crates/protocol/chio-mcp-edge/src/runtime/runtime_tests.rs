@@ -3014,7 +3014,10 @@ fn tasks_cancel_marks_working_task_cancelled_and_result_returns_error_payload() 
             "params": { "taskId": task_id.clone() }
         }))
         .unwrap();
+    let code = chio_kernel::ClientDenialCode::RequestCancelled;
     assert_eq!(result["result"]["isError"], true);
+    assert_eq!(result["result"]["structuredContent"]["code"], code.code());
+    assert_eq!(result["result"]["content"][0]["text"], code.text());
     assert_eq!(
         result["result"]["_meta"][RELATED_TASK_META_KEY]["taskId"],
         task_id
