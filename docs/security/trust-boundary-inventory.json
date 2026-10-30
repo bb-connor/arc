@@ -1298,7 +1298,6 @@
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::fetch_issuer_document_under::from_wire",
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs::post::from_wire",
-    "crates/platform/chio-control-plane/src/enterprise_federation.rs::load::from_wire",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy::from_wire",
     "crates/platform/chio-control-plane/src/federation_policy.rs::load::from_wire",
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs::post::from_wire",
@@ -14860,7 +14859,7 @@
         [
           "load",
           "decode_signed",
-          "64 * 1024 * 1024"
+          "MAX_SIGNED_FILE_BYTES"
         ]
       ],
       "retained_typed_conversions": [
@@ -17337,7 +17336,6 @@
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#2::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::fetch_issuer_document_under::from_wire#1::decode_external",
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs::post#2::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/enterprise_federation.rs::load#2::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/federation_policy.rs::load::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs::post#2::from_wire#1::decode_signed",
@@ -18727,7 +18725,7 @@
     ],
     "crates/platform/chio-control-plane/src/enterprise_federation.rs": [
       "load#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
-      "load#2::original-json-reader::UntrustedJsonText"
+      "load#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
     ],
     "crates/platform/chio-control-plane/src/enterprise_identity_index.rs": [
       "deactivate_enterprise_identity::shared-reader::crates/platform/chio-control-plane/src/enterprise_identity_index.rs::load",

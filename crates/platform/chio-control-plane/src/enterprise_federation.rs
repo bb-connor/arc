@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn enterprise_provider_registry_round_trips_validation_state() {
         let directory = chio_test_support::private_tempdir().test_unwrap();
-        let path = directory.path().join("path.json");
+        let path = directory.path().join("enterprise-providers.json");
         let mut invalid_record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
         invalid_record.issuer = None;
         EnterpriseProviderRegistry::update(&path, |registry| {
@@ -695,7 +695,7 @@ mod tests {
     #[test]
     fn enterprise_provider_registry_rejects_mismatched_map_key() {
         let directory = chio_test_support::private_tempdir().test_unwrap();
-        let path = directory.path().join("path.json");
+        let path = directory.path().join("enterprise-providers.json");
         let mut registry = EnterpriseProviderRegistry {
             version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
             providers: BTreeMap::new(),
@@ -777,7 +777,7 @@ mod tests {
     #[test]
     fn certification_discovery_network_round_trips_validation_state() {
         let directory = chio_test_support::private_tempdir().test_unwrap();
-        let path = directory.path().join("path.json");
+        let path = directory.path().join("discovery-network.json");
         let mut network = CertificationDiscoveryNetwork {
             version: CERTIFICATION_DISCOVERY_NETWORK_VERSION.to_string(),
             operators: BTreeMap::new(),
@@ -837,6 +837,35 @@ mod tests {
         );
 
         assert_registry_error(&error, "urn:chio:error:cli:io", "cli");
+    }
+
+    #[test]
+    fn certification_discovery_network_load_is_capped_at_the_signed_input_limit() {
+        use crate::signed_input::MAX_SIGNED_FILE_BYTES;
+        use chio_core::canonical::UntrustedJsonError;
+
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("discovery-network.json");
+        let file = fs::File::create(&path).test_unwrap();
+        for (len, refused_as_too_large) in [
+            (MAX_SIGNED_FILE_BYTES, false),
+            (MAX_SIGNED_FILE_BYTES + 1, true),
+        ] {
+            file.set_len(u64::try_from(len).test_unwrap()).test_unwrap();
+            let error = must_err(
+                CertificationDiscoveryNetwork::load(&path),
+                "a zero-filled discovery network is not a valid document",
+            );
+            assert_eq!(
+                matches!(
+                    error,
+                    CliError::SignedJson(UntrustedJsonError::TooLarge { bound, .. })
+                        if bound == MAX_SIGNED_FILE_BYTES
+                ),
+                refused_as_too_large,
+                "{len} bytes: {error:?}"
+            );
+        }
     }
 
     #[test]
