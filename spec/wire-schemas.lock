@@ -725,6 +725,11 @@ files = ["crates/trust/chio-governance/src/lease.rs"]
 first_seen = "769c627445"
 
 [[schema]]
+value = "chio.capability-presentation.v1"
+files = ["crates/core/chio-core-types/src/root_authority/presentation.rs"]
+first_seen = "61607d31ad"
+
+[[schema]]
 value = "chio.capability-security-binding.v1"
 files = ["crates/core/chio-core-types/src/capability/caveat.rs"]
 first_seen = "2b78941163"
