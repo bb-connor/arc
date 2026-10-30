@@ -14,6 +14,7 @@ pub mod consistency;
 pub mod delegation_context;
 pub mod idp_key_snapshot;
 pub mod jwk;
+pub mod presentation;
 pub mod provider_identity;
 pub mod revocation_entry;
 pub mod root_policy;
@@ -34,6 +35,10 @@ pub use idp_key_snapshot::{
     CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
 };
 pub use jwk::{Jwk, JwkCurve, JwkFields, JwkKeyType, JwkUse, JwsAlgorithm};
+pub use presentation::{
+    chain_digest, CapabilityPresentation, CapabilityPresentationFields,
+    CHIO_CAPABILITY_PRESENTATION_SCHEMA, MAX_PRESENTATION_ANCESTORS,
+};
 pub use provider_identity::{
     EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, InlineJwks, ProviderRecordKind,
     SubjectMapping, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,

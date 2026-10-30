@@ -10,7 +10,8 @@ use std::path::{Path, PathBuf};
 
 use chio_core_types::capability::anchor::RootAnchor;
 use chio_core_types::root_authority::{
-    DelegationContext, EnterpriseProviderIdentity, IdpKeySnapshot, RootPolicy,
+    CapabilityPresentation, DelegationContext, EnterpriseProviderIdentity, IdpKeySnapshot,
+    RootPolicy,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -182,6 +183,12 @@ const REJECTIONS: &[(&str, &str)] = &[
         "idp-key-snapshot.source-unknown-scheme.json",
         "`source` is not an https:// JWKS URL or registry:<provider_id>",
     ),
+    ("presentation.missing-leaf.json", "missing field `leaf`"),
+    ("presentation.padding.json", "unknown field `pad`"),
+    (
+        "presentation.too-many-ancestors.json",
+        "`ancestors` has 17 items, outside 0..=16",
+    ),
     (
         "root-anchor.digest-uppercase-hex.json",
         "`digest` is not sha256:<64 lowercase hex>",
@@ -320,6 +327,7 @@ fn decode_example(name: &str, text: &str) -> Option<Result<serde_json::Value, St
         "root-policy" => round_trip::<RootPolicy>(text),
         "enterprise-provider-identity" => round_trip::<EnterpriseProviderIdentity>(text),
         "idp-key-snapshot" => round_trip::<IdpKeySnapshot>(text),
+        "presentation" => round_trip::<CapabilityPresentation>(text),
         _ => return None,
     };
     Some(decoded)
@@ -361,7 +369,7 @@ fn valid_examples_decode_and_round_trip() {
         assert_eq!(value, original, "{name} does not round-trip");
         decoded += 1;
     }
-    assert_eq!(decoded, 11);
+    assert_eq!(decoded, 12);
 }
 
 #[test]
