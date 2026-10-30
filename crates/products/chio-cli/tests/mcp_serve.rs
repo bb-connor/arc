@@ -3457,7 +3457,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
 
     let (cancelled, cancelled_notifications) = read_response(&mut stdout, 2);
     assert!(cancelled_notifications.is_empty());
-    assert_closed_denial(&cancelled["result"], "denied");
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     drop(stdin);
 
