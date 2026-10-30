@@ -54,8 +54,8 @@ const CENSUS: &[(&str, CensusOutcome)] = &[
     ("model_metadata", Registered(ChioInternal, Unsafe)),
     ("channel", Registered(ChioInternal, Unsafe)),
     ("delivery_contract", Registered(ChioInternal, Unsafe)),
-    ("finding_delivery", Registered(ChioInternal, CommittedSafe)),
-    ("finding_recovery", Registered(ChioInternal, CommittedSafe)),
+    ("finding_delivery", Registered(ChioInternal, Unsafe)),
+    ("finding_recovery", Registered(ChioInternal, Unsafe)),
     (
         "finding_purchase_replay_snapshot",
         Registered(ChioInternal, Unsafe),
@@ -237,8 +237,6 @@ fn caller_origin_keys_are_unsafe() {
 const WRITER_EMITS_REGISTERED_FORM: &[&str] = &[
     "budget_authority",
     "session_anchor",
-    "finding_delivery",
-    "finding_recovery",
     "decision_model_witness",
     "execution_nonce",
     "active_response_terminal_evidence",
