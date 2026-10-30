@@ -28,14 +28,6 @@ struct AdminChildReceiptQuery {
 }
 
 #[derive(Debug, Default, Deserialize)]
-struct AdminRevocationQuery {
-    #[serde(default)]
-    capability_id: Option<String>,
-    #[serde(default)]
-    limit: Option<usize>,
-}
-
-#[derive(Debug, Default, Deserialize)]
 struct AdminBudgetQuery {
     #[serde(default)]
     capability_id: Option<String>,
@@ -43,9 +35,18 @@ struct AdminBudgetQuery {
     limit: Option<usize>,
 }
 
+/// `POST /admin/revocations`.
 #[derive(Debug, Deserialize)]
-struct AdminRevokeCapabilityRequest {
-    capability_id: String,
+#[serde(deny_unknown_fields)]
+struct AdminRevokeRequest {
+    target: AdminRevocationTarget,
+    reason: chio_core::root_authority::RevocationReason,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+enum AdminRevocationTarget {
+    CapabilityId { capability_id: String },
 }
 
 #[derive(Clone, Debug, Deserialize)]

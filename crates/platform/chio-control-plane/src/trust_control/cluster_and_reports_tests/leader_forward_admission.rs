@@ -848,9 +848,10 @@ async fn final_f10_public_forward_preserves_authenticated_revocation_and_budget_
     let revoked = handle_revoke_capability(
         State(state.clone()),
         headers.clone(),
-        Json(RevokeCapabilityRequest {
+        Ok(Json(RevokeCapabilityRequest {
             capability_id: "compromised-capability".to_string(),
-        }),
+            reason: chio_core_types::root_authority::RevocationReason::CredentialCompromise,
+        })),
     )
     .await;
     let budget = handle_try_increment_budget(

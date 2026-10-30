@@ -1681,8 +1681,11 @@ pub(crate) fn cmd_trust_revoke(
     let (newly_revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         let response = trust_control::service_runtime::client::build_client(url, token)?
-            .revoke_capability(capability_id)?;
-        (response.newly_revoked, url.to_string())
+            .revoke_capability(
+                capability_id,
+                chio_core_types::root_authority::RevocationReason::OperatorRequest,
+            )?;
+        (response.roots_revoked > 0, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
         let store = chio_store_sqlite::SqliteRevocationStore::open(path)?;
@@ -1719,16 +1722,9 @@ pub(crate) fn cmd_trust_status(
 ) -> Result<(), CliError> {
     let (revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
-            .list_revocations(&trust_control::RevocationQuery {
-                capability_id: Some(capability_id.to_string()),
-                limit: Some(1),
-            })?;
-        let revoked = response.revoked.ok_or_else(|| {
-            CliError::cli_other_error(format!(
-                "trust-control revocation response omitted revoked status for {capability_id}"
-            ))
-        })?;
+        let revoked = trust_control::service_runtime::client::build_client(url, token)?
+            .revocation_status(capability_id)?
+            .revoked;
         (revoked, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;

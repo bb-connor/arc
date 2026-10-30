@@ -524,48 +524,57 @@ pub(crate) async fn handle_evaluate_federation_policy(
     }
 }
 
+fn revocation_failure(error: &chio_kernel::RevocationStoreError) -> Response {
+    let (status, body) = revocation_store_failure(error);
+    plain_http_error(status, body)
+}
+
 pub(crate) async fn handle_list_revocations(
     State(state): State<TrustServiceState>,
-    Query(query): Query<RevocationQuery>,
+    query: Result<Query<RevocationQuery>, axum::extract::rejection::QueryRejection>,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsRead) {
         return response;
     }
+    let Some(listing) = query.ok().and_then(|Query(query)| query.listing()) else {
+        return plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST);
+    };
     let store = match state.revocation_store() {
         Ok(store) => store,
         Err(response) => return response,
     };
-    let revocations =
-        match store.list_revocations(list_limit(query.limit), query.capability_id.as_deref()) {
-            Ok(revocations) => revocations,
-            Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    match listing {
+        RevocationListing::Status(capability_id) => match store.revocation_entry(&capability_id) {
+            Ok(entry_id) => Json(RevocationStatusResponse {
+                capability_id,
+                revoked: entry_id.is_some(),
+                entry_id,
+            })
+            .into_response(),
+            Err(error) => revocation_failure(&error),
+        },
+        RevocationListing::Page { after, limit, kind } => {
+            match store.list_revocation_entries_after(after, limit, kind) {
+                Ok((entries, head)) => Json(RevocationEntryPage {
+                    next_after: entries.last().map_or(after, |(entry_seq, _)| *entry_seq),
+                    entries: entries
+                        .into_iter()
+                        .map(|(entry_seq, entry)| RevocationEntryPageItem { entry_seq, entry })
+                        .collect(),
+                    head,
+                })
+                .into_response(),
+                Err(error) => revocation_failure(&error),
             }
-        };
-    let revoked = query
-        .capability_id
-        .as_deref()
-        .map(|capability_id| store.is_revoked(capability_id))
-        .transpose();
-    let revoked = match revoked {
-        Ok(value) => value,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
-    };
-    Json(revocation_list_response(
-        query.capability_id,
-        revoked,
-        revocations,
-    ))
-    .into_response()
+    }
 }
 
 pub(crate) async fn handle_revoke_capability(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(payload): Json<RevokeCapabilityRequest>,
+    payload: Result<Json<RevokeCapabilityRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Response {
     let clock_now = match unix_timestamp_now() {
         Ok(now) => now,
@@ -574,6 +583,14 @@ pub(crate) async fn handle_revoke_capability(
     if let Err(response) = validate_caller(&headers, &state.config, Scope::RevocationsWrite) {
         return response;
     }
+    let Ok(Json(payload)) = payload else {
+        return plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST);
+    };
+    let Ok(target) =
+        chio_core_types::root_authority::RevocationTarget::capability(&payload.capability_id)
+    else {
+        return plain_http_error(StatusCode::BAD_REQUEST, INVALID_REVOCATION_REQUEST);
+    };
     match forward_post_to_leader(&state, &headers, REVOCATIONS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
@@ -583,9 +600,9 @@ pub(crate) async fn handle_revoke_capability(
         Ok(store) => store,
         Err(response) => return response,
     };
-    match store.revoke(&payload.capability_id) {
-        Ok(newly_revoked) => {
-            if newly_revoked {
+    match store.revoke_target(&target, &[], None, payload.reason) {
+        Ok(revocation) => {
+            if revocation.roots_revoked > 0 {
                 // A locally originated capability revoke: the revoke instant is
                 // now, so the propagation lag is ~0. Emit so the
                 // capability-revocation SLO reflects real capability revokes.
@@ -596,21 +613,19 @@ pub(crate) async fn handle_revoke_capability(
                 &state,
                 "revocation was not visible on the leader after write",
                 || {
-                    let revoked = store.is_revoked(&payload.capability_id).map_err(|error| {
-                        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                    })?;
-                    if revoked {
-                        Ok(Some(RevokeCapabilityResponse {
-                            capability_id: payload.capability_id.clone(),
-                            revoked: true,
-                            newly_revoked,
-                        }))
-                    } else {
-                        Ok(None)
-                    }
+                    let visible = store
+                        .revocation_entry(&payload.capability_id)
+                        .map_err(|error| revocation_failure(&error))?
+                        .is_some();
+                    Ok(visible.then(|| RevokeCapabilityResponse {
+                        entry: revocation.entry.clone(),
+                        newly_revoked: revocation.newly_revoked,
+                        roots_matched: revocation.roots_matched,
+                        roots_revoked: revocation.roots_revoked,
+                    }))
                 },
             )
         }
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Err(error) => revocation_failure(&error),
     }
 }

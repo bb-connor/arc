@@ -67,24 +67,20 @@ pub fn build_remote_revocation_store(
 impl RevocationStore for RemoteRevocationStore {
     fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         self.client
-            .list_revocations(&RevocationQuery {
-                capability_id: Some(capability_id.to_string()),
-                limit: Some(1),
-            })
-            .and_then(|response| {
-                response.revoked.ok_or_else(|| {
-                    CliError::cli_other_error(format!(
-                        "trust-control revocation response omitted revoked status for {capability_id}"
-                    ))
-                })
-            })
+            .revocation_status(capability_id)
+            .map(|status| status.revoked)
             .map_err(into_revocation_store_error)
     }
 
+    /// The trait carries no reason, so a forwarded revocation records
+    /// `operator_request`. True when this call marked the capability.
     fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         self.client
-            .revoke_capability(capability_id)
-            .map(|response| response.newly_revoked)
+            .revoke_capability(
+                capability_id,
+                chio_core_types::root_authority::RevocationReason::OperatorRequest,
+            )
+            .map(|response| response.roots_revoked > 0)
             .map_err(into_revocation_store_error)
     }
 

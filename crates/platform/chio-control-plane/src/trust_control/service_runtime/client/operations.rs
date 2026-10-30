@@ -491,23 +491,76 @@ impl TrustControlClient {
         )
     }
 
-    pub fn list_revocations(
+    /// Whether `capability_id` is revoked. A revoked answer must name the
+    /// entry the capability's target derives; anything else refuses.
+    pub fn revocation_status(
         &self,
-        query: &RevocationQuery,
-    ) -> Result<RevocationListResponse, CliError> {
-        self.get_json_with_query(REVOCATIONS_PATH, query)
+        capability_id: &str,
+    ) -> Result<RevocationStatusResponse, CliError> {
+        let target = chio_core_types::root_authority::RevocationTarget::capability(capability_id)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let response: RevocationStatusResponse = self.get_json_with_query(
+            REVOCATIONS_PATH,
+            &RevocationQuery {
+                capability_id: Some(capability_id.to_string()),
+                ..RevocationQuery::default()
+            },
+        )?;
+        let expected = response.revoked.then(|| target.id());
+        if response.capability_id != capability_id || response.entry_id != expected {
+            return Err(CliError::cli_other_error(format!(
+                "trust-control revocation status does not name the entry of {capability_id}"
+            )));
+        }
+        Ok(response)
     }
 
+    /// One page of revocation entries after `after`, of `kind` when named.
+    pub fn list_revocation_entries(
+        &self,
+        after: u64,
+        limit: usize,
+        kind: Option<chio_core_types::root_authority::RevocationTargetKind>,
+    ) -> Result<RevocationEntryPage, CliError> {
+        let page: RevocationEntryPage = self.get_json_with_query(
+            REVOCATIONS_PATH,
+            &RevocationQuery {
+                after: Some(after),
+                limit: Some(limit),
+                kind,
+                ..RevocationQuery::default()
+            },
+        )?;
+        for item in &page.entries {
+            item.entry
+                .validate()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        }
+        Ok(page)
+    }
+
+    /// Revoke `capability_id` with `reason`. The answer must carry the entry
+    /// the capability's target derives.
     pub fn revoke_capability(
         &self,
         capability_id: &str,
+        reason: chio_core_types::root_authority::RevocationReason,
     ) -> Result<RevokeCapabilityResponse, CliError> {
-        self.post_json(
+        let target = chio_core_types::root_authority::RevocationTarget::capability(capability_id)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        let response: RevokeCapabilityResponse = self.post_json(
             REVOCATIONS_PATH,
             &RevokeCapabilityRequest {
                 capability_id: capability_id.to_string(),
+                reason,
             },
-        )
+        )?;
+        if response.entry.validate().is_err() || response.entry.entry_id != target.id() {
+            return Err(CliError::cli_other_error(format!(
+                "trust-control revocation response does not carry the entry of {capability_id}"
+            )));
+        }
+        Ok(response)
     }
 
     pub fn list_tool_receipts(

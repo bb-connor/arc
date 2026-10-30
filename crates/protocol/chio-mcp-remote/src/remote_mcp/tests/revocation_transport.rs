@@ -96,13 +96,24 @@ struct Backend {
 }
 
 async fn mock_write(State(backend): State<Arc<Backend>>, Json(body): Json<Value>) -> Response {
-    let id = body["capabilityId"].as_str().unwrap_or_default();
+    let id = body["capability_id"].as_str().unwrap_or_default();
     if backend.mode.load(Ordering::SeqCst) == 1 && id == "b" {
         return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
     }
     let newly_revoked = backend.revoked.lock().unwrap().insert(id.into());
-    Json(json!({"capabilityId": id, "revoked": true, "newlyRevoked": newly_revoked}))
-        .into_response()
+    let entry = chio_core::root_authority::RevocationEntry::new(
+        &chio_core::root_authority::RevocationTarget::capability(id).unwrap(),
+        1_792_234_800,
+        chio_core::root_authority::RevocationReason::OperatorRequest,
+    )
+    .unwrap();
+    Json(json!({
+        "entry": entry,
+        "newly_revoked": newly_revoked,
+        "roots_matched": 1,
+        "roots_revoked": u64::from(newly_revoked),
+    }))
+    .into_response()
 }
 
 async fn mock_read(
@@ -112,10 +123,15 @@ async fn mock_read(
     if backend.mode.load(Ordering::SeqCst) == 2 {
         return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
     }
-    let id = query.get("capabilityId").cloned().unwrap_or_default();
+    let id = query.get("capability_id").cloned().unwrap_or_default();
     let revoked =
         backend.mode.load(Ordering::SeqCst) != 3 && backend.revoked.lock().unwrap().contains(&id);
-    Json(json!({"configured": true, "backend": "test", "capabilityId": id, "revoked": revoked, "count": 0, "revocations": []})).into_response()
+    let entry_id = revoked.then(|| {
+        chio_core::root_authority::RevocationTarget::capability(&id)
+            .unwrap()
+            .id()
+    });
+    Json(json!({"capability_id": id, "revoked": revoked, "entry_id": entry_id})).into_response()
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -154,61 +170,13 @@ async fn session_revocation_remote_failures_partial_retry_and_readback() -> Test
 }
 
 #[tokio::test]
-async fn session_revocation_local_write_failure_is_partial_and_retryable() -> TestResult {
+async fn session_revocation_needs_the_durable_local_store() -> TestResult {
     let directory = tempfile::tempdir()?;
     let state = state(directory.path(), None).await?;
-    let path = directory.path().join("revocations.db");
-    let store = chio_store_sqlite::SqliteRevocationStore::open(&path)?;
-    let connection = rusqlite::Connection::open(&path)?;
-    // One replication index remains: "a" takes it and the write of "b"
-    // overflows inside its transaction against a valid catalog.
-    connection.execute(
-        "UPDATE revocation_replication_meta SET next_index = ?1",
-        [i64::MAX - 1],
-    )?;
-    let partial = revoke(&state, StatusCode::SERVICE_UNAVAILABLE).await?;
-    assert_eq!(partial["revoked"], false);
-    assert_eq!(partial["newlyRevokedCount"], 1);
-    assert_eq!(partial["capabilities"][0]["revoked"], true);
-    assert_eq!(partial["capabilities"][1]["revoked"], false);
-    assert_eq!(partial["capabilities"][1]["failure"], "write_failed");
-    assert!(store.is_revoked("a")?);
-    assert!(!store.is_revoked("b")?);
-    // Renumbering keeps next_index >= MAX(revocation_index), which reopen checks.
-    connection.execute_batch(
-        "UPDATE revoked_capabilities SET revocation_index = 1;
-         UPDATE revocation_replication_meta SET next_index = 1;",
-    )?;
-    assert_eq!(
-        revoke(&state, StatusCode::OK).await?["newlyRevokedCount"],
-        1
-    );
-    assert_eq!(
-        revoke(&state, StatusCode::OK).await?["newlyRevokedCount"],
-        0
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn session_revocation_refuses_an_invalid_local_store_as_a_backend_failure() -> TestResult {
-    let directory = tempfile::tempdir()?;
-    let state = state(directory.path(), None).await?;
-    let path = directory.path().join("revocations.db");
-    drop(chio_store_sqlite::SqliteRevocationStore::open(&path)?);
-    let connection = rusqlite::Connection::open(&path)?;
-    connection.execute_batch("CREATE TRIGGER refuse_b BEFORE INSERT ON revoked_capabilities WHEN NEW.capability_id = 'b' BEGIN SELECT RAISE(ABORT, 'private-backend-detail'); END;")?;
     let (status, body) = send_revoke(&state).await?;
-    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{body}");
-    assert_eq!(
-        body,
-        chio_errors::_generated::error_codes::TRANSPORT_ADMIN_BACKEND_FAILED.urn
-    );
-    let written: i64 =
-        connection.query_row("SELECT COUNT(*) FROM revoked_capabilities", [], |row| {
-            row.get(0)
-        })?;
-    assert_eq!(written, 0);
+    assert_eq!(status, StatusCode::CONFLICT, "{body}");
+    assert_eq!(body, "remote trust admin requires durable revocation state");
+    assert!(!directory.path().join("revocations.db").exists());
     Ok(())
 }
 

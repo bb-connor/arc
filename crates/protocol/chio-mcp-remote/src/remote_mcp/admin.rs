@@ -155,7 +155,6 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         "stores": {
             "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),
             "revocationsConfigured": state.factory.config.control_url.is_some()
-                || state.factory.config.revocation_db_path.is_some()
                 || state.factory.durable_admission.is_some(),
             "authorityDbConfigured": state.factory.config.authority_db_path.is_some(),
             "authoritySeedConfigured": state.factory.config.authority_seed_path.is_some(),
@@ -449,82 +448,120 @@ async fn handle_admin_budgets(
     .into_response()
 }
 
+/// The largest accepted revocation request body.
+const MAX_REVOCATION_REQUEST_BYTES: usize = 4096;
+
+fn invalid_revocation_request() -> Response {
+    plain_http_error(
+        StatusCode::BAD_REQUEST,
+        trust_control::INVALID_REVOCATION_REQUEST,
+    )
+}
+
 async fn handle_admin_revocations(
     State(state): State<RemoteAppState>,
-    Query(query): Query<AdminRevocationQuery>,
+    query: Result<Query<RevocationQuery>, axum::extract::rejection::QueryRejection>,
     headers: HeaderMap,
 ) -> Response {
     if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
         return response;
     }
+    let Some(listing) = query.ok().and_then(|Query(query)| query.listing()) else {
+        return invalid_revocation_request();
+    };
 
     if let Some(client) = match control_client(&state) {
         Ok(client) => client,
         Err(response) => return response,
     } {
-        return match client.list_revocations(&RevocationQuery {
-            capability_id: query.capability_id.clone(),
-            limit: Some(admin_list_limit(query.limit)),
-        }) {
-            Ok(response) => Json(response).into_response(),
-            Err(error) => admin_backend_failure(error),
+        return match listing {
+            trust_control::RevocationListing::Status(capability_id) => {
+                match client.revocation_status(&capability_id) {
+                    Ok(response) => Json(response).into_response(),
+                    Err(error) => admin_backend_failure(error),
+                }
+            }
+            trust_control::RevocationListing::Page { after, limit, kind } => {
+                match client.list_revocation_entries(after, limit, kind) {
+                    Ok(response) => Json(response).into_response(),
+                    Err(error) => admin_backend_failure(error),
+                }
+            }
         };
     }
     let store = match open_revocation_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
     };
-    let revocations = match store.list_revocations(
-        admin_list_limit(query.limit),
-        query.capability_id.as_deref(),
-    ) {
-        Ok(revocations) => revocations,
-        Err(error) => {
-            return admin_backend_failure(error);
+    match listing {
+        trust_control::RevocationListing::Status(capability_id) => {
+            match store.revocation_entry(&capability_id) {
+                Ok(entry_id) => Json(json!({
+                    "capability_id": capability_id,
+                    "revoked": entry_id.is_some(),
+                    "entry_id": entry_id,
+                }))
+                .into_response(),
+                Err(error) => revocation_store_failure(error),
+            }
         }
-    };
-    let revoked = query
-        .capability_id
-        .as_deref()
-        .map(|capability_id| store.is_revoked(capability_id))
-        .transpose()
-        .map_err(admin_backend_failure);
-    let revoked = match revoked {
-        Ok(revoked) => revoked,
-        Err(response) => return response,
-    };
-
-    Json(json!({
-        "configured": true,
-        "backend": "sqlite",
-        "capabilityId": query.capability_id,
-        "revoked": revoked,
-        "count": revocations.len(),
-        "revocations": revocations.iter().map(|entry| {
-            json!({
-                "capabilityId": entry.capability_id,
-                "revokedAt": entry.revoked_at,
-            })
-        }).collect::<Vec<_>>(),
-    }))
-    .into_response()
+        trust_control::RevocationListing::Page { after, limit, kind } => {
+            match store.list_revocation_entries_after(after, limit, kind) {
+                Ok((entries, head)) => {
+                    let next_after = entries.last().map_or(after, |(entry_seq, _)| *entry_seq);
+                    Json(json!({
+                        "entries": entries
+                            .iter()
+                            .map(|(entry_seq, entry)| json!({
+                                "entry_seq": entry_seq,
+                                "entry": entry,
+                            }))
+                            .collect::<Vec<_>>(),
+                        "next_after": next_after,
+                        "head": head,
+                    }))
+                    .into_response()
+                }
+                Err(error) => revocation_store_failure(error),
+            }
+        }
+    }
 }
 
 async fn handle_admin_revoke_capability(
     State(state): State<RemoteAppState>,
-    headers: HeaderMap,
-    BoundedJson(payload): BoundedJson<AdminRevokeCapabilityRequest>,
+    request: Request,
 ) -> Response {
-    if let Err(response) = validate_admin_request(&headers, state.admin_token.as_deref()) {
+    if let Err(response) = validate_admin_request(request.headers(), state.admin_token.as_deref()) {
         return response;
     }
+    let Ok(body) = axum::body::to_bytes(request.into_body(), MAX_REVOCATION_REQUEST_BYTES).await
+    else {
+        return invalid_revocation_request();
+    };
+    let Ok(AdminRevokeRequest { target, reason }) =
+        crate::input::decode::<AdminRevokeRequest>(&body, MAX_REVOCATION_REQUEST_BYTES)
+    else {
+        return invalid_revocation_request();
+    };
+    let AdminRevocationTarget::CapabilityId { capability_id } = target;
+    let Ok(target) = chio_core::root_authority::RevocationTarget::capability(&capability_id) else {
+        return invalid_revocation_request();
+    };
 
     if let Some(client) = match control_client(&state) {
         Ok(client) => client,
         Err(response) => return response,
     } {
-        return match client.revoke_capability(&payload.capability_id) {
-            Ok(response) => Json(response).into_response(),
+        return match client.revoke_capability(&capability_id, reason) {
+            Ok(response) => Json(json!({
+                "reason_conflict": response.entry.reason != reason,
+                "entry": response.entry,
+                "newly_revoked": response.newly_revoked,
+                "roots_matched": response.roots_matched,
+                "roots_revoked": response.roots_revoked,
+            }))
+            .into_response(),
             Err(error) => admin_backend_failure(error),
         };
     }
@@ -532,19 +569,25 @@ async fn handle_admin_revoke_capability(
         Ok(store) => store,
         Err(response) => return response,
     };
-    let newly_revoked = match store.revoke(&payload.capability_id) {
-        Ok(revoked) => revoked,
-        Err(error) => {
-            return admin_backend_failure(error);
+    match store.revoke_target(&target, &[], None, reason) {
+        Ok(revocation) => {
+            info!(
+                entry_id = %revocation.entry.entry_id,
+                kind = revocation.entry.target_kind.as_str(),
+                reason = reason.as_str(),
+                "remote MCP admin recorded a revocation entry"
+            );
+            Json(json!({
+                "reason_conflict": revocation.entry.reason != reason,
+                "entry": revocation.entry,
+                "newly_revoked": revocation.newly_revoked,
+                "roots_matched": revocation.roots_matched,
+                "roots_revoked": revocation.roots_revoked,
+            }))
+            .into_response()
         }
-    };
-
-    Json(json!({
-        "capabilityId": payload.capability_id,
-        "revoked": true,
-        "newlyRevoked": newly_revoked,
-    }))
-    .into_response()
+        Err(error) => revocation_store_failure(error),
+    }
 }
 
 async fn handle_admin_session_trust(
@@ -798,6 +841,15 @@ fn admin_backend_failure(error: impl std::fmt::Display) -> Response {
     )
 }
 
+/// The response for a revocation store error. An unknown commit outcome
+/// poisons the serving owner until the provider restarts; every other error
+/// left nothing committed.
+pub(super) fn revocation_store_failure(error: chio_kernel::RevocationStoreError) -> Response {
+    error!(error = %error, "remote MCP admin revocation store operation failed");
+    let (status, body) = trust_control::revocation_store_failure(&error);
+    plain_http_error(status, body)
+}
+
 fn open_receipt_store(
     state: &RemoteAppState,
 ) -> Result<chio_store_sqlite::SqliteReceiptStore, Response> {
@@ -813,18 +865,17 @@ fn open_receipt_store(
 fn open_revocation_store(
     state: &RemoteAppState,
 ) -> Result<chio_store_sqlite::SqliteRevocationStore, Response> {
-    if let Some(runtime) = state.factory.durable_admission.as_ref() {
-        if let Some(store) = runtime.local_revocation_store() {
-            return Ok(store);
-        }
-    }
-    let Some(path) = state.factory.config.revocation_db_path.as_deref() else {
-        return Err(plain_http_error(
-            StatusCode::CONFLICT,
-            "remote trust admin requires durable revocation state",
-        ));
-    };
-    chio_store_sqlite::SqliteRevocationStore::open(path).map_err(admin_backend_failure)
+    state
+        .factory
+        .durable_admission
+        .as_ref()
+        .and_then(|runtime| runtime.local_revocation_store())
+        .ok_or_else(|| {
+            plain_http_error(
+                StatusCode::CONFLICT,
+                "remote trust admin requires durable revocation state",
+            )
+        })
 }
 
 fn open_budget_store(
@@ -911,16 +962,13 @@ fn load_session_revocation_status(
             .iter()
             .map(|capability| {
                 client
-                    .list_revocations(&RevocationQuery {
-                        capability_id: Some(capability.id.clone()),
-                        limit: Some(1),
-                    })
+                    .revocation_status(&capability.id)
                     .map(|response| {
                         json!({
                             "capabilityId": capability.id,
                             "issuerPublicKey": capability.issuer_public_key,
                             "subjectPublicKey": capability.subject_public_key,
-                            "revoked": response.revoked.unwrap_or(false),
+                            "revoked": response.revoked,
                         })
                     })
                     .map_err(admin_backend_failure)
