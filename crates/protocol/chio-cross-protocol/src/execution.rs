@@ -208,7 +208,7 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
         )?;
 
         let receipt_ref = response.receipt.id.clone();
-        let output = render_protocol_output(&response.output, response.reason.as_deref());
+        let output = render_protocol_output(&response.output, response.client_reason().as_deref());
 
         Ok(CrossProtocolTargetExecution {
             response,

@@ -244,6 +244,14 @@ pub fn dispatch() {
 }
 EOF
 
+allow_marker() {
+    local root="$1" kind="$2" path="$3"
+    mkdir -p "$root/scripts"
+    printf '%s\t%s\t%s\n' "$kind" "$path" "self-test caller" \
+        >> "$root/scripts/http-egress-marker-allowlist.tsv"
+}
+allow_marker "$work/positive_classified" reqwest crates/chio-fake-classified/src/lib.rs
+
 # Run the lint with a per-case repo-root override via env var.
 positive_output=$(CHIO_EGRESS_LINT_ROOT="$work/positive" bash "$LINT" 2>&1) && positive_status=0 || positive_status=$?
 negative_output=$(CHIO_EGRESS_LINT_ROOT="$work/negative" bash "$LINT" 2>&1) && negative_status=0 || negative_status=$?
@@ -375,6 +383,33 @@ http_client_case() {
     cat > "$work/$name/$path"
 }
 
+reqwest_classified_source='use reqwest::blocking::Client;
+
+pub fn dispatch() {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic self-test caller.
+    let client = Client::builder().build().unwrap();
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: diagnostic self-test caller.
+    let _ = client.get("https://example.com").send();
+}'
+ureq_classified_source='pub fn agent() -> ureq::Agent {
+    // CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ: operator CLI request to the
+    // endpoint the operator named.
+    ureq::AgentBuilder::new().build()
+}'
+printf '%s\n' "$reqwest_classified_source" | http_client_case reqwest_marker_unlisted crates/chio-fake/src/lib.rs
+printf '%s\n' "$reqwest_classified_source" | http_client_case reqwest_example_marker_unlisted examples/chio-fake-example/src/lib.rs
+printf '%s\n' "$ureq_classified_source" | http_client_case ureq_marker_unlisted crates/chio-fake/src/lib.rs
+printf '%s\n' "$ureq_classified_source" | http_client_case marker_kind_mismatch crates/chio-fake/src/lib.rs
+allow_marker "$work/marker_kind_mismatch" reqwest crates/chio-fake/src/lib.rs
+printf '%s\n' "$reqwest_classified_source" | http_client_case marker_listed_elsewhere crates/chio-fake/src/lib.rs
+allow_marker "$work/marker_listed_elsewhere" reqwest crates/chio-other/src/lib.rs
+printf 'pub fn noop() {}\n' | http_client_case marker_allowlist_stale crates/chio-fake/src/lib.rs
+allow_marker "$work/marker_allowlist_stale" reqwest crates/chio-fake/src/lib.rs
+printf '%s\n' "$reqwest_classified_source" | http_client_case marker_allowlist_malformed crates/chio-fake/src/lib.rs
+mkdir -p "$work/marker_allowlist_malformed/scripts"
+printf 'reqwest\tcrates/chio-fake/src/lib.rs\n' \
+    > "$work/marker_allowlist_malformed/scripts/http-egress-marker-allowlist.tsv"
+
 http_client_case ureq_builder crates/chio-fake/src/lib.rs <<'EOF'
 pub fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new().redirects(0).build()
@@ -444,6 +479,7 @@ pub fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new().build()
 }
 EOF
+allow_marker "$work/ureq_classified" ureq crates/chio-fake/src/lib.rs
 http_client_case ureq_contract_owner crates/protocol/chio-egress-contract/src/ureq_helper.rs <<'EOF'
 pub fn agent() -> ureq::Agent {
     ureq::AgentBuilder::new().redirects(0).build()
@@ -542,6 +578,7 @@ pub fn agent() -> Http {
     Http::new()
 }
 EOF
+allow_marker "$work/ureq_rename_classified" ureq crates/chio-fake/src/lib.rs
 http_client_case ureq_type_only crates/chio-fake/src/lib.rs <<'EOF'
 pub struct Rail {
     pub http: ureq::Agent,
@@ -682,6 +719,7 @@ pub fn fetch(url: &str) {
     let _ = reqwest::blocking::get(url);
 }
 EOF
+allow_marker "$work/reqwest_example_classified" reqwest examples/chio-fake-example/src/lib.rs
 http_client_case ureq_example_unclassified examples/chio-fake-example/src/lib.rs <<'EOF'
 pub fn fetch(url: &str) {
     let _ = ureq::get(url).call();
@@ -707,7 +745,10 @@ for expectation in \
     reject:ureq_parenthesized_qualified reject:ureq_parenthesized_alias_qualified \
     reject:ureq_parenthesized_type_alias reject:ureq_parenthesized_alias_chain \
     reject:reqwest_mcp_adapter_not_exempt reject:reqwest_example_unclassified \
-    accept:reqwest_example_classified reject:ureq_example_unclassified; do
+    accept:reqwest_example_classified reject:ureq_example_unclassified \
+    reject:reqwest_marker_unlisted reject:ureq_marker_unlisted reject:marker_kind_mismatch \
+    reject:marker_listed_elsewhere reject:marker_allowlist_stale \
+    reject:marker_allowlist_malformed reject:reqwest_example_marker_unlisted; do
     expected="${expectation%%:*}"
     name="${expectation#*:}"
     case_status=0

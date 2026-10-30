@@ -188,7 +188,7 @@ pub struct MeteredBillingContext {
 
 /// Delegated call-chain context bound into a governed request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GovernedCallChainContext {
     /// Stable identifier for the delegated transaction or call chain.
     pub chain_id: String,
@@ -585,33 +585,103 @@ pub enum GovernedCallChainEvidenceSource {
 }
 
 /// Typed provenance envelope for delegated governed call-chain metadata.
+///
+/// The wire object carries the `context` members inline beside the provenance
+/// members and refuses unknown members.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(
+    from = "GovernedCallChainProvenanceWire",
+    into = "GovernedCallChainProvenanceWire"
+)]
 pub struct GovernedCallChainProvenance {
     /// Evidence class describing how strongly Chio should treat this provenance.
-    #[serde(default)]
     pub evidence_class: GovernedProvenanceEvidenceClass,
     /// Specific authoritative local evidence Chio used when it upgraded the caller assertion.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_sources: Vec<GovernedCallChainEvidenceSource>,
     /// Optional signed upstream proof Chio validated before upgrading to verified provenance.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upstream_proof: Option<GovernedUpstreamCallChainProof>,
     /// Optional preserved caller assertion when Chio upgraded or rewrote the effective context.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asserted_context: Option<GovernedCallChainContext>,
     /// Optional continuation token identifier that backed a verified upgrade.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continuation_token_id: Option<String>,
     /// Optional session-anchor identifier that scoped the verified lineage edge.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_anchor_id: Option<String>,
     /// Optional receipt-lineage statement identifier that authenticated the receipt edge.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receipt_lineage_statement_id: Option<String>,
     /// The delegated call-chain details carried with the governed request or receipt.
-    #[serde(flatten)]
     pub context: GovernedCallChainContext,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GovernedCallChainProvenanceWire {
+    #[serde(default)]
+    evidence_class: GovernedProvenanceEvidenceClass,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    evidence_sources: Vec<GovernedCallChainEvidenceSource>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    upstream_proof: Option<GovernedUpstreamCallChainProof>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    asserted_context: Option<GovernedCallChainContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    continuation_token_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    session_anchor_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt_lineage_statement_id: Option<String>,
+    chain_id: String,
+    parent_request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    parent_receipt_id: Option<String>,
+    origin_subject: String,
+    delegator_subject: String,
+}
+
+impl From<GovernedCallChainProvenanceWire> for GovernedCallChainProvenance {
+    fn from(wire: GovernedCallChainProvenanceWire) -> Self {
+        Self {
+            evidence_class: wire.evidence_class,
+            evidence_sources: wire.evidence_sources,
+            upstream_proof: wire.upstream_proof,
+            asserted_context: wire.asserted_context,
+            continuation_token_id: wire.continuation_token_id,
+            session_anchor_id: wire.session_anchor_id,
+            receipt_lineage_statement_id: wire.receipt_lineage_statement_id,
+            context: GovernedCallChainContext {
+                chain_id: wire.chain_id,
+                parent_request_id: wire.parent_request_id,
+                parent_receipt_id: wire.parent_receipt_id,
+                origin_subject: wire.origin_subject,
+                delegator_subject: wire.delegator_subject,
+            },
+        }
+    }
+}
+
+impl From<GovernedCallChainProvenance> for GovernedCallChainProvenanceWire {
+    fn from(provenance: GovernedCallChainProvenance) -> Self {
+        let GovernedCallChainContext {
+            chain_id,
+            parent_request_id,
+            parent_receipt_id,
+            origin_subject,
+            delegator_subject,
+        } = provenance.context;
+        Self {
+            evidence_class: provenance.evidence_class,
+            evidence_sources: provenance.evidence_sources,
+            upstream_proof: provenance.upstream_proof,
+            asserted_context: provenance.asserted_context,
+            continuation_token_id: provenance.continuation_token_id,
+            session_anchor_id: provenance.session_anchor_id,
+            receipt_lineage_statement_id: provenance.receipt_lineage_statement_id,
+            chain_id,
+            parent_request_id,
+            parent_receipt_id,
+            origin_subject,
+            delegator_subject,
+        }
+    }
 }
 
 impl GovernedCallChainProvenance {

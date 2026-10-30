@@ -17,7 +17,11 @@ parentheses, names an agent type or an alias of one.
 
 A finding outside the kernel is accepted when one of the four lines above it
 carries the classification marker for its crate. Kernel crates take no
-classification and may not name ureq at all. Prints `path:line:text` per
+classification and may not name ureq at all. A classification marker of any
+kind, including the reqwest marker read by check-http-egress-contract.sh, is
+honored only in a file listed for that kind in
+scripts/http-egress-marker-allowlist.tsv; a marker anywhere else, and a listed
+file that carries no such marker, is a finding. Prints `path:line:text` per
 finding and exits 1 when there is any.
 """
 
@@ -41,6 +45,12 @@ KERNEL_ROOT = "crates/kernel/"
 SCAN_ROOTS = ("crates", "examples")
 UREQ_MARKER = "CHIO_EGRESS_LINT_ALLOW_DIRECT_UREQ:"
 HYPER_MARKER = "CHIO_EGRESS_LINT_ALLOW_DIRECT_HYPER_CLIENT:"
+MARKER_ALLOWLIST = "scripts/http-egress-marker-allowlist.tsv"
+MARKERS = {
+    "reqwest": "CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST:",
+    "ureq": UREQ_MARKER,
+    "hyper": HYPER_MARKER,
+}
 UREQ_FUNCTIONS = frozenset(
     {"get", "post", "put", "delete", "patch", "head", "request", "request_url", "agent", "builder", "run"}
 )
@@ -292,6 +302,46 @@ def scan_file(rel: str, raw: str, roots: dict[str, set[str]]) -> list[tuple[int,
     return sorted(result)
 
 
+def marker_allowlist(root: Path, findings: list[str]) -> set[tuple[str, str]]:
+    path = root / MARKER_ALLOWLIST
+    if not path.is_file():
+        return set()
+    entries: set[tuple[str, str]] = set()
+    for line_no, line in enumerate(path.read_text().splitlines(), start=1):
+        if not line.strip() or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != 3 or fields[0] not in MARKERS or not fields[1] or not fields[2].strip():
+            findings.append(f"{MARKER_ALLOWLIST}:{line_no}:malformed entry: {line}")
+            continue
+        entry = (fields[0], fields[1])
+        if entry in entries:
+            findings.append(f"{MARKER_ALLOWLIST}:{line_no}:duplicate entry: {line}")
+        entries.add(entry)
+    return entries
+
+
+def marker_findings(root: Path, sources: list[Path], findings: list[str]) -> None:
+    entries = marker_allowlist(root, findings)
+    carried: set[tuple[str, str]] = set()
+    for path in sources:
+        if "target" in path.parts:
+            continue
+        rel = path.relative_to(root).as_posix()
+        raw = path.read_text(errors="replace")
+        for kind, marker in MARKERS.items():
+            if marker not in raw:
+                continue
+            if (kind, rel) in entries:
+                carried.add((kind, rel))
+                continue
+            for line_no, line in enumerate(raw.split("\n"), start=1):
+                if marker in line:
+                    findings.append(f"{rel}:{line_no}:{kind} marker outside {MARKER_ALLOWLIST}: {line.strip()}")
+    for kind, rel in sorted(entries - carried):
+        findings.append(f"{MARKER_ALLOWLIST}:stale {kind} entry, {rel} carries no {MARKERS[kind]}")
+
+
 def main(argv: list[str]) -> int:
     root = Path(argv[1]) if len(argv) > 1 else Path(__file__).resolve().parents[1]
     findings: list[str] = []
@@ -302,6 +352,7 @@ def main(argv: list[str]) -> int:
         if (root / scan_root).is_dir()
         for path in (root / scan_root).rglob("*.rs")
     )
+    marker_findings(root, sources, findings)
     all_roots = roots["ureq"] | roots["hyper"]
     for path in sources:
         rel = path.relative_to(root).as_posix()

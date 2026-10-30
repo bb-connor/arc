@@ -20,6 +20,8 @@ use super::workload_identity::*;
 
 #[path = "tests/governed_intents.rs"]
 mod governed_intents;
+#[path = "tests/governed_provenance.rs"]
+mod governed_provenance;
 #[path = "tests/token_signing_input.rs"]
 mod token_signing_input;
 
@@ -1058,43 +1060,6 @@ fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
         Some(token.clone())
     );
     assert_eq!(intent.continuation_token().unwrap(), Some(token));
-}
-
-#[test]
-fn governed_call_chain_provenance_separates_asserted_and_verified_views() {
-    let asserted_context = GovernedCallChainContext {
-        chain_id: "chain-prov-1".to_string(),
-        parent_request_id: "req-parent-prov-1".to_string(),
-        parent_receipt_id: Some("rc-parent-prov-1".to_string()),
-        origin_subject: "origin-asserted".to_string(),
-        delegator_subject: "delegator-asserted".to_string(),
-    };
-    let verified_context = GovernedCallChainContext {
-        chain_id: "chain-prov-1".to_string(),
-        parent_request_id: "req-parent-prov-1".to_string(),
-        parent_receipt_id: Some("rc-parent-prov-1".to_string()),
-        origin_subject: "origin-verified".to_string(),
-        delegator_subject: "delegator-verified".to_string(),
-    };
-    let provenance = GovernedCallChainProvenance::verified(verified_context.clone())
-        .with_asserted_context(asserted_context.clone())
-        .with_continuation_token_id("continuation-1")
-        .with_session_anchor_id("anchor-1")
-        .with_receipt_lineage_statement_id("statement-1");
-
-    let encoded = serde_json::to_value(&provenance).unwrap();
-
-    assert!(provenance.is_verified());
-    assert_eq!(provenance.asserted_context(), Some(&asserted_context));
-    assert_eq!(provenance.verified_context(), Some(&verified_context));
-    assert_eq!(encoded["continuationTokenId"], "continuation-1");
-    assert_eq!(encoded["sessionAnchorId"], "anchor-1");
-    assert_eq!(encoded["receiptLineageStatementId"], "statement-1");
-    assert_eq!(
-        encoded["assertedContext"]["originSubject"],
-        "origin-asserted"
-    );
-    assert_eq!(encoded["originSubject"], "origin-verified");
 }
 
 #[test]

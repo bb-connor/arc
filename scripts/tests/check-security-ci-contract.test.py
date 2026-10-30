@@ -890,6 +890,14 @@ assert_rejected(
     "omits the exact formal traceability gate",
 )
 assert_rejected(
+    "formal mapping self-test removed",
+    "ci.yml",
+    replace_in_named_step(
+        "Formal traceability gate", "bash scripts/tests/check-mapping.test.sh\n", ""
+    ),
+    "omits the exact formal traceability gate",
+)
+assert_rejected(
     "workspace clippy narrowed",
     "ci.yml",
     replace_once(

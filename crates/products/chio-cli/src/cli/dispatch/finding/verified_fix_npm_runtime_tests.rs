@@ -303,11 +303,13 @@ fn npm_socket_entry_is_rejected() {
 #[test]
 #[ignore = "requires bubblewrap, prlimit, cgroup isolation and a self-contained node and npm on PATH"]
 fn npm_runs_an_offline_script_in_the_sandbox() {
-    use super::super::{executable_on_path, require_sandbox, run_test_command_with_timeout};
+    use super::super::{find_executable, require_sandbox, run_test_command_with_timeout};
+
+    let search_path = std::env::var_os("PATH").unwrap_or_default();
 
     for executable in ["node", "npm"] {
         assert!(
-            executable_on_path(executable).is_some(),
+            find_executable(executable, &search_path).is_some(),
             "npm sandbox test requires {executable} on PATH"
         );
     }

@@ -285,7 +285,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         ChioInternal,
         Unsafe,
         None,
-        "Kernel rejection code on a refusal receipt. No production reader.",
+        "Kernel rejection code and client denial code on a refusal receipt. Durable refusal replay reads client_denial_code.",
     ),
     spec(
         "runtime_admission",
