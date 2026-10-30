@@ -181,12 +181,12 @@ fn check_lock_identity(lock_path: &Path, file: &std::fs::File) -> Result<(), Reg
         crate::regular_file::OpenPolicy::Private,
         held.uid(),
         held.mode(),
+        held.nlink(),
         rustix::process::geteuid().as_raw(),
     );
     if !at_path.file_type().is_file()
         || !held.file_type().is_file()
         || (at_path.dev(), at_path.ino()) != (held.dev(), held.ino())
-        || held.nlink() != 1
         || private.is_err()
     {
         return Err(RegistryFileError::LockNotPrivate(lock_path.to_path_buf()));
