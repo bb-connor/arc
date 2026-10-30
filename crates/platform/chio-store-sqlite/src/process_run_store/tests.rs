@@ -164,6 +164,27 @@ fn busy_and_corrupt_rows_fail_closed_and_accounting_saturates() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn a_worker_outcome_that_is_not_a_reason_token_is_an_integrity_fault() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("run.db");
+    let store = initialize(&path)?;
+    let other = Connection::open(&path)?;
+    let oversized = "x".repeat(65);
+    for outcome in ["", "exit 1", "Exit_1", "exit_1\n", oversized.as_str()] {
+        other.execute(
+            "UPDATE run_workers SET outcome=?1 WHERE process='first'",
+            [outcome],
+        )?;
+        assert_eq!(
+            store.snapshots(),
+            Err(JournalError::Integrity),
+            "{outcome:?}"
+        );
+    }
+    Ok(())
+}
+
 fn terminal(store: &SqliteRunJournal, process: &str, outcome: &str) -> Result<(), JournalError> {
     store.transition(process, WorkerTransition::Start { max_attempts: 2 })?;
     store.transition(
