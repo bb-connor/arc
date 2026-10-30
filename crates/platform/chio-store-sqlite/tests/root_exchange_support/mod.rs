@@ -11,8 +11,8 @@ use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::root_exchange_store::{
     BearerMapping, ContextOpening, MintOutcome, MintReplayNamespace, MintRequest,
-    MintRevocationCheck, MintRevocationRefusal, RevocationCandidate, RootExchangeIntegrityError,
-    RootExchangeStoreError, RootTags, SqliteRootExchangeStore,
+    MintRevocationCheck, MintRevocationRefusal, RevocationCandidate, RevocationCheckError,
+    RootExchangeIntegrityError, RootExchangeStoreError, RootTags, SqliteRootExchangeStore,
 };
 use chio_store_sqlite::serving_owner::SqliteServingOwnerError;
 use chio_store_sqlite::SqliteAuthorityStore;
@@ -455,7 +455,9 @@ impl MintRevocationCheck for Failing {
         _: &RevocationCandidate<'_>,
     ) -> Result<(), MintRevocationRefusal> {
         Err(MintRevocationRefusal::Unavailable(
-            "revocation store offline".into(),
+            RevocationCheckError::new(chio_kernel::RevocationStoreError::Sync(
+                "revocation store offline".into(),
+            )),
         ))
     }
 }

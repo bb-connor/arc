@@ -39,8 +39,9 @@ pub use provider_identity::{
     SubjectMapping, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
 };
 pub use revocation_entry::{
-    RevocationEntry, RevocationEntryId, RevocationReason, RevocationTarget, RevocationTargetKind,
-    CHIO_REVOCATION_ENTRY_SCHEMA, REVOCATION_ENTRY_ID_DOMAIN,
+    RevocationCoverage, RevocationCoverageRoot, RevocationEntry, RevocationEntryId,
+    RevocationReason, RevocationTarget, RevocationTargetKind, CHIO_REVOCATION_ENTRY_SCHEMA,
+    REVOCATION_ENTRY_ID_DOMAIN,
 };
 pub use root_policy::{
     DisclosureDefault, InlineFields, LoadedRootPolicy, RootPolicy, RootPolicyDisclosure,
