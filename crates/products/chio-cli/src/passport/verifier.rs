@@ -295,7 +295,7 @@ pub(crate) fn cmd_passport_challenge_create(
             },
         )?;
         if let Some(path) = verifier_challenge_db {
-            PassportVerifierChallengeStore::open(path)?.register(&challenge)?;
+            register_presentation_challenge(&SqlitePassportVerifierStore::open(path)?, &challenge)?;
         }
         CreatePassportChallengeResponse {
             challenge,
@@ -491,7 +491,8 @@ pub(crate) fn cmd_passport_challenge_verify(
         )?;
         apply_passport_lifecycle_to_presentation(&mut verification, lifecycle);
         if let Some(path) = verifier_challenge_db {
-            PassportVerifierChallengeStore::open(path)?.consume(
+            consume_presentation_challenge(
+                &SqlitePassportVerifierStore::open(path)?,
                 challenge,
                 &response,
                 ChallengeConsumer::Verification,

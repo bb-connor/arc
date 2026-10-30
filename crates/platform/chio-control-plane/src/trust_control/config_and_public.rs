@@ -787,8 +787,8 @@ pub(crate) fn consume_challenge_if_configured(
         }
         return Ok(None);
     };
-    let store = PassportVerifierChallengeStore::open(path)?;
-    store.consume(challenge, presentation, consumer, now)?;
+    let store = SqlitePassportVerifierStore::open(path)?;
+    consume_presentation_challenge(&store, challenge, presentation, consumer, now)?;
     Ok(Some("consumed".to_string()))
 }
 

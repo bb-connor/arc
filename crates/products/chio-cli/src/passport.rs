@@ -4,6 +4,9 @@ use std::path::Path;
 
 use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use chio_core::{Keypair, PublicKey};
+use chio_credentials::verifier_ledger::{
+    consume_presentation_challenge, register_presentation_challenge, ChallengeConsumer,
+};
 use chio_credentials::{
     build_agent_passport, create_passport_presentation_challenge_with_reference,
     create_signed_passport_verifier_policy,
@@ -30,14 +33,13 @@ use chio_kernel::{
     ComplianceScoreInputs, EmaBaselineState,
 };
 use chio_reputation::{compute_local_scorecard, ReputationConfig};
-use chio_store_sqlite::SqliteReceiptStore;
+use chio_store_sqlite::{SqlitePassportVerifierStore, SqliteReceiptStore};
 use url::Url;
 
 use crate::issuance::build_local_reputation_corpus;
 use crate::passport_verifier::{
-    ChallengeConsumer, PassportIssuanceOfferRegistry, PassportStatusListResponse,
-    PassportStatusRegistry, PassportStatusRevocationRequest, PassportVerifierChallengeStore,
-    PublishPassportStatusRequest, VerifierPolicyRegistry,
+    PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
+    PassportStatusRevocationRequest, PublishPassportStatusRequest, VerifierPolicyRegistry,
 };
 use crate::trust_control::{
     CreateIdentityAssertionRequest, CreateOid4vpRequest, CreatePassportChallengeRequest,

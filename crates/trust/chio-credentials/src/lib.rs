@@ -69,6 +69,7 @@ mod jwt_decode;
 use jwt_decode::decode_compact_jwt_without_signature;
 
 pub mod trust_tier;
+pub mod verifier_ledger;
 pub use trust_tier::{
     synthesize_trust_tier, TrustTier, TRUST_TIER_ATTESTED_MIN, TRUST_TIER_PREMIER_MIN,
     TRUST_TIER_VERIFIED_MIN,

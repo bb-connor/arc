@@ -238,12 +238,11 @@ fn register_public_request(state: &mut TrustServiceState, signer: &Keypair, now:
     .test_unwrap();
     let transport =
         chio_credentials::build_oid4vp_request_transport(&request, signer).test_unwrap();
-    Oid4vpVerifierTransactionStore::open(
+    let store = SqlitePassportVerifierStore::open(
         configured_verifier_challenge_db_path(&state.config).test_unwrap(),
     )
-    .test_unwrap()
-    .register(&request, &transport.request_jwt)
     .test_unwrap();
+    register_oid4vp_request(&store, &request, &transport.request_jwt).test_unwrap();
     request.jti
 }
 

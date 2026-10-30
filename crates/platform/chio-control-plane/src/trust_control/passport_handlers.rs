@@ -671,11 +671,11 @@ pub(crate) async fn handle_create_passport_challenge(
         Ok(challenge) => challenge,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
     };
-    let store = match PassportVerifierChallengeStore::open(challenge_db_path) {
+    let store = match SqlitePassportVerifierStore::open(challenge_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    if let Err(error) = store.register(&challenge) {
+    if let Err(error) = register_presentation_challenge(&store, &challenge) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
     let transport = match passport_presentation_transport_for_service(&state.config, &challenge) {
@@ -837,13 +837,13 @@ pub(crate) async fn handle_public_get_passport_challenge(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match PassportVerifierChallengeStore::open(challenge_db_path) {
+    let store = match SqlitePassportVerifierStore::open(challenge_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    match store.fetch_active(&challenge_id, clock_now) {
+    match fetch_active_presentation_challenge(&store, &challenge_id, clock_now) {
         Ok(challenge) => Json(challenge).into_response(),
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             plain_http_error(StatusCode::NOT_FOUND, &error.to_string())
         }
         Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -922,7 +922,7 @@ fn verify_public_passport_challenge(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match PassportVerifierChallengeStore::open(challenge_db_path) {
+    let store = match SqlitePassportVerifierStore::open(challenge_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
@@ -970,14 +970,14 @@ fn verify_public_passport_challenge(
 /// The stored challenge `challenge_id` while it is active at `now`, refused
 /// when the submission names a different expected challenge.
 fn stored_public_challenge(
-    store: &PassportVerifierChallengeStore,
+    store: &SqlitePassportVerifierStore,
     challenge_id: &str,
     payload: &VerifyPassportChallengeRequest,
     now: u64,
 ) -> Result<PassportPresentationChallenge, Response> {
-    let stored_challenge = match store.fetch_active(challenge_id, now) {
+    let stored_challenge = match fetch_active_presentation_challenge(store, challenge_id, now) {
         Ok(challenge) => challenge,
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             return Err(plain_http_error(StatusCode::NOT_FOUND, &error.to_string()));
         }
         Err(error) => {
@@ -1040,11 +1040,11 @@ pub(crate) async fn handle_create_oid4vp_request(
             Ok(url) => url,
             Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
         };
-    let store = match Oid4vpVerifierTransactionStore::open(request_db_path) {
+    let store = match SqlitePassportVerifierStore::open(request_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    if let Err(error) = store.register(&request, &transport.request_jwt) {
+    if let Err(error) = register_oid4vp_request(&store, &request, &transport.request_jwt) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
     let wallet_exchange = match build_oid4vp_wallet_exchange_response(
@@ -1085,13 +1085,13 @@ pub(crate) async fn handle_public_get_wallet_exchange(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match Oid4vpVerifierTransactionStore::open(request_db_path) {
+    let store = match SqlitePassportVerifierStore::open(request_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let snapshot = match store.snapshot(&request_id, clock_now) {
+    let snapshot = match oid4vp_request_snapshot(&store, &request_id, clock_now) {
         Ok(snapshot) => snapshot,
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
         }
         Err(error) => {
@@ -1143,13 +1143,13 @@ fn get_public_oid4vp_request(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match Oid4vpVerifierTransactionStore::open(request_db_path) {
+    let store = match SqlitePassportVerifierStore::open(request_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, request_jwt) = match store.fetch_active(&request_id, clock_now) {
+    let (request, request_jwt) = match fetch_active_oid4vp_request(&store, &request_id, clock_now) {
         Ok(values) => values,
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -1198,13 +1198,13 @@ pub(crate) async fn handle_public_launch_oid4vp_request(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match Oid4vpVerifierTransactionStore::open(request_db_path) {
+    let store = match SqlitePassportVerifierStore::open(request_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let (request, _) = match store.fetch_active(&request_id, clock_now) {
+    let (request, _) = match fetch_active_oid4vp_request(&store, &request_id, clock_now) {
         Ok(values) => values,
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -1240,14 +1240,14 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
         Ok(path) => path,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let store = match Oid4vpVerifierTransactionStore::open(request_db_path) {
+    let store = match SqlitePassportVerifierStore::open(request_db_path) {
         Ok(store) => store,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
     let now = clock_now;
-    let (request, request_jwt) = match store.fetch_active(&request_id, now) {
+    let (request, request_jwt) = match fetch_active_oid4vp_request(&store, &request_id, now) {
         Ok(values) => values,
-        Err(error) if error.to_string().contains("not registered") => {
+        Err(error @ LedgerError::NotRegistered(..)) => {
             return plain_http_error(StatusCode::NOT_FOUND, &error.to_string());
         }
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -1383,7 +1383,7 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
     if let Err(error) = partner_door.admit(accept_unix_ms) {
         return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
-    if let Err(error) = store.consume(&request, &request_jwt, accept_now) {
+    if let Err(error) = consume_oid4vp_request(&store, &request, &request_jwt, accept_now) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
     verification.exchange_transaction = Some(WalletExchangeTransactionState::consumed(

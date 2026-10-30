@@ -60,6 +60,11 @@ use chio_core::session::{
     ChioIdentityAssertion, EnterpriseIdentityContext, OperationTerminalState,
 };
 use chio_core::{canonical_json_bytes, sha256_hex, Signature};
+use chio_credentials::verifier_ledger::{
+    consume_oid4vp_request, consume_presentation_challenge, fetch_active_oid4vp_request,
+    fetch_active_presentation_challenge, oid4vp_request_snapshot, register_oid4vp_request,
+    register_presentation_challenge, ChallengeConsumer, LedgerError,
+};
 use chio_credentials::{
     build_chio_passport_jwt_vc_json_type_metadata, build_chio_passport_sd_jwt_type_metadata,
     build_oid4vp_request_transport, build_portable_jwks, build_portable_negative_event_artifact,
@@ -240,8 +245,8 @@ use chio_store_sqlite::budget_store::{
     BudgetSnapshotAnchorProvenance, BudgetStoreSnapshot,
 };
 use chio_store_sqlite::{
-    SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore,
-    SqliteRevocationStore,
+    SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority,
+    SqlitePassportVerifierStore, SqliteReceiptStore, SqliteRevocationStore,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -281,10 +286,9 @@ use crate::{
     },
     issuance, load_or_create_authority_keypair,
     passport_verifier::{
-        ChallengeConsumer, Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord,
-        PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
-        PassportStatusRevocationRequest, PassportVerifierChallengeStore,
-        PublishPassportStatusRequest, VerifierPolicyRegistry,
+        PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry, PassportStatusListResponse,
+        PassportStatusRegistry, PassportStatusRevocationRequest, PublishPassportStatusRequest,
+        VerifierPolicyRegistry,
     },
     reputation, rotate_authority_keypair,
     scim_lifecycle::{

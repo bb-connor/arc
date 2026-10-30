@@ -3456,6 +3456,7 @@ dependencies = [
  "chio-revocation-oracle",
  "chio-security-types",
  "chio-spec-validate",
+ "chio-store-sqlite",
  "chio-test-support",
  "chrono",
  "dudect-bencher",

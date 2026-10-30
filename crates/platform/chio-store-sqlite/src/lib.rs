@@ -96,6 +96,7 @@ pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
+pub mod passport_verifier_store;
 mod pool;
 mod read_companion;
 pub mod receipt_query;
@@ -522,6 +523,7 @@ pub use governed_approval_replay_store::{
 };
 pub use iou_store::SqliteIouEnvelopeStore;
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
+pub use passport_verifier_store::{PassportVerifierStoreError, SqlitePassportVerifierStore};
 pub use receipt_store::{
     collect_retained_session_receipts_read_only, BackgroundCheckpointSigner,
     RetainedSessionReceipt, RetainedSessionReceipts, RetainedSessionSnapshotCoverage,

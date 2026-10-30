@@ -1,5 +1,6 @@
 mod passport_credential_digests;
 mod portable_sd_jwt;
+mod verifier_ledger;
 
 use super::*;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
