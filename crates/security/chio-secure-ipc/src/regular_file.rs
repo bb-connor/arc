@@ -17,7 +17,7 @@ pub enum OpenPolicy {
 }
 
 /// Why [`open_regular`] or [`read_regular_file`] refused a path.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum RegularFileError {
     #[error("file does not exist")]
     Missing,
@@ -111,7 +111,7 @@ pub fn read_regular_file(
 
 /// The owner and mode rule of `policy` for a file owned by `uid` with
 /// `st_mode` `mode`, read by `euid`.
-fn check_ownership(
+pub(crate) fn check_ownership(
     policy: OpenPolicy,
     uid: u32,
     mode: u32,

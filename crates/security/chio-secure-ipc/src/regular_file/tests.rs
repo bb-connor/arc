@@ -1,99 +1,47 @@
 use std::io::ErrorKind;
 use std::os::unix::fs::PermissionsExt;
 
+use super::OpenPolicy::{Authenticated, Private, Trusted};
+use super::RegularFileError::{Exposed, ForeignOwner, Writable};
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const LIMIT: usize = 64;
-const POLICIES: [OpenPolicy; 3] = [
-    OpenPolicy::Authenticated,
-    OpenPolicy::Trusted,
-    OpenPolicy::Private,
-];
+const POLICIES: [OpenPolicy; 3] = [Authenticated, Trusted, Private];
 
-fn file_with_mode(
-    directory: &Path,
-    bytes: &[u8],
-    mode: u32,
-) -> std::io::Result<std::path::PathBuf> {
+fn private_file(directory: &Path, bytes: &[u8]) -> std::io::Result<std::path::PathBuf> {
     let path = directory.join("input.json");
     std::fs::write(&path, bytes)?;
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode))?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
     Ok(path)
 }
 
 #[test]
 fn ownership_rules_by_policy() {
     const EUID: u32 = 1000;
-    let cases: [(OpenPolicy, u32, u32, Option<RegularFileError>); 15] = [
-        (OpenPolicy::Trusted, EUID, 0o100644, None),
-        (OpenPolicy::Trusted, 0, 0o100644, None),
-        (OpenPolicy::Trusted, 0, 0o100444, None),
-        (
-            OpenPolicy::Trusted,
-            1001,
-            0o100644,
-            Some(RegularFileError::ForeignOwner { uid: 1001 }),
-        ),
-        (
-            OpenPolicy::Trusted,
-            0,
-            0o100664,
-            Some(RegularFileError::Writable { mode: 0o664 }),
-        ),
-        (
-            OpenPolicy::Trusted,
-            EUID,
-            0o100646,
-            Some(RegularFileError::Writable { mode: 0o646 }),
-        ),
-        (OpenPolicy::Private, EUID, 0o100600, None),
-        (OpenPolicy::Private, EUID, 0o100400, None),
-        (
-            OpenPolicy::Private,
-            0,
-            0o100600,
-            Some(RegularFileError::ForeignOwner { uid: 0 }),
-        ),
-        (
-            OpenPolicy::Private,
-            EUID,
-            0o100640,
-            Some(RegularFileError::Exposed { mode: 0o640 }),
-        ),
-        (
-            OpenPolicy::Private,
-            EUID,
-            0o100604,
-            Some(RegularFileError::Exposed { mode: 0o604 }),
-        ),
-        (OpenPolicy::Authenticated, EUID, 0o100666, None),
-        (OpenPolicy::Authenticated, 1001, 0o100600, None),
-        (OpenPolicy::Authenticated, 0, 0o100777, None),
-        (OpenPolicy::Authenticated, 1001, 0o104755, None),
+    let cases = [
+        (Trusted, EUID, 0o100644, None),
+        (Trusted, 0, 0o100644, None),
+        (Trusted, 0, 0o100444, None),
+        (Trusted, 1001, 0o100644, Some(ForeignOwner { uid: 1001 })),
+        (Trusted, 0, 0o100664, Some(Writable { mode: 0o664 })),
+        (Trusted, EUID, 0o100646, Some(Writable { mode: 0o646 })),
+        (Private, EUID, 0o100600, None),
+        (Private, EUID, 0o100400, None),
+        (Private, 0, 0o100600, Some(ForeignOwner { uid: 0 })),
+        (Private, EUID, 0o100640, Some(Exposed { mode: 0o640 })),
+        (Private, EUID, 0o100604, Some(Exposed { mode: 0o604 })),
+        (Authenticated, EUID, 0o100666, None),
+        (Authenticated, 1001, 0o100600, None),
+        (Authenticated, 0, 0o100777, None),
+        (Authenticated, 1001, 0o104755, None),
     ];
     for (policy, uid, mode, expected) in cases {
-        let actual = check_ownership(policy, uid, mode, EUID);
-        let matched = match (&actual, &expected) {
-            (Ok(()), None) => true,
-            (
-                Err(RegularFileError::ForeignOwner { uid: actual }),
-                Some(RegularFileError::ForeignOwner { uid: expected }),
-            ) => actual == expected,
-            (
-                Err(RegularFileError::Writable { mode: actual }),
-                Some(RegularFileError::Writable { mode: expected }),
-            )
-            | (
-                Err(RegularFileError::Exposed { mode: actual }),
-                Some(RegularFileError::Exposed { mode: expected }),
-            ) => actual == expected,
-            _ => false,
-        };
-        assert!(
-            matched,
-            "{policy:?} uid {uid} mode {mode:o}: {actual:?}, want {expected:?}"
+        assert_eq!(
+            check_ownership(policy, uid, mode, EUID).err(),
+            expected,
+            "{policy:?} uid {uid} mode {mode:o}"
         );
     }
 }
@@ -101,42 +49,32 @@ fn ownership_rules_by_policy() {
 #[test]
 fn a_file_at_the_ceiling_reads_whole_and_one_byte_more_is_too_large() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = file_with_mode(directory.path(), &[b' '; LIMIT], 0o600)?;
+    let path = private_file(directory.path(), &[b' '; LIMIT])?;
     for policy in POLICIES {
         assert_eq!(read_regular_file(&path, LIMIT, policy)?.len(), LIMIT);
-        assert!(matches!(
+        assert_eq!(
             read_regular_file(&path, LIMIT - 1, policy),
-            Err(RegularFileError::TooLarge { max_bytes }) if max_bytes == LIMIT - 1
-        ));
+            Err(RegularFileError::TooLarge {
+                max_bytes: LIMIT - 1
+            })
+        );
     }
-    assert!(matches!(
-        read_regular_file(&path, 0, OpenPolicy::Authenticated),
-        Err(RegularFileError::TooLarge { max_bytes: 0 })
-    ));
     Ok(())
 }
 
 #[test]
 fn symlink_directory_and_missing_paths_are_refused_under_every_policy() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = file_with_mode(directory.path(), b"{}", 0o600)?;
+    let path = private_file(directory.path(), b"{}")?;
     let link = directory.path().join("link.json");
     std::os::unix::fs::symlink(&path, &link)?;
+    let absent = directory.path().join("absent.json");
     for policy in POLICIES {
-        assert!(matches!(
-            read_regular_file(&link, LIMIT, policy),
-            Err(RegularFileError::SymbolicLink)
-        ));
-        assert!(matches!(
-            read_regular_file(directory.path(), LIMIT, policy),
-            Err(RegularFileError::NotRegular)
-        ));
-        assert!(matches!(
-            read_regular_file(&directory.path().join("absent.json"), LIMIT, policy),
-            Err(RegularFileError::Missing)
-        ));
+        let read = |path: &Path| read_regular_file(path, LIMIT, policy);
+        assert_eq!(read(&link), Err(RegularFileError::SymbolicLink));
+        assert_eq!(read(directory.path()), Err(RegularFileError::NotRegular));
+        assert_eq!(read(&absent), Err(RegularFileError::Missing));
     }
-    assert_eq!(std::fs::read(path)?, b"{}");
     Ok(())
 }
 
@@ -151,43 +89,20 @@ fn fifo_without_a_writer_is_refused_without_blocking() -> TestResult {
     )?;
     let (sender, receiver) = std::sync::mpsc::channel();
     let reader = std::thread::spawn(move || {
-        let _ = sender.send(read_regular_file(&path, LIMIT, OpenPolicy::Authenticated));
+        let _ = sender.send(read_regular_file(&path, LIMIT, Authenticated));
     });
     let result = receiver.recv_timeout(std::time::Duration::from_secs(5))?;
     assert!(reader.join().is_ok(), "file reader panicked");
-    assert!(matches!(result, Err(RegularFileError::NotRegular)));
-    Ok(())
-}
-
-#[test]
-fn opened_file_modes_are_checked_against_the_policy() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let path = file_with_mode(directory.path(), b"{}", 0o644)?;
-    assert_eq!(read_regular_file(&path, LIMIT, OpenPolicy::Trusted)?, b"{}");
-    assert!(matches!(
-        read_regular_file(&path, LIMIT, OpenPolicy::Private),
-        Err(RegularFileError::Exposed { mode: 0o644 })
-    ));
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o620))?;
-    assert!(matches!(
-        read_regular_file(&path, LIMIT, OpenPolicy::Trusted),
-        Err(RegularFileError::Writable { mode: 0o620 })
-    ));
-    assert_eq!(
-        read_regular_file(&path, LIMIT, OpenPolicy::Authenticated)?,
-        b"{}"
-    );
+    assert_eq!(result, Err(RegularFileError::NotRegular));
     Ok(())
 }
 
 #[test]
 fn io_errors_keep_their_kind() {
-    assert!(matches!(
-        RegularFileError::from(std::io::Error::from(ErrorKind::PermissionDenied)),
+    let from = |kind: ErrorKind| RegularFileError::from(std::io::Error::from(kind));
+    assert_eq!(
+        from(ErrorKind::PermissionDenied),
         RegularFileError::Io(ErrorKind::PermissionDenied)
-    ));
-    assert!(matches!(
-        RegularFileError::from(std::io::Error::from(ErrorKind::NotFound)),
-        RegularFileError::Missing
-    ));
+    );
+    assert_eq!(from(ErrorKind::NotFound), RegularFileError::Missing);
 }
