@@ -602,13 +602,13 @@ rust_symbols = [
   "ChioReceipt",
   "ChioReceipt::verify_integrity_embedded_key",
 ]
-normalized_sha256 = "a604ba91d4463acca46d34da6bc8c2fe18a0836d02b7106e9830a81d1cbabf41"
+normalized_sha256 = "94de515aef8a67eba8e51b1e15c5aa1d64fc347ad5f69cab4bd0f5b2b7112c84"
 symbol_sha256 = [
   { symbol = "ChioReceiptBody", sha256 = "a3b7f9341eb8dfbda062cf8d951f32109e9a0cfcbd3d75066b854655b11ff810" },
   { symbol = "ChioReceiptIdInput", sha256 = "5b618d43a530570c1a9a408c0042682efaf01de0ff937ba125b2375b22bb270a" },
   { symbol = "chio_receipt_id", sha256 = "7b78cc054ecf0694eb25b0bf10aa521a7a18f0af85717b4316bf9cf7ce6005ba" },
   { symbol = "ChioReceipt", sha256 = "3591806f0d6998b98794cf3a9fa979e2db0ed7391415a4c68bd3eabf2f717baf" },
-  { symbol = "ChioReceipt::verify_integrity_embedded_key", sha256 = "f37c0937b9bffd5cde5aa66d981ff577e65ab12f739514bde151791ee55f0c37" },
+  { symbol = "ChioReceipt::verify_integrity_embedded_key", sha256 = "28987fdc6d498aac908b10e6dfbe02052138f3d8f31a0582406d19d211c90ecc" },
 ]
 
 [[mirror]]
