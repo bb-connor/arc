@@ -126,22 +126,37 @@ A holder of the key set who has a raw session id (from the agent's own records) 
 
 ### 4.6 Session handle resolution
 
-`SessionHandleResolver` is a port trait in `chio-kernel` beside `ReceiptStore`, implemented by `chio-store-sqlite`:
+`SessionHandleResolver` is a port trait in `chio-kernel` beside `ReceiptStore`, implemented by `chio-store-sqlite`. Both of its methods are required, with no default bodies:
 
 ```rust
 pub trait SessionHandleResolver {
-    fn resolve(
+    /// Per query, the candidate handles that occur on stored receipts of that signer.
+    fn matching_handles(
         &self,
         queries: &[SessionHandleQuery],
     ) -> Result<Vec<SessionHandleMatches>, SessionHandleResolveError>;
+    /// The distinct key generations named by stored session handles of `signer`.
+    fn handle_generations(
+        &self,
+        signer: &PublicKey,
+    ) -> Result<BTreeSet<Sha256Digest>, SessionHandleResolveError>;
 }
 ```
 
 - **Query.** `SessionHandleQuery` holds the signer key and the candidate handles: one per loaded generation, built by `SessionHandle::candidates(keys, origin, signer, session_id)` in `chio-core-types`.
-- **Store side.** The store scans the signer's handle-bearing receipts once per call, reading membership with `session_membership`. It returns, per query, the candidates that occur. It fails with `UnknownGeneration` if any membership handle of that signer names a `key_id` outside the loaded set.
+- **Index.** Lookups go through a store-owned index and never scan receipts. `chio-store-sqlite` keeps a table `chio_receipt_session_handles(signer_key, handle_key_id, handle_value, receipt_seq)`:
+  - Primary key `(signer_key, handle_key_id, handle_value, receipt_seq)`, which also serves the `(signer_key, handle_key_id)` prefix.
+  - The receipt append transaction writes one row per receipt that carries a session handle. The handle comes from `session_membership`, and an append whose membership refuses is itself refused.
+  - Retention archives and deletes the rows together with their receipt, as it already does for the claim-log projection.
+- **Lookups.**
+  - `matching_handles` runs one point lookup per candidate on the full key prefix, batched in one read transaction.
+  - `handle_generations` reads the distinct `handle_key_id` values for a signer from the key prefix alone. Its result is bounded by the number of generations.
+  - Before accepting a resolution, the caller refuses with `UnknownGeneration` if any of those generations is not loaded.
+- **Store files.** The table DDL and each query are their own `.sql` files in the store's session-handle index module, loaded through named consts.
 - **Batching.** `chio-mcp-remote` resolves every session it restores at startup in one call.
 - **Cardinality.** One pure function in `chio-core-types`, `SessionHandleMatches::into_resolution`, applies the rule: zero matches gives `None`, one match gives `Some(handle)`, and more than one gives `Ambiguous`.
-- **Consumers.** Kernel restore, ACP `session/load` and `chio cert generate` share it. The store keeps only the scan; the rule stays in the domain crate.
+- **Consumers.** Kernel restore, ACP `session/load` and `chio cert generate` share it. The store keeps only the index and its lookups; the rule stays in the domain crate.
+- **Certification.** `chio cert generate` uses the resolver only to name the handle. It still reads the session through the checkpoint-authenticated claim corpus (`session_certificate_read.rs`), because certification needs authenticated completeness, which an index lookup cannot give.
 
 ## 5. Interaction with in-flight work
 
@@ -202,6 +217,12 @@ PR 4 (flip):
     - `acp_session_load_keeps_original_handle`;
     - `acp_entry_for_unopened_session_resolves_before_signing`.
 16. `session_handle_resolution_cardinality` (`chio-core-types`): zero, one and two matches map to `None`, `Some` and `Ambiguous`.
+17. Store tests (`chio-store-sqlite`):
+    - `session_handle_index_written_on_append`;
+    - `append_refuses_malformed_session_membership`;
+    - `session_handle_index_rows_follow_retention`;
+    - `handle_generations_reports_unloaded_generation`;
+    - `matching_handles_uses_index` (`EXPLAIN QUERY PLAN` shows a search on the primary key, not a scan).
 14. `scripts/check-wire-schemas.py` fails before the protocol-refusal constant lands and passes after.
 
 Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<raw>` changes to the handle in the same PR: `chio-core-types` `tests/receipt_metadata_blocks.rs`, `tests/security_receipts.rs`; `chio-kernel` `compliance_certificate/tests.rs`, `kernel/tests/{protocol_refusal,reserved_session_metadata,session,post_effect_receipts}.rs`, `kernel/tests/reserved_session_metadata/kernel_written.rs`, `kernel/tests/durable_admission/review_regressions.rs`, `admission_operation_tests/terminal_projection.rs`, `tests/compliance_certificate_hybrid.rs`; `chio-store-sqlite` `receipt_store/session_certificate_read/tests.rs`, `tests/session_certificate_read.rs`, `admission_operation_store_tests/authorization_consumption.rs`; `chio-cli` `cert/session_receipts_tests.rs`, `tests/session_certificate.rs`, `cli/session/tests/pending_approval.rs`; `chio-acp-proxy` `compliance/bundle_tests.rs`, `tests/attestation_{denials,signer,support,compliance,clock,telemetry_transport}.rs`; `chio-acp-edge` `tests/all.rs`; `chio-cross-protocol` `tests.rs`; `chio-mcp-edge` `runtime/nested_flow_tests.rs`, `runtime/source_receipt_tests.rs`, `runtime/runtime_tests/{execution_evidence,stateless_revision}.rs`; `chio-mcp-remote` `remote_mcp/hosted_tests/protocol_refusal.rs`, `remote_mcp/tests.rs`; `chio-http-core` `authority/tests.rs`; `chio-control-plane` `security/active_defense_host_tests/terminal_response_refusal.rs`.
@@ -210,7 +231,7 @@ Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<
 
 1. **Primitive** (`chio-core-types` only, no signed bytes). `IndexPurpose::SessionHandle`, `IndexDomain::SessionHandle`, shared field encoder, `SessionHandle`, `session_membership`, the `AcpReceiptProjection` type change and the protocol-refusal schema constant. Tests 1-6. Lands first so PD2-F writes the handle directly.
 2. **Key-set wiring** (no signed bytes; after #1996). The directory reader in `tenant_index/load.rs` moves to `chio-secure-ipc` as a module beside `seed_custody`. It keeps the directory walk and the directory owner and mode checks. It reads each key file through `seed_custody::read_private_file(path, 32)`, which checks for a regular, singly linked file owned by the process user with mode 0600 or stricter, opens it with no-follow, re-checks file identity around the read and refuses over-length input. The module copies each file into a `Zeroizing<[u8; 32]>` after an exact length check. That function's `UnsafeFile` messages become purpose-neutral in `seed_custody` itself, together with the two control-plane tests that match them. The module returns the active key and the retired `(file name, key)` pairs. `TenantIndexKeySet` gains one pure constructor that refuses a retired file name other than the derived `key_id` hex, so that check stays with the key type, and `chio-secure-ipc` takes no dependency on `chio-core-types`. The core copy, its `std`-gated module and its `TenantIndexKeyLoadError` are deleted, and the loader tests in `chio-core-types` `tests/tenant_index.rs:363-395` move with it. `Arc<TenantIndexKeySet>` becomes a required argument of `KernelReceiptSigner::new` (`kernel_signer.rs:70`), `KernelCapabilityChecker::new` (`kernel_checker.rs:149`) and the kernel configuration that `open_session_with_id` reads. The `chio mcp` hosts and `chio cert` take `--tenant-index-keys <dir>` and refuse to start without it, local dev flows included. `chio init` and the dev quickstart provision a key set explicitly through `chio keys tenant-index generate`. The kernel never generates one itself. Test 7.
-3. **Retained-session statements and resolver** (no signed bytes). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3), and the existing reader tests stay green unchanged. The same PR adds the `SessionHandleResolver` port in `chio-kernel`, its `chio-store-sqlite` implementation in the retained-session module with its own `.sql` file, and the cardinality function. Test 16, plus store tests for the scan and the `UnknownGeneration` refusal.
+3. **Retained-session statements and resolver** (no signed bytes). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3), and the existing reader tests stay green unchanged. The same PR adds the `SessionHandleResolver` port in `chio-kernel` (required methods only), the `chio_receipt_session_handles` index with its append write and retention co-archive, its `chio-store-sqlite` implementation with its own `.sql` files and consts, and the cardinality function. It runs test 16 and the store tests in section 7 item 17.
 4. **Flip** (signed bytes, one PR). All three writers, both readers through `session_membership`, the authorization-path carriers in 3.2, both certificate bodies, schemas, signed-artifact examples, generated SDK types, `wire-schemas.lock`, registry descriptions, PROTOCOL 6.4, `spec/COMPLIANCE-CERTIFICATE.md`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` and the CLI. Writers and readers move together because the reader compares across members and receipts; a split leaves a window where the readers join raw ids against handles. Tests 8-15 and every fixture in section 7. `docs/formal/COVERAGE.md` regenerates last if the proof-coverage check asks for it.
 
 ## 9. Decisions
@@ -250,14 +271,13 @@ This section maps the design onto `DESIGN-QUALITY-CHARTER.md` and the R1-R15 che
 
 ### 10.1 Persistence
 
-The design adds no persisted state: no table, column, schema, migration or row type, and no stored handle or key.
+The design persists no key. Handle persistence is limited to signed receipts and one store-owned index, the only new table, `chio_receipt_session_handles` in `chio-store-sqlite` (section 4.6). The table is behind the `SessionHandleResolver` port, written in the receipt append transaction and co-archived by retention. It is a change to the fresh v1 receipt-store catalog, with no migration.
 
-- **Kernel.** The kernel holds a session's handle in memory for the life of the session. On restore it recovers the handle by resolution over receipts that already exist (section 4.6), so the restore record gains nothing.
+- **Kernel.** The kernel holds a session's handle in memory for the life of the session. On restore it recovers the handle through the resolver index (section 4.6), so the restore record gains nothing.
 - **ACP proxy.** The proxy keeps a bounded in-memory map for the life of the process.
 - **Receipts.** Receipts carry the handle inside signed metadata, so the existing receipt store keeps it as part of the receipt JSON with no schema change.
 - **Keys.** Keys stay in the operator-provisioned `--tenant-index-keys <dir>` layout, and no crate writes them.
-- **Resolver.** It reads only, through the `SessionHandleResolver` port in `chio-kernel`. Its query lives in `chio-store-sqlite` in the retained-session module as a named `.sql` file.
-- **Future index.** A handle index that avoids the claim-log scan, if one is ever needed, belongs to that same store module behind the same port.
+- **Resolver.** It answers from that index through the `SessionHandleResolver` port in `chio-kernel`. Its DDL and queries are named `.sql` files in the store's session-handle index module.
 
 ### 10.2 Crate boundaries (R1, R2, R3)
 
@@ -267,7 +287,7 @@ The design adds no persisted state: no table, column, schema, migration or row t
 | `chio-kernel` | `SessionHandleResolver` port, `HandleGeneration` on session open (new module `kernel/session_ops/handle.rs`), refusal writer, consumption field, certificate body | port only; no storage or SQL added |
 | `chio-acp-proxy` | signer, checker, compliance verifier, bounded handle map | no storage or SQL added |
 | `chio-cross-protocol` | carries the handle in place of the raw id | no storage |
-| `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership`; implements `SessionHandleResolver` with a named `.sql` query | persistence stays in the store crate |
+| `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership`; owns the `chio_receipt_session_handles` index (written on append, co-archived by retention) and implements `SessionHandleResolver` with its own `.sql` files and consts | persistence stays in the store crate |
 | `chio-secure-ipc` | key-set directory reader moved from `chio-core-types` (PR 2) | custody IO stays in the security crate; no dependency on `chio-core-types` |
 | `chio-mcp-remote` | restore resolves handles in one batched call and passes `HandleGeneration::Pinned` | no storage or SQL added |
 | `chio-cli` | `--tenant-index-keys`, `--origin`, `chio cert` input and output | host crate; no SQL |
@@ -277,7 +297,7 @@ The design adds no persisted state: no table, column, schema, migration or row t
 
 ### 10.3 Queries (R4)
 
-The design adds one query, the resolver scan, as a named `.sql` file in the retained-session module of `chio-store-sqlite`. The retained-session reader already embeds SQL in its logic: `git grep -c 'SELECT\|INSERT\|UPDATE '` counts 4 lines in `session_certificate_read.rs` and 6 in `session_certificate_read/preflight.rs`. PR 4 edits that reader, so PR 3 first moves those statements into named `.sql` files in `receipt_store/session_certificate_read/` and loads them with `include_str!`, following the `admission_operation_*.sql` convention in the same crate. The files are grouped by the retained-session aggregate.
+The design adds one index table and its lookups, each a named `.sql` file in a session-handle index module of `chio-store-sqlite`, loaded through consts. The retained-session reader already embeds SQL in its logic: `git grep -c 'SELECT\|INSERT\|UPDATE '` counts 4 lines in `session_certificate_read.rs` and 6 in `session_certificate_read/preflight.rs`. PR 4 edits that reader, so PR 3 first moves those statements into named `.sql` files in `receipt_store/session_certificate_read/` and loads them with `include_str!`, following the `admission_operation_*.sql` convention in the same crate. The files are grouped by the retained-session aggregate.
 
 ### 10.4 Abstractions and their payoff (R5)
 
@@ -285,7 +305,7 @@ The design adds one query, the resolver scan, as a named `.sql` file in the reta
 - `session_membership`: it removes the duplicated membership readers (`signed_membership`, `receipt_session_id`), which today enforce the same rule in two crates.
 - Shared length-prefixed field encoder: it removes the second copy that the session handle would otherwise add next to `enterprise_subject.rs`.
 - `IndexPurpose::SessionHandle`: it uses the purpose mechanism the key set already defines.
-- `SessionHandleResolver` port: three consumers (kernel restore, ACP `session/load` and `chio cert generate`) share one resolution and cardinality rule, and the store side holds only the scan. The ACP handle map stays a private type with no seam.
+- `SessionHandleResolver` port, with required methods only: three consumers (kernel restore, ACP `session/load` and `chio cert generate`) share one resolution and cardinality rule, and the store side holds only the index and its lookups. The ACP handle map stays a private type with no seam.
 
 ### 10.5 File budgets (R11)
 
