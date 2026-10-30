@@ -1,6 +1,7 @@
 # ci-gates/web3-free-closure.toml
-# Policy for `cargo xtask check web3-free-closure`, acceptance gates 1 and 3
-# of docs/adr/ADR-0035-web3-free-distribution.md.
+# Policy for `cargo xtask check web3-free-closure`, acceptance gates 1, 3 and
+# the `chio-settle-types` closure in gate 5 of
+# docs/adr/ADR-0035-web3-free-distribution.md.
 #
 # Each `[[mode]]` resolves every listed root on its own with
 #   cargo tree -p <root> -e normal,features --prefix depth --format "{p} {f}"
@@ -86,3 +87,27 @@ require = ["chio-settle", "chio-web3", "chio-finding"]
 [[mode.root]]
 name = "chio-cli"
 require = ["chio-settle", "chio-web3", "chio-finding", "chio-proof-room"]
+
+[[mode]]
+name = "settle-types"
+features = []
+deny_packages = [
+  "chio-core",
+  "chio-settle",
+  "chio-web3",
+  "chio-web3-bindings",
+  "chio-anchor",
+  "alloy",
+  "alloy-*",
+  "secp256k1",
+  "ethers*",
+  "chio-finding",
+  "chio-finding-*",
+  "chio-open-market",
+  "chio-swarm-authority",
+]
+deny_features = ["web3", "finding-market"]
+
+[[mode.root]]
+name = "chio-settle-types"
+require = ["chio-core-types", "chio-security-types"]

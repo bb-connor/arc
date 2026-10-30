@@ -505,8 +505,44 @@ fn checked_in_policy_matches_adr_modes_and_roots() -> Result<(), String> {
                 ),
             ],
         ),
+        (
+            "settle-types".to_string(),
+            Vec::new(),
+            vec![(
+                "chio-settle-types".to_string(),
+                owned(&["chio-core-types", "chio-security-types"]),
+            )],
+        ),
     ];
     assert_eq!(shape, expected);
+    Ok(())
+}
+
+#[test]
+fn checked_in_settle_types_mode_denies_the_core_facade() -> Result<(), String> {
+    let root = workspace_root().map_err(|err| err.to_string())?;
+    let policy = load_policy(&root).map_err(|err| err.to_string())?;
+    let mode = mode(&policy, "settle-types")?;
+    let rule = rule(mode, "chio-settle-types")?;
+    let clean = concat!(
+        "0chio-settle-types v0.1.0 (/w/crates/economy/chio-settle-types) \n",
+        "1chio-core-types feature \"default\"\n",
+        "2chio-core-types v0.1.0 (/w/crates/core/chio-core-types) default,std\n",
+        "3chio-security-types feature \"default\"\n",
+        "4chio-security-types v0.1.0 (/w/crates/security/chio-security-types) \n",
+        "1chio-security-types feature \"default\" (*)\n",
+    );
+    let (_, violations) = check_root(mode, rule, Ok(clean.to_string()))?;
+    assert_eq!(violations, Vec::new());
+
+    let facade = format!(
+        "{clean}{}{}",
+        "1chio-core feature \"default\"\n",
+        "2chio-core v0.1.0 (/w/crates/core/chio-core) default\n",
+    );
+    let (_, violations) = check_root(mode, rule, Ok(facade))?;
+    let packages: Vec<&str> = violations.iter().map(|v| v.breach.package()).collect();
+    assert_eq!(packages, vec!["chio-core"]);
     Ok(())
 }
 
