@@ -384,8 +384,8 @@ impl ChioMcpEdge {
             };
         }
 
-        let reason = "task cancelled by client";
-        task.mark_cancelled(reason, tool_error_result(reason), observed);
+        let code = chio_kernel::ClientDenialCode::RequestCancelled;
+        task.mark_cancelled(code.text(), denial_tool_result(code), observed);
         self.dequeue_background_task(&task_id);
         let task_view = task.clone();
         self.queue_task_status_notification(&task_view);
