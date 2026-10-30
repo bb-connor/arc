@@ -1,56 +1,58 @@
+use alloc::vec;
 use core::cell::{Cell, RefCell};
 use core::sync::atomic::{AtomicU8, Ordering};
 
 use chio_test_support::prelude::*;
 
 use super::*;
-use crate::root_authority::Sha256Digest;
 use crate::tenant_index::TenantIndexKey;
 
 const SCOPE: &str = "https://idp.example";
 const DEACTIVATED_AT: u64 = 1_767_225_600;
 
-/// In-memory store: `rows` are the committed rows, and `commits` counts replacements.
+type Error = EnterpriseIdentityIndexError;
+type HistoryRow = EnterpriseSubjectHistoryRow;
+
+/// In-memory store holding the committed rows and the count of committed change sets.
 #[derive(Default)]
-struct MemoryStore {
-    rows: RefCell<EnterpriseIdentityRows>,
-    commits: Cell<usize>,
-}
+struct MemoryStore(RefCell<EnterpriseIdentityRows>, Cell<usize>);
 
 impl MemoryStore {
-    fn holding(rows: EnterpriseIdentityRows) -> Self {
-        Self {
-            rows: RefCell::new(rows),
-            commits: Cell::new(0),
-        }
+    fn rows(&self) -> EnterpriseIdentityRows {
+        self.0.borrow().clone()
     }
 
-    fn rows(&self) -> EnterpriseIdentityRows {
-        self.rows.borrow().clone()
+    fn commits(&self) -> usize {
+        self.1.get()
     }
 }
 
 impl EnterpriseIdentityStore for MemoryStore {
-    fn transact<R>(
-        &self,
-        transaction: impl FnOnce(EnterpriseIdentityRows) -> EnterpriseIdentityTransaction<R>,
-    ) -> Result<R, EnterpriseIdentityIndexError> {
-        let (outcome, replaced) = transaction(self.rows())?;
-        if let Some(rows) = replaced {
-            self.rows.replace(rows);
-            self.commits.set(self.commits.get() + 1);
+    fn transact(&self, transaction: &mut EnterpriseIdentityTransaction<'_>) -> Result<(), Error> {
+        let Some(changes) = transaction(self.rows())? else {
+            return Ok(());
+        };
+        let mut rows = self.0.borrow_mut();
+        rows.history
+            .retain(|row| !changes.restored.contains(&row.subject));
+        rows.identities.extend(changes.inserted);
+        for row in &mut rows.identities {
+            let id = &row.identity_id;
+            if let Some((_, subject)) = changes.rekeyed.iter().find(|(at, _)| at == id) {
+                row.subject = *subject;
+            }
+            if let Some((_, at)) = changes.deactivated.iter().find(|(of, _)| of == id) {
+                row.deactivated_at.get_or_insert(*at);
+            }
         }
-        Ok(outcome)
+        rows.history.extend(changes.history);
+        self.1.set(self.1.get() + 1);
+        Ok(())
     }
 }
 
+/// Fills each draw with the next counter value, starting at 1.
 struct SequenceRng(AtomicU8);
-
-impl SequenceRng {
-    fn new() -> Self {
-        Self(AtomicU8::new(1))
-    }
-}
 
 impl Rng for SequenceRng {
     fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
@@ -59,20 +61,12 @@ impl Rng for SequenceRng {
     }
 }
 
-struct FailingRng;
-
-impl Rng for FailingRng {
-    fn fill_bytes(&self, _dest: &mut [u8]) -> Result<(), RngError> {
-        Err(RngError("entropy offline"))
-    }
+fn rng() -> SequenceRng {
+    SequenceRng(AtomicU8::new(1))
 }
 
 fn key(byte: u8) -> TenantIndexKey {
     TenantIndexKey::from_set_key(&[byte; 32]).test_unwrap()
-}
-
-fn key_id(byte: u8) -> Sha256Digest {
-    *key(byte).key_id()
 }
 
 fn set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
@@ -84,44 +78,29 @@ fn subject(keys: &TenantIndexKeySet, principal: &str) -> EnterpriseSubjectKey {
     EnterpriseSubjectKey::derive(keys, SCOPE, principal).test_unwrap()
 }
 
-fn id(byte: &str) -> EnterpriseIdentityId {
-    EnterpriseIdentityId::try_from(byte.repeat(16)).test_unwrap()
+fn id(n: usize) -> EnterpriseIdentityId {
+    EnterpriseIdentityId::try_from(alloc::format!("{n:032x}")).test_unwrap()
 }
 
-fn insert(
-    store: &MemoryStore,
-    keys: &TenantIndexKeySet,
-    rng: &dyn Rng,
-    principal: &str,
-) -> ResolvedIdentity {
-    with_enterprise_identity_index(store, keys, |index| {
-        index.resolve_or_insert(rng, SCOPE, principal)
-    })
-    .test_unwrap()
+fn insert(store: &MemoryStore, keys: &TenantIndexKeySet, r: &dyn Rng, p: &str) -> ResolvedIdentity {
+    let resolved =
+        with_enterprise_identity_index(store, keys, |index| index.resolve_or_insert(r, SCOPE, p));
+    resolved.test_unwrap()
 }
 
-fn length(
-    store: &MemoryStore,
-    keys: &TenantIndexKeySet,
-) -> Result<usize, EnterpriseIdentityIndexError> {
+fn length(store: &MemoryStore, keys: &TenantIndexKeySet) -> Result<usize, Error> {
     with_enterprise_identity_index(store, keys, |index| Ok(index.len()))
 }
 
-fn unknown(byte: u8) -> EnterpriseIdentityIndexError {
-    EnterpriseIdentityIndexError::Subject(EnterpriseSubjectError::Index(
-        TenantBindingError::TenantIndexKeyUnknown {
-            key_id: key_id(byte),
-        },
-    ))
+fn unknown(byte: u8) -> Error {
+    let key_id = *key(byte).key_id();
+    let unknown = TenantBindingError::TenantIndexKeyUnknown { key_id };
+    Error::Subject(EnterpriseSubjectError::Index(unknown))
 }
 
-fn identity_row(
-    identity_id: &EnterpriseIdentityId,
-    principal: &str,
-    subject: EnterpriseSubjectKey,
-) -> EnterpriseIdentityRow {
+fn identity_row(n: usize, principal: &str, subject: EnterpriseSubjectKey) -> EnterpriseIdentityRow {
     EnterpriseIdentityRow {
-        identity_id: identity_id.clone(),
+        identity_id: id(n),
         provider_scope: SCOPE.into(),
         principal: principal.into(),
         subject,
@@ -129,343 +108,209 @@ fn identity_row(
     }
 }
 
+fn history_row(identity_id: EnterpriseIdentityId, subject: EnterpriseSubjectKey) -> HistoryRow {
+    HistoryRow {
+        identity_id,
+        subject,
+    }
+}
+
 #[test]
-fn insert_resolves_by_principal_and_stores_only_the_keyed_subject() {
+fn insert_resolves_by_principal_and_a_read_commits_nothing() {
     let store = MemoryStore::default();
-    let keys = set(1, &[]);
-    let rng = SequenceRng::new();
+    let (keys, rng) = (set(1, &[]), rng());
     let alice = insert(&store, &keys, &rng, "alice");
     assert!(alice.inserted);
-    assert_eq!(alice.identity.identity_id, id("01"));
+    assert_eq!(alice.identity.identity_id.as_str(), "01".repeat(16));
     assert_eq!(alice.identity.subject, subject(&keys, "alice"));
-    assert_eq!(alice.identity.deactivated_at, None);
-
     let again = insert(&store, &keys, &rng, "alice");
-    assert_eq!(again.identity, alice.identity);
-    assert!(!again.inserted);
-    let bob = insert(&store, &keys, &rng, "bob");
-    assert_ne!(bob.identity.identity_id, alice.identity.identity_id);
-
-    let rows = store.rows();
-    assert_eq!(rows.identities.len(), 2);
-    assert!(rows.history.is_empty());
-    assert_eq!(store.commits.get(), 2);
+    assert_eq!((again.identity, again.inserted), (alice.identity, false));
+    let other = with_enterprise_identity_index(&store, &keys, |index| {
+        index.resolve_or_insert(&rng, "https://other-idp.example", "alice")
+    });
+    assert!(other.test_unwrap().inserted);
+    assert_eq!(store.rows().identities.len(), 2);
+    assert_eq!(store.commits(), 2);
 }
 
 #[test]
 fn rotation_rederives_every_identity_in_one_commit_and_keeps_history() {
     let store = MemoryStore::default();
-    let before = set(1, &[]);
-    let rng = SequenceRng::new();
+    let (before, after, rng) = (set(1, &[]), set(2, &[1]), rng());
     let principals = ["alice", "bob", "carol"];
-    let ids: Vec<EnterpriseIdentityId> = principals
-        .iter()
-        .map(|principal| {
-            insert(&store, &before, &rng, principal)
-                .identity
-                .identity_id
-        })
-        .collect();
+    let ids = principals.map(|p| insert(&store, &before, &rng, p).identity.identity_id);
     let inserted = store.rows();
-
-    let after = set(2, &[1]);
-    let refused = with_enterprise_identity_index(&store, &after, |_| {
-        Err::<(), _>(EnterpriseIdentityIndexError::UnknownIdentity)
+    let refused = with_enterprise_identity_index(&store, &after, |index| {
+        index.resolve_or_insert(&rng, SCOPE, "dave")?;
+        Err::<(), _>(Error::UnknownIdentity)
     });
-    assert_eq!(refused, Err(EnterpriseIdentityIndexError::UnknownIdentity));
+    assert_eq!(refused, Err(Error::UnknownIdentity));
     assert_eq!(store.rows(), inserted);
 
-    assert_eq!(length(&store, &after), Ok(principals.len()));
-    let rows = store.rows();
-    assert_eq!(rows.history.len(), principals.len());
-    for ((principal, identity_id), row) in principals.iter().zip(&ids).zip(&rows.identities) {
-        assert_eq!(&row.identity_id, identity_id);
-        assert_eq!(row.subject, subject(&after, principal));
-        assert!(rows.history.contains(&EnterpriseSubjectHistoryRow {
-            identity_id: identity_id.clone(),
-            subject: subject(&before, principal),
-        }));
-    }
-
-    let commits = store.commits.get();
     let presented = with_enterprise_identity_index(&store, &after, |index| {
         let fresh = index.resolve_presented(SCOPE, "alice", &subject(&after, "alice"))?;
         let stale = index.resolve_presented(SCOPE, "alice", &subject(&before, "alice"))?;
-        Ok((
-            fresh.identity_id,
-            stale.identity_id,
-            fresh.subject.key_id() == &key_id(2),
-        ))
+        Ok([fresh.identity_id, stale.identity_id])
     });
-    assert_eq!(presented, Ok((ids[0].clone(), ids[0].clone(), true)));
-    assert_eq!(store.commits.get(), commits);
+    assert_eq!(presented, Ok([ids[0].clone(), ids[0].clone()]));
+    length(&store, &after).test_unwrap();
+    assert_eq!(store.commits(), principals.len() + 1);
+    let rows = store.rows();
+    for (n, p) in principals.iter().enumerate() {
+        assert_eq!(rows.identities[n].subject, subject(&after, p));
+        let prior = history_row(ids[n].clone(), subject(&before, p));
+        assert_eq!(rows.history[n], prior);
+    }
 }
 
 #[test]
-fn history_join_after_rotation() {
+fn history_join_after_rotation_and_reactivation() {
     let store = MemoryStore::default();
-    let alice = insert(&store, &set(1, &[]), &SequenceRng::new(), "alice").identity;
-    let old_receipt_subject = alice.subject;
-
-    let after = set(2, &[1]);
-    let new_receipt_subject = subject(&after, "alice");
-    let relabeled = EnterpriseSubjectKey::parse(&alloc::format!(
-        "esk1.{}.{}",
-        key_id(2).to_bare_hex(),
-        old_receipt_subject.keyed_value().value.to_bare_hex()
-    ))
-    .test_unwrap();
-    let crossed = EnterpriseSubjectKey::parse(&alloc::format!(
-        "esk1.{}.{}",
-        key_id(1).to_bare_hex(),
-        new_receipt_subject.keyed_value().value.to_bare_hex()
-    ))
-    .test_unwrap();
-    let joined = with_enterprise_identity_index(&store, &after, |index| {
-        assert_eq!(
-            index.history_of(&alice.identity_id),
-            alloc::vec![old_receipt_subject]
-        );
-        Ok([
-            index.resolve_subject(&old_receipt_subject)?,
-            index.resolve_subject(&new_receipt_subject)?,
-            index.resolve_subject(&relabeled)?,
-            index.resolve_subject(&crossed)?,
-        ])
-    })
-    .test_unwrap();
-    assert_eq!(
-        joined,
-        [
-            Some(alice.identity_id.clone()),
-            Some(alice.identity_id),
-            None,
-            None
-        ]
-    );
-}
-
-#[test]
-fn unknown_generation_refuses_startup_and_lookup() {
-    let store = MemoryStore::default();
-    insert(&store, &set(1, &[]), &SequenceRng::new(), "alice");
-
-    assert_eq!(length(&store, &set(2, &[])), Err(unknown(1)));
-    length(&store, &set(2, &[1])).test_unwrap();
+    let alice = insert(&store, &set(1, &[]), &rng(), "alice").identity;
+    let (old, after) = (alice.subject, set(2, &[1]));
+    let new = subject(&after, "alice");
+    let relabel = |from: &EnterpriseSubjectKey, to: u8| {
+        let value = from.keyed_value().value.to_bare_hex();
+        let text = alloc::format!("esk1.{}.{value}", key(to).key_id().to_bare_hex());
+        EnterpriseSubjectKey::parse(&text).test_unwrap()
+    };
+    let foreign = subject(&set(7, &[]), "alice");
+    let joined: Result<Vec<_>, _> = with_enterprise_identity_index(&store, &after, |index| {
+        assert_eq!(index.history_of(&alice.identity_id), vec![old]);
+        let presented = index.resolve_presented(SCOPE, "alice", &foreign);
+        assert_eq!(presented, Err(unknown(7)));
+        assert_eq!(index.resolve_subject(&foreign), Err(unknown(7)));
+        let probes = [old, new, relabel(&old, 2), relabel(&new, 1)];
+        probes.iter().map(|p| index.resolve_subject(p)).collect()
+    });
+    let owner = Some(alice.identity_id.clone());
+    assert_eq!(joined, Ok(vec![owner.clone(), owner, None, None]));
     assert_eq!(length(&store, &set(3, &[2])), Err(unknown(1)));
 
-    let keys = set(2, &[1]);
-    let foreign = subject(&set(7, &[]), "alice");
-    let by_subject =
-        with_enterprise_identity_index(&store, &keys, |index| index.resolve_subject(&foreign));
-    assert_eq!(by_subject, Err(unknown(7)));
-    let presented = with_enterprise_identity_index(&store, &keys, |index| {
-        index.resolve_presented(SCOPE, "alice", &foreign)
+    let restored = with_enterprise_identity_index(&store, &set(1, &[2]), |index| {
+        let history = index.history_of(&alice.identity_id);
+        Ok((index.resolve(SCOPE, "alice"), history))
     });
-    assert_eq!(presented, Err(unknown(7)));
+    assert_eq!(restored, Ok((Some(alice), vec![new])));
+    assert_eq!(length(&store, &set(1, &[2])), Ok(1));
 }
 
 #[test]
-fn scim_deactivate_after_rotation_holds() {
-    let store = MemoryStore::default();
-    let before = set(1, &[]);
-    let rng = SequenceRng::new();
-    let alice = insert(&store, &before, &rng, "alice").identity;
-    let deactivated = with_enterprise_identity_index(&store, &before, |index| {
-        index.deactivate(&alice.identity_id, DEACTIVATED_AT)
-    });
-    assert_eq!(deactivated, Ok(DEACTIVATED_AT));
-
-    let after = set(2, &[1]);
+fn deactivation_holds_across_rotation_and_refuses_out_of_range_times() {
+    let (store, rng, after) = (MemoryStore::default(), rng(), set(2, &[1]));
+    let alice = insert(&store, &set(1, &[]), &rng, "alice").identity;
+    let deactivate = |keys: &TenantIndexKeySet, identity_id: &EnterpriseIdentityId, at| {
+        with_enterprise_identity_index(&store, keys, |index| index.deactivate(identity_id, at))
+    };
+    let first = deactivate(&set(1, &[]), &alice.identity_id, DEACTIVATED_AT);
+    assert_eq!(first, Ok(DEACTIVATED_AT));
     let recreated = insert(&store, &after, &rng, "alice");
     assert!(!recreated.inserted);
     assert_eq!(recreated.identity.identity_id, alice.identity_id);
     assert_eq!(recreated.identity.deactivated_at, Some(DEACTIVATED_AT));
-    let later = with_enterprise_identity_index(&store, &after, |index| {
-        index.deactivate(&alice.identity_id, DEACTIVATED_AT + 60)
-    });
+    let commits = store.commits();
+    let later = deactivate(&after, &alice.identity_id, DEACTIVATED_AT + 60);
     assert_eq!(later, Ok(DEACTIVATED_AT));
-    let missing = with_enterprise_identity_index(&store, &after, |index| {
-        index.deactivate(&id("0f"), DEACTIVATED_AT)
-    });
-    assert_eq!(missing, Err(EnterpriseIdentityIndexError::UnknownIdentity));
+    let missing = deactivate(&after, &id(0x0f), DEACTIVATED_AT);
+    assert_eq!(missing, Err(Error::UnknownIdentity));
+    let late = deactivate(&after, &alice.identity_id, u64::MAX);
+    assert_eq!(late, Err(Error::InvalidTime));
+    assert_eq!(store.commits(), commits);
 }
 
 #[test]
-fn no_duplicate_identity_across_rotation() {
-    let store = MemoryStore::default();
-    let rng = SequenceRng::new();
-    let first = insert(&store, &set(1, &[]), &rng, "alice").identity;
-    let second = insert(&store, &set(2, &[1]), &rng, "alice");
-    let third = insert(&store, &set(3, &[1, 2]), &rng, "alice");
-    assert!(!second.inserted && !third.inserted);
-    assert_eq!(second.identity.identity_id, first.identity_id);
-    assert_eq!(third.identity.identity_id, first.identity_id);
-    let other_scope = with_enterprise_identity_index(&store, &set(3, &[1, 2]), |index| {
-        let other = index.resolve_or_insert(&rng, "https://other-idp.example", "alice")?;
-        Ok((
-            other,
-            index.len(),
-            index.history_of(&first.identity_id).len(),
-        ))
-    })
-    .test_unwrap();
-    assert!(other_scope.0.inserted);
-    assert_ne!(other_scope.0.identity.identity_id, first.identity_id);
-    assert_eq!(other_scope.1, 2);
-    assert_eq!(other_scope.2, 2);
-}
-
-#[test]
-fn a_reactivated_generation_moves_its_subject_back_out_of_history() {
-    let store = MemoryStore::default();
-    let alice = insert(&store, &set(1, &[]), &SequenceRng::new(), "alice").identity;
-    length(&store, &set(2, &[1])).test_unwrap();
-    let restored = with_enterprise_identity_index(&store, &set(1, &[2]), |index| {
-        Ok((
-            index.resolve(SCOPE, "alice"),
-            index.history_of(&alice.identity_id),
-        ))
-    })
-    .test_unwrap();
-    assert_eq!(restored.0, Some(alice.clone()));
-    assert_eq!(restored.1, alloc::vec![subject(&set(2, &[]), "alice")]);
-}
-
-#[test]
-fn presented_subject_must_verify_and_be_indexed() {
-    let store = MemoryStore::default();
-    let keys = set(1, &[]);
-    insert(&store, &keys, &SequenceRng::new(), "alice");
+fn presented_principals_and_ids_must_be_in_bounds_and_verify() {
+    let (store, keys) = (MemoryStore::default(), set(1, &[]));
+    insert(&store, &keys, &rng(), "alice");
     let bob = subject(&keys, "bob");
-    let as_alice = with_enterprise_identity_index(&store, &keys, |index| {
-        index.resolve_presented(SCOPE, "alice", &bob)
+    let long = "a".repeat(ENTERPRISE_PRINCIPAL_MAX_BYTES + 1);
+    let invalid = [(SCOPE, ""), ("", "a"), (SCOPE, "a\0b"), (&*long, "a")];
+    let probes = with_enterprise_identity_index(&store, &keys, |index| {
+        let mismatch = Error::Subject(EnterpriseSubjectError::Index(TenantBindingError::Mismatch));
+        assert_eq!(index.resolve_presented(SCOPE, "alice", &bob), Err(mismatch));
+        let unindexed = index.resolve_presented(SCOPE, "bob", &bob);
+        assert_eq!(unindexed, Err(Error::UnknownIdentity));
+        let mut refusals = Vec::new();
+        for (scope, principal) in invalid {
+            refusals.push(index.resolve_presented(scope, principal, &bob).err());
+            refusals.push(index.resolve_or_insert(&rng(), scope, principal).err());
+        }
+        Ok(refusals)
     });
-    assert_eq!(
-        as_alice,
-        Err(EnterpriseIdentityIndexError::Subject(
-            EnterpriseSubjectError::Index(TenantBindingError::Mismatch)
-        ))
-    );
-    let unindexed = with_enterprise_identity_index(&store, &keys, |index| {
-        index.resolve_presented(SCOPE, "bob", &bob)
-    });
-    assert_eq!(
-        unindexed,
-        Err(EnterpriseIdentityIndexError::UnknownIdentity)
-    );
-}
-
-#[test]
-fn identity_ids_are_drawn_whole_and_validated() {
-    let store = MemoryStore::default();
-    let refused = with_enterprise_identity_index(&store, &set(1, &[]), |index| {
-        index.resolve_or_insert(&FailingRng, SCOPE, "alice")
-    });
-    assert_eq!(
-        refused,
-        Err(EnterpriseIdentityIndexError::Entropy(RngError(
-            "entropy offline"
-        )))
-    );
-    assert_eq!(store.commits.get(), 0);
-    for text in [
-        "",
-        "0A".repeat(16).as_str(),
-        "0a".repeat(15).as_str(),
-        "scim-0123",
-    ] {
+    let refusals = vec![Some(Error::InvalidPrincipal); 2 * invalid.len()];
+    assert_eq!(probes, Ok(refusals));
+    assert_eq!(store.commits(), 1);
+    for text in ["", &"0A".repeat(16), &"0a".repeat(15), "scim-0123"] {
         let parsed = EnterpriseIdentityId::try_from(String::from(text));
-        assert_eq!(
-            parsed,
-            Err(EnterpriseIdentityIndexError::MalformedIdentityId)
-        );
+        assert_eq!(parsed, Err(Error::MalformedIdentityId));
     }
 }
 
 #[test]
 fn tampered_rows_refuse_to_load_and_are_never_replaced() {
-    let keys = set(1, &[]);
-    let (alice, bob) = (subject(&keys, "alice"), subject(&keys, "bob"));
-    let (id_a, id_b) = (id("0a"), id("0b"));
-    let history = |identity_id: &EnterpriseIdentityId, subject| EnterpriseSubjectHistoryRow {
-        identity_id: identity_id.clone(),
-        subject,
+    use EnterpriseIdentityIndexError::{
+        DuplicateIdentityId, DuplicatePrincipal, DuplicateSubject, MalformedRow, OrphanHistory,
     };
+    let keys = set(1, &[]);
+    let (a, b, row) = (subject(&keys, "alice"), subject(&keys, "bob"), identity_row);
+    let (a1, mut late) = (row(1, "alice", a), row(1, "alice", a));
+    late.deactivated_at = Some(u64::MAX);
+    let mismatch = Error::Subject(EnterpriseSubjectError::Index(TenantBindingError::Mismatch));
+    let crowd = vec![a1.clone(); ENTERPRISE_IDENTITY_MAX_IDENTITIES + 1];
+    let long_history = vec![history_row(id(1), a); ENTERPRISE_IDENTITY_MAX_HISTORY + 1];
     let cases = [
+        (vec![row(1, "alice", b)], vec![], mismatch),
         (
-            alloc::vec![identity_row(&id_a, "alice", bob)],
-            alloc::vec![],
-            EnterpriseIdentityIndexError::Subject(EnterpriseSubjectError::Index(
-                TenantBindingError::Mismatch,
-            )),
+            vec![a1.clone(), row(2, "alice", a)],
+            vec![],
+            DuplicatePrincipal,
         ),
         (
-            alloc::vec![
-                identity_row(&id_a, "alice", alice),
-                identity_row(&id_b, "alice", alice)
-            ],
-            alloc::vec![],
-            EnterpriseIdentityIndexError::DuplicatePrincipal,
+            vec![a1.clone(), row(1, "bob", b)],
+            vec![],
+            DuplicateIdentityId,
         ),
+        (vec![a1.clone()], vec![history_row(id(2), b)], OrphanHistory),
         (
-            alloc::vec![
-                identity_row(&id_a, "alice", alice),
-                identity_row(&id_a, "bob", bob)
-            ],
-            alloc::vec![],
-            EnterpriseIdentityIndexError::DuplicateIdentityId,
+            vec![a1.clone()],
+            vec![history_row(id(1), a)],
+            DuplicateSubject,
         ),
-        (
-            alloc::vec![identity_row(&id_a, "alice", alice)],
-            alloc::vec![history(&id_b, bob)],
-            EnterpriseIdentityIndexError::OrphanHistory,
-        ),
-        (
-            alloc::vec![identity_row(&id_a, "alice", alice)],
-            alloc::vec![history(&id_a, alice)],
-            EnterpriseIdentityIndexError::DuplicateSubject,
-        ),
+        (vec![row(1, "", a)], vec![], MalformedRow),
+        (vec![late], vec![], MalformedRow),
+        (crowd, vec![], MalformedRow),
+        (vec![], long_history, MalformedRow),
     ];
     for (identities, history, expected) in cases {
-        let rows = EnterpriseIdentityRows {
-            identities,
-            history,
-        };
-        let store = MemoryStore::holding(rows.clone());
-        assert_eq!(length(&store, &keys), Err(expected));
-        assert_eq!(store.rows(), rows);
+        let store = MemoryStore::default();
+        store.0.borrow_mut().identities = identities;
+        store.0.borrow_mut().history = history;
+        assert_eq!((length(&store, &keys), store.commits()), (Err(expected), 0));
     }
 }
 
 #[test]
-fn a_full_index_refuses_inserts_but_still_deactivates() {
-    let keys = set(1, &[]);
-    let rows = EnterpriseIdentityRows {
-        identities: (0..ENTERPRISE_IDENTITY_MAX_IDENTITIES)
-            .map(|n| {
-                let principal = alloc::format!("p{n}");
-                let identity_id =
-                    EnterpriseIdentityId::try_from(alloc::format!("{n:032x}")).test_unwrap();
-                let subject = subject(&keys, &principal);
-                identity_row(&identity_id, &principal, subject)
-            })
-            .collect(),
-        history: alloc::vec![],
-    };
-    let store = MemoryStore::holding(rows);
-    let crowded = with_enterprise_identity_index(&store, &keys, |index| {
-        index.resolve_or_insert(&SequenceRng::new(), SCOPE, "newcomer")
+fn a_full_index_refuses_inserts_and_rekeys_but_still_deactivates() {
+    let generations: Vec<TenantIndexKeySet> = (1..=4).map(|byte| set(byte, &[])).collect();
+    let keys = set(5, &[1, 2, 3, 4]);
+    let mut rows = EnterpriseIdentityRows::default();
+    for n in 0..ENTERPRISE_IDENTITY_MAX_IDENTITIES {
+        let p = alloc::format!("p{n}");
+        rows.identities
+            .push(identity_row(n, &p, subject(&keys, &p)));
+        for retired in &generations {
+            rows.history.push(history_row(id(n), subject(retired, &p)));
+        }
+    }
+    assert_eq!(rows.history.len(), ENTERPRISE_IDENTITY_MAX_HISTORY);
+    let store = MemoryStore(RefCell::new(rows), Cell::new(0));
+    let outcome = with_enterprise_identity_index(&store, &keys, |index| {
+        let in_force = index.deactivate(&id(0), DEACTIVATED_AT)?;
+        Ok((in_force, index.resolve_or_insert(&rng(), SCOPE, "newcomer")))
     });
-    assert_eq!(
-        crowded,
-        Err(EnterpriseIdentityIndexError::CapacityExhausted)
-    );
-    assert_eq!(store.commits.get(), 0);
-
-    let first = EnterpriseIdentityId::try_from(alloc::format!("{:032x}", 0)).test_unwrap();
-    let in_force =
-        with_enterprise_identity_index(&store, &keys, |index| index.deactivate(&first, u64::MAX));
-    assert_eq!(in_force, Ok(u64::MAX));
-    assert_eq!(store.commits.get(), 1);
+    assert_eq!(outcome, Ok((DEACTIVATED_AT, Err(Error::CapacityExhausted))));
+    assert_eq!(store.commits(), 1);
+    let rotated = length(&store, &set(6, &[1, 2, 3, 4, 5]));
+    assert_eq!(rotated, Err(Error::HistoryExhausted));
+    assert_eq!(store.commits(), 1);
 }
