@@ -1729,6 +1729,88 @@ Test `intent_hash_has_no_public_alias`: two intents equal except `purpose` (and,
 
 **Sidecar job receipt submission** (writer `chio-api-protect/src/proxy/sidecar.rs:1353-1410`, `sidecar_submit_receipt_metadata`, signed at `sidecar.rs:449`). The submission receipt carries top-level keys copied from the submitted job receipt body: `job_name`, `namespace`, `job_uid`, `outcome`, `started_at`, `completed_at` and `steps` (each `pod_name`, `phase`, `payload`, `observed_at`), plus the constant `submission_kind: "job_receipt"` and the HTTP status scope keys of `http_status_metadata_final`. P-d registers none of the job keys and no production code reads them. P-d registers the HTTP status scope keys (`chio_http_status_scope`, and `chio_decision_receipt_id` on a final receipt) as `ChioInternal` `Unsafe` (reserved; no production reader, OQ-A1-1) until F commits them with the HTTP rows. Every copied value is part of the submitted body, which is the receipt's content preimage, so F removes these keys and the content commitment over the raw body covers them; `submission_kind` is removed because the signed `policy_hash` (`manual_receipt_policy_hash("chio_api_protect_sidecar_receipt_submission")`) already names the submission path. The HTTP status scope keys follow the HTTP rows (Task 12). Test `sidecar_submission_receipt_has_no_job_fields`.
 
+**P-d part 2 member audits.** Each of the five keys below fails the entropy or keyed test on at least one member its writer emits in plaintext today, so P-d part 2 registers it `Unsafe` with form `Projection`; F flips it to `CommittedSafe` in the commit that changes its writer to the decided form. A kernel reader that reads the private raw tool-outcome snapshot (`tool_outcome.rs:374`, `evaluation_contract.rs:105-113`, `terminal.rs:53-58`) counts as a named reader; replay byte-matches the rebuilt metadata against the persisted receipt (`terminal.rs:441-530`).
+
+**`caller_delivery`** (writer `return_context/caller/report.rs:118-130`; types `caller_delivery.rs:38-42,205-214`)
+
+| Member | Provenance | Readers (plaintext need) | Form | Reason |
+|---|---|---|---|---|
+| `schema` | constant (`report.rs:122`) | registry schema pin | **Plaintext** | closed code |
+| `report_digest` | SHA-256 of the executor-signed report (`report.rs:19-22`) | `terminal.rs:53-58` (plaintext) | **Plaintext** | keyed: the executor signature is in the preimage |
+| `authorization_digest` | SHA-256 of the kernel-signed authorization (`caller_delivery.rs:176-177`) | none | **Commitment** | no reader |
+| `executor.executor_id`, `executor.public_key`, `executor.key_epoch` | operator-pinned executor name, key and counter (`authority_profile.rs:133-146`) | none | **Commitment** | low-entropy, no reader |
+| `claim_id` | executor-signed; the reference ledger mints a UUIDv4 (`caller_execution_ledger.rs:240`) but the kernel does not require entropy | none | **Commitment** | executor value, no reader |
+| `execution_started_at_unix_ms`, `completed_at_unix_ms` | executor-asserted times | none | **Commitment** | no reader |
+
+**`chio_runtime`** (writers runtime-core `admission.rs:174-219`, `admission/operation_owned.rs:113-127`, `admission_hook/operation_owned.rs:63-86,138-161`, `admission_hook/metadata.rs:1-17`; kernel `dispatch/runtime_admission.rs:55,66,237`, `dispatch.rs:1580,1614`, `effect_obligation.rs:476,486`, `effect_obligation/preparation.rs:150,251`, `evaluation_helpers.rs:329,693,734`, `kernel_drop_guard.rs:369-387`, `receipt_identity.rs:20-41`, `deny_responses.rs:385`, `verified_treaty.rs:193`). The admission bundle is not Chio-minted: the production bundle writer (`chio-cli/.../swarm/requests.rs:78-94`) sets `admission_id` to `admission-{graph_id}-{process}`, `workflow_id` to the graph id and `workflow_grant_id` to the capability id, and hashes the manifests and the record unsalted.
+
+| Member | Provenance | Readers (plaintext need) | Form | Reason |
+|---|---|---|---|---|
+| `accepted` | bool | `admission_hook.rs:120,151` (plaintext) | **Plaintext** | closed code |
+| `identity_disposition` | enum (`receipt_identity.rs:32-36`) | `refusal.rs:502` (plaintext), PROTOCOL 8.3 stop contract | **Plaintext** | closed code |
+| `retryable_after_resume` | bool | PROTOCOL 8.3 stop contract (a caller retries after resume) | **Plaintext** | closed code |
+| `post_effect_fault` {`step`, `code`, `original_receipt_id`, `observed_at`} | static step and code, UUIDv7 receipt id, time | `effect_obligation/preparation.rs:242` (plaintext) | **Plaintext** | closed codes, entropy-backed id, time |
+| `operation_owned_replay.reference` | operation id derived over a request that includes the signed capability (`identity.rs:657-686`) | `nonce_evidence.rs:30`, `custody.rs:31`, `call_evidence.rs:276,507` (plaintext) | **Plaintext** | entropy-backed through the capability signature |
+| `verified_swarm_request_binding.capability_sha256` | SHA-256 of the signed capability | `verify_calls.rs:70`, `outcomes.rs:322` (plaintext) | **Plaintext** | entropy-backed |
+| `failure_code` | static code | tests only | **Commitment** | no production reader |
+| `reservation_retained`, `reservations_retained_fail_closed`, `pre_dispatch_cleanup_failed`, `reservation_release_failed`, `dispatch_credential_retention_outcome_unknown` | bools | `ledger_audit.rs:356` (debug assertion) | **Commitment** | no production plaintext reader |
+| `payment_credential_disposition`, `dispatch_credential_disposition`, `pre_dispatch_cleanup_reason`, `evaluation_started_at` | enums, constant, time | none | **Commitment** | no reader |
+| `admission_id` | caller intent context (`admission_hook/request.rs:27-50`) or the bundle writer | `admission_hook.rs:153-157` | **Commitment** | caller value |
+| `workflow_id`, `workflow_grant_id`, `step_index`, `destructive`, `lease_id`, `governance_receipt_id` | provisioned bundle (`requests.rs:78-94`) | none | **Commitment** | low-entropy, no reader |
+| `reserved_destructive_lease_id` and the `retained_*` copies | bundle `lease_id` (`admission.rs:212`) | `dispatch.rs:1535`, `kernel_drop_guard.rs:55` (values rows) | **Commitment** | provisioned value |
+| `trust_bundle_sha256`, `verification_context_sha256` | unsalted hashes of the manifests and the record | none | **Commitment** | low-entropy preimage |
+| `operation_owned_replay` plan, bundle, resources, treaty and swarm digests | unsalted digests over provisioned artifacts | presence checks only | **Commitment** | low-entropy preimages |
+| `verified_swarm_request_binding.graph_id`, `task_id`, `scope_sha256`, `evidence_refs_sha256` | plan id, process name, unsalted scope and reference hashes (`swarm_request_binding.rs:86-92`) | `verify_calls.rs:70`, `outcomes.rs:322` (values rows) | **Commitment** | low-entropy |
+| `verified_swarm_route_metadata` | route bridge, target and selected-route strings | `admission_hook.rs:325,567` (values rows) | **Commitment** | caller and plan values |
+| `pheromone_advisory`, `pheromone_policy_decision` | report fields and digests (`types.rs:110-122,480-491`) | none | **Commitment** | no reader |
+| `pre_dispatch_cleanup_faults` | fault entries naming lease ids | none | **Commitment** | no reader |
+| `pre_dispatch_payment_unwind` | rail `authorization_id` and `transaction_id` (`payment/types.rs:57-62`) | none | **Commitment** | provider ids |
+| `federation_treaty_dsse` | treaty predicate references (`verified_treaty.rs:193-203`) | none | **Commitment** | treaty values, no reader |
+
+**`finding_purchase_replay_snapshot`** (writer `purchase_gate.rs:483-499`; types `finding_purchase.rs:73-143`, built at `finding_purchase_verifier.rs:122-136` and `finding_status_verifier.rs:210-221`). Its reader is `restore_purchase_replay_snapshot` (`purchase_gate.rs:507`), which compares every member in `validate_purchase_replay_snapshot` and replays the value.
+
+| Member | Provenance | Form | Reason |
+|---|---|---|---|
+| `schema` | constant | **Plaintext** | closed code |
+| `payer_key_hex` | the capability subject's public key | **Plaintext** | entropy-backed key |
+| `reservation_id` | H(ask digest, payer), the ask digest covering the signed token offer (`finding_purchase_coordinator.rs:126,985`) | **Plaintext** | keyed |
+| `purchase_intent_id`, `authoritative_payment_operation_id` | H(domain, `reservation_id`) (`purchase_verification.rs:39-48`) | **Plaintext** | keyed |
+| `accepted_bid_envelope_sha256`, `venue_admission_envelope_sha256` | digests of signed envelopes | **Plaintext** | keyed |
+| `status_proof.status_epoch_artifact_sha256`, `status_proof.proof_sha256` | digests over bytes that include the operator signature | **Plaintext** | keyed |
+| `status_proof.non_inclusion_checked_at` | time | **Plaintext** | time |
+| `finding_id` | SHA-256 of the provider's finding body with no nonce (`validate.rs:336-341`) | **Commitment** | provider preimage |
+| `listing_id` | provider or operator assigned (`finding_verified_fix.rs:303`) | **Commitment** | provider value |
+| `payload_sha256` | unsalted digest of the reveal envelope, equal to the output content hash (`types.rs:71-77`) | **Commitment** | a plaintext copy would undo the content commitment |
+| `payload_media_type`, `expected_status_feed_id` | provider values | **Commitment** | provider values |
+| `accepted_price` | quoted price | **Commitment** | low-entropy |
+| `status_proof.feed_id`, `key_domain_nonce`, `map_epoch`, `status_epoch_id`, `root_hash` | configuration name, constant, counter, unsigned body digest (`status.rs:335-344`), map root | **Commitment** | low-entropy or deterministic |
+| `status_proof.operator_authorization_sha256`, `service_bond_evidence_sha256` | operator-configured digests (`finding_status_handlers.rs:789`) | **Commitment** | preimage not shown entropy-backed |
+
+**`finding_recovery_replay_snapshot`** (writer `recovery_gate.rs:497-519`; types `finding_recovery.rs:31-77`, built at `finding_recovery_verifier.rs:151-161` from `recovery.rs:333-354`). Its readers are `restore_recovery_replay_snapshot` (`recovery_gate.rs:546`) with `validate_frozen_recovery_binding`, and `revalidate_completed_recovery_status` (`terminal.rs:588,1060`) for the status block.
+
+| Member | Provenance | Form | Reason |
+|---|---|---|---|
+| `schema` | constant | **Plaintext** | closed code |
+| `request_binding_sha256` | SHA-256 of the grant and the full request, including the signed capability | **Plaintext** | entropy-backed through the signature |
+| `recovery_id` | H(capability id, `purchase_key`, receipt id) (`recovery.rs:333-334`) | **Plaintext** | keyed through `purchase_key` |
+| `purchase_key` | H(signed bid envelope digest, payment operation id) (`purchase_record.rs:171-185`) | **Plaintext** | keyed |
+| `original_delivery_receipt_id` | prefixed UUIDv7 (`receipt_building.rs:42`) | **Plaintext** | entropy-backed |
+| `original_subject_key_hex` | public key | **Plaintext** | entropy-backed key |
+| `original_capability_id` | the issuer's token id; entropy not required | **Commitment** | issuer value |
+| `finding_id`, `listing_id`, `payload_sha256`, `expected_status_feed_id` | as in `finding_purchase_replay_snapshot` | **Commitment** | as in `finding_purchase_replay_snapshot` |
+| `status.*` | as `status_proof` in `finding_purchase_replay_snapshot` | same split | same split |
+
+**`threshold_approval`** (writer `responses/pending_responses.rs:36-44`, the only one)
+
+| Member | Provenance | Readers (plaintext need) | Form | Reason |
+|---|---|---|---|---|
+| `state` | literal `approval_required` | `process_response_verify.rs:226` (plaintext) | **Plaintext** | closed code |
+| `proposal_id` | the admission operation id (`cumulative.rs:188`) | none | **Commitment** | no reader |
+| `proposal_hash` | domain digest over the proposal, including the policy-authority signature (`governance.rs:1712-1714`) | none | **Commitment** | no reader; the full proposal is the response output, covered by the content commitment |
+| `proposal_deadline` | time (`cumulative.rs:176-182`) | none | **Commitment** | no reader |
+
+**`finding_delivery` and `finding_recovery`** carry the same provider-derived ids as the snapshots, so P-d part 2 registers both `Unsafe` with form `Projection`: `finding_id` (an unsalted SHA-256 of the provider's finding body) and `listing_id` (provider-assigned) in `finding_delivery`, and `finding_id` and `original_capability_id` (the issuer's token id) in `finding_recovery`, become commitments. The keyed reservation, intent, payment-operation, recovery and purchase ids, the signed-envelope digests, the original delivery receipt id and the closed comparison results stay plaintext for open-market recovery, the remote admission projection and the kernel recovery gate, which read the committed ids from the values rows. Each flips back to `CommittedSafe` in the F commit that lands its writer.
+
 **`chio_http_receipt_v1`, `delivery_contract`, `active_defense_evidence_id`**: already planned (deleted with `HttpReceipt`, Task 12; split, OQ12; keyed, r5).
 
 ### Cage projection (Root-2 decision 3)
@@ -1768,7 +1850,7 @@ A guard `Err(e)` becomes `GuardDenied("guard \"{name}\" error (fail-closed): {e}
 - `lineageReferences`: the top-level fallback (`kernel/mod.rs:869-877`) is deleted in the reserved-key PR; F adds no reader of it.
 - The store claim log builds authorization details on read from values rows (derived copies are ephemeral, above); `derived_details_follow_values_erasure` pins that an erased `purpose` or `payment_token` refuses and never yields an empty token.
 - **Every producer is covered at the signer.** The registry check runs inside the one portable signer (Task 6 signer order, Task 8), so a direct producer that never passes through kernel assembly (keyring, ACP-Client, OTel, Mercury, Wall, the HTTP authority and sidecar, fixtures) cannot sign an unregistered, caller-origin or `Unsafe` key. Task 8's refusal therefore needs every key a producer writes at F's tip in its decided form: the census adds `keyEnterpriseReceipt`, `policySnapshot` and the sidecar submission keys (rows above), and P-d part 2 audits, member by member, every other key that is registered `Unsafe` and that a production writer names, before F.
-- `kept_digests_are_keyed_or_entropy_backed` extends to every `CommittedSafe` registry entry and to kept ids (the id-entropy test), not only the security projections, and to every row `digest_aliases.py` marks kept. P-d part 2 audits the next candidates member by member: `caller_delivery`, `chio_runtime`, `finding_purchase_replay_snapshot`, `finding_recovery_replay_snapshot`, `threshold_approval`. P-d part 1 registers `chio_runtime`, `finding_purchase_replay_snapshot` and `finding_recovery_replay_snapshot` as `ChioInternal` `Unsafe` pending that audit; P-d part 2 records each member's decided form and readers in the per-field table before F switches on the signer refusal.
+- `kept_digests_are_keyed_or_entropy_backed` extends to every `CommittedSafe` registry entry and to kept ids (the id-entropy test), not only the security projections, and to every row `digest_aliases.py` marks kept. P-d part 2 audits the next candidates member by member: `caller_delivery`, `chio_runtime`, `finding_purchase_replay_snapshot`, `finding_recovery_replay_snapshot`, `threshold_approval`. P-d part 2 records each member's decided form and readers in the per-field table (P-d part 2 member audits) and registers all five `ChioInternal` `Unsafe` with form `Projection`, because each writer emits at least one member in plaintext that the audit commits.
 
 ### Split of P-d
 
