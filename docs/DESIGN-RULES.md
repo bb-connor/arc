@@ -111,8 +111,8 @@ Each line is PASS, FAIL or N/A with evidence. Any FAIL blocks the merge.
 | # | Check | Rules |
 |---|---|---|
 | R1 | No SQL, schema, row mapping, store types or `rusqlite` in control-plane, kernel or CLI. Adapters are built only at the composition root. | 1, 31 |
-| R2 | No layer inversion. Core stays pure. New dependencies are justified and minimal. | 2, 30, 52 |
-| R3 | Domain rules live in the domain crate behind a consumer-owned port. Stores hold only persistence. | 3, 9 |
+| R2 | No layer inversion. New crates sit in the right group. Core stays pure. New dependencies are justified and minimal. | 2, 6, 30, 52 |
+| R3 | Domain rules live in the domain crate behind a consumer-owned port. Stores hold only persistence. New kernel behaviour is a borrowing type, not another `impl ChioKernel` block. | 3, 5, 9 |
 | R4 | One store per aggregate, with its own `.sql`. Transactions bound the invariants. Queries are indexed and bounded. | 4, 22, 48, 49, 50 |
 | R5 | Every new trait, type or module states its payoff. Traits have required methods only, with no capability flags. Visibility is minimal. | 8, 32, 33 |
 | R6 | No legacy or compat code. The old path is deleted in the same PR. Everything is v1. | 10 |
@@ -120,7 +120,7 @@ Each line is PASS, FAIL or N/A with evidence. Any FAIL blocks the merge.
 | R8 | Checked arithmetic on money, budget, quota and exposure. | 14 |
 | R9 | Types encode invariants (newtypes, typestate, `#[must_use]`, exhaustive matches). No needless clones. Secrets are typed. Output is deterministic. Wire parsing is strict. | 11, 17, 18, 35, 36, 37, 47, 51 |
 | R10 | Sound concurrency and IO: `unsafe` is justified, nothing blocks in async, no guard crosses `.await`, channels are bounded, tasks are owned, writes are atomic and time is injected. | 15, 38, 39, 40, 41, 42, 45, 46 |
-| R11 | File-size limits hold, no allowlisted file grew, modules are split by concept, and the PR is focused with its net line change measured. | 21, 22, 24 |
+| R11 | File-size limits hold, no allowlisted file grew, modules are split by concept, decomposition lands in green steps, and the PR is focused with its net line change measured. | 21, 22, 23, 24 |
 | R12 | Tests cover deny, error and boundary behaviour. Property or fuzz tests exist where input is parsed or arithmetic is done. Tests are deterministic and RED first. | 25, 26, 53, 54 |
 | R13 | No test churn. Test doubles are dev-only. | 27, 28 |
 | R14 | The gate is green at the exact head. Spec and canonical JSON agree with the wire. Formal mirrors are re-blessed and COVERAGE is last. Clippy and fmt pass, with no em dashes. | 7, 19, 20, 29, 55 |
