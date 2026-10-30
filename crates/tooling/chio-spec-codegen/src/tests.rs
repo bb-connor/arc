@@ -145,3 +145,51 @@ fn tool_call_response_receipt_keeps_record_type(
     );
     Ok(())
 }
+
+#[test]
+fn rendered_types_keep_descriptions_without_schema_copies() -> Result<()> {
+    let dir = unique_temp_dir("chio-spec-codegen-schema-docs")?;
+    fs::create_dir_all(&dir).map_err(|err| CodegenError::Io(dir.clone(), err))?;
+    let schema_path = dir.join("described.schema.json");
+    fs::write(
+        &schema_path,
+        br#"{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/test/v1/described.schema.json",
+  "title": "Described",
+  "description": "A record with a documented field.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode"],
+  "properties": {
+    "mode": {
+      "description": "Selected mode.",
+      "type": "string",
+      "enum": ["open", "closed"]
+    }
+  }
+}"#,
+    )
+    .map_err(|err| CodegenError::Io(schema_path.clone(), err))?;
+
+    let result = render_chio_wire_v1(&dir);
+    let _ = fs::remove_dir_all(&dir);
+    let rendered = result?;
+    assert!(
+        rendered.contains("///A record with a documented field."),
+        "type description must survive: {rendered}"
+    );
+    assert!(
+        rendered.contains("///Selected mode."),
+        "field description must survive: {rendered}"
+    );
+    assert!(
+        !rendered.contains("JSON schema</summary>") && !rendered.contains("</details>"),
+        "generated docs must not embed schema copies: {rendered}"
+    );
+    assert!(
+        !rendered.contains("///\n    #["),
+        "no blank doc line may be left before an attribute: {rendered}"
+    );
+    Ok(())
+}
