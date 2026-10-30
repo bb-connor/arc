@@ -211,3 +211,8 @@ pub(crate) fn dispatch_mcp(
         ),
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[path = "api_mcp_tests.rs"]
+mod tests;

@@ -430,3 +430,47 @@ async fn every_introspection_failure_answers_the_fixed_urn_without_its_cause() -
     server.abort();
     Ok(())
 }
+
+#[tokio::test]
+async fn admin_health_reports_only_local_store_members() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let state = admin_state(directory.path(), |_| {})?;
+    let (status, body) = admin(&state, "GET", ADMIN_HEALTH_PATH, None).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let health: Value = serde_json::from_str(&body)?;
+    let sections: Vec<&str> = health
+        .as_object()
+        .ok_or("health is not an object")?
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        sections,
+        [
+            "auth",
+            "authority",
+            "federation",
+            "oauth",
+            "ok",
+            "server",
+            "sessions",
+            "stores"
+        ]
+    );
+    let stores: Vec<&str> = health["stores"]
+        .as_object()
+        .ok_or("stores is not an object")?
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        stores,
+        [
+            "authorityDbConfigured",
+            "authoritySeedConfigured",
+            "receiptsConfigured",
+            "sessionTombstonesConfigured"
+        ]
+    );
+    Ok(())
+}
