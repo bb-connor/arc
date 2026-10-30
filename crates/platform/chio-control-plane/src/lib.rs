@@ -471,6 +471,7 @@ pub fn require_control_token(control_token: Option<&str>) -> Result<&str, CliErr
 
 pub mod server_transport;
 mod signing_custody;
+#[cfg(test)]
 pub(crate) use signing_custody::write_authority_seed_file;
 pub use signing_custody::{
     authority_public_key_from_seed_file, load_existing_authority_keypair,

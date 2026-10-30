@@ -56,17 +56,15 @@ pub(crate) fn local_receipt_store(
 pub(crate) fn load_existing_kernel_checkpoint_keypair(
     path: &Path,
 ) -> Result<chio_core::Keypair, CliError> {
-    let seed_hex = std::fs::read_to_string(path).map_err(|error| {
-        if error.kind() == std::io::ErrorKind::NotFound {
+    crate::load_existing_authority_keypair(path).map_err(|error| match error {
+        CliError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
             CliError::cli_other_error(format!(
                 "receipt checkpoint create requires an existing kernel seed file: {}",
                 path.display()
             ))
-        } else {
-            CliError::Io(error)
         }
-    })?;
-    chio_core::Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+        error => error,
+    })
 }
 
 pub(crate) fn cmd_receipt_health(backend: QueryBackend<'_>) -> Result<(), CliError> {
@@ -690,6 +688,12 @@ mod receipt_operator_tests {
         store.append_chio_receipt(&operator_sample_receipt_with_keypair(&keypair)?)?;
         drop(store);
         std::fs::write(&seed_path, keypair.seed_hex())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+
+            std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600))?;
+        }
 
         cmd_receipt_health(backend(Some(&db_path), None))?;
         cmd_receipt_flush(5000, backend(Some(&db_path), None))?;
@@ -769,6 +773,18 @@ mod receipt_operator_tests {
 
         let _ = std::fs::remove_file(db_path);
         Ok(())
+    }
+
+    #[test]
+    fn receipt_checkpoint_seed_resolves_through_key_custody() {
+        let credential = Path::new("credential:chio-checkpoint-seed");
+        assert!(matches!(
+            load_existing_kernel_checkpoint_keypair(credential),
+            Err(CliError::KeyCustody(
+                chio_control_plane::KeyCustodyError::CredentialsDirectoryUnset
+            ))
+        ));
+        assert!(!credential.exists());
     }
 
     #[test]

@@ -1752,7 +1752,9 @@ pub(crate) mod tests {
             load_existing_authority_keypair_with_identity(Path::new(
                 "credential:chio-authority-seed"
             )),
-            Err(CliError::KeyCustody(crate::KeyCustodyError::ReadOnlyCustody))
+            Err(CliError::KeyCustody(
+                crate::KeyCustodyError::ReadOnlyCustody
+            ))
         ));
         assert!(!Path::new("credential:chio-authority-seed").exists());
     }

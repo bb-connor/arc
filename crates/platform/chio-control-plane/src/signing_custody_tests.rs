@@ -147,7 +147,10 @@ fn credential_references_are_never_written() {
 
     let development = custody(CustodyPolicy::AllowFiles, Some(directory.path()));
     assert_eq!(
-        development.load_or_create(credential).test_unwrap().public_key(),
+        development
+            .load_or_create(credential)
+            .test_unwrap()
+            .public_key(),
         expected.public_key()
     );
     assert_eq!(
@@ -164,9 +167,18 @@ fn missing_credential_is_never_provisioned() {
     let credential = Path::new(CREDENTIAL_REF);
 
     for error in [
-        development.load_existing(credential).map(|_| ()).test_unwrap_err(),
-        development.load_or_create(credential).map(|_| ()).test_unwrap_err(),
-        development.public_key(credential).map(|_| ()).test_unwrap_err(),
+        development
+            .load_existing(credential)
+            .map(|_| ())
+            .test_unwrap_err(),
+        development
+            .load_or_create(credential)
+            .map(|_| ())
+            .test_unwrap_err(),
+        development
+            .public_key(credential)
+            .map(|_| ())
+            .test_unwrap_err(),
     ] {
         assert!(matches!(error, CliError::Io(ref io) if io.kind() == std::io::ErrorKind::NotFound));
     }
@@ -180,8 +192,14 @@ fn credential_without_credentials_directory_fails_closed() {
     for policy in [CustodyPolicy::AllowFiles, CustodyPolicy::RequireOsCustody] {
         let unset = custody(policy, None);
         for error in [
-            unset.load_existing(credential).map(|_| ()).test_unwrap_err(),
-            unset.load_or_create(credential).map(|_| ()).test_unwrap_err(),
+            unset
+                .load_existing(credential)
+                .map(|_| ())
+                .test_unwrap_err(),
+            unset
+                .load_or_create(credential)
+                .map(|_| ())
+                .test_unwrap_err(),
             unset.public_key(credential).map(|_| ()).test_unwrap_err(),
         ] {
             assert_eq!(
