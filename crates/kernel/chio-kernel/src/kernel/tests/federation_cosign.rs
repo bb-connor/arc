@@ -115,6 +115,28 @@ struct CountingAppendReceiptStore {
 }
 
 impl ReceiptStore for FailingAppendReceiptStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &crate::receipt_store::OpeningReadScope,
+    ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+        Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.called.store(true, Ordering::SeqCst);
         Err(ReceiptStoreError::Conflict(
@@ -131,6 +153,28 @@ impl ReceiptStore for FailingAppendReceiptStore {
 }
 
 impl ReceiptStore for CountingAppendReceiptStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &crate::receipt_store::OpeningReadScope,
+    ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+        Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(())

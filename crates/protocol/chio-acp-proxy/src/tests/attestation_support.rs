@@ -470,6 +470,34 @@ struct MockReceiptStore {
 }
 
 impl ReceiptStore for MockReceiptStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         assert!(receipt.action.verify_hash().unwrap());
         let mut state = self.state.lock().expect("mock store lock should hold");
@@ -612,6 +640,34 @@ struct UnsupportedDurableConsumptionStore {
 }
 
 impl ReceiptStore for UnsupportedDurableConsumptionStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }

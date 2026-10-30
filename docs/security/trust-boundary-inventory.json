@@ -4234,6 +4234,17 @@
       "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
     },
     {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/openings.rs",
+      "owner": "erase_openings",
+      "sha256": "0ddd36f0444b7fca46a12027541bbe231f071e7d62cd6df08ff2e6dc86b1d728",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT EXISTS (SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1)",
+      "principal": "receipt-integrity",
+      "contract": "Store-owned erasure precondition under the anchored serving writer: confirms the receipt id names a published receipt before its openings and metadata values are tombstoned, and refuses an unpublished id. The query returns one boolean, never receipt contents or tenant identity. Stores that hold no openings refuse erasure with a typed error before any SQL."
+    },
+    {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/authorization.rs",
       "owner": "query_authorization_context_report",
       "sha256": "2bf734ccc8196fb2d9677d99932269ede14e64a333ea02fbeca4de95fe252026",

@@ -24,6 +24,8 @@ mod insert;
 mod liability;
 #[path = "tests/lineage.rs"]
 mod lineage;
+#[path = "tests/openings.rs"]
+mod openings;
 #[path = "tests/qualified_finding_pool.rs"]
 mod qualified_finding_pool;
 #[path = "tests/query.rs"]
