@@ -19,6 +19,7 @@ use std::time::Duration;
 
 use chio_attest_verify::VerifiedAttestation;
 use chio_chaos::{chaos_iterations, ChaosError};
+use chio_core_types::receipt::crypto_floor::ReceiptCryptoFloor;
 use chio_core_types::receipt::metadata::DECISION_MODEL_WITNESS_METADATA_KEY;
 use chio_guards::{
     DecisionModelBinding, PredicateDagGuard, ScoreError, ScoreSource, Scores,
@@ -344,7 +345,13 @@ fn chaos_decision_model_scorer_outage_denies_with_a_fallback_witness() {
             "round {round}: a scorer outage must deny fail-closed"
         );
         assert!(
-            outcome.receipt.verify_signature().test_unwrap(),
+            outcome
+                .receipt
+                .verify_signature_with_floor(
+                    &harness.receipt_signing_key().test_unwrap(),
+                    ReceiptCryptoFloor::AllowClassical,
+                )
+                .test_unwrap(),
             "round {round}: the deny receipt must be signed"
         );
         assert!(

@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::{
     ChioKernel, Guard, HotPathDeadlineConfig, KernelConfig, KernelError, NestedFlowBridge,
@@ -198,6 +198,14 @@ impl StackHarness {
             receipt: response.receipt,
             elapsed: started.elapsed(),
         })
+    }
+
+    /// The public key the booted kernel signs its receipts with, for verifying
+    /// a dispatch receipt under a key the verifier trusts.
+    pub fn receipt_signing_key(&self) -> Result<PublicKey, LoadgenError> {
+        self.kernel
+            .receipt_signing_public_key()
+            .map_err(|error| LoadgenError::KernelBoot(format!("receipt signing key: {error}")))
     }
 
     /// Direct access to the durable store for chaos scenarios. `None` under a
