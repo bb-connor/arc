@@ -7807,6 +7807,12 @@
     "crates/protocol/chio-egress-contract/src/allowance.rs": [
       "for_endpoint::custom_deserialize",
       "serialize::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/receipt/metadata/financial.rs": [
+      "try_from::custom_deserialize"
+    ],
+    "crates/security/chio-cage/src/receipt/projection.rs": [
+      "open_raw::from_slice"
     ]
   },
   "decoder_file_contracts": {
@@ -13363,6 +13369,38 @@
           ],
           "checked": true,
           "instances": 2
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/metadata/financial.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom deserialization of the signed financial metadata block from a receipt value an outer original-byte reader already verified. A block naming payment_authorization_ambiguous decodes only as RetainedAmbiguous, through a deny_unknown_fields wire that requires ambiguous true, a closed error code and a non-empty attempt reference; any other block decodes only as the deny_unknown_fields Charged shape. A present block that decodes as neither refuses MalformedFinancialMetadata and is never read as absent. It establishes no authority.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/security/chio-cage/src/receipt/projection.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Decodes only the opening of the receipt's signed raw-body commitment: MetadataCommitter::open returns the opening only when the domain-separated salted SHA-256 over its canonical bytes equals the signed commitment, so the bytes are exactly the canonical body the signer committed. The decoded body is re-projected under the same committer and refuses ContentMismatch unless it equals the signed projection. Openings are operator-private disclosure state.",
+      "readers": [
+        {
+          "reader": "open_raw",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "MetadataCommitter::open+matches_with"
+          ],
+          "checked": true
         }
       ]
     }

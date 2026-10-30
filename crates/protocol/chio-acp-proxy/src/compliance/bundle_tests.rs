@@ -805,3 +805,70 @@ fn verification_result_round_trips_its_snake_case_shape() -> TestResult {
     assert_eq!(serde_json::to_value(&decoded)?, value);
     Ok(())
 }
+
+fn with_session_metadata(
+    signer: &Keypair,
+    metadata: serde_json::Value,
+) -> Result<ComplianceReceiptEntry, Box<dyn std::error::Error>> {
+    let mut entry = signed_entry(signer, 1)?;
+    let mut body = entry.receipt.body();
+    body.id.clear();
+    body.metadata = Some(metadata);
+    entry.receipt = ChioReceipt::sign(body, signer)?;
+    Ok(entry)
+}
+
+#[test]
+fn compliance_receipt_session_requires_the_three_session_blocks_to_agree() -> TestResult {
+    let signer = Keypair::from_seed(&[71; 32]);
+    let config = ComplianceConfig {
+        trusted_kernel_keys: std::collections::BTreeSet::from([signer.public_key().to_hex()]),
+        ..ComplianceConfig::default()
+    };
+    let refusal = |session: &str| {
+        serde_json::json!({ "schema": "chio.session.protocol-refusal.v1", "session_id": session })
+    };
+    let agreeing = with_session_metadata(
+        &signer,
+        serde_json::json!({
+            "acp": { "sessionId": "bundle-session" },
+            "receipt_context": { "session_id": "bundle-session" },
+            "protocol_refusal": refusal("bundle-session"),
+        }),
+    )?;
+    assert!(generate_compliance_certificate(
+        "bundle-session",
+        &[agreeing],
+        &config,
+        &signer,
+        &AcpClock::default()
+    )
+    .is_ok());
+    for metadata in [
+        serde_json::json!({
+            "acp": { "sessionId": "foreign" },
+            "receipt_context": { "session_id": "bundle-session" },
+        }),
+        serde_json::json!({
+            "acp": { "sessionId": "foreign" },
+            "protocol_refusal": refusal("bundle-session"),
+        }),
+        serde_json::json!({
+            "receipt_context": { "session_id": "foreign" },
+            "protocol_refusal": refusal("bundle-session"),
+        }),
+    ] {
+        let entry = with_session_metadata(&signer, metadata)?;
+        assert!(matches!(
+            generate_compliance_certificate(
+                "bundle-session",
+                &[entry],
+                &config,
+                &signer,
+                &AcpClock::default()
+            ),
+            Err(ComplianceCertificateError::SessionMismatch { .. })
+        ));
+    }
+    Ok(())
+}

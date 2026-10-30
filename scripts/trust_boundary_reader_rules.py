@@ -58,6 +58,10 @@ RULES = {
         r"if\s+sha256_hex\(&bytes\)\s*!=\s*sha256",
         r"serde_json::from_slice\(&bytes\)",
     )),
+    ("crates/security/chio-cage/src/receipt/projection.rs", "open_raw"): ("MetadataCommitter::open+matches_with", (
+        r"serde_json::from_slice\(committer\.open\(&self\.raw\)\?\.value\.as_bytes\(\)\)\?",
+        r"if\s+!self\.matches_with\(&body,\s*policy_hash,\s*committer\)\s*\{\s*return\s+Err\(CageReceiptError::ContentMismatch\);",
+    )),
     ("crates/platform/chio-control-plane/src/fiscal_state_anchor.rs", "compare_and_swap"): ("VerifiedFiscalContinuityAdvance::canonical_proof_bytes", (
         r"advance\s*:\s*&VerifiedFiscalContinuityAdvance\b", r"advance\s*\.reverify\(",
         r"serde_json::from_slice\(advance\.canonical_proof_bytes\(\)\)",
