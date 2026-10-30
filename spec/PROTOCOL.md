@@ -853,6 +853,23 @@ the issuer's actual upstream parent capability. Concretely:
   witness in the trust-root authority.
 - A chain whose hops omit `scope_hash` is rejected fail-closed.
 
+A nonempty delegation chain MUST start at a verifier-supplied root parent
+subject. The first link's `delegator` MUST equal that subject, and each later
+link's `delegator` MUST equal the previous link's `delegatee`. Each signature
+MUST verify under that expected key, rather than a key selected solely from
+the link being checked. The final delegatee MUST equal the token subject.
+
+The composite verifier obtains the root subject from
+`CapabilityFeatureContext.root_delegator`, `direct_root.subject`, or the first
+signed ancestor's subject. Supplied sources MUST agree. A nonempty chain with
+no resolved root subject MUST be refused with `DelegationRootUnresolved`.
+Signed root and ancestor inputs remain subject to the composite verifier's
+signature and lineage checks. Hosted kernels obtain the root parent subject
+from the stored ancestor snapshot and refuse delegated tokens when that
+snapshot is unavailable. Portable callers MUST provide the root subject or
+signed root evidence explicitly; an embedded chain delegator is not a root
+of trust.
+
 For an attenuated chain with more than one hop, scope hashes alone are
 insufficient. A verifier MUST either reject the chain or verify the original
 signed ancestor capability tokens in root-to-parent order. The evidence MUST
@@ -874,7 +891,7 @@ checks remain required after the pure verification pass.
 
 The portable verifier entrypoint
 `chio_kernel_core::verify_capability_with_floor_and_trust_root(token,
-trusted_issuers, clock, crypto_floor, trust_root_scope_hash)` enforces
+trusted_issuers, clock, crypto_floor, trust_root_scope_hash, root_delegator)` enforces
 the rule in isolation. Production kernels MUST route every inbound
 capability admission through the composite entrypoint
 `chio_kernel_core::verify_capability_full(token, trusted_issuers,
