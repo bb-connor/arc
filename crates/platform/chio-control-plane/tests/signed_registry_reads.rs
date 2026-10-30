@@ -115,7 +115,7 @@ macro_rules! registry_reader_tests {
                 std::os::unix::fs::symlink(&path, &link)?;
                 let error = Registry::load(&link).err().ok_or("symlink followed")?;
                 assert!(
-                    matches!(refusal(&error), Some(RegularFileError::Symlink)),
+                    matches!(refusal(&error), Some(RegularFileError::SymbolicLink)),
                     "{error:?}"
                 );
                 assert_eq!(std::fs::read(path)?, bytes);
