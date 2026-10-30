@@ -81,6 +81,9 @@ pub enum CliError {
     #[error(transparent)]
     ControlPlane(#[from] ControlPlaneError),
 
+    #[error("key custody error: {0}")]
+    KeyCustody(#[from] crate::KeyCustodyError),
+
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -359,6 +362,11 @@ impl CliError {
                 };
                 self.report_with_context(spec.string_code, context, spec.help)
             }
+            Self::KeyCustody(error) => self.report_with_context(
+                "CHIO-CLI-IO",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the key reference, CHIO_KEY_CUSTODY and the service credential delivery before retrying.",
+            ),
             Self::Io(error) => self.report_with_context(
                 "CHIO-CLI-IO",
                 serde_json::json!({ "source": error.to_string() }),
