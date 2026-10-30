@@ -404,7 +404,7 @@ impl PassportStatusRegistry {
     /// first; test fixtures only.
     #[cfg(test)]
     pub(crate) fn save(&self, path: &Path) -> Result<(), CliError> {
-        let lock = crate::signed_input::lock_registry(path).map_err(CliError::from)?;
+        let lock = chio_secure_ipc::registry_file::RegistryFile::lock(path)?;
         crate::signed_input::write_reserving_registry(&lock, self)
     }
 

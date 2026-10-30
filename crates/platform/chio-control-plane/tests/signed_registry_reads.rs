@@ -111,7 +111,7 @@ macro_rules! registry_reader_tests {
                 assert!(matches!(
                     error,
                     CliError::Io(ref io) if io.kind() == ErrorKind::InvalidInput
-                        && io.to_string() == "signed input must be a regular file"
+                        && io.to_string() == "input must be a regular file"
                 ), "{error:?}");
                 Ok(())
             }
@@ -135,7 +135,7 @@ macro_rules! registry_reader_tests {
                 assert!(matches!(
                     error,
                     CliError::Io(ref io) if io.kind() == ErrorKind::InvalidInput
-                        && io.to_string() == "signed input must be a regular file"
+                        && io.to_string() == "input must be a regular file"
                 ), "{error:?}");
                 Ok(())
             }
