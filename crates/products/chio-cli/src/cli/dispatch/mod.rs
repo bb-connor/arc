@@ -23,9 +23,9 @@ mod settle_arena;
 mod trust_cmd;
 mod workflow;
 
-pub(crate) use self::attest::dispatch_chio_attest_command;
 #[cfg(test)]
 pub(crate) use self::attest::cmd_chio_attest_runtime_quote_verify;
+pub(crate) use self::attest::dispatch_chio_attest_command;
 pub(crate) use self::federation::dispatch_chio_federation_command;
 pub(crate) use self::lineage_cmd::dispatch_lineage;
 pub(crate) use self::market_cmd::{cmd_market_info, cmd_market_install, cmd_market_list};

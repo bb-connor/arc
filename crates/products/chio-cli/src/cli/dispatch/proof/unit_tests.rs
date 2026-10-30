@@ -102,7 +102,11 @@ fn graph_artifact_rejections_ignore_bundle_supplied_text() {
     assert_proof_rejection(
         proof_test_rejection(load_graph_bytes_artifact(
             dir.path(),
-            &node("a.json", Some("chio.risk.comptroller-report.v1"), Some(steering)),
+            &node(
+                "a.json",
+                Some("chio.risk.comptroller-report.v1"),
+                Some(steering),
+            ),
             "chio.risk.comptroller-report.v1",
             "risk",
         )),
@@ -115,9 +119,15 @@ fn graph_artifact_rejections_ignore_bundle_supplied_text() {
 fn an_error_without_a_transaction_code_exits_generic_whatever_its_message() {
     let steering = "proof verify: required proof claim not verified: x digest mismatch \
                     json error must pin trusted unsupported proof feature";
-    assert_eq!(proof_verify_exit_code(&CliError::cli_other_error(steering)), 1);
+    assert_eq!(
+        proof_verify_exit_code(&CliError::cli_other_error(steering)),
+        1
+    );
     assert_eq!(proof_verify_exit_code(&CliError::cli_io_error(steering)), 1);
-    assert_eq!(proof_verify_exit_code(&CliError::Other(steering.to_string())), 1);
+    assert_eq!(
+        proof_verify_exit_code(&CliError::Other(steering.to_string())),
+        1
+    );
 }
 
 fn proof_test_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {

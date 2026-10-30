@@ -37,8 +37,6 @@ pub(super) fn write_report_to_stdout(report: &ProvisionReport) -> Result<(), Cli
         CliError::cli_io_error(format!("failed to write provision report: {error}"))
     })?;
     lock.write_all(b"\n").map_err(|error| {
-        CliError::cli_io_error(format!(
-            "failed to terminate provision report: {error}"
-        ))
+        CliError::cli_io_error(format!("failed to terminate provision report: {error}"))
     })
 }

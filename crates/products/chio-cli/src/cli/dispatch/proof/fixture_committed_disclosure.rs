@@ -44,7 +44,9 @@ pub(super) fn keep_committed_selective_disclosure_proof(
     );
     let kept = candidates.into_iter().find(|committed| {
         let mut comparable = committed.clone();
-        comparable.proof_bytes_hex.clone_from(&derived.proof_bytes_hex);
+        comparable
+            .proof_bytes_hex
+            .clone_from(&derived.proof_bytes_hex);
         comparable == derived
             && chio_selective_disclosure::verify_selective_disclosure_proof(committed, &registry)
                 .is_ok()

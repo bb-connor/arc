@@ -4,11 +4,10 @@ use chio_errors::_generated::error_codes::{
     TRANSACTION_AUTHORIZATION_NOT_BOUND, TRANSACTION_BUYER_REVIEW_REJECTED,
     TRANSACTION_CLAIM_REJECTED, TRANSACTION_DISPUTE_UNBOUND, TRANSACTION_GRAPH_CYCLE,
     TRANSACTION_GRAPH_NOT_CLOSED, TRANSACTION_IDENTITY_NOT_BOUND,
-    TRANSACTION_NEGATIVE_CASE_MISMATCH,
-    TRANSACTION_PASSPORT_HASH_MISMATCH, TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
-    TRANSACTION_SIGNATURE_INVALID, TRANSACTION_RECEIPT_UNCHECKPOINTED,
+    TRANSACTION_NEGATIVE_CASE_MISMATCH, TRANSACTION_PASSPORT_HASH_MISMATCH,
+    TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED, TRANSACTION_RECEIPT_UNCHECKPOINTED,
     TRANSACTION_REQUIRED_CLAIM_MISSING, TRANSACTION_RUNTIME_PROOF_REJECTED,
-    TRANSACTION_SETTLEMENT_UNVERIFIED,
+    TRANSACTION_SETTLEMENT_UNVERIFIED, TRANSACTION_SIGNATURE_INVALID,
     TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED, TRANSACTION_VERIFIER_CONTEXT_INVALID,
     TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
 };
@@ -76,7 +75,10 @@ const PROOF_VERIFY_EXIT_BY_CODE: &[(&ErrorCodeSpec, i32)] = &[
         &TRANSACTION_GRAPH_NOT_CLOSED,
         PROOF_VERIFY_EXIT_INTEGRITY_FAILURE,
     ),
-    (&TRANSACTION_GRAPH_CYCLE, PROOF_VERIFY_EXIT_INTEGRITY_FAILURE),
+    (
+        &TRANSACTION_GRAPH_CYCLE,
+        PROOF_VERIFY_EXIT_INTEGRITY_FAILURE,
+    ),
     (
         &TRANSACTION_SIGNATURE_INVALID,
         PROOF_VERIFY_EXIT_INTEGRITY_FAILURE,
@@ -106,7 +108,8 @@ const PROOF_VERIFY_EXIT_BY_CODE: &[(&ErrorCodeSpec, i32)] = &[
 /// The exit class is a function of the registry code alone; the message is
 /// never read.
 pub(super) fn proof_verify_exit_code(error: &CliError) -> i32 {
-    proof_verify_registry_exit_code(error.report().code.as_str()).unwrap_or(PROOF_VERIFY_EXIT_GENERIC)
+    proof_verify_registry_exit_code(error.report().code.as_str())
+        .unwrap_or(PROOF_VERIFY_EXIT_GENERIC)
 }
 
 fn proof_verify_registry_exit_code(code: &str) -> Option<i32> {
@@ -334,9 +337,7 @@ pub(super) fn map_public_settlement_proof_error(
     CliError::registry_error(spec, format!("proof verify: {error}"))
 }
 
-pub(super) fn map_swarm_proof_error(
-    error: chio_swarm_authority::SwarmAuthorityError,
-) -> CliError {
+pub(super) fn map_swarm_proof_error(error: chio_swarm_authority::SwarmAuthorityError) -> CliError {
     use chio_swarm_authority::SwarmAuthorityError as Error;
 
     let spec: &'static ErrorCodeSpec = match &error {
@@ -683,7 +684,9 @@ mod tests {
             20,
         );
         assert_typed(
-            claim_rejected("proof verify: disclosure crypto report projection manifest ref mismatch"),
+            claim_rejected(
+                "proof verify: disclosure crypto report projection manifest ref mismatch",
+            ),
             &TRANSACTION_CLAIM_REJECTED,
             10,
         );
@@ -694,14 +697,20 @@ mod tests {
         use chio_control_plane::transaction_passport::TransactionPassportError as Passport;
         use chio_selective_disclosure::DisclosureLineageError as Lineage;
         let passport_cases = [
-            (Passport::EnterpriseExportUnsupported("approval signature unsupported".into()), 50),
+            (
+                Passport::EnterpriseExportUnsupported("approval signature unsupported".into()),
+                50,
+            ),
             (
                 Passport::EnterpriseExportUnsupported(
                     "data governance retention class unsupported".into(),
                 ),
                 50,
             ),
-            (Passport::EnterpriseExportMalformed("export bundle digest mismatch".into()), 30),
+            (
+                Passport::EnterpriseExportMalformed("export bundle digest mismatch".into()),
+                30,
+            ),
             (
                 Passport::EnterpriseExportMalformed(
                     "approval case export bundle digest mismatch".into(),
@@ -712,7 +721,10 @@ mod tests {
                 Passport::AgentWebUnsupported("GraphQL subscription projection unsupported".into()),
                 50,
             ),
-            (Passport::AgentWebUnsupported("unsupported Agent Web digest algorithm".into()), 50),
+            (
+                Passport::AgentWebUnsupported("unsupported Agent Web digest algorithm".into()),
+                50,
+            ),
             (
                 Passport::AgentWebUnsupported("unsupported Agent Web signature algorithm".into()),
                 50,
@@ -742,7 +754,10 @@ mod tests {
             assert_eq!(proof_verify_exit_code(&error), exit_code, "{error}");
         }
         let lineage_cases = [
-            (Lineage::Unsupported("lineage subgraph signature unsupported".into()), 50),
+            (
+                Lineage::Unsupported("lineage subgraph signature unsupported".into()),
+                50,
+            ),
             (
                 Lineage::UnsupportedSchema("unsupported crypto context report schema".into()),
                 30,

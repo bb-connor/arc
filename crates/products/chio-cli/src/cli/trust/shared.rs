@@ -39,7 +39,11 @@ impl StagedLocalIssuanceSeed {
 
         let file_name = path
             .file_name()
-            .filter(|name| path.as_os_str().as_encoded_bytes().ends_with(name.as_encoded_bytes()))
+            .filter(|name| {
+                path.as_os_str()
+                    .as_encoded_bytes()
+                    .ends_with(name.as_encoded_bytes())
+            })
             .ok_or_else(|| CliError::cli_other_error("authority seed path must name a file"))?;
         let parent = path
             .parent()
@@ -135,7 +139,9 @@ mod local_issuance_seed_tests {
             let Err(error) = provision_local_issuance_authority(Some(&path), None) else {
                 return Err("directory-shaped seed path initialized custody".into());
             };
-            assert!(error.to_string().contains("authority seed path must name a file"));
+            assert!(error
+                .to_string()
+                .contains("authority seed path must name a file"));
             assert_eq!(std::fs::read_dir(directory.path())?.count(), 0);
         }
         Ok(())
@@ -152,7 +158,10 @@ mod local_issuance_seed_tests {
         let owner = crate::load_existing_authority_keypair(&path)?.public_key();
         second.publish()?;
         assert_eq!(std::fs::read(&path)?, original.as_slice());
-        assert_eq!(crate::load_existing_authority_keypair(&path)?.public_key(), owner);
+        assert_eq!(
+            crate::load_existing_authority_keypair(&path)?.public_key(),
+            owner
+        );
         assert_eq!(std::fs::read_dir(directory.path())?.count(), 1);
         Ok(())
     }
@@ -170,7 +179,10 @@ mod local_issuance_seed_tests {
         let Err(error) = staged.publish() else {
             return Err("invalid existing seed was accepted".into());
         };
-        assert!(matches!(error, CliError::Core(chio_core::error::Error::InvalidHex(_))));
+        assert!(matches!(
+            error,
+            CliError::Core(chio_core::error::Error::InvalidHex(_))
+        ));
         assert_eq!(std::fs::read(&path)?, b"invalid authority material");
         assert_eq!(std::fs::read_dir(directory.path())?.count(), 1);
         Ok(())
@@ -189,7 +201,9 @@ mod local_issuance_seed_tests {
         let Err(error) = staged.publish() else {
             return Err("symlink custody was accepted".into());
         };
-        assert!(error.to_string().contains("authority seed must be a regular file"));
+        assert!(error
+            .to_string()
+            .contains("authority seed must be a regular file"));
         assert_eq!(std::fs::read_link(&path)?, existing);
         assert_eq!(std::fs::read(&existing)?, original.as_slice());
         assert_eq!(std::fs::read_dir(directory.path())?.count(), 2);

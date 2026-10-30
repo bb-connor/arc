@@ -8,17 +8,16 @@ mod room;
 mod transaction_error;
 use super::*;
 use artifacts::*;
-use escrow_ledger::load_commerce_escrow_ledger_bytes;
 use chio_errors::_generated::error_codes::TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED;
+use escrow_ledger::load_commerce_escrow_ledger_bytes;
 use std::collections::{BTreeMap, BTreeSet};
 use transaction_error::{
     artifact_digest_mismatch, artifact_schema_invalid, claim_rejected, graph_not_closed,
     is_transparency_preview_not_allowed_code, map_commerce_proof_error,
     map_crypto_context_proof_error, map_disclosure_lineage_proof_error, map_proof_error,
-    map_runtime_proof_error,
-    map_selective_disclosure_proof_error, map_public_settlement_proof_error,
-    map_swarm_proof_error, proof_verify_exit_code, required_claim_missing, runtime_proof_rejected,
-    verifier_feature_unsupported,
+    map_public_settlement_proof_error, map_runtime_proof_error,
+    map_selective_disclosure_proof_error, map_swarm_proof_error, proof_verify_exit_code,
+    required_claim_missing, runtime_proof_rejected, verifier_feature_unsupported,
 };
 
 #[path = "proof/env.rs"]
@@ -2487,10 +2486,9 @@ fn ensure_disclosure_selective_disclosure_proof_matches_context(
     report: &chio_selective_disclosure::DisclosureCryptoContextReport,
 ) -> Result<(), CliError> {
     ensure_projection_manifest_declares_capsule_hidden_predicates(capsule, projection_manifest)?;
-    chio_selective_disclosure::verify_bbs_projection_manifest(proof, projection_manifest)
-        .map_err(|error| {
-            map_selective_disclosure_proof_error(&error, format!("proof verify: {error}"))
-        })?;
+    chio_selective_disclosure::verify_bbs_projection_manifest(proof, projection_manifest).map_err(
+        |error| map_selective_disclosure_proof_error(&error, format!("proof verify: {error}")),
+    )?;
     if let Some(inclusion) = transparency_inclusion {
         chio_selective_disclosure::verify_transparency_inclusion_proof(proof, inclusion).map_err(
             |error| map_selective_disclosure_proof_error(&error, format!("proof verify: {error}")),

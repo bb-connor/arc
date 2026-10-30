@@ -71,14 +71,22 @@ impl PreflightArgs {
         if given.iter().all(|present| !present) {
             return Ok(None);
         }
-        let (Some(signed_manifest), Some(manifest_public_key), Some(cage_policy), Some(cage_policy_signer), Some(server_id), Some((command, args))) = (
+        let (
+            Some(signed_manifest),
+            Some(manifest_public_key),
+            Some(cage_policy),
+            Some(cage_policy_signer),
+            Some(server_id),
+            Some((command, args)),
+        ) = (
             self.signed_manifest.clone(),
             self.manifest_public_key.clone(),
             self.cage_policy.clone(),
             self.cage_policy_signer.clone(),
             self.server_id.clone(),
             self.command.split_first(),
-        ) else {
+        )
+        else {
             return Err(CliError::cli_other_error(
                 "checking launch material needs --signed-manifest, --manifest-public-key, --cage-policy, --cage-policy-signer, --server-id and the wrapped command after --"
                     .to_string(),

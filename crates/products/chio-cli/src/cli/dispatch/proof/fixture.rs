@@ -23,12 +23,12 @@ use fixture_agent_web::{
 #[path = "fixture_cleanup.rs"]
 mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
+#[path = "fixture_committed_disclosure.rs"]
+mod fixture_committed_disclosure;
 #[path = "fixture_regenerate.rs"]
 mod fixture_regenerate;
 #[path = "fixture_runtime_check.rs"]
 mod fixture_runtime_check;
-#[path = "fixture_committed_disclosure.rs"]
-mod fixture_committed_disclosure;
 use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;
 #[path = "fixture_public_settlement_runtime.rs"]
 mod fixture_public_settlement_runtime;
@@ -38,7 +38,9 @@ mod fixture_paths;
 use fixture_paths::proof_fixture_source_root;
 #[path = "fixture_receipt_evidence.rs"]
 mod fixture_receipt_evidence;
-use fixture_receipt_evidence::{generate_minimal_receipt_evidence, write_terminal_receipt_evidence, RECEIPT_EVIDENCE_SCHEMA};
+use fixture_receipt_evidence::{
+    generate_minimal_receipt_evidence, write_terminal_receipt_evidence, RECEIPT_EVIDENCE_SCHEMA,
+};
 
 const PROOF_FIXTURE_ROOT_ENV: &str = "CHIO_PROOF_FIXTURE_ROOT";
 const PROOF_FIXTURE_CATALOG_FILE: &str = "catalog.json";
@@ -2162,7 +2164,12 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     let nodes = json_array_mut(&mut evidence_graph, "nodes", &evidence_graph_path)?;
     for (path, node_id, receipt_id, terminal_status) in receipts {
         let receipt_path = bundle.join(path);
-        write_terminal_receipt_evidence(&receipt_path, receipt_id, terminal_status, &policy_sha256)?;
+        write_terminal_receipt_evidence(
+            &receipt_path,
+            receipt_id,
+            terminal_status,
+            &policy_sha256,
+        )?;
         upsert_fixture_graph_node(
             nodes,
             node_id,
@@ -2182,7 +2189,6 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     write_signed_transaction_passport(&passport_path, passport)?;
     Ok(())
 }
-
 
 fn generate_disclosure_agent_web_fixture(out: &Path) -> Result<(), CliError> {
     if path_exists_or_is_symlink(out)? {

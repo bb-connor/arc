@@ -665,8 +665,7 @@ pub(crate) fn cmd_passport_oid4vp_respond(
 
     let request_jwt = fetch_text_url(EndpointSource::Operator, &resolved_request_url)?;
     let metadata_url = oid4vp_verifier_metadata_url(&resolved_request_url)?;
-    let metadata: Oid4vpVerifierMetadata =
-        fetch_json_url(EndpointSource::Operator, &metadata_url)?;
+    let metadata: Oid4vpVerifierMetadata = fetch_json_url(EndpointSource::Operator, &metadata_url)?;
     metadata
         .validate()
         .map_err(|error| CliError::policy_error(error.to_string()))?;

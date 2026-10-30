@@ -2,17 +2,13 @@
 use super::super::tests::{policy, signed_policy};
 use super::*;
 use chio_cage::*;
-use chio_core::{Ed25519Backend, Keypair, canonical_json_bytes};
+use chio_core::{canonical_json_bytes, Ed25519Backend, Keypair};
 use chio_manifest::NativeSyscallProfile;
 use serde_json::json;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-fn refusal<T>(
-    result: std::result::Result<T, CliError>,
-    label: &str,
-    expected: &str,
-) -> Result {
+fn refusal<T>(result: std::result::Result<T, CliError>, label: &str, expected: &str) -> Result {
     let message = match result {
         Ok(_) => return Err(format!("{label}: accepted").into()),
         Err(error) => error.to_string(),
@@ -448,11 +444,9 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
     )
     .err()
     .ok_or("legacy receipt proved complete policy")?;
-    assert!(
-        error
-            .to_string()
-            .contains("complete admitted signed policy")
-    );
+    assert!(error
+        .to_string()
+        .contains("complete admitted signed policy"));
     Ok(())
 }
 

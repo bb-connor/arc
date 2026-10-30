@@ -298,10 +298,9 @@ fn resolve_inputs(
 
     let output_directory = require_exact_absolute_output_path(output_dir)?;
     let runtime_security_directory = match runtime_security_dir {
-        Some(path) => require_exact_absolute_logical_directory(
-            path,
-            "native MCP runtime security directory",
-        )?,
+        Some(path) => {
+            require_exact_absolute_logical_directory(path, "native MCP runtime security directory")?
+        }
         None => output_directory.clone(),
     };
     authority_paths::protect(&mut profile, &output_directory, &runtime_security_directory)?;
@@ -471,13 +470,17 @@ mod runtime_linkage_tests;
 
 fn provision_new(inputs: &ProvisionInputs) -> Result<(), CliError> {
     let parent = inputs.output_directory.parent().ok_or_else(|| {
-        CliError::cli_other_error("native MCP provisioning output has no parent directory".to_string())
+        CliError::cli_other_error(
+            "native MCP provisioning output has no parent directory".to_string(),
+        )
     })?;
     let leaf = inputs
         .output_directory
         .file_name()
         .ok_or_else(|| {
-            CliError::cli_other_error("native MCP provisioning output has no directory name".to_string())
+            CliError::cli_other_error(
+                "native MCP provisioning output has no directory name".to_string(),
+            )
         })?
         .to_string_lossy();
     let staging_path = parent.join(format!(".{leaf}.chio-provision-{}", uuid::Uuid::new_v4()));
@@ -632,9 +635,8 @@ fn validate_existing_provision(inputs: &ProvisionInputs) -> Result<ProvisionRepo
         true,
         "provision report",
     )?;
-    let report: ProvisionReport = crate::input::json(&report_bytes).map_err(|error| {
-        CliError::cli_other_error(format!("invalid provision report: {error}"))
-    })?;
+    let report: ProvisionReport = crate::input::json(&report_bytes)
+        .map_err(|error| CliError::cli_other_error(format!("invalid provision report: {error}")))?;
     require_canonical_json(&report, &report_bytes, "provision report")?;
     let now = current_unix_ms()?;
     if report.created_at_unix_ms == 0 || report.created_at_unix_ms > now {
@@ -853,11 +855,15 @@ fn build_registration(
         signers.migration.public_key().to_hex(),
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!("failed to build the migration registration: {error}"))
+        CliError::cli_other_error(format!(
+            "failed to build the migration registration: {error}"
+        ))
     })?;
     chio_store_sqlite::sign_enterprise_migration_transition(body, &signers.migration).map_err(
         |error| {
-            CliError::cli_other_error(format!("failed to sign the migration registration: {error}"))
+            CliError::cli_other_error(format!(
+                "failed to sign the migration registration: {error}"
+            ))
         },
     )
 }
@@ -1191,11 +1197,15 @@ fn require_exact_absolute_output_path(path: &Path) -> Result<PathBuf, CliError> 
         ));
     }
     let parent = path.parent().ok_or_else(|| {
-        CliError::cli_other_error("native MCP provisioning output has no parent directory".to_string())
+        CliError::cli_other_error(
+            "native MCP provisioning output has no parent directory".to_string(),
+        )
     })?;
     let canonical_parent = require_exact_canonical_directory(parent, "output parent")?;
     let leaf = path.file_name().ok_or_else(|| {
-        CliError::cli_other_error("native MCP provisioning output has no directory name".to_string())
+        CliError::cli_other_error(
+            "native MCP provisioning output has no directory name".to_string(),
+        )
     })?;
     let canonical_output = canonical_parent.join(leaf);
     if canonical_output != path {
@@ -1508,9 +1518,7 @@ fn set_private_directory_permissions(path: &Path) -> Result<(), CliError> {
             .read(true)
             .custom_flags(libc::O_CLOEXEC | libc::O_DIRECTORY | libc::O_NOFOLLOW)
             .open(path)
-            .and_then(|directory| {
-                directory.set_permissions(std::fs::Permissions::from_mode(0o700))
-            })
+            .and_then(|directory| directory.set_permissions(std::fs::Permissions::from_mode(0o700)))
             .map_err(|error| {
                 CliError::cli_io_error(format!(
                     "failed to set private directory permissions on {}: {error}",
@@ -1543,27 +1551,27 @@ fn validate_private_directory(path: &Path) -> Result<(), CliError> {
 
 fn validate_exact_artifact_set(directory: &Path) -> Result<(), CliError> {
     let expected = [
-            REVIEWED_TOOLS_FILE,
-            SIGNED_MANIFEST_FILE,
-            MANIFEST_SEED_FILE,
-            MANIFEST_PUBLIC_KEY_FILE,
-            CAGE_POLICY_FILE,
-            CAGE_POLICY_SEED_FILE,
-            CAGE_POLICY_PUBLIC_KEY_FILE,
-            MIGRATION_SEED_FILE,
-            MIGRATION_PUBLIC_KEY_FILE,
-            MIGRATION_REGISTRATION_FILE,
-            MIGRATION_DATABASE_FILE,
-            RECEIPT_SEED_FILE,
-            RECEIPT_PUBLIC_KEY_FILE,
-            CONTROL_AUTHORITY_SEED_FILE,
-            CONTROL_AUTHORITY_PUBLIC_KEY_FILE,
-            TARGET_COMMAND_FILE,
-            REPORT_FILE,
-        ]
-        .into_iter()
-        .map(std::ffi::OsString::from)
-        .collect::<BTreeSet<_>>();
+        REVIEWED_TOOLS_FILE,
+        SIGNED_MANIFEST_FILE,
+        MANIFEST_SEED_FILE,
+        MANIFEST_PUBLIC_KEY_FILE,
+        CAGE_POLICY_FILE,
+        CAGE_POLICY_SEED_FILE,
+        CAGE_POLICY_PUBLIC_KEY_FILE,
+        MIGRATION_SEED_FILE,
+        MIGRATION_PUBLIC_KEY_FILE,
+        MIGRATION_REGISTRATION_FILE,
+        MIGRATION_DATABASE_FILE,
+        RECEIPT_SEED_FILE,
+        RECEIPT_PUBLIC_KEY_FILE,
+        CONTROL_AUTHORITY_SEED_FILE,
+        CONTROL_AUTHORITY_PUBLIC_KEY_FILE,
+        TARGET_COMMAND_FILE,
+        REPORT_FILE,
+    ]
+    .into_iter()
+    .map(std::ffi::OsString::from)
+    .collect::<BTreeSet<_>>();
     let allowed = expected
         .iter()
         .cloned()
@@ -1581,7 +1589,9 @@ fn validate_exact_artifact_set(directory: &Path) -> Result<(), CliError> {
         ))
     })? {
         let entry = entry.map_err(|error| {
-            CliError::cli_io_error(format!("failed to inspect provisioning output entry: {error}"))
+            CliError::cli_io_error(format!(
+                "failed to inspect provisioning output entry: {error}"
+            ))
         })?;
         let name = entry.file_name();
         if !allowed.contains(&name) || !actual.insert(name) {
