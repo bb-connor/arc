@@ -3,6 +3,7 @@ use super::*;
 use chio_secure_ipc::seed_custody::{CustodyPolicy, SeedReadError};
 use chio_test_support::prelude::*;
 use std::fs;
+use zeroize::Zeroizing;
 
 const CREDENTIAL: &str = "chio-authority-seed";
 const CREDENTIAL_REF: &str = "credential:chio-authority-seed";

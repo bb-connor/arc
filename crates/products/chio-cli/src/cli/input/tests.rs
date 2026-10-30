@@ -249,7 +249,7 @@ fn signing_custody_is_existing_private_bounded_and_not_aliased() {
         signer.public_key()
     );
     assert_io_message(
-        chio_control_plane::read_private_signing_custody(&path, 63).unwrap_err(),
+        CliError::from(chio_secure_ipc::seed_custody::read_private_file(&path, 63).unwrap_err()),
         "authority seed exceeds its byte limit",
     );
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();

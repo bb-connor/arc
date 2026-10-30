@@ -24,7 +24,7 @@ pub(crate) fn cmd_chio_federation_authority_issue(
         CliError::with_source(&chio_errors::_generated::error_codes::CLI_OTHER, error)
     })?;
     let signing_keys = chio_federation_authority::signing_keys_from_json(
-        std::str::from_utf8(&chio_control_plane::read_private_signing_custody(
+        std::str::from_utf8(&chio_secure_ipc::seed_custody::read_private_file(
             signing_keys,
             crate::input::MAX_DOCUMENT_BYTES,
         )?)
@@ -100,7 +100,7 @@ pub(crate) fn cmd_chio_federation_authority_checkpoint(
         CliError::cli_other_error(format!("Chio revocation publication request: {error}"))
     })?;
     let signing_keys = chio_federation_authority::signing_keys_from_json(
-        std::str::from_utf8(&chio_control_plane::read_private_signing_custody(
+        std::str::from_utf8(&chio_secure_ipc::seed_custody::read_private_file(
             signing_keys,
             crate::input::MAX_DOCUMENT_BYTES,
         )?)

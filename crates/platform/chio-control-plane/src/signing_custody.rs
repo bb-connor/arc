@@ -1,10 +1,7 @@
 //! Authority signing keys loaded through key custody.
 use crate::{CliError, Keypair};
-use chio_secure_ipc::seed_custody::{
-    read_private_file, KeyCustodyError, KeyRef, OsSeedSource, SeedSource,
-};
+use chio_secure_ipc::seed_custody::{KeyCustodyError, KeyRef, OsSeedSource, SeedSource};
 use std::path::Path;
-use zeroize::Zeroizing;
 
 const AUTHORITY_SEED_MAX_BYTES: usize = 256;
 
@@ -35,14 +32,6 @@ pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError
 /// read-only, and required custody refuses every seed file.
 pub fn writable_authority_seed_file(path: &Path) -> Result<&Path, CliError> {
     AuthoritySeeds::from_env()?.writable_seed_file(path)
-}
-
-/// Read existing private signing custody, bounded and wiped on every exit path.
-pub fn read_private_signing_custody(
-    path: &Path,
-    maximum_bytes: usize,
-) -> Result<Zeroizing<Vec<u8>>, CliError> {
-    Ok(read_private_file(path, maximum_bytes)?)
 }
 
 pub(crate) fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliError> {
