@@ -1,7 +1,8 @@
 # chio-replay-gate.yml - Deterministic-replay corpus gate.
 #
-# Runs the chio-replay-gate corpus on every PR and on push to main /
-# project/* branches. The `--bless` path is the only way to update goldens;
+# Runs the chio-replay-gate corpus on PRs that touch Rust, patched forks, the
+# replay corpus, or the TypeScript packages, and on push to main / project/*
+# branches. The `--bless` path is the only way to update goldens;
 # CI is banned from blessing (CHIO_BLESS=0 is enforced here and in the binary).
 #
 # Determinism contract: LC_ALL=C and LANG=C are pinned so receipt serialisation
@@ -20,6 +21,20 @@ name: chio-replay-gate
 
 on:
   pull_request:
+    paths:
+      - ".cargo/**"
+      - ".github/actions/setup-rust/**"
+      - ".github/workflows/chio-replay-gate.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "crates/**"
+      - "formal/diff-tests/**"
+      - "rust-toolchain.toml"
+      - "scripts/bless-replay-goldens.sh"
+      - "scripts/pull_tee_corpus.py"
+      - "sdks/typescript/packages/**"
+      - "tests/replay/**"
+      - "third_party/**"
   push:
     branches:
       - main
@@ -127,7 +142,9 @@ jobs:
     # required-on-main check; this job surfaces platform-specific
     # determinism breakage (filesystem case folding, BSD vs GNU coreutils,
     # APFS atime quirks) before it hits a contributor's local machine.
+    # Push-only: macOS runner slots are the scarcest hosted pool.
     name: replay-gate (macos read-only)
+    if: github.event_name == 'push'
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
