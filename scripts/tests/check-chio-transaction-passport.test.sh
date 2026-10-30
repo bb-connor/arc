@@ -86,7 +86,7 @@ trap 'rm -rf "$fixture_tree"' EXIT
 mkdir -p \
   "$fixture_tree/scripts/lib" \
   "$fixture_tree/spec/schemas/chio-transaction/v1" \
-  "$fixture_tree/crates/core/chio-core-types/src" \
+  "$fixture_tree/crates/core/chio-core-types/src/signed_artifact/schema_specs" \
   "$fixture_tree/fixtures/proof-room/family/valid" \
   "$fixture_tree/fixtures/proof-room/family/digest-mismatch" \
   "$fixture_tree/fixtures/proof-room/family/head-reorged" \
@@ -102,6 +102,9 @@ cat >"$fixture_tree/spec/schemas/registry.json" <<'JSON'
 JSON
 cat >"$fixture_tree/crates/core/chio-core-types/src/signed_artifact.rs" <<'RS'
 pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
+RS
+printf 'mod core_artifacts;\n' >"$fixture_tree/crates/core/chio-core-types/src/signed_artifact/schema_specs.rs"
+cat >"$fixture_tree/crates/core/chio-core-types/src/signed_artifact/schema_specs/core_artifacts.rs" <<'RS'
 ("transaction_passport", "transaction-passport-v1")
 RS
 cat >"$fixture_tree/fixtures/proof-room/catalog.json" <<'JSON'
@@ -173,6 +176,15 @@ PY
 )"
   run_stub_report "$exit_code" "$report"
 }
+
+catalog_modules="$fixture_tree/crates/core/chio-core-types/src/signed_artifact/schema_specs"
+mv "$catalog_modules" "$fixture_tree/catalog-modules"
+if PATH="$fixture_tree/bin:$PATH" bash "$fixture_tree/scripts/check-chio-transaction-passport.sh" --schema-only >"$fixture_tree/gate.log" 2>&1; then
+  echo "check-chio-transaction-passport.test.sh: gate accepted a tree without signed artifact catalog modules" >&2
+  exit 1
+fi
+grep -Fq "signed artifact catalog has no modules" "$fixture_tree/gate.log"
+mv "$fixture_tree/catalog-modules" "$catalog_modules"
 
 right_message="proof verify: evidence graph digest mismatch: expected 01, got 02"
 for rejected in \
