@@ -151,11 +151,75 @@ section 4.4). It does not requalify other rows.
 - **Rows updated.** Trust-control rows C24, C25, and C26 and the BCP 14
   row for C27 now state the snake_case wire. Their draft line pointers
   other than the C27 BCP 14 row stay at the frozen snapshot.
-- **Authentication not requalified.** The draft now names the scopes
-  the revocation handlers check (`revocations:write` for POST,
-  `revocations:read` for GET), but this change does NOT requalify the
-  authentication model. The draft-wide trust-control credential model
-  (service token versus scoped caller credentials) is open.
+- **Authentication.** The draft names the scopes the revocation
+  handlers check (`revocations:write` for POST, `revocations:read` for
+  GET). The trust-control credential model is requalified separately
+  in the next subsection.
+
+### 2026-10-30: trust-control scoped caller credential model
+
+This targeted source review covers the trust-control authentication
+rows below at the scoped caller credential model. It does not requalify
+other rows. It replaces the service-token text and the tenant read-token
+MAY of the September 30 snapshot.
+
+- **Credentials.** A caller credential has an id, a kind (`caller` or
+  `deployment`), a nonempty set of scopes from the closed `Scope` set,
+  and a tenant authority (the deployment or one tenant). The service
+  holds only the SHA-256 digest of each secret, compares the digest of
+  the presented bearer value with every record in constant time, and
+  refuses at load a credential with an unknown scope, a cluster scope,
+  no scopes, or a secret another credential shares. The removed
+  `service_token`, `tenant_read_tokens`, and `authority_workload_token`
+  keys refuse at load. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:68-213` (`Scope`, `CredentialKind`,
+  `TenantAuthority`), `:346-375` (`from_toml_str`), `:659-728`
+  (`from_entries`), `:759-804` (`authenticate`, `validate_caller`,
+  `bearer_token`).
+- **Route requirements.** The draft's new table
+  `tab-trust-control-routes` states the `ROUTE_TABLE` rows of the four
+  documented endpoints: `POST /v1/capabilities/issue` needs a
+  `deployment`-kind credential with `capabilities:issue`;
+  `POST /v1/federation/capabilities/issue` needs `federation:write`;
+  `GET /v1/receipts/query` needs `receipts:read` and admits a tenant
+  credential; `POST /v1/revocations` and `GET /v1/revocations` need
+  `revocations:write` and `revocations:read`. Every row but the
+  receipt query is deployment-only for tenant authority. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:156,173,280,330-331`.
+- **Check order and statuses.** `authorize_route` runs as a route layer
+  ahead of the JSON ingress layers and the handler extractors, so the
+  credential checks precede body and query parsing. `authorize_caller`
+  refuses peer authentication headers (401), then an absent or unknown
+  bearer (401), a missing scope (403), a `caller`-kind credential on a
+  deployment-kind row (403), and a tenant credential on a
+  deployment-only row (403). A 401 carries `WWW-Authenticate: Bearer`.
+  Load shedding sits outside the router. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:471-493,575-586,638-681`;
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:850-890`;
+  `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`;
+  `crates/protocol/chio-http-serve/src/hygiene.rs:64-73`.
+- **Tenant reads.** A deployment-authority credential reads every
+  receipt; a tenant credential reads only receipts whose `tenant_id` is
+  its tenant, and rows without that tenant are excluded. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:407-424` (`resolve_control_read_principal`);
+  `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:264-289`;
+  `crates/platform/chio-store-sqlite/src/receipt_query/read.rs:114-121`.
+- **Cluster forwarding.** A follower forwards issuance, delegated
+  issuance, and revocation writes to the leader with the caller's own
+  bearer, so the leader reapplies the route checks. Peer replication
+  uses pinned Ed25519 node signatures on the internal listener, which
+  the draft leaves outside its scope. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/report_rendering.rs:284-314,441-447`;
+  `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:112-132,574-602`;
+  `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:1400-1412`.
+- **Rows updated.** Trust-control rows C02, C03, C10, and C21 now state
+  this model, and C02 moves from FINAL QUALIFIED to FINAL SUPPORTED:
+  digests have a fixed length, so the earlier token-length
+  qualification no longer applies. The Outcome counts in the sections
+  10-12 ledger stay at the frozen snapshot. The BCP 14 table drops the
+  tenant read-token MAY, adds the check-order MUST, and its occurrence
+  counts are recomputed at this draft. Draft line pointers other than
+  the changed BCP 14 rows stay at the frozen snapshot.
 
 ## Abstract and Sections 1-3
 
@@ -1199,7 +1263,7 @@ Confidence: high for direct source findings and the final wording. The existing-
 
 ## Current BCP 14 coverage
 
-Occurrence counts in sections 10-12: MUST=21, SHOULD=2, MAY=6, REQUIRED=36, OPTIONAL=20, RECOMMENDED=0, SHALL=0, CONDITIONAL=3. REQUIRED and OPTIONAL include table presence labels. CONDITIONAL is a presence label, not a BCP 14 keyword. The following table covers all 29 MUST/SHOULD/MAY occurrences.
+Occurrence counts in sections 10-12: MUST=23, SHOULD=2, MAY=5, REQUIRED=36, OPTIONAL=21, RECOMMENDED=0, SHALL=0, CONDITIONAL=3. REQUIRED and OPTIONAL include table presence labels. CONDITIONAL is a presence label, not a BCP 14 keyword. The following table covers all 30 MUST/SHOULD/MAY occurrences.
 
 | Full-draft line | Keyword occurrences | Ledger rows | Exact requirement line |
 |---|---|---|---|
@@ -1226,10 +1290,10 @@ Occurrence counts in sections 10-12: MUST=21, SHOULD=2, MAY=6, REQUIRED=36, OPTI
 | 3166 | MUST | H15 | a fingerprint of the token, the request MUST carry the same token. The |
 | 3350 | MUST | H34 | `supplementalAuthorization` MUST carry `chioRequestId`, and the approval |
 | 3429 | MUST | H42 | The edge has not verified this metadata, so it MUST set |
+| 3632 | MUST | C02 | The service MUST perform these checks, in this order, before it reads |
 | 3557 | MUST | C11-C17 | The service MUST perform these checks, in this order, and reject the |
 | 3633 | MUST | C20 | The service MUST reject the query with 400 if `minCost` exceeds |
-| 3640 | MAY | C21 | service MAY also accept read tokens that are each bound to one tenant; a |
-| 3899 | MUST | C27 | kernel MUST deny the call, with a signed receipt, if any identifier is |
+| 3966 | MUST | C27 | kernel MUST deny the call, with a signed receipt, if any identifier is |
 
 REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07-N09 (both split tables), native response N15-N17, native chunks N18, direct issuance C04/C08, delegated request C10, signed policy C11, delegated response C18, receipt query C19, revocation C24, model metadata H41-H42. The table layout changes preserve the same fields and presence rules; both hosted alias/native-equivalent tables are covered by H32.
 
@@ -1320,15 +1384,15 @@ REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07
 | ID | Final requirement or claim | Current draft anchor | Exact source evidence | Final status and bounded qualification |
 |---|---|---|---|---|
 | C01 | /v1 versioned paths and camelCase outer JSON, nested objects keep defined names | trust-control (draft line 3449) | `spec/versions/chio-protocol-negotiation.v1.json:29-34`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:16-61`; `crates/platform/chio-control-plane/src/trust_control/service_types/paths.rs:11-12,124,163` | FINAL SUPPORTED |
-| C02 | Nonempty Bearer service token compared constant time, 401/WWW-Authenticate; tenant reads and cluster issuance auth exceptions | trust-control (draft line 3449) | `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:403-439`; `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:501-522`; `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:319-358` | FINAL QUALIFIED: The constant-time byte comparison applies to equal-length inputs. It does not hide token lengths; cluster authentication is a separate configured mechanism. |
-| C03 | JSON error body/error HTTP status; framework parser can reject before auth differently;503 shed | trust-control (draft line 3449) | `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:978-980`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:69-76`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:259-267`; `crates/protocol/chio-http-serve/src/hygiene.rs:64-73` | FINAL SUPPORTED |
+| C02 | Caller credential (id, `caller`/`deployment` kind, nonempty closed scopes, deployment or tenant authority); one nonempty Bearer header whose SHA-256 is compared with every configured digest in constant time; MUST check order before body/query parsing: peer headers 401, no credential 401 with `WWW-Authenticate: Bearer`, missing scope 403, wrong kind 403, tenant on deployment-only 403; per-endpoint scope table; followers forward writes with the caller's bearer | trust-control-credentials (draft line 3592) | `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:68-213,659-728,759-804,850-890`; `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:156,173,280,330-331,471-493,575-586`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`; `crates/platform/chio-control-plane/src/trust_control/report_rendering.rs:284-314,441-447` | FINAL SUPPORTED |
+| C03 | JSON error body/error HTTP status; parser rejection follows the credential checks and can carry a different body; 503 shed can precede them | trust-control (draft line 3449) | `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:978-980`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:69-76`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:259-267`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`; `crates/protocol/chio-http-serve/src/hygiene.rs:64-73` | FINAL SUPPORTED |
 | C04 | Direct issue request requires subjectPublicKey, scope, ttlSeconds; runtimeAttestation is optional; success returns capability | tab-issue-request (draft line 3486) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:16-30`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:98-106` | FINAL QUALIFIED: ttlSeconds is parsed as unsigned64. The table says integer; its implemented accepted range remains 0 through 18446744073709551615. |
 | C05 | Authority signs a direct token with exact subject, issued_at now and unsigned64 saturating expiry addition; policy can constrain scope and lifetime; delegation chain is empty | issuance (draft line 3473) | `crates/kernel/chio-kernel/src/authority.rs:181-214`; `crates/platform/chio-control-plane/src/issuance/authority.rs:99-159`; `crates/platform/chio-control-plane/src/issuance/scope.rs:47-82` | FINAL QUALIFIED: The revised text now explicitly matches unsigned64 saturation. Configured policy may deny issuance or impose extra constraints. |
 | C06 | Invalid subject/workload binding400; issuance rejection403 | issuance (draft line 3473) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:86-112`; `crates/core/chio-core-types/src/capability/runtime_attestation.rs:57-121` | FINAL SUPPORTED |
 | C07 | Local issuance statuses include 409 for absent or conflicting authority configuration and 500 for other local issuance/backend loading failures; auth/parser/load/cluster exceptions are described separately | issuance (draft line 3473) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:98-116`; `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:593-615` | FINAL QUALIFIED: The listed local status behavior is distinct from parser/auth/load and clustered forwarding/fencing failures. Missing config is 409; failing to open configured storage is 500. |
 | C08 | Runtime attestation statement fields/snake_case/tier values and validity issued_at<=now<expires_at | issuance (draft line 3473) | `crates/core/chio-core-types/src/capability/runtime_attestation.rs:15-54`; `crates/economy/chio-appraisal/src/appraisal.rs:753-773`; `crates/economy/chio-appraisal/src/appraisal.rs:815-821` | FINAL SUPPORTED |
 | C09 | Configured attestation trust/assurance rules determine acceptance and effective tier; absent trust rules can leave accepted=false and effective tier none while issuance proceeds; optional assurance ceilings use effective tier | issuance (draft line 3473) | `crates/economy/chio-appraisal/src/appraisal.rs:791-835`; `crates/platform/chio-control-plane/src/issuance/attestation.rs:22-51`; `crates/platform/chio-control-plane/src/issuance/authority.rs:108-145`; `crates/platform/chio-control-plane/src/issuance/scope.rs:53-62` | FINAL QUALIFIED: Normalization is not inherent trust. No trust rules produce accepted=false/effective tier none, and configured assurance policy can still deny that tier. |
-| C10 | Delegated issuance required presentation/challenge/capability scope+ttl; optional enterprise/admission/delegation/upstream; `federation:write` credential with deployment tenant authority only | delegated-issuance (draft line 3518) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:32-46`; `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:992-1004` | FINAL SUPPORTED |
+| C10 | Delegated issuance required presentation/challenge/capability scope+ttl; optional enterprise/admission/delegation/upstream; `federation:write` credential with deployment tenant authority only | delegated-issuance (draft line 3518) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:32-46`; `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:173`; `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:1400-1412` | FINAL SUPPORTED |
 | C11 | Signed policy body+signature, exact camelCase body fields; signature over canonical body | tab-delegation-policy (draft line 3555) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:218-240`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:251-281` | FINAL SUPPORTED |
 | C12 | MUST first challenge verifier equal configured public URL, else400 | delegated-issuance (draft line 3518) | `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:1005-1012` | FINAL SUPPORTED |
 | C13 | MUST policy schema/time/ttl/signature, inclusive active window, verifier matches challenge/config URL, else400 | delegated-issuance (draft line 3518) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:251-298`; `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:1014-1033` | FINAL SUPPORTED |
@@ -1339,7 +1403,7 @@ REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07
 | C18 | Issue direct token and persist policy lineage anchor; missing store409; return subject/key/verification/capability and optional enterprise/anchor members | tab-delegated-response (draft line 3609) | `crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs:1327-1417`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:48-61` | FINAL SUPPORTED |
 | C19 | All receipt query parameters are optional; filters match exact values, inclusive timestamps and charged monetary bounds; agentSubject uses receipt subject or capability subject only as fallback when receipt subject is absent | tab-receipt-query (draft line 3631) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:443-472`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:9-59`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:34-48` | FINAL QUALIFIED: The revised subject filter matches COALESCE fallback rather than an independent OR. Query numeric parameters have unsigned64 parser bounds. |
 | C20 | MUST minCost<=maxCost, cost bound requires currency, exactly3 uppercaseASCII;400 validation; invalid outcome500; costless excluded | receipt-query (draft line 3611) | `crates/kernel/chio-kernel/src/receipt_query.rs:131-151`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:288-296`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:16-33`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:284-295` | FINAL SUPPORTED |
-| C21 | Deployment-authority credential all tenants; MAY tenant credentials constrain returned tenant | receipt-query (draft line 3611) | `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:501-522`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:264-286`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:299-312` | FINAL SUPPORTED |
+| C21 | `receipts:read`; deployment-authority credential reads all receipts; tenant credential reads only receipts whose `tenant_id` is its tenant | receipt-query (draft line 3611) | `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:280`; `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:407-424`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:264-289`; `crates/platform/chio-store-sqlite/src/receipt_query/read.rs:114-121` | FINAL SUPPORTED |
 | C22 | Default50/max200/min1; sequence ascending strictly after cursor; total ignores cursor/limit; last-seq cursor when page full, null otherwise | receipt-query-paging (draft line 3644) | `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:972-976`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:49-59`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:411-445` | FINAL SUPPORTED |
 | C23 | Receipt signatures verified before return; bad stored receipt500; only receipt objects exposed, no seq; zero matches empty response | receipt-query-paging (draft line 3644) | `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:400-406`; `crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs:124-146`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:291-313`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:505-512` | FINAL QUALIFIED: Stored receipt verification checks the embedded signer signature and receipt/action hashes. It does not establish separate trust in that signer. |
 | C24 | POST revocation: required snake_case `capability_id` (valid identifier, no issued-token lookup) and closed `reason`; unknown members refused; 400 malformed; 200 only after readback; 409 missing store; 503 store failure | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:574-631`; `crates/platform/chio-control-plane/src/trust_control/config_and_public.rs:23-37`; `crates/platform/chio-control-plane/src/trust_control/service_types/state.rs:300-309`; `crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs:289-305` | FINAL SUPPORTED |

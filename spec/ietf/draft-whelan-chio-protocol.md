@@ -3579,30 +3579,92 @@ paths begin with `/v1` ({{versioning}}). Request and response bodies are
 JSON objects with camelCase member names, except at the revocation
 endpoint ({{revocation}}). Nested capability tokens, receipts, and
 attestation statements keep their own member names. This section
-specifies four endpoints: issuance, delegated issuance, receipt query,
-and revocation.
-
-A caller authenticates with an `Authorization` header that carries the
-`Bearer` scheme and the service token. The service compares the token
-with its configured value in constant time and answers a missing or
-wrong token with 401 and `WWW-Authenticate: Bearer`. The receipt query
-also accepts tenant read tokens ({{receipt-query}}). The nodes of a
-clustered service can authenticate issuance requests to each other by a
-mechanism outside the scope of this document; a clustered service also
-adds members that describe the node that handled a request.
+specifies caller authentication ({{trust-control-credentials}}) and four
+endpoints: issuance, delegated issuance, receipt query, and revocation.
 
 An error response has the body `{"error": "<message>"}`, and its status
 code gives the class of error. The service rejects a body or query
 string that does not parse into the structure defined here with a 4xx
-status, which can precede authentication and can carry a different
-body. It answers 503 when it sheds load.
+status, which can carry a different body. That rejection follows the
+credential checks ({{trust-control-credentials}}). The service answers
+503 when it sheds load, which can precede them.
+
+## Caller Credentials {#trust-control-credentials}
+
+A caller authenticates with a caller credential: a secret that the
+service's operator configures. Each credential has:
+
+* an identifier;
+
+* a kind, `caller` or `deployment`;
+
+* a nonempty set of scopes;
+
+* a tenant authority: either the whole deployment that the service
+  serves, or one named tenant of that deployment.
+
+A request presents the secret in exactly one `Authorization` header
+with the `Bearer` scheme and a nonempty value. The service holds only
+the SHA-256 digest of each secret. It compares the digest of the
+presented value with the digest of every configured credential in
+constant time, and the credential whose digest matches authenticates the
+request. No two credentials share a secret. How an operator configures
+credentials is outside the scope of this document.
+
+A scope is a name such as `receipts:read` from a closed set. The service
+refuses at load time a credential that names a scope outside that set.
+Each endpoint requires one scope, and some endpoints also require a
+`deployment`-kind credential or deployment tenant authority.
+{{tab-trust-control-routes}} gives the requirements of the endpoints
+this section specifies; "Any" admits either kind and either tenant
+authority. Other endpoints of the service, and the scopes
+they require, are outside the scope of this document.
+
+| Method | Path | Scope | Credential |
+|---|---|---|---|
+| POST | `/v1/capabilities/issue` | `capabilities:issue` | `deployment` kind, deployment authority |
+| POST | `/v1/federation/capabilities/issue` | `federation:write` | Deployment authority |
+| GET | `/v1/receipts/query` | `receipts:read` | Any |
+| POST | `/v1/revocations` | `revocations:write` | Deployment authority |
+| GET | `/v1/revocations` | `revocations:read` | Deployment authority |
+{: #tab-trust-control-routes title="Trust-Control Endpoint Credentials"}
+
+The service MUST perform these checks, in this order, before it reads
+the request body or parses the query string, and refuse the request at
+the first that fails:
+
+1. The request carries none of the headers by which the nodes of a
+   clustered service authenticate to each other (401).
+
+2. The request presents a credential, as above (401).
+
+3. The credential holds the endpoint's scope (403).
+
+4. If the endpoint requires a `deployment`-kind credential, the
+   credential is of that kind (403).
+
+5. If the endpoint requires deployment tenant authority, the credential
+   has it (403).
+
+A 401 response carries `WWW-Authenticate: Bearer`. A refusal has the
+error body above.
+
+A node of a clustered service that is not the leader forwards an
+issuance, delegated issuance, or revocation request to the leader with
+the caller's own `Authorization` header, so the leader repeats these
+checks for the same credential. The nodes authenticate to each other
+for replication by a mechanism outside the scope of this document. A
+clustered service also adds members that describe the node that handled
+a request.
 
 ## Capability Issuance {#issuance}
 
 `POST /v1/capabilities/issue` issues a direct capability token, one with
 an empty delegation chain. {{tab-issue-request}} lists the request
 members. A 200 response has one member, `capability`, which holds the
-token ({{capability-structure}}).
+token ({{capability-structure}}). A caller authenticates with a
+`deployment`-kind credential holding `capabilities:issue` and deployment
+tenant authority ({{trust-control-credentials}}).
 
 | Field | Type | Presence | Meaning |
 |---|---|---|---|
@@ -3648,8 +3710,9 @@ the scope of this document.
 the subject of an Agent Passport presentation, optionally within a
 delegation policy signed by another party. Passports and presentations
 are outside the scope of this document; this section specifies the
-delegation policy and the checks that bound the issued token. Only the
-service token authenticates this endpoint.
+delegation policy and the checks that bound the issued token. A caller
+authenticates with a credential holding `federation:write` and
+deployment tenant authority ({{trust-control-credentials}}).
 
 | Field | Type | Presence | Meaning |
 |---|---|---|---|
@@ -3763,10 +3826,11 @@ The service MUST reject the query with 400 if `minCost` exceeds
 ASCII letters. It answers an `outcome` outside the four values with
 500. A receipt without cost data matches no cost filter.
 
-A caller authenticated with the service token reads all receipts. The
-service MAY also accept read tokens that are each bound to one tenant; a
-query authenticated with such a token returns only receipts whose
-`tenant_id` is that tenant.
+A caller authenticates with a credential holding `receipts:read`
+({{trust-control-credentials}}). A query authenticated by a credential
+with deployment tenant authority reads all receipts. A query
+authenticated by a credential bound to one tenant returns only receipts
+whose `tenant_id` is that tenant.
 
 ### Paging {#receipt-query-paging}
 
@@ -3817,7 +3881,8 @@ REQUIRED members:
 {"capability_id": "cap-1", "reason": "operator_request"}
 ~~~
 
-A caller authenticates with a credential holding `revocations:write`.
+A caller authenticates with a credential holding `revocations:write`
+and deployment tenant authority ({{trust-control-credentials}}).
 The service records the identifier as revoked without checking that it
 names an issued capability, so a caller can revoke an identifier before
 any token uses it. It answers 200 only after the revocation is visible in its store,
@@ -3865,7 +3930,8 @@ A revocation entry is a JSON object with these members:
 : The reason of the first revocation.
 
 `GET /v1/revocations`, authenticated by a credential holding
-`revocations:read`, reports revocation state. With the parameter
+`revocations:read` and deployment tenant authority, reports revocation
+state. With the parameter
 `capability_id`, it reports one capability and accepts no other
 parameter. The response has the members
 `capability_id`, the identifier; `revoked`, a boolean; and `entry_id`,
@@ -4242,8 +4308,9 @@ redacted when it was signed or exported. It describes the receipt; it
 does not by itself remove anything.
 
 A trust-control service limits receipt queries by tenant
-({{receipt-query}}). A tenant sees its own receipts; an administrator
-sees all of them. Checkpoints commit to batches of receipts from every
+({{receipt-query}}). A credential bound to one tenant sees that tenant's
+receipts; a credential with deployment tenant authority sees all of
+them. Checkpoints commit to batches of receipts from every
 tenant that a kernel serves, so the size and timing of a batch can reveal
 aggregate activity across tenants to anyone who can see the checkpoint.
 
