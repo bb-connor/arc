@@ -112,6 +112,29 @@ fn emergency(control_url: &str, token: Option<&str>, args: &[&str]) -> Output {
     command.output().expect("run chio trust emergency")
 }
 
+/// A token file the way an operator should keep one: owned, mode 0600.
+fn private_token_file(dir: &Path, name: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+    let path = dir.join(name);
+    std::fs::write(&path, format!("{TOKEN}\n")).expect("write token file");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+        .expect("restrict token file");
+    path
+}
+
+/// Run `chio trust emergency status` reading the token from `token_file`.
+fn status_with_token_file(control_url: &str, token_file: &Path) -> Output {
+    emergency(
+        control_url,
+        None,
+        &[
+            "--token-file",
+            token_file.to_str().expect("token file path"),
+            "status",
+        ],
+    )
+}
+
 fn stdout_json(output: &Output) -> Value {
     assert!(
         output.status.success(),
@@ -157,17 +180,8 @@ fn chio_trust_emergency_stops_reports_and_resumes() {
     assert_eq!(stopped["stopped"], json!(true));
     assert_eq!(stopped["durability"], json!("durable"));
 
-    let token_file = dir.path().join("admin-token");
-    std::fs::write(&token_file, format!("{TOKEN}\n")).expect("write token file");
-    let status = stdout_json(&emergency(
-        &control_url,
-        None,
-        &[
-            "--token-file",
-            token_file.to_str().expect("token file path"),
-            "status",
-        ],
-    ));
+    let token_file = private_token_file(dir.path(), "admin-token");
+    let status = stdout_json(&status_with_token_file(&control_url, &token_file));
     assert_eq!(status["stopped"], json!(true));
     assert_eq!(status["readiness"]["state"], json!("ready_stopped"));
     let generation = status["head"]["chain_generation"].to_string();
@@ -224,5 +238,40 @@ fn chio_trust_emergency_refuses_unreachable_control_and_argv_tokens() {
         String::from_utf8_lossy(&argv.stderr).contains("CHIO_CONTROL_TOKEN"),
         "argv token refusal: {}",
         String::from_utf8_lossy(&argv.stderr)
+    );
+}
+
+/// The token file is custody: a file other users can read, or a symlink to a
+/// private file, refuses before any request.
+#[test]
+fn chio_trust_emergency_refuses_a_shared_or_linked_token_file() {
+    use std::os::unix::fs::PermissionsExt;
+    if skip_when_loopback_bind_denied("chio_trust_emergency_refuses_a_shared_or_linked_token_file")
+    {
+        return;
+    }
+    let dir = chio_test_support::private_tempdir().expect("private test dir");
+    let closed = format!("http://{}", reserve_listen_addr());
+
+    let shared = private_token_file(dir.path(), "shared-token");
+    std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o644))
+        .expect("share token file");
+    let refused = status_with_token_file(&closed, &shared);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("mode 0600"),
+        "shared token file: {}",
+        String::from_utf8_lossy(&refused.stderr)
+    );
+
+    let target = private_token_file(dir.path(), "target-token");
+    let link = dir.path().join("linked-token");
+    std::os::unix::fs::symlink(&target, &link).expect("link token file");
+    let refused = status_with_token_file(&closed, &link);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("regular file"),
+        "linked token file: {}",
+        String::from_utf8_lossy(&refused.stderr)
     );
 }
