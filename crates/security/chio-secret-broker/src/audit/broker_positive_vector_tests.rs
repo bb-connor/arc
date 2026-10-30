@@ -409,13 +409,15 @@ fn a_tampered_broker_vector_body_is_rejected() {
     envelope["body"]["maximumExecutions"] = json!(3);
     let key = keypair(CAPABILITY_ISSUER_SEED).public_key();
     let signature: Signature = serde_json::from_value(envelope["signature"].clone()).test_unwrap();
-    assert!(verify_wrapped(
-        &key,
-        "chio.broker-capability.v1",
-        &envelope["body"],
-        &signature
-    )
-    .is_err());
+    assert!(matches!(
+        verify_wrapped(
+            &key,
+            "chio.broker-capability.v1",
+            &envelope["body"],
+            &signature
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
 }
 
 fn load_broker_files() -> BTreeMap<String, Value> {
