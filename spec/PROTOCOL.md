@@ -3525,6 +3525,48 @@ respectively. Store failure details remain in operator diagnostic logs. A tool c
 denied by a stop carries `chio_runtime.identity_disposition = "reusable"` and
 `chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
 
+The revocation routes write and read `chio.revocation-entry.v1`
+(`schemas/chio-wire/v1/root_authority/revocation-entry.schema.json`). Every
+member is snake_case and an unknown member is refused.
+
+- `POST /admin/revocations` takes
+  `chio.revocation-admin-request.v1` (`revocation-admin-request.schema.json`):
+  `{"target": {"kind": "capability_id", "capability_id": string}, "reason":
+  reason}`, at most 4 KiB, where `reason` is one of `operator_request`,
+  `credential_compromise`, `principal_offboarded`, `tenant_offboarded`,
+  `policy_withdrawn` or `incident_response`. It answers 200 only after the
+  commit: `{"entry": chio.revocation-entry.v1, "newly_revoked": bool,
+  "roots_matched": u64, "roots_revoked": u64, "reason_conflict": bool}`.
+  `roots_matched` counts the capabilities the target names that stand revoked
+  after the call and `roots_revoked` how many of those this call marked, so a
+  newly revoked capability reports 1/1 and a repeat 1/0. `newly_revoked` is
+  whether this call recorded the entry, and `reason_conflict` is whether the
+  stored entry carries a different reason than this request; the first write's
+  `revoked_at` and `reason` stand. The same target always derives the same
+  `entry_id`, so a retry returns the stored entry with `newly_revoked = false`.
+- `GET /admin/revocations?capability_id=<id>` answers `{"capability_id",
+  "revoked", "entry_id"}`; a capability check takes no page members.
+- `GET /admin/revocations?after=<seq>&limit=<n>&kind=<kind>` answers one
+  snapshot page `{"entries": [{"entry_seq": u64, "entry": ...}], "next_after":
+  u64, "head": u64}` in `entry_seq` order. `limit` defaults to 100 and is 1 to
+  500. A caller passes `next_after` as the next `after` until `entries` is
+  empty.
+
+With `--control-url`, a revocation forwards to trust-control
+`POST /v1/revocations` (`{"capability_id", "reason"}`) and `GET
+/v1/revocations` with the same query forms, and answers the same bodies.
+
+Refusals carry a fixed body and no store text:
+
+| Condition | Status | Body |
+|---|---|---|
+| admin token not configured | 403 | `remote admin API is disabled` |
+| missing or wrong bearer | 401 | `missing or invalid admin bearer token` |
+| unknown member, kind or reason, missing reason, oversized body, invalid capability id, page member on a capability check, `limit` outside 1 to 500 | 400 | `invalid revocation request` |
+| no local serving-owner store and no control URL | 409 | `remote trust admin requires durable revocation state` |
+| store error before the commit | 503 | `revocation store unavailable` |
+| commit outcome unknown, or any later request on the poisoned serving owner | 503 | `revocation outcome unknown; restart the provider, then retry the same request` |
+
 ### 8.4 HTTP egress contract enforcement (W2.2)
 
 Every kernel, guard, and adapter outbound HTTP path declares a typed

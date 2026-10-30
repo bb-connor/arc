@@ -2294,6 +2294,18 @@
       "schemaFile": "spec/schemas/chio-runtime/v1/treaty-epoch.schema.json"
     },
     {
+      "schema": "chio.revocation-entry.v1",
+      "artifactKind": "revocation_entry",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json"
+    },
+    {
+      "schema": "chio.revocation-admin-request.v1",
+      "artifactKind": "revocation_admin_request",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/root_authority/revocation-admin-request.schema.json"
+    },
+    {
       "schema": "chio.active-response-artifact-authority-attestation.v1",
       "artifactKind": "active_response_artifact_authority_attestation",
       "introducedBy": "signing-wrapper-v1",

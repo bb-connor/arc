@@ -75,7 +75,7 @@ families; `MANIFEST.sha256` contains the complete schema inventory.
 | `error/policy_denied.schema.json`     |    27 |
 | `error/tool_server_error.schema.json` |    16 |
 
-### capability (12)
+### capability (11)
 
 Capability tokens, grants, revocation envelopes, and the capability list
 projection. See `capability/README.md`.
@@ -88,7 +88,6 @@ projection. See `capability/README.md`.
 | `capability/cumulative-approval-root.schema.json`      |    64 |
 | `capability/governed-approval-token.schema.json`       |    41 |
 | `capability/grant.schema.json`                         |   140 |
-| `capability/revocation.schema.json`                    |    20 |
 | `capability/security-binding.schema.json`              |    47 |
 | `capability/supplemental-authorization.schema.json`    |    17 |
 | `capability/threshold-approval-proposal.schema.json`   |    48 |

@@ -1,0 +1,8 @@
+{
+  "target": {
+    "kind": "capability_id",
+    "capability_id": "cap-1"
+  },
+  "reason": "operator_request",
+  "extra": 1
+}

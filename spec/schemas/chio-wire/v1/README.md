@@ -35,7 +35,7 @@ Directory layout:
   - `policy_denied.schema.json`
   - `tool_server_error.schema.json`
   - `internal_error.schema.json`
-- `capability/` - capability tokens, grants, revocation envelopes, and the
+- `capability/` - capability tokens, grants, and the
   `chio.capability-presentation.v1` envelope (`presentation.schema.json`).
 - `jsonrpc/` - JSON-RPC framing used by the hosted MCP HTTP edge.
 - `provenance/` - provenance and attestation records emitted by the kernel.
@@ -45,8 +45,9 @@ Directory layout:
 - `root_authority/` - anchored-root artifacts: `root_anchor` and the shared
   definitions (`root-anchor.schema.json`), the delegation context, the signed
   root policy, the enterprise provider identity projection, the signed
-  identity-provider key snapshot, the verifier trust file, and the signed
-  caller revocation request. Valid and invalid instances live under
+  identity-provider key snapshot, the verifier trust file, the signed caller
+  revocation request, the stored `chio.revocation-entry.v1` and the
+  `POST /admin/revocations` request body. Valid and invalid instances live under
   `root_authority/examples/`; `scripts/check-root-authority-schema-examples.py`
   checks them, each invalid instance against the error path and keyword in
   `examples/invalid-expectations.json`.

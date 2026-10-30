@@ -215,6 +215,46 @@
     "keyword": "maxItems",
     "path": "/ancestors"
   },
+  "revocation-admin-request.missing-reason.json": {
+    "keyword": "required",
+    "path": ""
+  },
+  "revocation-admin-request.padding.json": {
+    "keyword": "additionalProperties",
+    "path": ""
+  },
+  "revocation-admin-request.unknown-kind.json": {
+    "keyword": "const",
+    "path": "/target/kind"
+  },
+  "revocation-admin-request.unknown-reason.json": {
+    "keyword": "enum",
+    "path": "/reason"
+  },
+  "revocation-entry.entry-id-prefix.json": {
+    "keyword": "oneOf",
+    "path": ""
+  },
+  "revocation-entry.non-hex-tag.json": {
+    "keyword": "enum",
+    "path": "/target_kind"
+  },
+  "revocation-entry.padding.json": {
+    "keyword": "enum",
+    "path": "/target_kind"
+  },
+  "revocation-entry.unknown-kind.json": {
+    "keyword": "oneOf",
+    "path": ""
+  },
+  "revocation-entry.unknown-reason.json": {
+    "keyword": "oneOf",
+    "path": ""
+  },
+  "revocation-entry.zero-time.json": {
+    "keyword": "oneOf",
+    "path": ""
+  },
   "revocation-request.missing-signature.json": {
     "keyword": "required",
     "path": ""

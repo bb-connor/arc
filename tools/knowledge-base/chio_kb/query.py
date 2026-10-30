@@ -237,7 +237,7 @@ DOMAIN_DOC_HINTS: list[tuple[set[str], list[str]]] = [
         {"capability", "revocation"},
         [
             "spec/PROTOCOL.md",
-            "spec/schemas/chio-wire/v1/capability/revocation.schema.json",
+            "spec/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json",
             "spec/schemas/chio-wire/v1/capability/README.md",
             "docs/standards/CHIO_RECEIPTS_PROFILE.md",
         ],

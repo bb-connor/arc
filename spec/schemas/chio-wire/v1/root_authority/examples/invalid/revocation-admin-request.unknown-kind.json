@@ -1,0 +1,7 @@
+{
+  "target": {
+    "kind": "root_policy_rule",
+    "capability_id": "cap-1"
+  },
+  "reason": "operator_request"
+}
