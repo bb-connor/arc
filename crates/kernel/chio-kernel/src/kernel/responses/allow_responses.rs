@@ -697,27 +697,7 @@ impl ChioKernel {
                 "Finding delivery lineage requires a durable receipt store".to_owned(),
             ));
         };
-        let verifier = self.finding_status_proof_verifier.as_ref().ok_or_else(|| {
-            KernelError::GuardDenied(
-                "Finding memory write requires a configured finding status verifier".to_owned(),
-            )
-        })?;
-        verifier
-            .verify_current_status_admission(
-                &crate::finding_purchase::FindingCurrentStatusContextView {
-                    expected_finding_id: &finding_id,
-                    expected_feed_id: &status_proof.feed_id,
-                    minimum_map_epoch: status_proof.map_epoch,
-                    minimum_non_inclusion_checked_at: status_proof.non_inclusion_checked_at,
-                },
-                now_unix_secs,
-            )
-            .map_err(|error| {
-                KernelError::GuardDenied(format!(
-                    "Finding memory write status revalidation failed: {error}"
-                ))
-            })?;
-        Ok(())
+        self.verify_finding_memory_current_status(&finding_id, &status_proof, now_unix_secs)
     }
 
     /// Append a provenance entry for a governed memory write once the allow

@@ -41,18 +41,13 @@ pub struct VerifiedFindingRecovery {
     pub original_subject_key_hex: String,
 }
 
-/// Receipt-metadata key carrying the durable recovery binding and the exact
-/// live-status floor admitted immediately before dispatch.
-pub(crate) const FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY: &str =
-    "finding_recovery_replay_snapshot";
-#[cfg(feature = "finding-market")]
+pub(crate) use crate::finding_admission_vocabulary::FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY;
 pub(crate) const FINDING_RECOVERY_REPLAY_SNAPSHOT_SCHEMA: &str =
     "chio.finding.recovery-replay-snapshot.v1";
 
 /// Dispatch-frozen recovery facts used only as minima for a new current-floor
 /// lookup. Terminal replay never re-authenticates this old proof under a newly
 /// rotated operator key.
-#[cfg(feature = "finding-market")]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FindingRecoveryReplaySnapshotV1 {
@@ -65,7 +60,6 @@ pub(crate) struct FindingRecoveryReplaySnapshotV1 {
     pub(crate) status: crate::finding_purchase::VerifiedFindingStatusProof,
 }
 
-#[cfg(feature = "finding-market")]
 impl FindingRecoveryReplaySnapshotV1 {
     #[must_use]
     pub(crate) fn new(

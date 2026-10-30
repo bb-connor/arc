@@ -254,6 +254,27 @@ fn validate_frozen_recovery_binding(
 }
 
 impl ChioKernel {
+    pub(crate) fn record_finding_recovery_receipt(
+        &self,
+        recovery: &VerifiedFindingRecovery,
+        receipt_id: &str,
+        recorded_at: u64,
+        phase: &str,
+    ) -> Result<(), super::KernelError> {
+        let verifier = self.finding_recovery_verifier.as_ref().ok_or_else(|| {
+            super::KernelError::DurableAdmission(format!(
+                "finding recovery verifier disappeared during {phase}"
+            ))
+        })?;
+        verifier
+            .record_recovery_receipt(recovery, receipt_id, recorded_at)
+            .map_err(|error| {
+                super::KernelError::DurableAdmission(format!(
+                    "finding recovery lineage could not be recorded: {error}"
+                ))
+            })
+    }
+
     /// Deterministically re-derive a recovery binding from the frozen request.
     pub(crate) fn verify_recovery_context(
         &self,
