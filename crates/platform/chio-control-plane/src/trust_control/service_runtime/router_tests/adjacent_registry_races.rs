@@ -12,6 +12,8 @@ use crate::passport_verifier::{
 
 #[path = "enterprise_provider_races.rs"]
 mod enterprise_provider_races;
+#[path = "federation_policy_races.rs"]
+mod federation_policy_races;
 
 const HANG_GUARD: Duration = Duration::from_secs(30);
 const PAUSE_BOUND: Duration = HANG_GUARD;
