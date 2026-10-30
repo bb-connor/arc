@@ -457,6 +457,25 @@ async fn id_jag_context_carries_the_assertion_digest() {
 }
 
 #[tokio::test]
+async fn prepared_anchored_root_body_carries_its_anchor() {
+    let harness = Harness::new();
+    let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
+    let anchor = prepared.body.root_anchor.clone().unwrap();
+    assert_eq!(
+        anchor.kind,
+        chio_core::capability::anchor::AnchorKind::OauthIdJag
+    );
+    assert_eq!(anchor.context_digest, prepared.context().digest().unwrap());
+    assert_eq!(&anchor.root_policy_digest, harness.exchange.policy.digest());
+
+    let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
+    assert_eq!(root.root_anchor, Some(anchor));
+    assert!(root
+        .verify_signature(&exchange_keypair().public_key())
+        .unwrap());
+}
+
+#[tokio::test]
 async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     let harness = Harness::new();
     let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
@@ -464,8 +483,9 @@ async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     assert_eq!(prepared.holder(), HolderClass::EdgeSession);
     assert_eq!(prepared.body.issued_at, NOW);
     assert_eq!(prepared.body.expires_at, NOW + 290);
-    assert_eq!(prepared.anchor().assertion_exp, NOW + 290);
-    assert_eq!(prepared.anchor().anchored_at, NOW);
+    let anchor = prepared.body.root_anchor.as_ref().unwrap();
+    assert_eq!(anchor.assertion_exp, NOW + 290);
+    assert_eq!(anchor.anchored_at, NOW);
     let tools: Vec<_> = prepared
         .body
         .scope
@@ -490,7 +510,6 @@ async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
     check_root_consistency(RootConsistencyInput {
         root: &root,
-        anchor: prepared.anchor(),
         context: prepared.context(),
         policy: &harness.exchange.policy,
         sender_key: None,
@@ -817,7 +836,6 @@ async fn requested_scope_narrows_the_root() {
         let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
         check_root_consistency(RootConsistencyInput {
             root: &root,
-            anchor: prepared.anchor(),
             context: prepared.context(),
             policy: &harness.exchange.policy,
             sender_key: None,
@@ -1410,7 +1428,10 @@ async fn root_lifetime_is_capped_by_the_assertion() {
     });
     let prepared = harness.run(id_jag_header(), claims).await.unwrap();
     assert_eq!(prepared.body.expires_at, NOW + 20);
-    assert_eq!(prepared.anchor().assertion_exp, NOW + 20);
+    assert_eq!(
+        prepared.body.root_anchor.as_ref().unwrap().assertion_exp,
+        NOW + 20
+    );
 }
 
 #[tokio::test]
@@ -1646,7 +1667,10 @@ async fn root_lifetime_is_capped_by_the_policy_validity() {
     let harness = Harness::with(|_| {}, |policy| policy["valid_until"] = json!(NOW + 100));
     let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
     assert_eq!(prepared.expires_at(), NOW + 100);
-    assert_eq!(prepared.anchor().assertion_exp, NOW + 290);
+    assert_eq!(
+        prepared.body.root_anchor.as_ref().unwrap().assertion_exp,
+        NOW + 290
+    );
 }
 
 fn assert_entropy_denied_before_the_bind(harness: &Harness, error: RootExchangeError) {

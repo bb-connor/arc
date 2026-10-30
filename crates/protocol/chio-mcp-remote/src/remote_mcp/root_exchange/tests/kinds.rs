@@ -377,7 +377,6 @@ fn consistent(exchange: &RootExchange, prepared: &PreparedAnchoredRoot) {
     let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
     check_root_consistency(RootConsistencyInput {
         root: &root,
-        anchor: prepared.anchor(),
         context: prepared.context(),
         policy: &exchange.policy,
         sender_key: None,
@@ -514,7 +513,7 @@ async fn every_kind_reaches_the_same_prepare() {
             artifact_digest.as_ref(),
             "{kind:?}"
         );
-        assert_eq!(prepared.anchor().kind, kind);
+        assert_eq!(prepared.body.root_anchor.as_ref().unwrap().kind, kind);
         assert_eq!(prepared.context().anchor.kind, kind);
         assert_eq!(prepared.context().anchor.issuer.as_str(), issuer);
         assert_eq!(prepared.holder(), HolderClass::EdgeSession);
@@ -1289,7 +1288,10 @@ fn local_issue_and_reexchange_spend_apart_and_a_second_reexchange_refuses() {
             .unwrap()
     };
     let first = narrowed();
-    assert_eq!(first.anchor().assertion_exp, NOW + 200);
+    assert_eq!(
+        first.body.root_anchor.as_ref().unwrap().assertion_exp,
+        NOW + 200
+    );
     assert!(first.expires_at() <= NOW + 200);
     exchange.spend_replay_key(&first, &replay, NOW).unwrap();
     assert_eq!(
