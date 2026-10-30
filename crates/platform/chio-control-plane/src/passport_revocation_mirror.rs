@@ -18,12 +18,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use chio_revocation_oracle::{
-    verify_fresh_epoch_root, EpochRoot, FreshnessConfig, PassportRevocationLeaf, RevocationKey,
-    RevocationOracle, RevocationOracleError, SignedEpochRoot, SqliteRevocationOracle,
-    SqliteRevocationOracleError, MAX_REVOCATION_SUBJECT_BYTES,
+    verify_fresh_epoch_root, ConflictRecord, EpochRoot, FreshnessConfig, PartnerMirrorConflict,
+    PartnerMirrorError, PartnerMirrorRefusal, PassportRevocationLeaf, RevocationKey,
+    SignedEpochRoot, SqlitePartnerMirror, SqliteRevocationOracleError,
+    MAX_RECORDED_PARTNER_CONFLICTS, MAX_REVOCATION_SUBJECT_BYTES,
 };
 use chio_security_types::clock::Clock;
-use rusqlite::{params, OptionalExtension};
 
 use crate::passport_revocation_feed::{
     passport_revocation_root_verifier, PassportRevocationLeavesPage,
@@ -39,30 +39,6 @@ pub const MAX_PARTNER_SYNC_LEAVES: u64 = 65_536;
 /// Largest amount a partner's signed root may be dated after this operator's
 /// clock.
 pub const MAX_PARTNER_ROOT_FUTURE_SKEW_MS: u64 = 5_000;
-
-/// Most distinct conflicting roots one mirror records. A mirror at the bound
-/// refuses every further conflicting root with
-/// [`PartnerRevocationError::ConflictLogFull`].
-pub const MAX_RECORDED_PARTNER_CONFLICTS: i64 = 256;
-
-/// Largest stored signed root, in bytes.
-const MAX_STORED_ROOT_BYTES: usize = 16 * 1024;
-
-const MIRROR_SCHEMA: &str = "
-CREATE TABLE IF NOT EXISTS chio_partner_revocation_mirror (
-    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-    partner_id TEXT NOT NULL CHECK (length(partner_id) BETWEEN 1 AND 64),
-    signed_root TEXT
-) STRICT;
-CREATE TABLE IF NOT EXISTS chio_partner_revocation_conflicts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    observed_at_unix_ms INTEGER NOT NULL,
-    reason TEXT NOT NULL,
-    accepted_root TEXT,
-    offered_root TEXT NOT NULL,
-    offered_root_sha256 TEXT NOT NULL UNIQUE CHECK (length(offered_root_sha256) = 64)
-) STRICT;
-";
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PartnerRevocationError {
@@ -166,93 +142,42 @@ pub fn partner_revocation_mirror_path(
     Ok(registry.with_file_name(format!("{name}.partner-{partner_id}.revocations.sqlite3")))
 }
 
-/// A partner root that contradicted the mirror's accepted history.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PartnerRevocationConflict {
-    pub observed_at_unix_ms: u64,
-    pub reason: String,
-    pub accepted_root: Option<SignedEpochRoot>,
-    pub offered_root: SignedEpochRoot,
-}
-
 pub struct PartnerRevocationMirror {
-    partner_id: String,
-    oracle: SqliteRevocationOracle,
+    store: SqlitePartnerMirror,
 }
 
 impl PartnerRevocationMirror {
     /// Opens (creating if absent) the mirror of `partner_id` at `path`. A
     /// mirror stamped for another partner is refused.
     pub fn open(path: &Path, partner_id: &str) -> Result<Self, PartnerRevocationError> {
-        let unavailable = mirror_unavailable(partner_id);
-        let oracle = SqliteRevocationOracle::open(path).map_err(&unavailable)?;
-        let mut found = None;
-        oracle
-            .transact(0, |txn| {
-                let connection = txn.connection();
-                connection.execute_batch(MIRROR_SCHEMA)?;
-                connection.execute(
-                    "INSERT INTO chio_partner_revocation_mirror (singleton, partner_id)
-                     VALUES (1, ?1) ON CONFLICT (singleton) DO NOTHING",
-                    params![partner_id],
-                )?;
-                found = Some(connection.query_row(
-                    "SELECT partner_id FROM chio_partner_revocation_mirror WHERE singleton = 1",
-                    [],
-                    |row| row.get::<_, String>(0),
-                )?);
-                Ok(())
-            })
-            .map_err(&unavailable)?;
-        match found {
-            Some(found) if found == partner_id => Ok(Self {
-                partner_id: partner_id.to_owned(),
-                oracle,
-            }),
-            Some(found) => Err(PartnerRevocationError::PartnerMismatch {
-                expected: partner_id.to_owned(),
-                found,
-            }),
-            None => Err(unavailable(SqliteRevocationOracleError::UnstampedDatabase)),
-        }
+        let store = SqlitePartnerMirror::open(path, partner_id).map_err(|error| match error {
+            PartnerMirrorError::PartnerMismatch { expected, found } => {
+                PartnerRevocationError::PartnerMismatch { expected, found }
+            }
+            other => {
+                PartnerRevocationError::MirrorUnavailable(partner_id.to_owned(), other.to_string())
+            }
+        })?;
+        Ok(Self { store })
     }
 
     #[must_use]
     pub fn partner_id(&self) -> &str {
-        &self.partner_id
+        self.store.partner_id()
     }
 
     /// The root this mirror last accepted.
     pub fn accepted(&self) -> Result<Option<SignedEpochRoot>, PartnerRevocationError> {
-        self.oracle
-            .read(read_accepted)
-            .map_err(mirror_unavailable(&self.partner_id))
+        self.store
+            .accepted()
+            .map_err(mirror_unavailable(self.partner_id()))
     }
 
     /// Every recorded conflict, oldest first.
-    pub fn conflicts(&self) -> Result<Vec<PartnerRevocationConflict>, PartnerRevocationError> {
-        self.oracle
-            .read(|connection| {
-                let mut statement = connection.prepare(
-                    "SELECT observed_at_unix_ms, reason, accepted_root, offered_root
-                     FROM chio_partner_revocation_conflicts ORDER BY id ASC",
-                )?;
-                let mut rows = statement.query([])?;
-                let mut conflicts = Vec::new();
-                while let Some(row) = rows.next()? {
-                    let observed: i64 = row.get(0)?;
-                    let accepted: Option<String> = row.get(2)?;
-                    conflicts.push(PartnerRevocationConflict {
-                        observed_at_unix_ms: u64::try_from(observed)
-                            .map_err(|_| corrupt("conflict observation time"))?,
-                        reason: row.get(1)?,
-                        accepted_root: accepted.as_deref().map(decode_root).transpose()?,
-                        offered_root: decode_root(&row.get::<_, String>(3)?)?,
-                    });
-                }
-                Ok(conflicts)
-            })
-            .map_err(mirror_unavailable(&self.partner_id))
+    pub fn conflicts(&self) -> Result<Vec<PartnerMirrorConflict>, PartnerRevocationError> {
+        self.store
+            .conflicts()
+            .map_err(mirror_unavailable(self.partner_id()))
     }
 
     /// Refuses unless the accepted root verifies against `partner`'s pinned
@@ -277,21 +202,13 @@ impl PartnerRevocationMirror {
         subjects: &[RevocationKey],
         now_unix_ms: u64,
     ) -> Result<(SignedEpochRoot, Option<RevocationKey>), PartnerRevocationError> {
-        let (accepted, local, revoked) = self
-            .oracle
-            .read_with_tree(|connection, tree| {
-                Ok((
-                    read_accepted(connection)?,
-                    tree.epoch_root(),
-                    subjects
-                        .iter()
-                        .find(|subject| tree.contains(subject))
-                        .cloned(),
-                ))
-            })
-            .map_err(mirror_unavailable(&self.partner_id))?;
-        let accepted = accepted
-            .ok_or_else(|| PartnerRevocationError::NoVerifiedRoot(self.partner_id.clone()))?;
+        let view = self
+            .store
+            .view(subjects)
+            .map_err(mirror_unavailable(self.partner_id()))?;
+        let accepted = view
+            .accepted
+            .ok_or_else(|| PartnerRevocationError::NoVerifiedRoot(self.partner_id().to_owned()))?;
         verify_signature(partner, &accepted)?;
         let root = &accepted.root;
         check_not_future(partner, root, now_unix_ms)?;
@@ -304,10 +221,10 @@ impl PartnerRevocationMirror {
                 ttl_ms: partner.revocation_freshness_ttl_ms(),
             },
         )?;
-        if !same_tree(&local, root) {
-            return Err(diverged(&self.partner_id));
+        if !view.tree.same_tree(root) {
+            return Err(diverged(self.partner_id()));
         }
-        Ok((accepted, revoked))
+        Ok((accepted, view.revoked))
     }
 
     /// Refuses unless the mirror is fresh at `now_unix_ms` and holds none of
@@ -321,7 +238,7 @@ impl PartnerRevocationMirror {
         let (_, revoked) = self.fresh_view(partner, subjects, now_unix_ms)?;
         if let Some(subject) = revoked {
             return Err(PartnerRevocationError::Revoked {
-                partner_id: self.partner_id.clone(),
+                partner_id: self.partner_id().to_owned(),
                 subject: subject.subject_id.as_str().to_owned(),
             });
         }
@@ -398,150 +315,49 @@ impl PartnerRevocationMirror {
     ) -> Result<EpochRoot, PartnerRevocationError> {
         verify_signature(partner, offered)?;
         check_not_future(partner, &offered.root, now_unix_ms)?;
-        let offered_json = encode_root(offered).map_err(mirror_unavailable(&self.partner_id))?;
-        let want = leaf_count(&offered.root);
-        let mut refusal = None;
-        let outcome = self.oracle.transact(now_unix_ms, |txn| {
-            let accepted = read_accepted(txn.connection())?;
-            let mut have = crate::integer::count(txn.epoch_root().leaf_count);
-            match &accepted {
-                Some(accepted) => {
-                    if !same_tree(&txn.epoch_root(), &accepted.root) {
-                        refusal = Some(diverged(&partner.partner_id));
-                        return Err(refused());
-                    }
-                    if let Err(error) = check_history(partner, accepted, offered) {
-                        refusal = Some(error);
-                        return Err(refused());
-                    }
-                }
-                None if have != 0 => {
-                    refusal = Some(diverged(&partner.partner_id));
-                    return Err(refused());
-                }
-                None => {}
-            }
-            for leaf in leaves {
-                if have >= want {
-                    break;
-                }
-                if Some(leaf.seq) != have.checked_add(1) {
-                    refusal = Some(PartnerRevocationError::MalformedPage(
-                        partner.partner_id.clone(),
-                        format!("leaf {} does not follow mirror leaf {have}", leaf.seq),
-                    ));
-                    return Err(refused());
-                }
-                let inserted = match txn.revoke(&leaf.to_revocation_key()) {
-                    Ok(inserted) => inserted,
-                    Err(error) => {
-                        refusal = Some(PartnerRevocationError::MalformedPage(
-                            partner.partner_id.clone(),
-                            format!("leaf {} is not a valid revocation key: {error}", leaf.seq),
-                        ));
-                        return Err(refused());
-                    }
-                };
-                if !inserted {
-                    refusal = Some(PartnerRevocationError::DuplicateLeaf {
-                        partner_id: partner.partner_id.clone(),
-                        seq: leaf.seq,
-                    });
-                    return Err(refused());
-                }
-                have = leaf.seq;
-            }
-            if !same_tree(&txn.epoch_root(), &offered.root) {
-                refusal = Some(PartnerRevocationError::RootMismatch {
-                    partner_id: partner.partner_id.clone(),
-                    epoch: offered.root.epoch,
-                });
-                return Err(refused());
-            }
-            txn.connection().execute(
-                "UPDATE chio_partner_revocation_mirror SET signed_root = ?1 WHERE singleton = 1",
-                params![offered_json],
-            )?;
-            Ok(())
-        });
-        match (outcome, refusal) {
-            (Ok(((), root)), None) => Ok(root),
-            (_, Some(refusal)) => {
-                if matches!(
-                    refusal,
-                    PartnerRevocationError::Equivocation { .. }
-                        | PartnerRevocationError::RootMismatch { .. }
-                        | PartnerRevocationError::Rollback { .. }
-                        | PartnerRevocationError::AttestationRollback { .. }
-                ) {
-                    self.record_conflict(&refusal, &offered_json, now_unix_ms)?;
-                }
-                Err(refusal)
-            }
-            (Err(error), None) => Err(mirror_unavailable(&self.partner_id)(error)),
+        let refusal = match self.store.apply(offered, leaves, now_unix_ms) {
+            Ok(root) => return Ok(root),
+            Err(PartnerMirrorError::Refused(refusal)) => refusal,
+            Err(error) => return Err(self.store_failure(error)),
+        };
+        let error = refused(&partner.partner_id, &refusal);
+        if refusal.is_conflict() {
+            self.record_conflict(&error, offered, now_unix_ms)?;
         }
+        Err(error)
     }
 
-    /// Records a conflicting signed root once, keyed by the SHA-256 of its
-    /// canonical JSON, refusing a new one when the mirror already holds the
-    /// bound.
+    /// Records a conflicting signed root once, refusing a new one when the
+    /// mirror already holds the bound.
     fn record_conflict(
         &self,
         refusal: &PartnerRevocationError,
-        offered_json: &str,
+        offered: &SignedEpochRoot,
         now_unix_ms: u64,
     ) -> Result<(), PartnerRevocationError> {
-        let observed = i64::try_from(now_unix_ms).map_err(|_| {
-            PartnerRevocationError::Clock(format!("{now_unix_ms} exceeds the stored time range"))
-        })?;
-        let digest = chio_core::sha256_hex(offered_json.as_bytes());
-        let reason = refusal.to_string();
-        let mut full = false;
-        self.oracle
-            .transact(now_unix_ms, |txn| {
-                let connection = txn.connection();
-                let recorded: bool = connection.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM chio_partner_revocation_conflicts
-                     WHERE offered_root_sha256 = ?1)",
-                    params![digest],
-                    |row| row.get(0),
-                )?;
-                if recorded {
-                    return Ok(());
-                }
-                let count: i64 = connection.query_row(
-                    "SELECT count(*) FROM chio_partner_revocation_conflicts",
-                    [],
-                    |row| row.get(0),
-                )?;
-                if count >= MAX_RECORDED_PARTNER_CONFLICTS {
-                    full = true;
-                    return Ok(());
-                }
-                let accepted: Option<String> = connection
-                    .query_row(
-                        "SELECT signed_root FROM chio_partner_revocation_mirror WHERE singleton = 1",
-                        [],
-                        |row| row.get(0),
-                    )
-                    .optional()?
-                    .flatten();
-                connection.execute(
-                    "INSERT INTO chio_partner_revocation_conflicts
-                        (observed_at_unix_ms, reason, accepted_root, offered_root,
-                         offered_root_sha256)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    params![observed, reason, accepted, offered_json, digest],
-                )?;
-                Ok(())
-            })
-            .map_err(mirror_unavailable(&self.partner_id))?;
-        if full {
-            return Err(PartnerRevocationError::ConflictLogFull(
-                self.partner_id.clone(),
-            ));
+        match self
+            .store
+            .record_conflict(&refusal.to_string(), offered, now_unix_ms)
+        {
+            Ok(ConflictRecord::Recorded | ConflictRecord::AlreadyRecorded) => Ok(()),
+            Ok(ConflictRecord::LogFull) => Err(PartnerRevocationError::ConflictLogFull(
+                self.partner_id().to_owned(),
+            )),
+            Err(error) => Err(self.store_failure(error)),
         }
-        Ok(())
+    }
+
+    fn store_failure(&self, error: PartnerMirrorError) -> PartnerRevocationError {
+        match error {
+            PartnerMirrorError::TimeOutOfRange(now) => {
+                PartnerRevocationError::Clock(format!("{now} exceeds the stored time range"))
+            }
+            PartnerMirrorError::Refused(refusal) => refused(self.partner_id(), &refusal),
+            other => PartnerRevocationError::MirrorUnavailable(
+                self.partner_id().to_owned(),
+                other.to_string(),
+            ),
+        }
     }
 }
 
@@ -619,51 +435,47 @@ fn mirror_unavailable(
 }
 
 fn diverged(partner_id: &str) -> PartnerRevocationError {
-    PartnerRevocationError::MirrorUnavailable(
-        partner_id.to_owned(),
-        "mirror tree does not match its accepted root".to_owned(),
-    )
+    refused(partner_id, &PartnerMirrorRefusal::Diverged)
 }
 
-fn refused() -> SqliteRevocationOracleError {
-    SqliteRevocationOracleError::Oracle(RevocationOracleError::InvalidEpochTransition)
-}
-
-fn corrupt(what: &str) -> SqliteRevocationOracleError {
-    SqliteRevocationOracleError::CorruptRecord(what.to_owned())
-}
-
-fn encode_root(root: &SignedEpochRoot) -> Result<String, SqliteRevocationOracleError> {
-    chio_core::canonical_json_bytes(root)
-        .ok()
-        .and_then(|bytes| String::from_utf8(bytes).ok())
-        .ok_or_else(|| corrupt("partner signed root"))
-}
-
-fn decode_root(json: &str) -> Result<SignedEpochRoot, SqliteRevocationOracleError> {
-    crate::json_input::read(json.as_bytes(), MAX_STORED_ROOT_BYTES)
-        .map_err(|_| corrupt("partner signed root"))
-}
-
-fn read_accepted(
-    connection: &rusqlite::Connection,
-) -> Result<Option<SignedEpochRoot>, SqliteRevocationOracleError> {
-    let root: Option<String> = connection.query_row(
-        "SELECT signed_root FROM chio_partner_revocation_mirror WHERE singleton = 1",
-        [],
-        |row| row.get(0),
-    )?;
-    root.as_deref().map(decode_root).transpose()
+fn refused(partner_id: &str, refusal: &PartnerMirrorRefusal) -> PartnerRevocationError {
+    let partner_id = partner_id.to_owned();
+    match refusal {
+        PartnerMirrorRefusal::Diverged => {
+            PartnerRevocationError::MirrorUnavailable(partner_id, refusal.to_string())
+        }
+        PartnerMirrorRefusal::Rollback { accepted, offered } => PartnerRevocationError::Rollback {
+            partner_id,
+            accepted: *accepted,
+            offered: *offered,
+        },
+        PartnerMirrorRefusal::AttestationRollback { accepted, offered } => {
+            PartnerRevocationError::AttestationRollback {
+                partner_id,
+                accepted: *accepted,
+                offered: *offered,
+            }
+        }
+        PartnerMirrorRefusal::Equivocation { epoch } => PartnerRevocationError::Equivocation {
+            partner_id,
+            epoch: *epoch,
+        },
+        PartnerMirrorRefusal::OutOfSequence { .. } | PartnerMirrorRefusal::InvalidLeaf { .. } => {
+            PartnerRevocationError::MalformedPage(partner_id, refusal.to_string())
+        }
+        PartnerMirrorRefusal::DuplicateLeaf { seq } => PartnerRevocationError::DuplicateLeaf {
+            partner_id,
+            seq: *seq,
+        },
+        PartnerMirrorRefusal::RootMismatch { epoch } => PartnerRevocationError::RootMismatch {
+            partner_id,
+            epoch: *epoch,
+        },
+    }
 }
 
 fn leaf_count(root: &EpochRoot) -> u64 {
     crate::integer::count(root.leaf_count)
-}
-
-fn same_tree(left: &EpochRoot, right: &EpochRoot) -> bool {
-    left.epoch == right.epoch
-        && left.root_hash == right.root_hash
-        && left.leaf_count == right.leaf_count
 }
 
 fn verify_signature(
@@ -686,35 +498,6 @@ fn check_not_future(
             partner_id: partner.partner_id.clone(),
             issued_at_unix_ms: root.issued_at_unix_ms,
             now_unix_ms,
-        });
-    }
-    Ok(())
-}
-
-fn check_history(
-    partner: &RevocationPartner,
-    accepted: &SignedEpochRoot,
-    offered: &SignedEpochRoot,
-) -> Result<(), PartnerRevocationError> {
-    let partner_id = partner.partner_id.clone();
-    if offered.root.epoch < accepted.root.epoch {
-        return Err(PartnerRevocationError::Rollback {
-            partner_id,
-            accepted: accepted.root.epoch,
-            offered: offered.root.epoch,
-        });
-    }
-    if offered.root.epoch == accepted.root.epoch && !same_tree(&offered.root, &accepted.root) {
-        return Err(PartnerRevocationError::Equivocation {
-            partner_id,
-            epoch: offered.root.epoch,
-        });
-    }
-    if offered.root.issued_at_unix_ms < accepted.root.issued_at_unix_ms {
-        return Err(PartnerRevocationError::AttestationRollback {
-            partner_id,
-            accepted: accepted.root.issued_at_unix_ms,
-            offered: offered.root.issued_at_unix_ms,
         });
     }
     Ok(())

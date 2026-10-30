@@ -31,6 +31,8 @@ use crate::api::{
 };
 use crate::sparse_merkle::InMemoryRevocationOracle;
 
+pub mod partner_mirror;
+
 /// Schema version written by and accepted by this oracle.
 pub const SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION: i64 = 1;
 
@@ -171,16 +173,28 @@ impl SqliteRevocationOracle {
 
     /// Runs `body` inside one immediate transaction over the current tree.
     /// Keys the body revokes are persisted and published only if the body
-    /// and the commit succeed. The transaction is also available to the body
-    /// for state an owner keeps beside the oracle in the same database.
+    /// and the commit succeed.
     pub fn transact<T>(
         &self,
         now_unix_ms: u64,
         body: impl FnOnce(&mut RevocationTransaction<'_>) -> Result<T>,
     ) -> Result<(T, EpochRoot)> {
+        self.write(now_unix_ms, body)
+    }
+
+    /// [`Self::transact`] for a body that refuses with its own error type.
+    /// The transaction also carries state an owner in this crate keeps beside
+    /// the oracle in the same database.
+    pub(crate) fn write<T, E: From<SqliteRevocationOracleError>>(
+        &self,
+        now_unix_ms: u64,
+        body: impl FnOnce(&mut RevocationTransaction<'_>) -> core::result::Result<T, E>,
+    ) -> core::result::Result<(T, EpochRoot), E> {
         let mut connection = self.lock_connection()?;
         let mut replayed = self.lock_replayed()?;
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(SqliteRevocationOracleError::from)?;
         let base = catch_up(&transaction, replayed.clone())?;
         let mut staged = RevocationTransaction {
             connection: &transaction,
@@ -193,15 +207,17 @@ impl SqliteRevocationOracle {
             oracle: staged.oracle,
             seq: staged.seq,
         };
-        transaction.commit()?;
+        transaction
+            .commit()
+            .map_err(SqliteRevocationOracleError::from)?;
         let root = published.oracle.epoch_root();
         *replayed = published;
         Ok((value, root))
     }
 
     /// Runs `body` against the connection, for owner state kept in the same
-    /// database. Writes belong in [`Self::transact`].
-    pub fn read<T>(&self, body: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+    /// database. Writes belong in [`Self::write`].
+    pub(crate) fn read<T>(&self, body: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
         let connection = self.lock_connection()?;
         body(&connection)
     }
@@ -209,7 +225,7 @@ impl SqliteRevocationOracle {
     /// Runs `body` against the connection and the tree inside one read
     /// transaction, so owner state the body reads and the tree describe one
     /// committed state.
-    pub fn read_with_tree<T>(
+    pub(crate) fn read_with_tree<T>(
         &self,
         body: impl FnOnce(&Connection, &InMemoryRevocationOracle) -> Result<T>,
     ) -> Result<T> {
@@ -338,7 +354,7 @@ pub struct RevocationTransaction<'t> {
 impl RevocationTransaction<'_> {
     /// The open transaction, for owner state kept in the same database.
     #[must_use]
-    pub fn connection(&self) -> &Connection {
+    pub(crate) fn connection(&self) -> &Connection {
         self.connection
     }
 

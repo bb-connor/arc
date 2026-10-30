@@ -6,6 +6,7 @@ pub mod api;
 pub mod epoch;
 pub mod finding_status_sparse;
 pub mod freshness;
+pub mod partner_mirror;
 pub mod passport_bridge;
 pub mod signer;
 pub mod sparse_merkle;
@@ -30,6 +31,10 @@ pub use finding_status_sparse::{
     FINDING_STATUS_SPARSE_DEPTH,
 };
 pub use freshness::{verify_fresh_epoch_root, FreshnessConfig};
+pub use partner_mirror::{
+    check_history, ConflictRecord, PartnerMirrorConflict, PartnerMirrorRefusal,
+    MAX_RECORDED_PARTNER_CONFLICTS,
+};
 pub use passport_bridge::{
     apply_passport_revocation, credential_revocation_key, passport_revocation_key,
     PassportRevocationBridgeError, PassportRevocationEvent, PassportRevocationLeafKind,
@@ -42,6 +47,8 @@ pub use signer::{
     PASSPORT_REVOCATION_ROOT_SCHEMA,
 };
 pub use sparse_merkle::InMemoryRevocationOracle;
+#[cfg(feature = "sqlite")]
+pub use sqlite::partner_mirror::{PartnerMirrorError, PartnerMirrorView, SqlitePartnerMirror};
 #[cfg(feature = "sqlite")]
 pub use sqlite::{
     RevocationLeaf, RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
