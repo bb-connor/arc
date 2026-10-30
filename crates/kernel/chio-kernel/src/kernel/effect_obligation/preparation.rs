@@ -215,23 +215,29 @@ impl ChioKernel {
 }
 
 pub(super) fn fault_response(receipt: ChioReceipt, request_id: &str) -> PreparedResponse {
-    let reason = match receipt.decision.as_ref() {
-        Some(Decision::Cancelled { reason } | Decision::Deny { reason, .. }) => reason.clone(),
-        _ => FAULT_REASON.into(),
-    };
     PreparedResponse::terminal(
-        ToolCallResponse {
-            request_id: request_id.to_owned(),
-            verdict: Verdict::Deny,
-            output: None,
-            reason: Some(reason.clone()),
-            terminal_state: OperationTerminalState::Cancelled { reason },
-            receipt,
-            execution_nonce: None,
-            denial_code: None,
-        },
+        fault_tool_call_response(receipt, request_id),
         crate::kernel::responses::ReceiptRecordMode::WithFederation,
     )
+}
+
+fn fault_tool_call_response(receipt: ChioReceipt, request_id: &str) -> ToolCallResponse {
+    let reason = match receipt.decision.as_ref() {
+        Some(Decision::Cancelled { reason }) => reason.clone(),
+        Some(Decision::Allow | Decision::Deny { .. } | Decision::Incomplete { .. }) | None => {
+            FAULT_REASON.into()
+        }
+    };
+    ToolCallResponse {
+        request_id: request_id.to_owned(),
+        verdict: Verdict::Deny,
+        output: None,
+        reason: Some(reason.clone()),
+        terminal_state: OperationTerminalState::Cancelled { reason },
+        receipt,
+        execution_nonce: None,
+        denial_code: None,
+    }
 }
 
 impl PreparedFaultReceipt {
