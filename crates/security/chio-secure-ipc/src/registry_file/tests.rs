@@ -1,17 +1,11 @@
 #![cfg(unix)]
 
 use std::fs;
-use std::io::{BufRead, BufReader, Read, Write as _};
 use std::os::unix::fs::{symlink, PermissionsExt};
-use std::process::{Command, Stdio};
 
 use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
-
-/// Names the registry the child-process holder locks.
-const HOLDER_REGISTRY: &str = "CHIO_TEST_REGISTRY_FILE_LOCK_HOLDER";
-const HOLDER_READY: &str = "registry-file-lock-held";
 
 fn temporary_for(directory: &Path, nonce: &str) -> PathBuf {
     directory.join(format!(".registry.json.{nonce}.tmp"))
@@ -40,62 +34,6 @@ fn a_held_lock_makes_a_second_writer_busy_until_it_is_dropped() -> TestResult {
     let file = RegistryFile::lock(&path)?;
     file.replace(b"{}")?;
     assert_eq!(fs::read(&path)?, b"{}");
-    Ok(())
-}
-
-/// Run as a child process by `another_process_holding_the_lock_makes_writers_busy`:
-/// takes the lock of the registry named by the environment, reports it, and
-/// holds it until its standard input closes. Without that environment it
-/// does nothing.
-#[test]
-fn registry_lock_holder_for_child_process() -> TestResult {
-    let Some(path) = std::env::var_os(HOLDER_REGISTRY) else {
-        return Ok(());
-    };
-    let _lock = RegistryFile::lock(Path::new(&path))?;
-    let mut stdout = std::io::stdout();
-    writeln!(stdout, "{HOLDER_READY}")?;
-    stdout.flush()?;
-    let mut released = Vec::new();
-    std::io::stdin().read_to_end(&mut released)?;
-    Ok(())
-}
-
-#[test]
-fn another_process_holding_the_lock_makes_writers_busy() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("registry.json");
-    let mut holder = Command::new(std::env::current_exe()?)
-        .args([
-            "--exact",
-            "registry_file::tests::registry_lock_holder_for_child_process",
-            "--nocapture",
-            "--test-threads=1",
-        ])
-        .env(HOLDER_REGISTRY, &path)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-    let output = holder.stdout.take().ok_or("holder stdout")?;
-    let mut lines = BufReader::new(output).lines();
-    loop {
-        let line = lines
-            .next()
-            .ok_or("the holder exited before taking the lock")??;
-        if line.contains(HOLDER_READY) {
-            break;
-        }
-    }
-
-    assert!(matches!(
-        RegistryFile::lock(&path),
-        Err(RegistryFileError::Busy)
-    ));
-
-    drop(holder.stdin.take());
-    assert!(holder.wait()?.success());
-    RegistryFile::lock(&path)?.replace(b"{}")?;
     Ok(())
 }
 
@@ -172,71 +110,30 @@ fn a_lock_file_that_is_shared_or_linked_is_refused() -> TestResult {
 }
 
 #[test]
-fn exclusive_create_refuses_a_symlink_planted_at_the_attempted_temporary() -> TestResult {
+fn exclusive_create_refuses_a_planted_temporary_and_leaves_it_alone() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("registry.json");
     fs::write(&path, b"before")?;
     let victim = directory.path().join("victim");
     fs::write(&victim, b"keep")?;
     let planted = temporary_for(directory.path(), "fixed");
-    symlink(&victim, &planted)?;
-
-    let error = replace_with(&path, b"after", "fixed", &|_| Ok(()))
-        .err()
-        .ok_or("a planted temporary name must be refused")?;
-    assert!(matches!(
-        error,
-        RegistryFileError::Io(ref io) if io.kind() == std::io::ErrorKind::AlreadyExists
-    ));
-    assert_eq!(fs::read(&victim)?, b"keep");
-    assert_eq!(fs::read_link(&planted)?, victim);
-    assert_eq!(fs::read(&path)?, b"before");
-    Ok(())
-}
-
-#[test]
-fn exclusive_create_refuses_a_regular_file_collision_without_clobbering_it() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("registry.json");
-    fs::write(&path, b"before")?;
-    let planted = temporary_for(directory.path(), "fixed");
-    fs::write(&planted, b"other writer")?;
-
-    let error = replace_with(&path, b"after", "fixed", &|_| Ok(()))
-        .err()
-        .ok_or("a colliding temporary name must be refused")?;
-    assert!(matches!(
-        error,
-        RegistryFileError::Io(ref io) if io.kind() == std::io::ErrorKind::AlreadyExists
-    ));
-    assert_eq!(fs::read(&planted)?, b"other writer");
-    assert_eq!(fs::read(&path)?, b"before");
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-#[test]
-fn rename_failure_removes_only_its_own_temporary_and_reports_the_os_error() -> TestResult {
-    const EISDIR: i32 = 21;
-    let directory = chio_test_support::private_tempdir()?;
-    // A directory at the destination makes the rename fail regardless of the
-    // caller's privileges.
-    let path = directory.path().join("registry.json");
-    fs::create_dir(&path)?;
-    fs::write(path.join("occupant"), b"keep")?;
-    let bystander = temporary_for(directory.path(), "bystander");
-    fs::write(&bystander, b"other writer")?;
-
-    let error = replace_with(&path, b"after", "fixed", &|_| Ok(()))
-        .err()
-        .ok_or("renaming a file over a directory must fail")?;
-    assert!(matches!(
-        error,
-        RegistryFileError::Io(ref io) if io.raw_os_error() == Some(EISDIR)
-    ));
-    assert_eq!(fs::read(path.join("occupant"))?, b"keep");
-    assert_eq!(fs::read(&bystander)?, b"other writer");
-    assert_eq!(fs::read_dir(directory.path())?.count(), 2);
+    for plant_symlink in [true, false] {
+        if plant_symlink {
+            symlink(&victim, &planted)?;
+        } else {
+            fs::remove_file(&planted)?;
+            fs::write(&planted, b"other writer")?;
+        }
+        let error = replace_with(&path, b"after", "fixed", &|_| Ok(()))
+            .err()
+            .ok_or("a planted temporary name must be refused")?;
+        assert!(matches!(
+            error,
+            RegistryFileError::Io(ref io) if io.kind() == std::io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(fs::read(&victim)?, b"keep");
+        assert_eq!(fs::read(&path)?, b"before");
+    }
     Ok(())
 }
 

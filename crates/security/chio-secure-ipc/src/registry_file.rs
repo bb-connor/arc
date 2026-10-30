@@ -9,10 +9,8 @@ use crate::LifecycleLock;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RegistryFileError {
-    /// Another writer holds the lock. Nothing was read or written.
     #[error("the registry file is being written by another writer; nothing was changed, retry")]
     Busy,
-    /// This platform has no exclusive writer lock, so nothing is written.
     #[error("registry files can be written only where an exclusive writer lock is available")]
     Unsupported,
     #[error("registry path has no file name")]
@@ -38,14 +36,10 @@ pub enum RegistryFileError {
 
 /// Exclusive writer lock for one registry file, and the only way to replace it.
 ///
-/// The lock is an advisory `flock` on `.<file name>.lock` in the registry's
-/// canonical directory. That file is never renamed, replaced or removed, so
-/// every writer that names the registry by any path through that directory
-/// contends on the same inode, in this process or another on the same host.
-/// The registry file itself is replaced by rename on every write and is never
-/// the lock target. Writers on other hosts sharing the directory over a
-/// network filesystem are not excluded. A hard link to the registry under
-/// another name is a different registry with its own lock.
+/// The lock is a `flock` on `.<file name>.lock` in the registry's canonical
+/// directory. That file is never replaced, so every path naming the registry
+/// through that directory contends on one inode. Writers on other hosts
+/// sharing a network filesystem are not excluded.
 #[must_use = "dropping the lock releases the registry"]
 pub struct RegistryFile {
     #[cfg(unix)]
@@ -79,9 +73,7 @@ impl RegistryFile {
             .write(true)
             .create(true)
             .mode(0o600)
-            .custom_flags(open_flags(
-                rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW,
-            )?)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
             .open(&lock_path)?;
         check_lock_identity(&lock_path, &file)?;
         let lock = match LifecycleLock::try_exclusive(file) {
@@ -89,8 +81,6 @@ impl RegistryFile {
             Err(rustix::io::Errno::WOULDBLOCK) => return Err(RegistryFileError::Busy),
             Err(error) => return Err(std::io::Error::from(error).into()),
         };
-        // The locked inode must still be the one at the lock path, or two
-        // writers could hold locks on different inodes.
         check_lock_identity(&lock_path, lock.file())?;
         Ok(Self {
             _lock: lock,
@@ -109,24 +99,18 @@ impl RegistryFile {
         &self.destination
     }
 
-    /// Replaces the registry with `bytes` through a freshly created, uniquely
-    /// named sibling opened exclusively with owner-only permissions (never
-    /// more permissive than the file it replaces), synced, renamed into
-    /// place, and followed by a sync of the directory.
-    ///
-    /// A failure before the rename removes only the temporary this call
-    /// created and leaves the prior file intact.
+    /// Replaces the registry with `bytes`: an exclusively created sibling, no
+    /// more permissive than the file it replaces, is synced and renamed into
+    /// place, then the directory is synced. A failure before the rename
+    /// removes only that sibling and leaves the prior file intact.
     pub fn replace(&self, bytes: &[u8]) -> Result<(), RegistryFileError> {
         replace_with(&self.destination, bytes, &temporary_nonce(), &|_| Ok(()))
     }
 }
 
-/// Points in [`replace_with`] where a failure can be injected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ReplaceStage {
-    /// After the temporary is fully written and synced, before the rename.
     BeforeRename,
-    /// After the rename, at the directory sync.
     DirectorySync,
 }
 
@@ -177,8 +161,6 @@ fn parent_of(path: &Path) -> &Path {
     }
 }
 
-/// Unique among this process's replaces; the exclusive create refuses any
-/// name another process left behind.
 fn temporary_nonce() -> String {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     format!(
@@ -188,11 +170,6 @@ fn temporary_nonce() -> String {
     )
 }
 
-#[cfg(unix)]
-fn open_flags(flags: rustix::fs::OFlags) -> std::io::Result<i32> {
-    i32::try_from(flags.bits()).map_err(std::io::Error::other)
-}
-
 /// The lock file is a private regular file of this user with one link, and
 /// `file` is that file.
 #[cfg(unix)]
@@ -200,13 +177,17 @@ fn check_lock_identity(lock_path: &Path, file: &std::fs::File) -> Result<(), Reg
     use std::os::unix::fs::MetadataExt;
     let at_path = std::fs::symlink_metadata(lock_path)?;
     let held = file.metadata()?;
+    let private = crate::regular_file::check_ownership(
+        crate::regular_file::OpenPolicy::Private,
+        held.uid(),
+        held.mode(),
+        rustix::process::geteuid().as_raw(),
+    );
     if !at_path.file_type().is_file()
         || !held.file_type().is_file()
-        || at_path.dev() != held.dev()
-        || at_path.ino() != held.ino()
+        || (at_path.dev(), at_path.ino()) != (held.dev(), held.ino())
         || held.nlink() != 1
-        || held.mode() & 0o077 != 0
-        || held.uid() != rustix::process::geteuid().as_raw()
+        || private.is_err()
     {
         return Err(RegistryFileError::LockNotPrivate(lock_path.to_path_buf()));
     }
@@ -218,11 +199,7 @@ fn sync_directory(directory: &Path) -> std::io::Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
     std::fs::OpenOptions::new()
         .read(true)
-        .custom_flags(open_flags(
-            rustix::fs::OFlags::DIRECTORY
-                | rustix::fs::OFlags::NOFOLLOW
-                | rustix::fs::OFlags::CLOEXEC,
-        )?)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(directory)?
         .sync_all()
 }

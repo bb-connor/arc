@@ -28,19 +28,10 @@ pub(crate) fn read_bounded_with_limit(
     path: &Path,
     max_bytes: usize,
 ) -> Result<Vec<u8>, std::io::Error> {
-    read_regular_file(path, max_bytes, OpenPolicy::Authenticated).map_err(|error| {
-        let kind = match error {
-            RegularFileError::Io(kind) => return std::io::Error::from(kind),
-            RegularFileError::Missing => std::io::ErrorKind::NotFound,
-            RegularFileError::SymbolicLink | RegularFileError::NotRegular => {
-                std::io::ErrorKind::InvalidInput
-            }
-            RegularFileError::ForeignOwner { .. }
-            | RegularFileError::Writable { .. }
-            | RegularFileError::Exposed { .. } => std::io::ErrorKind::PermissionDenied,
-            RegularFileError::TooLarge { .. } => std::io::ErrorKind::InvalidData,
-        };
-        std::io::Error::new(kind, error)
+    read_regular_file(path, max_bytes, OpenPolicy::Authenticated).map_err(|error| match error {
+        RegularFileError::Io(kind) => kind.into(),
+        RegularFileError::Missing => std::io::ErrorKind::NotFound.into(),
+        refusal => std::io::Error::new(std::io::ErrorKind::InvalidData, refusal),
     })
 }
 
