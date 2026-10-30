@@ -115,7 +115,7 @@ impl IssuanceRequestRepository for InMemoryIssuanceRequestRepository {
         ordered.sort_by(|a, b| {
             (a.submitted_at, &a.challenge_id).cmp(&(b.submitted_at, &b.challenge_id))
         });
-        let size = query.page_size();
+        let size = query.limit.get();
         let more = ordered.len() > size;
         let requests: Vec<IssuanceRequestSummary> =
             ordered.into_iter().take(size).map(summary).collect();

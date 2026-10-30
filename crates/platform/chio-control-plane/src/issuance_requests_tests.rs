@@ -25,6 +25,10 @@ fn store_refusals_map_to_http_statuses() {
             StatusCode::CONFLICT,
         ),
         (
+            IssuanceStoreError::InvalidPageLimit(0),
+            StatusCode::BAD_REQUEST,
+        ),
+        (
             IssuanceStoreError::InvalidTimestamp,
             StatusCode::INTERNAL_SERVER_ERROR,
         ),

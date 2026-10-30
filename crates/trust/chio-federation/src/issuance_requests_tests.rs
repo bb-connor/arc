@@ -28,15 +28,22 @@ fn status_names_round_trip_and_unknown_names_fail_closed() {
 }
 
 #[test]
-fn list_page_size_is_clamped() {
-    let query = |limit| IssuanceListQuery {
-        status: None,
-        after: None,
-        limit,
-    };
-    assert_eq!(query(0).page_size(), 1);
-    assert_eq!(query(10).page_size(), 10);
-    assert_eq!(query(10_000).page_size(), MAX_ISSUANCE_LIST_PAGE);
+fn page_limits_outside_one_to_max_are_refused() {
+    assert_eq!(
+        IssuancePageLimit::new(0),
+        Err(IssuanceStoreError::InvalidPageLimit(0))
+    );
+    assert_eq!(
+        IssuancePageLimit::new(MAX_ISSUANCE_LIST_PAGE + 1),
+        Err(IssuanceStoreError::InvalidPageLimit(
+            MAX_ISSUANCE_LIST_PAGE + 1
+        ))
+    );
+    assert_eq!(IssuancePageLimit::new(1).map(IssuancePageLimit::get), Ok(1));
+    assert_eq!(
+        IssuancePageLimit::new(MAX_ISSUANCE_LIST_PAGE),
+        Ok(IssuancePageLimit::MAX)
+    );
 }
 
 #[test]

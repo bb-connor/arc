@@ -31,6 +31,8 @@ pub enum IssuanceStoreError {
     NotClaimed(String),
     #[error("issuance timestamp is out of range")]
     InvalidTimestamp,
+    #[error("issuance list limit {0} is outside 1..=50")]
+    InvalidPageLimit(usize),
     #[error("issuance request store is busy")]
     Busy,
     #[error("issuance request store is unavailable")]
@@ -130,20 +132,33 @@ pub struct IssuanceRequestSummary {
     pub decision_reason: Option<String>,
 }
 
+/// Summaries one listing page may hold, in `1..=MAX_ISSUANCE_LIST_PAGE`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IssuancePageLimit(usize);
+
+impl IssuancePageLimit {
+    pub const MAX: Self = Self(MAX_ISSUANCE_LIST_PAGE);
+
+    /// Refuses zero and any limit above [`MAX_ISSUANCE_LIST_PAGE`].
+    pub const fn new(limit: usize) -> Result<Self, IssuanceStoreError> {
+        if limit == 0 || limit > MAX_ISSUANCE_LIST_PAGE {
+            return Err(IssuanceStoreError::InvalidPageLimit(limit));
+        }
+        Ok(Self(limit))
+    }
+
+    #[must_use]
+    pub const fn get(self) -> usize {
+        self.0
+    }
+}
+
 /// One listing request. `after` names the last request of the previous page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IssuanceListQuery<'a> {
     pub status: Option<IssuanceRequestStatus>,
     pub after: Option<&'a str>,
-    pub limit: usize,
-}
-
-impl IssuanceListQuery<'_> {
-    /// `limit` clamped to `1..=MAX_ISSUANCE_LIST_PAGE`.
-    #[must_use]
-    pub fn page_size(&self) -> usize {
-        self.limit.clamp(1, MAX_ISSUANCE_LIST_PAGE)
-    }
+    pub limit: IssuancePageLimit,
 }
 
 /// One listing page in `(submitted_at, challenge_id)` order. `next_after`

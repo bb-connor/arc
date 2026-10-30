@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::sync::Arc;
 
-use chio_federation::issuance_requests::conformance;
+use chio_federation::issuance_requests::{conformance, IssuancePageLimit};
 use chio_test_support::clock::ClockScope;
 use chio_test_support::prelude::*;
 
@@ -57,7 +57,7 @@ fn all(store: &SqliteIssuanceRequestStore) -> Result<IssuanceRequestPage, Issuan
         IssuanceListQuery {
             status: None,
             after: None,
-            limit: 10,
+            limit: IssuancePageLimit::MAX,
         },
         150,
     )
@@ -139,4 +139,52 @@ fn an_in_memory_path_is_refused() {
         SqliteIssuanceRequestStore::open(":memory:"),
         Err(IssuanceRequestStoreOpenError::InvalidPath)
     ));
+}
+
+fn query_plan(path: &std::path::Path, statement: &str) -> Vec<String> {
+    let raw = Connection::open(path).test_unwrap();
+    let mut plan = raw
+        .prepare(&format!("EXPLAIN QUERY PLAN {statement}"))
+        .test_unwrap();
+    let unbound = vec![rusqlite::types::Null; plan.parameter_count()];
+    plan.query_map(rusqlite::params_from_iter(unbound), |row| {
+        row.get::<_, String>(3)
+    })
+    .test_unwrap()
+    .collect::<rusqlite::Result<Vec<_>>>()
+    .test_unwrap()
+}
+
+#[test]
+fn hot_lookups_seek_an_index_and_never_sort() {
+    let fixture = fixture();
+    let _store = fixture.fresh(MAX_PENDING_ISSUANCE_REQUESTS);
+    let path = fixture.path("issuance-0");
+    for (name, statement) in [
+        ("get", sql::GET),
+        ("exists", sql::EXISTS),
+        ("submitted_at", sql::SUBMITTED_AT),
+        ("claim", sql::CLAIM),
+        ("finish", sql::FINISH),
+        ("release", sql::RELEASE),
+        ("count_open", sql::COUNT_OPEN),
+        ("expire_stale", sql::EXPIRE_STALE),
+        ("list_status", sql::LIST_STATUS),
+        ("list_status_after", sql::LIST_STATUS_AFTER),
+        ("list_all_after", sql::LIST_ALL_AFTER),
+    ] {
+        let plan = query_plan(&path, statement);
+        assert!(
+            !plan.is_empty() && plan.iter().all(|step| step.starts_with("SEARCH ")),
+            "{name}: {plan:?}"
+        );
+    }
+    let walk = query_plan(&path, sql::LIST_ALL);
+    assert!(
+        matches!(
+            walk.as_slice(),
+            [step] if step.contains("USING INDEX idx_federation_issuance_requests_order")
+        ),
+        "list_all: {walk:?}"
+    );
 }

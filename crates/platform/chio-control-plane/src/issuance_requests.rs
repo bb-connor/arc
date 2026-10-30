@@ -14,6 +14,7 @@ pub fn issuance_store_status(error: &IssuanceStoreError) -> StatusCode {
         | IssuanceStoreError::NotClaimed(_) => StatusCode::CONFLICT,
         IssuanceStoreError::Full => StatusCode::TOO_MANY_REQUESTS,
         IssuanceStoreError::NotFound(_) => StatusCode::NOT_FOUND,
+        IssuanceStoreError::InvalidPageLimit(_) => StatusCode::BAD_REQUEST,
         IssuanceStoreError::InvalidTimestamp => StatusCode::INTERNAL_SERVER_ERROR,
         IssuanceStoreError::Busy
         | IssuanceStoreError::Unavailable

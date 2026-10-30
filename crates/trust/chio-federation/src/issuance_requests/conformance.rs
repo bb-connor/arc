@@ -4,9 +4,9 @@
 use std::sync::{Arc, Barrier};
 
 use super::{
-    IssuanceDecision, IssuanceListQuery, IssuanceRequestPage, IssuanceRequestRecord,
-    IssuanceRequestRepository, IssuanceRequestStatus, IssuanceStoreError, EXPIRED_REASON,
-    MAX_ISSUANCE_LIST_PAGE,
+    IssuanceDecision, IssuanceListQuery, IssuancePageLimit, IssuanceRequestPage,
+    IssuanceRequestRecord, IssuanceRequestRepository, IssuanceRequestStatus, IssuanceStoreError,
+    EXPIRED_REASON, MAX_ISSUANCE_LIST_PAGE,
 };
 
 /// Opens a fresh, empty repository holding at most `pending_cap` open
@@ -38,6 +38,9 @@ fn query(
     after: Option<&str>,
     limit: usize,
 ) -> IssuanceListQuery<'_> {
+    let Ok(limit) = IssuancePageLimit::new(limit) else {
+        panic!("conformance page limit {limit} is outside 1..={MAX_ISSUANCE_LIST_PAGE}");
+    };
     IssuanceListQuery {
         status,
         after,
@@ -246,11 +249,13 @@ pub fn listing_pages_hold_at_most_the_page_limit(make: Factory<'_>) {
     for n in 0..MAX_ISSUANCE_LIST_PAGE + 5 {
         assert_eq!(repository.submit(&record(&format!("p{n:02}")), 100), Ok(()));
     }
-    let page = repository.list(query(None, None, 500), 150);
+    let page = repository.list(query(None, None, MAX_ISSUANCE_LIST_PAGE), 150);
     assert_eq!(ids(&page).len(), MAX_ISSUANCE_LIST_PAGE);
     let last = format!("p{:02}", MAX_ISSUANCE_LIST_PAGE - 1);
     assert_eq!(next_after(&page), Some(last));
-    assert_eq!(ids(&repository.list(query(None, None, 0), 150)).len(), 1);
+    let single = repository.list(query(None, None, 1), 150);
+    assert_eq!(ids(&single), ["p00"]);
+    assert_eq!(next_after(&single).as_deref(), Some("p00"));
 }
 
 pub fn expired_pending_request_is_denied_and_frees_capacity(make: Factory<'_>) {

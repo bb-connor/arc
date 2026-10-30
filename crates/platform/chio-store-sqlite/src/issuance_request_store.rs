@@ -240,7 +240,7 @@ impl IssuanceRequestRepository for SqliteIssuanceRequestStore {
         query: IssuanceListQuery<'_>,
         now: u64,
     ) -> Result<IssuanceRequestPage, IssuanceStoreError> {
-        let limit = query.page_size();
+        let limit = query.limit.get();
         let fetch = i64::try_from(limit + 1).map_err(|_| IssuanceStoreError::Unavailable)?;
         let mut connection = self.lock()?;
         let tx = connection
