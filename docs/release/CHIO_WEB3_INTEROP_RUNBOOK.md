@@ -27,7 +27,7 @@ Before enabling any web3 interop surface:
 3. Confirm every enabled surface keeps direct fund movement subordinate to the
    explicit `chio-settle` lane.
 4. Re-run the local qualification commands:
-   - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor -- --test-threads=1`
+   - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor --features web3 -- --test-threads=1`
    - `CARGO_TARGET_DIR=target/chio-settle-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-settle --lib -- --test-threads=1`
    - `CARGO_TARGET_DIR=target/chio-settle-runtime CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-settle --test runtime_devnet -- --nocapture`
 

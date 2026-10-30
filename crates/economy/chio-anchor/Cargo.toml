@@ -12,7 +12,7 @@ publish = false
 name = "chio_anchor"
 
 [features]
-default = ["web3"]
+default = []
 web3 = [
     "dep:alloy-primitives",
     "dep:alloy-sol-types",

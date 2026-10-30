@@ -185,7 +185,7 @@ chio-adversarial-suite = { workspace = true }
 # chio-a2a-adapter A2aAdapter).
 chio-egress-contract = { workspace = true }
 chio-siem = { workspace = true }
-chio-link = { workspace = true }
+chio-link = { workspace = true, features = ["web3"] }
 chio-openapi-mcp-bridge = { workspace = true }
 chio-a2a-adapter = { workspace = true }
 chio-mcp-remote = { workspace = true }
@@ -198,7 +198,7 @@ zeroize = { workspace = true }
 # AnchorWitnessClient (RekorClient + OtsClient) and the WitnessState
 # state machine via the chio-anchor crate. tokio drives the async
 # trait surface; tiny_http stages the mock Rekor server.
-chio-anchor = { workspace = true }
+chio-anchor = { workspace = true, features = ["web3"] }
 # Settlement-lane conformance tests drive the chio-web3 public settlement
 # verifier and anchor inclusion readback directly.
 chio-web3 = { workspace = true }

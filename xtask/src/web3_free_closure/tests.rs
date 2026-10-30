@@ -115,6 +115,24 @@ const COMBINED_TREE: &str = concat!(
     "2chio-proof-room v0.1.0 (/w/crates/products/chio-proof-room) \n",
 );
 
+const DEFAULT_OFF_POLICY: &str = r#"
+schema = "chio.ci-gate.web3-free-closure.v1"
+
+[[mode]]
+name = "default-off"
+features = []
+deny_packages = []
+deny_features = ["web3"]
+
+[[mode.root]]
+name = "chio-anchor"
+require = []
+
+[[mode.root]]
+name = "chio-link"
+require = []
+"#;
+
 type ModeShape = (String, Vec<String>, Vec<(String, Vec<String>)>);
 
 fn policy() -> Result<Policy, String> {
@@ -549,5 +567,20 @@ fn selection_filters_and_rejects_unknown_modes_and_roots() -> Result<(), String>
         pairs(&["web3"], &["chio-core"]),
         Err("usage: root `chio-core` is not listed in ci-gates/web3-free-closure.toml for the selected modes".to_string())
     );
+    Ok(())
+}
+
+#[test]
+fn anchor_and_link_default_features_enable_no_web3_feature() -> Result<(), String> {
+    let policy = Policy::parse(DEFAULT_OFF_POLICY)?;
+    let default_off = mode(&policy, "default-off")?;
+    let workspace = workspace_root().map_err(|err| err.to_string())?;
+    let mut violations = Vec::new();
+    for root in ["chio-anchor", "chio-link"] {
+        let rule = rule(default_off, root)?;
+        let tree = cargo_tree(&workspace, default_off, root);
+        violations.extend(check_root(default_off, rule, tree)?.1);
+    }
+    assert_eq!(violations, Vec::new());
     Ok(())
 }

@@ -93,7 +93,7 @@ Web3 incident recovery is complete when all of the following are true:
   - `./scripts/qualify-web3-ops-controls.sh`
   - `target/web3-ops-qualification/incident-audit.json`
   - `pnpm --dir contracts devnet:smoke`
-  - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor -- --test-threads=1`
+  - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor --features web3 -- --test-threads=1`
   - `CARGO_TARGET_DIR=target/chio-settle-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-settle -- --test-threads=1`
 - the hosted staged bundle is refreshed when release qualification is being prepared:
   - `target/release-qualification/web3-runtime/ops/incident-audit.json`

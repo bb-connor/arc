@@ -27,7 +27,7 @@ Before enabling a live anchoring lane for an operator deployment:
 5. If Solana memo publication is enabled, confirm the intended cluster and the
    operator memo-signing key.
 6. Run the local qualification commands:
-   - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor -- --test-threads=1`
+   - `CARGO_TARGET_DIR=target/chio-anchor-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-anchor --features web3 -- --test-threads=1`
    - `pnpm --dir contracts devnet:smoke`
 
 ## EVM Publication
