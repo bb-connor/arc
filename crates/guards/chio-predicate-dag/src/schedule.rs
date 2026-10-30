@@ -82,22 +82,42 @@ impl ScheduleStorage {
 
     /// Decodes and validates `chio.decision-model.v1` bytes. Fail closed.
     pub fn decode(&mut self, bytes: &[u8]) -> Result<Thresholds, DagError> {
-        self.validated = false;
-        let (meta, thresholds) = artifact::decode_into(bytes, &mut self.ops)?;
-        self.meta = meta;
-        self.validated = true;
-        Ok(thresholds)
+        decode_storage(bytes, &mut self.ops, &mut self.meta, &mut self.validated)
     }
 
     /// A view of the validated schedule, borrowed for one evaluation.
     pub fn schedule(&self) -> Result<Schedule<'_>, DagError> {
-        if !self.validated {
-            return Err(DagError::NotValidated);
-        }
-        let len = usize::try_from(self.meta.op_count).map_err(|_| DagError::NotValidated)?;
-        let ops = self.ops.get(..len).ok_or(DagError::NotValidated)?;
-        Ok(Schedule::new(ops, &self.meta))
+        storage_schedule(&self.ops, &self.meta, self.validated)
     }
+}
+
+/// Decode into a storage's fields. `validated` is cleared first and set only
+/// on success, so a failed decode leaves the storage invalid.
+pub(crate) fn decode_storage(
+    bytes: &[u8],
+    ops: &mut [Op],
+    meta: &mut Meta,
+    validated: &mut bool,
+) -> Result<Thresholds, DagError> {
+    *validated = false;
+    let (decoded, thresholds) = artifact::decode_into(bytes, ops)?;
+    *meta = decoded;
+    *validated = true;
+    Ok(thresholds)
+}
+
+/// The validated schedule view over a storage's fields.
+pub(crate) fn storage_schedule<'s>(
+    ops: &'s [Op],
+    meta: &'s Meta,
+    validated: bool,
+) -> Result<Schedule<'s>, DagError> {
+    if !validated {
+        return Err(DagError::NotValidated);
+    }
+    let len = usize::try_from(meta.op_count).map_err(|_| DagError::NotValidated)?;
+    let ops = ops.get(..len).ok_or(DagError::NotValidated)?;
+    Ok(Schedule::new(ops, meta))
 }
 
 /// A validated, acyclic, canonical op stream.
