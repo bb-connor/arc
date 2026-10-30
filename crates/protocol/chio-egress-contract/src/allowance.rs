@@ -1,10 +1,11 @@
 //! Operator-declared private network allowances.
 //!
 //! An allowance names one `host:port` and the CIDR its resolved addresses must
-//! fall inside. It is the only way a contract reaches a private address, and
-//! it never reaches link-local or cloud metadata addresses.
+//! fall inside. It is the only way a contract reaches a private or IPv6
+//! unique-local address, and it never reaches link-local or cloud metadata
+//! addresses.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::str::FromStr;
@@ -212,6 +213,36 @@ pub struct PrivateNetworkAllowance {
     pub cidr: IpCidr,
 }
 
+impl PrivateNetworkAllowance {
+    /// The allowance an operator grants by naming an IPv6 unique-local
+    /// literal as an endpoint URL: that address, port and scheme only. `None`
+    /// when the URL host is not a unique-local literal or the scheme is not
+    /// `http` or `https`.
+    #[must_use]
+    pub fn for_ipv6_ula_literal(url: &Url) -> Option<Self> {
+        let Some(Host::Ipv6(address)) = url.host() else {
+            return None;
+        };
+        if address.segments()[0] & 0xfe00 != 0xfc00 {
+            return None;
+        }
+        let scheme = match url.scheme() {
+            "https" => AllowanceScheme::Https,
+            "http" => AllowanceScheme::Http,
+            _ => return None,
+        };
+        Some(Self {
+            host: address.to_string(),
+            port: url.port_or_known_default()?,
+            scheme,
+            cidr: IpCidr {
+                network: IpAddr::V6(address),
+                prefix: 128,
+            },
+        })
+    }
+}
+
 /// Why a declared allowance is refused when its contract is loaded.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PrivateNetworkAllowanceError {
@@ -245,6 +276,8 @@ pub enum PrivateNetworkAllowanceError {
     },
     #[error("more than one allowance declares {host}:{port}")]
     DuplicateAllowance { host: String, port: u16 },
+    #[error("allowance for {host}:{port} names both http and https")]
+    SchemeConflict { host: String, port: u16 },
 }
 
 /// Ranges an allowance may open: RFC 1918, RFC 6598 shared address space and
@@ -302,7 +335,7 @@ pub(crate) fn validate_allowances(
     if allowances.is_empty() {
         return Ok(());
     }
-    let mut seen = BTreeSet::new();
+    let mut seen = BTreeMap::new();
     for allowance in allowances {
         validate_allowance(allowance)?;
         if !allowed_schemes.contains(allowance.scheme.as_str()) {
@@ -312,12 +345,7 @@ pub(crate) fn validate_allowances(
                 scheme: allowance.scheme.as_str().to_string(),
             });
         }
-        if !seen.insert((allowance.host.as_str(), allowance.port)) {
-            return Err(PrivateNetworkAllowanceError::DuplicateAllowance {
-                host: allowance.host.clone(),
-                port: allowance.port,
-            });
-        }
+        record_endpoint(&mut seen, allowance)?;
         let authority_host = match allowance.host.parse::<Ipv6Addr>() {
             Ok(_) => format!("[{}]", allowance.host),
             Err(_) => allowance.host.clone(),
@@ -412,19 +440,15 @@ impl EgressAllowanceSet {
     pub fn new(
         entries: impl IntoIterator<Item = PrivateNetworkAllowance>,
     ) -> Result<Self, PrivateNetworkAllowanceError> {
-        let mut allow = BTreeSet::new();
-        let mut seen = BTreeSet::new();
-        for entry in entries {
-            validate_allowance(&entry)?;
-            if !seen.insert((entry.host.clone(), entry.port)) {
-                return Err(PrivateNetworkAllowanceError::DuplicateAllowance {
-                    host: entry.host,
-                    port: entry.port,
-                });
-            }
-            allow.insert(entry);
+        let entries: Vec<_> = entries.into_iter().collect();
+        let mut seen = BTreeMap::new();
+        for entry in &entries {
+            validate_allowance(entry)?;
+            record_endpoint(&mut seen, entry)?;
         }
-        Ok(Self { allow })
+        Ok(Self {
+            allow: entries.into_iter().collect(),
+        })
     }
 
     #[must_use]
@@ -453,6 +477,27 @@ impl<'de> Deserialize<'de> for EgressAllowanceSet {
         }
         let document = Document::deserialize(deserializer)?;
         Self::new(document.allow).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Record the `host:port` `allowance` pins, refusing a second entry for it.
+fn record_endpoint<'a>(
+    seen: &mut BTreeMap<(&'a str, u16), AllowanceScheme>,
+    allowance: &'a PrivateNetworkAllowance,
+) -> Result<(), PrivateNetworkAllowanceError> {
+    let (host, port) = (allowance.host.as_str(), allowance.port);
+    match seen.insert((host, port), allowance.scheme) {
+        None => Ok(()),
+        Some(scheme) if scheme != allowance.scheme => {
+            Err(PrivateNetworkAllowanceError::SchemeConflict {
+                host: host.to_string(),
+                port,
+            })
+        }
+        Some(_) => Err(PrivateNetworkAllowanceError::DuplicateAllowance {
+            host: host.to_string(),
+            port,
+        }),
     }
 }
 

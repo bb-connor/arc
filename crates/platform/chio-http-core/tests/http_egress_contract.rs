@@ -16,7 +16,6 @@ fn strict_contract() -> HttpEgressContract {
         ]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 2,
         max_response_bytes: 4096,
         private_network_allowances: Default::default(),

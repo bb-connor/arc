@@ -32,7 +32,6 @@ fn loopback_contract(
         allowed_authority_set: BTreeSet::from([authority.to_ascii_lowercase()]),
         deny_loopback: false,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain,
         max_response_bytes,
         private_network_allowances: Default::default(),

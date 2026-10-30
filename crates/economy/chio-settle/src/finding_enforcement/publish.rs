@@ -174,7 +174,6 @@ impl RemoteFindingImpairmentPublisherConfig {
             allowed_authority_set: BTreeSet::from([authority]),
             deny_loopback: true,
             deny_link_local: true,
-            deny_ipv6_ula: true,
             max_redirect_chain: 0,
             max_response_bytes: MAX_PUBLISHER_RESPONSE_BYTES as u64,
             private_network_allowances: Default::default(),

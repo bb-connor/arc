@@ -40,14 +40,13 @@ pub struct HttpEgressContract {
     pub deny_loopback: bool,
     /// Reject IPv4 and IPv6 link-local address literals.
     pub deny_link_local: bool,
-    /// Reject IPv6 unique-local address literals.
-    pub deny_ipv6_ula: bool,
     /// Maximum redirect hop count accepted for a request chain.
     pub max_redirect_chain: u8,
     /// Maximum response bytes accepted before the substrate must abort.
     pub max_response_bytes: u64,
-    /// Private destinations this contract may reach. Each entry pins one
-    /// `host:port` to the CIDR every resolved address must fall inside.
+    /// Private destinations this contract may reach, IPv6 unique-local
+    /// included. Each entry pins one `host:port` to the CIDR every resolved
+    /// address must fall inside.
     #[serde(default)]
     pub private_network_allowances: BTreeSet<PrivateNetworkAllowance>,
 }
@@ -376,6 +375,9 @@ impl HttpEgressContract {
             IpAddr::V4(address) => classify_ipv4_address(&address),
             IpAddr::V6(address) => classify_ipv6_address(&address),
         };
+        if class == IpAddressClass::Ipv6Ula && allowance::is_metadata_address(address) {
+            return Err(HttpEgressError::ReservedAddressDenied { host: label });
+        }
         self.enforce_ip_address_class(label.clone(), class)?;
         if allowance::is_metadata_address(address) {
             return Err(HttpEgressError::ReservedAddressDenied { host: label });
@@ -402,12 +404,7 @@ impl HttpEgressContract {
                 }
                 Ok(())
             }
-            IpAddressClass::Ipv6Ula => {
-                if self.deny_ipv6_ula {
-                    return Err(HttpEgressError::Ipv6UlaDenied { host });
-                }
-                Ok(())
-            }
+            IpAddressClass::Ipv6Ula => Err(HttpEgressError::Ipv6UlaDenied { host }),
             IpAddressClass::PrivateOrSpecialUse => {
                 Err(HttpEgressError::PrivateNetworkDenied { host })
             }
@@ -887,7 +884,6 @@ impl HttpEgressContract {
             allowed_authority_set: BTreeSet::from([normalized_url_authority(&parsed)?]),
             deny_loopback: !loopback,
             deny_link_local: true,
-            deny_ipv6_ula: true,
             max_redirect_chain: 0,
             max_response_bytes,
             private_network_allowances: BTreeSet::new(),
@@ -901,7 +897,7 @@ impl HttpEgressContract {
     /// use this; production always builds a contract from tenant-scoped
     /// substrate config.
     ///
-    /// Loopback, link-local and IPv6 ULA denials are disabled so wiremock's
+    /// Loopback and link-local denials are disabled so wiremock's
     /// `127.0.0.1:<port>` URL is accepted. Authority allow-list is wildcard
     /// per `allowed_authority_set` semantics: caller supplies the wiremock
     /// authority. Schemes default to `http` and `https`.
@@ -917,7 +913,6 @@ impl HttpEgressContract {
             allowed_authority_set,
             deny_loopback: false,
             deny_link_local: false,
-            deny_ipv6_ula: false,
             max_redirect_chain: 4,
             max_response_bytes: 64 * 1024 * 1024,
             private_network_allowances: BTreeSet::new(),

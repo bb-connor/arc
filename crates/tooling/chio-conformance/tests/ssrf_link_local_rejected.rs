@@ -19,7 +19,6 @@ fn strict_contract_excluding_link_local() -> HttpEgressContract {
         allowed_authority_set: BTreeSet::from(["splunk.example.com:8088".to_string()]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 64 * 1024,
         private_network_allowances: Default::default(),

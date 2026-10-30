@@ -935,7 +935,6 @@ fn payment_rail_contract(
         allowed_authority_set: BTreeSet::from([authority]),
         deny_loopback: !loopback_http,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PAYMENT_RESPONSE_BYTES,
         private_network_allowances: egress.allowances().clone(),

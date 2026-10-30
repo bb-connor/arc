@@ -35,7 +35,6 @@ fn tight_response_size_contract() -> HttpEgressContract {
         allowed_authority_set: BTreeSet::from(["api.example.com".to_string()]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 1024,
         private_network_allowances: Default::default(),

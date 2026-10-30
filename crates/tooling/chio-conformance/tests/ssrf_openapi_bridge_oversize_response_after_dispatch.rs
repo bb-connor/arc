@@ -37,7 +37,6 @@ fn tight_response_size_contract() -> HttpEgressContract {
         allowed_authority_set: BTreeSet::from(["127.0.0.1:18080".to_string()]),
         deny_loopback: false,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 64,
         private_network_allowances: Default::default(),

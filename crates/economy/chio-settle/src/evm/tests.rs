@@ -100,7 +100,6 @@ fn hostname_rpc_contract(authority: &str) -> chio_egress_contract::HttpEgressCon
         allowed_authority_set: std::collections::BTreeSet::from([authority.to_string()]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024 * 1024,
         private_network_allowances: Default::default(),

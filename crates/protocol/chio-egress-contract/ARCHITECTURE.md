@@ -44,9 +44,10 @@ byte ceiling.
 Serialization yields policy data. It carries no signature or kernel
 authorization. A prepared handle preserves policy after raw-contract mutation.
 
-Loopback, link-local, and IPv6 ULA denial follow their configured flags.
-Private and special-use classes covered by the classifier deny regardless
-of explicit authority entries. IPv4-mapped IPv6 follows IPv4 classification.
+Loopback and link-local denial follow their configured flags. Private, IPv6
+ULA and special-use classes covered by the classifier deny regardless of
+explicit authority entries; only a pinned private network allowance reaches a
+private or ULA address. IPv4-mapped IPv6 follows IPv4 classification.
 
 DNS checks on a URL alone do not bind a later independent connection.
 The contract client installs a checking resolver and disables proxies and

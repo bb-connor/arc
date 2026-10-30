@@ -3536,15 +3536,16 @@ before any byte leaves the substrate. The contract carries:
 - a tenant-scoped namespace,
 - a lowercase scheme allow-list,
 - an exact authority allow-list,
-- explicit denials for loopback, IPv4/IPv6 link-local, and IPv6 unique-local
-  (`fc00::/7`),
+- explicit denials for loopback and IPv4/IPv6 link-local,
 - a `max_redirect_chain` ceiling that bounds redirect hop count,
 - a `max_response_bytes` ceiling that bounds the observed response body, and
 - `private_network_allowances`, empty by default: each entry pins one
   `host:port` of the authority set to a scheme and a CIDR.
 
-An allowance is the only way a contract reaches a private IPv4 address; IPv6
-unique-local addresses follow `deny_ipv6_ula` unless pinned. Its CIDR
+An allowance is the only way a contract reaches a private IPv4 address or an
+IPv6 unique-local (`fc00::/7`) address; an unpinned unique-local address is
+refused (`Ipv6UlaDenied`). An operator that names a unique-local literal as an
+endpoint URL pins exactly that address, port and scheme. Its CIDR
 MUST lie inside 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 100.64.0.0/10 or
 fc00::/7, MUST be at least a /16 (IPv4) or /48 (IPv6), and MUST NOT intersect
 link-local or the metadata ranges 100.100.100.200/32 and fd00:ec2::/32. Each
@@ -3557,8 +3558,10 @@ Plaintext reaches a private address only through an entry that names `http`.
 When a pinned host resolves, every address in the answer, public or private,
 MUST lie inside the CIDR, or the request is refused. Cloud metadata addresses
 (169.254.169.254, 100.100.100.200, fd00:ec2::/32) are refused for every
-contract: by their address class when its flags deny it, and otherwise as
-`ReservedAddressDenied`. Each allowance set has a SHA-256 digest over its
+contract: the IPv4 ones by their address class when its flags deny it, and
+otherwise as `ReservedAddressDenied`; fd00:ec2::/32 always as
+`ReservedAddressDenied`. Two allowances for one `host:port` are refused at
+load, as `SchemeConflict` when one names `http` and the other `https`. Each allowance set has a SHA-256 digest over its
 RFC 8785 canonical form tagged `chio.egress.private-network-allowance.v1`; a payment
 journal records the digest its rail was dialed under, and recovery refuses a
 rail whose digest changed. Dispatchers check each resolved address with the

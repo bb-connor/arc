@@ -35,7 +35,6 @@ pub(crate) fn default_upstream_egress_contract(
         allowed_authority_set,
         deny_loopback: !host_is_loopback(&host),
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: DEFAULT_UPSTREAM_REDIRECT_LIMIT,
         max_response_bytes: DEFAULT_UPSTREAM_MAX_RESPONSE_BYTES,
         private_network_allowances: Default::default(),

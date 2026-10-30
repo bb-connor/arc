@@ -55,6 +55,7 @@ use chio_core::receipt::body::chio_receipt_id;
 use chio_core::receipt::{body::ChioReceipt, decision::Decision, metadata::GuardEvidence};
 use chio_egress_contract::{
     client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+    PrivateNetworkAllowance,
 };
 
 // -- Severity -----------------------------------------------------------------
@@ -458,8 +459,10 @@ impl OpsGenieBackend {
 /// by both the alert-backend endpoints (PagerDuty/OpsGenie) and the SOC export
 /// sinks (e.g. the generic webhook) so every SIEM egress path derives its
 /// contract the same way. `namespace_prefix` scopes the tenant egress namespace
-/// (`siem:{prefix}:{authority}`); loopback/link-local/ULA denials are relaxed
-/// only when the endpoint explicitly targets such an address.
+/// (`siem:{prefix}:{authority}`); loopback and link-local denials are relaxed
+/// only when the endpoint explicitly targets such an address, and an IPv6
+/// unique-local endpoint literal is pinned as the contract's one private
+/// network allowance.
 pub(crate) fn siem_endpoint_egress_contract(
     namespace_prefix: &str,
     endpoint: &str,
@@ -476,7 +479,6 @@ pub(crate) fn siem_endpoint_egress_contract(
     allowed_authority_set.insert(authority.clone());
     let mut deny_loopback = true;
     let mut deny_link_local = true;
-    let mut deny_ipv6_ula = true;
 
     if let Some(host) = parsed.host() {
         match host {
@@ -509,9 +511,6 @@ pub(crate) fn siem_endpoint_egress_contract(
                 if is_alert_ipv6_unicast_link_local(&address) {
                     deny_link_local = false;
                 }
-                if is_alert_ipv6_unique_local(&address) {
-                    deny_ipv6_ula = false;
-                }
             }
         }
     }
@@ -522,10 +521,11 @@ pub(crate) fn siem_endpoint_egress_contract(
         allowed_authority_set,
         deny_loopback,
         deny_link_local,
-        deny_ipv6_ula,
         max_redirect_chain: 3,
         max_response_bytes: 1024 * 1024,
-        private_network_allowances: Default::default(),
+        private_network_allowances: PrivateNetworkAllowance::for_ipv6_ula_literal(&parsed)
+            .into_iter()
+            .collect(),
     };
     contract.validate().map_err(|error| {
         ExportError::HttpError(format!(
@@ -540,7 +540,7 @@ fn normalized_alert_authority(url: &url::Url) -> Result<String, ExportError> {
         ExportError::HttpError(format!("endpoint URL `{url}` is missing an authority"))
     })?;
     let host = match url.host() {
-        Some(url::Host::Ipv6(_)) => format!("[{}]", host.to_ascii_lowercase()),
+        Some(url::Host::Ipv6(address)) => format!("[{address}]"),
         Some(url::Host::Domain(_)) => host.trim_end_matches('.').to_ascii_lowercase(),
         _ => host.to_ascii_lowercase(),
     };
@@ -552,10 +552,6 @@ fn normalized_alert_authority(url: &url::Url) -> Result<String, ExportError> {
 
 fn is_alert_ipv6_unicast_link_local(address: &std::net::Ipv6Addr) -> bool {
     (address.segments()[0] & 0xffc0) == 0xfe80
-}
-
-fn is_alert_ipv6_unique_local(address: &std::net::Ipv6Addr) -> bool {
-    (address.segments()[0] & 0xfe00) == 0xfc00
 }
 
 impl AlertBackend for OpsGenieBackend {
@@ -875,6 +871,37 @@ mod tests {
         body::ChioReceiptBody, decision::ToolCallAction, metadata::GuardEvidence,
         metadata::ReceiptSemanticFields,
     };
+
+    #[test]
+    fn unique_local_endpoint_is_pinned_as_its_only_private_allowance() {
+        let endpoint = "https://[fd12:3456:789a::7]:8443/hook";
+        let contract = siem_endpoint_egress_contract("webhook", endpoint).unwrap();
+        let pins: Vec<_> = contract
+            .private_network_allowances
+            .iter()
+            .map(|pin| (pin.host.as_str(), pin.port, pin.cidr.to_string()))
+            .collect();
+        assert_eq!(
+            pins,
+            vec![(
+                "fd12:3456:789a::7",
+                8443,
+                "fd12:3456:789a::7/128".to_string()
+            )]
+        );
+        assert!(contract.enforce_url(endpoint, 0).is_ok());
+    }
+
+    #[test]
+    fn unique_local_metadata_endpoint_is_refused_at_load() {
+        match siem_endpoint_egress_contract("webhook", "https://[fd00:ec2::254]:8443/hook") {
+            Err(ExportError::HttpError(message)) => assert!(
+                message.contains("includes the reserved range fd00:ec2::/32"),
+                "{message}"
+            ),
+            other => panic!("metadata endpoint must be refused, got {other:?}"),
+        }
+    }
 
     /// The production serve wiring passes the operator
     /// `CHIO_SIEM_ALERT_*_ENDPOINT` value straight to `with_endpoint`, so a

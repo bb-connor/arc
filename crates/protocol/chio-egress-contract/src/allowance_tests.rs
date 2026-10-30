@@ -45,7 +45,6 @@ fn vpc_contract(allowances: &[PrivateNetworkAllowance]) -> HttpEgressContract {
         ]),
         deny_loopback: true,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1024,
         private_network_allowances: allowances.iter().cloned().collect(),
@@ -153,7 +152,6 @@ fn mapped_ipv6_answer_is_compared_as_ipv4() {
 fn metadata_addresses_are_refused_whatever_the_flags() {
     let mut open = HttpEgressContract::permissive_for_tests("metadata.test:80");
     open.deny_link_local = false;
-    open.deny_ipv6_ula = false;
     for address in ["169.254.169.254", "fd00:ec2::254", "::ffff:169.254.169.254"] {
         let ip: IpAddr = address.parse().expect("ip");
         let shown = match ip {
@@ -617,7 +615,6 @@ fn contract_and_allowance_refuse_unknown_fields() {
         "allowed_authority_set": ["a.example"],
         "deny_loopback": true,
         "deny_link_local": true,
-        "deny_ipv6_ula": true,
         "max_redirect_chain": 0,
         "max_response_bytes": 1,
         "allow_private": true
@@ -764,4 +761,108 @@ fn allowance_set_document_is_strict() {
     }))
     .expect_err("broad CIDR in the document");
     assert!(error.to_string().contains("broader than /16"), "{error}");
+}
+
+fn ula_contract(allowances: serde_json::Value) -> HttpEgressContract {
+    serde_json::from_value(serde_json::json!({
+        "tenant_egress_namespace": "ula",
+        "allowed_schemes": ["https"],
+        "allowed_authority_set": [
+            "ula.example:8443",
+            "other.example:8443",
+            "[fd12:3456:789a::7]:8443"
+        ],
+        "deny_loopback": true,
+        "deny_link_local": true,
+        "max_redirect_chain": 0,
+        "max_response_bytes": 1,
+        "private_network_allowances": allowances
+    }))
+    .expect("contract parses")
+}
+
+#[test]
+fn unique_local_dial_is_admitted_only_through_a_pinned_allowance() {
+    let ula: SocketAddr = "[fd12:3456:789a::7]:8443".parse().expect("addr");
+    let literal = "https://[fd12:3456:789a::7]:8443/";
+
+    let unpinned = ula_contract(serde_json::json!([]));
+    assert_eq!(
+        unpinned.enforce_resolved_address("ula.example", ula),
+        Err(HttpEgressError::Ipv6UlaDenied {
+            host: "ula.example resolved to fd12:3456:789a::7".to_string()
+        })
+    );
+    assert_eq!(
+        unpinned.enforce_url(literal, 0),
+        Err(HttpEgressError::Ipv6UlaDenied {
+            host: "fd12:3456:789a::7".to_string()
+        })
+    );
+
+    let pinned = ula_contract(serde_json::json!([
+        {"host": "ula.example", "port": 8443, "cidr": "fd12:3456:789a::/48"},
+        {"host": "fd12:3456:789a::7", "port": 8443, "cidr": "fd12:3456:789a::7/128"}
+    ]));
+    assert_eq!(pinned.enforce_resolved_address("ula.example", ula), Ok(()));
+    assert!(pinned.enforce_url(literal, 0).is_ok());
+    assert_eq!(
+        pinned.enforce_resolved_address("other.example", ula),
+        Err(HttpEgressError::Ipv6UlaDenied {
+            host: "other.example resolved to fd12:3456:789a::7".to_string()
+        })
+    );
+}
+
+#[test]
+fn contract_refuses_a_unique_local_opt_out() {
+    let error = serde_json::from_value::<HttpEgressContract>(serde_json::json!({
+        "tenant_egress_namespace": "ula",
+        "allowed_schemes": ["https"],
+        "allowed_authority_set": ["[fd12:3456:789a::7]:8443"],
+        "deny_loopback": true,
+        "deny_link_local": true,
+        "deny_ipv6_ula": false,
+        "max_redirect_chain": 0,
+        "max_response_bytes": 1
+    }))
+    .expect_err("unique-local opt-out");
+    assert!(
+        error.to_string().contains("unknown field `deny_ipv6_ula`"),
+        "{error}"
+    );
+}
+
+#[test]
+fn unpinned_unique_local_metadata_reports_the_reserved_range() {
+    let unpinned = ula_contract(serde_json::json!([]));
+    assert_eq!(
+        unpinned
+            .enforce_resolved_address("ula.example", "[fd00:ec2::254]:8443".parse().expect("addr")),
+        Err(HttpEgressError::ReservedAddressDenied {
+            host: "ula.example resolved to fd00:ec2::254".to_string()
+        })
+    );
+}
+
+#[test]
+fn one_host_port_pinned_under_both_schemes_is_a_scheme_conflict() {
+    let contract = dual_scheme(vpc_contract(&[
+        allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+        http_allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+    ]));
+    let error = contract.validate().expect_err("both schemes");
+    assert_eq!(
+        error.to_string(),
+        "invalid private network allowance: allowance for fd12:3456::7:8443 names both http and https"
+    );
+    let error = EgressAllowanceSet::new([
+        allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+        http_allowance("fd12:3456::7", 8443, "fd12:3456::7/128"),
+    ])
+    .expect_err("both schemes");
+    assert_eq!(
+        error.to_string(),
+        "allowance for fd12:3456::7:8443 names both http and https"
+    );
 }
