@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
+# Schema sha256: 29e7de509b9e808e1385895b2caf534b995fb61bf99b87fab79bedc072f5a842
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,6 +14,8 @@ from .delegation_context_schema import ChioDelegationContext, DelegationAnchor, 
 from .enterprise_provider_identity_schema import ChioEnterpriseProviderIdentity, InlineJwks, Kind, SubjectMapping
 from .idp_key_snapshot_body_schema import ChioIdpKeySnapshotV1SignedBody, Key
 from .idp_key_snapshot_schema import ChioIdpKeySnapshot
+from .revocation_admin_request_schema import CapabilityTarget, ChioRevocationAdminRequest
+from .revocation_entry_schema import ChioRevocationEntry, NamedRevocationEntry, RevocationReason, TaggedRevocationEntry, TargetKind, TargetKind1
 from .revocation_request_body_schema import ChioRevocationRequestV1SignedBody
 from .revocation_request_schema import ChioRevocationRequest
 from .root_anchor_schema import AnchorKind, ChioRootAnchor, ClaimValue, Commitment, Crv, Digest, HolderClass, HttpsUrl, Identifier, Jwk, JwsAlgorithm, Kty, PublicKeyHex, RecordedClaims, Salt, SaltRef, SignatureHex, Text, Uri, Use, X5cItem
@@ -23,12 +25,15 @@ from .verifier_trust_schema import CheckpointTrustAnchorBinding, ChioVerifierTru
 
 __all__ = [
     "AnchorKind",
+    "CapabilityTarget",
     "CeilingScope",
     "CheckpointTrustAnchorBinding",
     "ChioDelegationContext",
     "ChioEnterpriseProviderIdentity",
     "ChioIdpKeySnapshot",
     "ChioIdpKeySnapshotV1SignedBody",
+    "ChioRevocationAdminRequest",
+    "ChioRevocationEntry",
     "ChioRevocationRequest",
     "ChioRevocationRequestV1SignedBody",
     "ChioRootAnchor",
@@ -62,6 +67,7 @@ __all__ = [
     "Kty",
     "Match",
     "MatchClaims",
+    "NamedRevocationEntry",
     "Parameters",
     "PublicKeyHex",
     "PublicationIdentity",
@@ -70,6 +76,7 @@ __all__ = [
     "RequiredColumn",
     "ResourceGrant",
     "Result",
+    "RevocationReason",
     "RootPolicyDisclosure",
     "RootPolicyMatch",
     "RootPolicyRule",
@@ -79,6 +86,9 @@ __all__ = [
     "SignatureHex",
     "SubjectCommitment",
     "SubjectMapping",
+    "TaggedRevocationEntry",
+    "TargetKind",
+    "TargetKind1",
     "TenantCommitment",
     "Text",
     "ToolDisclosure",

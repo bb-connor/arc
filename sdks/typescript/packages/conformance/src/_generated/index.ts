@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 3e8e51422168badb635820e4894962c4ca99733a4e9e31eede7818a2f0ec0ba3
+// Schema SHA: 04489c7397c3fceae3091c298bb3794323f880083fc1fc8947f74dae0295b083
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -1786,24 +1786,6 @@ export namespace Capability_Presentation {
      * Who holds the root capability's subject key: the edge session or a Chio-aware caller.
      */
     holder: "edge_session" | "caller";
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Source: spec/schemas/chio-wire/v1/capability/revocation.schema.json
-export namespace Capability_Revocation {
-  /**
-   * A single revocation entry recording that a previously issued capability token (identified by its `id`) is no longer valid as of `revoked_at`. Mirrors `RevocationRecord` in `crates/kernel/chio-kernel/src/revocation_store.rs` (the kernel's persisted revocation row), and is the wire-level companion to the `capability_revoked` kernel notification under `chio-wire/v1/kernel/capability_revoked.schema.json`. Operators read these entries from `/admin/revocations` (hosted edge) and from the trust-control revocation list.
-   */
-  export interface ChioCapabilityRevocationEntry {
-    /**
-     * The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.
-     */
-    capability_id: string;
-    /**
-     * Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape.
-     */
-    revoked_at: number;
   }
 }
 
@@ -66020,6 +66002,94 @@ export namespace RootAuthority_IdpKeySnapshot {
      * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
      */
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/revocation-admin-request.schema.json
+export namespace RootAuthority_RevocationAdminRequest {
+  /**
+   * Body of `POST /admin/revocations` on a hosted edge: one target and a closed reason, strict at every level. The target is a tagged union on `kind`; this version accepts the `capability_id` kind. The response carries the stored `chio.revocation-entry.v1`.
+   */
+  export interface ChioRevocationAdminRequest {
+    target: CapabilityTarget;
+    /**
+     * Closed set of revocation reasons. The first write's reason stands.
+     */
+    reason:
+      | "operator_request"
+      | "credential_compromise"
+      | "principal_offboarded"
+      | "tenant_offboarded"
+      | "policy_withdrawn"
+      | "incident_response";
+  }
+  export interface CapabilityTarget {
+    kind: "capability_id";
+    /**
+     * The capability to revoke, with every descendant.
+     */
+    capability_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json
+export namespace RootAuthority_RevocationEntry {
+  /**
+   * `chio.revocation-entry.v1`, unsigned. One stored revocation: its target is a closed kind and value, `entry_id` is `rev_` and the lowercase hex of SHA-256(`chio.revocation-entry-id.v1` NUL, kind, NUL, value), so retrying the same target names the same entry. A `capability_id` target revokes that capability and every descendant; the other kinds revoke every anchored root they match. Subject and tenant targets hold keyed tags, never plaintext. Operators write entries through `POST /admin/revocations` and trust-control `POST /v1/revocations`; a denial names the matching `entry_id`. A decoder also checks that `entry_id` is the id the target derives, which a schema cannot express.
+   */
+  export type ChioRevocationEntry = ChioNamedRevocationEntry | ChioTaggedRevocationEntry;
+  /**
+   * Closed set of revocation reasons. The first write's reason stands.
+   */
+  export type RevocationReason =
+    | "operator_request"
+    | "credential_compromise"
+    | "principal_offboarded"
+    | "tenant_offboarded"
+    | "policy_withdrawn"
+    | "incident_response";
+
+  export interface ChioNamedRevocationEntry {
+    schema: "chio.revocation-entry.v1";
+    /**
+     * `rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it.
+     */
+    entry_id: string;
+    /**
+     * Target kinds whose value is an identifier.
+     */
+    target_kind: "capability_id" | "root_policy_rule";
+    /**
+     * The capability id or root policy rule id: 1 to 512 NUL-free characters.
+     */
+    target_value: string;
+    /**
+     * Unix seconds at which the first write of this entry took effect.
+     */
+    revoked_at: number;
+    reason: RevocationReason;
+  }
+  export interface ChioTaggedRevocationEntry {
+    schema: "chio.revocation-entry.v1";
+    /**
+     * `rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it.
+     */
+    entry_id: string;
+    /**
+     * Target kinds whose value is a 64-hex digest.
+     */
+    target_kind: "anchor_subject" | "tenant_tag" | "replay_key";
+    /**
+     * The keyed subject tag, tenant tag or replay key digest: 64 lowercase hex characters.
+     */
+    target_value: string;
+    /**
+     * Unix seconds at which the first write of this entry took effect.
+     */
+    revoked_at: number;
+    reason: RevocationReason;
   }
 }
 

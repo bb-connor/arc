@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
+# Schema sha256: 29e7de509b9e808e1385895b2caf534b995fb61bf99b87fab79bedc072f5a842
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -24,7 +24,6 @@ from .governed_approval_token_schema import ChioGovernedApprovalToken, Decision,
 from .governed_upstream_call_chain_proof_schema import ChioGovernedUpstreamCallChainProofSignedBody
 from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
 from .presentation_schema import ChioCapabilityPresentation
-from .revocation_schema import ChioCapabilityRevocationEntry
 from .security_binding_schema import ChioCapabilitySecurityBinding, SecurityBindingText
 from .supplemental_authorization_schema import ChioOpaqueSupplementalAuthorization
 from .threshold_approval_proposal_body_schema import ChioThresholdApprovalProposalV1SignedBody
@@ -54,7 +53,6 @@ __all__ = [
     "ChioCapabilityGrant",
     "ChioCapabilityNegotiationV1",
     "ChioCapabilityPresentation",
-    "ChioCapabilityRevocationEntry",
     "ChioCapabilitySecurityBinding",
     "ChioCapabilityV1SignedBody",
     "ChioCapabilitytoken",
