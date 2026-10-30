@@ -46,7 +46,8 @@ fn serve_http_start(global: &[&str]) -> Result<(), CliError> {
 fn refusal(global: &[&str]) -> String {
     match serve_http_start(global) {
         Ok(()) => panic!("serve-http started with {global:?}"),
-        Err(error) => error.to_string(),
+        Err(CliError::Chio(error)) => error.message().to_string(),
+        Err(error) => panic!("serve-http refused {global:?} outside the registry: {error}"),
     }
 }
 
