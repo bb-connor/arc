@@ -640,3 +640,62 @@ fn admission_operation_catalog_refuses_nul_padding() -> TestResult {
     assert!(probed > 150, "{probed} bounded admission columns");
     Ok(())
 }
+
+#[test]
+fn root_exchange_store_refuses_nul_padding() -> TestResult {
+    let catalog = catalog(include_str!("root_exchange_store.sql"))?;
+    for (table, column) in [
+        ("root_exchange_events", "digest"),
+        ("root_exchange_replay", "replay_key_digest"),
+        ("root_exchange_replay_bindings", "replay_key_digest"),
+        ("root_exchange_bearer_bindings", "token_digest"),
+        ("root_exchange_roots", "tag_key_id"),
+        ("root_exchange_roots", "subject_tag"),
+        ("root_exchange_roots", "tenant_tag"),
+        ("root_exchange_roots", "replay_key_digest"),
+        ("root_exchange_roots", "artifact_digest"),
+        ("root_exchange_roots", "request_digest"),
+        ("root_exchange_roots", "root_policy_digest"),
+        ("root_exchange_roots", "provider_identity_digest"),
+        ("root_exchange_roots", "key_snapshot_digest"),
+        ("root_exchange_roots", "context_digest"),
+        ("root_exchange_roots", "authorization_projection_digest"),
+        ("root_exchange_bearer_tokens", "token_digest"),
+        ("root_exchange_key_snapshots", "snapshot_digest"),
+        ("root_exchange_policies", "root_policy_digest"),
+        (
+            "root_exchange_provider_identities",
+            "provider_identity_digest",
+        ),
+    ] {
+        assert_column_refuses_nul_padding(&catalog, table, column, Bound::ExactText(HEX64))?;
+    }
+    for (table, column, valid) in [
+        ("root_exchange_events", "subject", "cap-1"),
+        ("root_exchange_replay", "capability_id", "cap-1"),
+        ("root_exchange_replay_bindings", "capability_id", "cap-1"),
+        ("root_exchange_bearer_bindings", "capability_id", "cap-1"),
+        ("root_exchange_roots", "capability_id", "cap-1"),
+        ("root_exchange_roots", "root_policy_rule_id", "rule-1"),
+        ("root_exchange_roots", "client_id", "client-1"),
+        (
+            "root_exchange_key_snapshots",
+            "issuer",
+            "https://idp.example",
+        ),
+        ("root_exchange_openings", "capability_id", "cap-1"),
+        ("root_exchange_openings", "salt_ref", "anchor.sub"),
+    ] {
+        assert_column_refuses_nul_padding(&catalog, table, column, Bound::Text(valid))?;
+    }
+    for (table, column, len) in [
+        ("root_exchange_roots", "delegation_context", 2),
+        ("root_exchange_roots", "root_capability", 2),
+        ("root_exchange_key_snapshots", "snapshot", 2),
+        ("root_exchange_policies", "policy", 2),
+        ("root_exchange_provider_identities", "identity", 2),
+    ] {
+        assert_column_refuses_nul_padding(&catalog, table, column, Bound::Blob(len))?;
+    }
+    Ok(())
+}

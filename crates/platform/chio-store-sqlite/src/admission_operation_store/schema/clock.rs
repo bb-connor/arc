@@ -17,7 +17,7 @@ pub(crate) fn verify_trusted_time(
 /// Time for live authorization checks, not for serialized decision evidence.
 /// Neither a delayed request nor a caller clock ahead of this authority may
 /// extend the lifetime of a lease, nonce, approval, or other expiring authority.
-pub(in crate::admission_operation_store) fn authority_validation_time(
+pub(crate) fn authority_validation_time(
     transaction: &Transaction<'_>,
     decision_time: u64,
     owner: &SqliteServingOwner,

@@ -2,8 +2,7 @@ use super::*;
 
 mod clock;
 
-pub(super) use clock::authority_validation_time;
-pub(crate) use clock::{observe_authority_time, verify_trusted_time};
+pub(crate) use clock::{authority_validation_time, observe_authority_time, verify_trusted_time};
 
 /// The admission v1 schema: every table family, in creation order. A store is
 /// created from exactly this list and every open is verified against it.

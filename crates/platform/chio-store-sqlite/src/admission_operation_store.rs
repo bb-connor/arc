@@ -232,11 +232,12 @@ pub(crate) use runtime_source::{
     verify_runtime_source_projection_coverage,
 };
 pub use runtime_source::{RuntimeSourceRecordV1, RuntimeSourceRequalificationInput};
-use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use schema::{
-    initialize_admission_operation_schema, observe_authority_time, validate_trusted_time,
-    verify_active_owner, verify_admission_operation_invariants, verify_trusted_time,
+    authority_validation_time, initialize_admission_operation_schema, observe_authority_time,
+    validate_trusted_time, verify_active_owner, verify_admission_operation_invariants,
+    verify_trusted_time,
 };
+use schema::{coordinator_lease_id_for_epoch, recovery_claim_digest, verify_latest_commit};
 pub(crate) use security_participant_migration::{
     security_participant_projection_reference, verify_security_participant_migration_coverage,
     verify_security_participant_migration_pristine,
