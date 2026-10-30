@@ -5,10 +5,11 @@ use std::error::Error as _;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
+use chio_control_plane::enterprise_federation::load_enterprise_provider_registry;
 use chio_control_plane::CliError;
 use chio_core::canonical::{canonical_json_bytes, UntrustedJsonError};
 use chio_core::crypto::sha256_hex;
+use chio_core::enterprise_provider::EnterpriseProviderRegistry;
 use chio_errors::_generated::error_codes::{
     CLI_IO, CLI_JSON, TRANSPORT_PROVIDER_REGISTRY_INVALID, TRANSPORT_PROVIDER_REGISTRY_OVERSIZED,
     TRANSPORT_PROVIDER_REGISTRY_UNREADABLE,
@@ -109,7 +110,7 @@ impl EnterpriseProviderRegistryFile {
     }
 
     fn read(&self) -> Result<EnterpriseProviderRegistry, EnterpriseProviderRegistryRefusal> {
-        EnterpriseProviderRegistry::load(&self.path)
+        load_enterprise_provider_registry(&self.path)
             .map_err(EnterpriseProviderRegistryRefusal::from)
     }
 

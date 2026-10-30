@@ -838,8 +838,16 @@ pub(crate) enum McpCommands {
         auth_introspection_client_secret: Option<String>,
 
         /// Optional provider profile used for principal mapping and default OIDC discovery behavior.
-        #[arg(long, value_enum)]
-        auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
+        #[arg(
+            long,
+            value_parser = clap::builder::TypedValueParser::try_map(
+                clap::builder::PossibleValuesParser::new(
+                    chio_core_types::enterprise_provider::JwtProviderProfile::ALL.map(chio_core_types::enterprise_provider::JwtProviderProfile::as_str),
+                ),
+                |name| name.parse::<chio_core_types::enterprise_provider::JwtProviderProfile>(),
+            )
+        )]
+        auth_jwt_provider_profile: Option<chio_core_types::enterprise_provider::JwtProviderProfile>,
 
         /// Local auth-server signing seed file. When set, `serve-http` can issue JWTs itself.
         #[arg(long)]

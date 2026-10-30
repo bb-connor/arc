@@ -3050,7 +3050,6 @@ dependencies = [
  "chio-underwriting",
  "chrono",
  "ciborium",
- "clap 4.6.0",
  "futures-util",
  "hex",
  "jsonschema",

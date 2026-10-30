@@ -1261,7 +1261,7 @@ pub(crate) fn cmd_mcp_serve_http(
     auth_introspection_url: Option<&str>,
     auth_introspection_client_id: Option<&str>,
     auth_introspection_client_secret: Option<&str>,
-    auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
+    auth_jwt_provider_profile: Option<chio_core_types::enterprise_provider::JwtProviderProfile>,
     auth_server_seed_file: Option<&Path>,
     identity_federation_seed_file: Option<&Path>,
     enterprise_providers_file: Option<&Path>,

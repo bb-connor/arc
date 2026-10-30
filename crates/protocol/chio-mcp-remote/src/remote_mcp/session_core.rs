@@ -23,6 +23,10 @@ use base64::Engine;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{sha256_hex, Keypair, PublicKey, Signature as Ed25519Signature};
+use chio_core::enterprise_provider::{
+    EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
+    JwtProviderProfile,
+};
 use chio_core::session::{
     ChioIdentityAssertion, EnterpriseFederationMethod, EnterpriseIdentityContext,
     OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
@@ -75,9 +79,6 @@ use chio_control_plane::trust_control::{
 use chio_control_plane::{
     authority_public_key_from_seed_file, configure_budget_store, configure_capability_authority,
     configure_receipt_store, configure_revocation_store, durable_admission_sidecar_path,
-    enterprise_federation::{
-        EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
-    },
     issue_default_capabilities, load_or_create_authority_keypair, open_durable_admission_runtime,
     require_control_token, rotate_authority_keypair, validate_distinct_database_paths,
     validate_durable_admission_participant_paths, DurableAdmissionRuntime,

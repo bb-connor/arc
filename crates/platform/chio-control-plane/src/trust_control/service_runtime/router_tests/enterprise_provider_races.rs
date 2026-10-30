@@ -3,7 +3,9 @@
 //! and its write must be refused, so no committed change is lost.
 
 use super::*;
-use crate::enterprise_federation::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
+use chio_core_types::enterprise_provider::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
+
+use crate::enterprise_federation::load_enterprise_provider_registry;
 
 fn provider(provider_id: &str) -> Result<EnterpriseProviderRecord, Box<dyn std::error::Error>> {
     Ok(serde_json::from_value(serde_json::json!({
@@ -76,7 +78,7 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
     assert_eq!(response.status(), StatusCode::OK);
     if status == StatusCode::OK {
         assert!(
-            !EnterpriseProviderRegistry::load(&path)?
+            !load_enterprise_provider_registry(&path)?
                 .providers
                 .contains_key("removed"),
             "an unrelated provider upsert restored a committed provider deletion"
@@ -95,7 +97,7 @@ async fn an_unrelated_provider_upsert_cannot_restore_a_deleted_provider() -> Tes
     )
     .await;
     assert_eq!(response.status(), StatusCode::OK);
-    let reopened = EnterpriseProviderRegistry::load(&path)?;
+    let reopened = load_enterprise_provider_registry(&path)?;
     assert!(!reopened.providers.contains_key("removed"));
     assert!(reopened.providers.contains_key("unrelated"));
     Ok(())

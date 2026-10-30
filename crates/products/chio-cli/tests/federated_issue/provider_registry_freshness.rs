@@ -3,7 +3,7 @@
 //! the next issuance without a restart.
 
 use super::super::*;
-use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
+use chio_control_plane::enterprise_federation::load_enterprise_provider_registry;
 
 #[test]
 fn federated_issue_refuses_a_provider_record_disabled_after_startup() {
@@ -84,7 +84,7 @@ fn federated_issue_refuses_a_provider_registry_corrupted_after_startup() {
         .challenge_path
         .with_file_name("enterprise-providers.json");
     fs::write(&providers_path, b"{\"version\":").expect("corrupt enterprise provider registry");
-    let expected = EnterpriseProviderRegistry::load(&providers_path)
+    let expected = load_enterprise_provider_registry(&providers_path)
         .expect_err("a truncated registry loaded")
         .to_string();
 

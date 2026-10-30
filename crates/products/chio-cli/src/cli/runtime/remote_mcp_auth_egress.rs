@@ -1,10 +1,10 @@
-use super::{remote_mcp, CliError};
+use super::CliError;
 
 pub(crate) fn remote_mcp_auth_egress_contract(
     server_id: &str,
     auth_jwt_discovery_url: Option<&str>,
     auth_introspection_url: Option<&str>,
-    auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
+    auth_jwt_provider_profile: Option<chio_core_types::enterprise_provider::JwtProviderProfile>,
     auth_jwt_issuer: Option<&str>,
     auth_jwks_uri: Option<&str>,
 ) -> Result<Option<chio_egress_contract::HttpEgressContract>, CliError> {

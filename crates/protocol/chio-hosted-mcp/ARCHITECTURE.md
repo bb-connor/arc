@@ -9,7 +9,7 @@ modules, transport implementations, or session state machines in this crate.
 The facade allows downstream hosts to import setup and serving APIs together.
 
 `serve_http` and `RemoteServeHttpConfig` come from `chio-mcp-remote`.
-`CliError` and `JwtProviderProfile` come from `chio-control-plane`.
+`CliError` comes from `chio-control-plane`.
 Authority, policy, storage, federation, and trust-control helpers also come
 from the control-plane dependency. Their implementations own their checks.
 

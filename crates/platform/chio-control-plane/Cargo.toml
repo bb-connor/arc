@@ -81,7 +81,6 @@ serde_json = { workspace = true }
 yaml_serde = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
-clap = { version = "4", features = ["derive"] }
 tracing = { workspace = true }
 tokio = { workspace = true }
 sha2 = { workspace = true }

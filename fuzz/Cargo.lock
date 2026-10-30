@@ -1655,7 +1655,6 @@ dependencies = [
  "chio-underwriting",
  "chrono",
  "ciborium",
- "clap",
  "futures-util",
  "hex",
  "libc",

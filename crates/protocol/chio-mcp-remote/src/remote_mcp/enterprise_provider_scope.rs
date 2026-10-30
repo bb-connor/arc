@@ -1,7 +1,7 @@
-use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
+use chio_core::enterprise_provider::EnterpriseProviderRegistry;
 use serde::Serialize;
 
-use crate::{canonicalize_federated_issuer, enterprise_provider_kind_name, SessionAuthMethod};
+use crate::{canonicalize_federated_issuer, SessionAuthMethod};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "scope", rename_all = "snake_case")]
@@ -54,7 +54,7 @@ impl RegistryDigestScope {
                 selected_provider.as_deref() == Some(id.as_str())
                     || (provider_kind
                         .as_deref()
-                        .is_none_or(|kind| kind == enterprise_provider_kind_name(&provider.kind))
+                        .is_none_or(|kind| kind == provider.kind.as_str())
                         && issuer.as_ref().is_none_or(|issuer| {
                             provider
                                 .issuer

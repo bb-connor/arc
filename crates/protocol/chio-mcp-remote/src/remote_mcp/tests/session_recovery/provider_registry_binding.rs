@@ -3,7 +3,7 @@ use super::super::enterprise_provider_freshness::{
 };
 use super::cursor_seed::{ready_factory_session, ReadOnlyTransport};
 use super::*;
-use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
+use chio_control_plane::enterprise_federation::load_enterprise_provider_registry;
 
 #[tokio::test]
 async fn static_bearer_resume_ignores_provider_record_changes(
@@ -132,7 +132,7 @@ async fn registry_scope_case(enterprise: bool) -> Result<(), Box<dyn std::error:
     assert_eq!(*bytes, bound + 1);
 
     std::fs::remove_file(&registry_path)?;
-    let expected = EnterpriseProviderRegistry::load(&registry_path)
+    let expected = load_enterprise_provider_registry(&registry_path)
         .err()
         .ok_or("a missing provider registry loaded")?;
     let unreadable = factory

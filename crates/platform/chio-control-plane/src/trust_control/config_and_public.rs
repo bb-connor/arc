@@ -340,7 +340,7 @@ pub(crate) fn validate_enterprise_provider_registry(
     let Some(path) = path else {
         return Ok(());
     };
-    let registry = EnterpriseProviderRegistry::load(path)?;
+    let registry = load_enterprise_provider_registry(path)?;
     for record in registry.providers.values() {
         if !record.validation_errors.is_empty() {
             warn!(
@@ -544,7 +544,7 @@ pub(crate) fn load_enterprise_provider_registry_for_admin(
 ) -> Result<(PathBuf, EnterpriseProviderRegistry), CliError> {
     let path = configured_enterprise_provider_registry_path(config)?.to_path_buf();
     let registry = if path.exists() {
-        EnterpriseProviderRegistry::load(&path)?
+        load_enterprise_provider_registry(&path)?
     } else {
         EnterpriseProviderRegistry::default()
     };
@@ -1346,14 +1346,7 @@ pub(crate) fn build_enterprise_admission_audit(
         provider_id: identity.provider_id.clone(),
         provider_record_id: identity.provider_record_id.clone(),
         provider_kind: provider
-            .map(|record| match &record.kind {
-                crate::enterprise_federation::EnterpriseProviderKind::OidcJwks => "oidc_jwks",
-                crate::enterprise_federation::EnterpriseProviderKind::OauthIntrospection => {
-                    "oauth_introspection"
-                }
-                crate::enterprise_federation::EnterpriseProviderKind::Scim => "scim",
-                crate::enterprise_federation::EnterpriseProviderKind::Saml => "saml",
-            })
+            .map(|record| record.kind.as_str())
             .unwrap_or(identity.provider_kind.as_str())
             .to_string(),
         federation_method: match &identity.federation_method {

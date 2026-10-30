@@ -174,7 +174,7 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
     let clock_now = unix_timestamp_now()?;
     let enterprise_provider_summary =
         if let Some(path) = state.config.enterprise_providers_file.as_deref() {
-            match EnterpriseProviderRegistry::load(path) {
+            match load_enterprise_provider_registry(path) {
                 Ok(registry) => {
                     let configured_counts = enterprise_provider_health_counts(&registry);
                     json!({
@@ -538,7 +538,7 @@ mod tests {
             saml_metadata_url: None,
             tenant_id: None,
             organization_id: None,
-            subject_mapping: crate::enterprise_federation::EnterpriseSubjectMapping {
+            subject_mapping: chio_core_types::enterprise_provider::EnterpriseSubjectMapping {
                 principal_source: "sub".to_string(),
                 client_id_field: None,
                 object_id_field: None,

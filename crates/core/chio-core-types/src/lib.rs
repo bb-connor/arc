@@ -43,6 +43,7 @@ pub mod crypto;
 pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
+pub mod enterprise_provider;
 #[cfg(feature = "tenant-index")]
 pub mod enterprise_subject;
 pub mod error;

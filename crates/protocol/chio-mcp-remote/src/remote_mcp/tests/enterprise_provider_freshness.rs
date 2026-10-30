@@ -3,7 +3,7 @@
 //! mutation governs the next request and an unusable registry refuses it.
 
 use super::*;
-use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
+use chio_control_plane::enterprise_federation::load_enterprise_provider_registry;
 
 pub(super) const ISSUER: &str = "https://issuer.enterprise.example";
 
@@ -242,7 +242,7 @@ async fn a_provider_registry_corrupted_after_startup_refuses_the_next_request() 
     fixture.admitted();
 
     std::fs::write(&fixture.path, b"{\"version\":").unwrap();
-    let expected_cause = EnterpriseProviderRegistry::load(&fixture.path)
+    let expected_cause = load_enterprise_provider_registry(&fixture.path)
         .expect_err("a truncated registry loaded")
         .to_string();
     let refused = fixture
@@ -289,7 +289,7 @@ async fn a_provider_registry_unreadable_at_request_time_refuses_the_request() {
     fixture.admitted();
 
     std::fs::remove_file(&fixture.path).unwrap();
-    let expected_cause = EnterpriseProviderRegistry::load(&fixture.path)
+    let expected_cause = load_enterprise_provider_registry(&fixture.path)
         .expect_err("a missing registry loaded")
         .to_string();
     let refused = fixture
@@ -310,7 +310,7 @@ async fn a_provider_registry_unreadable_at_request_time_refuses_the_request() {
 fn startup_refuses_an_unreadable_provider_registry_with_its_cause() {
     let directory = chio_test_support::private_tempdir().unwrap();
     let path = directory.path().join("enterprise-providers.json");
-    let expected = EnterpriseProviderRegistry::load(&path)
+    let expected = load_enterprise_provider_registry(&path)
         .expect_err("a missing registry loaded")
         .to_string();
     let error = enterprise_provider_registry_file(Some(&path), "remote_mcp")

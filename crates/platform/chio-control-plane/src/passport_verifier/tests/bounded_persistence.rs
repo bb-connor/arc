@@ -385,12 +385,12 @@ fn verifier_policy_registry_over_the_read_cap_is_refused_at_load() -> TestResult
 
 #[test]
 fn enterprise_provider_registry_over_the_read_cap_is_refused_at_load() -> TestResult {
-    use crate::enterprise_federation::EnterpriseProviderRegistry;
+    use crate::enterprise_federation::load_enterprise_provider_registry;
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("enterprise-providers.json");
     let document = r#"{"version":"chio.enterprise-providers.v1","providers":{}}"#;
     fs::write(&path, padded_document(document, MAX_SIGNED_FILE_BYTES))?;
-    assert!(EnterpriseProviderRegistry::load(&path)?
+    assert!(load_enterprise_provider_registry(&path)?
         .providers
         .is_empty());
 
@@ -399,7 +399,7 @@ fn enterprise_provider_registry_over_the_read_cap_is_refused_at_load() -> TestRe
     let expected = crate::signed_input::decode::<serde_json::Value>(&oversized)
         .err()
         .ok_or("an oversized document decoded")?;
-    let error = EnterpriseProviderRegistry::load(&path)
+    let error = load_enterprise_provider_registry(&path)
         .err()
         .ok_or("an oversized enterprise provider registry loaded")?;
     assert_eq!(error.to_string(), expected.to_string());

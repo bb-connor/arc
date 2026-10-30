@@ -1,7 +1,11 @@
 use std::fs;
 use std::path::Path;
 
-use crate::enterprise_federation::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
+use chio_core_types::enterprise_provider::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
+
+use crate::enterprise_federation::{
+    load_enterprise_provider_registry, update_enterprise_provider_registry,
+};
 use crate::federation_policy::{
     FederationAdmissionEvaluationRequest, FederationAdmissionPolicyDeleteResponse,
     FederationAdmissionPolicyListResponse, FederationAdmissionPolicyRecord,
@@ -43,7 +47,7 @@ fn load_enterprise_provider_registry_local(
     path: &Path,
 ) -> Result<EnterpriseProviderRegistry, CliError> {
     if path.exists() {
-        EnterpriseProviderRegistry::load(path)
+        load_enterprise_provider_registry(path)
     } else {
         Ok(EnterpriseProviderRegistry::default())
     }
@@ -170,7 +174,7 @@ pub(crate) fn cmd_trust_provider_upsert(
             .upsert_enterprise_provider(&provider.provider_id, &provider)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        EnterpriseProviderRegistry::update(path, |registry| {
+        update_enterprise_provider_registry(path, |registry| {
             Ok::<_, CliError>(registry.upsert(provider))
         })?
     };
@@ -197,7 +201,7 @@ pub(crate) fn cmd_trust_provider_delete(
             .delete_enterprise_provider(provider_id)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let deleted = EnterpriseProviderRegistry::update(path, |registry| {
+        let deleted = update_enterprise_provider_registry(path, |registry| {
             Ok::<_, CliError>(registry.remove(provider_id))
         })?;
         trust_control::EnterpriseProviderDeleteResponse {

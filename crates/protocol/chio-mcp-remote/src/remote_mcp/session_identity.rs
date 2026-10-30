@@ -547,7 +547,7 @@ fn build_enterprise_identity_context(
     EnterpriseIdentityContext {
         provider_id: provider_id.clone(),
         provider_record_id: matched_provider.map(|provider| provider.provider_id.clone()),
-        provider_kind: enterprise_provider_kind_name(&provider_kind).to_string(),
+        provider_kind: provider_kind.as_str().to_string(),
         federation_method: enterprise_federation_method(&provider_kind),
         principal: principal.to_string(),
         subject_key: derive_enterprise_subject_key(&provider_id, principal),
@@ -561,15 +561,6 @@ fn build_enterprise_identity_context(
         attribute_sources,
         trust_material_ref: matched_provider
             .and_then(|provider| provider.provenance.trust_material_ref.clone()),
-    }
-}
-
-fn enterprise_provider_kind_name(kind: &EnterpriseProviderKind) -> &'static str {
-    match kind {
-        EnterpriseProviderKind::OidcJwks => "oidc_jwks",
-        EnterpriseProviderKind::OauthIntrospection => "oauth_introspection",
-        EnterpriseProviderKind::Scim => "scim",
-        EnterpriseProviderKind::Saml => "saml",
     }
 }
 

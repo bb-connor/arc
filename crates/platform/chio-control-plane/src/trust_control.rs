@@ -60,6 +60,9 @@ use chio_core::session::{
     ChioIdentityAssertion, EnterpriseIdentityContext, OperationTerminalState,
 };
 use chio_core::{canonical_json_bytes, sha256_hex, Signature};
+use chio_core_types::enterprise_provider::{
+    EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
+};
 use chio_credentials::{
     build_chio_passport_jwt_vc_json_type_metadata, build_chio_passport_sd_jwt_type_metadata,
     build_oid4vp_request_transport, build_portable_jwks, build_portable_negative_event_artifact,
@@ -268,8 +271,8 @@ use crate::{
         CertificationTransparencyResponse, SignedCertificationCheck,
     },
     enterprise_federation::{
-        CertificationDiscoveryNetwork, EnterpriseProviderKind, EnterpriseProviderRecord,
-        EnterpriseProviderRegistry,
+        load_enterprise_provider_registry, update_enterprise_provider_registry,
+        CertificationDiscoveryNetwork,
     },
     evidence_export,
     federation_policy::{

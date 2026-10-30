@@ -21,7 +21,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
-use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_control_plane::scim_lifecycle::{
     build_scim_user_record, derive_enterprise_subject_key, ScimLifecycleRegistry, ScimUserResource,
     CHIO_SCIM_USER_EXTENSION_SCHEMA, SCIM_CORE_USER_SCHEMA,
@@ -32,6 +31,7 @@ use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::ReceiptAttributionMetadata,
 };
+use chio_core_types::enterprise_provider::EnterpriseProviderRecord;
 use chio_kernel::{BudgetStore, CapabilityAuthority, LocalCapabilityAuthority, ReceiptStore};
 use chio_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};

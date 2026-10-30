@@ -365,7 +365,7 @@ pub(crate) async fn handle_upsert_enterprise_provider(
     record.provider_id = provider_id;
     let lane = state.operator_registry_write_lane.clone();
     run_registry_transaction(&lane, move || {
-        EnterpriseProviderRegistry::update(&path, |registry| {
+        update_enterprise_provider_registry(&path, |registry| {
             Ok::<_, RegistryOperationError>(registry.upsert(record))
         })
     })
@@ -393,7 +393,7 @@ pub(crate) async fn handle_delete_enterprise_provider(
     };
     let lane = state.operator_registry_write_lane.clone();
     run_registry_transaction(&lane, move || {
-        EnterpriseProviderRegistry::update(&path, |registry| {
+        update_enterprise_provider_registry(&path, |registry| {
             let deleted = registry.remove(&provider_id);
             Ok::<_, RegistryOperationError>(EnterpriseProviderDeleteResponse {
                 provider_id,

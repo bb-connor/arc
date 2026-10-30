@@ -7,8 +7,8 @@ use chio_core::sha256_hex;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::enterprise_federation::{EnterpriseProviderKind, EnterpriseProviderRecord};
 use crate::CliError;
+use chio_core_types::enterprise_provider::{EnterpriseProviderKind, EnterpriseProviderRecord};
 
 const MAX_REGISTRY_BYTES: usize = 64 * 1024 * 1024;
 

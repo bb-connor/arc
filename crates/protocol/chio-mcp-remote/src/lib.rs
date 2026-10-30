@@ -28,7 +28,7 @@ use input::{
 pub use transport_identity::TrustedProxyConfig;
 use transport_identity::{SenderRequest, TransportIdentity};
 
-pub use chio_control_plane::{CliError, JwtProviderProfile};
+pub use chio_control_plane::CliError;
 
 #[path = "remote_mcp/admin.rs"]
 mod remote_mcp_admin;

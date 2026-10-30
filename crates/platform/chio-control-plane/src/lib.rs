@@ -101,16 +101,6 @@ impl chio_kernel::threshold_approval::ThresholdApprovalRequirementResolver
     }
 }
 
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum, serde::Serialize, serde::Deserialize,
-)]
-pub enum JwtProviderProfile {
-    Generic,
-    Auth0,
-    Okta,
-    AzureAd,
-}
-
 pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) -> ChioKernel {
     build_kernel_with_clock(
         loaded_policy,

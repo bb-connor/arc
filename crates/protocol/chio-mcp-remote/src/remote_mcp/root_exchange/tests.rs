@@ -20,10 +20,10 @@ use crate::root_exchange::{
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::enterprise_provider::EnterpriseProviderRecord;
 use chio_core::rng::{Rng, RngError};
 use chio_core::root_authority::{
     check_root_consistency, ClaimValue, EnterpriseProviderIdentity, HolderClass, IdpKeySnapshot,

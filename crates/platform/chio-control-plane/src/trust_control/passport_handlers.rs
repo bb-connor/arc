@@ -1656,7 +1656,7 @@ pub(crate) async fn execute_federated_issue(
     if let Some(identity) = payload.enterprise_identity.as_ref() {
         let provider_registry = match state.config.enterprise_providers_file.as_deref() {
             Some(path) if identity.provider_record_id.is_some() => {
-                match EnterpriseProviderRegistry::load(path) {
+                match load_enterprise_provider_registry(path) {
                     Ok(registry) => Some(registry),
                     Err(error) => {
                         return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()))
