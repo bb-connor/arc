@@ -125,7 +125,11 @@ impl Default for FederationAdmissionPolicyRegistry {
 
 impl FederationAdmissionPolicyRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        match chio_secure_ipc::regular_file::read_regular_file(path, MAX_REGISTRY_BYTES) {
+        match chio_secure_ipc::regular_file::read_regular_file(
+            path,
+            chio_secure_ipc::regular_file::OpenPolicy::Authenticated,
+            MAX_REGISTRY_BYTES,
+        ) {
             Ok(bytes) => {
                 let mut registry: Self =
                     chio_core::canonical::UntrustedJsonText::from_wire(&bytes, MAX_REGISTRY_BYTES)

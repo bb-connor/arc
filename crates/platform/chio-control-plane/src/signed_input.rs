@@ -17,7 +17,11 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) mod read_pause;
 
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
-    chio_secure_ipc::regular_file::read_regular_file(path, MAX_SIGNED_FILE_BYTES)
+    chio_secure_ipc::regular_file::read_regular_file(
+        path,
+        chio_secure_ipc::regular_file::OpenPolicy::Authenticated,
+        MAX_SIGNED_FILE_BYTES,
+    )
 }
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
