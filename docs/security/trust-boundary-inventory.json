@@ -6764,7 +6764,7 @@
       "open_raw::from_slice"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
-      "parse::from_value"
+      "from_members::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -12358,10 +12358,10 @@
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": {
       "kind": "typed-value-conversion",
-      "contract": "Converts the JSON object that the bounded, duplicate-refusing input reader admitted, after the schema and signature members are removed. The signature over the converted request is verified against the operator key the caller pins, so this site establishes no authority.",
+      "contract": "Converts the JSON object that the bounded, duplicate-refusing input reader admitted, with the schema and signature members removed from a signed request, after the required tenant_value is found present. A signed request's signature over the converted request is verified against the operator key the caller pins, so this site establishes no authority.",
       "readers": [
         {
-          "reader": "parse#2",
+          "reader": "from_members",
           "decoders": [
             "from_value"
           ],
