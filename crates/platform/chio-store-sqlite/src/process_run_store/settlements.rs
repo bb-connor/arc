@@ -1,0 +1,62 @@
+use super::{bounded, immediate, limit, storage_error, workers, SqliteRunJournal};
+use chio_process::run_journal::{settle, ChildOutcome, ChildSettlement, JournalError, MAX_WORKERS};
+use rusqlite::params;
+
+pub(super) const LIST: &str =
+    "SELECT parent,child,request_id FROM run_child_settlements ORDER BY parent,child LIMIT ?1";
+const RECORD: &str =
+    "INSERT OR IGNORE INTO run_child_settlements(parent,child,request_id) VALUES(?1,?2,?3)";
+
+impl SqliteRunJournal {
+    /// Each child has one parent, so settlements share the worker bound.
+    pub fn settlements(&self) -> Result<Vec<ChildSettlement>, JournalError> {
+        let rows = self
+            .db
+            .prepare(LIST)
+            .map_err(storage_error)?
+            .query_map([limit(MAX_WORKERS)], |row| {
+                Ok(ChildSettlement {
+                    parent: row.get(0)?,
+                    child: row.get(1)?,
+                    request_id: row.get(2)?,
+                })
+            })
+            .map_err(storage_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(storage_error)?;
+        bounded(rows, MAX_WORKERS)
+    }
+
+    /// Reads the awaited children and records the failures that
+    /// [`settle`] selects under the settling request. A repeated settlement
+    /// keeps the first request identity.
+    pub fn settle_children(
+        &self,
+        parent: &str,
+        children: &[String],
+        request_id: &str,
+    ) -> Result<Vec<ChildOutcome>, JournalError> {
+        let tx = immediate(&self.db)?;
+        let parent_state = workers::read(&tx, parent)?.map(|record| record.state);
+        let outcomes = children
+            .iter()
+            .map(|child| {
+                Ok(match workers::read(&tx, child)? {
+                    Some(record) => ChildOutcome {
+                        process: record.process,
+                        state: record.state,
+                        attempts: record.attempts,
+                        outcome: record.outcome,
+                    },
+                    None => ChildOutcome::undiscovered(child.clone()),
+                })
+            })
+            .collect::<Result<Vec<_>, JournalError>>()?;
+        for child in settle(parent_state, &outcomes)?.unwrap_or_default() {
+            tx.execute(RECORD, params![parent, child, request_id])
+                .map_err(storage_error)?;
+        }
+        tx.commit().map_err(storage_error)?;
+        Ok(outcomes)
+    }
+}

@@ -27,6 +27,7 @@ mod integrity_tests;
 pub mod mailboxes;
 mod registry;
 mod routes;
+pub mod run_journal;
 mod security;
 mod state_reader;
 mod store;

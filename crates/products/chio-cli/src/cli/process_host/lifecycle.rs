@@ -7,8 +7,9 @@ use chio_kernel::{
     KernelError, NestedFlowBridge, ToolInvocationContext, ToolInvocationCost, ToolServerConnection,
 };
 use chio_manifest::{ToolDefinition, ToolManifest};
+use chio_process::run_journal::{JournalError, WorkerState};
 use chio_process::{ChildSubmission, ProcessError, ProcessRegistry};
-use rusqlite::{Connection as SqliteConnection, OpenFlags, OptionalExtension};
+use chio_store_sqlite::process_run_store::{Access, SqliteRunJournal};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -100,14 +101,8 @@ impl Service {
             }
             return self.settle(context, arguments, active, &caller.id);
         }
-        let db =
-            SqliteConnection::open_with_flags(&self.journal, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        db.busy_timeout(std::time::Duration::from_secs(5))?;
-        if worker_state(&db, &caller.id)?.as_deref() != Some("running") {
-            return Err(ProcessError::Invalid(
-                "caller has no running worker attempt",
-            ));
-        }
+        let journal = SqliteRunJournal::open_existing(&self.journal, Access::Read)?;
+        require_running(&journal, &caller.id)?;
         if context.tool_name() == "wait_children" {
             #[derive(Deserialize)]
             #[serde(deny_unknown_fields)]
@@ -121,9 +116,11 @@ impl Service {
                 })?;
             let mut complete = true;
             for child in &wait.children {
-                match worker_state(&db, child)?.as_deref() {
-                    Some("completed") => {}
-                    Some("failed") => return Err(ProcessError::Invalid("child worker failed")),
+                match journal.worker_state(child)? {
+                    Some(WorkerState::Completed) => {}
+                    Some(WorkerState::Failed) => {
+                        return Err(ProcessError::Invalid("child worker failed"))
+                    }
                     _ => complete = false,
                 }
             }
@@ -176,14 +173,18 @@ impl Service {
     }
 }
 
-fn worker_state(db: &SqliteConnection, id: &str) -> Result<Option<String>, ProcessError> {
-    Ok(db
-        .query_row(
-            "SELECT state FROM run_workers WHERE process=?1",
-            [id],
-            |r| r.get(0),
-        )
-        .optional()?)
+fn journal_error(failure: JournalError) -> ProcessError {
+    match failure {
+        JournalError::NotRunning => ProcessError::Invalid("caller has no running worker attempt"),
+        failure => failure.into(),
+    }
+}
+
+fn require_running(journal: &SqliteRunJournal, process: &str) -> Result<(), ProcessError> {
+    if journal.worker_state(process)? != Some(WorkerState::Running) {
+        return Err(journal_error(JournalError::NotRunning));
+    }
+    Ok(())
 }
 
 fn acyclic(mut graph: BTreeMap<String, Vec<String>>) -> Result<(), ProcessError> {

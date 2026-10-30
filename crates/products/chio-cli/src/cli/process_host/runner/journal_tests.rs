@@ -55,7 +55,7 @@ fn pending_cancellation_spends_no_attempt_or_resources() -> TestResult {
         .iter()
         .find(|s| s.process == "A")
         .ok_or("missing A")?;
-    assert_eq!(cancelled.state, "failed");
+    assert_eq!(cancelled.state, WorkerState::Failed);
     assert_eq!(cancelled.outcome.as_deref(), Some("process_cancelled"));
     assert_eq!(
         (
@@ -73,25 +73,25 @@ fn pending_cancellation_spends_no_attempt_or_resources() -> TestResult {
         .find(|s| s.process == "B")
         .ok_or("missing B")?;
     assert_eq!(
-        (
-            blocked.state.as_str(),
-            blocked.outcome.as_deref(),
-            blocked.attempts
-        ),
-        ("failed", Some("dependency_failed"), 0)
+        (blocked.state, blocked.outcome.as_deref(), blocked.attempts),
+        (WorkerState::Failed, Some("dependency_failed"), 0)
     );
     let root = snapshots
         .iter()
         .find(|s| s.process == "root")
         .ok_or("missing root")?;
-    assert_eq!((root.state.as_str(), root.attempts), ("pending", 0));
+    assert_eq!((root.state, root.attempts), (WorkerState::Pending, 0));
     assert!(!journal.completion()?.complete);
     let cancelled = BTreeSet::from(["A".to_owned()]);
     assert!(!journal.has_stop_failure(&snapshots, &cancelled)?);
     assert!(journal.has_stop_failure(&snapshots, &BTreeSet::new())?);
     let root = journal.workers[0].clone();
     journal.start(&root)?;
-    journal.finish(&root, Completion::Failed("exit_68"), Usage::default())?;
+    journal.finish(
+        &root,
+        Completion::Failed("exit_68"),
+        ResourceUsage::default(),
+    )?;
     assert!(journal.has_stop_failure(&journal.snapshots()?, &cancelled)?);
     Ok(())
 }
@@ -107,7 +107,7 @@ fn pending_cancellation_refuses_active_and_completed_attempts_without_mutation()
             journal.finish(
                 &worker,
                 Completion::Completed("exit_0"),
-                Usage {
+                ResourceUsage {
                     peak_resident_bytes: 4096,
                     cpu_ms: 7,
                 },
