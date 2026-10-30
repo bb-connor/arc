@@ -99,6 +99,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/guards/chio-external-guards/**",
             "crates/guards/chio-wasm-guards/**",
             "crates/guards/chio-policy/**",
+            "crates/guards/chio-predicate-dag/**",
             "crates/sdk/chio-guard-sdk/**",
             "crates/sdk/chio-guard-sdk-macros/**",
             "crates/guards/chio-guard-registry/**",
