@@ -3,17 +3,18 @@ use std::path::PathBuf;
 
 use chio_attest_loopback::{
     authority_issuance_request_for_package, authority_profile_document, authority_profile_json,
-    authority_signing_keys_document, disclosure_policy, fresh_proof_package, issuance_request_json,
-    package_json, peer_pins_document_for_package, peer_pins_json, proof_package_from_json,
-    report_json, revocation_publication_request, revocation_publication_request_json,
-    signing_keys_json, verification_context, verification_context_json,
-    verifier_trust_bundle_document_for_package, verifier_trust_bundle_json, verify_package,
-    write_signed_negative_case_inputs, ChioPackageError, ChioProofPackage, ChioVerificationContext,
-    ChioVerifierTrustBundle, ChioVerifierTrustBundleDocument, VerifierReport,
+    authority_signing_keys_document, disclosure_policy, fresh_proof_package,
+    fresh_proof_package_keeping_disclosure, issuance_request_json, package_json,
+    peer_pins_document_for_package, peer_pins_json, proof_package_from_json, report_json,
+    revocation_publication_request, revocation_publication_request_json, signing_keys_json,
+    verification_context, verification_context_json, verifier_trust_bundle_document_for_package,
+    verifier_trust_bundle_json, verify_package, write_signed_negative_case_inputs,
+    ChioPackageError, ChioProofPackage, ChioVerificationContext, ChioVerifierTrustBundle,
+    ChioVerifierTrustBundleDocument, VerifierReport,
 };
 use chio_core_types::merkle::MerkleTree;
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
-use chio_core_types::{canonical_json_bytes, sha256_hex, Keypair, SigningAlgorithm};
+use chio_core_types::{canonical_json_bytes, sha256_hex, CanonicalBytes, Keypair};
 use chio_federation::{
     pheromone_gossip::verify_pheromone_gossip_frame, pheromone_gossip::PheromoneDepositGossip,
     pheromone_gossip::PheromoneGossipBatch, pheromone_gossip::PheromoneTransitChain,
@@ -35,6 +36,12 @@ use chio_pheromone::{
     PHEROMONE_OBSERVATION_COST_TELEMETRY_ROOT_SCHEMA,
     PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, PHEROMONE_SCARCITY_POLICY_SCHEMA,
     PHEROMONE_WORKFLOW_CONTEXT_SCHEMA,
+};
+use chio_pheromone_relay::{
+    promote_peer_directory_candidate, sign_peer_directory_bundle, PeerDirectoryBundleDocument,
+    PeerDirectoryBundleSigningInput, PeerDirectoryBundleTrust, PeerDirectoryDocument,
+    PeerDirectoryEntry, PeerDirectoryStateDocument, RelayLadderRef, RelayProfile,
+    RelayProfileLimits, RelayRole, TrustedPeerDirectoryIssuer, PHEROMONE_PEER_DIRECTORY_SCHEMA,
 };
 use chio_pheromone_runtime::store::SqlitePheromoneRuntimeStore;
 use chio_pheromone_runtime::{
@@ -58,13 +65,34 @@ pub fn run_with_args(args: &[String]) -> Result<(), ChioPackageError> {
 enum Command {
     PrintPackage,
     PrintReport,
-    SignTransitPolicy { body: PathBuf, out: PathBuf },
-    WriteOutDir { dir: PathBuf },
-    WriteSignedNegativeDir { dir: PathBuf },
-    WriteAuthorityInputDir { dir: PathBuf },
-    WriteAuthorityInputForPackage { package: PathBuf, dir: PathBuf },
-    WritePheromoneOutDir { dir: PathBuf },
-    WritePheromoneForPackage { package: PathBuf, dir: PathBuf },
+    SignTransitPolicy {
+        body: PathBuf,
+        out: PathBuf,
+    },
+    WriteOutDir {
+        dir: PathBuf,
+        keep_disclosure: Option<PathBuf>,
+    },
+    WriteSignedNegativeDir {
+        dir: PathBuf,
+    },
+    WriteAuthorityInputDir {
+        dir: PathBuf,
+    },
+    WriteAuthorityInputForPackage {
+        package: PathBuf,
+        dir: PathBuf,
+    },
+    WritePheromoneOutDir {
+        dir: PathBuf,
+    },
+    WritePheromoneForPackage {
+        package: PathBuf,
+        dir: PathBuf,
+    },
+    WriteRelayDirectoryOutDir {
+        dir: PathBuf,
+    },
 }
 
 impl Command {
@@ -84,7 +112,14 @@ impl Command {
             }
             [_, flag, dir] if flag == "--out-dir" => Ok(Self::WriteOutDir {
                 dir: PathBuf::from(dir),
+                keep_disclosure: None,
             }),
+            [_, flag, dir, keep, proof] if flag == "--out-dir" && keep == "--keep-disclosure" => {
+                Ok(Self::WriteOutDir {
+                    dir: PathBuf::from(dir),
+                    keep_disclosure: Some(PathBuf::from(proof)),
+                })
+            }
             [_, flag, dir] if flag == "--signed-negative-dir" => Ok(Self::WriteSignedNegativeDir {
                 dir: PathBuf::from(dir),
             }),
@@ -106,6 +141,11 @@ impl Command {
                     dir: PathBuf::from(dir),
                 })
             }
+            [_, flag, dir] if flag == "--relay-directory-out-dir" => {
+                Ok(Self::WriteRelayDirectoryOutDir {
+                    dir: PathBuf::from(dir),
+                })
+            }
             _ => Err(ChioPackageError::Json(usage(&argv0))),
         }
     }
@@ -123,7 +163,7 @@ fn execute_command(command: Command) -> Result<(), ChioPackageError> {
                 context: _,
                 trust_bundle_document: _,
                 package: _,
-            } = verified_fixture()?;
+            } = verified_fixture(fresh_proof_package()?)?;
             println!("{}", report_json(&report)?);
         }
         Command::SignTransitPolicy { body, out } => {
@@ -132,17 +172,33 @@ fn execute_command(command: Command) -> Result<(), ChioPackageError> {
             let body: serde_json::Value = serde_json::from_str(&body_json)
                 .map_err(|error| ChioPackageError::Json(error.to_string()))?;
             let runtime_issuer_key = Keypair::from_seed(&[42; 32]);
-            let signed = SignedExportEnvelope::sign(body, &runtime_issuer_key)
-                .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+            let signed = SignedExportEnvelope::sign(
+                chio_pheromone_runtime::RuntimeTransitPolicyDocument(body),
+                &runtime_issuer_key,
+            )
+            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
             write_json(out, &signed)?;
         }
-        Command::WriteOutDir { dir } => {
+        Command::WriteOutDir {
+            dir,
+            keep_disclosure,
+        } => {
+            let package = match keep_disclosure {
+                Some(path) => {
+                    let json = fs::read_to_string(path)
+                        .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+                    let committed = serde_json::from_str(&json)
+                        .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+                    fresh_proof_package_keeping_disclosure(&committed)?
+                }
+                None => fresh_proof_package()?,
+            };
             let VerifiedFixture {
                 package,
                 context,
                 trust_bundle_document,
                 report,
-            } = verified_fixture()?;
+            } = verified_fixture(package)?;
             write_out_dir(&package, &context, &trust_bundle_document, &report, dir)?;
         }
         Command::WriteSignedNegativeDir { dir } => {
@@ -168,13 +224,16 @@ fn execute_command(command: Command) -> Result<(), ChioPackageError> {
             let package = proof_package_from_json(&package_json)?;
             write_pheromone_fixtures(&package, &dir)?;
         }
+        Command::WriteRelayDirectoryOutDir { dir } => {
+            write_relay_directory_fixtures(&dir)?;
+        }
     }
     Ok(())
 }
 
 fn usage(argv0: &str) -> String {
     format!(
-        "usage: {argv0} [--report|--out-dir DIR|--signed-negative-dir DIR|--authority-input-dir DIR|--authority-input-package PACKAGE DIR|--pheromone-out-dir DIR|--pheromone-package PACKAGE DIR|--sign-transit-policy BODY OUT]"
+        "usage: {argv0} [--report|--out-dir DIR [--keep-disclosure PROOF]|--signed-negative-dir DIR|--authority-input-dir DIR|--authority-input-package PACKAGE DIR|--pheromone-out-dir DIR|--pheromone-package PACKAGE DIR|--relay-directory-out-dir DIR|--sign-transit-policy BODY OUT]"
     )
 }
 
@@ -185,8 +244,7 @@ struct VerifiedFixture {
     report: VerifierReport,
 }
 
-fn verified_fixture() -> Result<VerifiedFixture, ChioPackageError> {
-    let package = fresh_proof_package()?;
+fn verified_fixture(package: ChioProofPackage) -> Result<VerifiedFixture, ChioPackageError> {
     let context = verification_context();
     let runtime_issuer_key = Keypair::from_seed(&[42; 32]);
     let mut trust_bundle_document = verifier_trust_bundle_document_for_package(&package)?;
@@ -523,9 +581,11 @@ fn write_pheromone_fixtures(
     };
     let mut policy_document = transit_policy_document(&policy, &validation_context)?;
     seal_runtime_policy_document_hashes(&mut policy_document, &runtime_issuer_key)?;
-    let signed_policy_document =
-        SignedExportEnvelope::sign(policy_document.clone(), &runtime_issuer_key)
-            .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    let signed_policy_document = SignedExportEnvelope::sign(
+        chio_pheromone_runtime::RuntimeTransitPolicyDocument(policy_document.clone()),
+        &runtime_issuer_key,
+    )
+    .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     let (loaded_policy, receiver_config) = runtime_policy_from_json(
         &serde_json::to_string(&signed_policy_document)
             .map_err(|error| ChioPackageError::Json(error.to_string()))?,
@@ -724,8 +784,11 @@ fn seal_runtime_policy_document_hashes(
         root["runtimePolicySha256"] = serde_json::json!(runtime_policy_sha256);
         let parsed: PheromoneObservationCostVerifierRoot = serde_json::from_value(root.clone())
             .map_err(|error| ChioPackageError::Json(error.to_string()))?;
-        let (signature, _) = runtime_issuer_key
-            .sign_canonical(&parsed.body)
+        let signature = CanonicalBytes::from_serializable(&parsed.body)
+            .and_then(|canonical| {
+                runtime_issuer_key
+                    .sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
+            })
             .map_err(|error| ChioPackageError::Json(error.to_string()))?;
         root["issuerSignature"] = serde_json::json!(signature.to_hex());
     }
@@ -755,7 +818,6 @@ fn observation_cost_verifier_root(
         verifier_id: "did:chio:dataco-cost-verifier".to_string(),
         verifier_key_id: "cost-root-key-1".to_string(),
         public_key: verifier_key.public_key(),
-        signature_algorithm: SigningAlgorithm::Ed25519,
         valid_from_unix_ms: generated_at_unix_ms.saturating_sub(60_000),
         valid_until_unix_ms: generated_at_unix_ms.saturating_add(60_000),
         allowed_treaties: vec!["treaty:buyer-dataco:support-ops".to_string()],
@@ -764,8 +826,11 @@ fn observation_cost_verifier_root(
         runtime_policy_sha256: runtime_policy_sha256.to_string(),
         issuer_kernel_id: "did:chio:dataco-runtime".to_string(),
     };
-    let (issuer_signature, _) = runtime_issuer_key
-        .sign_canonical(&body)
+    let issuer_signature = CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            runtime_issuer_key
+                .sign_wrapped(PHEROMONE_OBSERVATION_COST_VERIFIER_ROOT_SCHEMA, &canonical)
+        })
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     Ok(PheromoneObservationCostVerifierRoot {
         body,
@@ -841,8 +906,10 @@ fn signed_cost_commitment(
             .map_err(|error| ChioPackageError::Json(error.to_string()))?,
         leaf_preimage_sha256: sha256_hex(&leaf_bytes),
     };
-    let (signature, _) = verifier_key
-        .sign_canonical(&statement)
+    let signature = CanonicalBytes::from_serializable(&statement)
+        .and_then(|canonical| {
+            verifier_key.sign_wrapped(PHEROMONE_OBSERVATION_COST_STATEMENT_SCHEMA, &canonical)
+        })
         .map_err(|error| ChioPackageError::Json(error.to_string()))?;
     Ok(PheromoneCostCommitment {
         schema: PHEROMONE_COST_COMMITMENT_SCHEMA.to_string(),
@@ -881,6 +948,142 @@ fn transit_hop(
         action_class_id: "whisker.pheromone_deposit".to_string(),
         emitted_at_unix_ms: generated_at_unix_ms.saturating_add(100),
     }
+}
+
+const RELAY_DIRECTORY_ISSUER: &str = "did:chio:relay-ops";
+const RELAY_DIRECTORY_KEY_ID: &str = "relay-ops-2026";
+const RELAY_DIRECTORY_LOCAL_KERNEL_ID: &str = "did:chio:dataco";
+const RELAY_DIRECTORY_ISSUED_AT_UNIX_MS: u64 = 1_765_999_999_500;
+const RELAY_DIRECTORY_EXPIRES_AT_UNIX_MS: u64 = 1_766_000_060_500;
+const RELAY_DIRECTORY_PROMOTED_AT_UNIX_MS: u64 = 1_766_000_000_500;
+
+/// Writes the version-1 buyer directory, its signed bundle, the signed
+/// version-2 auditor candidate that removes the buyer, and the state and
+/// rotation report after promoting both in order.
+fn write_relay_directory_fixtures(dir: &PathBuf) -> Result<(), ChioPackageError> {
+    fs::create_dir_all(dir).map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    let issuer_key = Keypair::from_seed(&[9; 32]);
+    let buyer_directory = relay_peer_directory(relay_peer(
+        "did:chio:buyer-kernel",
+        &Keypair::from_seed(&[21; 32]),
+        "https://relay-buyer.example.test",
+        "treaty:buyer-dataco:support-ops",
+        RelayRole::Hub,
+        "ladder:buyer:refund:v1",
+        &"b".repeat(64),
+    ));
+    let auditor_directory = relay_peer_directory(relay_peer(
+        "did:chio:auditor-kernel",
+        &Keypair::from_seed(&[22; 32]),
+        "https://relay-auditor.example.test",
+        "treaty:auditor-dataco:support-ops",
+        RelayRole::Receiver,
+        "ladder:auditor:review:v1",
+        &"c".repeat(64),
+    ));
+    let trust = PeerDirectoryBundleTrust {
+        issuers: vec![TrustedPeerDirectoryIssuer {
+            issuer: RELAY_DIRECTORY_ISSUER.to_string(),
+            key_id: RELAY_DIRECTORY_KEY_ID.to_string(),
+            public_key: issuer_key.public_key(),
+        }],
+        min_version: 0,
+        now_unix_ms: RELAY_DIRECTORY_PROMOTED_AT_UNIX_MS,
+        profile: RelayProfile::Production,
+        limits: RelayProfileLimits::production_defaults(),
+    };
+    let first_bundle = sign_relay_directory(&buyer_directory, 1, None, &issuer_key)?;
+    let mut state = PeerDirectoryStateDocument::new(
+        RELAY_DIRECTORY_LOCAL_KERNEL_ID,
+        RELAY_DIRECTORY_PROMOTED_AT_UNIX_MS,
+    );
+    promote_peer_directory_candidate(
+        &mut state,
+        first_bundle.clone(),
+        &trust,
+        RELAY_DIRECTORY_PROMOTED_AT_UNIX_MS,
+    )
+    .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+    let first_bundle_sha256 = state
+        .active
+        .as_ref()
+        .map(|active| active.bundle_sha256.clone())
+        .ok_or_else(|| ChioPackageError::Json("first directory was not promoted".to_string()))?;
+    let candidate = sign_relay_directory(
+        &auditor_directory,
+        2,
+        Some(first_bundle_sha256),
+        &issuer_key,
+    )?;
+    let report = promote_peer_directory_candidate(
+        &mut state,
+        candidate.clone(),
+        &trust,
+        RELAY_DIRECTORY_PROMOTED_AT_UNIX_MS,
+    )
+    .map_err(|error| ChioPackageError::Json(error.to_string()))?;
+
+    write_json(dir.join("peer-directory.json"), &buyer_directory)?;
+    write_json(dir.join("peer-directory-bundle.json"), &first_bundle)?;
+    write_json(dir.join("peer-directory-candidate.json"), &candidate)?;
+    write_json(dir.join("peer-directory-state.json"), &state)?;
+    write_json(dir.join("peer-directory-rotation-report.json"), &report)
+}
+
+fn relay_peer_directory(peer: PeerDirectoryEntry) -> PeerDirectoryDocument {
+    PeerDirectoryDocument {
+        schema: PHEROMONE_PEER_DIRECTORY_SCHEMA.to_string(),
+        local_kernel_id: RELAY_DIRECTORY_LOCAL_KERNEL_ID.to_string(),
+        issued_at_unix_ms: RELAY_DIRECTORY_ISSUED_AT_UNIX_MS,
+        expires_at_unix_ms: RELAY_DIRECTORY_EXPIRES_AT_UNIX_MS,
+        peers: vec![peer],
+    }
+}
+
+fn relay_peer(
+    kernel_id: &str,
+    key: &Keypair,
+    endpoint: &str,
+    treaty_id: &str,
+    relay_role: RelayRole,
+    ladder_manifest_id: &str,
+    ladder_manifest_sha256: &str,
+) -> PeerDirectoryEntry {
+    PeerDirectoryEntry {
+        kernel_id: kernel_id.to_string(),
+        public_key: key.public_key(),
+        endpoint: endpoint.to_string(),
+        treaty_subscriptions: vec![treaty_id.to_string()],
+        relay_role,
+        allowed_subject_class_namespaces: vec!["dev.chio.support".to_string()],
+        accepted_ladder_refs: vec![RelayLadderRef {
+            ladder_manifest_id: ladder_manifest_id.to_string(),
+            ladder_manifest_sha256: ladder_manifest_sha256.to_string(),
+            expires_at_unix_ms: RELAY_DIRECTORY_EXPIRES_AT_UNIX_MS,
+        }],
+        max_batch_frames: 8,
+        max_catchup_frames: 16,
+        max_catchup_bytes: 64_000,
+    }
+}
+
+fn sign_relay_directory(
+    directory: &PeerDirectoryDocument,
+    version: u64,
+    previous_version_sha256: Option<String>,
+    issuer_key: &Keypair,
+) -> Result<PeerDirectoryBundleDocument, ChioPackageError> {
+    sign_peer_directory_bundle(PeerDirectoryBundleSigningInput {
+        issuer: RELAY_DIRECTORY_ISSUER,
+        key_id: RELAY_DIRECTORY_KEY_ID,
+        version,
+        previous_version_sha256,
+        issued_at_unix_ms: RELAY_DIRECTORY_ISSUED_AT_UNIX_MS,
+        expires_at_unix_ms: RELAY_DIRECTORY_EXPIRES_AT_UNIX_MS,
+        directory,
+        keypair: issuer_key,
+    })
+    .map_err(|error| ChioPackageError::Json(error.to_string()))
 }
 
 fn canonical_sha256<T: serde::Serialize>(value: &T) -> Result<String, ChioPackageError> {

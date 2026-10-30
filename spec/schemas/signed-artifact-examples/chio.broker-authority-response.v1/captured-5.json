@@ -1,0 +1,21 @@
+{
+  "authority": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "issuedAtUnixSeconds": 20,
+  "requestDigest": "10cfe804d37bd33739bfb160e5b5c635a33bd7afb026fe592df76db4e975bb8d",
+  "requestId": "82a10a9655194278633b49cebc97563d2cc240d1c71607e16e21c85c9b1707d3",
+  "result": {
+    "kind": "live_parent",
+    "response": {
+      "audience": "broker-parent",
+      "authoritySnapshotDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capabilityId": "parent-capability",
+      "delegationAncestorIds": [
+        "delegation-ancestor"
+      ],
+      "expiresAtUnixSeconds": 1000,
+      "subject": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "verifiedAtUnixSeconds": 20
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

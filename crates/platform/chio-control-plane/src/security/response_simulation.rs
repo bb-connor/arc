@@ -231,13 +231,13 @@ impl ProductionResponseSimulator {
                 record_simulation_failure("store_readiness", &error);
                 error
             })?;
-        self.signer
-            .sign_bytes(b"chio.response-simulation.readiness.v1\0")
-            .map_err(|error| {
+        super::sign_signer_readiness_probe(self.signer.as_ref(), "response_simulation").map_err(
+            |error| {
                 let error = signing_error(error);
                 record_simulation_failure("signer_readiness", &error);
                 error
-            })?;
+            },
+        )?;
         Ok(())
     }
 

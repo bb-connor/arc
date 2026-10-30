@@ -1,0 +1,114 @@
+{
+  "budget": {
+    "action": "deny",
+    "rationale": "fixture decision for uwd-report-3"
+  },
+  "decisionId": "uwd-report-3",
+  "evaluation": {
+    "generatedAt": 1700000149,
+    "input": {
+      "certification": {
+        "artifactId": "cert-1",
+        "checkedAt": 1700000110,
+        "publishedAt": 1700000111,
+        "state": "active",
+        "toolServerId": "server-1",
+        "verdict": "pass"
+      },
+      "filters": {
+        "agentSubject": "subject-underwriting",
+        "receiptLimit": 100
+      },
+      "generatedAt": 1700000120,
+      "receipts": {
+        "actionableMeteredReceipts": 0,
+        "actionableSettlementReceipts": 0,
+        "allowCount": 2,
+        "approvalReceipts": 1,
+        "approvedReceipts": 1,
+        "callChainReceipts": 0,
+        "cancelledCount": 0,
+        "denyCount": 0,
+        "failedSettlementReceipts": 0,
+        "governedReceipts": 2,
+        "incompleteCount": 0,
+        "matchingReceipts": 2,
+        "meteredReceipts": 0,
+        "pendingSettlementReceipts": 0,
+        "returnedReceipts": 2,
+        "runtimeAssuranceReceipts": 1,
+        "sharedEvidenceProofRequiredCount": 0,
+        "sharedEvidenceReferenceCount": 0
+      },
+      "reputation": {
+        "acceptedImportedSignalCount": 0,
+        "effectiveScore": 0.94,
+        "importedSignalCount": 0,
+        "probationary": false,
+        "resolvedTier": "prime",
+        "subjectKey": "subject-underwriting"
+      },
+      "runtimeAssurance": {
+        "governedReceipts": 2,
+        "highestTier": "verified",
+        "latestEvidenceSha256": "sha256-attest",
+        "latestSchema": "chio.runtime-attestation.enterprise.v1",
+        "latestVerifier": "verifier.chio",
+        "latestVerifierFamily": "enterprise_verifier",
+        "observedVerifierFamilies": [
+          "enterprise_verifier"
+        ],
+        "runtimeAssuranceReceipts": 1
+      },
+      "schema": "chio.underwriting.policy-input.v1",
+      "taxonomy": {
+        "supportedClasses": [
+          "baseline",
+          "guarded",
+          "elevated",
+          "critical"
+        ],
+        "supportedReasons": [
+          "probationary_history",
+          "low_reputation",
+          "imported_trust_dependency",
+          "missing_certification",
+          "failed_certification",
+          "revoked_certification",
+          "missing_runtime_assurance",
+          "weak_runtime_assurance",
+          "pending_settlement_exposure",
+          "failed_settlement_exposure",
+          "metered_billing_mismatch",
+          "delegated_call_chain",
+          "shared_evidence_proof_required"
+        ],
+        "version": "chio.underwriting.taxonomy.v1"
+      }
+    },
+    "outcome": "deny",
+    "policy": {
+      "denyReputationScoreBelow": 0.25,
+      "maximumReceiptAgeSeconds": 2592000,
+      "minimumApproveReputationScore": 0.6,
+      "minimumApproveRuntimeAssuranceTier": "verified",
+      "minimumReceiptHistory": 1,
+      "minimumStepUpRuntimeAssuranceTier": "attested",
+      "reduceCeilingFactor": 0.5,
+      "requireActiveToolCertification": true,
+      "requireComplianceScoreReference": false,
+      "schema": "chio.underwriting.decision-policy.v1",
+      "version": "chio.underwriting.decision-policy.default.v1"
+    },
+    "riskClass": "guarded",
+    "schema": "chio.underwriting.decision-report.v1"
+  },
+  "issuedAt": 1700000150,
+  "lifecycleState": "active",
+  "premium": {
+    "rationale": "fixture premium for uwd-report-3",
+    "state": "not_applicable"
+  },
+  "reviewState": "denied",
+  "schema": "chio.underwriting.decision.v1"
+}

@@ -141,6 +141,10 @@ impl EntryActivationDecision {
 pub type SignedEntryActivationDecision =
     chio_core::receipt::lineage::SignedExportEnvelope<EntryActivationDecision>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for EntryActivationDecision {
+    const SCHEMA_ID: &'static str = FINANCIAL_ENTRY_ACTIVATION_DECISION_SCHEMA_V1;
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FinancialCrossIssuerTrustPackPolicy {
@@ -184,6 +188,10 @@ pub struct FinancialCrossIssuerTrustPack {
 
 pub type SignedFinancialCrossIssuerTrustPack =
     chio_core::receipt::lineage::SignedExportEnvelope<FinancialCrossIssuerTrustPack>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for FinancialCrossIssuerTrustPack {
+    const SCHEMA_ID: &'static str = FINANCIAL_CROSS_ISSUER_TRUST_PACK_SCHEMA_V1;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FinancialCrossIssuerMigrationInput {
@@ -246,6 +254,10 @@ impl FinancialCrossIssuerMigration {
 
 pub type SignedFinancialCrossIssuerMigration =
     chio_core::receipt::lineage::SignedExportEnvelope<FinancialCrossIssuerMigration>;
+
+impl chio_core::receipt::lineage::SignedExportPayload for FinancialCrossIssuerMigration {
+    const SCHEMA_ID: &'static str = FINANCIAL_CROSS_ISSUER_MIGRATION_SCHEMA_V1;
+}
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

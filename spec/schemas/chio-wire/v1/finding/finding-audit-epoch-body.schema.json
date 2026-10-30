@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-audit-epoch-body.schema.json",
+  "title": "chio.finding.audit-epoch.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audit_authority",
+    "audit_epoch_id",
+    "authorization_digest",
+    "available_budget",
+    "committed_at",
+    "eligible_listing_count",
+    "eligible_snapshot_at",
+    "eligible_snapshot_digest",
+    "epoch_index",
+    "fee_schedule_envelope_sha256",
+    "published_rate_bps",
+    "schema",
+    "seed_commitment",
+    "seed_witness",
+    "seed_witness_signature",
+    "seed_witnessed_at",
+    "selection_algorithm_id"
+  ],
+  "properties": {
+    "audit_authority": {
+      "type": "string"
+    },
+    "audit_epoch_id": {
+      "type": "string"
+    },
+    "authorization_digest": {
+      "type": "string"
+    },
+    "available_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "committed_at": {
+      "type": "integer"
+    },
+    "eligible_listing_count": {
+      "type": "integer"
+    },
+    "eligible_snapshot_at": {
+      "type": "integer"
+    },
+    "eligible_snapshot_digest": {
+      "type": "string"
+    },
+    "epoch_index": {
+      "type": "integer"
+    },
+    "fee_schedule_envelope_sha256": {
+      "type": "string"
+    },
+    "published_rate_bps": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.audit-epoch.v1"
+    },
+    "seed_commitment": {
+      "type": "string"
+    },
+    "seed_witness": {
+      "type": "string"
+    },
+    "seed_witness_signature": {
+      "type": "string"
+    },
+    "seed_witnessed_at": {
+      "type": "integer"
+    },
+    "selection_algorithm_id": {
+      "type": "string"
+    }
+  }
+}

@@ -287,3 +287,7 @@ impl VerifiedFiscalRuntimeReadiness {
         &self.runtime_registry
     }
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalRuntimeReadiness {
+    const SCHEMA_ID: &'static str = FISCAL_RUNTIME_READINESS_SCHEMA;
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-reputation-snapshot-body.schema.json",
+  "title": "chio.commerce.reputation-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "issued_at",
+    "provider_subject",
+    "schema",
+    "score_bps",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.reputation-snapshot.v1"
+    },
+    "score_bps": {
+      "type": "integer"
+    },
+    "status": {
+      "type": "string"
+    }
+  }
+}

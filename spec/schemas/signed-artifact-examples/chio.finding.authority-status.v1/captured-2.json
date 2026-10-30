@@ -1,0 +1,9 @@
+{
+  "authority_id": "venue",
+  "key": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17",
+  "key_epoch": 1,
+  "observed_at": 1750000002,
+  "revoked_from": 1,
+  "schema": "chio.finding.authority-status.v1",
+  "status_ref": "revocations/finding-market"
+}

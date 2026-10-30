@@ -259,13 +259,10 @@ impl ThresholdApprovalProposalRegistration {
                 "threshold proposal exceeds the collector storage limit".to_string(),
             ));
         }
-        let algorithm = self.proposal.algorithm.unwrap_or_default();
-        if self.proposal.policy_authority().algorithm() != algorithm
-            || self.proposal.signature.algorithm() != algorithm
-            || !self
-                .proposal
-                .verify_signature()
-                .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
+        if !self
+            .proposal
+            .verify_integrity_embedded_key()
+            .map_err(|error| invalid(format!("threshold proposal signature failed: {error}")))?
         {
             return Err(invalid(
                 "threshold proposal signature did not verify".to_string(),
@@ -531,20 +528,9 @@ impl ThresholdApprovalVoteRecord {
                 "approval token expiry is outside the proposal window".to_string(),
             ));
         }
-        let expected_algorithm = token.algorithm.unwrap_or_default();
-        if token.approver.algorithm() != expected_algorithm
-            || token.signature.algorithm() != expected_algorithm
-        {
+        if token.approver.algorithm() != token.signature.algorithm() {
             return Err(invalid(
                 "approval token signing algorithm is inconsistent".to_string(),
-            ));
-        }
-        if !token
-            .verify_signature()
-            .map_err(|error| invalid(format!("approval token signature failed: {error}")))?
-        {
-            return Err(invalid(
-                "approval token signature did not verify".to_string(),
             ));
         }
         let approver_fingerprint = token.approver.to_hex();
@@ -555,6 +541,14 @@ impl ThresholdApprovalVoteRecord {
         {
             return Err(invalid(
                 "approval token signer is not policy-eligible".to_string(),
+            ));
+        }
+        if !token
+            .verify_integrity_embedded_key()
+            .map_err(|error| invalid(format!("approval token signature failed: {error}")))?
+        {
+            return Err(invalid(
+                "approval token signature did not verify".to_string(),
             ));
         }
         if registration.separation_of_duties

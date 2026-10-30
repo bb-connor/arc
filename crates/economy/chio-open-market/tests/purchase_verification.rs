@@ -975,6 +975,24 @@ fn request_arguments_naming_another_finding_reject() {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn a_bid_validly_signed_by_a_key_other_than_the_token_subject_rejects() {
+    let mut web = base_web();
+    let other = keypair(99);
+    web.bid_request = SignedBidRequest::sign(web.bid_request.body.clone(), &other)
+        .test_expect("re-sign bid under another key");
+    assert!(matches!(
+        web.bid_request.verify_signature(&other.public_key()),
+        Ok(true)
+    ));
+    let mut context = web.context();
+    web.rebind_admission(&mut context);
+    assert_eq!(
+        web.reject_context(&context),
+        PurchaseVerificationError::HandshakeBinding("bid_signer")
+    );
+}
+
+#[test]
 fn an_admission_outside_the_pinned_venue_authority_rejects() {
     // The signer, the body venue, and the venue id are three independent
     // ways to present an admission this deployment never issued.

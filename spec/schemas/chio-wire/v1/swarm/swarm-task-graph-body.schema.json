@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-task-graph-body.schema.json",
+  "title": "chio.swarm.task-graph.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "budgetPoolRef",
+    "createdAtUnixMs",
+    "edges",
+    "expiresAtUnixMs",
+    "graphId",
+    "issuer",
+    "joins",
+    "maxDepth",
+    "maxFanout",
+    "nodes",
+    "plannerSubject",
+    "revocationEpochRef",
+    "rootTransactionRef",
+    "routePlanRefs",
+    "schema"
+  ],
+  "properties": {
+    "budgetPoolRef": {
+      "type": "string"
+    },
+    "createdAtUnixMs": {
+      "type": "integer"
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "edgeType",
+          "fromTaskId",
+          "toTaskId"
+        ],
+        "properties": {
+          "edgeType": {
+            "type": "string"
+          },
+          "fromTaskId": {
+            "type": "string"
+          },
+          "toTaskId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "joins": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "joinId",
+          "nextTaskId",
+          "parentTaskIds"
+        ],
+        "properties": {
+          "joinId": {
+            "type": "string"
+          },
+          "nextTaskId": {
+            "type": "string"
+          },
+          "parentTaskIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "maxDepth": {
+      "type": "integer"
+    },
+    "maxFanout": {
+      "type": "integer"
+    },
+    "multiHopWitnessChains": {
+      "type": "boolean"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "depth",
+          "scopeHash",
+          "taskId"
+        ],
+        "properties": {
+          "budgetAllocationRef": {
+            "type": "string"
+          },
+          "continuationTokenRef": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "parentTaskId": {
+            "type": "string"
+          },
+          "routePlanRef": {
+            "type": "string"
+          },
+          "scopeHash": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "plannerSubject": {
+      "type": "string"
+    },
+    "revocationEpochRef": {
+      "type": "string"
+    },
+    "rootTransactionRef": {
+      "type": "string"
+    },
+    "routePlanRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.swarm.task-graph.v1"
+    }
+  }
+}

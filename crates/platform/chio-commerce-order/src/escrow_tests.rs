@@ -159,7 +159,7 @@ fn acceptance_body(
     }
 }
 
-fn sign<T: Serialize + Clone>(body: T, signer: &Keypair) -> SignedExportEnvelope<T> {
+fn sign<T: SignedExportPayload + Clone>(body: T, signer: &Keypair) -> SignedExportEnvelope<T> {
     SignedExportEnvelope::sign(body, signer).test_expect("sign envelope")
 }
 
@@ -276,7 +276,7 @@ fn accept_locks_quote_into_fixed_custody_and_pins_digests() {
     );
     assert!(acceptance
         .settlement_packet
-        .verify_signature()
+        .verify_signature(&fixture.settlement_authority.public_key())
         .test_expect("packet signature verifies"));
     context
         .validate_shape()
@@ -404,6 +404,36 @@ fn accept_denies_forged_acceptance_signature() {
     assert_eq!(
         fixture.denial(),
         escrow(CommerceEscrowError::AcceptanceSignatureInvalid)
+    );
+}
+
+fn unwrapped<T: Serialize>(body: &T, signer: &Keypair) -> chio_core_types::crypto::Signature {
+    let canonical = chio_core_types::canonical::CanonicalBytes::from_serializable(body)
+        .test_expect("canonical");
+    signer.sign_exempt(
+        chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+        canonical.as_bytes(),
+    )
+}
+
+#[test]
+fn accept_denies_unwrapped_acceptance_signature() {
+    let mut fixture = AcceptFixture::new();
+    fixture.acceptance.signature = unwrapped(&fixture.acceptance.body, &fixture.buyer);
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::AcceptanceSignatureInvalid)
+    );
+}
+
+#[test]
+fn accept_denies_unwrapped_reservation_signature() {
+    let mut fixture = AcceptFixture::new();
+    fixture.reservation.signature =
+        unwrapped(&fixture.reservation.body, &fixture.reservation_authority);
+    assert_eq!(
+        fixture.denial(),
+        escrow(CommerceEscrowError::ReservationSignatureInvalid)
     );
 }
 

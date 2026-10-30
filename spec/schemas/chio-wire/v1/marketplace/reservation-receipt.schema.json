@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/marketplace/reservation-receipt.schema.json",
+  "title": "Chio marketplace reservation receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentId",
+    "askDigest",
+    "listingId",
+    "receiptId",
+    "reservedAmount",
+    "schema"
+  ],
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "askDigest": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "reservedAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.marketplace.reservation-receipt.v1"
+    }
+  }
+}

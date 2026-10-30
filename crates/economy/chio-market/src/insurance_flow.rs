@@ -38,7 +38,9 @@ use serde::{Deserialize, Serialize};
 
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{sha256_hex, PublicKey, Signature};
+use chio_core_types::crypto::{sha256_hex, verify_wrapped_bytes, PublicKey, Signature};
+use chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA;
+use chio_core_types::CanonicalBytes;
 use chio_fiscal::FiscalResolver;
 use chio_underwriting::{price_fiscal_premium, LookbackWindow, PremiumInputs, PremiumQuote};
 
@@ -48,6 +50,9 @@ use crate::validate_positive_money;
 /// Lane identifier used for insurance-flow settlement commitments. Matches
 /// the `lane_kind` convention used elsewhere in the chio-settle stack.
 pub const INSURANCE_CLAIM_LANE_KIND: &str = "chio.insurance.claim.v1";
+
+/// Largest canonical receipt body a claim may cite as evidence.
+const MAX_RECEIPT_EVIDENCE_BODY_BYTES: usize = 1_048_576;
 
 /// Error surface for the insurance flow.
 #[derive(Debug, thiserror::Error)]
@@ -422,10 +427,7 @@ impl BoundPolicy {
                     ),
                 });
             }
-            if !resolved
-                .signer_key
-                .verify(&resolved.canonical_body, &resolved.signature)
-            {
+            if !receipt_signature_verifies(&resolved) {
                 return Ok(ClaimDecision::Denied {
                     policy_id: self.policy_id.clone(),
                     claim_id: evidence.claim_id.clone(),
@@ -792,6 +794,29 @@ fn validate_clean_required(value: &str, field_name: &str) -> Result<(), Insuranc
     Ok(())
 }
 
+/// The kernel signature covers the signing wrapper of the canonical receipt
+/// body under `chio.receipt.v1`; `canonical_body` must already be canonical.
+fn receipt_signature_verifies(resolved: &ResolvedReceiptEvidence) -> bool {
+    let Ok(value) = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &resolved.canonical_body,
+        MAX_RECEIPT_EVIDENCE_BODY_BYTES,
+    )
+    .and_then(|input| input.decode_canonical::<serde_json::Value>()) else {
+        return false;
+    };
+    let Ok(canonical) = CanonicalBytes::from_value(&value) else {
+        return false;
+    };
+    canonical.as_bytes() == resolved.canonical_body.as_slice()
+        && verify_wrapped_bytes(
+            &resolved.signer_key,
+            CHIO_RECEIPT_SCHEMA,
+            &canonical,
+            &resolved.signature,
+        )
+        .is_ok()
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -988,6 +1013,16 @@ mod tests {
         }
     }
 
+    fn sign_fixture_receipt(keypair: &Keypair, canonical: &[u8]) -> Signature {
+        let value: serde_json::Value = serde_json::from_slice(canonical).unwrap();
+        keypair
+            .sign_wrapped(
+                CHIO_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_value(&value).unwrap(),
+            )
+            .unwrap()
+    }
+
     fn fake_receipt(
         keypair: &Keypair,
         receipt_id: &str,
@@ -997,7 +1032,7 @@ mod tests {
         let body = ("chio.receipt.fixture.v1", receipt_id, 1_000_000u64);
         let canonical = canonical_json_bytes(&body).unwrap();
         let body_sha256 = sha256_hex(&canonical);
-        let signature = keypair.sign(&canonical);
+        let signature = sign_fixture_receipt(keypair, &canonical);
         let signer_key = keypair.public_key();
         (
             ReceiptFingerprint {
@@ -1383,7 +1418,7 @@ mod tests {
         let (fingerprint, mut resolved) = fake_receipt(&real, "rcpt-tampered");
         // Swap the signature with one produced by the imposter key --
         // signer key still matches the real one, but signature won't verify.
-        resolved.signature = imposter.sign(&resolved.canonical_body);
+        resolved.signature = sign_fixture_receipt(&imposter, &resolved.canonical_body);
         let receipts = InMemoryReceiptSource {
             entries: std::collections::BTreeMap::from([(fingerprint.receipt_id.clone(), resolved)]),
         };

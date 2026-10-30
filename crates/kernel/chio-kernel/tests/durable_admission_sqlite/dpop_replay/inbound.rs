@@ -32,7 +32,7 @@ fn assert_replay_refused(
             .and_then(serde_json::Value::as_str),
         Some("CHIO-KERNEL-DURABLE-ADMISSION")
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(route.prepares.load(Ordering::SeqCst), 2);
     assert_eq!(route.invocations.load(Ordering::SeqCst), 1);
     Ok(())

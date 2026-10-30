@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-participant-acceptance-body.schema.json",
+  "title": "chio.clearing.participant-acceptance.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acceptedAtUnixMs",
+    "expiresAtUnixMs",
+    "keyEpoch",
+    "outputManifestDigest",
+    "participantId",
+    "participantStatementDigest",
+    "roundCoreDigest",
+    "roundId",
+    "schema"
+  ],
+  "properties": {
+    "acceptedAtUnixMs": {
+      "type": "integer"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "participantId": {
+      "type": "string"
+    },
+    "participantStatementDigest": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.participant-acceptance.v1"
+    }
+  }
+}

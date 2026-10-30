@@ -507,6 +507,9 @@ pub(super) fn bind_ledger_store(
     Ok(expected)
 }
 
+/// Signing-wrapper schema id of the store identity proof over a fresh challenge.
+const STORE_IDENTITY_PROOF_SCHEMA: &str = "chio.finding-pool.store-identity-proof.v1";
+
 fn derive_ledger_store_binding(
     ledger_domain: &str,
     database_identity: &QualifiedDatabaseIdentity,
@@ -534,10 +537,23 @@ fn derive_ledger_store_binding(
     append_binding_part(&mut challenge, ledger_domain.as_bytes());
     append_binding_part(&mut challenge, &identity_material);
     append_binding_part(&mut challenge, &nonce);
+    let proof_body = chio_core::CanonicalBytes::from_serializable(&serde_json::json!({
+        "challenge": hex::encode(&challenge),
+        "schema": STORE_IDENTITY_PROOF_SCHEMA,
+    }))
+    .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?;
     let proof = store_identity
-        .sign_bytes(&challenge)
-        .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?;
-    if !public_key.verify(&challenge, &proof) {
+        .sign_wrapped_for_identity(&public_key, STORE_IDENTITY_PROOF_SCHEMA, &proof_body)
+        .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?
+        .signature;
+    if chio_core::crypto::verify_wrapped_bytes(
+        &public_key,
+        STORE_IDENTITY_PROOF_SCHEMA,
+        &proof_body,
+        &proof,
+    )
+    .is_err()
+    {
         return Err(FindingPoolLedgerError::InvalidLedgerStoreIdentity);
     }
 

@@ -112,7 +112,7 @@ fn require_completed(pending: &PendingCallers, caller: &RecordedCaller) -> TestR
             caller.report.report.output.clone(),
         ))
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response.receipt.kernel_key,
         pending.kernel.receipt_signing_public_key()?

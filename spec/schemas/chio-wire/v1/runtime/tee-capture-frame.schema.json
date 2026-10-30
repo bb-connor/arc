@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/tee-capture-frame.schema.json",
+  "title": "Chio tee capture frame signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "invocation",
+    "provenance",
+    "redaction_pass_id",
+    "request_blob_sha256",
+    "response_blob_sha256",
+    "schema_version",
+    "tee_id",
+    "ts",
+    "upstream",
+    "verdict",
+    "would_have_blocked"
+  ],
+  "properties": {
+    "deny_reason": {
+      "type": "string"
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cmd": {
+          "type": "string"
+        },
+        "q": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "otel"
+      ],
+      "properties": {
+        "otel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "span_id",
+            "trace_id"
+          ],
+          "properties": {
+            "span_id": {
+              "type": "string"
+            },
+            "trace_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "redaction_pass_id": {
+      "type": "string"
+    },
+    "request_blob_sha256": {
+      "type": "string"
+    },
+    "response_blob_sha256": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string"
+    },
+    "tee_id": {
+      "type": "string"
+    },
+    "ts": {
+      "type": "string"
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_version",
+        "operation",
+        "system"
+      ],
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        }
+      }
+    },
+    "verdict": {
+      "type": "string"
+    },
+    "would_have_blocked": {
+      "type": "boolean"
+    }
+  }
+}

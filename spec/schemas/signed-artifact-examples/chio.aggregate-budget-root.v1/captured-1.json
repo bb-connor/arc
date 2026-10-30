@@ -1,0 +1,10 @@
+{
+  "max_invocations": 0,
+  "root_capability_hash": "cebb03b873180d7f942fdf858b49556bdcba3e73a558f82b705edcc7e68fae9a",
+  "root_capability_id": "cap-zero",
+  "root_expires_at": 1000,
+  "root_issuer": "83066e8ce2c918b7509d2b21c06dd34d780909bc500867d233c065a4b07295dd",
+  "root_scope_hash": "67dd8174da205f59dcbe7c68d04c86ad30d5e8651b8bd33477492ec22322bfa0",
+  "root_subject": "c96dbbf36d148aaef151d56f5b95b5898cabfc9ae2a04e97d1002d6c68a9d927",
+  "schema": "chio.aggregate-budget-root.v1"
+}

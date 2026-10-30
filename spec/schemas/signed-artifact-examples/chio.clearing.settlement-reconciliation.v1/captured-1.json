@@ -1,0 +1,25 @@
+{
+  "attemptNumber": 1,
+  "authorityDigest": "d2512e69fbfa3375b833b5b044f53d705de914a38a11cb3f8448a43474a6a209",
+  "dispositionAuthorityId": "obligation-authority",
+  "dispositionAuthorityKeyEpoch": 1,
+  "effectSlotId": "961358d67b55b3c39564c8a24afcbf54054f18cdd18f0718931cb24e44330c67",
+  "externalReferences": [
+    "rail:transaction:1"
+  ],
+  "intentDigest": "d690f8f51b1bf96529943f7f42fd01048e4348c0d52e5340c709b56d4a880807",
+  "intentId": "intent-reconciliation",
+  "nextLifecycleFence": 6,
+  "nextLifecycleVersion": 6,
+  "observedAtUnixMs": 506,
+  "observedStatus": "settled",
+  "outputManifestDigest": "ca6a43f375a476724d44ba170b1fb45746e92f22c18ff77399bf70ea1f833d0f",
+  "roundCoreDigest": "8966afcf174acf5d5cdadb8a07fe0d2be786c5d27dde1f9c10df34b0d767f538",
+  "roundId": "round-1",
+  "schema": "chio.clearing.settlement-reconciliation.v1",
+  "settlementOutcomeDigest": "c4969153403b3edc5c8b175099117b2a74e17a957af8e5ab19cbf082cf8a4f31",
+  "sourceEffectSlotDigest": "f15e326a0baf125f1cc0626050a1627fc4241d980e61c4ecb23857b25b7abe2c",
+  "sourceLifecycleFence": 5,
+  "sourceLifecycleHeadDigest": "f901d18a78b92b3fa55ce5550da8a88a33e950cff31781fb7212ed399d4aec36",
+  "sourceLifecycleVersion": 5
+}

@@ -1,0 +1,18 @@
+{
+  "configurationRevision": "integration-revision-1",
+  "coveredCheckpointSha256": "f34fbf365ba7e1efdf9226d4395586fc60ed1d97dff954aa5e5098a05fe720f7",
+  "createdAt": 1793209509,
+  "objectSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "objectSize": 128,
+  "objectUri": "s3://chio-test/job-1.json",
+  "previousArchiveSha256": null,
+  "schema": "chio.finding.hosted-archive-manifest.v1",
+  "target": {
+    "resourceFamily": "finding.purchase",
+    "resourceId": "job-1",
+    "resourceKind": "job",
+    "resourceRevision": 0,
+    "resourceSha256": "6a0ef63913cfd75ce9d24a204e6329016d3a14c00952ef49d9b7322d6d290148"
+  },
+  "tenantId": "integration-a-1793209486471803644"
+}

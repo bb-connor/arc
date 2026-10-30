@@ -89,14 +89,16 @@ pub use canonical::{
     canonical_json_string_from_str, canonicalize, CanonicalBytes, CanonicalJsonWitness,
 };
 pub use crypto::{
-    sha256_hex, sha256_hex_bytes, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend, SigningOutcome,
+    sha256_hex, sha256_hex_bytes, sign_shared_wrapped, sign_wrapped, sign_wrapped_for_identity,
+    verify_exempt, verify_wrapped, verify_wrapped_bytes, verify_wrapper, Ed25519Backend,
+    ExemptFormat, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningMessage,
+    SigningOutcome, SigningWrapper, SIGNING_WRAPPER_LEN, SIGNING_WRAPPER_PREFIX,
 };
 #[cfg(feature = "pq")]
 pub use crypto::{HybridBackend, MlDsa65Backend};
 #[cfg(feature = "fips")]
 pub use crypto::{P256Backend, P384Backend};
-pub use declassification::{SignedDeclassificationGrant, DECLASSIFICATION_GRANT_SIGNATURE_DOMAIN};
+pub use declassification::{SignedDeclassificationGrant, CHIO_DECLASSIFICATION_GRANT_SCHEMA};
 pub use delegation_receipt::{DelegationReceipt, ScopeAttenuation};
 pub use economic_continuity::{
     CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
@@ -109,7 +111,7 @@ pub use loaded_weights::{
 };
 pub use manifest::{
     DeclassificationPurpose, LatencyHint, PricingModel, ToolAnnotations, ToolDefinition,
-    ToolFlowDeclaration, ToolFlowValidationError, ToolManifest, ToolManifestBody, ToolPricing,
+    ToolFlowDeclaration, ToolFlowValidationError, ToolPricing,
 };
 pub use merkle::{leaf_hash, node_hash, MerkleConsistencyProof, MerkleProof, MerkleTree};
 pub use merkle_steps::{inclusion_step, InclusionStep};
@@ -132,7 +134,7 @@ pub use runtime_attestation::{
     ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
     GOOGLE_CONFIDENTIAL_VM_VERIFIER_ADAPTER,
 };
-pub use security_event::{SignedSecurityEvent, SECURITY_EVENT_SIGNATURE_DOMAIN};
+pub use security_event::{SignedSecurityEvent, CHIO_SIGNED_SECURITY_EVENT_SCHEMA};
 pub use session::{
     ChioIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,
     CompletionResult, CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
@@ -147,7 +149,7 @@ pub use session::{
 };
 pub use signed_artifact::{
     built_in_signed_artifact_registry, is_supported_signed_artifact_schema,
-    validate_signed_artifact_schema, SignedArtifactSchemaEntry,
+    registered_wrapper_schema, validate_signed_artifact_schema, SignedArtifactSchemaEntry,
     CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA, CHIO_ANCHOR_BATCH_V1_SCHEMA,
     CHIO_ANCHOR_INCLUSION_PROOF_V1_SCHEMA, CHIO_ANCHOR_PROOF_BUNDLE_V1_SCHEMA,
     CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA, CHIO_CREDIT_FACILITY_BIND_V1_SCHEMA,

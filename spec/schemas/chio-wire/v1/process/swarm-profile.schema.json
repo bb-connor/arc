@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/process/swarm-profile.schema.json",
+  "title": "Chio process swarm profile signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admission",
+    "binding",
+    "record_sha256",
+    "routes",
+    "runtime_id",
+    "schema"
+  ],
+  "properties": {
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expiresAtUnixMs",
+        "issuedAtUnixMs",
+        "localKernelId",
+        "profileId",
+        "schema",
+        "verifierId"
+      ],
+      "properties": {
+        "expiresAtUnixMs": {
+          "type": "integer"
+        },
+        "issuedAtUnixMs": {
+          "type": "integer"
+        },
+        "localKernelId": {
+          "type": "string"
+        },
+        "profileId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "verifierId": {
+          "type": "string"
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectation_id",
+        "runtime_authority_id"
+      ],
+      "properties": {
+        "expectation_id": {
+          "type": "string"
+        },
+        "runtime_authority_id": {
+          "type": "string"
+        }
+      }
+    },
+    "record_sha256": {
+      "type": "string"
+    },
+    "routes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alice"
+      ],
+      "properties": {
+        "alice": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bridge",
+            "manifest_sha256",
+            "protocol_target",
+            "selected_route"
+          ],
+          "properties": {
+            "bridge": {
+              "type": "string"
+            },
+            "manifest_sha256": {
+              "type": "string"
+            },
+            "protocol_target": {
+              "type": "string"
+            },
+            "selected_route": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "runtime_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.process.swarm-profile.v1"
+    }
+  }
+}

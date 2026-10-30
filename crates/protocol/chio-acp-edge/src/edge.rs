@@ -300,37 +300,14 @@ impl ChioAcpEdge {
         self.capabilities.iter().map(|c| c.id.clone()).collect()
     }
 
-    /// Evaluate a permission request against an explicit capability token.
-    ///
-    /// This is a truthful permission preview for deployments that already have
-    /// authenticated capability context but are not yet dispatching the tool call
-    /// itself. DPoP-required grants need kernel policy context and fail closed
-    /// here; use [`evaluate_permission_with_kernel`](Self::evaluate_permission_with_kernel)
-    /// for kernel-backed previews.
-    pub fn evaluate_permission(
-        &self,
-        request: &PermissionRequest,
-        execution: &AcpKernelExecutionContext,
-    ) -> PermissionDecision {
-        self.evaluate_permission_with_dpop_policy(request, execution, None)
-    }
-
-    /// Evaluate a permission request against the same kernel DPoP policy that
-    /// authoritative invocation will use.
+    /// Preview a permission request against the trust, clock and DPoP policy
+    /// that authoritative invocation through `kernel` uses. Allow requires the
+    /// capability issuer to be one of the kernel's trusted issuers.
     pub fn evaluate_permission_with_kernel(
         &self,
         request: &PermissionRequest,
         kernel: &ChioKernel,
         execution: &AcpKernelExecutionContext,
-    ) -> PermissionDecision {
-        self.evaluate_permission_with_dpop_policy(request, execution, Some(kernel))
-    }
-
-    fn evaluate_permission_with_dpop_policy(
-        &self,
-        request: &PermissionRequest,
-        execution: &AcpKernelExecutionContext,
-        kernel: Option<&ChioKernel>,
     ) -> PermissionDecision {
         if validate_execution_context(execution, &self.config.peer_capabilities).is_err() {
             return PermissionDecision::Deny;
@@ -340,13 +317,13 @@ impl ChioAcpEdge {
             return PermissionDecision::Deny;
         };
 
-        if !matches!(execution.capability.verify_signature(), Ok(true)) {
+        if !matches!(execution.capability.verify_integrity_embedded_key(), Ok(true)) {
             return PermissionDecision::Deny;
         }
-        let reading = match kernel.map_or_else(
-            || chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock),
-            ChioKernel::authority_clock_reading,
-        ) {
+        let Some(trusted_issuer) = TrustedIssuer::pin(kernel, &execution.capability) else {
+            return PermissionDecision::Deny;
+        };
+        let reading = match kernel.authority_clock_reading() {
             Ok(reading) => reading,
             Err(_) => return PermissionDecision::Deny,
         };
@@ -389,9 +366,6 @@ impl ChioAcpEdge {
             let Some(proof) = execution.dpop_proof.as_ref() else {
                 return PermissionDecision::Deny;
             };
-            let Some(kernel) = kernel else {
-                return PermissionDecision::Deny;
-            };
             if !Self::dpop_proof_matches_kernel_permission_preview(
                 kernel,
                 proof,
@@ -403,7 +377,7 @@ impl ChioAcpEdge {
             }
         }
 
-        PermissionDecision::Allow
+        trusted_issuer.allow()
     }
 
     /// Invoke a capability through the Chio kernel.
@@ -888,5 +862,22 @@ impl ChioAcpEdge {
             return Err(AcpEdgeError::Deferred(error.clone()));
         }
         Ok((task.task.clone(), serde_json::to_value(&task.result)?))
+    }
+}
+
+/// Proof that a capability issuer is in the kernel's trusted issuer set.
+/// [`TrustedIssuer::pin`] is its only constructor and [`TrustedIssuer::allow`]
+/// is the only way a permission preview yields [`PermissionDecision::Allow`].
+struct TrustedIssuer(());
+
+impl TrustedIssuer {
+    fn pin(kernel: &ChioKernel, capability: &CapabilityToken) -> Option<Self> {
+        kernel
+            .capability_issuer_is_trusted(&capability.issuer)
+            .then_some(Self(()))
+    }
+
+    fn allow(self) -> PermissionDecision {
+        PermissionDecision::Allow
     }
 }

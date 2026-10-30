@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": ["schema", "requestId", "issuedAtUnixSeconds", "broker", "operation"],
   "properties": {
-    "schema": { "const": "chio.broker-authority-rpc.v1" },
+    "schema": { "const": "chio.broker-authority-request.v1" },
     "requestId": { "$ref": "#/$defs/authorityRpcIdentifier" },
     "issuedAtUnixSeconds": { "$ref": "#/$defs/positiveU64" },
     "broker": { "$ref": "#/$defs/publicKey" },

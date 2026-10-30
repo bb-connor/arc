@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/capital-pool-simulation-report.schema.json",
+  "title": "Chio capital pool simulation report signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "baseline_optimization",
+    "candidate_optimization",
+    "currency",
+    "deltas",
+    "generated_at",
+    "note",
+    "recommended_operator_action",
+    "schema",
+    "simulation_id",
+    "simulation_mode",
+    "subject_key"
+  ],
+  "properties": {
+    "baseline_optimization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capital_book_ref",
+        "currency",
+        "facility_refs",
+        "issued_at",
+        "max_bind_capacity_units",
+        "max_facility_utilization_bps",
+        "note",
+        "optimization_id",
+        "pending_claim_refs",
+        "pricing_decision_ref",
+        "recommendations",
+        "schema",
+        "subject_key",
+        "support_boundary",
+        "target_reserve_ratio_bps"
+      ],
+      "properties": {
+        "capital_book_ref": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "facility_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "max_bind_capacity_units": {
+          "type": "integer"
+        },
+        "max_facility_utilization_bps": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        },
+        "optimization_id": {
+          "type": "string"
+        },
+        "pending_claim_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pricing_decision_ref": {
+          "type": "string"
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "amount",
+              "rationale",
+              "source_ref"
+            ],
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "destination_ref": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "subject_key": {
+          "type": "string"
+        },
+        "support_boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cross_currency_optimization_supported",
+            "live_mutation_supported",
+            "operator_override_required",
+            "scenario_comparison_supported",
+            "web3_reconciliation_required"
+          ],
+          "properties": {
+            "cross_currency_optimization_supported": {
+              "type": "boolean"
+            },
+            "live_mutation_supported": {
+              "type": "boolean"
+            },
+            "operator_override_required": {
+              "type": "boolean"
+            },
+            "scenario_comparison_supported": {
+              "type": "boolean"
+            },
+            "web3_reconciliation_required": {
+              "type": "boolean"
+            }
+          }
+        },
+        "target_reserve_ratio_bps": {
+          "type": "integer"
+        }
+      }
+    },
+    "candidate_optimization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capital_book_ref",
+        "currency",
+        "facility_refs",
+        "issued_at",
+        "max_bind_capacity_units",
+        "max_facility_utilization_bps",
+        "note",
+        "optimization_id",
+        "pending_claim_refs",
+        "pricing_decision_ref",
+        "recommendations",
+        "schema",
+        "subject_key",
+        "support_boundary",
+        "target_reserve_ratio_bps"
+      ],
+      "properties": {
+        "capital_book_ref": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "facility_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "max_bind_capacity_units": {
+          "type": "integer"
+        },
+        "max_facility_utilization_bps": {
+          "type": "integer"
+        },
+        "note": {
+          "type": "string"
+        },
+        "optimization_id": {
+          "type": "string"
+        },
+        "pending_claim_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pricing_decision_ref": {
+          "type": "string"
+        },
+        "recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "action",
+              "amount",
+              "rationale",
+              "source_ref"
+            ],
+            "properties": {
+              "action": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "destination_ref": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "subject_key": {
+          "type": "string"
+        },
+        "support_boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cross_currency_optimization_supported",
+            "live_mutation_supported",
+            "operator_override_required",
+            "scenario_comparison_supported",
+            "web3_reconciliation_required"
+          ],
+          "properties": {
+            "cross_currency_optimization_supported": {
+              "type": "boolean"
+            },
+            "live_mutation_supported": {
+              "type": "boolean"
+            },
+            "operator_override_required": {
+              "type": "boolean"
+            },
+            "scenario_comparison_supported": {
+              "type": "boolean"
+            },
+            "web3_reconciliation_required": {
+              "type": "boolean"
+            }
+          }
+        },
+        "target_reserve_ratio_bps": {
+          "type": "integer"
+        }
+      }
+    },
+    "currency": {
+      "type": "string"
+    },
+    "deltas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "baseline_units",
+          "candidate_units",
+          "description",
+          "metric_name"
+        ],
+        "properties": {
+          "baseline_units": {
+            "type": "integer"
+          },
+          "candidate_units": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "metric_name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "generated_at": {
+      "type": "integer"
+    },
+    "note": {
+      "type": "string"
+    },
+    "recommended_operator_action": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.capital-pool-simulation-report.v1"
+    },
+    "simulation_id": {
+      "type": "string"
+    },
+    "simulation_mode": {
+      "type": "string"
+    },
+    "subject_key": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "capabilityIds": [
+    "capability"
+  ],
+  "parameterHash": "7bd828be72a5ed7985b98d2d12d38499c8d3e36c27dc974e6855de2d5a245905",
+  "requestHash": "0a3d50ca67ba28c4037c3d223a221cbb51b32d9a3fb437252d6e33625884e487",
+  "requestId": "logical-one",
+  "reservationId": "oZXLtmmD5v0_Gf6RPyRbIhw3__gsoSZISGwzWxyGy98",
+  "response": {
+    "id": 1,
+    "jsonrpc": "2.0",
+    "result": {
+      "ownerResult": true
+    }
+  },
+  "schema": "chio.mcp.session-credential-call.v1",
+  "serverId": "fs",
+  "sessionId": "retained-session",
+  "startedAt": 1793196149,
+  "state": "completed_unacknowledged",
+  "subjectKey": "subject",
+  "toolName": "write_file"
+}

@@ -58,7 +58,7 @@ fn revoked_epoch_after_nonce_preflight_refuses_fresh_dispatch_and_releases_claim
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(preflight.verdict, Verdict::Allow, "{preflight:#?}");
-    assert!(preflight.receipt.verify_signature()?);
+    assert!(preflight.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
     let before = faults::history(&fixture.inner)?;
     assert_eq!(before.len(), 1);
@@ -78,7 +78,7 @@ fn revoked_epoch_after_nonce_preflight_refuses_fresh_dispatch_and_releases_claim
     let denied = kernel
         .evaluate_tool_call_blocking_with_metadata(&execution, Some(swarm_route_metadata()))?;
     assert_eq!(denied.verdict, Verdict::Deny, "{denied:#?}");
-    assert!(denied.receipt.verify_signature()?);
+    assert!(denied.receipt.verify_integrity_embedded_key()?);
     let metadata = denied
         .receipt
         .metadata
@@ -113,7 +113,7 @@ fn completed_treaty_replay_after_revocation_keeps_original_authorization() -> Te
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(completed.verdict, Verdict::Allow, "{completed:#?}");
-    assert!(completed.receipt.verify_signature()?);
+    assert!(completed.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
     let history = faults::history(&fixture.inner)?;
     assert_eq!(history.len(), 1);
@@ -127,7 +127,7 @@ fn completed_treaty_replay_after_revocation_keeps_original_authorization() -> Te
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(replay.verdict, Verdict::Allow, "{replay:#?}");
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.history(&history[0].reference)?, before);
     Ok(())

@@ -1,0 +1,46 @@
+{
+  "bondRequirements": [
+    {
+      "bondClass": "listing",
+      "collateralReferenceKind": "credit_bond",
+      "requiredAmount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "slashable": true
+    }
+  ],
+  "disputeFee": {
+    "currency": "USD",
+    "units": 2500
+  },
+  "expiresAt": 204,
+  "feeScheduleId": "market-fee-schedule-e03e342fdc8ae009268b746c9eb65ada78d92252f089f08e43568eedb69abb24",
+  "governingOperatorId": "https://registry.chio.example",
+  "governingOperatorName": "Registry Operator",
+  "issuedAt": 202,
+  "issuedBy": "market@chio.example",
+  "marketParticipationFee": {
+    "currency": "USD",
+    "units": 500
+  },
+  "namespace": "https://registry.chio.example",
+  "publicationFee": {
+    "currency": "USD",
+    "units": 100
+  },
+  "schema": "chio.registry.market-fee-schedule.v1",
+  "scope": {
+    "allowedActorKinds": [
+      "tool_server"
+    ],
+    "allowedAdmissionClasses": [
+      "bond_backed"
+    ],
+    "allowedListingOperatorIds": [
+      "https://registry.chio.example"
+    ],
+    "namespace": "https://registry.chio.example",
+    "policyReference": "policy/open-market/default"
+  }
+}

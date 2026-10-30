@@ -1,0 +1,17 @@
+{
+  "nonce": {
+    "bound_to": {
+      "capability_id": "cap-wire-001",
+      "parameter_hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "request_id": "req-wire-001",
+      "subject_id": "agent-wire-001",
+      "tool_name": "echo",
+      "tool_server": "srv"
+    },
+    "expires_at": 1030,
+    "issued_at": 1000,
+    "nonce_id": "nonce-wire-001",
+    "schema": "chio.operation_execution_nonce.v1"
+  },
+  "operation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+}

@@ -53,10 +53,17 @@ use sha2::{Digest, Sha256};
 
 use crate::canonical::{CanonicalBytes, CanonicalJsonWitness};
 use crate::error::{Error, Result};
+use crate::signed_artifact::registered_wrapper_schema;
 
 mod ed25519_verification;
 mod encoding;
 mod wire;
+mod wrapper;
+
+pub use wrapper::{
+    assemble_wrapper, ExemptFormat, SigningMessage, SigningWrapper, SIGNING_WRAPPER_LEN,
+    SIGNING_WRAPPER_PREFIX,
+};
 
 pub use wire::MAX_KEY_WIRE_BYTES;
 
@@ -86,9 +93,8 @@ pub const ML_DSA_65_SIGNATURE_LEN: usize = 3309;
 /// the `pq` feature to produce or verify cryptographically.
 ///
 /// This enum serializes as a short lowercase identifier:
-/// `"ed25519"`, `"p256"`, `"p384"`, or `"hybrid"`. When absent from an
-/// artifact's envelope, consumers MUST treat the algorithm as
-/// [`SigningAlgorithm::Ed25519`] (the default algorithm).
+/// `"ed25519"`, `"p256"`, `"p384"`, or `"hybrid"`. A verifier takes the
+/// algorithm only from the pinned key, never from an artifact member.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SigningAlgorithm {
@@ -123,24 +129,6 @@ impl SigningAlgorithm {
             Self::P384 => "p384",
             Self::Hybrid => "hybrid",
         }
-    }
-}
-
-/// Returns `true` when `alg` equals the default algorithm. Free function
-/// so it can be referenced from `#[serde(skip_serializing_if = "...")]`.
-#[must_use]
-pub fn is_default_algorithm(alg: &SigningAlgorithm) -> bool {
-    alg.is_default()
-}
-
-/// Returns `true` when the optional algorithm is absent or is the default
-/// (Ed25519). Used by `#[serde(skip_serializing_if)]` on envelope fields to
-/// omit the algorithm field for standard Ed25519 artifacts.
-#[must_use]
-pub fn is_default_optional_algorithm(alg: &Option<SigningAlgorithm>) -> bool {
-    match alg {
-        None => true,
-        Some(a) => a.is_default(),
     }
 }
 
@@ -191,37 +179,28 @@ impl Keypair {
     }
 
     #[must_use]
-    pub fn sign(&self, message: &[u8]) -> Signature {
-        let sig = self.signing_key.sign(message);
+    pub(crate) fn sign(&self, message: SigningMessage<'_>) -> Signature {
+        let sig = self.signing_key.sign(message.as_bytes());
         Signature {
             material: SignatureMaterial::Ed25519 { inner: sig },
         }
     }
 
-    /// Sign a serializable value by converting it to canonical JSON first.
-    ///
-    /// Returns the signature and the canonical bytes that were signed, so the
-    /// caller can store or transmit them alongside the signature.
-    pub fn sign_canonical<T: Serialize>(&self, value: &T) -> Result<(Signature, Vec<u8>)> {
-        let canonical = CanonicalBytes::from_serializable(value)?;
-        let signature = self.sign(canonical.as_bytes());
-        Ok((signature, canonical.into_vec()))
+    /// Sign the wrapper over `canonical` under `schema_id`; refuses an
+    /// unregistered id before signing.
+    pub fn sign_wrapped(
+        &self,
+        schema_id: &str,
+        canonical: &CanonicalBytes<CanonicalJsonWitness>,
+    ) -> Result<Signature> {
+        let wrapper = SigningWrapper::new(schema_id, canonical)?;
+        Ok(self.sign(SigningMessage::wrapper(&wrapper)))
     }
 
-    /// Sign a serializable value after converting it to shared canonical JSON.
-    ///
-    /// The returned payload carries the exact canonical bytes behind an
-    /// `Arc`, allowing downstream code to reuse the signed representation.
-    pub fn sign_canonical_shared<T: Serialize>(&self, value: &T) -> Result<SignedCanonicalPayload> {
-        let canonical = canonical_json_shared_bytes(value)?;
-        Ok(self.sign_shared_canonical(canonical))
-    }
-
-    /// Sign shared canonical JSON bytes without reserializing the payload.
+    /// Sign bytes whose layout an external standard fixes.
     #[must_use]
-    pub fn sign_shared_canonical(&self, canonical: SharedCanonicalBytes) -> SignedCanonicalPayload {
-        let signature = self.sign(canonical.as_bytes());
-        SignedCanonicalPayload::new(signature, canonical)
+    pub fn sign_exempt(&self, format: ExemptFormat, bytes: &[u8]) -> Signature {
+        self.sign(SigningMessage::exempt(format, bytes))
     }
 
     #[must_use]
@@ -440,7 +419,7 @@ impl PublicKey {
     /// Returns `false` when algorithms differ between key and signature, or
     /// when the cryptographic check fails. Never panics.
     #[must_use]
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
+    pub(crate) fn verify(&self, message: &[u8], signature: &Signature) -> bool {
         match (&self.material, &signature.material) {
             (
                 PublicKeyMaterial::Ed25519 { verifying_key },
@@ -479,7 +458,7 @@ impl PublicKey {
     /// signature points. Other algorithms retain their normal verifier;
     /// hybrid signatures apply strict verification to the classical part.
     #[must_use]
-    pub fn verify_strict(&self, message: &[u8], signature: &Signature) -> bool {
+    pub(crate) fn verify_strict(&self, message: &[u8], signature: &Signature) -> bool {
         match (&self.material, &signature.material) {
             (
                 PublicKeyMaterial::Ed25519 { verifying_key },
@@ -510,45 +489,6 @@ impl PublicKey {
             }
             _ => false,
         }
-    }
-
-    /// Verify a signature over the canonical JSON form of a serializable value.
-    pub fn verify_canonical<T: Serialize>(&self, value: &T, signature: &Signature) -> Result<bool> {
-        let canonical = canonical_json_shared_bytes(value)?;
-        Ok(self.verify_shared_canonical(&canonical, signature))
-    }
-
-    /// Strictly verify a signature over canonical JSON.
-    ///
-    /// Use this for public, identity-bearing artifacts whose verification
-    /// must reject weak Ed25519 keys and small-order signature points.
-    pub fn verify_canonical_strict<T: Serialize>(
-        &self,
-        value: &T,
-        signature: &Signature,
-    ) -> Result<bool> {
-        let canonical = canonical_json_shared_bytes(value)?;
-        Ok(self.verify_strict(canonical.as_bytes(), signature))
-    }
-
-    /// Verify a signature over shared canonical JSON bytes.
-    #[must_use]
-    pub fn verify_shared_canonical(
-        &self,
-        canonical: &SharedCanonicalBytes,
-        signature: &Signature,
-    ) -> bool {
-        self.verify_canonical_bytes(canonical.as_ref(), signature)
-    }
-
-    /// Verify a signature over canonical JSON bytes without reserializing.
-    #[must_use]
-    pub fn verify_canonical_bytes(
-        &self,
-        canonical: &CanonicalBytes<CanonicalJsonWitness>,
-        signature: &Signature,
-    ) -> bool {
-        self.verify(canonical.as_bytes(), signature)
     }
 
     /// Hex encoding, with algorithm prefix for non-Ed25519 keys.
@@ -924,17 +864,18 @@ pub trait SigningBackend: Send + Sync {
     fn public_key(&self) -> Result<PublicKey>;
 
     /// Produce a detached signature over `message`.
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature>;
 
     /// Capture identity and signature as one validated operation.
     ///
     /// A rotating backend must override this method and retain its selector
     /// lease through signature creation and durable signing evidence.
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
+    fn sign_bytes_with_identity(&self, message: SigningMessage<'_>) -> Result<SigningOutcome> {
         let public_key = self.public_key()?;
         let algorithm = public_key.algorithm();
         let signature = self.sign_bytes(message)?;
-        if signature.algorithm() != algorithm || !public_key.verify(message, &signature) {
+        if signature.algorithm() != algorithm || !public_key.verify(message.as_bytes(), &signature)
+        {
             return Err(Error::InvalidSignature(
                 "signing backend returned a signature from a different identity".to_string(),
             ));
@@ -953,7 +894,7 @@ pub trait SigningBackend: Send + Sync {
     fn sign_bytes_for_identity(
         &self,
         expected_key: &PublicKey,
-        message: &[u8],
+        message: SigningMessage<'_>,
     ) -> Result<SigningOutcome> {
         let outcome = self.sign_bytes_with_identity(message)?;
         if &outcome.public_key != expected_key {
@@ -964,62 +905,137 @@ pub trait SigningBackend: Send + Sync {
         Ok(outcome)
     }
 
-    /// Produce a detached signature over canonical JSON bytes.
-    fn sign_canonical_bytes(
+    /// Build the wrapper and sign it; refuses an unregistered id before any
+    /// signing call.
+    fn sign_wrapped(
         &self,
+        schema_id: &str,
         canonical: &CanonicalBytes<CanonicalJsonWitness>,
-    ) -> Result<Signature> {
-        self.sign_bytes_with_identity(canonical.as_bytes())
-            .map(|outcome| outcome.signature)
+    ) -> Result<SigningOutcome> {
+        let wrapper = SigningWrapper::new(schema_id, canonical)?;
+        self.sign_bytes_with_identity(SigningMessage::wrapper(&wrapper))
+    }
+
+    /// [`SigningBackend::sign_wrapped`] bound to `expected_key`.
+    fn sign_wrapped_for_identity(
+        &self,
+        expected_key: &PublicKey,
+        schema_id: &str,
+        canonical: &CanonicalBytes<CanonicalJsonWitness>,
+    ) -> Result<SigningOutcome> {
+        let wrapper = SigningWrapper::new(schema_id, canonical)?;
+        self.sign_bytes_for_identity(expected_key, SigningMessage::wrapper(&wrapper))
     }
 }
 
-/// Sign the canonical JSON form of `value` with the given backend.
+/// Sign the wrapper over the canonical JSON of `value` under `schema_id`.
 ///
-/// Returns the produced signature and the canonical byte sequence that was
-/// signed (so callers can store or retransmit the exact bytes used). This is
-/// a free function rather than a trait method so [`SigningBackend`] remains
-/// dyn-compatible.
-pub fn sign_canonical_with_backend<T: Serialize>(
+/// Returns the outcome and the canonical body the wrapper hashed.
+pub fn sign_wrapped<T: Serialize>(
     backend: &dyn SigningBackend,
+    schema_id: &str,
     value: &T,
-) -> Result<(Signature, Vec<u8>)> {
+) -> Result<(SigningOutcome, CanonicalBytes<CanonicalJsonWitness>)> {
     let canonical = CanonicalBytes::from_serializable(value)?;
-    let outcome = backend.sign_bytes_with_identity(canonical.as_bytes())?;
-    Ok((outcome.signature, canonical.into_vec()))
+    let outcome = backend.sign_wrapped(schema_id, &canonical)?;
+    Ok((outcome, canonical))
 }
 
-/// Sign canonical JSON while binding the operation to an embedded public key.
-pub fn sign_canonical_with_backend_for_identity<T: Serialize>(
+/// [`sign_wrapped`] bound to `expected_key`.
+pub fn sign_wrapped_for_identity<T: Serialize>(
     backend: &dyn SigningBackend,
     expected_key: &PublicKey,
+    schema_id: &str,
     value: &T,
-) -> Result<(SigningOutcome, Vec<u8>)> {
+) -> Result<(SigningOutcome, CanonicalBytes<CanonicalJsonWitness>)> {
     let canonical = CanonicalBytes::from_serializable(value)?;
-    let outcome = backend.sign_bytes_for_identity(expected_key, canonical.as_bytes())?;
-    Ok((outcome, canonical.into_vec()))
+    let outcome = backend.sign_wrapped_for_identity(expected_key, schema_id, &canonical)?;
+    Ok((outcome, canonical))
 }
 
-/// Sign shared canonical JSON bytes with the given backend.
-///
-/// The returned payload keeps the exact bytes behind an `Arc` so callers can
-/// share the signed representation without copying or reserializing.
-pub fn sign_shared_canonical_with_backend(
+/// Sign the wrapper over shared canonical bytes without reserializing them.
+pub fn sign_shared_wrapped(
     backend: &dyn SigningBackend,
+    schema_id: &str,
     canonical: SharedCanonicalBytes,
 ) -> Result<SignedCanonicalPayload> {
-    let outcome = backend.sign_bytes_with_identity(canonical.as_ref().as_bytes())?;
+    let outcome = backend.sign_wrapped(schema_id, canonical.as_ref())?;
     Ok(SignedCanonicalPayload::new(outcome.signature, canonical))
 }
 
-/// Sign the canonical JSON form of `value` with the given backend and keep the
-/// canonical byte sequence shareable.
-pub fn sign_canonical_with_backend_shared<T: Serialize>(
-    backend: &dyn SigningBackend,
+/// Verify `signature` over the wrapper of the canonical JSON of `value`.
+///
+/// `pinned` is the key the caller trusts; its encoding alone selects the
+/// algorithm. `schema_id` is the type the call site expects. Order: id
+/// registered, signature algorithm equals `pinned.algorithm()`, strict
+/// cryptographic check.
+pub fn verify_wrapped<T: Serialize>(
+    pinned: &PublicKey,
+    schema_id: &str,
     value: &T,
-) -> Result<SignedCanonicalPayload> {
-    let canonical = canonical_json_shared_bytes(value)?;
-    sign_shared_canonical_with_backend(backend, canonical)
+    signature: &Signature,
+) -> Result<()> {
+    if !registered_wrapper_schema(schema_id) {
+        return Err(Error::UnregisteredSchemaId(schema_id.to_string()));
+    }
+    let canonical = CanonicalBytes::from_serializable(value)?;
+    verify_wrapped_bytes(pinned, schema_id, &canonical, signature)
+}
+
+/// [`verify_wrapped`] over canonical bytes the caller already holds.
+pub fn verify_wrapped_bytes(
+    pinned: &PublicKey,
+    schema_id: &str,
+    canonical: &CanonicalBytes<CanonicalJsonWitness>,
+    signature: &Signature,
+) -> Result<()> {
+    let wrapper = SigningWrapper::new(schema_id, canonical)?;
+    verify_message(pinned, wrapper.as_bytes(), signature)
+}
+
+/// Verify a signature over a wrapper the caller already holds.
+pub fn verify_wrapper(
+    pinned: &PublicKey,
+    wrapper: &SigningWrapper,
+    signature: &Signature,
+) -> Result<()> {
+    verify_message(pinned, wrapper.as_bytes(), signature)
+}
+
+/// Verify a signature over bytes whose layout `format` fixes.
+pub fn verify_exempt(
+    pinned: &PublicKey,
+    _format: ExemptFormat,
+    bytes: &[u8],
+    signature: &Signature,
+) -> Result<()> {
+    verify_message(pinned, bytes, signature)
+}
+
+/// Maps a wrapper verification to the boolean artifact verifiers return: a
+/// rejected signature is `Ok(false)`; every other refusal stays an error.
+pub(crate) fn wrapped_verdict(result: Result<()>) -> Result<bool> {
+    match result {
+        Ok(()) => Ok(true),
+        Err(Error::SignatureRejected) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+fn verify_message(pinned: &PublicKey, message: &[u8], signature: &Signature) -> Result<()> {
+    let key = pinned.algorithm();
+    let signed = signature.algorithm();
+    if key != signed {
+        return Err(Error::SignatureAlgorithmMismatch {
+            key,
+            signature: signed,
+        });
+    }
+    if pinned.verify_strict(message, signature) {
+        Ok(())
+    } else {
+        Err(Error::SignatureRejected)
+    }
 }
 
 /// Ed25519 [`SigningBackend`] wrapping a [`Keypair`].
@@ -1057,7 +1073,7 @@ impl SigningBackend for Ed25519Backend {
         Ok(self.keypair.public_key())
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
         Ok(self.keypair.sign(message))
     }
 }
@@ -1068,7 +1084,9 @@ impl SigningBackend for Ed25519Backend {
 
 #[cfg(feature = "fips")]
 mod fips_backends {
-    use super::{PublicKey, PublicKeyMaterial, Result, Signature, SignatureMaterial};
+    use super::{
+        PublicKey, PublicKeyMaterial, Result, Signature, SignatureMaterial, SigningMessage,
+    };
     use crate::crypto::{Error, SigningBackend};
     use aws_lc_rs::rand::SystemRandom;
     use aws_lc_rs::signature::{
@@ -1124,10 +1142,10 @@ mod fips_backends {
             })
         }
 
-        fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+        fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
             let sig = self
                 .keypair
-                .sign(&self.rng, message)
+                .sign(&self.rng, message.as_bytes())
                 .map_err(|e| Error::InvalidSignature(format!("aws-lc-rs P-256 sign: {e}")))?;
             Ok(Signature {
                 material: SignatureMaterial::P256 {
@@ -1186,10 +1204,10 @@ mod fips_backends {
             })
         }
 
-        fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+        fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
             let sig = self
                 .keypair
-                .sign(&self.rng, message)
+                .sign(&self.rng, message.as_bytes())
                 .map_err(|e| Error::InvalidSignature(format!("aws-lc-rs P-384 sign: {e}")))?;
             Ok(Signature {
                 material: SignatureMaterial::P384 {
@@ -1337,9 +1355,13 @@ pub fn canonical_json_string<T: Serialize>(value: &T) -> Result<String> {
 mod tests {
     use super::*;
 
+    fn raw(bytes: &[u8]) -> SigningMessage<'_> {
+        SigningMessage::exempt(ExemptFormat::JwsSigningInput, bytes)
+    }
+
     #[test]
     fn signature_encoded_text_len_matches_existing_encoding() -> Result<()> {
-        let ed25519 = Keypair::from_seed(&[31; 32]).sign(b"encoding-length");
+        let ed25519 = Keypair::from_seed(&[31; 32]).sign(raw(b"encoding-length"));
         let p256 = Signature::from_p256_der(&[0x30; 72]);
         let p384 = Signature::from_p384_der(&[0x30; 104]);
         let pq = alloc::vec![0; ML_DSA_65_SIGNATURE_LEN];
@@ -1368,14 +1390,14 @@ mod tests {
     fn sign_and_verify() {
         let kp = Keypair::generate();
         let msg = b"hello chio";
-        let sig = kp.sign(msg);
+        let sig = kp.sign(raw(msg));
         assert!(kp.public_key().verify(msg, &sig));
     }
 
     #[test]
     fn wrong_message_fails() {
         let kp = Keypair::generate();
-        let sig = kp.sign(b"hello chio");
+        let sig = kp.sign(raw(b"hello chio"));
         assert!(!kp.public_key().verify(b"wrong", &sig));
     }
 
@@ -1383,7 +1405,7 @@ mod tests {
     fn wrong_key_fails() {
         let kp1 = Keypair::generate();
         let kp2 = Keypair::generate();
-        let sig = kp1.sign(b"hello chio");
+        let sig = kp1.sign(raw(b"hello chio"));
         assert!(!kp2.public_key().verify(b"hello chio", &sig));
     }
 
@@ -1441,7 +1463,7 @@ mod tests {
     #[test]
     fn signature_hex_roundtrip() {
         let kp = Keypair::generate();
-        let sig = kp.sign(b"test");
+        let sig = kp.sign(raw(b"test"));
         let hex = sig.to_hex();
         let restored = Signature::from_hex(&hex).unwrap();
         assert_eq!(sig.to_bytes(), restored.to_bytes());
@@ -1459,39 +1481,21 @@ mod tests {
     #[test]
     fn signature_serde_roundtrip() {
         let kp = Keypair::generate();
-        let sig = kp.sign(b"test");
+        let sig = kp.sign(raw(b"test"));
         let json = serde_json::to_string(&sig).unwrap();
         let restored: Signature = serde_json::from_str(&json).unwrap();
         assert_eq!(sig.to_bytes(), restored.to_bytes());
     }
 
     #[test]
-    fn sign_canonical_roundtrip() {
-        let kp = Keypair::generate();
-        let value = serde_json::json!({"b": 2, "a": 1});
-        let (sig, _bytes) = kp.sign_canonical(&value).unwrap();
-        let valid = kp.public_key().verify_canonical(&value, &sig).unwrap();
-        assert!(valid);
-    }
-
-    #[test]
-    fn sign_canonical_shared_returns_shared_canonical_bytes() -> Result<()> {
+    fn sign_wrapped_roundtrip() -> Result<()> {
         let kp = Keypair::from_seed(&[7u8; 32]);
-        let value = serde_json::json!({"b": 2, "a": 1});
-        let signed = kp.sign_canonical_shared(&value)?;
-
-        assert_eq!(signed.canonical_bytes(), br#"{"a":1,"b":2}"#);
-        assert!(kp
-            .public_key()
-            .verify_shared_canonical(signed.canonical(), signed.signature()));
-
-        let shared = signed.canonical().clone();
-        assert!(SharedCanonicalBytes::ptr_eq(signed.canonical(), &shared));
-
-        let (legacy_signature, legacy_bytes) = kp.sign_canonical(&value)?;
-        assert_eq!(&legacy_signature, signed.signature());
-        assert_eq!(legacy_bytes, signed.canonical_bytes());
-
+        let canonical = CanonicalBytes::from_serializable(&serde_json::json!({"b": 2, "a": 1}))?;
+        let sig = kp.sign_wrapped("chio.receipt.v1", &canonical)?;
+        verify_wrapped_bytes(&kp.public_key(), "chio.receipt.v1", &canonical, &sig)?;
+        let wrapper = SigningWrapper::new("chio.receipt.v1", &canonical)?;
+        assert!(kp.public_key().verify_strict(wrapper.as_bytes(), &sig));
+        assert!(!kp.public_key().verify(canonical.as_bytes(), &sig));
         Ok(())
     }
 
@@ -1500,17 +1504,18 @@ mod tests {
         let backend = Ed25519Backend::new(Keypair::from_seed(&[9u8; 32]));
         let value = serde_json::json!({"z": 0, "a": [true]});
         let canonical = canonical_json_shared_bytes(&value)?;
-        let signed = sign_shared_canonical_with_backend(&backend, canonical.clone())?;
+        let signed = sign_shared_wrapped(&backend, "chio.receipt.v1", canonical.clone())?;
 
         assert!(SharedCanonicalBytes::ptr_eq(&canonical, signed.canonical()));
-        assert!(backend
-            .public_key()?
-            .verify_shared_canonical(signed.canonical(), signed.signature()));
-
-        let (legacy_signature, legacy_bytes) = sign_canonical_with_backend(&backend, &value)?;
-        assert_eq!(&legacy_signature, signed.signature());
-        assert_eq!(legacy_bytes, signed.canonical_bytes());
-
+        verify_wrapped(
+            &backend.public_key()?,
+            "chio.receipt.v1",
+            &value,
+            signed.signature(),
+        )?;
+        let (outcome, bytes) = sign_wrapped(&backend, "chio.receipt.v1", &value)?;
+        assert_eq!(&outcome.signature, signed.signature());
+        assert_eq!(bytes.as_bytes(), signed.canonical_bytes());
         Ok(())
     }
 
@@ -1553,7 +1558,7 @@ mod tests {
             SigningAlgorithm::Ed25519
         );
         let msg = b"hello chio";
-        let sig = backend.sign_bytes(msg).unwrap();
+        let sig = backend.sign_bytes(raw(msg)).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
         assert!(backend.public_key().unwrap().verify(msg, &sig));
     }
@@ -1562,7 +1567,7 @@ mod tests {
     fn atomic_signing_outcome_binds_identity_algorithm_and_signature() {
         let backend = Ed25519Backend::new(Keypair::from_seed(&[21_u8; 32]));
         let outcome = backend
-            .sign_bytes_with_identity(b"atomic identity")
+            .sign_bytes_with_identity(raw(b"atomic identity"))
             .unwrap();
 
         assert_eq!(outcome.public_key, backend.public_key().unwrap());
@@ -1575,7 +1580,7 @@ mod tests {
             .public_key()
             .unwrap();
         assert!(backend
-            .sign_bytes_for_identity(&wrong, b"wrong identity")
+            .sign_bytes_for_identity(&wrong, raw(b"wrong identity"))
             .is_err());
     }
 
@@ -1591,7 +1596,7 @@ mod tests {
                 self.advertised.public_key()
             }
 
-            fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+            fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
                 self.signer.sign_bytes(message)
             }
         }
@@ -1601,7 +1606,7 @@ mod tests {
             signer: Ed25519Backend::new(Keypair::from_seed(&[24_u8; 32])),
         };
         assert!(backend
-            .sign_bytes_with_identity(b"identity substitution")
+            .sign_bytes_with_identity(raw(b"identity substitution"))
             .is_err());
     }
 
@@ -1612,7 +1617,7 @@ mod tests {
         let pk_hex = kp.public_key().to_hex();
         assert_eq!(pk_hex.len(), 64);
         assert!(!pk_hex.contains(':'));
-        let sig = kp.sign(b"x");
+        let sig = kp.sign(raw(b"x"));
         let sig_hex = sig.to_hex();
         assert_eq!(sig_hex.len(), 128);
         assert!(!sig_hex.contains(':'));
@@ -1655,7 +1660,7 @@ mod tests {
             SigningAlgorithm::P256
         );
         let msg = b"hello fips";
-        let sig = backend.sign_bytes(msg).unwrap();
+        let sig = backend.sign_bytes(raw(msg)).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P256);
         assert!(backend.public_key().unwrap().verify(msg, &sig));
         // Serde round-trips.
@@ -1678,7 +1683,7 @@ mod tests {
             SigningAlgorithm::P384
         );
         let msg = b"hello fips 384";
-        let sig = backend.sign_bytes(msg).unwrap();
+        let sig = backend.sign_bytes(raw(msg)).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P384);
         assert!(backend.public_key().unwrap().verify(msg, &sig));
     }
@@ -1687,7 +1692,7 @@ mod tests {
     #[test]
     fn p256_wrong_message_fails() {
         let backend = P256Backend::generate().unwrap();
-        let sig = backend.sign_bytes(b"original").unwrap();
+        let sig = backend.sign_bytes(raw(b"original")).unwrap();
         assert!(!backend.public_key().unwrap().verify(b"tampered", &sig));
     }
 }

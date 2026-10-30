@@ -1,0 +1,16 @@
+{
+  "checkpointDigest": "4d9a04b3416ee3bf12320169d92baa8a2d98cd0934369e6d05c41f4c81f8a08f",
+  "generationPinDigest": "7a9e2dc1c755bc300e9be7fa1530ee3935e1de29079e440c75b0b35c0e5be52c",
+  "issuerDid": "did:chio:db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d",
+  "pinDigest": "58fa7f403219dd0f50e9cca9ea12344f71ff1930ef09fd6bfccf38e5542cfa86",
+  "resolverIdentity": "resolver-a",
+  "resultDigest": "c0c9a83eefbb753ee111571a0eb4fb8ef4714fd038407e66dd2acd9083850e58",
+  "schema": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1",
+  "signerKeyEpoch": 5,
+  "sourcePassportId": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+  "status": "active",
+  "statusVersion": 10,
+  "storeGeneration": 2,
+  "storeId": "high-water-a",
+  "trustedClockHighWater": 1710000100
+}

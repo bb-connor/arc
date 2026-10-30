@@ -144,6 +144,11 @@ jobs:
       - name: Install Python workflow validators
         run: python -m pip install --disable-pip-version-check PyYAML==6.0.2 jsonschema==4.26.0 referencing==0.37.0
 
+      - name: Signing wrapper vectors
+        run: |
+          python -m pip install --disable-pip-version-check -r scripts/gen-signing-wrapper-vectors.requirements.txt
+          python3 -I scripts/gen-signing-wrapper-vectors.py check
+
       - name: Patch hygiene
         run: python3 scripts/check-patch-hygiene.py
 
@@ -201,6 +206,7 @@ jobs:
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before }}
+          SELF_KEY_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           source scripts/structural-gates.sh
           run_gate bash scripts/tests/run-structural-gates.test.sh
@@ -279,6 +285,7 @@ jobs:
           run_gate bash ./scripts/tests/check-chio-proof-room-release-truth.test.sh
           run_gate bash ./scripts/check-chio-schema-registry.sh
           run_gate bash ./scripts/tests/check-chio-schema-registry.test.sh
+          run_gate python3 ./scripts/tests/gen-signed-artifact-schemas.test.py
           run_gate bash ./scripts/tests/check-chio-transaction-passport.test.sh
           run_gate python3 ./scripts/check-root-authority-schema-examples.py
           run_gate python3 ./scripts/tests/check-root-authority-schema-examples.test.py
@@ -328,6 +335,8 @@ jobs:
           run_gate bash scripts/tests/check-accounting-arithmetic.test.sh
           run_gate python3 scripts/check-domain-separation.py
           run_gate bash scripts/tests/check-domain-separation.test.sh
+          run_gate python3 scripts/check-self-key-verify.py --base "$SELF_KEY_BASE_SHA"
+          run_gate python3 scripts/tests/check-self-key-verify.test.py
           run_gate python3 scripts/check-enterprise-subject-census.py
           run_gate python3 scripts/tests/check-enterprise-subject-census.test.py
           run_gate python3 scripts/check-security-clocks.py

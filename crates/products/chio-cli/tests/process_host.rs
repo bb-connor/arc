@@ -157,11 +157,11 @@ fn process_swarm_binds_issued_workers_and_recovers_sealed_authority(
     );
     let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let bootstrap: ChioReceipt = serde_json::from_value(evidence["bootstrap"].clone())?;
-    assert!(bootstrap.verify_signature()?);
+    assert!(bootstrap.verify_integrity_embedded_key()?);
     assert_eq!(bootstrap.kernel_key.to_hex(), evidence["kernel_key"]);
     for raw in evidence["receipts"].as_array().ok_or("missing receipts")? {
         let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("invalid receipt")?)?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
     }
     assert_eq!(evidence["effects"], 2);
@@ -188,11 +188,11 @@ fn independent_swarm_graphs_share_the_original_family_quota(
     );
     let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let bootstrap: ChioReceipt = serde_json::from_value(evidence["bootstrap"].clone())?;
-    assert!(bootstrap.verify_signature()?);
+    assert!(bootstrap.verify_integrity_embedded_key()?);
     assert_eq!(bootstrap.kernel_key.to_hex(), evidence["kernel_key"]);
     for raw in evidence["receipts"].as_array().ok_or("missing receipts")? {
         let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("invalid receipt")?)?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
     }
     assert_eq!(evidence["effects"], 2);

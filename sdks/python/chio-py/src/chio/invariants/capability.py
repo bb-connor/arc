@@ -4,10 +4,49 @@ from typing import Any
 
 from ..errors import ChioInvariantError, parse_json_text
 from .json import canonicalize_json
-from .signing import verify_utf8_message_ed25519
+from .signing import wrapped_signature_valid
 
 
 CAPABILITY_SCHEMA = "chio.capability.v1"
+DELEGATION_LINK_SCHEMA = "chio.delegation-link.v1"
+
+_CAPABILITY_MEMBERS = frozenset(
+    {
+        "schema",
+        "id",
+        "issuer",
+        "subject",
+        "scope",
+        "issued_at",
+        "expires_at",
+        "delegation_chain",
+        "aggregate_invocation_budget",
+        "caveats",
+        "scope_attenuations",
+        "attenuation_proof",
+        "budget_share_bps",
+        "signature",
+    }
+)
+_DELEGATION_LINK_MEMBERS = frozenset(
+    {
+        "capability_id",
+        "delegator",
+        "delegatee",
+        "attenuations",
+        "timestamp",
+        "scope_hash",
+        "aggregate_budget",
+        "cumulative_approval",
+        "signature",
+    }
+)
+
+
+def _reject_unknown_members(value: dict[str, Any], allowed: frozenset[str], kind: str) -> None:
+    for key in sorted(value):
+        if key not in allowed:
+            raise ChioInvariantError("json", f"{kind} has unknown member {key}")
 
 
 def parse_capability_json(input_text: str) -> dict[str, Any]:
@@ -21,11 +60,11 @@ def parse_capability_json(input_text: str) -> dict[str, Any]:
 def _require_capability_schema(capability: dict[str, Any]) -> None:
     if capability.get("schema") != CAPABILITY_SCHEMA:
         raise ChioInvariantError("json", 'capability schema must be "chio.capability.v1"')
+    _reject_unknown_members(capability, _CAPABILITY_MEMBERS, "capability")
 
 
 def _capability_body(capability: dict[str, Any]) -> dict[str, Any]:
     omitted = {
-        "algorithm",
         "attenuation_proof",
         "budget_share_bps",
         "caveats",
@@ -75,7 +114,9 @@ def _verify_delegation_chain(
     if max_delegation_depth is not None and len(chain) > max_delegation_depth:
         return False
     for index, current in enumerate(chain):
-        if not verify_utf8_message_ed25519(
+        _reject_unknown_members(current, _DELEGATION_LINK_MEMBERS, "delegation link")
+        if not wrapped_signature_valid(
+            DELEGATION_LINK_SCHEMA,
             canonicalize_json(_delegation_link_body(current)),
             current["delegator"],
             current["signature"],
@@ -102,7 +143,8 @@ def verify_capability(
     else:
         time_status = "valid"
     return {
-        "signature_valid": verify_utf8_message_ed25519(
+        "signature_valid": wrapped_signature_valid(
+            CAPABILITY_SCHEMA,
             capability_signing_body_canonical_json(capability),
             capability["issuer"],
             capability["signature"],

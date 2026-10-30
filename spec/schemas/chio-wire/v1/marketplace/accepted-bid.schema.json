@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/marketplace/accepted-bid.schema.json",
+  "title": "Chio marketplace accepted bid signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acceptedAt",
+    "agentId",
+    "askDigest",
+    "bidDigest",
+    "bidReceiptId",
+    "listingId",
+    "quotedPrice",
+    "schema",
+    "tokenExpiresAt",
+    "tokenId",
+    "tokenSubject"
+  ],
+  "properties": {
+    "acceptedAt": {
+      "type": "integer"
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "askDigest": {
+      "type": "string"
+    },
+    "bidDigest": {
+      "type": "string"
+    },
+    "bidReceiptId": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "quotedPrice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.marketplace.accepted-bid.v1"
+    },
+    "tokenExpiresAt": {
+      "type": "integer"
+    },
+    "tokenId": {
+      "type": "string"
+    },
+    "tokenSubject": {
+      "type": "string"
+    }
+  }
+}

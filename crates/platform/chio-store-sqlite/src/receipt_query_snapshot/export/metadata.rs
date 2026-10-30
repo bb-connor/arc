@@ -327,7 +327,10 @@ pub(super) fn checkpoints(
         bytes.charge(&checkpoint)?;
         checkpoints.push(checkpoint);
     }
-    let mut summary = validate_checkpoint_transparency(&checkpoints)
+    let carried_kernel_keys =
+        chio_kernel_core::evidence_verify::verify_integrity_embedded_key_set(&checkpoints)
+            .map_err(|error| metadata_refusal(error.to_string()))?;
+    let mut summary = validate_checkpoint_transparency(&checkpoints, &carried_kernel_keys)
         .map_err(|error| metadata_refusal(error.to_string()))?;
     for publication in &mut summary.publications {
         let partial = CheckpointTransparencySummary {

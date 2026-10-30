@@ -386,7 +386,10 @@ fn make_execution_nonce(kp: &Keypair) -> SignedExecutionNonce {
             reserved_hold_id: None,
             reserving_request_id: None,
         },
-        signature: kp.sign(b"wire-execution-nonce"),
+        signature: kp.sign_exempt(
+            chio_core_types::crypto::ExemptFormat::JwsSigningInput,
+            b"wire-execution-nonce",
+        ),
     }
 }
 
@@ -677,7 +680,7 @@ fn receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary(
         let mut body = make_receipt_body(&key, Decision::Allow);
         body.tool_origin = origin;
         let receipt = ChioReceipt::sign(body, &key)?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert_schema_accepts("receipt/record.schema.json", &to_json(&receipt));
         let mut changed = receipt.clone();
         changed.tool_origin = if origin == ToolOrigin::ChioInternal {
@@ -685,7 +688,7 @@ fn receipt_schemas_accept_signed_internal_origin_and_keep_closed_vocabulary(
         } else {
             ToolOrigin::ChioInternal
         };
-        assert!(!changed.verify_signature()?);
+        assert!(!changed.verify_integrity_embedded_key()?);
     }
 
     let expected = to_json(&origins);
@@ -800,7 +803,7 @@ fn tool_call_response_schema_rejects_allow_shaped_trace_receipts() {
 fn capability_token_schema_accepts_live_hybrid_wire_values() {
     let token = make_hybrid_token();
     let instance = to_json(&token);
-    assert_eq!(instance["algorithm"], "hybrid");
+    assert!(instance.get("algorithm").is_none());
     assert!(instance["issuer"]
         .as_str()
         .expect("issuer string")
@@ -824,7 +827,7 @@ fn inbound_authority_invocation_proof_schema_preserves_signed_shape() {
             "expectation_id":"b".repeat(64), "proof_ttl_secs":300, "max_clock_skew_secs":30,
         }
     });
-    let proof = json!({"signature":key.sign(&chio_core_types::canonical::canonical_json_bytes(&body).unwrap()),"body":body});
+    let proof = json!({"signature":key.sign_wrapped("chio.dpop_proof.v1", &chio_core_types::CanonicalBytes::from_serializable(&body).unwrap()).unwrap(),"body":body});
     assert_schema_accepts("kernel/dpop_proof.schema.json", &proof);
     let mut request = AgentMessage::ToolCallRequest {
         id: "proof-wire".into(),

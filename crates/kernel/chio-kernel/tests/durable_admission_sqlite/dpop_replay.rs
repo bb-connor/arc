@@ -281,7 +281,7 @@ fn sqlite_released_dpop_proof_is_refused_for_a_different_operation() -> Result<(
         .evaluate_tool_call_blocking(&route.request("dpop-other-operation", &proof))?;
     assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
     assert_eq!(replay.reason.as_deref(), Some(SPENT_PROOF_REASON));
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         replay
             .receipt

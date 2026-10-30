@@ -282,7 +282,7 @@ impl NativeSecurityEventVerifier {
         let canonical_receipt =
             canonical_json_bytes(&receipt).map_err(|_| PortError::invalid_data())?;
         let sealed = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| PortError::integrity_failure())?;
         let projection_value = receipt
             .metadata

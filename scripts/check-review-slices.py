@@ -262,6 +262,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "audits/**",
             "compliance/**",
             "supply-chain/**",
+            "crates/tooling/chio-bundle-verify/**",
             "crates/tooling/chio-release-evidence/**",
             "tools/knowledge-base/**",
             "CHANGELOG.md",

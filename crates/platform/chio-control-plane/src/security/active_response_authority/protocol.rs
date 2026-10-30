@@ -25,15 +25,15 @@ use serde::{Deserialize, Serialize};
 use super::transport::{validate_connected_peer, AbsoluteDeadlineUnixStream};
 #[cfg(target_os = "linux")]
 use super::{
-    active_response_authority_response_signing_bytes, validate_active_response_artifacts_draft,
+    active_response_authority_response_signing_body, validate_active_response_artifacts_draft,
     ActiveResponseAdmissionArtifactsWire, ActiveResponseAuthorityResponseBody,
-    SignedActiveResponseAuthorityResponse,
+    SignedActiveResponseAuthorityResponse, ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
 };
 use super::{
     validate_active_response_policy_selection, ActiveResponseAdmissionArtifactsDraftWire,
     ActiveResponseAuthorityOperation, ActiveResponseAuthorityRejection,
     ActiveResponseAuthorityResult, ActiveResponsePolicySelectionWire,
-    ACTIVE_RESPONSE_AUTHORITY_SCHEMA, MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS,
+    ACTIVE_RESPONSE_AUTHORITY_PROTOCOL, MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS,
 };
 #[cfg(target_os = "linux")]
 use chio_kernel::ActiveResponseArtifactAuthorityAttestation;
@@ -276,7 +276,7 @@ impl ActiveResponseAuthorityProtocolServer {
             return Err(ServeFailure::Internal(PortError::integrity_failure()));
         }
         let body = ActiveResponseAuthorityResponseBody {
-            schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            schema: ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA.to_string(),
             deployment_digest: self.config.deployment_digest,
             store_digest: self.config.store_digest,
             request_id: request.body.request_id.clone(),
@@ -289,24 +289,30 @@ impl ActiveResponseAuthorityProtocolServer {
             authority: self.authority_identity.clone(),
             result,
         };
-        let canonical_signing_input = active_response_authority_response_signing_bytes(&body)
+        let canonical_signing_body = active_response_authority_response_signing_body(&body)
             .map_err(ServeFailure::Internal)?;
         let signed = self
             .authority_signer
-            .sign_bytes_for_identity(&self.authority_identity, &canonical_signing_input)
+            .sign_wrapped_for_identity(
+                &self.authority_identity,
+                ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
+                &canonical_signing_body,
+            )
             .map_err(|_| ServeFailure::Internal(PortError::unavailable()))?;
         if signed.public_key != self.authority_identity
             || signed.algorithm != self.authority_identity.algorithm()
-            || signed.signature.algorithm() != signed.algorithm
-            || !self
-                .authority_identity
-                .verify(&canonical_signing_input, &signed.signature)
+            || chio_core::crypto::verify_wrapped_bytes(
+                &self.authority_identity,
+                ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
+                &canonical_signing_body,
+                &signed.signature,
+            )
+            .is_err()
         {
             return Err(ServeFailure::Internal(PortError::integrity_failure()));
         }
         let response = SignedActiveResponseAuthorityResponse {
             body,
-            algorithm: signed.algorithm,
             signature: signed.signature,
         };
         let response_bytes = canonical_json_bytes(&response)
@@ -337,7 +343,7 @@ impl ActiveResponseAuthorityProtocolServer {
                 self.handler
                     .health()
                     .map(|()| ActiveResponseAuthorityResult::Ready {
-                        protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+                        protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
                         deployment_digest: self.config.deployment_digest,
                         store_digest: self.config.store_digest,
                     })
@@ -473,7 +479,7 @@ pub(super) fn validate_operation_result(
                 deployment_digest,
                 store_digest,
             },
-        ) if protocol == ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+        ) if protocol == ACTIVE_RESPONSE_AUTHORITY_PROTOCOL
             && !deployment_digest.is_zero()
             && !store_digest.is_zero() =>
         {

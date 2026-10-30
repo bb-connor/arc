@@ -36,11 +36,15 @@ impl LiabilityPlacementArtifact {
     /// must equal the quoted terms, and the effective window must be
     /// ordered and start before the quote expires.
     pub fn validate(&self) -> Result<(), MarketError> {
-        if !self.quote_response.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "placement quote_response signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .quote_response
+            .verify_signature(&self.quote_response.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "placement quote_response signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "placement quote_response signature verification failed",
             ));
@@ -131,11 +135,15 @@ impl LiabilityBoundCoverageArtifact {
     /// must verify, and the bound window and amounts must equal what the
     /// placement selected.
     pub fn validate(&self) -> Result<(), MarketError> {
-        if !self.placement.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "bound coverage placement signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .placement
+            .verify_signature(&self.placement.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "bound coverage placement signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "bound coverage placement signature verification failed",
             ));
@@ -246,20 +254,28 @@ impl LiabilityAutoBindDecisionArtifact {
     /// must verify, and the disposition fixes which of findings,
     /// placement, and bound_coverage must be present and cross-bound.
     pub fn validate(&self) -> Result<(), MarketError> {
-        if !self.authority.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "auto-bind authority signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .authority
+            .verify_signature(&self.authority.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "auto-bind authority signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "auto-bind authority signature verification failed",
             ));
         }
-        if !self.quote_response.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "auto-bind quote_response signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .quote_response
+            .verify_signature(&self.quote_response.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "auto-bind quote_response signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "auto-bind quote_response signature verification failed",
             ));
@@ -288,20 +304,26 @@ impl LiabilityAutoBindDecisionArtifact {
                 let bound_coverage = self.bound_coverage.as_ref().ok_or_else(|| {
                     MarketError::field_invalid("auto-bound decisions require bound_coverage")
                 })?;
-                if !placement.verify_signature().map_err(|error| {
-                    MarketError::signature_invalid(format!(
-                        "auto-bind placement signature verification failed: {error}"
-                    ))
-                })? {
+                if !placement
+                    .verify_signature(&placement.signer_key)
+                    .map_err(|error| {
+                        MarketError::signature_invalid(format!(
+                            "auto-bind placement signature verification failed: {error}"
+                        ))
+                    })?
+                {
                     return Err(MarketError::signature_invalid(
                         "auto-bind placement signature verification failed",
                     ));
                 }
-                if !bound_coverage.verify_signature().map_err(|error| {
-                    MarketError::signature_invalid(format!(
-                        "auto-bind bound coverage signature verification failed: {error}"
-                    ))
-                })? {
+                if !bound_coverage
+                    .verify_signature(&bound_coverage.signer_key)
+                    .map_err(|error| {
+                        MarketError::signature_invalid(format!(
+                            "auto-bind bound coverage signature verification failed: {error}"
+                        ))
+                    })?
+                {
                     return Err(MarketError::signature_invalid(
                         "auto-bind bound coverage signature verification failed",
                     ));
@@ -333,3 +355,15 @@ impl LiabilityAutoBindDecisionArtifact {
 
 /// Signed auto-bind decision envelope.
 pub type SignedLiabilityAutoBindDecision = SignedExportEnvelope<LiabilityAutoBindDecisionArtifact>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityAutoBindDecisionArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityBoundCoverageArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityPlacementArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_PLACEMENT_ARTIFACT_SCHEMA;
+}

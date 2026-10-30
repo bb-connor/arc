@@ -461,7 +461,10 @@ pub fn cmd_evidence_federation_policy_create(
         require_proofs: args.require_proofs,
         purpose: args.purpose.map(ToOwned::to_owned),
     };
-    let (signature, _) = keypair.sign_canonical(&body)?;
+    let signature = keypair.sign_wrapped(
+        FEDERATION_POLICY_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let policy = FederationPolicyDocument { body, signature };
     verify_federation_policy(&policy)?;
     fs::write(args.output, serde_json::to_vec_pretty(&policy)?)?;
@@ -567,6 +570,7 @@ pub fn cmd_evidence_export(
         policy_file,
         response.federation_policy.as_ref(),
         signing_key,
+        unix_now()?,
     )
 }
 
@@ -868,10 +872,14 @@ fn write_evidence_package(
     policy_file: Option<&Path>,
     federation_policy: Option<&FederationPolicyDocument>,
     signing_key: &chio_core::Keypair,
+    exported_at: u64,
 ) -> Result<(), CliError> {
-    let exported_at = unix_now()?;
     ensure_clean_output_dir(output)?;
-    let transparency = verify_transparency(&bundle.checkpoints, transparency.as_ref())?;
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        transparency.as_ref(),
+        &[signing_key.public_key()],
+    )?;
     let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
     let disclosure_notice = EvidenceDisclosureNotice::for_query(&bundle.query);
     let readme = render_readme(

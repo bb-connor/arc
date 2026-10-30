@@ -1,0 +1,17 @@
+{
+  "agentId": "agent-a",
+  "authContext": {
+    "method": {
+      "kind": "anonymous"
+    },
+    "transport": "in_process"
+  },
+  "authContextHash": "e9c280e641d0444ccee81f0deda151c9f63868ccd509e6fa36e86c2a316a561c",
+  "authEpoch": 0,
+  "authMethodHash": "63c567c06f47285c113bc77b281dfcc1ab6121319fe9ace1e35e8230fdc72c79",
+  "id": "sess-restored:anchor:0:e9c280e641d0",
+  "issuedAt": 1793195390,
+  "kernelKey": "440c45b1ceec7c5f19ecae84c1351f3bd51f7f9ded7b87dcaf13bbd55aae8cc1",
+  "schema": "chio.session_anchor.v1",
+  "sessionId": "sess-restored"
+}

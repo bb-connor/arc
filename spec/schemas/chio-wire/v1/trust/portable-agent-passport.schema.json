@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/portable-agent-passport.schema.json",
+  "title": "Chio portable agent passport signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAt",
+    "issuedAt",
+    "issuer",
+    "payloadCanonicalBytes",
+    "schema",
+    "subject"
+  ],
+  "properties": {
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "payloadCanonicalBytes": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.portable-agent-passport.v1"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

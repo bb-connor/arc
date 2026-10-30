@@ -1,0 +1,47 @@
+{
+  "activationId": "activation-9bad99e5bfe85caf588102aae895a13407fc9ce2f303160cd2fcdc12445b49cc",
+  "admissionClass": "bond_backed",
+  "disposition": "approved",
+  "eligibility": {
+    "allowedActorKinds": [
+      "tool_server"
+    ],
+    "allowedPublisherRoles": [
+      "origin"
+    ],
+    "allowedStatuses": [
+      "active"
+    ],
+    "policyReference": "policy/open-market/default",
+    "requireBondBacking": true,
+    "requireFreshListing": true,
+    "requiredListingOperatorIds": [
+      "http://127.0.0.2:3300"
+    ]
+  },
+  "expiresAt": 1750900000,
+  "listingId": "governance-authority-listing",
+  "listingPublishedAt": 1749999000,
+  "listingSha256": "9ed0ec598e02f541f48d0ff601fbf27aa3fb9f2b2e8c432aca3fb3de5184d0eb",
+  "localOperatorId": "http://127.0.0.2:3300",
+  "namespace": "http://127.0.0.2:3300",
+  "requestedAt": 1750000000,
+  "requestedBy": "ops@chio.example",
+  "reviewContext": {
+    "freshness": {
+      "ageSecs": 0,
+      "generatedAt": 1749999000,
+      "maxAgeSecs": 300,
+      "state": "fresh",
+      "validUntil": 1751000000
+    },
+    "publisher": {
+      "operatorId": "http://127.0.0.2:3300",
+      "registryUrl": "http://127.0.0.2:3300",
+      "role": "origin"
+    }
+  },
+  "reviewedAt": 1750000001,
+  "reviewedBy": "reviewer@chio.example",
+  "schema": "chio.registry.trust-activation.v1"
+}

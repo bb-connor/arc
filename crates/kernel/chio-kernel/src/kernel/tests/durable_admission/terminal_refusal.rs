@@ -105,7 +105,7 @@ fn dispatched_refusal_replays_one_signed_terminal_across_restart() -> TestResult
         Some("dispatch outcome is unknown after transport_return: CHIO-KERNEL-TOOL-SERVER")
     );
     assert!(initial.output.is_none());
-    assert!(initial.receipt.verify_signature()?);
+    assert!(initial.receipt.verify_integrity_embedded_key()?);
     let operation = assert_original_unknown_incident(
         &store,
         &request,
@@ -155,7 +155,7 @@ fn compensated_budget_denial_replays_original_signed_bytes() -> TestResult {
         initial.reason,
         Some(KernelError::BudgetExhausted(request.capability.id.clone()).to_string())
     );
-    assert!(initial.receipt.verify_signature()?);
+    assert!(initial.receipt.verify_integrity_embedded_key()?);
     let terminal = store.operation();
     assert_eq!(
         terminal.state(),
@@ -407,7 +407,7 @@ fn unknown_projection_refuses_a_replacement_signer() -> TestResult {
     )?;
     assert_eq!(recovered.verdict, Verdict::Deny);
     assert_eq!(recovered.receipt.kernel_key, original_key);
-    assert!(recovered.receipt.verify_signature()?);
+    assert!(recovered.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         store.operation().state(),
         AdmissionOperationState::OutcomeUnknownAfterDispatch

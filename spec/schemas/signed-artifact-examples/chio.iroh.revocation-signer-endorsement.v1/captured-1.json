@@ -1,0 +1,5 @@
+{
+  "kernel_id": "did:chio:bob",
+  "oracle_public_key": "5526f742941711b3bc530ba44ff6f6dab0f0ab71af832f41a7fe3b9fdaed9c60",
+  "signer_id": "oracle-a"
+}

@@ -143,7 +143,7 @@ fn receipt_records_w3c_otel_trace_and_span_ids() -> Result<(), Box<dyn Error>> {
     )?;
 
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
 
     let metadata = response
         .receipt

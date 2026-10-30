@@ -26,11 +26,10 @@
             "treaty:buyer-dataco:support-ops"
           ],
           "issuerKernelId": "did:chio:dataco-runtime",
-          "issuerSignature": "81f599116ee7bf2db7a0f91a7511208af6ca2bbb77d78a95870067697b9270a245c06cce7c4cd6cb05e0b7e9989624e929766f4fe1d915ae547f4d5acbfa360d",
+          "issuerSignature": "29cd94960b0783199043dc61b80a52fdd858db69c8b02a58ef3df90eebe1acfa1c52a75ce48fe365d36a7eebefbadaf5536efa96a411c59408566975da3d6a01",
           "publicKey": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
-          "runtimePolicySha256": "b0cfe65c6f966a7e7b3abbc3490bcc9a2c2546e46df757aa15ab6473096f6955",
+          "runtimePolicySha256": "0b749d4d2b2cf2c5beb23ef804397c017c821b3c88f523218904db6bab268f8f",
           "schema": "chio.pheromone-observation-cost-verifier-root.v1",
-          "signatureAlgorithm": "ed25519",
           "validFromUnixMs": 1765999940000,
           "validUntilUnixMs": 1766000060000,
           "verifierId": "did:chio:dataco-cost-verifier",
@@ -70,9 +69,9 @@
           "newcomerHorizonEpochs": 8,
           "observationCostVerification": "required",
           "policyId": "scarcity:buyer-dataco:support-ops:epoch42",
-          "policySha256": "69073f134018c3cc27f53726aa2a98a63bdfedf6bd68bfde7bb2b3777f3050d4",
+          "policySha256": "dab554ff6d64ba4278e435fd76a351f663c117b69c416810e89dab51db7705dd",
           "reputationEpoch": 42,
-          "runtimePolicySha256": "b0cfe65c6f966a7e7b3abbc3490bcc9a2c2546e46df757aa15ab6473096f6955",
+          "runtimePolicySha256": "0b749d4d2b2cf2c5beb23ef804397c017c821b3c88f523218904db6bab268f8f",
           "schema": "chio.pheromone-scarcity-policy.v1",
           "subjectClass": "support.prompt_injection",
           "subjectClassNamespace": "dev.chio.support",
@@ -132,5 +131,5 @@
     "valid_until_unix_ms": 1766000060000
   },
   "signerKey": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
-  "signature": "f14e56f9418ae661421a0d2e80aeea8d42db47dbe05d3c20f0a8c85474e6f08d423e4b58d523a745e9081aa74c50fe267e56564d8738f1e20a2d2b1b15c67400"
+  "signature": "d489e69810c33620cf61f672009cc8069a7bbd3ce5cda4f6654be5a901676830f24cfc3ab755cfe5682c5effe3d3c1c1b860bbee4908d7fc71db7f0afb20ae09"
 }

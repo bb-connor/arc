@@ -167,7 +167,7 @@ fn receipt_projection_couples_decision_to_evidence_body() {
     };
 
     let receipt = ChioReceipt::sign(body, &keypair).test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
 
     let projection = ReceiptProjection::from_receipt(&receipt);
     assert!(projection.couples(

@@ -1,0 +1,28 @@
+{
+  "allocation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "buyer_pool_units": 7,
+  "community_fund_units": 2,
+  "cutoff_slot": 10,
+  "deterministic_allocation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "entries": [
+    {
+      "amount_units": 7,
+      "beneficiary_kind": "buyer",
+      "destination": "buyer:destination"
+    },
+    {
+      "amount_units": 2,
+      "beneficiary_kind": "community_fund",
+      "destination": "community:destination"
+    }
+  ],
+  "liability_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "purchase_snapshot_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "recorded_at": 20,
+  "schema": "chio.finding.claim-allocation.v1",
+  "slash": {
+    "currency": "USD",
+    "units": 9
+  },
+  "total_realized_spend_units": 7
+}

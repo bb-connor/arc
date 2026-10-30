@@ -52,6 +52,10 @@ impl CapabilityLeaseArtifact {
 
 pub type SignedCapabilityLease = SignedExportEnvelope<CapabilityLeaseArtifact>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapabilityLeaseArtifact {
+    const SCHEMA_ID: &'static str = CAPABILITY_LEASE_SCHEMA_V1;
+}
+
 pub fn verify_capability_lease(
     lease: &SignedCapabilityLease,
     now_unix_ms: u64,
@@ -59,7 +63,7 @@ pub fn verify_capability_lease(
 ) -> Result<(), GovernanceAuthorizationError> {
     lease.body.validate()?;
     if !lease
-        .verify_signature()
+        .verify_signature(&lease.signer_key)
         .map_err(|e| GovernanceAuthorizationError::Crypto(e.to_string()))?
     {
         return Err(GovernanceAuthorizationError::InvalidSignature);

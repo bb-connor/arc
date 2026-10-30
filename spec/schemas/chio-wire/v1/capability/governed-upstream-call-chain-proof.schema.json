@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/governed-upstream-call-chain-proof.schema.json",
+  "title": "Chio governed upstream call chain proof signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chainId",
+    "delegatorSubject",
+    "expiresAt",
+    "issuedAt",
+    "originSubject",
+    "parentReceiptId",
+    "parentRequestId",
+    "signer",
+    "subject"
+  ],
+  "properties": {
+    "chainId": {
+      "type": "string"
+    },
+    "delegatorSubject": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "originSubject": {
+      "type": "string"
+    },
+    "parentReceiptId": {
+      "type": "string"
+    },
+    "parentRequestId": {
+      "type": "string"
+    },
+    "signer": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

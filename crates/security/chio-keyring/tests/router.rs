@@ -7,7 +7,10 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use chio_core_types::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
+use chio_core_types::crypto::{verify_wrapped_bytes, ExemptFormat, SigningMessage, SigningWrapper};
+use chio_core_types::{
+    CanonicalBytes, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend,
+};
 use chio_keyring::{
     derive_key_id, AnchorId, ArtifactTimeAnchorKind, AuthorityId, BootstrapAuthorization, EventId,
     EventReason, KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation, KeyLogPolicy,
@@ -20,6 +23,16 @@ use chio_keyring::{
 mod support;
 
 use support::{private_tempdir, trusted_temp_path};
+
+const ARTIFACT_SCHEMA: &str = "chio.receipt.v1";
+
+fn artifact_body(label: &str) -> CanonicalBytes {
+    CanonicalBytes::from_serializable(&serde_json::json!({ "artifact": label })).test_unwrap()
+}
+
+fn artifact_wrapper(canonical: &CanonicalBytes) -> SigningWrapper {
+    SigningWrapper::new(ARTIFACT_SCHEMA, canonical).test_unwrap()
+}
 
 fn backend(seed: u8) -> Ed25519Backend {
     Ed25519Backend::new(Keypair::from_seed(&[seed; 32]))
@@ -243,10 +256,10 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
         .test_unwrap();
 
     let first = router
-        .sign_canonical(0, &serde_json::json!({"artifact": 1}))
+        .sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 1}))
         .test_unwrap();
     let first_retry = router
-        .sign_canonical(0, &serde_json::json!({"artifact": 1}))
+        .sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 1}))
         .test_unwrap();
     assert_eq!(first_retry, first);
     assert_eq!(first.signing_epoch, 0);
@@ -259,15 +272,23 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
         .test_unwrap()
     );
     let mut corrupted_evidence = first.clone();
-    corrupted_evidence.artifact_signature =
-        ready.old.sign_bytes(b"corrupted evidence").test_unwrap();
+    corrupted_evidence.artifact_signature = ready
+        .old
+        .sign_bytes(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"corrupted evidence",
+        ))
+        .test_unwrap();
     assert!(matches!(
         corrupted_evidence.verify(&ready.old.public_key().test_unwrap()),
         Err(chio_keyring::KeyringError::InvalidSignature)
     ));
-    assert!(router
-        .sign_canonical(1, &serde_json::json!({"artifact": 2}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 2})),
+        Err(chio_keyring::KeyringError::StateInvariant(
+            "stale signing epoch"
+        ))
+    ));
 
     router
         .activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
@@ -275,11 +296,14 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     router
         .activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
         .test_unwrap();
-    assert!(router
-        .sign_canonical(0, &serde_json::json!({"artifact": 3}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 3})),
+        Err(chio_keyring::KeyringError::StateInvariant(
+            "stale signing epoch"
+        ))
+    ));
     let second = router
-        .sign_canonical(1, &serde_json::json!({"artifact": 4}))
+        .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"artifact": 4}))
         .test_unwrap();
     assert_eq!(second.signing_epoch, 1);
     assert_eq!(
@@ -316,7 +340,7 @@ impl SigningBackend for PanicOnArmedIdentityBackend {
         self.inner.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
         self.inner.sign_bytes(message)
     }
 }
@@ -351,7 +375,10 @@ fn keyring_public_key_errors_when_selector_lock_is_poisoned() {
         Err(chio_keyring::KeyringError::Synchronization)
     ));
     assert!(matches!(
-        router.sign_bytes_with_identity(b"m"),
+        router.sign_message_with_identity(SigningMessage::exempt(
+            ExemptFormat::JwsSigningInput,
+            b"m"
+        )),
         Err(chio_keyring::KeyringError::Synchronization)
     ));
 }
@@ -363,7 +390,7 @@ impl SigningBackend for PanicOnDropBackend {
         self.0.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
         self.0.sign_bytes(message)
     }
 }
@@ -402,7 +429,11 @@ fn retired_backend_drop_panic_leaves_the_selector_usable() {
         ready.new.public_key().test_unwrap()
     );
     let signed = router
-        .sign_canonical(1, &serde_json::json!({"artifact": "after-retired-drop"}))
+        .sign_canonical(
+            1,
+            ARTIFACT_SCHEMA,
+            &serde_json::json!({"artifact": "after-retired-drop"}),
+        )
         .test_unwrap();
     assert_eq!(signed.signing_epoch, 1);
     assert_eq!(
@@ -430,7 +461,9 @@ fn concurrent_duplicate_signing_returns_one_durable_artifact() {
             let barrier = Arc::clone(&barrier);
             std::thread::spawn(move || {
                 barrier.wait();
-                router.sign_bytes(0, b"duplicate artifact").test_unwrap()
+                router
+                    .sign_canonical(0, ARTIFACT_SCHEMA, &"duplicate artifact")
+                    .test_unwrap()
             })
         })
         .collect::<Vec<_>>();
@@ -457,7 +490,7 @@ impl SigningBackend for BlockingBackend {
         self.inner.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> chio_core_types::Result<Signature> {
         if self.blocked_once.swap(true, Ordering::SeqCst) {
             return self.inner.sign_bytes(message);
         }
@@ -498,8 +531,9 @@ fn activation_waits_until_inflight_signature_is_durably_anchored() {
         .test_unwrap();
 
     let signer = Arc::clone(&router);
-    let sign_thread =
-        std::thread::spawn(move || signer.sign_canonical(0, &serde_json::json!({"race": true})));
+    let sign_thread = std::thread::spawn(move || {
+        signer.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"race": true}))
+    });
     started_rx.recv().test_unwrap();
 
     let activator = Arc::clone(&router);
@@ -528,7 +562,7 @@ fn activation_waits_until_inflight_signature_is_durably_anchored() {
         vec![evidence]
     );
     router
-        .sign_canonical(1, &serde_json::json!({"after": true}))
+        .sign_canonical(1, ARTIFACT_SCHEMA, &serde_json::json!({"after": true}))
         .test_unwrap();
 }
 
@@ -546,9 +580,10 @@ fn failed_durable_anchor_never_returns_signature_evidence() {
         )
         .test_unwrap();
 
-    assert!(router
-        .sign_canonical(0, &serde_json::json!({"must": "persist"}))
-        .is_err());
+    assert!(matches!(
+        router.sign_canonical(0, ARTIFACT_SCHEMA, &serde_json::json!({"must": "persist"})),
+        Err(chio_keyring::KeyringError::Storage(_))
+    ));
     assert!(ready
         .store
         .load_artifact_signatures()
@@ -569,18 +604,27 @@ fn enterprise_router_returns_one_identity_epoch_signature_and_anchor_result() {
     )
     .test_unwrap();
 
-    let artifact = b"authority artifact with embedded identity";
+    let canonical = artifact_body("authority artifact with embedded identity");
     let result = router
-        .sign_bytes_for_identity(&expected_public_key, artifact)
+        .sign_wrapped_for_identity(&expected_public_key, ARTIFACT_SCHEMA, &canonical)
         .test_unwrap();
     assert_eq!(result.public_key, expected_public_key);
-    assert_eq!(result.algorithm, expected_public_key.algorithm());
     assert_eq!(result.signing_epoch, 0);
     assert_eq!(result.signature, result.evidence.artifact_signature);
-    assert!(result.public_key.verify(artifact, &result.signature));
+    verify_wrapped_bytes(
+        &result.public_key,
+        ARTIFACT_SCHEMA,
+        &canonical,
+        &result.signature,
+    )
+    .test_unwrap();
     assert!(result.time_anchor.is_some());
     assert!(matches!(
-        router.sign_bytes_for_identity(&ready.new.public_key().test_unwrap(), artifact),
+        router.sign_wrapped_for_identity(
+            &ready.new.public_key().test_unwrap(),
+            ARTIFACT_SCHEMA,
+            &canonical
+        ),
         Err(chio_keyring::KeyringError::StateInvariant(_))
     ));
 }
@@ -599,8 +643,12 @@ fn enterprise_time_anchor_keeps_pre_rotation_artifact_verifiable_after_reopen() 
         Arc::new(ready.artifact_time_signer.clone()),
     )
     .test_unwrap();
-    let artifact = b"artifact issued before witnessed rotation";
-    let signed = router.sign_bytes_with_identity(artifact).test_unwrap();
+    let canonical = artifact_body("artifact issued before witnessed rotation");
+    let wrapper = artifact_wrapper(&canonical);
+    let artifact = wrapper.as_bytes();
+    let signed = router
+        .sign_wrapped_with_identity(ARTIFACT_SCHEMA, &canonical)
+        .test_unwrap();
     ready
         .store
         .activate_rotation(
@@ -652,8 +700,12 @@ fn remote_verifier_accepts_pre_activation_anchor_and_rejects_post_activation_or_
         Arc::new(ready.artifact_time_signer.clone()),
     )
     .test_unwrap();
-    let artifact = b"issuance response finalized before activation";
-    let signed = router.sign_bytes_with_identity(artifact).test_unwrap();
+    let canonical = artifact_body("issuance response finalized before activation");
+    let wrapper = artifact_wrapper(&canonical);
+    let artifact = wrapper.as_bytes();
+    let signed = router
+        .sign_wrapped_with_identity(ARTIFACT_SCHEMA, &canonical)
+        .test_unwrap();
     let pre_activation_anchor = signed.time_anchor.clone().test_unwrap();
     let state = ready
         .store
@@ -785,9 +837,13 @@ fn enterprise_anchor_insert_failure_rolls_back_the_artifact_signature() {
         )
         .test_unwrap();
 
-    assert!(router
-        .sign_bytes_with_identity(b"signature and anchor must commit together")
-        .is_err());
+    assert!(matches!(
+        router.sign_wrapped_with_identity(
+            ARTIFACT_SCHEMA,
+            &artifact_body("signature and anchor must commit together")
+        ),
+        Err(chio_keyring::KeyringError::Storage(_))
+    ));
     assert!(ready
         .store
         .load_artifact_signatures()
@@ -811,7 +867,10 @@ fn enterprise_router_rejects_legacy_artifact_without_trusted_time() {
     let legacy = KeyringSigningRouter::open(Arc::clone(&ready.store), Box::new(ready.old.clone()))
         .test_unwrap();
     legacy
-        .sign_bytes_with_identity(b"legacy artifact without a time anchor")
+        .sign_wrapped_with_identity(
+            ARTIFACT_SCHEMA,
+            &artifact_body("artifact without a time anchor"),
+        )
         .test_unwrap();
     drop(legacy);
 

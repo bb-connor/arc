@@ -499,7 +499,7 @@ fn recovery_resigned_context_substitutions_fail_the_intended_binding() -> Result
         }
         let signed = Signed::sign(serde_json::from_value(body)?, &f.keys[0])?;
         assert!(
-            signed.verify_signature()?,
+            signed.verify_integrity_embedded_key()?,
             "mutation must retain valid crypto: {field}"
         );
         let mut proofs = f.proofs.clone();
@@ -635,7 +635,7 @@ fn recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts() -> Resul
         };
         let changed = SignedRecoveryGrant::sign(serde_json::from_value(body)?, &key)?;
         assert!(
-            changed.verify_signature()?,
+            changed.verify_integrity_embedded_key()?,
             "resigned mutation lost crypto: {name}"
         );
         assert_eq!(
@@ -824,7 +824,7 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
         }
         let changed = SignedRecoveryGrant::sign(serde_json::from_value(changed)?, &key)?;
         assert!(
-            changed.verify_signature()?,
+            changed.verify_integrity_embedded_key()?,
             "the negative must retain trusted cryptography"
         );
         let echoed = corpus_request(

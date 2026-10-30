@@ -71,7 +71,7 @@ fn generated_instance(schema_file: &str, instance: Value) -> Value {
 fn parse_generated(schema_file: &str, instance: Wire<'_>) -> Result<Value, String> {
     match schema_file {
         "receipt/record.schema.json" => {
-            round_trip::<generated::kernel_tool_call_response::ChioReceiptRecord>(instance)
+            round_trip::<generated::shared::ChioReceiptRecord>(instance)
         }
         "kernel/caller_dispatch_authorization.schema.json" => round_trip::<
             generated::kernel_caller_dispatch_authorization::ChioSignedCallerDispatchAuthorization,
@@ -83,19 +83,19 @@ fn parse_generated(schema_file: &str, instance: Wire<'_>) -> Result<Value, Strin
             generated::kernel_tool_call_response::ChioKernelMessageToolCallResponseResult,
         >(instance),
         "kernel/execution_nonce.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioSignedExecutionNonce>(instance)
+            round_trip::<generated::shared::ChioSignedExecutionNonce>(instance)
         }
         "capability/token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioCapabilityToken>(instance)
+            round_trip::<generated::shared::ChioCapabilityToken>(instance)
         }
-        "capability/aggregate-invocation-budget.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioAggregateInvocationBudget,
-        >(instance),
-        "capability/threshold-approval-proposal.schema.json" => round_trip::<
-            generated::agent_tool_call_request::ChioThresholdApprovalProposal,
-        >(instance),
+        "capability/aggregate-invocation-budget.schema.json" => {
+            round_trip::<generated::shared::ChioAggregateInvocationBudget>(instance)
+        }
+        "capability/threshold-approval-proposal.schema.json" => {
+            round_trip::<generated::shared::ChioThresholdApprovalProposal>(instance)
+        }
         "capability/governed-approval-token.schema.json" => {
-            round_trip::<generated::agent_tool_call_request::ChioGovernedApprovalToken>(instance)
+            round_trip::<generated::shared::ChioGovernedApprovalToken>(instance)
         }
         "agent/active-response-governed-intent.schema.json" => round_trip::<
             generated::agent_tool_call_request::ChioGovernedTransactionIntent,
@@ -188,4 +188,272 @@ fn generated_rust_shapes_parse_reject_and_round_trip_shared_fixtures() {
             ),
         }
     }
+}
+
+mod receipt_fixture {
+    use chio_core_types::canonical::CanonicalBytes;
+    use chio_core_types::crypto::{sha256_hex, Keypair};
+    use chio_core_types::receipt::body::{chio_receipt_id, ChioReceipt, ChioReceiptBody};
+    use chio_core_types::receipt::decision::{Decision, ToolCallAction};
+    use chio_core_types::receipt::kinds::{
+        BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+    };
+    use chio_core_types::receipt::metadata::GuardEvidence;
+    use chio_core_types::receipt::signing::ChioReceiptSigningBody;
+    use serde::Serialize;
+    use serde_json::{json, Value};
+
+    const RECEIPT_SCHEMA_FILE: &str = "receipt/record.schema.json";
+    const FIRST_UNSIGNED_CASE: &str = "    {\n      \"name\": \"caller-dispatch-authorization\"";
+    const RAW_CASES_OPEN: &str = "\n  ],\n  \"raw_cases\": [\n";
+
+    #[derive(Serialize)]
+    struct Case {
+        name: &'static str,
+        schema_file: &'static str,
+        valid: bool,
+        instance: Value,
+    }
+
+    #[derive(Serialize)]
+    struct RawCase {
+        name: &'static str,
+        schema_file: &'static str,
+        valid: bool,
+        instance_text: String,
+    }
+
+    fn reference_receipt() -> Value {
+        let kernel = Keypair::from_seed(&[7u8; 32]);
+        let mut body = ChioReceiptBody {
+            id: String::new(),
+            timestamp: 1710000200,
+            capability_id: "cap-bindings-001".to_string(),
+            tool_server: "srv-files".to_string(),
+            tool_name: "file_read".to_string(),
+            action: ToolCallAction::from_parameters(json!({
+                "path": "/workspace/docs/roadmap.md",
+                "mode": "read"
+            }))
+            .unwrap(),
+            decision: Some(Decision::Allow),
+            receipt_kind: ReceiptKind::MediatedDecision,
+            boundary_class: BoundaryClass::Prevent,
+            observation_outcome: None,
+            tool_origin: ToolOrigin::CallerExecuted,
+            redaction_mode: RedactionMode::None,
+            actor_chain: Vec::new(),
+            content_hash: sha256_hex(br#"{"ok":true}"#),
+            policy_hash: "policy-bindings-v1".to_string(),
+            evidence: vec![
+                GuardEvidence {
+                    guard_name: "ForbiddenPathGuard".to_string(),
+                    verdict: true,
+                    details: Some("path allowed".to_string()),
+                },
+                GuardEvidence {
+                    guard_name: "SecretLeakGuard".to_string(),
+                    verdict: true,
+                    details: Some("no secrets detected".to_string()),
+                },
+            ],
+            metadata: Some(json!({
+                "surface": "bindings-vectors",
+                "version": 1
+            })),
+            trust_level: TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: kernel.public_key(),
+            bbs_projection_version: None,
+        };
+        body.id = chio_receipt_id(&body).unwrap();
+        let signature = kernel
+            .sign_wrapped(
+                chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_serializable(&ChioReceiptSigningBody::from(&body)).unwrap(),
+            )
+            .unwrap();
+        let mut receipt = serde_json::to_value(&body).unwrap();
+        receipt["signature"] = serde_json::to_value(&signature).unwrap();
+        receipt
+    }
+
+    fn with_origin(origin: Value) -> Value {
+        let mut receipt = reference_receipt();
+        receipt["tool_origin"] = origin;
+        receipt
+    }
+
+    fn indented(value: &impl Serialize) -> String {
+        let rendered = serde_json::to_string_pretty(value).unwrap();
+        format!("    {}", rendered.replace('\n', "\n    "))
+    }
+
+    fn receipt_cases() -> Vec<Case> {
+        let mut unknown_field = with_origin(json!("chio_internal"));
+        unknown_field["unsigned_extension"] = json!(true);
+        vec![
+            Case {
+                name: "receipt-internal-origin",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: true,
+                instance: with_origin(json!("chio_internal")),
+            },
+            Case {
+                name: "receipt-unknown-origin",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: false,
+                instance: with_origin(json!("untrusted_future_origin")),
+            },
+            Case {
+                name: "receipt-null-origin",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: false,
+                instance: with_origin(Value::Null),
+            },
+            Case {
+                name: "receipt-unknown-field",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: false,
+                instance: unknown_field,
+            },
+        ]
+    }
+
+    fn raw_receipt_cases() -> Vec<RawCase> {
+        let text = serde_json::to_string(&with_origin(json!("chio_internal"))).unwrap();
+        let duplicate_id = format!(
+            "{{\"id\":\"{}\",{}",
+            "0".repeat(64),
+            text.strip_prefix('{').unwrap()
+        );
+        let honest_parameters =
+            r#""parameters":{"mode":"read","path":"/workspace/docs/roadmap.md"}"#;
+        assert!(text.contains(honest_parameters));
+        let duplicate_parameter = text.replace(
+            honest_parameters,
+            r#""parameters":{"path":"/etc/shadow","mode":"read","path":"/workspace/docs/roadmap.md"}"#,
+        );
+        vec![
+            RawCase {
+                name: "receipt-duplicate-id",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: false,
+                instance_text: duplicate_id,
+            },
+            RawCase {
+                name: "receipt-duplicate-parameter",
+                schema_file: RECEIPT_SCHEMA_FILE,
+                valid: false,
+                instance_text: duplicate_parameter,
+            },
+        ]
+    }
+
+    /// Rebuilds the corpus text. Only the receipt cases carry Chio-produced
+    /// signatures; every other case holds fixed placeholder signature bytes and
+    /// is carried over unchanged from `committed`.
+    pub fn render(committed: &str) -> String {
+        let start = committed
+            .find(FIRST_UNSIGNED_CASE)
+            .expect("corpus lists the caller dispatch authorization case");
+        let end = committed
+            .find(RAW_CASES_OPEN)
+            .expect("corpus lists the raw cases");
+        let receipts: Vec<String> = receipt_cases().iter().map(indented).collect();
+        let raws: Vec<String> = raw_receipt_cases().iter().map(indented).collect();
+        format!(
+            "{{\n  \"cases\": [\n{},\n{}{}{}\n  ]\n}}\n",
+            receipts.join(",\n"),
+            &committed[start..end],
+            RAW_CASES_OPEN,
+            raws.join(",\n"),
+        )
+    }
+
+    pub fn reference_receipt_verifies() -> bool {
+        let mut receipt = reference_receipt();
+        receipt["tool_origin"] = json!("caller_executed");
+        serde_json::from_value::<ChioReceipt>(receipt)
+            .unwrap()
+            .verify_integrity_embedded_key()
+            .unwrap()
+    }
+}
+
+fn corpus_path() -> PathBuf {
+    repo_root().join("tests/bindings/fixtures/protocol-primitives-v1.json")
+}
+
+#[test]
+fn protocol_primitives_receipt_cases_are_current() {
+    let path = corpus_path();
+    let committed = fs::read_to_string(&path).unwrap();
+    assert_eq!(
+        committed,
+        receipt_fixture::render(&committed),
+        "fixture {} is out of date",
+        path.display()
+    );
+    assert!(receipt_fixture::reference_receipt_verifies());
+}
+
+#[test]
+#[ignore = "regenerator: rewrite the receipt cases of tests/bindings/fixtures/protocol-primitives-v1.json from the receipt builder; run with --ignored"]
+fn regenerate_protocol_primitives_receipt_cases() {
+    let path = corpus_path();
+    let committed = fs::read_to_string(&path).unwrap();
+    fs::write(&path, receipt_fixture::render(&committed)).unwrap();
+}
+
+/// Signature members in the schema-shape cases after the receipt cases are
+/// placeholders. Under every registered wrapper id and every Ed25519 key the
+/// instance names, a verifier refuses each one.
+#[test]
+fn placeholder_case_signatures_are_refused() {
+    use chio_core_types::signed_artifact::KNOWN_SIGNED_ARTIFACT_SCHEMAS;
+    use chio_core_types::{verify_wrapped, PublicKey, Signature};
+
+    fn keys(value: &Value, found: &mut Vec<PublicKey>) {
+        match value {
+            Value::String(text) if text.len() == 64 => {
+                if let Ok(key) = PublicKey::from_hex(text) {
+                    found.push(key);
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|item| keys(item, found)),
+            Value::Object(members) => members.values().for_each(|item| keys(item, found)),
+            _ => {}
+        }
+    }
+
+    let corpus: Value = serde_json::from_str(&fs::read_to_string(corpus_path()).unwrap()).unwrap();
+    let mut refused = 0;
+    for case in corpus["cases"].as_array().unwrap() {
+        if case["schema_file"] == "receipt/record.schema.json" {
+            continue;
+        }
+        let Some(mut signed) = case["instance"].as_object().cloned() else {
+            continue;
+        };
+        let Some(Value::String(signature)) = signed.remove("signature") else {
+            continue;
+        };
+        let Ok(signature) = Signature::from_hex(&signature) else {
+            continue;
+        };
+        let mut candidates = Vec::new();
+        keys(&Value::Object(signed.clone()), &mut candidates);
+        for key in &candidates {
+            for schema_id in KNOWN_SIGNED_ARTIFACT_SCHEMAS {
+                assert!(
+                    verify_wrapped(key, schema_id, &signed, &signature).is_err(),
+                    "{} placeholder signature verifies under {schema_id}",
+                    case["name"]
+                );
+            }
+        }
+        refused += 1;
+    }
+    assert!(refused > 0);
 }

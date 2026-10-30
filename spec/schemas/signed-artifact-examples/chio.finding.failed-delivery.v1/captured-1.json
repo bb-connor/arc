@@ -1,0 +1,23 @@
+{
+  "accepted_bid_envelope_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "authoritative_payment_operation_id": "payment-operation-42",
+  "buyer": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "currency": "USD",
+  "deny_checkpoint_ref": "checkpoints/venue-wedge/9001",
+  "deny_checkpoint_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "deny_receipt_id": "deny-receipt-42",
+  "deny_receipt_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "failed_delivery_id": "845afd41516df03105494624a942a5b4e948d00d564d4ae1353f19dff7cf6e3c",
+  "finding_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "hold_attempt_reference": "hold-attempt-42",
+  "listing_id": "finding-listing-01",
+  "payout_eligible": false,
+  "purchase_intent_id": "purchase-intent-42",
+  "realized_spend_units": 0,
+  "recorded_at": 1750000000,
+  "release_terminal": "released",
+  "reservation_id": "reservation-42",
+  "schema": "chio.finding.failed-delivery.v1",
+  "seller_backing_envelope_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "venue_admission_envelope_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+}

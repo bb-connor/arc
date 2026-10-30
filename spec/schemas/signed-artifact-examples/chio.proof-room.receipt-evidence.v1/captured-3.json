@@ -1,0 +1,11 @@
+{
+  "ambient_authority": true,
+  "execution_lease_ref": "first-run-single-call-lease",
+  "kernel_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "policy_digest": "3f562106e60d01c801571ab725ce3d9c8f5cf35451ae9e5d08c1fff1bf005bfe",
+  "receipt_id": "first-run-single-call-allow",
+  "request_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "response_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema": "chio.proof-room.receipt-evidence.v1",
+  "terminal_status": "allowed_executed"
+}

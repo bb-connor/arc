@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/regulatory/receipt-export.schema.json",
+  "title": "Chio regulatory receipt export signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generatedAt",
+    "matchingReceipts",
+    "receipts",
+    "schema"
+  ],
+  "properties": {
+    "after": {
+      "type": "integer"
+    },
+    "agentId": {
+      "type": "string"
+    },
+    "before": {
+      "type": "integer"
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "matchingReceipts": {
+      "type": "integer"
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "boundary_class",
+          "capability_id",
+          "content_hash",
+          "decision",
+          "id",
+          "kernel_key",
+          "metadata",
+          "policy_hash",
+          "receipt_kind",
+          "redaction_mode",
+          "signature",
+          "timestamp",
+          "tool_name",
+          "tool_origin",
+          "tool_server",
+          "trust_level"
+        ],
+        "properties": {
+          "action": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "parameter_hash",
+              "parameters"
+            ],
+            "properties": {
+              "parameter_hash": {
+                "type": "string"
+              },
+              "parameters": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {}
+              }
+            }
+          },
+          "boundary_class": {
+            "type": "string"
+          },
+          "capability_id": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "verdict"
+            ],
+            "properties": {
+              "verdict": {
+                "type": "string"
+              }
+            }
+          },
+          "id": {
+            "type": "string"
+          },
+          "kernel_key": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "chio_receipt_signing_nonce"
+            ],
+            "properties": {
+              "chio_receipt_signing_nonce": {
+                "type": "string"
+              }
+            }
+          },
+          "policy_hash": {
+            "type": "string"
+          },
+          "receipt_kind": {
+            "type": "string"
+          },
+          "redaction_mode": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "tool_origin": {
+            "type": "string"
+          },
+          "tool_server": {
+            "type": "string"
+          },
+          "trust_level": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.regulatory.receipt-export.v1"
+    }
+  }
+}

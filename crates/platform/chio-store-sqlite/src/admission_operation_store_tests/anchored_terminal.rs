@@ -151,7 +151,7 @@ fn economic_advance(
     operation: &AdmissionOperationV1,
     envelope: &SignedAdmissionTerminalProjectionV1,
 ) -> AnchoredTestResult<(VerifiedEconomicStateBatchAdvance, VerifiedEconomicStateView)> {
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     let dispatched_slot = dispatched_effect_slot(operation, &verified.context().store_fence)?;
     let dispatched_head = effect_head(&dispatched_slot, 1, None)?;
     let dispatched_digest = dispatched_head.digest()?;
@@ -878,7 +878,12 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
     assert_eq!(recorded_at, updated_at);
     assert_eq!(projection_committed_at, updated_at);
     assert_eq!(projection_owner_epoch, owner_epoch);
-    let signed_decision_time = i64::try_from(envelope.verify()?.context().trusted_time_unix_ms)?;
+    let signed_decision_time = i64::try_from(
+        envelope
+            .verify_integrity_embedded_key()?
+            .context()
+            .trusted_time_unix_ms,
+    )?;
     assert_ne!(projection_committed_at, signed_decision_time);
     Ok(())
 }

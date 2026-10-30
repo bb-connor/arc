@@ -757,7 +757,7 @@ pub(crate) fn purchase() -> crate::finding_purchase::VerifiedFindingPurchase {
 }
 
 fn pool_mutation_from_receipt(receipt: &ChioReceipt) -> FindingPoolMutation {
-    assert!(matches!(receipt.verify_signature(), Ok(true)));
+    assert!(matches!(receipt.verify_integrity_embedded_key(), Ok(true)));
     serde_json::from_value(
         receipt
             .metadata

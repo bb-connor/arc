@@ -278,10 +278,13 @@ pub fn verify_federated_delegation_policy(
             "federated delegation policy ttl_seconds must be greater than zero".to_string(),
         ));
     }
-    if !policy
-        .body
-        .signer_public_key
-        .verify_canonical(&policy.body, &policy.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &policy.body.signer_public_key,
+        FEDERATED_DELEGATION_POLICY_SCHEMA,
+        &policy.body,
+        &policy.signature,
+    )
+    .is_err()
     {
         return Err(CliError::cli_other_error(
             "federated delegation policy signature verification failed".to_string(),
@@ -908,7 +911,10 @@ mod capability_snapshot_tests {
             purpose: None,
             parent_capability_id: Some(parent.capability_id.clone()),
         };
-        let (signature, _) = signer.sign_canonical(&body)?;
+        let signature = signer.sign_wrapped(
+            FEDERATED_DELEGATION_POLICY_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&body)?,
+        )?;
         let policy = FederatedDelegationPolicyDocument { body, signature };
         let challenge = PassportPresentationChallenge {
             schema: "chio.passport-presentation-challenge.v1".to_string(),

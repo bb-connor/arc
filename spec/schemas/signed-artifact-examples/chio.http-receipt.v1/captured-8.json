@@ -1,0 +1,21 @@
+{
+  "boundary_class": "prevent",
+  "caller_identity_hash": "61de55ba3388aec4fdf6ecfc6eef846fb0f1b13e28cc8381270c27ffa313aee5",
+  "content_hash": "1f58b9145b24d108d7ac38887338b3ea3229833b9c1e418250343f907bfd1047",
+  "id": "140cbc1df805ad848af6422b074234686b8827c9e2e268e5da8ee5725632b7a3",
+  "kernel_key": "ab7260f20edab8208990343f0b9954b20b42b0bd81c8256bebab0c70d41750cc",
+  "metadata": null,
+  "method": "GET",
+  "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+  "receipt_kind": "mediated_decision",
+  "redaction_mode": "none",
+  "request_id": "metadata-request",
+  "response_status": 200,
+  "route_pattern": "/receipts",
+  "timestamp": 1775137626,
+  "tool_origin": "caller_executed",
+  "trust_level": "mediated",
+  "verdict": {
+    "verdict": "allow"
+  }
+}

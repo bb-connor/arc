@@ -1319,6 +1319,7 @@ impl SqliteReceiptStore {
             chio_kernel_core::evidence_verify::build_trust_anchored_checkpoint_publication(
                 &checkpoint,
                 binding.clone(),
+                std::slice::from_ref(&checkpoint.body.kernel_key),
             )
             .map_err(checkpoint_error_to_receipt_store)?;
         let normalized_binding = publication.trust_anchor_binding.ok_or_else(|| {

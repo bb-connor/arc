@@ -442,6 +442,17 @@
       "verify_schema_id": "chio.receipt.v1"
     },
     {
+      "algorithm": "ed25519",
+      "canonical_body": "{\"algorithm\":\"ed25519\",\"fixture\":\"signing-wrapper\",\"n\":1}",
+      "description": "A body carrying an algorithm member that names ed25519, with an Ed25519 signature, under a pinned P-256 key; the key alone selects the verifier and the signature rejects on its encoding prefix.",
+      "expected_verify": false,
+      "id": "p256-key/ed25519-signature/algorithm-member",
+      "public_key": "p256:04550f471003f3df97c3df506ac797f6721fb1a1fb7b8f6f83d224498a65c88e24136093d7012e509a73715cbd0b00a3cc0ff4b5c01b3ffa196ab1fb327036b8e6",
+      "signature": "31cda7cb8bb2bf3438f125f543bc2b366646af8ec8daba034e6a975b3cd3be65ebe50a601f4e04448805e1a8fc548845083359eedf815f8d2a02d53b167f8b0b",
+      "signed_schema_id": "chio.receipt.v1",
+      "verify_schema_id": "chio.receipt.v1"
+    },
+    {
       "algorithm": "p256",
       "canonical_body": "{\"fixture\":\"signing-wrapper\",\"n\":1}",
       "description": "ECDSA-SHA256 over SHA-256(wrapper): the wrapper digest hashed a second time.",
@@ -706,9 +717,57 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-comparison-report.v1",
+      "schema_id": "chio.autonomous-comparison-report.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007b4fa8946c9d350fceccbb9cae87aaf9eb7c5e888aab7f3ce700954acb71d2c2015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-drift-report.v1",
+      "schema_id": "chio.autonomous-drift-report.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631009995c4eb8cdbb77ee8d4c273b6480f9854ab79ff4618df0bf4d0f1ae92442d5b015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-execution-decision.v1",
+      "schema_id": "chio.autonomous-execution-decision.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003b6ade36f81c1ea43d717979fa76fe64afad62519372225bdb0220caf67f2952015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-pricing-authority-envelope.v1",
+      "schema_id": "chio.autonomous-pricing-authority-envelope.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310044d99b6fdc6929b92b37bd7088ed39520b2e0055359e90c4ab6ba8b5a3ec99e6015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-pricing-decision.v1",
+      "schema_id": "chio.autonomous-pricing-decision.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000793eeab66b37a9c6075a4aa554d606f2611d6ae35c079055b08a717efc4f34a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-pricing-input.v1",
+      "schema_id": "chio.autonomous-pricing-input.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100205f980ac117024f053f59a9e9637bd309daa07af10055edc340f6d2f23c8867015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.autonomous-rollback-plan.v1",
+      "schema_id": "chio.autonomous-rollback-plan.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e1c10f1dbf8f401a2223194d38a91a66205c425e7055f1f08f5a2dc6486ea78c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.bbs-projection.manifest.v1",
       "schema_id": "chio.bbs-projection.manifest.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310011a3b166f610e9281bf68153baddb156e730fe226d4864bdeb55eae8ca2a9947015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.behavioral-feed.v1",
+      "schema_id": "chio.behavioral-feed.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c827bdb1d2389065b9ed49fda5e16a050dc7877d38e042449ee69bc44d9e99a9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -958,6 +1017,18 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.capital-pool-optimization.v1",
+      "schema_id": "chio.capital-pool-optimization.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310067c55ca3f922c59a21ea67127ce8f66af9362eaea3064b3532d75f0ed431d9cf015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.capital-pool-simulation-report.v1",
+      "schema_id": "chio.capital-pool-simulation-report.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006332bc577b16a3a0582d830de1510dad08c8e04e7922174c667c5c7b3b985922015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.certify.check.v1",
       "schema_id": "chio.certify.check.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310050daccdeff324bea3ac46f45f9df111565a5a8ad8aaad0d9bd93ea8f480cbfe3015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1009,12 +1080,6 @@
       "id": "chio.channel.reservation.v1",
       "schema_id": "chio.channel.reservation.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ee344bc63c297d1b5f015829ea2633653ee7e53bdcade6b11492ce28afe7c12f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.channel.signature.v1",
-      "schema_id": "chio.channel.signature.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fbcaf240e1ec31a1942bd57829e8e36b974e0f578faa331d15993fcd9479b4a6015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1150,6 +1215,24 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.cluster-budget-anchor-signature.v1",
+      "schema_id": "chio.cluster-budget-anchor-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003866bd0890482528e57f972a782df622e2fecd029748c94fb00626347d3d9c5c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.cluster.peer-signature.v1",
+      "schema_id": "chio.cluster.peer-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310027050e39cac1f0a60872bcf8053e57bed4e63812fe76d6f3ae3134d7c89aa6f0015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.commerce.escrow-acceptance.v1",
+      "schema_id": "chio.commerce.escrow-acceptance.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310029cec5a27a273d9ec5e7ffd93756a11a5cd2a52d16ec70916139b14d880afd56015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.commerce.event-log.v1",
       "schema_id": "chio.commerce.event-log.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310085e80b242e4a13068c6f3e89526a1e4e1fc1383497db6bca13062b9d9b6dc56a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1216,6 +1299,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.commerce.reservation-receipt.v1",
+      "schema_id": "chio.commerce.reservation-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100851f9c951e5ab3a591898f0116d50c0d13cd83d6b5f6008fd39ca651b2c94719015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.commerce.settlement-packet.v1",
       "schema_id": "chio.commerce.settlement-packet.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100bacf190a4d5631e25b10f4b49102fc5843d6fa6ab6d80929e936e015d336f47e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1276,9 +1365,51 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.bond.v1",
+      "schema_id": "chio.credit.bond.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d9d0fb30bf914e2c01eae347bf27951732d37d6e914360ba2b4d4d376a426a7f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.capital-allocation.v1",
+      "schema_id": "chio.credit.capital-allocation.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f40711e7b14460017cc83eae92ed83f8076c21f9d235a17526d7f21656db7b32015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.capital-authority-step-proof.v1",
+      "schema_id": "chio.credit.capital-authority-step-proof.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100513491d075bdf99a002d809564bdd22522d7f4bfaf8d467b19cbd64b1d856414015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.capital-book.v1",
+      "schema_id": "chio.credit.capital-book.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f87fd52cb0f40cf82f24f4d9b533552e28e43c3b3647b6154f8da1a12e7f32cb015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.capital-instruction.v1",
+      "schema_id": "chio.credit.capital-instruction.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631009b6c62f68da278162bf5b3fc719aa092f54c0a73b544e2e19621726f9f17014f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.exposure-ledger.v1",
+      "schema_id": "chio.credit.exposure-ledger.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e38c44220e65aea63de5831473c1593108af4de767ca181e6d5328193edab796015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.credit.facility-bind.v1",
       "schema_id": "chio.credit.facility-bind.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a22b68bbefe66912718e98a57dc7ea3052bb7690dbcdcabc3f3a18e4269f3bb3015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.facility.v1",
+      "schema_id": "chio.credit.facility.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e36aa2767c635c3cb577976575bf05396f9c3ea69149ceff50abaf3d97ab26b0015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1288,9 +1419,27 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.loss-lifecycle.v1",
+      "schema_id": "chio.credit.loss-lifecycle.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d3ba345adee0867ffd3766d8e8b8be4be47a4ff9427e02ddc102c68e60e2a037015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.provider-risk-package.v1",
+      "schema_id": "chio.credit.provider-risk-package.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002478073192474f8ca429f2ab802869b49dcd7769c190d10c36b70a5723c1f1ee015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.credit.receivable-iou-envelope.v1",
       "schema_id": "chio.credit.receivable-iou-envelope.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006426c93d44483e990be03288f8c4f9c6943a0de426a88c6d86d89a4c49bf8859015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.credit.scorecard.v1",
+      "schema_id": "chio.credit.scorecard.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006b2f9c3e122bc5f3bd1a5e3e3c6e1a8568ab13142d97a40dbf09592831c9cb66015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1309,6 +1458,12 @@
       "id": "chio.cumulative-approval-root.v1",
       "schema_id": "chio.cumulative-approval-root.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007eb3934caf5d6da48048bf33c3a6909eae88617f772c60ecf3c0f543a35eaf31015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.decision-model-witness.v1",
+      "schema_id": "chio.decision-model-witness.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310097f7ca61b693b7100d8148e334560178b4df420d848c898500870fc974741231015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1546,15 +1701,45 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.federation-activation-exchange.v1",
+      "schema_id": "chio.federation-activation-exchange.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310049a80320d8c5eaeab76fac636cec16c40bdb58f3a97c6d672b51b83ea797bd0a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.federation-kernel-handshake.v1",
       "schema_id": "chio.federation-kernel-handshake.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100096a28b063ae2cacb8f3a45aae0fd80194b528c6d13c64cb6ba653cee85b555c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.federation-open-admission-policy.v1",
+      "schema_id": "chio.federation-open-admission-policy.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b59f29d1276941631b1bdcfaa0e1a6b5ac46770369fe9522768a48f930ca5d7c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.federation-policy.v1",
       "schema_id": "chio.federation-policy.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100cf2f9cd1a088832ac9122943fbbb7cf52729c5c5c4f12d4619398a2c8c6bb034015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.federation-qualification-matrix.v1",
+      "schema_id": "chio.federation-qualification-matrix.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310066fe03f031479ced0eacdbe772083e9a599b9a8381980907af394cf5a2418d78015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.federation-quorum-report.v1",
+      "schema_id": "chio.federation-quorum-report.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631005f0615724762239e4904b8a8588f357fb050d2eb6d8f41aa44570a570454fa45015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.federation-reputation-clearing.v1",
+      "schema_id": "chio.federation-reputation-clearing.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008193aba121a2a2c5ac48717a263a6a0d34701fd30a55fadb526bf1812a91a3d6015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1648,6 +1833,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.federation.transport.iroh.peer-directory-bundle.v1",
+      "schema_id": "chio.federation.transport.iroh.peer-directory-bundle.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310027dcbe48b521abf3144446c94c2b3910658589572d6938dad66d359c61c6b486015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.federation.treaty-negative-fixture-corpus.v1",
       "schema_id": "chio.federation.treaty-negative-fixture-corpus.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c097232d99c4dcae3d39187a91d2834232d461f665323262d878aa187ca673db015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1708,6 +1899,48 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer-entry-activation-decision.v1",
+      "schema_id": "chio.financial.cross-issuer-entry-activation-decision.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631005285c1ca512790258ea8ff2e3b3e5fc9a4d71575eb1b9b3ce820fe8be4e9b363015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer-migration.v1",
+      "schema_id": "chio.financial.cross-issuer-migration.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310054beba11418cde611567033e4f82183034756630c614920469dae18ddaa06793015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer-trust-pack.v1",
+      "schema_id": "chio.financial.cross-issuer-trust-pack.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631004866c2e44eb5267856aa056c9ea93fa03bc5d82b79eadbde3a81759accb884d8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1",
+      "schema_id": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f9b7bbf011eb5d121334d6a045113609c35ebe989353eb88c4c34761299d419a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer.lifecycle-checkpoint.v1",
+      "schema_id": "chio.financial.cross-issuer.lifecycle-checkpoint.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100afdda228bc695c550dda6bbe76e201d2b21db8415d47c37f067d71a554bec178015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer.lifecycle-generation-pin.v1",
+      "schema_id": "chio.financial.cross-issuer.lifecycle-generation-pin.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f0f4c2959f9b0d99b1508871790d0536593f59b4d37694717ff74a5694de2c8d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.financial.cross-issuer.lifecycle-result.v1",
+      "schema_id": "chio.financial.cross-issuer.lifecycle-result.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c62447150963b3b803b2bf2e4edadec1008faa8e8c8aac4fc3783a7a0b5f0c61015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.fincred.credit-scorecard.v1",
       "schema_id": "chio.fincred.credit-scorecard.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e28371abed1a845926490321de70c23015645133e0a7b8229e26960e325e0b71015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1762,9 +1995,21 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding-status-operator-authorization.v1",
+      "schema_id": "chio.finding-status-operator-authorization.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100be9694214da25be0a2f0f1d038b48f1fb635ddc7e66e3006b125b8170985320e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.admission.v1",
       "schema_id": "chio.finding.admission.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310082d7f44c5acad13acfdcd8a6c6883086d4eeaead875ee4a0675efaaae01dd0b7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.anchor-checkpoint-publication.v1",
+      "schema_id": "chio.finding.anchor-checkpoint-publication.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100857bd2a32a5b1d84081e20756ae74976d3dab9c757251490e00f16c8f9adfb9a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1783,6 +2028,12 @@
       "id": "chio.finding.audit-round-authorization.v1",
       "schema_id": "chio.finding.audit-round-authorization.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003782ec829dd81010d22735688269fea9f0896916da9f6da06cd2e9346649bb05015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.audit-seed-witness.v1",
+      "schema_id": "chio.finding.audit-seed-witness.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003cec6e22112d9debb8efb7aab938c2c63629832f04c255e15901b6aa5ae9f579015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1807,6 +2058,12 @@
       "id": "chio.finding.bond-observation-response.v1",
       "schema_id": "chio.finding.bond-observation-response.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310043e2957ea7263bade04d958dad6746dfa6b422b81f8ecc8a7f778b41359f241f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.bond-store-snapshot.v1",
+      "schema_id": "chio.finding.bond-store-snapshot.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a30c9dad1a64ec5931ddc68e93c0f079887bc58ab864e2f173d5f5588b9720b4015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1840,6 +2097,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.current-listing-assertion.v1",
+      "schema_id": "chio.finding.current-listing-assertion.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100487cd072ac2d04044888ea1b31849989ad0586631ad60dc94a60cd80fd385126015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.delivery.v1",
       "schema_id": "chio.finding.delivery.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310057dc101c945994e45828989418d42f70787f5b2ecc66d738817447edf5a3aa08015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1858,15 +2121,105 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-api-key-lifecycle.v1",
+      "schema_id": "chio.finding.hosted-api-key-lifecycle.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c05a192fa8b0214bbcf2fc6f3a3ea4d6f396674a22ae146b74580df213505265015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-archive-manifest.v1",
+      "schema_id": "chio.finding.hosted-archive-manifest.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310031646655b310ed42ad7dd8fd2232079dfbc5e2115044a4b5d73941b1ce5c9e9e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.hosted-authenticated-delivery.v1",
       "schema_id": "chio.finding.hosted-authenticated-delivery.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002274018ad2195c41cdfbd7c4b3c73d1019df76a8c6119b29ce57780d8506699f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-authority-transition.v1",
+      "schema_id": "chio.finding.hosted-authority-transition.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a2bb0d8d1d721ec036e8b0d789018c17d4a890ea6cb204c49c825fccad265cb7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-canary-observation.v1",
+      "schema_id": "chio.finding.hosted-canary-observation.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003bc0cf61f2d25abd05fbd57f3256074ff43f711048daddb0a20638a74ca59ab8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-gc-receipt.v1",
+      "schema_id": "chio.finding.hosted-gc-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100106e073f626119f3c7f4f29b1775b7306b0a57e7446f2d1da701326add5a2aec015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-journal-checkpoint.v1",
+      "schema_id": "chio.finding.hosted-journal-checkpoint.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100945e5c9947c8300e7a55e76da9e9477f0874063005078e9444b8b5dbf970336d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-legal-hold.v1",
+      "schema_id": "chio.finding.hosted-legal-hold.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100df085ff33ae760f7a6efd8689222b7eb33ad7013a3b5e0c7f79d177629bc7ec0015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-principal-lifecycle.v1",
+      "schema_id": "chio.finding.hosted-principal-lifecycle.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d6045fed1ff9426130b7e4575e72acc9e238e80b471817bc558cc14755dfe70a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-principal-replication-event.v1",
+      "schema_id": "chio.finding.hosted-principal-replication-event.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310004325f9e643dd9ddf2f8cab33d85d002301b8bedf4a348159b6c62ccee6ff13a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.hosted-qualification.v1",
       "schema_id": "chio.finding.hosted-qualification.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310071b8981d8cb2f6121c2e34ff0d0067dbdcc2e5e536cc6527233cbeff65c1f759015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-quota-alert.v1",
+      "schema_id": "chio.finding.hosted-quota-alert.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ca8c829a80f98716fcd798334411dc80b88855800e7fc000270f6df40ba639de015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-replication-check.v1",
+      "schema_id": "chio.finding.hosted-replication-check.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006bb0fbca23b9a60344569ac790ecb5b6806b89399076aeabf5488d84af9efa91015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-replication-event.v1",
+      "schema_id": "chio.finding.hosted-replication-event.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310092fdef8bf15dff09688f487eac95ab86c2227934809b9049926fe86753475ac4015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-restore-verification.v1",
+      "schema_id": "chio.finding.hosted-restore-verification.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310002a912a710e588ce19959057e1abad650da42bb57bb085677b6e95af487fae41015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted-sqlite-import-batch.v1",
+      "schema_id": "chio.finding.hosted-sqlite-import-batch.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b17d93c52a11af0229607f99c2968544080715415e7d4de6061194c83aa0da68015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.hosted.aggregate-checkpoint.v1",
+      "schema_id": "chio.finding.hosted.aggregate-checkpoint.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003dfb91894089c2d50b4c5be7434d076b260703179820d7383a3113df169be789015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1900,9 +2253,21 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.operator-purchase-job.v1",
+      "schema_id": "chio.finding.operator-purchase-job.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006b9782783a3dc5f5fc56621bf67ef4b9ae4aabcae03cd00435ec91254ca082e3015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.pool-allocation.v1",
       "schema_id": "chio.finding.pool-allocation.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fd414a7c04490510022fb0dd5ba751d2d09d42de91dbb460100d6a4052735c0a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.pool-debit-authorization.v1",
+      "schema_id": "chio.finding.pool-debit-authorization.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310022e2b483224050d9dcbad5cd6fb8fd451d53cc15666877f412863731fb1df5a4015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -1954,6 +2319,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.status-intent-submission.v1",
+      "schema_id": "chio.finding.status-intent-submission.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310051866ebe1f02936788d5a2b35eb643fa3f363407d9f154cc150b9627dd541240015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.status-proof-input.v1",
       "schema_id": "chio.finding.status-proof-input.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000b0b4bb3a8139b72df4c40729b17d4240314dbd208a7d5f81b02f0ab61562f65015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -1978,9 +2349,27 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.voluntary-retraction-receipt.v1",
+      "schema_id": "chio.finding.voluntary-retraction-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000d74c06a4c3901b14427ab1589c59dfa8a7bddbc1a48e15e8082140b252d667d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.finding.voluntary-retraction.v1",
       "schema_id": "chio.finding.voluntary-retraction.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310007653a335afaf12f28e8f1900e34884fe7f9fd011a36222fb6238ae5b534c503015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.worker-attested-result.v1",
+      "schema_id": "chio.finding.worker-attested-result.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310094ce03fc4dd8dc0625ef706df6639b260594fc84ecc48a5685bfbd59fb2a8e60015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.finding.worker-capability.v1",
+      "schema_id": "chio.finding.worker-capability.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a051d41cac6ce535f8ecd9b16e6bcf6d6a302d98a9db101e1df0dbdedd65e699015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -2098,15 +2487,39 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.http-receipt.v1",
+      "schema_id": "chio.http-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fe45e479be7abdf79b1487355aef1b99672a8ceeb58bafa4c30d399d9c3ae271015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.idp-key-snapshot.v1",
       "schema_id": "chio.idp-key-snapshot.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008751e478f298c4e1fa8b5f4de8d698d684cc4569b36f3686f032eea68632e7fb015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.iroh.revocation-signer-endorsement.v1",
+      "schema_id": "chio.iroh.revocation-signer-endorsement.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007fd6b39c7c4bb858cec8a992ad6ec5a42e236348672ea8d4b94b3c55a10d64e1015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.iroh.transport-endorsement.v1",
+      "schema_id": "chio.iroh.transport-endorsement.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fcd4ac493b9b633cf57f0802a14f68ee3f9edd104c29a18c648c99b1f1d13221015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.isolation-boundary.v1",
       "schema_id": "chio.isolation-boundary.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008e4bd9e40ccb4ac018df6b3acefbef71edfc5a43000c3b9e070232b06f568234015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.key-binding-certificate.v1",
+      "schema_id": "chio.key-binding-certificate.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631005f09560bf058201045f6a8f4f36cdcc79213d7874eb720875e7b9219a8a16207015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -2188,6 +2601,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.lineage.frontier-signature.v1",
+      "schema_id": "chio.lineage.frontier-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000a05f4063b94ad68d78bac77c06c2ffd7af1bab52cc2254a16b4ec245103bc43015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.lineage.signed-subgraph.v1",
       "schema_id": "chio.lineage.signed-subgraph.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003779fe10322d974d3d1c7a527c0ee8b3b59233e53e573dad399167bf7485ea3c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -2197,6 +2616,126 @@
       "id": "chio.manifest.v1",
       "schema_id": "chio.manifest.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310054cacd522f75973c14176e1e18aa915f1132812302ca6afb104c53e5aa0ae7f9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.auto-bind.v1",
+      "schema_id": "chio.market.auto-bind.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b9a43d7e6015dbb86bcd947485df1f869d32cb1d4a86fcdfa395face0670bc93015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.bound-coverage.v1",
+      "schema_id": "chio.market.bound-coverage.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100478aedd98f65d683968708692910f99c714ad2ea1941e9d449fab3813363b988015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-adjudication.v1",
+      "schema_id": "chio.market.claim-adjudication.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100690cf01a8de84f6dc127bf1c0bf1c4c4da6bb41267d34aa26c48cf18fdd6edf8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-dispute.v1",
+      "schema_id": "chio.market.claim-dispute.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310081daddd3118b10635215f858cd51e27a5d318608d3414b6298716be45d21336b015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-package.v1",
+      "schema_id": "chio.market.claim-package.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002c86a11cbbd1d1c482022a72f73d6616ce35d29aaf95bc309bc44768cab3e538015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-payout-instruction.v1",
+      "schema_id": "chio.market.claim-payout-instruction.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631001b3614040691a313bd83c3f637a50088488921f3441f9176e1161b9361d17b40015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-payout-receipt.v1",
+      "schema_id": "chio.market.claim-payout-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100967f7a88240e313494ed495d47b1f1d41ef05172d487efc7ef74b15fa36cde39015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-response.v1",
+      "schema_id": "chio.market.claim-response.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f073851c735ceb41eadbb1ee05ac131bf174599fe366025555a1166e47bc3c94015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-settlement-instruction.v1",
+      "schema_id": "chio.market.claim-settlement-instruction.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310007a1257391ca4e66cc0644e502e0653ddebf1cf9a13455103bdb9671e0a702a8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.claim-settlement-receipt.v1",
+      "schema_id": "chio.market.claim-settlement-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008086e3c248e3cedd0e1863709646eb9779410f31aa489a9b1bf4f3944fb8b430015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.placement.v1",
+      "schema_id": "chio.market.placement.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a8fae40b2510e9d056af161e72086fa3db751f94a4ba55f29e973dff513cb584015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.pricing-authority.v1",
+      "schema_id": "chio.market.pricing-authority.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a2f0c7d1690df9bcf6846185086a03a98fcbdd27affddbf3ba06b108d558437d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.provider.v1",
+      "schema_id": "chio.market.provider.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c53ec0cae1cd00ed541704791f698966aa52afc0c0b6e97be23e59e39e740ce1015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.quote-request.v1",
+      "schema_id": "chio.market.quote-request.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b08ab2e289110b97337c1fb7055bc0a31bd53f17ce5d16318442cff75ccfb18e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.market.quote-response.v1",
+      "schema_id": "chio.market.quote-response.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f007524fa440c78a838f97132b78ca7f043ded44fcee2c7e9909035e01247a38015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.marketplace.accepted-bid.v1",
+      "schema_id": "chio.marketplace.accepted-bid.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100918af36c55515671931e990445bee693f3cd10f6e6afe4106a90eace6e6cd397015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.marketplace.ask-response.v1",
+      "schema_id": "chio.marketplace.ask-response.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310059d09b352c93ddad2b26d288940ff8728f963e239eb4060356aba1415c057cbc015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.marketplace.bid-request.v1",
+      "schema_id": "chio.marketplace.bid-request.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100dc8f48df997c87db6137766f80d2764018312756b6f5cd72935051d73e6e94e3015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.marketplace.listing-pricing-hint.v1",
+      "schema_id": "chio.marketplace.listing-pricing-hint.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310000602188b70945a034bcc7bc6e601ad8b2c07197299cf0c4da6da6f940026257015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.marketplace.reservation-receipt.v1",
+      "schema_id": "chio.marketplace.reservation-receipt.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b2e892274f4307c560549ed2783b970f570c3fd5ea176acaedfe70a11c556908015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -2317,6 +2856,24 @@
       "id": "chio.outcome.sla.v1",
       "schema_id": "chio.outcome.sla.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310043e95784d2725e4e609ba998d2cb5168577982c78ffee1af78645f24a4d61621015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.parametric.contest.v1",
+      "schema_id": "chio.parametric.contest.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b81a7114066e319f8ef9aed06f7670d75d1fd0a5129a365516ee92451c1457d8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.parametric.evidence-source-checkpoint.v1",
+      "schema_id": "chio.parametric.evidence-source-checkpoint.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d0bf0465a8310e84ce6846abec31c7d0ff66bf8f82dd7d0b32a8b658e6eac005015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.parametric.payout-intent.v1",
+      "schema_id": "chio.parametric.payout-intent.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310054305b7beef51e2c36d0f73ae27c5a24ba3170823e85c3a9b455d64d2cca4af7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -2872,6 +3429,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.policy.activation-receipt-signature.v1",
+      "schema_id": "chio.policy.activation-receipt-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d5fc299698630b72ab94d5a1b277685861ce2c6911dd71a2dd192de3525d9f65015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.policy.activation-receipt.v1",
       "schema_id": "chio.policy.activation-receipt.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100360fd56b673efcca53b887c4c195432b57d2e923c8348bc77be59e299566fedd015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -2881,6 +3444,24 @@
       "id": "chio.policy.bundle.v1",
       "schema_id": "chio.policy.bundle.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100163f364a7e4e0113d4049318bb2f28f451d0b11a3ed369c75e08659132ce9631015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.portable-agent-passport.v1",
+      "schema_id": "chio.portable-agent-passport.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f98a17ff365ec0365471718285ff62727d1607096d743248748313d96e76b326015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.portable-negative-event.v1",
+      "schema_id": "chio.portable-negative-event.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fad1cebd513a01554c5df04392346df950704c65d31e81e607f1db8b06d740dd015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.portable-reputation-summary.v1",
+      "schema_id": "chio.portable-reputation-summary.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a52fff5aa1587da7f7c86043d8528d1b1d52c35e4857955f1c119f4d97f372ed015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -2989,6 +3570,12 @@
       "id": "chio.public-verifier-discovery.v1",
       "schema_id": "chio.public-verifier-discovery.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c88d208058ab2dc8cd2487f52729fe2b6b3d674b34bf3f9ebbde07ee21c7467e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.receipt-session-anchor.v1",
+      "schema_id": "chio.receipt-session-anchor.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000d0164c3c9a29daca9f55f055a3c0dc6b19bdae936ea839e1d9b57155f3d524c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3106,9 +3693,33 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-archive-manifest.v1",
+      "schema_id": "chio.recovery.signed-archive-manifest.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000dff53e022138de33e2cab811880caf7424ca94ff354852dba53a5f81eede962015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-artifact-certificate.v1",
+      "schema_id": "chio.recovery.signed-artifact-certificate.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100587430da75ef5c0f2d26c2a8df84fe682ec66ecc38c2c73699df502e6b6a1327015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.recovery.signed-authority-coverage.v1",
       "schema_id": "chio.recovery.signed-authority-coverage.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f3a977914d1796c7e328a4b6a94550388fd42fecd262b286b64926955c38bb96015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-confined-disclosure.v1",
+      "schema_id": "chio.recovery.signed-confined-disclosure.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631004f94c81a2b2f02f8217cbf1e259cb6f705bd210f5ea0d15a8fd32d0911b82143015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-confined-endorsement.v1",
+      "schema_id": "chio.recovery.signed-confined-endorsement.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100dca05a3f70695b88b15e5202ce797c06a021d7d667420b55384e77a211e82050015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3124,9 +3735,57 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-policy-deployment-change.v1",
+      "schema_id": "chio.recovery.signed-policy-deployment-change.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ad50883515f08b0dcc2f02b7772040d1932ac9a105de8d46b9288e031390a469015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.recovery.signed-provider-finality.v1",
       "schema_id": "chio.recovery.signed-provider-finality.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007f81860f015cf28b9439e4e93281d6f987c6740d79c8c86774d1ec226342e4ec015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-scoped-endorsement.v1",
+      "schema_id": "chio.recovery.signed-scoped-endorsement.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e91f51e1876f321f85eba4625cfaa05144a55049d8e0b23924c71c27dd16a644015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-annotation.v1",
+      "schema_id": "chio.recovery.signed-semantic-annotation.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002a2f68ee4e8d9ea6ef78d65a0d5f9e5d8de427016c1ca08014a5d5bb33b7dff5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-audience.v1",
+      "schema_id": "chio.recovery.signed-semantic-audience.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d4cd43a85bd638b63ec781b35d39447f7bdd2ccc26a6727d5e0e920a1906abf7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-deployment.v1",
+      "schema_id": "chio.recovery.signed-semantic-deployment.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100257776d99941832e482f87d7e806c3f9ba183dc6bb1b743ddf3a7b04b51be053015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-package.v1",
+      "schema_id": "chio.recovery.signed-semantic-package.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631009c9699606d24632bed2894e9cf878311d3e6eb2c59ee3a940d95d060ec0cb0f5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-prerequisite.v1",
+      "schema_id": "chio.recovery.signed-semantic-prerequisite.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631004df380b969fe14a8dcd54d3f805e5ee962fa52327b7834339d73a406be6178ab015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.recovery.signed-semantic-transformation.v1",
+      "schema_id": "chio.recovery.signed-semantic-transformation.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100cbd284d7297b2b8284dff82d1f68b87b47fd0a0049fcb1b078991005c8b26b10015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3136,9 +3795,57 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.governance-case.v1",
+      "schema_id": "chio.registry.governance-case.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ffb431ef94aa0982d3d926ce2472b5b08bb79ac3151775ebcc66ce3ba43e2dc6015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.governance-charter.v1",
+      "schema_id": "chio.registry.governance-charter.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310038d316aa07b581d64248d86923d294cafcdf451e7a9b4e5b386caf444132322c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.listing.v1",
+      "schema_id": "chio.registry.listing.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000a31b75a202386b2b06d283ebba83e56347f7db7e702556b8a73517fa43cc785015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.market-fee-schedule.v1",
+      "schema_id": "chio.registry.market-fee-schedule.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008916214ddb11a41f9560b687c2885340d4f627d9ab9bd33a972fcb9ea39391aa015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.registry.market-penalty.v1",
       "schema_id": "chio.registry.market-penalty.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310094608ff6865350195901c88d289092d9b14a949242d69f546e0bcab6ddcea07d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.namespace.v1",
+      "schema_id": "chio.registry.namespace.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b6c58e7cd44d6bbd5847a96e44ad53670ec1f3316616379b09e4e0f485bb38b9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.registry.trust-activation.v1",
+      "schema_id": "chio.registry.trust-activation.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100eaf6119d9be3c153508521e82307781efd0ab47f1e92d7532e004b3da1d4f85d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.regulatory.receipt-export.v1",
+      "schema_id": "chio.regulatory.receipt-export.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310082fa53b960e07d603e5dc0c88fc0bfb9b080148a45937593388a36c1f7377f6c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.release-qualification-manifest.v1",
+      "schema_id": "chio.release-qualification-manifest.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100848ebde395616e7c5e693e9f768544b1fe0194abac50cd15b3ac1249b9d305fa015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3151,6 +3858,12 @@
       "id": "chio.request.digest.v1",
       "schema_id": "chio.request.digest.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002af7a3c2d5df605d5fd81c7495d9b1bcd7114f9f194c95004fc153053aecc152015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.request_lineage_record.v1",
+      "schema_id": "chio.request_lineage_record.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002d3dd1dc55ad0f1711c15d2fb501038259fe5433646a1f97b0a829afde12b17c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3238,6 +3951,42 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation-evidence.v1",
+      "schema_id": "chio.runtime-attestation-evidence.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ff63e90e697984d3973cfa7622da14ad54b18005bd6c176dbffcb5448ee24281015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation.appraisal-report.v1",
+      "schema_id": "chio.runtime-attestation.appraisal-report.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003b25d9e7c56b5279339f266a41ae15cf95901327105047732d9bd1867fff9dc5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation.appraisal-result.v1",
+      "schema_id": "chio.runtime-attestation.appraisal-result.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b789267d4f37baa464b058e17c40e44561a80ca57d08314ebc80b7ac01582364015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation.reference-values.v1",
+      "schema_id": "chio.runtime-attestation.reference-values.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100125e834d0e337dc7facdd9e1e780990666fc71f8e5875d9991187a2f45a1e3f8015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation.trust-bundle.v1",
+      "schema_id": "chio.runtime-attestation.trust-bundle.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631000116047a7a7c97bf832cffd3aa91fb6e713008f7d4d9f6e05102be2968a6c252015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime-attestation.verifier-descriptor.v1",
+      "schema_id": "chio.runtime-attestation.verifier-descriptor.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310042e61910fc0b14aa14056989a3a5454b57b10e938c2b6cb5d1140323cc08470e015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.runtime.admission-bundle.v1",
       "schema_id": "chio.runtime.admission-bundle.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fd2ec8f342cecb92db51a83b316b0807837a51440676794acf333425912e18ab015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3274,9 +4023,21 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.attack-simulation-report-signature.v1",
+      "schema_id": "chio.runtime.attack-simulation-report-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100bc709d89b772970f4409a16aa41a9387a99aaf7d4a715c27913cc8c6e44407b9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.runtime.attack-simulation-report.v1",
       "schema_id": "chio.runtime.attack-simulation-report.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d94b6a923973514c2f01f944dfda83fbd1c02ee4864eead9f532d8d846049143015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.chaos-run-report-signature.v1",
+      "schema_id": "chio.runtime.chaos-run-report-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100ea67c70093c49623eaf1d93b3dcff276dc884fe7c1c4ac50060f3fbd403ba5cc015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3295,6 +4056,12 @@
       "id": "chio.runtime.evidence-sink-health-report.v1",
       "schema_id": "chio.runtime.evidence-sink-health-report.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100edff0278a560a1eb1cf3a418e33b489d20dc4b7d7760ff8539d8e4ead11fec6d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.execution-lease-signature.v1",
+      "schema_id": "chio.runtime.execution-lease-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b4a53e04d33a9d6816538ada76dfa0bdf7369eec139378428b8a5d6964083c14015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3418,6 +4185,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.revocation-freshness-proof-signature.v1",
+      "schema_id": "chio.runtime.revocation-freshness-proof-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b9affe4f8376524538cfc6ce2ad2d54e93952c00c6947ab34bf98fd972e2c95d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.runtime.revocation-freshness-proof.v1",
       "schema_id": "chio.runtime.revocation-freshness-proof.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100060b3d39905d869c291cc4ecbf0a494793ce5eb101e2d6ef3c99b88be236f9c9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3433,6 +4206,12 @@
       "id": "chio.runtime.run-lease.v1",
       "schema_id": "chio.runtime.run-lease.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d69ec7d6ff46eb3b63d7778377c08fbb9157b5034f5dfe27c236c658d0a1af9d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.sandbox-attestation-signature.v1",
+      "schema_id": "chio.runtime.sandbox-attestation-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002bd2d0efbfe254b062e38212a5f843e38d704811eee952baff09d6bc71c98e36015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3460,6 +4239,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.terminal-receipt-signature.v1",
+      "schema_id": "chio.runtime.terminal-receipt-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100d3dbe841461deb04728ca4ab4017435cb646c8c0cda139eb5c824554e8350919015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.runtime.terminal-receipt.v1",
       "schema_id": "chio.runtime.terminal-receipt.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003a41b7c53df1398213b6b16d66e5ac1e379de70e648ef65c35a99486eacd7baa015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3481,6 +4266,12 @@
       "id": "chio.runtime.trust-floor-state.v1",
       "schema_id": "chio.runtime.trust-floor-state.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100053f2d6e6f9b0db82120343b74ca45563c0542cdbf991308176716b51027e975015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.runtime.trusted-time-proof-signature.v1",
+      "schema_id": "chio.runtime.trusted-time-proof-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631005676e2b163bff0e5702399e028f818caf9768dbcd45f43347919abd4e701ed90015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3634,36 +4425,6 @@
     },
     {
       "canonical_body": "{\"a\":1}",
-      "id": "chio.signed-confined-disclosure.v1",
-      "schema_id": "chio.signed-confined-disclosure.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310063bb89e26f2d49ce2e0c543f870d33066d2d3e0019aeaf054be8839f707943bf015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed-confined-endorsement.v1",
-      "schema_id": "chio.signed-confined-endorsement.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310052c5a7971c6e7d9b8243c872b7e9ce614a40de934872fc6c4d8ca6e9baed1325015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed-policy-deployment-change.v1",
-      "schema_id": "chio.signed-policy-deployment-change.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310023187c6346d502f3e9127b589b083bc98e4198127b342eb668f3e3963a955da7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed-recovery-setup-probe.v1",
-      "schema_id": "chio.signed-recovery-setup-probe.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100713d8e0454b0e39048221c39e9b45cf1563dbbfdeabe1e65afad085d14e0009c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed-recovery-setup-report.v1",
-      "schema_id": "chio.signed-recovery-setup-report.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007a6d8e159e69be5c51a19514d42addc8cd60433d4e0e584be5f281a94ab5a7ad015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
       "id": "chio.signed-security-event.v1",
       "schema_id": "chio.signed-security-event.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631007e7a342d843b71099ab7b9fd5cf4823b5c70df78a993cfef7a425a58ac3e3d01015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3673,60 +4434,6 @@
       "id": "chio.signed-watermark-envelope.v1",
       "schema_id": "chio.signed-watermark-envelope.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631004eb52632a820d60acd3bc40fd6a52d973543a5f94baab5ac98e01c2237513a07015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.artifact.archive.manifest.v1",
-      "schema_id": "chio.signed.artifact.archive.manifest.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c095afa1768168977ae28924cd5c99ecbcace44349c869708c55c48459593f84015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.artifact.certificate.v1",
-      "schema_id": "chio.signed.artifact.certificate.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631006bdd23cf5a92f36b3c8dd22203c3de96f1794117873fbc08464e714ee9a02a11015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.scoped.endorsement.v1",
-      "schema_id": "chio.signed.scoped.endorsement.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631009c8615afe810a20688df030f2ec2c89b38187623854f45a12dbcdcf0e4ea25f7015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.annotation.v1",
-      "schema_id": "chio.signed.semantic.annotation.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310087939009b33116092e26dab4e05715adae8f3b431880be737babab03c0974199015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.audience.v1",
-      "schema_id": "chio.signed.semantic.audience.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310073f90e5fc8e47e727be3c2e1782ecb6612cb67501c73d18f1323e382304504e9015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.deployment.v1",
-      "schema_id": "chio.signed.semantic.deployment.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100117923af8330489cb262e20c104c9ce17da8fb1f4ff412577e1f2cc57c24641a015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.package.v1",
-      "schema_id": "chio.signed.semantic.package.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310032b4f84f069da604c32b2b4095ea87cee59c6c86df9a7e7978ba70fc512a3ec4015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.prerequisite.v1",
-      "schema_id": "chio.signed.semantic.prerequisite.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631002b73ea81d8493fc0c9ac01d11cb8c8d2d6d6678ad0a7bc06f4376c727a3b0745015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.signed.semantic.transformation.v1",
-      "schema_id": "chio.signed.semantic.transformation.v1",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100efba5a90ed98c6f063e6277d69f13eb457df1d8d23eea62cf68bfd572f3b7b21015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3790,6 +4497,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.swarm.route-plan-receipt-signature.v1",
+      "schema_id": "chio.swarm.route-plan-receipt-signature.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100550ae03d1e790cf806724862739484e7f8f31bd6fcfce0b58f114521d1066dde015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.swarm.route-plan-receipt.v1",
       "schema_id": "chio.swarm.route-plan-receipt.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310009efe9e28f626c5cf09fc8c5910396950d1e78c758c25881bb0f7c3223d2c080015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3811,6 +4524,12 @@
       "id": "chio.tee-bless-audit.v1",
       "schema_id": "chio.tee-bless-audit.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310009856614822dc3392e1572775609b19d0ccbe008ca0845bbc53bed07ded2923c015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.tee-capture-frame.v1",
+      "schema_id": "chio.tee-capture-frame.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003331651014a3cc0ef6f927bf9dd07f1dafc9fa558a1cef4259ab082d39844373015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3874,6 +4593,12 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.treaty-epoch.v1",
+      "schema_id": "chio.treaty-epoch.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100a3429b07d6fea56f746e6a3d32bb681727e74e28a2ef22def25473dd19fd1f75015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.tripwire-observation-receipt-body.v1",
       "schema_id": "chio.tripwire-observation-receipt-body.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e382def192b1ad7f2d1cbfc47ce8af55071900cb3035ed8e08d8a7f81ac92ae5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
@@ -3883,6 +4608,18 @@
       "id": "chio.trust.key-state.v1",
       "schema_id": "chio.trust.key-state.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100fbdbc1f679775a8bde86e779a9219c591101d1a0286c0da202e20f9443684c0d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.trust.passport-revocation-leaves.v1",
+      "schema_id": "chio.trust.passport-revocation-leaves.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631008b647722e9356af7a289c938eab9a4d7e5bc4216dedfbaf040f47b202ad2b181015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.trust.passport-revocation-root.v1",
+      "schema_id": "chio.trust.passport-revocation-root.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100f783d2b25f879eff69627dcf13efa7ae54e24d564357f88fd35cc19223f6f7d5015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
@@ -3910,9 +4647,27 @@
     },
     {
       "canonical_body": "{\"a\":1}",
+      "id": "chio.underwriting.decision.v1",
+      "schema_id": "chio.underwriting.decision.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100bacf64672f7bb7192d7093139d08f3c48284eef883b4ec0953815f81ac9c6b1d015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.underwriting.policy-input.v1",
+      "schema_id": "chio.underwriting.policy-input.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e76310073f8523e2abcdb8e6b100fbacddb9b051c0731d3a127d73fbc6e79480699d80f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
       "id": "chio.verified-approval-set.v1",
       "schema_id": "chio.verified-approval-set.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e7631003b35761396fcbefc7f404b4e6a0f41020c078a276bdead1e84e67212be8bf645015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    },
+    {
+      "canonical_body": "{\"a\":1}",
+      "id": "chio.wasm-module.v1",
+      "schema_id": "chio.wasm-module.v1",
+      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100661eb477d9ffd0cca1fb25ef8a0ee2c1ca6d3982122c0647447f06534b28f041015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",

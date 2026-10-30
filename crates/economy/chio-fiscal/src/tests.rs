@@ -430,6 +430,59 @@ fn schedule_rejects_lineage_gaps_and_cross_domain_predecessors() {
     ));
 }
 
+fn schedule_refusal(
+    builder: FiscalScheduleBuilder,
+    charter: &VerifiedFiscalCharter,
+    signer: &Keypair,
+) -> Option<FiscalError> {
+    let signed = builder.sign(charter, None, signer).test_unwrap();
+    assert!(matches!(
+        signed.verify_signature(&signer.public_key()),
+        Ok(true)
+    ));
+    VerifiedFiscalSchedule::verify(signed, charter, None).err()
+}
+
+#[test]
+fn schedule_must_be_issued_by_the_current_charter_issuer() {
+    let charter = verified_charter();
+    let builder = || schedule_builder(FiscalDomain::TierLimits, tier_params());
+
+    let mut wrong_issuer_id = builder();
+    wrong_issuer_id.issued_by = "operator.other".to_string();
+    assert_eq!(
+        schedule_refusal(wrong_issuer_id, &charter, &key(9)),
+        Some(FiscalError::InvalidField("schedule.issued_by"))
+    );
+    assert_eq!(
+        schedule_refusal(builder(), &charter, &key(1)),
+        Some(FiscalError::InvalidField("schedule.issuer_key")),
+        "a signer_set member is not the charter issuer"
+    );
+    assert_eq!(
+        schedule_refusal(builder(), &charter, &key(8)),
+        Some(FiscalError::InvalidField("schedule.issuer_key"))
+    );
+    assert_eq!(schedule_refusal(builder(), &charter, &key(9)), None);
+}
+
+#[test]
+fn schedule_signed_by_the_previous_charter_issuer_refuses_after_rotation() {
+    let charter = verified_charter();
+    let mut successor_builder = charter_builder();
+    successor_builder.sequence = 2;
+    successor_builder.predecessor_charter_digest = Some(charter.digest().to_string());
+    let successor =
+        VerifiedFiscalCharter::verify(successor_builder.sign(&key(10)).test_unwrap()).test_unwrap();
+    let builder = || schedule_builder(FiscalDomain::TierLimits, tier_params());
+
+    assert_eq!(
+        schedule_refusal(builder(), &successor, &key(9)),
+        Some(FiscalError::InvalidField("schedule.issuer_key"))
+    );
+    assert_eq!(schedule_refusal(builder(), &successor, &key(10)), None);
+}
+
 #[test]
 fn open_market_schedule_requires_exact_operator_and_time_binding() {
     let charter = verified_charter();

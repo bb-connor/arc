@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime-attestation/reference-values.schema.json",
+  "title": "Chio runtime attestation reference values signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attestationSchema",
+    "descriptorId",
+    "expiresAt",
+    "issuedAt",
+    "measurements",
+    "referenceValueId",
+    "schema",
+    "state",
+    "verifierFamily"
+  ],
+  "properties": {
+    "attestationSchema": {
+      "type": "string"
+    },
+    "descriptorId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hwModel": {
+          "type": "string"
+        },
+        "mrEnclave": {
+          "type": "string"
+        }
+      }
+    },
+    "referenceValueId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime-attestation.reference-values.v1"
+    },
+    "sourceUri": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "supersededBy": {
+      "type": "string"
+    },
+    "verifierFamily": {
+      "type": "string"
+    }
+  }
+}

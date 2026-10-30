@@ -1,0 +1,61 @@
+{
+  "checkedAt": 1793190657,
+  "criteria": [
+    {
+      "description": "Certification requires at least one declared scenario.",
+      "id": "non-empty-scenario-corpus",
+      "status": "pass"
+    },
+    {
+      "description": "Certification requires at least one observed result.",
+      "id": "non-empty-result-corpus",
+      "status": "pass"
+    },
+    {
+      "description": "Every declared scenario must have at least one result and every result must map to a declared scenario.",
+      "id": "scenario-coverage-complete",
+      "status": "pass"
+    },
+    {
+      "description": "The alpha certification profile only supports scenario sets whose declared expectation is pass.",
+      "id": "certification-profile-supported",
+      "status": "pass"
+    },
+    {
+      "description": "Every observed conformance result must be pass; fail, unsupported, skipped, and xfail block certification.",
+      "id": "all-results-pass",
+      "status": "pass"
+    }
+  ],
+  "criteriaProfile": "conformance-all-pass-v1",
+  "evidence": {
+    "evidenceProfile": "conformance-report-bundle-v1",
+    "generatedReportBytes": 214,
+    "generatedReportMediaType": "text/markdown",
+    "generatedReportSha256": "e2ffa892bd2be053bb1dbbb309e6c021a0240a69adb7242989ce33a8c04448d1",
+    "normalizedResultsSha256": "372f7f52d368e502d1471d74504de72e3eedee215320fe58f327a91b04a1a44b",
+    "normalizedScenariosSha256": "4d18044855bdf9dc67e50635b9f4adc23d9f66cad189e920ca967893369fc603",
+    "provenanceMode": "artifact-signer-key",
+    "resultsDir": "/tmp/results",
+    "scenariosDir": "/tmp/scenarios"
+  },
+  "findings": [],
+  "schema": "chio.certify.check.v1",
+  "summary": {
+    "evaluatedPeerCount": 1,
+    "failCount": 0,
+    "missingScenariosCount": 0,
+    "passCount": 1,
+    "resultCount": 1,
+    "scenarioCount": 1,
+    "skippedCount": 0,
+    "unknownResultsCount": 0,
+    "unsupportedCount": 0,
+    "xfailCount": 0
+  },
+  "target": {
+    "toolServerId": "demo-server",
+    "toolServerName": "Demo"
+  },
+  "verdict": "pass"
+}

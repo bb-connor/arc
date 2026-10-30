@@ -1,0 +1,16 @@
+{
+  "authorityId": "kernel-1",
+  "authorityKeyEpoch": 6,
+  "contractualZeroId": "06a0534ba2a888c7cb69de2cbf6a6802a4a8032fd0eb66134d0d3dab2353a903",
+  "eligibilityDigest": "8d2e3b34566f44d35b57399dcfed9f83daf6eb3405ad2edca57a7f9ceb107035",
+  "expiresAtUnixMs": 1800,
+  "issuedAtUnixMs": 1300,
+  "noDeliverySlotProofDigest": "93bd9ef779d9ec5353d0a97c8dd65302d00d4eddfe05231eee60efe3bccdaee2",
+  "postGuardEvidenceDigest": "43955ec21bb59d6c169de3faffc0d59bca8ca41a942936ab86f7a3275e68d00b",
+  "postGuardPolicyDigest": "19861b1dc91993f6a76dfb11e9bcadea5736d3f94a05d91d9be885115ce35afd",
+  "providerAcceptanceDigest": "43d810149c113c91cb4a46f74f63b69c42f64b1640a647f91c6d2f5af0000a4c",
+  "reason": "output_blocked",
+  "requestId": "req-outcome-1",
+  "schema": "chio.outcome.contractual-zero.v1",
+  "terminalToolOutcomeDigest": "01ef91aaffd79b3e87fbe5131b1b5e39c47474641b6ad8748d32e7c5282d9f41"
+}

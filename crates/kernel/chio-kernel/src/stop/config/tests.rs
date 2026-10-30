@@ -83,7 +83,7 @@ fn approvals(document: &StopOperatorConfigV1, seeds: &[u8]) -> Vec<StopConfigApp
     let digest = document.digest().unwrap();
     seeds
         .iter()
-        .map(|seed| StopConfigApprovalV1::sign(&key(*seed), &digest))
+        .map(|seed| StopConfigApprovalV1::sign(&key(*seed), &digest).unwrap())
         .collect()
 }
 
@@ -442,6 +442,35 @@ fn the_root_and_its_signature_are_both_required() {
         tampered.verify(&pins(), None),
         Err(StopConfigError::Signature)
     );
+}
+
+#[test]
+fn the_document_and_its_approvals_refuse_unwrapped_and_foreign_id_signatures() {
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(&root(), &first_body()) {
+        let document = StopOperatorConfigV1 {
+            signature,
+            body: first_body(),
+        };
+        assert_eq!(
+            document.verify(&pins(), None),
+            Err(StopConfigError::Signature),
+            "{label}"
+        );
+    }
+
+    let second = second();
+    let digest = second.digest().unwrap();
+    let principal = PrincipalId::from_subject_key(&key(12).public_key());
+    let body = approval_body(&principal, &digest).unwrap();
+    for (label, signature) in crate::wrapper_refusals::refused_signatures_over(&key(12), &body) {
+        let mut approvals = approvals(&second, &[11, 12]);
+        approvals[1].signature = signature;
+        assert_eq!(
+            succeed(second.clone(), &approvals),
+            Err(StopConfigError::ApprovalSignature),
+            "{label}"
+        );
+    }
 }
 
 #[test]

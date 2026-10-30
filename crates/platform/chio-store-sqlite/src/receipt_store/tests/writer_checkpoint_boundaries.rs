@@ -304,6 +304,7 @@ fn checkpoint_archive_reopens_with_exact_typed_predecessors() -> TestResult {
             chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
                 previous,
                 &checkpoint,
+                std::slice::from_ref(&previous.body.kernel_key),
             )?;
         }
         predecessor = Some(checkpoint);

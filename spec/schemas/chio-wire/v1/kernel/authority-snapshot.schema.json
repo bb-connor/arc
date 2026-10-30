@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/authority-snapshot.schema.json",
+  "title": "Chio authority snapshot signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorDigest",
+    "chainCommitment",
+    "expiresAt",
+    "issuedAt",
+    "schema",
+    "snapshot",
+    "streamId"
+  ],
+  "properties": {
+    "anchorDigest": {
+      "type": "string"
+    },
+    "chainCommitment": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.authority-snapshot.v1"
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation",
+        "publicKeyHex",
+        "rotatedAt",
+        "trustedKeys"
+      ],
+      "properties": {
+        "generation": {
+          "type": "integer"
+        },
+        "publicKeyHex": {
+          "type": "string"
+        },
+        "rotatedAt": {
+          "type": "integer"
+        },
+        "trustedKeys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "activatedAt",
+              "generation",
+              "lifecycle",
+              "publicKeyHex"
+            ],
+            "properties": {
+              "activatedAt": {
+                "type": "integer"
+              },
+              "generation": {
+                "type": "integer"
+              },
+              "lifecycle": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "state"
+                ],
+                "properties": {
+                  "at": {
+                    "type": "integer"
+                  },
+                  "issueUntil": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "verifyUntil": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "publicKeyHex": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "streamId": {
+      "type": "string"
+    }
+  }
+}

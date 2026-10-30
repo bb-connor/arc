@@ -6,7 +6,7 @@ impl SqliteReceiptStore {
         decision: &SignedUnderwritingDecision,
     ) -> Result<(), ReceiptStoreError> {
         if !decision
-            .verify_signature()
+            .verify_signature(&decision.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -405,7 +405,7 @@ impl SqliteReceiptStore {
         facility: &SignedCreditFacility,
     ) -> Result<(), ReceiptStoreError> {
         if !facility
-            .verify_signature()
+            .verify_signature(&facility.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -594,7 +594,7 @@ impl SqliteReceiptStore {
 
     pub fn record_credit_bond(&self, bond: &SignedCreditBond) -> Result<(), ReceiptStoreError> {
         if !bond
-            .verify_signature()
+            .verify_signature(&bond.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -787,7 +787,7 @@ impl SqliteReceiptStore {
         event: &SignedCreditLossLifecycle,
     ) -> Result<(), ReceiptStoreError> {
         if !event
-            .verify_signature()
+            .verify_signature(&event.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(

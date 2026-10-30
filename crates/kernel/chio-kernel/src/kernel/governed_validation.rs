@@ -279,15 +279,10 @@ impl ChioKernel {
         &self,
         approval_token: &GovernedApprovalToken,
     ) -> Result<(), String> {
-        // Multi-algorithm dispatch happens inside `approval_token.verify_signature()`:
-        // the `approver` public key and the `signature` field are each algorithm-
-        // tagged (Ed25519 by default; `p256:` / `p384:` under the FIPS crypto
-        // path), so ECDSA approvals are validated through aws-lc-rs when the
-        // `chio-core-types/fips` feature is enabled without any kernel-side
-        // algorithm plumbing.
+        // The approver is pinned by membership in governed_approvers before the integrity check.
         for pk in &self.governed_approvers {
             if *pk == approval_token.approver {
-                return match approval_token.verify_signature() {
+                return match approval_token.verify_integrity_embedded_key() {
                     Ok(true) => Ok(()),
                     Ok(false) => Err("signature did not verify".to_string()),
                     Err(error) => Err(error.to_string()),
@@ -841,11 +836,25 @@ impl ChioKernel {
                 "governed call_chain continuation token is malformed: {error}"
             ))
         })? {
-            let signature_valid = continuation_token.verify_signature().map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
+            let signer_matches_capability_lineage = cap
+                .delegation_chain
+                .last()
+                .is_some_and(|link| link.delegator == continuation_token.signer);
+            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
+                && !signer_matches_capability_lineage
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token signer is not trusted".to_string(),
+                ));
+            }
+            let signature_valid =
+                continuation_token
+                    .verify_integrity_embedded_key()
+                    .map_err(|error| {
+                        KernelError::GovernedTransactionDenied(format!(
                     "governed call_chain continuation token failed signature verification: {error}"
                 ))
-            })?;
+                    })?;
             if !signature_valid {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed call_chain continuation token failed signature verification"
@@ -870,17 +879,6 @@ impl ChioKernel {
                 ));
             }
 
-            let signer_matches_capability_lineage = cap
-                .delegation_chain
-                .last()
-                .is_some_and(|link| link.delegator == continuation_token.signer);
-            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
-                && !signer_matches_capability_lineage
-            {
-                return Err(KernelError::GovernedTransactionDenied(
-                    "governed call_chain continuation token signer is not trusted".to_string(),
-                ));
-            }
             if continuation_token.chain_id != call_chain.chain_id {
                 return Err(KernelError::GovernedTransactionDenied(
                     "governed call_chain continuation token chain_id does not match the asserted call_chain".to_string(),
@@ -966,7 +964,10 @@ impl ChioKernel {
             {
                 match self.local_receipt_artifact(parent_receipt_id)? {
                     Some(parent_receipt) => {
+                        let mut trusted = self.trusted_issuer_keys();
+                        trusted.push(self.receipt_signing_public_key()?);
                         let signature_valid = parent_receipt.verify_signature_with_floor(
+                            &trusted,
                             receipt_crypto_floor(self.capability_crypto_floor),
                         )?;
                         if !signature_valid {
@@ -1058,11 +1059,24 @@ impl ChioKernel {
             return Ok(None);
         };
 
-        let signature_valid = upstream_proof.verify_signature().map_err(|error| {
-            KernelError::GovernedTransactionDenied(format!(
-                "governed call_chain upstream proof failed signature verification: {error}"
-            ))
-        })?;
+        let Some(expected_signer) = cap.delegation_chain.last().map(|link| &link.delegator) else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof requires a delegated capability lineage"
+                    .to_string(),
+            ));
+        };
+        if upstream_proof.signer != *expected_signer {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof signer does not match the validated capability delegation source".to_string(),
+            ));
+        }
+        let signature_valid = upstream_proof
+            .verify_integrity_embedded_key()
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain upstream proof failed signature verification: {error}"
+                ))
+            })?;
         if !signature_valid {
             return Err(KernelError::GovernedTransactionDenied(
                 "governed call_chain upstream proof failed signature verification".to_string(),
@@ -1080,17 +1094,6 @@ impl ChioKernel {
             ));
         }
 
-        let Some(expected_signer) = cap.delegation_chain.last().map(|link| &link.delegator) else {
-            return Err(KernelError::GovernedTransactionDenied(
-                "governed call_chain upstream proof requires a delegated capability lineage"
-                    .to_string(),
-            ));
-        };
-        if upstream_proof.signer != *expected_signer {
-            return Err(KernelError::GovernedTransactionDenied(
-                "governed call_chain upstream proof signer does not match the validated capability delegation source".to_string(),
-            ));
-        }
         if upstream_proof.chain_id != call_chain.chain_id {
             return Err(KernelError::GovernedTransactionDenied(
                 "governed call_chain upstream proof chain_id does not match the asserted call_chain".to_string(),
@@ -1151,11 +1154,20 @@ impl ChioKernel {
         })?;
 
         let signed_bond = &bond_row.bond;
-        let signature_valid = signed_bond.verify_signature().map_err(|error| {
-            KernelError::GovernedTransactionDenied(format!(
-                "delegation bond `{bond_id}` failed signature verification: {error}"
-            ))
-        })?;
+        let trusted = self.trusted_issuer_keys();
+        let Some(credit_authority) = trusted.iter().find(|key| **key == signed_bond.signer_key)
+        else {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "delegation bond `{bond_id}` signer is not the trusted credit authority"
+            )));
+        };
+        let signature_valid = signed_bond
+            .verify_signature(credit_authority)
+            .map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "delegation bond `{bond_id}` failed signature verification: {error}"
+                ))
+            })?;
         if !signature_valid {
             return Err(KernelError::GovernedTransactionDenied(format!(
                 "delegation bond `{bond_id}` failed signature verification"

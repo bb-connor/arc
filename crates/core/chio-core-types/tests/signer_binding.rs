@@ -16,12 +16,14 @@ use chio_core_types::receipt::{
     body::{ChioReceipt, ChioReceiptBody},
     decision::{Decision, ToolCallAction},
     kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel},
-    lineage::{ChildRequestReceipt, ChildRequestReceiptBody, SignedExportEnvelope},
+    lineage::{
+        ChildRequestReceipt, ChildRequestReceiptBody, SignedExportEnvelope, SignedExportPayload,
+    },
 };
 use chio_core_types::session::{SessionAnchor, SessionAnchorBody, SessionAnchorContext};
 use chio_core_types::{
     sha256_hex, Ed25519Backend, Keypair, OperationKind, OperationTerminalState, RequestId,
-    SessionAuthContext, SessionId, ToolManifest, ToolManifestBody,
+    SessionAuthContext, SessionId,
 };
 
 fn capability_body(
@@ -444,36 +446,43 @@ fn session_anchor_sign_rejects_embedded_kernel_key_mismatch() -> chio_core_types
 }
 
 #[test]
-fn manifest_sign_rejects_embedded_server_key_mismatch() -> chio_core_types::Result<()> {
-    let embedded_server = Keypair::generate();
-    let actual_signer = Keypair::generate();
-
-    let body = || ToolManifestBody {
-        server_id: "srv-files".to_string(),
-        server_key: embedded_server.public_key(),
-        tools: Vec::new(),
-        required_capabilities: Vec::new(),
-    };
-
-    assert_signer_mismatch(
-        ToolManifest::sign(body(), &actual_signer),
-        "tool manifest",
-        "server_key",
-    );
-    ToolManifest::sign(body(), &embedded_server)?;
-    Ok(())
-}
-
-#[test]
 fn export_envelope_backend_path_matches_keypair_signing() -> chio_core_types::Result<()> {
     let keypair = Keypair::from_seed(&[88_u8; 32]);
     let backend = Ed25519Backend::new(keypair.clone());
-    let body = serde_json::json!({"schema": "chio.test.export.v1", "value": 9});
+    let body = ExportFixture { value: 9 };
 
     let local = SignedExportEnvelope::sign(body.clone(), &keypair)?;
     let external = SignedExportEnvelope::sign_with_backend(body, &backend)?;
 
     assert_eq!(local, external);
-    assert!(external.verify_signature()?);
+    assert!(external.verify_signature(&keypair.public_key())?);
+    assert!(!external.verify_signature(&Keypair::from_seed(&[89_u8; 32]).public_key())?);
     Ok(())
+}
+
+#[test]
+fn export_envelope_refuses_an_unregistered_payload_id() {
+    let keypair = Keypair::from_seed(&[88_u8; 32]);
+    assert!(matches!(
+        SignedExportEnvelope::sign(UnregisteredExportFixture { value: 9 }, &keypair),
+        Err(chio_core_types::Error::UnregisteredSchemaId(ref id)) if id == "chio.unregistered-export-fixture.v1"
+    ));
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+struct ExportFixture {
+    value: u32,
+}
+
+impl SignedExportPayload for ExportFixture {
+    const SCHEMA_ID: &'static str = chio_core_types::CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+struct UnregisteredExportFixture {
+    value: u32,
+}
+
+impl SignedExportPayload for UnregisteredExportFixture {
+    const SCHEMA_ID: &'static str = "chio.unregistered-export-fixture.v1";
 }

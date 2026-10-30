@@ -1,0 +1,29 @@
+{
+  "authority": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "issuedAtUnixSeconds": 1793197535,
+  "requestDigest": "ab1d32b98e022578b89e2536760d24b123dac402da66d2aea8387b7115799768",
+  "requestId": "544531b4990ecfa42c5c62eca6b7a86c02d6470655b61dfb1db25ca98851265f",
+  "result": {
+    "kind": "control",
+    "response": [
+      123,
+      34,
+      97,
+      99,
+      99,
+      101,
+      112,
+      116,
+      101,
+      100,
+      34,
+      58,
+      116,
+      114,
+      117,
+      101,
+      125
+    ]
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

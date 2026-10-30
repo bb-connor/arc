@@ -763,7 +763,7 @@ fn sign_receipt_pure_round_trip() {
         &seed,
     )
     .expect("sign_receipt_pure");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 
     let seed_pubkey = Keypair::from_seed(&seed).public_key();
     assert_eq!(receipt.kernel_key, seed_pubkey);
@@ -848,7 +848,7 @@ fn sign_receipt_relaying_trusted_body_pure_relays_without_preimage() {
         &seed,
     )
     .expect("relay seam signs an upstream-trusted body");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -891,7 +891,7 @@ fn sign_receipt_pure_recomputes_content_hash_when_preimage_present() {
         &seed,
     )
     .expect("matching content signs");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]

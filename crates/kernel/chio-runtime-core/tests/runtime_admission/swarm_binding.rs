@@ -99,7 +99,7 @@ impl BindingFixture {
         let response = self
             .kernel
             .evaluate_tool_call_blocking_with_metadata(request, Some(self.route_metadata()))?;
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         Ok(response)
     }
     fn revalidate(&self, request: &ToolCallRequest, metadata: &serde_json::Value) -> TestResult {

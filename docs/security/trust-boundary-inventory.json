@@ -13,9 +13,7 @@
     "crates/core/chio-core-types/src/delegation_receipt.rs",
     "crates/core/chio-core-types/src/hashing.rs",
     "crates/core/chio-core-types/src/merkle.rs",
-    "crates/core/chio-core-types/src/receipt/evidence.rs",
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc",
-    "crates/core/chio-core-types/src/root_authority/verifier_trust.rs",
     "crates/core/chio-core-types/src/wire_text.rs",
     "crates/core/chio-response-model/src/simulation.rs",
     "crates/core/chio-response-model/src/state.rs",
@@ -93,7 +91,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/projection/economic_cancellation.rs",
     "crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs",
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs",
     "crates/kernel/chio-kernel/src/caller_delivery.rs",
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs",
     "crates/kernel/chio-kernel/src/capability_lineage.rs",
@@ -552,7 +549,6 @@
     "crates/security/chio-security-types/src/flow.rs",
     "crates/security/chio-security-types/src/ports/bounded.rs",
     "crates/security/chio-security-types/src/ports/identifiers.rs",
-    "crates/tooling/chio-bundle-verify/src/read.rs",
     "crates/trust/chio-attest-buyer-core/src/context.rs",
     "crates/trust/chio-attest-buyer-core/src/input.rs",
     "crates/trust/chio-attest-buyer-core/src/issuer.rs",
@@ -1171,6 +1167,7 @@
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_wire",
     "crates/economy/chio-listing/src/outcome/mod.rs::load_canonical_outcome_json::from_wire",
     "crates/economy/chio-listing/src/outcome/predicate.rs::evaluate_outcome_predicate::from_wire",
+    "crates/economy/chio-market/src/insurance_flow.rs::receipt_signature_verifies::from_wire",
     "crates/economy/chio-market/src/parametric.rs::from_canonical_bytes::from_wire",
     "crates/economy/chio-open-market/src/purchase_verification.rs::parse_member::from_wire",
     "crates/economy/chio-open-market/src/recovery.rs::strict_member::from_wire",
@@ -1532,6 +1529,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire",
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire",
@@ -1690,542 +1688,6 @@
     "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire"
   ],
   "raw_decoders": [
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
-    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -3040,7 +2502,6 @@
     "crates/security/chio-security-types/src/ports/bounded.rs::is_empty::custom_deserialize",
     "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
     "crates/security/chio-security-types/src/ports/identifiers.rs::fmt::custom_deserialize",
-    "crates/tooling/chio-bundle-verify/src/read.rs::decode_strict::from_value",
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value",
@@ -5503,7 +4964,6 @@
     "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request::from_str": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
     "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs::decode_evaluate_request::from_str": "Bounded duplicate-refusing document preflight permits unsigned argument numbers. Borrowed RawValue members preserve original capability and optional direct-root text for signed-number refusal before typed decoding. Caller authentication and semantic acceptance remain in the original entrypoint baseline.",
     "crates/platform/chio-control-plane/src/evidence_export.rs::decode_remote_import_request::from_value": "Typed conversion of a value the signed-JSON reader already decoded from the original bounded request bytes with duplicate-key refusal; the reserialized value must equal the input.",
-    "crates/tooling/chio-bundle-verify/src/read.rs::decode_strict::from_value": "Typed conversion of a value the signed-JSON reader already decoded from the original bounded request bytes with duplicate-key refusal; the reserialized value must equal the input.",
     "crates/platform/chio-control-plane/src/evidence_export.rs::verify_projection::from_value": "Typed conversion of the embedded HTTP receipt from an already strictly decoded, envelope-verified package; failure refuses the package."
   },
   "proofs": [
@@ -6148,542 +5608,6 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
-      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -6743,12 +5667,35 @@
       "validate::custom_deserialize",
       "validate::custom_deserialize"
     ],
-    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": [
-      "deserialize::from_value",
-      "from::custom_deserialize"
+    "crates/core/chio-core-types/src/recovery/confinement.rs": [
+      "project_confined_boolean::from_slice"
+    ],
+    "crates/core/chio-core-types/src/recovery/decode.rs": [
+      "decode_contract_with_limits::from_value",
+      "decode_recovery_capability::from_value"
+    ],
+    "crates/core/chio-core-types/src/recovery/disclosure_grant.rs": [
+      "present::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs": [
+      "serialize::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/root_authority/revocation_entry.rs": [
+      "serialize::custom_deserialize",
+      "validate::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/root_authority/wire.rs": [
+      "new::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/wire_text.rs": [
       "schema::custom_deserialize"
+    ],
+    "crates/core/chio-fixed/src/q16.rs": [
+      "serialize::custom_deserialize"
     ],
     "crates/core/chio-response-model/src/simulation.rs": [
       "decode::from_slice"
@@ -6808,6 +5755,9 @@
       "fuzz_wit_host_call_boundary::from_slice",
       "fuzz_wit_host_call_boundary::from_slice"
     ],
+    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": [
+      "schema::custom_deserialize"
+    ],
     "crates/kernel/chio-kernel/src/admission_operation/identity.rs": [
       "as_str::custom_deserialize",
       "from_derived::custom_deserialize",
@@ -6847,6 +5797,9 @@
     "crates/kernel/chio-kernel/src/kernel/active_response_coordinator/execution_validation.inc": [
       "validate_active_response_terminal_executor_receipt::from_value",
       "verify_active_response_completion_receipt::from_value"
+    ],
+    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/refusal.rs": [
+      "replay_durable_refusal::from_value"
     ],
     "crates/kernel/chio-kernel/src/kernel/admission_coordinator/terminal/compacted_replay.rs": [
       "completed_compacted_value_response::from_value",
@@ -6898,6 +5851,13 @@
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs": [
       "parse_artifact_value::from_value"
     ],
+    "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": [
+      "returned_value::from_value"
+    ],
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
+    ],
     "crates/kernel/chio-kernel-browser/src/pure.rs": [
       "parse_authority_input::from_str"
     ],
@@ -6907,6 +5867,10 @@
     ],
     "crates/kernel/chio-kernel-core/src/passport_verify.rs": [
       "serialize::custom_deserialize"
+    ],
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
     ],
     "crates/kernel/chio-process/examples/langgraph_report.rs": [
       "invoke::from_slice",
@@ -6988,6 +5952,13 @@
       "evaluate_bounded_treaty_predicate_json::from_slice",
       "evaluate_bounded_treaty_predicate_json::from_value"
     ],
+    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
+      "decode::from_value",
+      "recovery_contract::from_value"
+    ],
+    "crates/kernel/chio-runtime-core/src/work/ids.rs": [
+      "as_str::custom_deserialize"
+    ],
     "crates/kernel/chio-runtime-harness/src/lib.rs": [
       "run_runtime_loopback_scenario_with_static_baseline::from_str"
     ],
@@ -7021,6 +5992,9 @@
     ],
     "crates/platform/chio-control-plane/src/fiscal_state_anchor.rs": [
       "compare_and_swap::from_slice"
+    ],
+    "crates/platform/chio-control-plane/src/keyring_runtime.rs": [
+      "serialize::custom_deserialize"
     ],
     "crates/platform/chio-control-plane/src/policy/guard_api_key.rs": [
       "serialize::custom_deserialize"
@@ -7122,6 +6096,13 @@
     ],
     "crates/platform/chio-risk-comptroller/src/lib.rs": [
       "validate_signed_risk_report::from_value"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
+      "decode_protected_payload::from_slice",
+      "require_canonical_json::from_slice"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": [
+      "require_canonical_payload::from_slice"
     ],
     "crates/platform/chio-store-sqlite/src/channel_lifecycle_store/terminal.rs": [
       "decode_inline::from_value"
@@ -7424,10 +6405,27 @@
       "create_message_with_client_inbox::from_value",
       "refresh_roots_carried_by::from_value"
     ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": [
+      "deserialize::from_slice",
+      "deserialize::from_str",
+      "initialize_request_shape::custom_deserialize"
+    ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": [
       "parse_request_time_authorization_details_from_value::from_value",
       "parse_request_time_transaction_context_from_value::from_value",
       "validate_chio_oauth_authorization_profile_metadata::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "parse::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": [
+      "local_key::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/sender.rs": [
+      "confirmation::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": [
+      "verified_receipt::from_value"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs": [
       "acknowledge_call::from_value"
@@ -7453,6 +6451,10 @@
     ],
     "crates/sdk/chio-bindings-ffi/src/lib.rs": [
       "chio_verify_receipt_json_with_trusted_signers::from_str"
+    ],
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
+      "decode_evaluate_request::from_str",
+      "decode_evaluate_request::from_str"
     ],
     "crates/sdk/chio-eval-receipt/src/verify.rs": [
       "test_signature_for_bundle_json::from_str",
@@ -7566,6 +6568,32 @@
       "fmt::custom_deserialize",
       "fmt::custom_deserialize"
     ],
+    "crates/security/chio-security-types/src/recovery/bounds.rs": [
+      "as_slice::custom_deserialize",
+      "checked_add::custom_deserialize",
+      "deserialize::custom_deserialize",
+      "fmt::custom_deserialize",
+      "fmt::custom_deserialize",
+      "serialize::custom_deserialize"
+    ],
+    "crates/security/chio-security-types/src/recovery/identifiers.rs": [
+      "fmt::custom_deserialize",
+      "get::custom_deserialize"
+    ],
+    "crates/security/chio-security-types/src/recovery/observation.rs": [
+      "knowledge_digest::custom_deserialize",
+      "operation_version::custom_deserialize"
+    ],
+    "crates/security/chio-security-types/src/recovery/profile.rs": [
+      "attachment_profile::custom_deserialize"
+    ],
+    "crates/security/chio-security-types/src/strict_serde.rs": [
+      "lossless::custom_deserialize",
+      "schema::custom_deserialize"
+    ],
+    "crates/security/chio-semantic-contracts/src/effect.rs": [
+      "recovery_profile::custom_deserialize"
+    ],
     "crates/tooling/chio-conformance/src/bin/chio_econsim_runner.rs": [
       "run::from_slice"
     ],
@@ -7598,7 +6626,7 @@
     ],
     "crates/tooling/chio-spec-codegen/src/lib.rs": [
       "read_schema_file::from_str",
-      "render_schema_modules::from_value"
+      "render_module::from_value"
     ],
     "crates/tooling/chio-spec-codegen/src/threat_coverage_doc.rs": [
       "render_threat_coverage_doc::from_str",
@@ -7697,113 +6725,12 @@
     "crates/trust/chio-weights/src/card.rs": [
       "schema::custom_deserialize"
     ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs": [
-      "deserialize::from_slice",
-      "deserialize::from_str",
-      "initialize_request_shape::custom_deserialize"
+    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": [
+      "deserialize::from_value",
+      "from::custom_deserialize"
     ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": [
-      "verified_receipt::from_value"
-    ],
-    "crates/platform/chio-control-plane/src/keyring_runtime.rs": [
-      "serialize::custom_deserialize"
-    ],
-    "crates/kernel/chio-kernel/src/kernel/admission_coordinator/refusal.rs": [
-      "replay_durable_refusal::from_value"
-    ],
-    "crates/core/chio-core-types/src/recovery/confinement.rs": [
-      "project_confined_boolean::from_slice"
-    ],
-    "crates/core/chio-core-types/src/recovery/decode.rs": [
-      "decode_contract_with_limits::from_value",
-      "decode_recovery_capability::from_value"
-    ],
-    "crates/core/chio-core-types/src/recovery/disclosure_grant.rs": [
-      "present::custom_deserialize"
-    ],
-    "crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs": [
-      "serialize::custom_deserialize"
-    ],
-    "crates/core/chio-core-types/src/root_authority/revocation_entry.rs": [
-      "serialize::custom_deserialize",
-      "validate::custom_deserialize"
-    ],
-    "crates/core/chio-core-types/src/root_authority/wire.rs": [
-      "new::custom_deserialize",
-      "serialize::custom_deserialize",
-      "serialize::custom_deserialize",
-      "serialize::custom_deserialize",
-      "serialize::custom_deserialize"
-    ],
-    "crates/security/chio-security-types/src/recovery/bounds.rs": [
-      "as_slice::custom_deserialize",
-      "checked_add::custom_deserialize",
-      "deserialize::custom_deserialize",
-      "fmt::custom_deserialize",
-      "fmt::custom_deserialize",
-      "serialize::custom_deserialize"
-    ],
-    "crates/security/chio-security-types/src/recovery/identifiers.rs": [
-      "fmt::custom_deserialize",
-      "get::custom_deserialize"
-    ],
-    "crates/security/chio-security-types/src/recovery/observation.rs": [
-      "knowledge_digest::custom_deserialize",
-      "operation_version::custom_deserialize"
-    ],
-    "crates/security/chio-security-types/src/recovery/profile.rs": [
-      "attachment_profile::custom_deserialize"
-    ],
-    "crates/security/chio-security-types/src/strict_serde.rs": [
-      "lossless::custom_deserialize",
-      "schema::custom_deserialize"
-    ],
-    "crates/security/chio-semantic-contracts/src/effect.rs": [
-      "recovery_profile::custom_deserialize"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
-      "decode_protected_payload::from_slice",
-      "require_canonical_json::from_slice"
-    ],
-    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": [
-      "schema::custom_deserialize"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": [
-      "require_canonical_payload::from_slice"
-    ],
-    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
-      "decode::from_value",
-      "recovery_contract::from_value"
-    ],
-    "crates/kernel/chio-runtime-core/src/work/ids.rs": [
-      "as_str::custom_deserialize"
-    ],
-    "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": [
-      "returned_value::from_value"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
-      "parse::from_value"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/local_as.rs": [
-      "local_key::from_value"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/sender.rs": [
-      "confirmation::from_value"
-    ],
-    "crates/core/chio-fixed/src/q16.rs": [
-      "serialize::custom_deserialize"
-    ],
-    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
-      "decode_evaluate_request::from_str",
-      "decode_evaluate_request::from_str"
-    ],
-    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
-      "decode_evaluate_request::from_str",
-      "decode_evaluate_request::from_str"
-    ],
-    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
-      "decode_evaluate_request::from_str",
-      "decode_evaluate_request::from_str"
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": [
+      "from_receipt_metadata::from_value"
     ],
     "crates/platform/chio-control-plane/src/evidence_export.rs": [
       "decode_remote_import_request::from_value",
@@ -7811,9 +6738,6 @@
     ],
     "crates/tooling/chio-bundle-verify/src/read.rs": [
       "decode_strict::from_value"
-    ],
-    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": [
-      "from_receipt_metadata::from_value"
     ],
     "crates/protocol/chio-egress-contract/src/allowance.rs": [
       "for_endpoint::custom_deserialize",
@@ -7844,7 +6768,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 1113
+          "instances": 577
         }
       ]
     },
@@ -8163,24 +7087,6 @@
           ],
           "checked": true,
           "instances": 3
-        }
-      ]
-    },
-    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": {
-      "kind": "parser-internal-or-typed",
-      "contract": "The decision-model witness Deserialize reads through strict_serde::lossless: repeated keys are refused and the decoded value must reserialize to the exact input, so a null fallback_reason or an unknown member is refused. validate() then enforces the pinned schema, the digest shape and the evaluation contract. Decoding grants no authority; the block is authenticated by the enclosing receipt.",
-      "readers": [
-        {
-          "reader": "deserialize",
-          "decoders": [
-            "custom_deserialize",
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value",
-            "serde::Deserializer"
-          ],
-          "checked": true
         }
       ]
     },
@@ -8694,7 +7600,7 @@
       "contract": "flush reparses canonical bytes just written by this process; validate_authorization decodes the bounded caller artifact after its retained wire validation. Neither grants fresh authority.",
       "readers": [
         {
-          "reader": "bounded_canonical",
+          "reader": "bounded_body",
           "decoders": [
             "from_slice"
           ],
@@ -8709,7 +7615,7 @@
             "from_slice"
           ],
           "apis": [
-            "call::bounded_canonical::serde_json::to_writer+same_buffer"
+            "call::bounded_body::serde_json::to_writer+same_buffer"
           ],
           "checked": true
         }
@@ -13308,6 +12214,40 @@
         }
       ]
     },
+    "crates/core/chio-core-types/src/receipt/metadata/decision_model.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The decision-model witness Deserialize reads through strict_serde::lossless: repeated keys are refused and the decoded value must reserialize to the exact input, so a null fallback_reason or an unknown member is refused. validate() then enforces the pinned schema, the digest shape and the evaluation contract. Decoding grants no authority; the block is authenticated by the enclosing receipt.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value",
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
+      "readers": [
+        {
+          "reader": "from_receipt_metadata",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
     "crates/platform/chio-control-plane/src/evidence_export.rs": {
       "kind": "typed-value-conversion",
       "contract": "Remote import requests decode from their original bytes through UntrustedJsonText (64 MiB bound, duplicate-key refusal at every depth); the trust section reloads through VerifierTrust::load and the whole request must reserialize to its input through chio_security_types::strict_serde::lossless. The embedded HTTP receipt converts from a value already read by the bounded strict package reader. Any failure refuses the request or package.",
@@ -13340,22 +12280,6 @@
       "readers": [
         {
           "reader": "decode_strict",
-          "decoders": [
-            "from_value"
-          ],
-          "apis": [
-            "serde_json::from_value"
-          ],
-          "checked": true
-        }
-      ]
-    },
-    "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": {
-      "kind": "typed-value-conversion",
-      "contract": "Converts an existing JSON value. This site cannot validate the original byte stream and does not establish authority.",
-      "readers": [
-        {
-          "reader": "from_receipt_metadata",
           "decoders": [
             "from_value"
           ],
@@ -14048,17 +12972,6 @@
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs": {
       "contract": "Required explicit authority profile and current v4 only; exact typed canonical bytes within 262144 bytes, no transient credentials, recomputed request/profile/security binding before recovery and fresh authority checks before execution.",
       "migrations": [],
-      "retained_typed_conversions": []
-    },
-    "crates/kernel/chio-kernel/src/admission_operation/runtime_source.rs": {
-      "contract": "Source qualification reads at most 4096 canonical JSON bytes and rejects unknown fields, duplicate keys, noncanonical numbers, wrong v1 schema, non-single link counts and domain-separated digest mismatches. The descriptor grants no admission authority: installation and dispatch also verify the live SQLite file identity, exact runtime/destination binding and fenced operation-owned custody.",
-      "migrations": [
-        [
-          "from_canonical_bytes",
-          "decode_canonical",
-          "MAX_RUNTIME_SOURCE_BYTES"
-        ]
-      ],
       "retained_typed_conversions": []
     },
     "crates/kernel/chio-kernel/src/admission_operation.part2.inc": {
@@ -18293,6 +17206,7 @@
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_wire#1::decode_document",
     "crates/economy/chio-listing/src/outcome/mod.rs::load_canonical_outcome_json::from_wire#1::canonicalize+decode_external",
     "crates/economy/chio-listing/src/outcome/predicate.rs::evaluate_outcome_predicate::from_wire#1::decode_external",
+    "crates/economy/chio-market/src/insurance_flow.rs::receipt_signature_verifies::from_wire#1::decode_canonical",
     "crates/economy/chio-market/src/parametric.rs::from_canonical_bytes::from_wire#1::decode_canonical",
     "crates/economy/chio-open-market/src/purchase_verification.rs::parse_member::from_wire#1::decode_signed",
     "crates/economy/chio-open-market/src/recovery.rs::strict_member::from_wire#1::canonicalize+decode_canonical",
@@ -18654,6 +17568,7 @@
     "crates/products/chio-cli/src/cli/dispatch/finding/operator.rs::load_profile::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata::from_wire#1::decode_document",
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/input.rs::canonical_ijson::from_wire#1::canonicalize+decode_canonical",
     "crates/products/chio-cli/src/cli/input.rs::decode::from_wire#1::decode_signed",
     "crates/products/chio-cli/src/cli/input/config.rs::load_document::from_wire#1::decode_document",
@@ -18835,6 +17750,21 @@
       "sign_attenuated::shared-reader::crates/core/chio-core-types/src/capability/attenuation.rs::validate_attenuation_proof",
       "validate_schema::shared-reader::crates/core/chio-core-types/src/capability/attenuation.rs::verify_attenuation_witness"
     ],
+    "crates/core/chio-core-types/src/receipt/evidence.rs": [
+      "validate_signed_token::original-json-reader::UntrustedJsonText",
+      "validate_synthetic_anchor::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/core/chio-core-types/src/recovery/decode.rs": [
+      "decode_contract::shared-reader::crates/core/chio-core-types/src/recovery/decode.rs::decode_contract_with_limits",
+      "decode_contract_with_limits::shared-reader::crates/core/chio-core-types/src/canonical/signed_json.rs::parse_signed_json",
+      "decode_recovery_capability::shared-reader::crates/core/chio-core-types/src/canonical/signed_json.rs::parse_signed_json"
+    ],
+    "crates/core/chio-core-types/src/recovery/semantic.rs": [
+      "decode_semantic_invocation::shared-reader::crates/core/chio-core-types/src/recovery/decode.rs::decode_contract"
+    ],
+    "crates/core/chio-core-types/src/root_authority/verifier_trust.rs": [
+      "load::original-json-reader::UntrustedJsonText"
+    ],
     "crates/core/chio-response-model/src/simulation.rs": [
       "apply_effect::shared-reader::crates/core/chio-response-model/src/simulation.rs::decode",
       "apply_effect::shared-reader::crates/core/chio-response-model/src/simulation.rs::decode",
@@ -18937,13 +17867,13 @@
     "crates/economy/chio-credit/src/input.rs": [
       "canonical::original-json-reader::UntrustedJsonText"
     ],
-    "crates/economy/chio-credit/src/receivable_iou.rs": [
-      "from_canonical_bytes::shared-reader::crates/economy/chio-credit/src/input.rs::canonical"
-    ],
     "crates/economy/chio-credit/src/obligation/credit_facility_bind.rs": [
       "from_canonical_bytes::shared-reader::crates/economy/chio-credit/src/input.rs::canonical"
     ],
     "crates/economy/chio-credit/src/obligation/status.rs": [
+      "from_canonical_bytes::shared-reader::crates/economy/chio-credit/src/input.rs::canonical"
+    ],
+    "crates/economy/chio-credit/src/receivable_iou.rs": [
       "from_canonical_bytes::shared-reader::crates/economy/chio-credit/src/input.rs::canonical"
     ],
     "crates/economy/chio-finding/src/challenge.rs": [
@@ -19011,6 +17941,10 @@
     "crates/economy/chio-listing/src/outcome/predicate.rs": [
       "evaluate_outcome_predicate::original-json-reader::UntrustedJsonText",
       "verify_outcome_predicate::shared-reader::crates/economy/chio-listing/src/outcome/mod.rs::load_canonical_outcome_json"
+    ],
+    "crates/economy/chio-market/src/insurance_flow.rs": [
+      "file_claim::shared-reader::crates/economy/chio-market/src/insurance_flow.rs::receipt_signature_verifies",
+      "receipt_signature_verifies::original-json-reader::UntrustedJsonText"
     ],
     "crates/economy/chio-market/src/parametric.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
@@ -19203,6 +18137,9 @@
       "load_wasm_guards::shared-reader::crates/guards/chio-wasm-guards/src/manifest.rs::load_manifest",
       "load_wasm_guards::shared-reader::crates/guards/chio-wasm-guards/src/manifest.rs::verify_guard_signature"
     ],
+    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
+    ],
     "crates/kernel/chio-kernel-browser/src/pure.rs": [
       "verify_receipt_pure::original-json-reader::UntrustedJsonText"
     ],
@@ -19222,6 +18159,9 @@
     ],
     "crates/kernel/chio-kernel-core/src/passport_verify.rs": [
       "verify_passport::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel-mobile/src/lib.rs": [
       "evaluate::shared-reader::crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request",
@@ -19279,15 +18219,15 @@
       "validate_records::original-json-reader::UntrustedJsonText",
       "validate_sidecars::original-json-reader::UntrustedJsonText",
       "validate_unknown_projection_body::original-json-reader::UntrustedJsonText",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_channel_terminal_record",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_denied_projection_body",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_economic_mutation_result_record",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_projection_body",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_receipt_record",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_record_set",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_records",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body"
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_channel_terminal_record",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_denied_projection_body",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_economic_mutation_result_record",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_projection_body",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_receipt_record",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_record_set",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_records",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_sidecars",
+      "verify_integrity_embedded_key::shared-reader::crates/kernel/chio-kernel/src/admission_operation/remote_projection.rs::validate_unknown_projection_body"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
@@ -19296,6 +18236,7 @@
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/caller_delivery.rs": [
+      "bounded_canonical::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body",
       "canonical_bytes#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
       "canonical_bytes#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::validate_authorization",
       "canonical_bytes#2::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
@@ -19304,12 +18245,12 @@
       "from_canonical_bytes#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::decode",
       "from_canonical_bytes#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::validate_authorization",
       "from_canonical_bytes#2::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::decode",
-      "sign#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
+      "sign#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body",
       "sign#1::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::validate_authorization",
-      "sign#2::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
-      "validate_authorization::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
-      "verify::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical",
-      "verify_historical::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_canonical"
+      "sign#2::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body",
+      "validate_authorization::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body",
+      "verify::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body",
+      "verify_historical::shared-reader::crates/kernel/chio-kernel/src/caller_delivery.rs::bounded_body"
     ],
     "crates/kernel/chio-kernel/src/caller_delivery/retained.rs": [
       "validate_native_original::original-json-reader::UntrustedJsonText"
@@ -19548,6 +18489,14 @@
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs": [
       "treaty_runtime_artifact::original-json-reader::UntrustedJsonText"
     ],
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs.rs": [
+      "apply_treaty_epoch_update::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
+    ],
+    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs": [
+      "decode::original-json-reader::UntrustedJsonText",
+      "load_pin::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs::decode",
+      "load_record::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
+    ],
     "crates/kernel/chio-runtime-core/src/store/trust_floor.rs": [
       "open::shared-reader::crates/kernel/chio-runtime-core/src/store/json_file.rs::read_json_store"
     ],
@@ -19557,6 +18506,9 @@
       "receipt_lineage_bundle_from_json::original-json-reader::UntrustedJsonText",
       "receipt_lineage_statement_from_json::original-json-reader::UntrustedJsonText",
       "treaty_scope_from_json::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs": [
+      "treaty_epoch_from_wire::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-runtime-core/src/validation/proof.rs": [
       "canonical_json_value_sha256::shared-reader::crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json",
@@ -19568,6 +18520,25 @@
       "validate_runtime_proof_regeneration_artifacts::shared-reader::crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json",
       "validate_runtime_proof_regeneration_artifacts::shared-reader::crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json",
       "validate_runtime_proof_regeneration_artifacts::shared-reader::crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json"
+    ],
+    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
+      "decode::original-json-reader::UntrustedJsonText",
+      "decode_work_join_inputs::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
+      "decode_work_request::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
+      "decode_work_response::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode"
+    ],
+    "crates/kernel/chio-runtime-harness/src/fixture_generation.rs": [
+      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_baseline",
+      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_parity_report",
+      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
+      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
+      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
+      "generate_runtime_loopback_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/lib.rs::run_runtime_loopback_scenario_with_static_baseline",
+      "generate_runtime_loopback_fixture::shared-reader::crates/trust/chio-attest-buyer-core/src/proof_package.rs::proof_package_from_json",
+      "generate_runtime_loopback_fixture::shared-reader::crates/trust/chio-attest-buyer-core/src/report.rs::verifier_report_from_json",
+      "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/proof_package.rs::proof_package_from_json",
+      "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/report.rs::verifier_report_from_json",
+      "read_parity_report::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-runtime-harness/src/lib.rs": [
       "run_runtime_loopback_scenario::shared-reader::crates/kernel/chio-runtime-harness/src/lib.rs::run_runtime_loopback_scenario_with_static_baseline",
@@ -19620,6 +18591,10 @@
     "crates/observability/chio-siem/src/exporters/splunk.rs": [
       "export_batch::shared-reader::crates/observability/chio-siem/src/exporters/splunk.rs::classify_hec_response"
     ],
+    "crates/observability/chio-siem/src/manager.rs": [
+      "decode_receipt_row::original-json-reader::UntrustedJsonText",
+      "poll_once::shared-reader::crates/observability/chio-siem/src/manager.rs::decode_receipt_row"
+    ],
     "crates/platform/chio-agent-web-interop/src/artifacts.rs": [
       "validate_external_subject::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json"
     ],
@@ -19644,6 +18619,9 @@
     "crates/platform/chio-agent-web-interop/src/policy.rs": [
       "parse_policy::shared-reader::crates/platform/chio-transaction-passport/src/input.rs::decode_evidence_json"
     ],
+    "crates/platform/chio-commerce-order/src/escrow.rs": [
+      "verify_escrow_ledger::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode"
+    ],
     "crates/platform/chio-commerce-order/src/fuzz.rs": [
       "commerce_receipt_verify::shared-reader::crates/platform/chio-commerce-order/src/fuzz.rs::verify_commerce_receipt",
       "decode_fixture::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
@@ -19661,9 +18639,6 @@
     ],
     "crates/platform/chio-commerce-order/src/input.rs": [
       "decode::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-commerce-order/src/escrow.rs": [
-      "verify_escrow_ledger::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode"
     ],
     "crates/platform/chio-commerce-order/src/lib.rs": [
       "parse_json::shared-reader::crates/platform/chio-commerce-order/src/input.rs::decode",
@@ -19803,6 +18778,10 @@
       "rotate_remote_authority_seed::shared-reader::crates/platform/chio-control-plane/src/keyring_runtime.rs::remove_authority_seed_handoff",
       "rotate_remote_authority_seed::shared-reader::crates/platform/chio-control-plane/src/keyring_runtime.rs::remove_authority_seed_handoff"
     ],
+    "crates/platform/chio-control-plane/src/passport_revocation_mirror.rs": [
+      "conflicts::shared-reader::crates/platform/chio-control-plane/src/passport_revocation_mirror.rs::decode_root",
+      "decode_root::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
+    ],
     "crates/platform/chio-control-plane/src/passport_verifier.rs": [
       "fetch_active#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "fetch_active#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
@@ -19820,6 +18799,9 @@
       "cmd_reputation_compare::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::read",
       "load_passport_verifier_policy::format-yaml::from_slice",
       "load_passport_verifier_policy::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-control-plane/src/revocation_partner.rs": [
+      "from_json::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
     ],
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs": [
       "load::original-json-reader::UntrustedJsonText"
@@ -19859,6 +18841,11 @@
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/containment.rs": [
       "decode_session_suspension::original-json-reader::UntrustedJsonText",
       "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/containment.rs::decode_session_suspension"
+    ],
+    "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs": [
+      "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
+      "load_result::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
+      "validate_durable_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/egress.rs": [
       "decode_egress_restriction::original-json-reader::UntrustedJsonText",
@@ -19985,6 +18972,9 @@
     ],
     "crates/platform/chio-control-plane/src/trust_control/cluster/partition.rs": [
       "handle_internal_cluster_partition::request-json::ClusterPartitionRequest"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/config_and_public/partner_revocation_sync.rs": [
+      "get::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
     ],
     "crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs": [
       "fetch#1::shared-reader::crates/platform/chio-control-plane/src/trust_control/config_and_public/portable_issuer_fetch.rs::fetch_portable_issuer_jwks",
@@ -20174,6 +19164,9 @@
       "handle_record_lineage_snapshot::request-json::RecordCapabilitySnapshotRequest",
       "handle_record_metered_billing_reconciliation::request-json::MeteredBillingReconciliationUpdateRequest",
       "handle_record_settlement_reconciliation::request-json::SettlementReconciliationUpdateRequest"
+    ],
+    "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs": [
+      "handle_receipt_query_snapshot_recovery::request-json::ReceiptQuerySnapshotRecoveryRequest"
     ],
     "crates/platform/chio-control-plane/src/trust_control/reports.rs": [
       "build_comptroller_surface_report::shared-reader::crates/platform/chio-control-plane/src/trust_control/reports.rs::build_operator_report",
@@ -20705,6 +19698,9 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs": [
       "load::original-json-reader::UntrustedJsonText"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_authority.rs": [
+      "deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment.rs": [
       "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/history.rs::preserve_installation",
       "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::save_planned",
@@ -20791,6 +19787,23 @@
       "verify_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::decode",
       "verify_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::decode_operation"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source.rs": [
+      "install_runtime_source::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::active_count"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/integrity.rs": [
+      "runtime_source_projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
+      "runtime_source_projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all",
+      "verify_runtime_source_pristine::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
+      "verify_runtime_source_projection_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
+      "verify_runtime_source_projection_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs": [
+      "verify_all_records::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::active_count"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs": [
+      "active_count::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all",
+      "load_all::original-json-reader::UntrustedJsonText"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs": [
       "admission_operation_schema_sql::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs::sql",
       "initialize_admission_operation_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::admission_operation_schema_sql",
@@ -20856,6 +19869,21 @@
       "verify_all::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/rows.rs::keyframe",
       "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint.rs::latest",
       "visit_rows::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs::image"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": [
+      "compact::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::compact_native_rows",
+      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
+      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::sessions",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::imported_sessions",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
+      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated",
+      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/delta.rs": [
       "image::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/record.rs::load_local",
@@ -21098,6 +20126,30 @@
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
       "visit_archive::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs": [
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::verify_planning_allocations",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_history",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_routes",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::planning_tenant",
+      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::verify_planning_allocations",
+      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_history",
+      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_routes",
+      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "require_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "require_routes::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
+      "save::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::save_planned"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs": [
+      "load_owned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload",
+      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs": [
       "authenticated_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
       "save_setup_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
@@ -21109,6 +20161,15 @@
       "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::authenticated_record",
       "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::save_setup_record",
       "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup/context.rs::mark_tenant_required"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs": [
+      "append_stop_transition::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
+      "decode::original-json-reader::UntrustedJsonText",
+      "load_chain::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
+      "load_stop_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
+      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
+      "require_output_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
+      "verified_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::load_chain"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs": [
       "apply_in_transaction::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
@@ -21423,6 +20484,16 @@
       "query_receipts_impl::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query/read.rs::query_receipts_on_connection",
       "query_receipts_on_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
     ],
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs": [
+      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs::collect_tools",
+      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs::checkpoints",
+      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs::children",
+      "collect_tools::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs::fetch"
+    ],
+    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": [
+      "checkpoints::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
+      "children::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt"
+    ],
     "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs": [
       "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs::publish_verified",
       "extend_cycle::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/extend.rs::stage_leaves",
@@ -21605,6 +20676,27 @@
     "crates/platform/chio-rollback-anchor/src/lib.rs": [
       "decode_slot::original-json-reader::UntrustedJsonText"
     ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store.rs": [
+      "decode_blob::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/projection.rs": [
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs": [
+      "idp_key_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "provider_identity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "read_retained::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
+      "root_policy::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs": [
+      "initialize_root_exchange_schema::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_root_exchange_invariants",
+      "verify_integrity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::verify_retained_table",
+      "verify_root_exchange_invariants::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_integrity"
+    ],
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs": [
       "claim_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",
       "claim_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",
@@ -21782,6 +20874,37 @@
       "validate_response_dispatch_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body",
       "validate_response_dispatch_request::shared-reader::crates/platform/chio-store-sqlite/src/security_state/response_journal.rs::decode_response_snapshot"
     ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": [
+      "check_apply::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
+      "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
+      "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
+      "load_marker::original-json-reader::UntrustedJsonText",
+      "persist_first::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
+      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load",
+      "validate_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
+      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
+      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs": [
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_stored_containment_overlay_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_stored_egress_restriction_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs": [
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
+      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
+      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker"
+    ],
     "crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs": [
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
       "apply_egress_restriction::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
@@ -21841,6 +20964,10 @@
       "publish_attested_finding_batch::shared-reader::crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs::load_attested_finding_batch_record",
       "publish_attested_finding_batch::shared-reader::crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs::validate_attested_finding_batch_publication",
       "validate_attested_finding_batch_publication::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
+      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
+      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/flow_state/labels.rs": [
       "load_lineage_label::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
@@ -21924,6 +21051,28 @@
     "crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs": [
       "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
       "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": [
+      "cell::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_dead",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_sessions",
+      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
+      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
+      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "text::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
+      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
+      "validate_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/native_mutation/row_policy.rs": [
       "decode::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
@@ -22452,6 +21601,11 @@
       "load_verification_market::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::read_private_client_profile",
       "read_private_client_profile::original-json-reader::UntrustedJsonText"
     ],
+    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs": [
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
+      "read_package_metadata::original-json-reader::UntrustedJsonText"
+    ],
     "crates/products/chio-cli/src/cli/dispatch/finding/verify.rs": [
       "advance_verified_status_floor::shared-reader::crates/economy/chio-finding/src/status.rs::parse_status_proof_input",
       "advance_verified_status_floor::shared-reader::crates/economy/chio-finding/src/status.rs::verify_status_proof_input",
@@ -22562,6 +21716,15 @@
       "verify_fixture_transaction_passport_file::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof.rs::verify_transaction_passport_file",
       "write_generated_verifier_report::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs::verify_fixture_transaction_passport_file"
     ],
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs": [
+      "claim_set_bytes::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id",
+      "finding_id::original-json-reader::UntrustedJsonText",
+      "generate_cognition_market_qualified_profile::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::claim_set_bytes",
+      "generate_cognition_market_qualified_profile::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id",
+      "generate_cognition_market_qualified_profile::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id",
+      "generate_cognition_market_qualified_profile::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::report_bytes",
+      "report_bytes::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_finding_cognition.rs::finding_id"
+    ],
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture_paths.rs": [
       "proof_fixture_source_root::shared-reader::crates/tooling/chio-conformance/src/peers.rs::checkout_root"
     ],
@@ -22569,6 +21732,9 @@
       "ensure_chio_web3_contract_package_in_bundle::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_public_settlement_runtime.rs::find_chio_web3_contract_package",
       "find_chio_web3_contract_package::shared-reader::crates/tooling/chio-conformance/src/peers.rs::checkout_root",
       "public_settlement_runtime_hashes::shared-reader::crates/products/chio-cli/src/cli/dispatch/proof/fixture_public_settlement_runtime.rs::ensure_chio_web3_contract_package_in_bundle"
+    ],
+    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_runtime_check.rs": [
+      "verify_committed_runtime_fixture::shared-reader::crates/trust/chio-attest-buyer/src/api.rs::verify_proof_package_json"
     ],
     "crates/products/chio-cli/src/cli/dispatch/proof/serve.rs": [
       "proof_room_fixture_root::shared-reader::crates/tooling/chio-conformance/src/peers.rs::checkout_root",
@@ -22628,6 +21794,12 @@
     ],
     "crates/products/chio-cli/src/cli/process_host/state.rs": [
       "open::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy"
+    ],
+    "crates/products/chio-cli/src/cli/process_host/stop_control.rs": [
+      "handle::original-json-reader::UntrustedJsonText",
+      "run::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::via_socket",
+      "serve::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::handle",
+      "via_socket::original-json-reader::UntrustedJsonText"
     ],
     "crates/products/chio-cli/src/cli/process_response_verify.rs": [
       "cmd_verify_process_response::shared-reader::crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt",
@@ -23102,6 +22274,17 @@
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs": [
       "authenticate_token#2::http-response-json::json"
     ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "decode_part::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/oauth_introspection.rs": [
+      "verify::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
+    ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs": [
       "bind_approval_intent::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy",
       "new::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy",
@@ -23267,6 +22450,9 @@
     "crates/protocol/chio-tool-call-fabric/src/types.rs": [
       "validate::original-json-reader::UntrustedJsonText"
     ],
+    "crates/sdk/chio-binding-helpers/src/canonical.rs": [
+      "canonicalize_json_str::original-json-reader::UntrustedJsonText"
+    ],
     "crates/sdk/chio-binding-helpers/src/capability.rs": [
       "parse_capability_json::original-json-reader::UntrustedJsonText",
       "verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::parse_capability_json"
@@ -23280,14 +22466,22 @@
       "verify_receipt_json::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json",
       "verify_receipt_json_with_trusted_signer_hex::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json"
     ],
+    "crates/sdk/chio-binding-helpers/src/signing.rs": [
+      "json_document::original-json-reader::UntrustedJsonText",
+      "sign_wrapped_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
+      "verify_wrapped_json::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
+    ],
     "crates/sdk/chio-bindings-ffi/src/lib.rs": [
       "chio_canonicalize_json::shared-reader::crates/sdk/chio-binding-helpers/src/canonical.rs::canonicalize_json_str",
-      "chio_sign_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::sign_json_str_ed25519",
+      "chio_sign_wrapped_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::sign_wrapped_json_ed25519",
       "chio_verify_capability_json::shared-reader::crates/sdk/chio-binding-helpers/src/capability.rs::verify_capability_json",
-      "chio_verify_json_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::verify_json_str_signature_ed25519",
       "chio_verify_manifest_json::shared-reader::crates/sdk/chio-binding-helpers/src/manifest.rs::verify_signed_manifest_json",
       "chio_verify_receipt_json::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json",
-      "chio_verify_receipt_json_with_trusted_signers::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json_with_trusted_signer_hex"
+      "chio_verify_receipt_json_with_trusted_signers::shared-reader::crates/sdk/chio-binding-helpers/src/receipt.rs::verify_receipt_json_with_trusted_signer_hex",
+      "chio_verify_wrapped_json::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::verify_wrapped_json"
+    ],
+    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
+      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
     ],
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": [
       "chio_kernel_evaluate_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str",
@@ -23642,6 +22836,37 @@
       "transition::shared-reader::crates/security/chio-secret-broker/src/sqlite.rs::load_attempt_in_transaction",
       "transition::shared-reader::crates/security/chio-secret-broker/src/sqlite.rs::load_attempt_in_transaction"
     ],
+    "crates/tooling/chio-bundle-verify/src/bin/chio-verify.rs": [
+      "main::shared-reader::crates/tooling/chio-bundle-verify/src/report.rs::verify_bundle"
+    ],
+    "crates/tooling/chio-bundle-verify/src/read.rs": [
+      "decode_strict::original-json-reader::UntrustedJsonText",
+      "read_json::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict",
+      "read_ndjson::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict"
+    ],
+    "crates/tooling/chio-bundle-verify/src/report.rs": [
+      "verify_bundle::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::verify_package"
+    ],
+    "crates/tooling/chio-bundle-verify/src/verify.rs": [
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
+      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::verify_policy_attachment",
+      "verify_package::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::read_package",
+      "verify_policy_attachment::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json"
+    ],
     "crates/tooling/chio-conformance/src/bin/chio_conformance_report.rs": [
       "main::shared-reader::crates/tooling/chio-conformance/src/bin/chio_conformance_report.rs::run",
       "run::shared-reader::crates/tooling/chio-conformance/src/load.rs::load_results_from_dir",
@@ -23696,6 +22921,13 @@
       "run_conformance_harness::shared-reader::crates/tooling/chio-conformance/src/load.rs::load_results_from_dir",
       "run_conformance_harness::shared-reader::crates/tooling/chio-conformance/src/load.rs::load_scenarios_from_dir"
     ],
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs": [
+      "open_subscribed_session::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize",
+      "parse_sse::original-json-reader::UntrustedJsonText",
+      "rpc::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse",
+      "validate_initialize::original-json-reader::UntrustedJsonText",
+      "validate_initialize::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse"
+    ],
     "crates/tooling/chio-conformance/verdict_matrix/drivers/lambda/src/lib.rs": [
       "evaluate_scenario::http-response-json::json",
       "evaluate_scenario::shared-reader::crates/tooling/chio-conformance/verdict_matrix/drivers/lambda/src/lib.rs::scenario_to_http_request",
@@ -23740,6 +22972,9 @@
       "main::shared-reader::crates/tooling/chio-release-evidence/src/main.rs::run",
       "run::shared-reader::crates/tooling/chio-release-evidence/src/main.rs::verify"
     ],
+    "crates/tooling/chio-spec-codegen/src/schema_catalog.rs": [
+      "load::shared-reader::crates/tooling/chio-spec-codegen/src/lib.rs::read_schema_file"
+    ],
     "crates/tooling/chio-spec-codegen/src/statemachines_pass.rs": [
       "check_statemachine_outputs::shared-reader::crates/tooling/chio-spec-codegen/src/statemachines_pass.rs::render_statemachine_outputs",
       "codegen_statemachines::shared-reader::crates/tooling/chio-spec-codegen/src/statemachines_pass.rs::render_statemachine_outputs",
@@ -23775,6 +23010,9 @@
       "trace_evaluation_input_module::shared-reader::crates/tooling/chio-trace-validate/src/apalache.rs::parse_strict_json",
       "trace_input_module::shared-reader::crates/tooling/chio-trace-validate/src/apalache.rs::parse_strict_json",
       "validate_itf_witness::shared-reader::crates/tooling/chio-trace-validate/src/apalache.rs::parse_strict_json"
+    ],
+    "crates/tooling/chio-trace-validate/src/decode.rs": [
+      "decode_observations::original-json-reader::UntrustedJsonText"
     ],
     "crates/trust/chio-attest-buyer-core/src/context.rs": [
       "verification_context_from_json::shared-reader::crates/trust/chio-attest-buyer-core/src/input.rs::decode"
@@ -24087,315 +23325,6 @@
     ],
     "crates/trust/chio-weights/src/card.rs": [
       "from_canonical_json::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs": [
-      "execute::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
-      "load_result::shared-reader::crates/platform/chio-control-plane/src/security/adapters/effect_port/dispatch.rs::validate_durable_plan_binding",
-      "validate_durable_plan_binding::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs": [
-      "compact::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::compact_native_rows",
-      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
-      "imported_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
-      "plan::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::sessions",
-      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
-      "plan::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
-      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::imported_sessions",
-      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
-      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
-      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/compaction.rs::visit_session_rows",
-      "sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated",
-      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
-      "visit_session_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs": [
-      "check_apply::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
-      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
-      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
-      "completed_capability_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
-      "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
-      "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
-      "load_marker::original-json-reader::UntrustedJsonText",
-      "persist_first::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
-      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
-      "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load",
-      "validate_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
-      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
-      "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs": [
-      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
-      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
-      "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs": [
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::load_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::validate_stored_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::load_containment_overlay_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/containment.rs::validate_stored_containment_overlay_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::load_egress_restriction_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/egress_restriction.rs::validate_stored_egress_restriction_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::load_session_throttle_command",
-      "load::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_stored_session_throttle_command"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs": [
-      "cell::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::session_key",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_dead",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::validate_sessions",
-      "compact_native_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row",
-      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
-      "record::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
-      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "session_key::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "text::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
-      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
-      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
-      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::cell",
-      "validate_dead::shared-reader::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs::text",
-      "validate_sessions::shared-reader::crates/platform/chio-store-sqlite/src/security_state/flow_state.rs::native_session_dominated"
-    ],
-    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs": [
-      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export.rs::collect_tools",
-      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs::checkpoints",
-      "build_export::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs::children",
-      "collect_tools::shared-reader::crates/platform/chio-store-sqlite/src/receipt_query_snapshot/fetch.rs::fetch"
-    ],
-    "crates/platform/chio-store-sqlite/src/receipt_query_snapshot/export/metadata.rs": [
-      "checkpoints::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
-      "children::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt"
-    ],
-    "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs": [
-      "handle_receipt_query_snapshot_recovery::request-json::ReceiptQuerySnapshotRecoveryRequest"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
-      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
-      "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs": [
-      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
-      "add_npm_runtime::shared-reader::crates/products/chio-cli/src/cli/dispatch/finding/verified_fix_npm_runtime.rs::read_package_metadata",
-      "read_package_metadata::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/tooling/chio-conformance/src/runner/restart_probe.rs": [
-      "open_subscribed_session::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize",
-      "parse_sse::original-json-reader::UntrustedJsonText",
-      "rpc::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse",
-      "validate_initialize::original-json-reader::UntrustedJsonText",
-      "validate_initialize::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs": [
-      "append_stop_transition::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
-      "decode::original-json-reader::UntrustedJsonText",
-      "load_chain::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
-      "load_stop_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
-      "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
-      "require_output_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
-      "verified_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::load_chain"
-    ],
-    "crates/products/chio-cli/src/cli/process_host/stop_control.rs": [
-      "handle::original-json-reader::UntrustedJsonText",
-      "run::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::via_socket",
-      "serve::shared-reader::crates/products/chio-cli/src/cli/process_host/stop_control.rs::handle",
-      "via_socket::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/core/chio-core-types/src/recovery/decode.rs": [
-      "decode_contract::shared-reader::crates/core/chio-core-types/src/recovery/decode.rs::decode_contract_with_limits",
-      "decode_contract_with_limits::shared-reader::crates/core/chio-core-types/src/canonical/signed_json.rs::parse_signed_json",
-      "decode_recovery_capability::shared-reader::crates/core/chio-core-types/src/canonical/signed_json.rs::parse_signed_json"
-    ],
-    "crates/core/chio-core-types/src/recovery/semantic.rs": [
-      "decode_semantic_invocation::shared-reader::crates/core/chio-core-types/src/recovery/decode.rs::decode_contract"
-    ],
-    "crates/tooling/chio-spec-codegen/src/schema_catalog.rs": [
-      "load::shared-reader::crates/tooling/chio-spec-codegen/src/lib.rs::read_schema_file"
-    ],
-    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
-      "decode::original-json-reader::UntrustedJsonText",
-      "decode_work_join_inputs::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
-      "decode_work_request::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
-      "decode_work_response::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_authority.rs": [
-      "deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs": [
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::verify_planning_allocations",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_history",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_routes",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::save",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "configure_semantic_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::planning_tenant",
-      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::verify_planning_allocations",
-      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_history",
-      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment.rs::require_routes",
-      "read_semantic_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "require_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "require_routes::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs::load_owned",
-      "save::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::save_planned"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/semantic_deployment/records.rs": [
-      "load_owned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
-      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload",
-      "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload"
-    ],
-    "crates/observability/chio-siem/src/manager.rs": [
-      "decode_receipt_row::original-json-reader::UntrustedJsonText",
-      "poll_once::shared-reader::crates/observability/chio-siem/src/manager.rs::decode_receipt_row"
-    ],
-    "crates/platform/chio-control-plane/src/passport_revocation_mirror.rs": [
-      "conflicts::shared-reader::crates/platform/chio-control-plane/src/passport_revocation_mirror.rs::decode_root",
-      "decode_root::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
-    ],
-    "crates/platform/chio-control-plane/src/revocation_partner.rs": [
-      "from_json::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
-    ],
-    "crates/platform/chio-control-plane/src/trust_control/config_and_public/partner_revocation_sync.rs": [
-      "get::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
-    ],
-    "crates/tooling/chio-trace-validate/src/decode.rs": [
-      "decode_observations::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
-      "decode_part::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode",
-      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part",
-      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/oauth_introspection.rs": [
-      "verify::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
-    ],
-    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
-      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
-    ],
-    "crates/sdk/chio-binding-helpers/src/canonical.rs": [
-      "canonicalize_json_str::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/sdk/chio-binding-helpers/src/signing.rs": [
-      "json_document::original-json-reader::UntrustedJsonText",
-      "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
-      "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
-    ],
-    "crates/kernel/chio-kernel-browser/src/evaluate_input.rs": [
-      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/kernel/chio-kernel-mobile/src/evaluate_input.rs": [
-      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/sdk/chio-cpp-kernel-ffi/src/evaluate_input.rs": [
-      "decode_evaluate_request::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/core/chio-core-types/src/receipt/evidence.rs": [
-      "validate_signed_token::original-json-reader::UntrustedJsonText",
-      "validate_synthetic_anchor::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/core/chio-core-types/src/root_authority/verifier_trust.rs": [
-      "load::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/tooling/chio-bundle-verify/src/bin/chio-verify.rs": [
-      "main::shared-reader::crates/tooling/chio-bundle-verify/src/report.rs::verify_bundle"
-    ],
-    "crates/tooling/chio-bundle-verify/src/read.rs": [
-      "decode_strict::original-json-reader::UntrustedJsonText",
-      "read_json::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict",
-      "read_ndjson::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict"
-    ],
-    "crates/tooling/chio-bundle-verify/src/report.rs": [
-      "verify_bundle::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::verify_package"
-    ],
-    "crates/tooling/chio-bundle-verify/src/verify.rs": [
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::decode_strict",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_ndjson",
-      "read_package::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::verify_policy_attachment",
-      "verify_package::shared-reader::crates/tooling/chio-bundle-verify/src/verify.rs::read_package",
-      "verify_policy_attachment::shared-reader::crates/tooling/chio-bundle-verify/src/read.rs::read_json"
-    ],
-    "crates/kernel/chio-runtime-harness/src/fixture_generation.rs": [
-      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_baseline",
-      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/fixture_generation.rs::read_parity_report",
-      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
-      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
-      "assemble_qualified_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/proof_assembly.rs::assemble_runtime_loopback_outputs",
-      "generate_runtime_loopback_fixture::shared-reader::crates/kernel/chio-runtime-harness/src/lib.rs::run_runtime_loopback_scenario_with_static_baseline",
-      "generate_runtime_loopback_fixture::shared-reader::crates/trust/chio-attest-buyer-core/src/proof_package.rs::proof_package_from_json",
-      "generate_runtime_loopback_fixture::shared-reader::crates/trust/chio-attest-buyer-core/src/report.rs::verifier_report_from_json",
-      "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/proof_package.rs::proof_package_from_json",
-      "read_baseline::shared-reader::crates/trust/chio-attest-buyer-core/src/report.rs::verifier_report_from_json",
-      "read_parity_report::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/products/chio-cli/src/cli/dispatch/proof/fixture_runtime_check.rs": [
-      "verify_committed_runtime_fixture::shared-reader::crates/trust/chio-attest-buyer/src/api.rs::verify_proof_package_json"
-    ],
-    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs.rs": [
-      "apply_treaty_epoch_update::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
-    ],
-    "crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs": [
-      "treaty_epoch_from_wire::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs": [
-      "decode::original-json-reader::UntrustedJsonText",
-      "load_pin::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/treaty_epochs/storage.rs::decode",
-      "load_record::shared-reader::crates/kernel/chio-runtime-core/src/treaty_epoch/update.rs::treaty_epoch_from_wire"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source.rs": [
-      "install_runtime_source::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::active_count"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/integrity.rs": [
-      "runtime_source_projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
-      "runtime_source_projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all",
-      "verify_runtime_source_pristine::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
-      "verify_runtime_source_projection_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs::verify_all_records",
-      "verify_runtime_source_projection_coverage::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/records.rs": [
-      "verify_all_records::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::active_count"
-    ],
-    "crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs": [
-      "active_count::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_source/supersession.rs::load_all",
-      "load_all::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-store-sqlite/src/root_exchange_store.rs": [
-      "decode_blob::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-store-sqlite/src/root_exchange_store/projection.rs": [
-      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
-      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob"
-    ],
-    "crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs": [
-      "idp_key_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
-      "provider_identity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
-      "read_retained::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
-      "root_policy::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
-      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
-      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
-      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained"
-    ],
-    "crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs": [
-      "initialize_root_exchange_schema::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_root_exchange_invariants",
-      "verify_integrity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::verify_retained_table",
-      "verify_root_exchange_invariants::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_integrity"
     ]
   },
   "retired_direct_readers": {
@@ -24417,19 +23346,29 @@
       ],
       "consumers": [
         {
+          "path": "crates/products/chio-mercury/src/commands/assurance_release/assurance_suite.rs",
+          "owner": "export_assurance_suite",
+          "source_sha256": "69aec1757e1a2e624ca06561c1e809d7c1c737f191e0fe6f32a9b5becd111ab1"
+        },
+        {
+          "path": "crates/products/chio-mercury/src/commands/assurance_release/trust_network.rs",
+          "owner": "export_trust_network",
+          "source_sha256": "68344ed6d2ede19c8c05326dd873527201d2910906c8cc0f744c79032eb9ccff"
+        },
+        {
           "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
           "owner": "cmd_mercury_inquiry_export",
           "source_sha256": "1c0bb457005a6e15c52a1fd9ca848ab127b9f0f70de489e09d326ad87c3b0288"
         },
         {
           "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
-          "owner": "cmd_mercury_verify",
-          "source_sha256": "ff847cc79b721f03b2bc8613907a102750c4f2183cece193c7f3ae4a15e5d063"
+          "owner": "cmd_mercury_supervised_live_export",
+          "source_sha256": "9273a3969dd66524ee6b8cfb118a44d3dad50a59bffb1f88536adfbf9a9081f9"
         },
         {
           "path": "crates/products/chio-mercury/src/commands/core_cli/commands.rs",
-          "owner": "cmd_mercury_supervised_live_export",
-          "source_sha256": "9273a3969dd66524ee6b8cfb118a44d3dad50a59bffb1f88536adfbf9a9081f9"
+          "owner": "cmd_mercury_verify",
+          "source_sha256": "3925054afe778dda4bfc61238260e9351b6fe17b611218ed5e54143efffa7183"
         },
         {
           "path": "crates/products/chio-mercury/src/commands/core_cli/exports.rs",
@@ -24445,16 +23384,6 @@
           "path": "crates/products/chio-mercury/src/commands/shared/utils.rs",
           "owner": "load_bundle_manifests",
           "source_sha256": "b81785e7fe9af361eb8aea1486a0386546782dab28e2cd53c232ffbc8c01498f"
-        },
-        {
-          "path": "crates/products/chio-mercury/src/commands/assurance_release/trust_network.rs",
-          "owner": "export_trust_network",
-          "source_sha256": "e412a632807ad7ff9de15aa9ee2c90c84f8ae1037ac8eb02956c85f9ddbf3522"
-        },
-        {
-          "path": "crates/products/chio-mercury/src/commands/assurance_release/assurance_suite.rs",
-          "owner": "export_assurance_suite",
-          "source_sha256": "69aec1757e1a2e624ca06561c1e809d7c1c737f191e0fe6f32a9b5becd111ab1"
         }
       ],
       "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. read_json_file caps each file read at MAX_JSON_INPUT_BYTES through UntrustedJsonText::from_wire.",
@@ -24583,7 +23512,7 @@
     "crates/sdk/chio-binding-helpers/src/capability.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "4581afcd7c783116056e53af2e8a93266c1b76d924566a94073fb95c4e67f6c9",
+      "source_sha256": "19fde1e9a226287425d9637b80805b7a6915faf5981ef852399290d1469276a2",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "parse_capability_json::original-json-reader::UntrustedJsonText",
@@ -24596,12 +23525,12 @@
     "crates/sdk/chio-binding-helpers/src/signing.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "8730c90eae28e3510e71c1cec1c091da9f8825e19ef8787e237c738a6919e84c",
+      "source_sha256": "33b94af62a2ce3f42906d2fe28858ad5c45ded9e074119a3b2e6f9b33f6dd330",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "json_document::original-json-reader::UntrustedJsonText",
-        "sign_json_str_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
-        "verify_json_str_signature_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
+        "sign_wrapped_json_ed25519::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document",
+        "verify_wrapped_json::shared-reader::crates/sdk/chio-binding-helpers/src/signing.rs::json_document"
       ],
       "status": "direct-serde-site-migrated-original-debt-open",
       "scope": "Bounded original JSON reader migration only. Canonicalization and generic JSON signing normalize document numbers; capability and receipt readers enforce signed-number rules. Evaluate envelopes preserve unsigned argument numbers and re-check original signed members. This is not complete caller or semantic acceptance.",

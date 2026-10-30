@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/registry-market-penalty-body.schema.json",
+  "title": "chio.registry.market-penalty.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "abuseClass",
+    "action",
+    "bondClass",
+    "caseId",
+    "charterId",
+    "evidenceRefs",
+    "feeScheduleId",
+    "governingOperatorId",
+    "issuedBy",
+    "listingId",
+    "namespace",
+    "openedAt",
+    "penaltyAmount",
+    "penaltyId",
+    "schema",
+    "state",
+    "updatedAt"
+  ],
+  "properties": {
+    "abuseClass": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string"
+    },
+    "activationId": {
+      "type": "string"
+    },
+    "bondClass": {
+      "type": "string"
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "referenceId"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "feeScheduleId": {
+      "type": "string"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "openedAt": {
+      "type": "integer"
+    },
+    "penaltyAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "penaltyId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.registry.market-penalty.v1"
+    },
+    "state": {
+      "type": "string"
+    },
+    "subjectOperatorId": {
+      "type": "string"
+    },
+    "supersedesPenaltyId": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "integer"
+    }
+  }
+}

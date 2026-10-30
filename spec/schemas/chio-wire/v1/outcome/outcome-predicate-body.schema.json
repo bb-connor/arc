@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-predicate-body.schema.json",
+  "title": "chio.outcome.predicate.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "assertions",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "predicateId",
+    "providerId",
+    "schema"
+  ],
+  "properties": {
+    "assertions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparator",
+          "pointer"
+        ],
+        "properties": {
+          "comparator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "x",
+                      "y"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "integer"
+                      },
+                      "y": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "pointer": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "predicateId": {
+      "type": "string"
+    },
+    "providerId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.predicate.v1"
+    }
+  }
+}

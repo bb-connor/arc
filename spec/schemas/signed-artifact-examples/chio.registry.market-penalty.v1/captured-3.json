@@ -1,0 +1,28 @@
+{
+  "abuseClass": "fraudulent_listing",
+  "action": "hold_bond",
+  "bondClass": "listing",
+  "caseId": "case-1",
+  "charterId": "charter-1",
+  "evidenceRefs": [
+    {
+      "kind": "external",
+      "referenceId": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+    }
+  ],
+  "feeScheduleId": "fee-schedule-1",
+  "governingOperatorId": "venue-operator",
+  "issuedBy": "venue-operator",
+  "listingId": "finding-listing-01",
+  "namespace": "findings",
+  "openedAt": 1750000000,
+  "penaltyAmount": {
+    "currency": "USD",
+    "units": 120000
+  },
+  "penaltyId": "market-penalty-42",
+  "schema": "chio.registry.market-penalty.v1",
+  "state": "enforced",
+  "updatedAt": 1750000000
+}

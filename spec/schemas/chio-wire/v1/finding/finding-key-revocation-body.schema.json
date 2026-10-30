@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-key-revocation-body.schema.json",
+  "title": "chio.finding.key-revocation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authority_id",
+    "key",
+    "key_epoch",
+    "recorded_at",
+    "revocation_status_ref",
+    "revoked_from",
+    "schema"
+  ],
+  "properties": {
+    "authority_id": {
+      "type": "string"
+    },
+    "key": {
+      "type": "string"
+    },
+    "key_epoch": {
+      "type": "integer"
+    },
+    "recorded_at": {
+      "type": "integer"
+    },
+    "revocation_status_ref": {
+      "type": "string"
+    },
+    "revoked_from": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.key-revocation.v1"
+    }
+  }
+}

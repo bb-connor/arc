@@ -66,6 +66,7 @@ chio-manifest = { workspace = true }
 chio-policy = { workspace = true }
 chio-process = { workspace = true, features = ["worker-server", "mailboxes"] }
 chio-proof-room = { workspace = true }
+chio-revocation-oracle = { workspace = true }
 chio-mcp-adapter = { workspace = true }
 chio-mcp-remote = { workspace = true }
 chio-attest-buyer = { workspace = true }
@@ -89,6 +90,7 @@ chio-store-sqlite = { workspace = true }
 chio-tee-frame = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 chio-trace-validate = { workspace = true }
+chio-transaction-passport = { workspace = true }
 chio-workflow = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }
@@ -138,7 +140,6 @@ chio-file-custody = { workspace = true }
 [dev-dependencies]
 chio-credit = { workspace = true }
 chio-open-market = { workspace = true }
-chio-revocation-oracle = { workspace = true }
 chio-test-support = { workspace = true }
 insta = { version = "1.42", features = ["json", "redactions"] }
 jsonschema = { workspace = true }

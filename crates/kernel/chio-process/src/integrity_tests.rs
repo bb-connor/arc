@@ -47,7 +47,7 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
     let path = directory.path().join("thin-receipt.json");
     std::fs::write(&path, &original)?;
     let loaded = serde_json::from_slice::<ChioReceipt>(&std::fs::read(&path)?)?;
-    assert!(loaded.verify_signature()?);
+    assert!(loaded.verify_integrity_embedded_key()?);
     let response = ToolCallResponse {
         request_id: "thin-request".into(),
         verdict: Verdict::Deny,
@@ -64,6 +64,6 @@ fn persisted_thin_unknown_receipts_remain_original_evidence_not_redispatch_autho
     );
     assert_eq!(serde_json::to_vec(&response.receipt)?, original);
     assert_eq!(std::fs::read(path)?, original);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }

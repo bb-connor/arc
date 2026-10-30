@@ -436,8 +436,11 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         std::slice::from_ref(&second_canonical),
         &checkpoint_keypair,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&first_checkpoint)
-                .expect("verified predecessor"),
+            &chio_kernel_core::evidence_verify::validate_checkpoint(
+                &first_checkpoint,
+                std::slice::from_ref(&first_checkpoint.body.kernel_key),
+            )
+            .expect("verified predecessor"),
         ),
         &[first_chain_leaf],
     )
@@ -475,9 +478,11 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
             oldest_live_receipt_timestamp: Some(1_775_137_626),
         },
     };
-    let mut transparency =
-        validate_checkpoint_transparency(&[first_checkpoint.clone(), second_checkpoint.clone()])
-            .expect("transparency");
+    let mut transparency = validate_checkpoint_transparency(
+        &[first_checkpoint.clone(), second_checkpoint.clone()],
+        std::slice::from_ref(&first_checkpoint.body.kernel_key),
+    )
+    .expect("transparency");
     let binding = CheckpointPublicationTrustAnchorBinding {
         publication_identity: CheckpointPublicationIdentity::new(
             CheckpointPublicationIdentityKind::LocalLog,
@@ -492,10 +497,18 @@ fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, Checkpoint
         publication_profile_version: "phase4-pilot".to_string(),
     };
     transparency.publications = vec![
-        build_trust_anchored_checkpoint_publication(&first_checkpoint, binding.clone())
-            .expect("first anchored publication"),
-        build_trust_anchored_checkpoint_publication(&second_checkpoint, binding)
-            .expect("second anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &first_checkpoint,
+            binding.clone(),
+            std::slice::from_ref(&first_checkpoint.body.kernel_key),
+        )
+        .expect("first anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &second_checkpoint,
+            binding,
+            std::slice::from_ref(&second_checkpoint.body.kernel_key),
+        )
+        .expect("second anchored publication"),
     ];
     (bundle, transparency)
 }
@@ -524,7 +537,9 @@ fn proof_package_build_and_verify_passes() {
     );
     assert!(claim_boundary.trust_anchor.is_none());
 
-    let report = package.verify(1_775_137_900).expect("verification report");
+    let report = package
+        .verify_integrity_only(1_775_137_900)
+        .expect("verification report");
     assert_eq!(report.package_kind, MercuryPackageKind::Proof);
     assert_eq!(report.workflow_id, "workflow-release-control");
     assert_eq!(report.receipt_count, 1);
@@ -574,7 +589,7 @@ fn proof_package_rejects_full_coverage_when_inclusion_proof_is_missing() {
     package.refresh_package_id().expect("refresh package id");
 
     let error = package
-        .verify(1_775_137_923)
+        .verify_integrity_only(1_775_137_923)
         .expect_err("verification must derive the missing checkpoint coverage");
     assert!(
         error
@@ -625,7 +640,7 @@ fn proof_package_rejects_uncheckpointed_receipt_id_mismatch() {
     package.refresh_package_id().expect("refresh package id");
 
     let error = package
-        .verify(1_775_137_923)
+        .verify_integrity_only(1_775_137_923)
         .expect_err("uncheckpointed receipt id must bind to its tool receipt");
     assert!(
         error.to_string().contains("uncheckpointed receipt id"),
@@ -704,7 +719,7 @@ fn package_with_partial_identity_is_refused() {
         serde_json::from_slice(&encoded).expect("deserialize package");
 
     let error = restored
-        .verify(1_775_137_901)
+        .verify_integrity_only(1_775_137_901)
         .expect_err("partial identity is refused");
     assert!(
         error
@@ -926,7 +941,9 @@ fn proof_package_rejects_signed_observation_as_mercury_authorization() {
     body.observation_outcome = Some(ObservationOutcome::Observed);
     body.trust_level = TrustLevel::Verified;
     let observation = ChioReceipt::sign(body, &keypair).expect("signed observation receipt");
-    assert!(observation.verify_signature().expect("verify observation"));
+    assert!(observation
+        .verify_integrity_embedded_key()
+        .expect("verify observation"));
 
     let error = build_sample_proof_package(sample_bundle_with_receipt(observation))
         .expect_err("observation receipt cannot authorize Mercury action");
@@ -1062,8 +1079,14 @@ fn proof_package_requires_explicitly_trusted_mercury_signers() {
     )
     .expect("proof package");
 
-    let structural_report = package.verify(1_775_137_900).expect("structural report");
+    let structural_report = package
+        .verify_integrity_only(1_775_137_900)
+        .expect("structural report");
     assert!(!structural_report.verifier_equivalent);
+    assert_eq!(
+        structural_report.scope,
+        MercuryVerificationScope::IntegrityOnly
+    );
 
     let untrusted_keypair = Keypair::generate();
     let untrusted_keys = BTreeSet::from([untrusted_keypair.public_key().to_hex()]);
@@ -1082,6 +1105,10 @@ fn proof_package_requires_explicitly_trusted_mercury_signers() {
         .verify_with_trusted_kernel_keys(1_775_137_902, &trusted_keys)
         .expect("trusted verification report");
     assert!(!trusted_report.verifier_equivalent);
+    assert_eq!(
+        trusted_report.scope,
+        MercuryVerificationScope::TrustedKernelAuthority
+    );
 }
 
 #[test]
@@ -1240,7 +1267,7 @@ fn trusted_proof_verification_rejects_selectively_omitted_checkpoint_leaf() {
         COMPLETENESS_BEST_EFFORT
     );
     package
-        .verify(1_775_137_920)
+        .verify_integrity_only(1_775_137_920)
         .expect("selective package remains structurally verifiable");
 
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);
@@ -1312,7 +1339,8 @@ fn trusted_proof_verification_rejects_untrusted_checkpoint_signer() {
 #[test]
 fn trusted_proof_verification_rejects_invalid_checkpoint_signature() {
     let mut package = full_trusted_sample_package();
-    package.chio_bundle.checkpoints[0].signature = Keypair::generate().sign(b"invalid");
+    package.chio_bundle.checkpoints[0].signature = Keypair::generate()
+        .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, b"invalid");
     let trusted_keys = trusted_authority_keys(&package.chio_bundle);
 
     let error = package
@@ -1341,7 +1369,7 @@ fn untrusted_proof_verification_rejects_flipped_checkpoint_signature() {
     flip_checkpoint_signature_byte(&mut package);
 
     let error = package
-        .verify(1_775_137_923)
+        .verify_integrity_only(1_775_137_923)
         .expect_err("flipped checkpoint signature");
 
     assert_eq!(
@@ -1403,7 +1431,9 @@ fn trusted_proof_verification_rejects_checkpoint_free_audit_only_package() {
         vec![manifest],
     )
     .expect("checkpoint-free audit package");
-    let structural_report = package.verify(1_775_137_923).expect("structural report");
+    let structural_report = package
+        .verify_integrity_only(1_775_137_923)
+        .expect("structural report");
     assert!(!structural_report.verifier_equivalent);
 
     let error = package
@@ -1552,7 +1582,9 @@ fn proof_package_carries_publication_record_and_optional_consistency_chain() {
         Some("anchor-root-1")
     );
 
-    package.verify(1_775_137_900).expect("verification report");
+    package
+        .verify_integrity_only(1_775_137_900)
+        .expect("verification report");
 
     let first_signer_only = BTreeSet::from([package.chio_bundle.tool_receipts[0]
         .receipt
@@ -1603,7 +1635,9 @@ fn inquiry_package_build_and_verify_passes() {
     )
     .expect("inquiry package");
 
-    let report = inquiry.verify(1_775_137_902).expect("verification report");
+    let report = inquiry
+        .verify_integrity_only(1_775_137_902)
+        .expect("verification report");
     assert_eq!(report.package_kind, MercuryPackageKind::Inquiry);
     assert!(!report.verifier_equivalent);
 

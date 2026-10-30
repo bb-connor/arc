@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/trust-activation.schema.json",
+  "title": "Chio registry trust activation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activationId",
+    "admissionClass",
+    "disposition",
+    "eligibility",
+    "expiresAt",
+    "listingId",
+    "listingPublishedAt",
+    "listingSha256",
+    "localOperatorId",
+    "namespace",
+    "requestedAt",
+    "requestedBy",
+    "reviewContext",
+    "schema"
+  ],
+  "properties": {
+    "activationId": {
+      "type": "string"
+    },
+    "admissionClass": {
+      "type": "string"
+    },
+    "disposition": {
+      "type": "string"
+    },
+    "eligibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedActorKinds",
+        "allowedPublisherRoles",
+        "allowedStatuses",
+        "policyReference",
+        "requireBondBacking",
+        "requireFreshListing"
+      ],
+      "properties": {
+        "allowedActorKinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedPublisherRoles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedStatuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "policyReference": {
+          "type": "string"
+        },
+        "requireBondBacking": {
+          "type": "boolean"
+        },
+        "requireFreshListing": {
+          "type": "boolean"
+        },
+        "requiredListingOperatorIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "listingPublishedAt": {
+      "type": "integer"
+    },
+    "listingSha256": {
+      "type": "string"
+    },
+    "localOperatorId": {
+      "type": "string"
+    },
+    "localOperatorName": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "requestedAt": {
+      "type": "integer"
+    },
+    "requestedBy": {
+      "type": "string"
+    },
+    "reviewContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "freshness",
+        "publisher"
+      ],
+      "properties": {
+        "freshness": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ageSecs",
+            "generatedAt",
+            "maxAgeSecs",
+            "state",
+            "validUntil"
+          ],
+          "properties": {
+            "ageSecs": {
+              "type": "integer"
+            },
+            "generatedAt": {
+              "type": "integer"
+            },
+            "maxAgeSecs": {
+              "type": "integer"
+            },
+            "state": {
+              "type": "string"
+            },
+            "validUntil": {
+              "type": "integer"
+            }
+          }
+        },
+        "publisher": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operatorId",
+            "registryUrl",
+            "role"
+          ],
+          "properties": {
+            "operatorId": {
+              "type": "string"
+            },
+            "operatorName": {
+              "type": "string"
+            },
+            "registryUrl": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "reviewedAt": {
+      "type": "integer"
+    },
+    "reviewedBy": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.registry.trust-activation.v1"
+    }
+  }
+}

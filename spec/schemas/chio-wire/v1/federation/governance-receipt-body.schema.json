@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/governance-receipt-body.schema.json",
+  "title": "chio.governance-receipt.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorizedLeaseId",
+    "authorizingKernel",
+    "caseKind",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "receiptId",
+    "schema",
+    "stepSha256",
+    "workflowId"
+  ],
+  "properties": {
+    "authorizedLeaseId": {
+      "type": "string"
+    },
+    "authorizingKernel": {
+      "type": "string"
+    },
+    "caseKind": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.governance-receipt.v1"
+    },
+    "stepSha256": {
+      "type": "string"
+    },
+    "workflowId": {
+      "type": "string"
+    }
+  }
+}

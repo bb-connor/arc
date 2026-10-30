@@ -107,7 +107,9 @@ async fn sign_accepts_content_at_the_byte_budget() {
         .sign(body, content)
         .await
         .expect("content at the budget should sign");
-    assert!(receipt.verify_signature().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -142,7 +144,9 @@ async fn sign_refuses_oversized_content_fail_closed() {
         .sign(body, small)
         .await
         .expect("normal request still signs after an oversized rejection");
-    assert!(receipt.verify_signature().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -200,7 +204,9 @@ async fn default_budget_admits_large_async_receipts_above_one_mib() {
         .sign(body, content)
         .await
         .expect("a 2 MiB async receipt must sign under the configured-stream-max budget");
-    assert!(receipt.verify_signature().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -230,7 +236,9 @@ async fn zero_per_request_cap_admits_large_receipts_unlimited() {
     let receipt = handle.sign(body, content).await.expect(
         "a 0 (unlimited) per-request cap must admit a 64 KiB receipt, not reject as 1-over",
     );
-    assert!(receipt.verify_signature().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
 
     handle.shutdown().await;
 }
@@ -298,7 +306,9 @@ async fn aggregate_byte_budget_backpressures_even_with_channel_room() {
         .sign(body, content)
         .await
         .expect("a request within the aggregate budget signs");
-    assert!(receipt.verify_signature().expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("signature verifies"));
     handle.shutdown().await;
 }
 
@@ -345,7 +355,7 @@ async fn backpressure_under_exhausted_budget_signs_inline_without_parking() {
     .await
     .expect("backpressure must inline-sign, not error");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("inline-signed receipt verifies"));
 
     handle.shutdown().await;
@@ -376,7 +386,7 @@ async fn oversized_preimage_signs_inline_without_exceeding_queue_bound() {
         .await
         .expect("an oversized preimage must inline-sign, never clamp-and-enqueue");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("oversized inline-signed receipt verifies"));
 
     // The oversized request was never queued, so the full 4-byte budget is still
@@ -475,7 +485,7 @@ async fn many_blocked_producers_do_not_retain_more_than_budget() {
     for result in results {
         let receipt = result.expect("every producer signs (inline fallback or queued)");
         assert!(receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .expect("each signed receipt verifies"));
     }
 

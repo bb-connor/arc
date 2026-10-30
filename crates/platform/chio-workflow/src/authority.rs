@@ -717,7 +717,7 @@ mod tests {
         let receipt = authority.finalize(execution).unwrap();
         assert!(receipt.is_complete());
         assert_eq!(receipt.successful_steps(), 2);
-        assert!(receipt.verify().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         assert_eq!(authority.execution_count(), 1);
     }
 
@@ -1146,7 +1146,7 @@ mod tests {
         let receipt = authority.finalize(execution).unwrap();
         assert!(receipt.is_complete());
         assert_eq!(receipt.successful_steps(), 1);
-        assert!(receipt.verify().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

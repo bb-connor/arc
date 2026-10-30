@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/request-lineage-record.schema.json",
+  "title": "Chio request lineage record signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityId",
+    "continuationTokenId",
+    "evidenceClass",
+    "intentHash",
+    "issuerKey",
+    "lineageMode",
+    "operationKind",
+    "parentRequestId",
+    "requestId",
+    "schema",
+    "sessionAnchor",
+    "startedAt",
+    "subjectKey"
+  ],
+  "properties": {
+    "capabilityId": {
+      "type": "string"
+    },
+    "continuationTokenId": {
+      "type": "string"
+    },
+    "evidenceClass": {
+      "type": "string"
+    },
+    "intentHash": {
+      "type": "string"
+    },
+    "issuerKey": {
+      "type": "string"
+    },
+    "lineageMode": {
+      "type": "string"
+    },
+    "operationKind": {
+      "type": "string"
+    },
+    "parentRequestId": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.request_lineage_record.v1"
+    },
+    "sessionAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionAnchorHash",
+        "sessionAnchorId"
+      ],
+      "properties": {
+        "sessionAnchorHash": {
+          "type": "string"
+        },
+        "sessionAnchorId": {
+          "type": "string"
+        }
+      }
+    },
+    "startedAt": {
+      "type": "integer"
+    },
+    "subjectKey": {
+      "type": "string"
+    }
+  }
+}

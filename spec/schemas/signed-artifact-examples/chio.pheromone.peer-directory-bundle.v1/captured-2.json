@@ -1,0 +1,10 @@
+{
+  "directorySha256": "dca6e4ba8026e805effd634537226fabd3d9d1ef539d6512c0bf6b6131a1c0d1",
+  "expiresAtUnixMs": 1766000060500,
+  "issuedAtUnixMs": 1765999999500,
+  "issuer": "did:chio:relay-ops",
+  "keyId": "relay-ops-2026",
+  "previousVersionSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "schema": "chio.pheromone.peer-directory-bundle.v1",
+  "version": 2
+}

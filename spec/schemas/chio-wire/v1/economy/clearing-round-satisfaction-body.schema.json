@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-round-satisfaction-body.schema.json",
+  "title": "chio.clearing.round-satisfaction.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityDigest",
+    "dispositionAuthorityId",
+    "dispositionAuthorityKeyEpoch",
+    "finalizationDigest",
+    "intentProgressRoot",
+    "nextLifecycleFence",
+    "nextLifecycleVersion",
+    "outputManifestDigest",
+    "reservationCount",
+    "reservationHeadRoot",
+    "reservationRoot",
+    "roundCoreDigest",
+    "roundId",
+    "satisfiedAtUnixMs",
+    "schema",
+    "settlementIntentCount",
+    "settlementIntentRoot",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion"
+  ],
+  "properties": {
+    "authorityDigest": {
+      "type": "string"
+    },
+    "dispositionAuthorityId": {
+      "type": "string"
+    },
+    "dispositionAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "finalizationDigest": {
+      "type": "string"
+    },
+    "intentProgressRoot": {
+      "type": "string"
+    },
+    "nextLifecycleFence": {
+      "type": "integer"
+    },
+    "nextLifecycleVersion": {
+      "type": "integer"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "reservationCount": {
+      "type": "integer"
+    },
+    "reservationHeadRoot": {
+      "type": "string"
+    },
+    "reservationRoot": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "satisfiedAtUnixMs": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.clearing.round-satisfaction.v1"
+    },
+    "settlementIntentCount": {
+      "type": "integer"
+    },
+    "settlementIntentRoot": {
+      "type": "string"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    }
+  }
+}

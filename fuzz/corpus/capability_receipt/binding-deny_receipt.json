@@ -1,9 +1,18 @@
 {
   "description": "Valid deny receipt with matching signature and parameter hash.",
   "expected": {
+    "authorized": false,
+    "boundary_class": "prevent",
     "decision": "deny",
+    "ok": false,
     "parameter_hash_valid": true,
-    "signature_valid": true
+    "receipt_id_valid": true,
+    "receipt_kind": "mediated_decision",
+    "result": "Denied",
+    "signature_valid": true,
+    "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signer_trusted": false,
+    "trust_level": "mediated"
   },
   "id": "deny_receipt",
   "receipt": {
@@ -14,6 +23,7 @@
         "path": "/etc/shadow"
       }
     },
+    "boundary_class": "prevent",
     "capability_id": "cap-bindings-001",
     "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
     "decision": {
@@ -33,17 +43,22 @@
         "verdict": true
       }
     ],
-    "id": "rcpt-bindings-deny",
+    "id": "56d5644db5c53d0bb837bf615a60e541724858757aee1b8259a25816b75bb682",
     "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
     "metadata": {
       "surface": "bindings-vectors",
       "version": 1
     },
     "policy_hash": "policy-bindings-v1",
-    "signature": "d272e21ab1030d25e28daa50065ecea47e60fa07a1f446b587e64b5cc8616048627afd2cdf547a2ab8abbeaa3b661afd8dfb423c6b2bdad4b1955189e755b30a",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "signature": "d3b96d12fb74aa7f05c46adc2d62942caa5f92a65716ba79e9f3b6c6179f54e5221e7531beb9bb17fcbf8ab6a409c994caba1158d904054d371386117b8e7008",
     "timestamp": 1710000200,
     "tool_name": "file_read",
-    "tool_server": "srv-files"
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-files",
+    "trust_level": "mediated"
   },
-  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"d6f55d803ff027795f4a4c43fd8f6d3119051f82b7e3e1a13b1713fd37ea7b09\",\"parameters\":{\"mode\":\"read\",\"path\":\"/etc/shadow\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"guard\":\"ForbiddenPathGuard\",\"reason\":\"path is forbidden\",\"verdict\":\"deny\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-deny\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"d6f55d803ff027795f4a4c43fd8f6d3119051f82b7e3e1a13b1713fd37ea7b09\",\"parameters\":{\"mode\":\"read\",\"path\":\"/etc/shadow\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"guard\":\"ForbiddenPathGuard\",\"reason\":\"path is forbidden\",\"verdict\":\"deny\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"56d5644db5c53d0bb837bf615a60e541724858757aee1b8259a25816b75bb682\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"mediated\"}",
+  "verify_only": true
 }

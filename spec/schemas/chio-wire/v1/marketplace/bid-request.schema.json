@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/marketplace/bid-request.schema.json",
+  "title": "Chio marketplace bid request signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentId",
+    "issuedAt",
+    "listingId",
+    "maxPricePerCall",
+    "requestedScope",
+    "schema",
+    "windowSeconds"
+  ],
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "maxPricePerCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "payoutDestination": {
+      "type": "string"
+    },
+    "requestedScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityScopePrefix",
+        "maxInvocations",
+        "serverId",
+        "toolName"
+      ],
+      "properties": {
+        "capabilityScopePrefix": {
+          "type": "string"
+        },
+        "maxInvocations": {
+          "type": "integer"
+        },
+        "serverId": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.marketplace.bid-request.v1"
+    },
+    "windowSeconds": {
+      "type": "integer"
+    }
+  }
+}

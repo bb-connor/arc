@@ -56,7 +56,7 @@ fn report_binds_original_operation_and_exact_content_without_caller_authority() 
     let receipt = kernel.record_session_tool_failure(&context, &operation)?;
     assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
     assert_eq!(receipt.policy_hash, kernel.config.policy_hash);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert!(receipt.action.verify_hash()?);
     assert_eq!(receipt.action.parameters, operation.arguments);
     assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
@@ -131,7 +131,7 @@ fn report_tenant_is_explicit_session_snapshot_not_ambient_or_caller_metadata() -
     let event = &receipt.metadata.as_ref().ok_or("metadata missing")?["session_report"];
     assert_eq!(event["session_anchor_id"], snapshot.session_anchor.id());
     assert_eq!(event["auth_epoch"], snapshot.session_anchor.auth_epoch());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     kernel.begin_session_request(&context, OperationKind::ToolCall, true)?;
     kernel.set_session_auth_context(
         &context.session_id,
@@ -228,7 +228,10 @@ impl chio_core::SigningBackend for UnavailableSigner {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         Ok(self.0.clone())
     }
-    fn sign_bytes(&self, _: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        _: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<chio_core::Signature, chio_core::Error> {
         Err(chio_core::Error::InvalidSignature(
             "test signer unavailable".into(),
         ))

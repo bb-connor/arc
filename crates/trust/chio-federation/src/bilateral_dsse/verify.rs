@@ -105,7 +105,7 @@ pub fn verify_dsse_envelope(
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
     let receipt_signature_valid = embedded_receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
     if !receipt_signature_valid {
         return Err(BilateralCoSigningError::ReceiptMismatch);
@@ -137,11 +137,25 @@ pub fn verify_dsse_envelope(
     let sig_b_struct = Signature::from_bytes(&sig_b_bytes);
 
     // Spec §7 step 11.
-    if !org_a_public_key.verify(&pae_bytes, &sig_a_struct) {
+    if chio_core_types::crypto::verify_exempt(
+        org_a_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &pae_bytes,
+        &sig_a_struct,
+    )
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
     // Spec §7 step 12.
-    if !org_b_public_key.verify(&pae_bytes, &sig_b_struct) {
+    if chio_core_types::crypto::verify_exempt(
+        org_b_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &pae_bytes,
+        &sig_b_struct,
+    )
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 
@@ -241,10 +255,24 @@ fn verify_chio_bilateral_dsse_envelope_inner(
         .ok_or(BilateralCoSigningError::OrgBSignatureInvalid)?;
     let sig_a_struct = Signature::from_bytes(&sig_a_bytes);
     let sig_b_struct = Signature::from_bytes(&sig_b_bytes);
-    if !org_a_public_key.verify(&pae_bytes, &sig_a_struct) {
+    if chio_core_types::crypto::verify_exempt(
+        org_a_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &pae_bytes,
+        &sig_a_struct,
+    )
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
-    if !org_b_public_key.verify(&pae_bytes, &sig_b_struct) {
+    if chio_core_types::crypto::verify_exempt(
+        org_b_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &pae_bytes,
+        &sig_b_struct,
+    )
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgBSignatureInvalid);
     }
 

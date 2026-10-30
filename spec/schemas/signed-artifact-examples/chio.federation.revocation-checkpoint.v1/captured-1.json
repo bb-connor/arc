@@ -1,0 +1,10 @@
+{
+  "checkpointId": "revocation-checkpoint:chio-refund:001",
+  "epochHeight": 64,
+  "expiresAtUnixMs": 1766000120000,
+  "issuedAtUnixMs": 1766000000000,
+  "revokedKeyFingerprints": [
+    "ed23d853125a3acff2782dddf84e018ebc85942ebf328ff1287202a479964207"
+  ],
+  "schema": "chio.federation.revocation-checkpoint.v1"
+}

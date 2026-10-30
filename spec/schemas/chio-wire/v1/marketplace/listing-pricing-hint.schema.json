@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/marketplace/listing-pricing-hint.schema.json",
+  "title": "Chio marketplace listing pricing hint signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityScope",
+    "expiresAt",
+    "issuedAt",
+    "listingId",
+    "namespace",
+    "pricePerCall",
+    "providerOperatorId",
+    "recentReceiptsVolume",
+    "revocationRateBps",
+    "schema",
+    "sla"
+  ],
+  "properties": {
+    "capabilityScope": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "pricePerCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "providerOperatorId": {
+      "type": "string"
+    },
+    "recentReceiptsVolume": {
+      "type": "integer"
+    },
+    "revocationRateBps": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.marketplace.listing-pricing-hint.v1"
+    },
+    "sla": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "availabilityBps",
+        "maxLatencyMs",
+        "throughputRps"
+      ],
+      "properties": {
+        "availabilityBps": {
+          "type": "integer"
+        },
+        "maxLatencyMs": {
+          "type": "integer"
+        },
+        "throughputRps": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

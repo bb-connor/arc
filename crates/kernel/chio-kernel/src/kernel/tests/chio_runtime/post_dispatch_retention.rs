@@ -124,7 +124,7 @@ fn chio_runtime_admission_retains_reservations_on_non_durable_url_elicitation(
         .get(0)
         .ok_or_else(|| std::io::Error::other("URL elicitation ambiguity receipt missing"))?;
     assert!(receipt.is_cancelled());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -300,7 +300,7 @@ fn chio_post_effect_owner_retains_non_monetary_runtime_reservations(
         return Err("expected a cancelled decision on the drop receipt".into());
     };
     assert_eq!(reason, "post-effect finalization failed; output withheld");
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         receipt
             .metadata
@@ -389,7 +389,7 @@ async fn drop_non_monetary_post_dispatch_records_cancellation_receipt(
         Some(&serde_json::json!("CHIO-KERNEL-POST-EFFECT-DROP"))
     );
     assert!(
-        receipt.verify_signature()?,
+        receipt.verify_integrity_embedded_key()?,
         "drop receipt signature must verify"
     );
     Ok(())

@@ -1,0 +1,12 @@
+{
+  "capabilityId": "capability-a",
+  "expiresAtUnixSecs": 20,
+  "jobId": "job-a",
+  "jobKind": "finding.verify",
+  "jobSpecSha256": "acf2d960404b2bb45c662c7d2b3d35efeeebbcc060f187d08f6a975a300702be",
+  "maxAttempts": 3,
+  "notBeforeUnixSecs": 1,
+  "requestSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "schema": "chio.finding.worker-capability.v1",
+  "tenantId": "tenant-a"
+}

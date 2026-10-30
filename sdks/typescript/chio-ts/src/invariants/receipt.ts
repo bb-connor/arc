@@ -1,18 +1,18 @@
 import { canonicalizeJson, canonicalizeJsonString, parseJsonTextUniqueKeys } from "./json.ts";
-import { publicKeyHexMatches, sha256Hex, verifyChioSignature } from "./crypto.ts";
+import { publicKeyHexMatches, sha256Hex, wrappedSignatureValid } from "./crypto.ts";
 import { ChioInvariantError } from "./errors.ts";
 
+export const RECEIPT_SCHEMA = "chio.receipt.v1";
+
 function safeVerifyReceiptSignature(
-  signedBytes: string,
+  signingBodyCanonicalJson: string,
   signature: string,
   publicKey: string,
 ): boolean {
   try {
-    return verifyChioSignature(signedBytes, signature, publicKey);
+    return wrappedSignatureValid(RECEIPT_SCHEMA, signingBodyCanonicalJson, publicKey, signature);
   } catch (error) {
     if (error instanceof ChioInvariantError) {
-      // Fail-closed: receipts signed with unsupported algorithms or malformed
-      // keys/signatures verify as false rather than propagating an exception.
       return false;
     }
     throw error;
@@ -58,7 +58,6 @@ export interface ChioReceipt {
   trust_level: "mediated" | "verified" | "advisory" | string;
   tenant_id?: string;
   kernel_key: string;
-  algorithm?: unknown;
   signature: string;
 }
 
@@ -80,7 +79,6 @@ export interface ReceiptVerification {
 const RECEIPT_MEMBERS = new Set([
   "action",
   "actor_chain",
-  "algorithm",
   "bbs_projection_version",
   "bbs_signature",
   "boundary_class",
@@ -168,11 +166,11 @@ export function parseReceiptJson(input: string): ChioReceipt {
   return parseJsonTextUniqueKeys(input);
 }
 
-export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "algorithm" | "signature"> {
-  const { signature: _signature, algorithm: _algorithm, ...body } = receipt;
+export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "signature"> {
+  const { signature: _signature, ...body } = receipt;
   return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)) as Omit<
     ChioReceipt,
-    "algorithm" | "signature"
+    "signature"
   >;
 }
 

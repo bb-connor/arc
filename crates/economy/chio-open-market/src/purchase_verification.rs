@@ -268,12 +268,12 @@ pub fn verify_purchase_context_pure(
 
     // Listing and pricing identity under the admitted envelopes.
     let listing: SignedGenericListing = parse_member(&context.listing_envelope_json, "listing")?;
-    if !matches!(listing.verify_signature(), Ok(true)) {
+    if !matches!(listing.verify_signature(&listing.signer_key), Ok(true)) {
         return Err(PurchaseVerificationError::EnvelopeSignature("listing"));
     }
     let pricing: SignedListingPricingHint =
         parse_member(&context.pricing_hint_envelope_json, "pricing_hint")?;
-    if !matches!(pricing.verify_signature(), Ok(true)) {
+    if !matches!(pricing.verify_signature(&pricing.signer_key), Ok(true)) {
         return Err(PurchaseVerificationError::EnvelopeSignature("pricing_hint"));
     }
     if pricing.body.listing_id != inputs.marker_listing_id
@@ -301,7 +301,7 @@ pub fn verify_purchase_context_pure(
 
     // Handshake: bid, ask, accepted bid, and the exact token offer.
     let ask: SignedAskResponse = parse_member(&context.ask_response_envelope_json, "ask_response")?;
-    if !matches!(ask.verify_signature(), Ok(true)) {
+    if !matches!(ask.verify_signature(&ask.signer_key), Ok(true)) {
         return Err(PurchaseVerificationError::EnvelopeSignature("ask_response"));
     }
     if ask.body.token_offer.issuer != ask.signer_key {
@@ -311,7 +311,13 @@ pub fn verify_purchase_context_pure(
         return Err(PurchaseVerificationError::UnauthorizedIssuer);
     }
     let bid: SignedBidRequest = parse_member(&context.bid_request_envelope_json, "bid_request")?;
-    if !matches!(bid.verify_signature(), Ok(true)) {
+    if bid.signer_key != ask.body.token_offer.subject {
+        return Err(PurchaseVerificationError::HandshakeBinding("bid_signer"));
+    }
+    if !matches!(
+        bid.verify_signature(&ask.body.token_offer.subject),
+        Ok(true)
+    ) {
         return Err(PurchaseVerificationError::EnvelopeSignature("bid_request"));
     }
     let bid_request_envelope_sha256 =
@@ -329,7 +335,7 @@ pub fn verify_purchase_context_pure(
     }
     let accepted: SignedAcceptedBid =
         parse_member(&context.accepted_bid_envelope_json, "accepted_bid")?;
-    if !matches!(accepted.verify_signature(), Ok(true)) {
+    if !matches!(accepted.verify_signature(&accepted.signer_key), Ok(true)) {
         return Err(PurchaseVerificationError::EnvelopeSignature("accepted_bid"));
     }
     let ask_digest = canonical_json_bytes(&ask.body)

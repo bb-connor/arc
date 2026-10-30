@@ -320,6 +320,7 @@ pub(crate) async fn handle_issue_credit_loss_lifecycle(
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
         &request,
+        state.config.capital_authority.as_ref(),
     ) {
         Ok(event) => Json::<SignedCreditLossLifecycle>(event).into_response(),
         Err(error) => error.into_response(),

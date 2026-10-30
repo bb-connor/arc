@@ -1,0 +1,18 @@
+{
+  "configurationRevision": "integration-revision-1",
+  "coveredCheckpointSha256": "84782db474d5682c9344f5e053bb1b6439ffeff7eaac57177fd396c79835b058",
+  "createdAt": 1793209497,
+  "objectSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "objectSize": 256,
+  "objectUri": "s3://chio-test/archive-finding-a-v2-a.json",
+  "previousArchiveSha256": "0006c089e693d0ad50297a1488a416faec3644022752afffd3ce3cb5ff013dec",
+  "schema": "chio.finding.hosted-archive-manifest.v1",
+  "target": {
+    "resourceFamily": "finding",
+    "resourceId": "60b49af83cd6724007c7480071e9201d3b6775d287e83935a25f4847aef3e679",
+    "resourceKind": "aggregate",
+    "resourceRevision": 2,
+    "resourceSha256": "8c3c9cc8f3ca30f0ccbc770ebc9ba7c15ddf8b29f1888f560ad7a07c3961c2a5"
+  },
+  "tenantId": "integration-a-1793209486471803644"
+}

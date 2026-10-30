@@ -1,0 +1,10 @@
+{
+  "finding_id": "8888888888888888888888888888888888888888888888888888888888888888",
+  "inclusion_deadline": 24,
+  "intent_id": "7777777777777777777777777777777777777777777777777777777777777777",
+  "issued_at": 23,
+  "reason": "seller_voluntary_retraction",
+  "schema": "chio.finding.voluntary-retraction.v1",
+  "seller": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "status_feed_ref": "status:feed"
+}

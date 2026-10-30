@@ -14,15 +14,16 @@
 //! capability tokens, receipts, and DPoP proofs. The fabric crate does not
 //! introduce new key handling or new algorithms.
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{
-    sign_canonical_with_backend, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped_bytes, PublicKey, Signature, SigningBackend};
 use chio_core::error::Error as CoreError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::ProvenanceStamp;
+
+/// Signing-wrapper schema id of a signed provenance stamp.
+pub const PROVENANCE_STAMP_SCHEMA: &str = "chio.provenance-stamp.v1";
 
 /// Envelope wrapping a [`ProvenanceStamp`] together with a detached signature
 /// over its canonical-JSON bytes.
@@ -33,6 +34,7 @@ use crate::ProvenanceStamp;
 /// bytes, matching the protocol's general "receipts compare by exact bytes"
 /// posture.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SignedProvenance {
     /// Original stamp. Mirrors the unsigned shape so consumers that only
     /// trust their own canonicalization can re-derive the signed bytes.
@@ -41,13 +43,11 @@ pub struct SignedProvenance {
     /// signer's exact byte sequence is reproducible without re-running
     /// canonicalization on the verifier side.
     pub signed_bytes: Vec<u8>,
-    /// Algorithm of the [`Signature`]. Matches `signature.algorithm()` and is
-    /// retained as a top-level hint so consumers can short-circuit before
-    /// touching the signature material.
-    pub algorithm: SigningAlgorithm,
-    /// Public half of the producing [`SigningBackend`].
+    /// Public half of the producing [`SigningBackend`]; its encoding alone
+    /// selects the signature algorithm.
     pub public_key: PublicKey,
-    /// Detached signature over [`Self::signed_bytes`].
+    /// Detached signature over the signing wrapper of [`Self::signed_bytes`]
+    /// under `chio.provenance-stamp.v1`.
     pub signature: Signature,
 }
 
@@ -67,9 +67,6 @@ pub enum ProvenanceError {
     /// the verifier independently produces.
     #[error("envelope signed_bytes diverged from canonical re-serialization of stamp")]
     CanonicalDrift,
-    /// Algorithm hint disagreed with the [`Signature`]'s algorithm.
-    #[error("envelope algorithm hint did not match signature algorithm")]
-    AlgorithmMismatch,
 }
 
 impl From<CoreError> for ProvenanceError {
@@ -82,7 +79,7 @@ impl From<CoreError> for ProvenanceError {
 /// [`SignedProvenance`] envelope.
 ///
 /// The stamp is serialized to RFC 8785 canonical JSON; the resulting bytes
-/// are signed via [`sign_canonical_with_backend`]; both the bytes and the
+/// are signed through the signing wrapper; both the bytes and the
 /// signature are placed in the returned envelope alongside the producing
 /// public key.
 ///
@@ -92,41 +89,41 @@ pub fn sign_provenance(
     stamp: &ProvenanceStamp,
     backend: &dyn SigningBackend,
 ) -> Result<SignedProvenance, ProvenanceError> {
-    let public_key = backend.public_key()?;
-    let (signature, signed_bytes) = sign_canonical_with_backend(backend, stamp)?;
+    let canonical = CanonicalBytes::from_serializable(stamp)?;
+    let outcome = backend.sign_wrapped(PROVENANCE_STAMP_SCHEMA, &canonical)?;
     Ok(SignedProvenance {
         stamp: stamp.clone(),
-        signed_bytes,
-        algorithm: public_key.algorithm(),
-        public_key,
-        signature,
+        signed_bytes: canonical.into_vec(),
+        public_key: outcome.public_key,
+        signature: outcome.signature,
     })
 }
 
 /// Verify a [`SignedProvenance`] envelope.
 ///
-/// Three checks run, in order:
+/// Two checks run, in order:
 ///
-/// 1. The envelope's `algorithm` field matches the signature algorithm.
-/// 2. The envelope's `signed_bytes` re-canonicalize from `stamp` byte-for-byte
+/// 1. The envelope's `signed_bytes` re-canonicalize from `stamp` byte-for-byte
 ///    (so a verifier never trusts unsigned framing decisions).
-/// 3. The signature verifies against `public_key` over `signed_bytes`.
+/// 2. The signature verifies against `public_key` over the wrapper of
+///    `signed_bytes`.
 ///
 /// On success returns the public key that signed the stamp so callers can
 /// route trust decisions through their identity layer.
 pub fn verify_signed_provenance(
     envelope: &SignedProvenance,
 ) -> Result<&PublicKey, ProvenanceError> {
-    if envelope.algorithm != envelope.signature.algorithm() {
-        return Err(ProvenanceError::AlgorithmMismatch);
-    }
-    let recanon = canonical_json_bytes(&envelope.stamp)?;
-    if recanon != envelope.signed_bytes {
+    let recanon = CanonicalBytes::from_serializable(&envelope.stamp)?;
+    if recanon.as_bytes() != envelope.signed_bytes.as_slice() {
         return Err(ProvenanceError::CanonicalDrift);
     }
-    if !envelope
-        .public_key
-        .verify(&envelope.signed_bytes, &envelope.signature)
+    if verify_wrapped_bytes(
+        &envelope.public_key,
+        PROVENANCE_STAMP_SCHEMA,
+        &recanon,
+        &envelope.signature,
+    )
+    .is_err()
     {
         return Err(ProvenanceError::SignatureMismatch);
     }
@@ -161,7 +158,9 @@ mod tests {
         let stamp = sample_stamp();
         let envelope = sign_provenance(&stamp, &backend).unwrap();
         assert_eq!(envelope.stamp, stamp);
-        assert_eq!(envelope.algorithm, SigningAlgorithm::Ed25519);
+        assert!(!serde_json::to_string(&envelope)
+            .unwrap()
+            .contains("\"algorithm\""));
         let pk = verify_signed_provenance(&envelope).unwrap();
         assert_eq!(pk, &backend.public_key().unwrap());
     }

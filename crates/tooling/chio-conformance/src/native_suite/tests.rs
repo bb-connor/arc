@@ -238,7 +238,9 @@ fn native_fixture_responses_include_governed_receipt_metadata() {
     let request = build_governed_request();
     let messages = fixture_messages_for_request(&request);
     let (_, receipt) = terminal_response(&messages).expect("terminal response");
-    assert!(receipt.verify_signature().expect("verify signature"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("verify signature"));
     assert!(receipt
         .metadata
         .as_ref()

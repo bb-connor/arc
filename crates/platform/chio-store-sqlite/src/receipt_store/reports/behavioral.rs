@@ -422,7 +422,7 @@ impl SqliteReceiptStore {
         );
         let budget_authority = receipt.financial_budget_authority_metadata();
         let authorized = receipt.is_allowed()
-            && receipt.verify_signature().unwrap_or(false)
+            && receipt.verify_integrity_embedded_key().unwrap_or(false)
             && receipt.action.verify_hash().unwrap_or(false);
 
         Ok(BehavioralFeedReceiptRow {

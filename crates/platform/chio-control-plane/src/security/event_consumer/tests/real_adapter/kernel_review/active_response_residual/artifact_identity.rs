@@ -27,7 +27,7 @@ fn shorter_signed_request(
         &Ed25519Backend::new(submitter),
     )
     .test_unwrap();
-    assert!(proof.verify_signature().test_unwrap());
+    assert!(proof.verify_integrity_embedded_key().test_unwrap());
     assert_ne!(
         chio_kernel::active_response_submission_proof_digest(&proof).test_unwrap(),
         chio_kernel::active_response_submission_proof_digest(
@@ -64,7 +64,7 @@ fn shorter_signed_request(
         &Ed25519Backend::new(fixture.submission_authority.clone()),
     )
     .test_unwrap();
-    assert!(attestation.verify_signature().test_unwrap());
+    assert!(attestation.verify_integrity_embedded_key().test_unwrap());
     let authorization = ActiveResponseAuthorizationRequest::new(
         original.authorization().operator_capability().clone(),
         original.authorization().plan_body().clone(),

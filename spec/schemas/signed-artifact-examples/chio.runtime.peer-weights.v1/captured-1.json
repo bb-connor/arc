@@ -1,0 +1,14 @@
+{
+  "expiresAtUnixMs": 3000,
+  "issuedAtUnixMs": 1000,
+  "keyId": "key-preparation",
+  "reputationEpoch": 7,
+  "schema": "chio.runtime.peer-weights.v1",
+  "verifierId": "verifier-preparation",
+  "weights": [
+    {
+      "peerKernelId": "kernel-local",
+      "weight": 1
+    }
+  ]
+}

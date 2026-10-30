@@ -734,7 +734,10 @@ fn runtime_attestation_import_reasons_cover_remaining_policy_fail_closed_paths()
 
     assert_eq!(
         import.local_policy_outcome.reason_codes,
-        vec![RuntimeAttestationImportReasonCode::NoLocalPolicy]
+        vec![
+            RuntimeAttestationImportReasonCode::NoLocalPolicy,
+            RuntimeAttestationImportReasonCode::UntrustedSigner,
+        ]
     );
     assert_eq!(
         import.local_policy_outcome.reasons[0].description,
@@ -1536,7 +1539,10 @@ fn imported_runtime_attestation_rejects_invalid_signature() {
     );
     assert_eq!(
         import.local_policy_outcome.reason_codes,
-        vec![RuntimeAttestationImportReasonCode::InvalidSignature]
+        vec![
+            RuntimeAttestationImportReasonCode::InvalidSignature,
+            RuntimeAttestationImportReasonCode::UntrustedSigner,
+        ]
     );
 }
 
@@ -1587,6 +1593,52 @@ fn imported_runtime_attestation_can_be_attenuated_locally() {
     assert_eq!(
         import.local_policy_outcome.reason_codes,
         vec![RuntimeAttestationImportReasonCode::TierAttenuated]
+    );
+}
+
+#[test]
+fn imported_runtime_attestation_refuses_a_valid_signature_when_no_signer_is_trusted() {
+    let evidence = sample_evidence();
+    let appraisal = derive_runtime_attestation_appraisal(&evidence).test_expect("derive appraisal");
+    let report = RuntimeAttestationAppraisalReport {
+        schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
+        generated_at: 150,
+        appraisal,
+        policy_outcome: RuntimeAttestationPolicyOutcome {
+            trust_policy_configured: false,
+            accepted: true,
+            effective_tier: RuntimeAssuranceTier::Attested,
+            reason: None,
+        },
+    };
+    let result = RuntimeAttestationAppraisalResult::from_report("did:chio:test:issuer", &report)
+        .test_unwrap();
+    let signer = crate::crypto::Keypair::generate();
+    let signed = SignedRuntimeAttestationAppraisalResult::sign(result, &signer).test_unwrap();
+
+    let import = evaluate_imported_runtime_attestation_appraisal(
+        &RuntimeAttestationAppraisalImportRequest {
+            signed_result: signed,
+            local_policy: RuntimeAttestationImportedAppraisalPolicy {
+                trusted_issuers: vec!["did:chio:test:issuer".to_string()],
+                trusted_signer_keys: Vec::new(),
+                allowed_verifier_families: vec![AttestationVerifierFamily::AzureMaa],
+                max_result_age_seconds: Some(300),
+                max_evidence_age_seconds: Some(300),
+                maximum_effective_tier: Some(RuntimeAssuranceTier::Basic),
+                required_claims: BTreeMap::new(),
+            },
+        },
+        160,
+    );
+
+    assert_eq!(
+        import.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert_eq!(
+        import.local_policy_outcome.reason_codes,
+        vec![RuntimeAttestationImportReasonCode::UntrustedSigner]
     );
 }
 

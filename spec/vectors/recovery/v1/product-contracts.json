@@ -4299,7 +4299,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "base_deployment": [
@@ -4516,7 +4515,7 @@
             8
           ]
         },
-        "signature": "a4a6f76c231e8babd4fe13a13143fe39974d264492f83c4c63642cbe73e02e3ed500c0aff43cef926f7665277d6805e76479b25b6c3b9629a9562bc4733d9f09"
+        "signature": "eb2b65ad2cf879946cad4c9da607279331e73ddc60b4aee9f4588060c5d9dbd3c80a00c30054161ad80112f392c4e1460955fd77c596376ccd13f628d94ed207"
       },
       "name": "signed-policy-deployment-change.schema.json",
       "schema": "signed-policy-deployment-change.schema.json",
@@ -4525,7 +4524,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "base_deployment": [
@@ -4742,7 +4740,7 @@
             8
           ]
         },
-        "signature": "a4a6f76c231e8babd4fe13a13143fe39974d264492f83c4c63642cbe73e02e3ed500c0aff43cef926f7665277d6805e76479b25b6c3b9629a9562bc4733d9f09",
+        "signature": "eb2b65ad2cf879946cad4c9da607279331e73ddc60b4aee9f4588060c5d9dbd3c80a00c30054161ad80112f392c4e1460955fd77c596376ccd13f628d94ed207",
         "untrusted_approval": true
       },
       "name": "signed-policy-deployment-change.schema.json:unknown",
@@ -4752,7 +4750,6 @@
     },
     {
       "body": {
-        "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "base_deployment": [
             1,
@@ -4968,7 +4965,7 @@
             8
           ]
         },
-        "signature": "a4a6f76c231e8babd4fe13a13143fe39974d264492f83c4c63642cbe73e02e3ed500c0aff43cef926f7665277d6805e76479b25b6c3b9629a9562bc4733d9f09"
+        "signature": "eb2b65ad2cf879946cad4c9da607279331e73ddc60b4aee9f4588060c5d9dbd3c80a00c30054161ad80112f392c4e1460955fd77c596376ccd13f628d94ed207"
       },
       "name": "signed-policy-deployment-change.schema.json:missing",
       "schema": "signed-policy-deployment-change.schema.json",
@@ -4977,7 +4974,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "base_deployment": [
@@ -5194,7 +5190,7 @@
             99
           ]
         },
-        "signature": "a4a6f76c231e8babd4fe13a13143fe39974d264492f83c4c63642cbe73e02e3ed500c0aff43cef926f7665277d6805e76479b25b6c3b9629a9562bc4733d9f09"
+        "signature": "eb2b65ad2cf879946cad4c9da607279331e73ddc60b4aee9f4588060c5d9dbd3c80a00c30054161ad80112f392c4e1460955fd77c596376ccd13f628d94ed207"
       },
       "name": "signed-policy-deployment-change.schema.json:substitution",
       "schema": "signed-policy-deployment-change.schema.json",
@@ -5203,7 +5199,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_workflow": "benign-workflow",
@@ -5354,7 +5349,7 @@
             10
           ]
         },
-        "signature": "51209d019bbd01f5b20e8cc45c56c4a21d5dcc0453cd08f1ae3e00b10f7dab5e669d8afee0d84718532400cf9f0baa05216175f587cd107ab9b25a8418639703"
+        "signature": "dfb88d303ddaae924d827a81f7ae0ea055b8237c293b168efbcd11494ca15da6ae37804ba3da516d357be32c36c6ffdad93f890a348c642217f80997e3375f0f"
       },
       "name": "signed-recovery-setup-probe.schema.json",
       "schema": "signed-recovery-setup-probe.schema.json",
@@ -5363,7 +5358,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_workflow": "benign-workflow",
@@ -5514,7 +5508,7 @@
             10
           ]
         },
-        "signature": "51209d019bbd01f5b20e8cc45c56c4a21d5dcc0453cd08f1ae3e00b10f7dab5e669d8afee0d84718532400cf9f0baa05216175f587cd107ab9b25a8418639703",
+        "signature": "dfb88d303ddaae924d827a81f7ae0ea055b8237c293b168efbcd11494ca15da6ae37804ba3da516d357be32c36c6ffdad93f890a348c642217f80997e3375f0f",
         "untrusted_approval": true
       },
       "name": "signed-recovery-setup-probe.schema.json:unknown",
@@ -5524,7 +5518,6 @@
     },
     {
       "body": {
-        "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_workflow": "benign-workflow",
           "denied_command": "denied-command",
@@ -5674,7 +5667,7 @@
             10
           ]
         },
-        "signature": "51209d019bbd01f5b20e8cc45c56c4a21d5dcc0453cd08f1ae3e00b10f7dab5e669d8afee0d84718532400cf9f0baa05216175f587cd107ab9b25a8418639703"
+        "signature": "dfb88d303ddaae924d827a81f7ae0ea055b8237c293b168efbcd11494ca15da6ae37804ba3da516d357be32c36c6ffdad93f890a348c642217f80997e3375f0f"
       },
       "name": "signed-recovery-setup-probe.schema.json:missing",
       "schema": "signed-recovery-setup-probe.schema.json",
@@ -5683,7 +5676,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_workflow": "benign-workflow",
@@ -5834,7 +5826,7 @@
             99
           ]
         },
-        "signature": "51209d019bbd01f5b20e8cc45c56c4a21d5dcc0453cd08f1ae3e00b10f7dab5e669d8afee0d84718532400cf9f0baa05216175f587cd107ab9b25a8418639703"
+        "signature": "dfb88d303ddaae924d827a81f7ae0ea055b8237c293b168efbcd11494ca15da6ae37804ba3da516d357be32c36c6ffdad93f890a348c642217f80997e3375f0f"
       },
       "name": "signed-recovery-setup-probe.schema.json:substitution",
       "schema": "signed-recovery-setup-probe.schema.json",
@@ -5843,7 +5835,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_operation": "benign-operation",
@@ -6135,7 +6126,7 @@
           },
           "qualified_at_unix_ms": 2000
         },
-        "signature": "0571f768fbb91b1b80a1fa650d72094d52a90e0aaf166f9413dc26dd3eccf45bd7719301baf4cecaa1a1a4f0d9f6d52b46322f949e7f184f48d2b71a20ca0706"
+        "signature": "062955d116d4fb185d3ff3f6a35e8179f6ba2a078f3bfbe241a1b31c850ce0a4b560d93caedbfa09bb15ed4062fe329cc81db6ee11f2dbafe64303278a1dbc06"
       },
       "name": "signed-recovery-setup-report.schema.json",
       "schema": "signed-recovery-setup-report.schema.json",
@@ -6144,7 +6135,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_operation": "benign-operation",
@@ -6436,7 +6426,7 @@
           },
           "qualified_at_unix_ms": 2000
         },
-        "signature": "0571f768fbb91b1b80a1fa650d72094d52a90e0aaf166f9413dc26dd3eccf45bd7719301baf4cecaa1a1a4f0d9f6d52b46322f949e7f184f48d2b71a20ca0706",
+        "signature": "062955d116d4fb185d3ff3f6a35e8179f6ba2a078f3bfbe241a1b31c850ce0a4b560d93caedbfa09bb15ed4062fe329cc81db6ee11f2dbafe64303278a1dbc06",
         "untrusted_approval": true
       },
       "name": "signed-recovery-setup-report.schema.json:unknown",
@@ -6446,7 +6436,6 @@
     },
     {
       "body": {
-        "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_operation": "benign-operation",
           "benign_receipt": [
@@ -6737,7 +6726,7 @@
           },
           "qualified_at_unix_ms": 2000
         },
-        "signature": "0571f768fbb91b1b80a1fa650d72094d52a90e0aaf166f9413dc26dd3eccf45bd7719301baf4cecaa1a1a4f0d9f6d52b46322f949e7f184f48d2b71a20ca0706"
+        "signature": "062955d116d4fb185d3ff3f6a35e8179f6ba2a078f3bfbe241a1b31c850ce0a4b560d93caedbfa09bb15ed4062fe329cc81db6ee11f2dbafe64303278a1dbc06"
       },
       "name": "signed-recovery-setup-report.schema.json:missing",
       "schema": "signed-recovery-setup-report.schema.json",
@@ -6746,7 +6735,6 @@
     },
     {
       "body": {
-        "algorithm": "ed25519",
         "authority_key": "c91cb3ce2b84e4ba85f562ece41edfe4e27afc52d88d507f66a18638df823e9f",
         "body": {
           "benign_operation": "benign-operation",
@@ -7038,7 +7026,7 @@
           },
           "qualified_at_unix_ms": 2000
         },
-        "signature": "0571f768fbb91b1b80a1fa650d72094d52a90e0aaf166f9413dc26dd3eccf45bd7719301baf4cecaa1a1a4f0d9f6d52b46322f949e7f184f48d2b71a20ca0706"
+        "signature": "062955d116d4fb185d3ff3f6a35e8179f6ba2a078f3bfbe241a1b31c850ce0a4b560d93caedbfa09bb15ed4062fe329cc81db6ee11f2dbafe64303278a1dbc06"
       },
       "name": "signed-recovery-setup-report.schema.json:substitution",
       "schema": "signed-recovery-setup-report.schema.json",

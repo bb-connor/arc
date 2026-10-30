@@ -47,6 +47,7 @@ fi
 
 # ci-workspace is the fast regression gate.
 bash scripts/check-supply-chain.sh
+python3 scripts/check-self-key-verify.py --release
 ./scripts/ci-workspace.sh
 rm -rf \
   "${conformance_root}" \

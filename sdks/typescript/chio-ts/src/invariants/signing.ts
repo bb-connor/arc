@@ -1,19 +1,18 @@
 import {
   isValidEd25519PublicKeyHex,
   isValidEd25519SignatureHex,
+  publicKeyFromSeedEd25519,
   publicKeyHexMatches,
-  signEd25519Message,
-  verifyEd25519Signature,
+  signWrappedCanonicalEd25519,
+  verifyWrappedCanonical,
 } from "./crypto.ts";
 import { canonicalizeJsonString } from "./json.ts";
 
-export interface Utf8MessageSignature {
+export interface WrappedJsonSignature {
+  schema_id: string;
+  canonical_json: string;
   public_key_hex: string;
   signature_hex: string;
-}
-
-export interface CanonicalJsonSignature extends Utf8MessageSignature {
-  canonical_json: string;
 }
 
 export function isValidPublicKeyHex(value: string): boolean {
@@ -24,34 +23,29 @@ export function isValidSignatureHex(value: string): boolean {
   return isValidEd25519SignatureHex(value);
 }
 
-export function signUtf8MessageEd25519(input: string, seedHex: string): Utf8MessageSignature {
-  return signEd25519Message(input, seedHex);
-}
-
-export function verifyUtf8MessageEd25519(
-  input: string,
-  publicKeyHex: string,
-  signatureHex: string,
-): boolean {
-  return verifyEd25519Signature(input, publicKeyHex, signatureHex);
-}
-
-export function signJsonStringEd25519(input: string, seedHex: string): CanonicalJsonSignature {
-  const canonical_json = canonicalizeJsonString(input);
-  const signed = signEd25519Message(canonical_json, seedHex);
+export function signWrappedJsonEd25519(
+  schemaId: string,
+  inputJson: string,
+  seedHex: string,
+): WrappedJsonSignature {
+  const canonical_json = canonicalizeJsonString(inputJson);
+  const signed = signWrappedCanonicalEd25519(schemaId, canonical_json, seedHex);
   return {
+    schema_id: schemaId,
     canonical_json,
     public_key_hex: signed.public_key_hex,
     signature_hex: signed.signature_hex,
   };
 }
 
-export function verifyJsonStringSignatureEd25519(
-  input: string,
+/** Throws a `ChioInvariantError` unless the signature covers the wrapper of `inputJson`. */
+export function verifyWrappedJson(
+  schemaId: string,
+  inputJson: string,
   publicKeyHex: string,
   signatureHex: string,
-): boolean {
-  return verifyEd25519Signature(canonicalizeJsonString(input), publicKeyHex, signatureHex);
+): void {
+  verifyWrappedCanonical(schemaId, canonicalizeJsonString(inputJson), publicKeyHex, signatureHex);
 }
 
-export { publicKeyHexMatches };
+export { publicKeyFromSeedEd25519, publicKeyHexMatches };

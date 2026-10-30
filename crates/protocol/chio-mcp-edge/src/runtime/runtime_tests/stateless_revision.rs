@@ -247,7 +247,7 @@ fn stateless_tool_results_carry_signed_execution_evidence() {
     assert_eq!(evidence["outputKind"], "value");
     let receipt: chio_core::receipt::body::ChioReceipt =
         serde_json::from_value(evidence["receipt"].clone()).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.decision, Some(Decision::Allow));
     assert_eq!(
         receipt.metadata.as_ref().unwrap()["receipt_context"]["request_id"],

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/worker-capability.schema.json",
+  "title": "Chio finding worker capability signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityId",
+    "expiresAtUnixSecs",
+    "jobId",
+    "jobKind",
+    "jobSpecSha256",
+    "maxAttempts",
+    "notBeforeUnixSecs",
+    "requestSha256",
+    "schema",
+    "tenantId"
+  ],
+  "properties": {
+    "capabilityId": {
+      "type": "string"
+    },
+    "expiresAtUnixSecs": {
+      "type": "integer"
+    },
+    "jobId": {
+      "type": "string"
+    },
+    "jobKind": {
+      "type": "string"
+    },
+    "jobSpecSha256": {
+      "type": "string"
+    },
+    "maxAttempts": {
+      "type": "integer"
+    },
+    "notBeforeUnixSecs": {
+      "type": "integer"
+    },
+    "requestSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.worker-capability.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

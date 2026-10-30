@@ -163,7 +163,7 @@ fn restart_pricing(
             serde_json::json!({"original_paid_output": true}),
         ))
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let financial = response
         .receipt
         .metadata

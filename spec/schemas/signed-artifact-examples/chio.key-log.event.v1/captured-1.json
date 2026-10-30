@@ -1,0 +1,20 @@
+{
+  "algorithm": "ed25519",
+  "authority_id": "authority.snapshot",
+  "effective_at": 2000,
+  "event_id": "event.rotation",
+  "issued_at": 2000,
+  "key_id": "0x6c312db3f7a5c36c463005f9880f439607a0c0641a17e46377b419ac41dac8ee",
+  "log_id": "log.snapshot",
+  "operation": {
+    "previous_key_id": "0xf6d98d6a0f4dc443c179b7f2a7989b7bf7c84badc69c39b7e564c1f893f6d8ce",
+    "type": "rotate",
+    "witness_roster_binding": "0x6536eaaba59aecaa56fdad9ca2c3ea9a41fa2255cc6ed5d843065dbe94860ced",
+    "witness_roster_id": "roster.snapshot"
+  },
+  "previous_event_hash": "0xc800005ae1ba62061e458ef0200d56b0dfacd55867792c83ddba3f629fc1359b",
+  "public_key": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+  "schema": "chio.key-log.event.v1",
+  "sequence": 1,
+  "verify_until": 9000
+}

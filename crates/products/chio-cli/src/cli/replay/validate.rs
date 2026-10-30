@@ -96,8 +96,9 @@ pub fn schema_version_gate(
     Ok(())
 }
 
-/// Build the byte slice the tenant-sig commits to: canonical JSON of
-/// every frame field except `tenant_sig`.
+/// Build the bytes the tenant-sig commits to: the signing wrapper under
+/// `chio.tee-capture-frame.v1` over the canonical JSON of every frame field
+/// except `tenant_sig`.
 pub fn signing_payload(frame: &chio_tee_frame::Frame) -> Result<Vec<u8>, ValidateError> {
     let mut value = serde_json::to_value(frame)
         .map_err(|e| ValidateError::TenantSig(format!("serialize frame: {e}")))?;
@@ -108,10 +109,15 @@ pub fn signing_payload(frame: &chio_tee_frame::Frame) -> Result<Vec<u8>, Validat
             "frame did not serialize as a JSON object".to_string(),
         ));
     }
-    let bytes = chio_core::canonical::canonical_json_bytes(&value)
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&value)
         .map_err(|e| ValidateError::TenantSig(format!("canonicalize frame: {e}")))?;
-    Ok(bytes)
+    let wrapper = chio_core::crypto::SigningWrapper::new(TEE_CAPTURE_FRAME_SCHEMA, &canonical)
+        .map_err(|e| ValidateError::TenantSig(format!("frame signing wrapper: {e}")))?;
+    Ok(wrapper.as_bytes().to_vec())
 }
+
+/// Signing-wrapper schema id of a TEE capture frame's tenant signature.
+pub const TEE_CAPTURE_FRAME_SCHEMA: &str = "chio.tee-capture-frame.v1";
 
 /// Decode the embedded `tenant_sig: ed25519:<base64>` field into a raw
 /// 64-byte Ed25519 signature. Returns the `ValidateError::TenantSig`

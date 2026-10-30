@@ -1,0 +1,11 @@
+{
+  "createdAt": 1999999990,
+  "expiresAt": 2000000010,
+  "issuer": "https://verifier.example",
+  "partner": "acme",
+  "schema": "chio.federated-delegation-policy.v1",
+  "scope": {},
+  "signerPublicKey": "000615b38566dd69ddc6d7d20b08c48ca976b573b18d668868a3cb920eeccd38",
+  "ttlSeconds": 60,
+  "verifier": "https://verifier.example"
+}

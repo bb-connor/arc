@@ -331,7 +331,7 @@ fn semantic_refusals_accept_bound_signed_denials_and_cancellations() -> Result<(
         ] {
             let fixture = SemanticRefusal::new(state, decision)?;
             receipt(&fixture.call, &fixture.key.public_key())?;
-            assert!(fixture.cap.verify_signature().map_err(error)?);
+            assert!(fixture.cap.verify_integrity_embedded_key().map_err(error)?);
             fixture.verify()?;
         }
     }

@@ -1,0 +1,7 @@
+{
+  "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+  "policy_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "receipt_id": "receipt-evidence-id-separation",
+  "schema": "chio.receipt.v1",
+  "terminal_status": "allowed_executed"
+}

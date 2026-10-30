@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/trust-scorecard-snapshot-body.schema.json",
+  "title": "chio.trust.scorecard-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "component_scores",
+    "computed_score",
+    "downgrade_reasons",
+    "freshness_window",
+    "id",
+    "issued_at",
+    "issuer_trust_roots",
+    "negative_event_refs",
+    "portable_reputation_import_refs",
+    "reputation_snapshot_refs",
+    "schema",
+    "scope",
+    "score_ceiling",
+    "score_floor",
+    "sla_performance_refs",
+    "subject",
+    "verifier_policy_ref"
+  ],
+  "properties": {
+    "component_scores": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "evidence_ref",
+          "score",
+          "stale",
+          "weight"
+        ],
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "evidence_ref": {
+            "type": "string"
+          },
+          "score": {
+            "type": "integer"
+          },
+          "stale": {
+            "type": "boolean"
+          },
+          "weight": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "computed_score": {
+      "type": "integer"
+    },
+    "downgrade_reasons": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "freshness_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "valid_from": {
+          "type": "string"
+        },
+        "valid_until": {
+          "type": "string"
+        }
+      }
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "issuer_trust_roots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "negative_event_refs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "portable_reputation_import_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reputation_snapshot_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.trust.scorecard-snapshot.v1"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "score_ceiling": {
+      "type": "integer"
+    },
+    "score_floor": {
+      "type": "integer"
+    },
+    "sla_performance_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "subject": {
+      "type": "string"
+    },
+    "verifier_policy_ref": {
+      "type": "string"
+    }
+  }
+}

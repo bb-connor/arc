@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/key-binding-certificate.schema.json",
+  "title": "Chio key binding certificate signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chain_scope",
+    "chio_identity",
+    "chio_public_key",
+    "expires_at",
+    "issued_at",
+    "nonce",
+    "purpose",
+    "schema",
+    "settlement_address"
+  ],
+  "properties": {
+    "chain_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "chio_identity": {
+      "type": "string"
+    },
+    "chio_public_key": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.key-binding-certificate.v1"
+    },
+    "settlement_address": {
+      "type": "string"
+    }
+  }
+}

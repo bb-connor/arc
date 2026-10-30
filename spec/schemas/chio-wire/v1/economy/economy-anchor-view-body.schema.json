@@ -1,0 +1,1262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/economy-anchor-view-body.schema.json",
+  "title": "chio.economy.anchor-view.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "absentRequestKeys",
+    "absentResourceKeys",
+    "anchorId",
+    "checkpointDigest",
+    "checkpointSequence",
+    "heads",
+    "headsRoot",
+    "namespace",
+    "observedAt",
+    "requestReplays",
+    "requestReplaysRoot",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId"
+  ],
+  "properties": {
+    "absentRequestKeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requestId",
+          "requestNamespaceDigest"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "requestNamespaceDigest": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "absentResourceKeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resourceFamily",
+          "resourceId",
+          "scopeId"
+        ],
+        "properties": {
+          "resourceFamily": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "scopeId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "anchorId": {
+      "type": "string"
+    },
+    "checkpointDigest": {
+      "type": "string"
+    },
+    "checkpointSequence": {
+      "type": "integer"
+    },
+    "heads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "anchorId",
+          "headVersion",
+          "lifecycleFence",
+          "lifecycleState",
+          "namespace",
+          "resourceKey",
+          "resourceVersion",
+          "schema",
+          "state",
+          "stateDigest",
+          "trustedClockHighWater"
+        ],
+        "properties": {
+          "anchorId": {
+            "type": "string"
+          },
+          "effectIdempotencyKey": {
+            "type": "string"
+          },
+          "frost": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "actionDigest",
+              "authorizationId",
+              "authorizationSlotId",
+              "signedEnvelopeDigest"
+            ],
+            "properties": {
+              "actionDigest": {
+                "type": "string"
+              },
+              "authorizationId": {
+                "type": "string"
+              },
+              "authorizationSlotId": {
+                "type": "string"
+              },
+              "signedEnvelopeDigest": {
+                "type": "string"
+              }
+            }
+          },
+          "headVersion": {
+            "type": "integer"
+          },
+          "lifecycleFence": {
+            "type": "integer"
+          },
+          "lifecycleState": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "predecessorDigest": {
+            "type": "string"
+          },
+          "resourceKey": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "resourceFamily",
+              "resourceId",
+              "scopeId"
+            ],
+            "properties": {
+              "resourceFamily": {
+                "type": "string"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "scopeId": {
+                "type": "string"
+              }
+            }
+          },
+          "resourceVersion": {
+            "type": "integer"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "state": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "storage",
+              "value"
+            ],
+            "properties": {
+              "storage": {
+                "type": "string"
+              },
+              "value": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "actionDigest": {
+                    "type": "string"
+                  },
+                  "admissionHandoff": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "lifecycleFence",
+                      "operationVersion",
+                      "state",
+                      "storeFence"
+                    ],
+                    "properties": {
+                      "lifecycleFence": {
+                        "type": "integer"
+                      },
+                      "operationVersion": {
+                        "type": "integer"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "storeFence": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "lease_id",
+                          "owner_epoch",
+                          "store_uuid"
+                        ],
+                        "properties": {
+                          "lease_id": {
+                            "type": "string"
+                          },
+                          "owner_epoch": {
+                            "type": "integer"
+                          },
+                          "store_uuid": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "admittedDisputeDigest": {
+                    "type": "string"
+                  },
+                  "anchorId": {
+                    "type": "string"
+                  },
+                  "atomDigest": {
+                    "type": "string"
+                  },
+                  "channelId": {
+                    "type": "string"
+                  },
+                  "claim": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "beneficiaryId",
+                      "contestDeadline",
+                      "coverageAuthorityId",
+                      "fundingFacilityId",
+                      "identity",
+                      "lifecycleFence",
+                      "openedAt",
+                      "payerId",
+                      "payoutAmount",
+                      "payoutMode",
+                      "payoutRail",
+                      "schema",
+                      "state",
+                      "triggerMagnitude",
+                      "version"
+                    ],
+                    "properties": {
+                      "beneficiaryId": {
+                        "type": "string"
+                      },
+                      "contestDeadline": {
+                        "type": "integer"
+                      },
+                      "contestDigest": {
+                        "type": "string"
+                      },
+                      "coverageAuthorityId": {
+                        "type": "string"
+                      },
+                      "fundingFacilityId": {
+                        "type": "string"
+                      },
+                      "identity": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "claimId",
+                          "key",
+                          "triggerInstanceId"
+                        ],
+                        "properties": {
+                          "claimId": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "boundCoverageBodyDigest",
+                              "evidenceRangeDigest",
+                              "parametricPolicyBodyDigest",
+                              "subjectKey",
+                              "triggerPredicateBodyDigest",
+                              "windowEnd",
+                              "windowStart"
+                            ],
+                            "properties": {
+                              "boundCoverageBodyDigest": {
+                                "type": "string"
+                              },
+                              "evidenceRangeDigest": {
+                                "type": "string"
+                              },
+                              "parametricPolicyBodyDigest": {
+                                "type": "string"
+                              },
+                              "subjectKey": {
+                                "type": "string"
+                              },
+                              "triggerPredicateBodyDigest": {
+                                "type": "string"
+                              },
+                              "windowEnd": {
+                                "type": "integer"
+                              },
+                              "windowStart": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "triggerInstanceId": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "lifecycleFence": {
+                        "type": "integer"
+                      },
+                      "openedAt": {
+                        "type": "integer"
+                      },
+                      "payerId": {
+                        "type": "string"
+                      },
+                      "payoutAmount": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "currency",
+                          "units"
+                        ],
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "units": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "payoutMode": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "windowSeconds"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "windowSeconds": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "payoutRail": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "destinationAccountDigest",
+                          "kind",
+                          "railId"
+                        ],
+                        "properties": {
+                          "destinationAccountDigest": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "railId": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "schema": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "triggerMagnitude": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "version": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "disposition": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "round_id"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "round_id": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "effectKind": {
+                    "type": "string"
+                  },
+                  "escrowReference": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "chainId",
+                      "escrowContract",
+                      "escrowId"
+                    ],
+                    "properties": {
+                      "chainId": {
+                        "type": "string"
+                      },
+                      "escrowContract": {
+                        "type": "string"
+                      },
+                      "escrowId": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "fence": {
+                    "type": "integer"
+                  },
+                  "finalizationDigest": {
+                    "type": "string"
+                  },
+                  "firstDispatchOperationId": {
+                    "type": "string"
+                  },
+                  "governanceScopeId": {
+                    "type": "string"
+                  },
+                  "idempotencyKey": {
+                    "type": "string"
+                  },
+                  "inputManifestDigest": {
+                    "type": "string"
+                  },
+                  "intentProgress": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "ambiguityCount",
+                        "attemptCount",
+                        "completedEffectSlotId",
+                        "intentDigest",
+                        "intentId",
+                        "noEffectCount",
+                        "reconciliationChainDigest",
+                        "reconciliationCount"
+                      ],
+                      "properties": {
+                        "ambiguityCount": {
+                          "type": "integer"
+                        },
+                        "attemptCount": {
+                          "type": "integer"
+                        },
+                        "completedEffectSlotId": {
+                          "type": "string"
+                        },
+                        "intentDigest": {
+                          "type": "string"
+                        },
+                        "intentId": {
+                          "type": "string"
+                        },
+                        "noEffectCount": {
+                          "type": "integer"
+                        },
+                        "reconciliationChainDigest": {
+                          "type": "string"
+                        },
+                        "reconciliationCount": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "lastTransition": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "authority_digest",
+                      "kind",
+                      "round_id"
+                    ],
+                    "properties": {
+                      "authority_digest": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "round_id": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "lastTransitionDigest": {
+                    "type": "string"
+                  },
+                  "latestSequence": {
+                    "type": "integer"
+                  },
+                  "latestStateDigest": {
+                    "type": "string"
+                  },
+                  "lifecycleFence": {
+                    "type": "integer"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "obligationId": {
+                    "type": "string"
+                  },
+                  "openDigest": {
+                    "type": "string"
+                  },
+                  "operationId": {
+                    "type": "string"
+                  },
+                  "outputManifestDigest": {
+                    "type": "string"
+                  },
+                  "parametersDigest": {
+                    "type": "string"
+                  },
+                  "participantAcceptanceCount": {
+                    "type": "integer"
+                  },
+                  "participantAcceptanceRoot": {
+                    "type": "string"
+                  },
+                  "pendingCloseBodyDigest": {
+                    "type": "string"
+                  },
+                  "request": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "requestBindingDigest",
+                      "requestId",
+                      "requestNamespaceDigest"
+                    ],
+                    "properties": {
+                      "requestBindingDigest": {
+                        "type": "string"
+                      },
+                      "requestId": {
+                        "type": "string"
+                      },
+                      "requestNamespaceDigest": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "reservationCount": {
+                    "type": "integer"
+                  },
+                  "reservationRoot": {
+                    "type": "string"
+                  },
+                  "resourceHeadDigest": {
+                    "type": "string"
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "resourceKey": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "resourceFamily",
+                      "resourceId",
+                      "scopeId"
+                    ],
+                    "properties": {
+                      "resourceFamily": {
+                        "type": "string"
+                      },
+                      "resourceId": {
+                        "type": "string"
+                      },
+                      "scopeId": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "resourceVersion": {
+                    "type": "integer"
+                  },
+                  "roundCoreDigest": {
+                    "type": "string"
+                  },
+                  "roundId": {
+                    "type": "string"
+                  },
+                  "rowVersion": {
+                    "type": "integer"
+                  },
+                  "schema": {
+                    "type": "string"
+                  },
+                  "slotId": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "stateVersion": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "qualificationDigest",
+                      "targetId",
+                      "targetKeyEpoch"
+                    ],
+                    "properties": {
+                      "qualificationDigest": {
+                        "type": "string"
+                      },
+                      "targetId": {
+                        "type": "string"
+                      },
+                      "targetKeyEpoch": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "terminal": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "outcome"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "outcome": {
+                        "type": "string"
+                      },
+                      "proof": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "storage",
+                          "value"
+                        ],
+                        "properties": {
+                          "storage": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "cancellation"
+                            ],
+                            "properties": {
+                              "cancellation": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "proof_digest": {
+                        "type": "string"
+                      },
+                      "proof_id": {
+                        "type": "string"
+                      },
+                      "result": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "storage",
+                          "value"
+                        ],
+                        "properties": {
+                          "storage": {
+                            "type": "string"
+                          },
+                          "value": {}
+                        }
+                      },
+                      "result_digest": {
+                        "type": "string"
+                      },
+                      "result_id": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "trigger": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "evidenceManifest",
+                      "identity",
+                      "magnitude",
+                      "schema",
+                      "signedPolicy"
+                    ],
+                    "properties": {
+                      "evidenceManifest": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "ranges"
+                        ],
+                        "properties": {
+                          "ranges": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "anchorEpoch",
+                                "checkpointAt",
+                                "checkpointId",
+                                "checkpointRoot",
+                                "expectedCount",
+                                "indexNamespace",
+                                "queryIndexRoot",
+                                "rangeProofDigest",
+                                "selectedMemberRoot",
+                                "sequenceRange",
+                                "signerKeyEpoch",
+                                "sourceId",
+                                "sourceKind",
+                                "sourcePrefixCutoff",
+                                "subjectKey",
+                                "window"
+                              ],
+                              "properties": {
+                                "anchorEpoch": {
+                                  "type": "integer"
+                                },
+                                "checkpointAt": {
+                                  "type": "integer"
+                                },
+                                "checkpointId": {
+                                  "type": "string"
+                                },
+                                "checkpointRoot": {
+                                  "type": "string"
+                                },
+                                "expectedCount": {
+                                  "type": "integer"
+                                },
+                                "indexNamespace": {
+                                  "type": "string"
+                                },
+                                "queryIndexRoot": {
+                                  "type": "string"
+                                },
+                                "rangeProofDigest": {
+                                  "type": "string"
+                                },
+                                "selectedMemberRoot": {
+                                  "type": "string"
+                                },
+                                "sequenceRange": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "first",
+                                    "last"
+                                  ],
+                                  "properties": {
+                                    "first": {
+                                      "type": "integer"
+                                    },
+                                    "last": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                },
+                                "signerKeyEpoch": {
+                                  "type": "integer"
+                                },
+                                "sourceId": {
+                                  "type": "string"
+                                },
+                                "sourceKind": {
+                                  "type": "string"
+                                },
+                                "sourcePrefixCutoff": {
+                                  "type": "integer"
+                                },
+                                "subjectKey": {
+                                  "type": "string"
+                                },
+                                "window": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "endAt",
+                                    "startAt"
+                                  ],
+                                  "properties": {
+                                    "endAt": {
+                                      "type": "integer"
+                                    },
+                                    "startAt": {
+                                      "type": "integer"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "identity": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "claimId",
+                          "key",
+                          "triggerInstanceId"
+                        ],
+                        "properties": {
+                          "claimId": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "boundCoverageBodyDigest",
+                              "evidenceRangeDigest",
+                              "parametricPolicyBodyDigest",
+                              "subjectKey",
+                              "triggerPredicateBodyDigest",
+                              "windowEnd",
+                              "windowStart"
+                            ],
+                            "properties": {
+                              "boundCoverageBodyDigest": {
+                                "type": "string"
+                              },
+                              "evidenceRangeDigest": {
+                                "type": "string"
+                              },
+                              "parametricPolicyBodyDigest": {
+                                "type": "string"
+                              },
+                              "subjectKey": {
+                                "type": "string"
+                              },
+                              "triggerPredicateBodyDigest": {
+                                "type": "string"
+                              },
+                              "windowEnd": {
+                                "type": "integer"
+                              },
+                              "windowStart": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "triggerInstanceId": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "magnitude": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "value"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "schema": {
+                        "type": "string"
+                      },
+                      "signedPolicy": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "body",
+                          "signature",
+                          "signerKey"
+                        ],
+                        "properties": {
+                          "body": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "beneficiaryId",
+                              "boundCoverageBodyDigest",
+                              "boundCoverageEnvelopeDigest",
+                              "coverageAmount",
+                              "coverageAuthorityId",
+                              "effectiveFrom",
+                              "effectiveUntil",
+                              "evaluatorAuthority",
+                              "fundingFacilityId",
+                              "issuedAt",
+                              "maxCheckpointLagSeconds",
+                              "payerId",
+                              "payoutMode",
+                              "payoutRail",
+                              "payoutSchedule",
+                              "preActionAuthorityDigest",
+                              "predicate",
+                              "schema",
+                              "subjectKey",
+                              "windowAnchor",
+                              "windowSeconds"
+                            ],
+                            "properties": {
+                              "beneficiaryId": {
+                                "type": "string"
+                              },
+                              "boundCoverageBodyDigest": {
+                                "type": "string"
+                              },
+                              "boundCoverageEnvelopeDigest": {
+                                "type": "string"
+                              },
+                              "coverageAmount": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "currency",
+                                  "units"
+                                ],
+                                "properties": {
+                                  "currency": {
+                                    "type": "string"
+                                  },
+                                  "units": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "coverageAuthorityId": {
+                                "type": "string"
+                              },
+                              "effectiveFrom": {
+                                "type": "integer"
+                              },
+                              "effectiveUntil": {
+                                "type": "integer"
+                              },
+                              "evaluatorAuthority": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "authorityId",
+                                  "keyEpoch",
+                                  "keyId"
+                                ],
+                                "properties": {
+                                  "authorityId": {
+                                    "type": "string"
+                                  },
+                                  "keyEpoch": {
+                                    "type": "integer"
+                                  },
+                                  "keyId": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "fundingFacilityId": {
+                                "type": "string"
+                              },
+                              "issuedAt": {
+                                "type": "integer"
+                              },
+                              "maxCheckpointLagSeconds": {
+                                "type": "integer"
+                              },
+                              "payerId": {
+                                "type": "string"
+                              },
+                              "payoutMode": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "windowSeconds"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "type": "string"
+                                  },
+                                  "windowSeconds": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "payoutRail": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "destinationAccountDigest",
+                                  "kind",
+                                  "railId"
+                                ],
+                                "properties": {
+                                  "destinationAccountDigest": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "type": "string"
+                                  },
+                                  "railId": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "payoutSchedule": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "amount",
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "amount": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "currency",
+                                      "units"
+                                    ],
+                                    "properties": {
+                                      "currency": {
+                                        "type": "string"
+                                      },
+                                      "units": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  },
+                                  "kind": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "preActionAuthorityDigest": {
+                                "type": "string"
+                              },
+                              "predicate": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "kind",
+                                  "minEvents",
+                                  "thresholdBps"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "type": "string"
+                                  },
+                                  "minEvents": {
+                                    "type": "integer"
+                                  },
+                                  "thresholdBps": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "schema": {
+                                "type": "string"
+                              },
+                              "subjectKey": {
+                                "type": "string"
+                              },
+                              "windowAnchor": {
+                                "type": "integer"
+                              },
+                              "windowSeconds": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "signature": {
+                            "type": "string"
+                          },
+                          "signerKey": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "trustedOpenedAt": {
+                    "type": "integer"
+                  },
+                  "version": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "stateDigest": {
+            "type": "string"
+          },
+          "terminalResult": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "result",
+              "resultDigest",
+              "resultId"
+            ],
+            "properties": {
+              "result": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "storage",
+                  "value"
+                ],
+                "properties": {
+                  "storage": {
+                    "type": "string"
+                  },
+                  "value": {}
+                }
+              },
+              "resultDigest": {
+                "type": "string"
+              },
+              "resultId": {
+                "type": "string"
+              }
+            }
+          },
+          "trustedClockHighWater": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "headsRoot": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "observedAt": {
+      "type": "integer"
+    },
+    "requestReplays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "effectSlotIds",
+          "operationId",
+          "request"
+        ],
+        "properties": {
+          "effectSlotIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "request": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requestBindingDigest",
+              "requestId",
+              "requestNamespaceDigest"
+            ],
+            "properties": {
+              "requestBindingDigest": {
+                "type": "string"
+              },
+              "requestId": {
+                "type": "string"
+              },
+              "requestNamespaceDigest": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "requestReplaysRoot": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.economy.anchor-view.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    }
+  }
+}

@@ -6,8 +6,8 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::canonical::canonical_json_bytes;
-use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
+use crate::crypto::{sha256_hex, verify_wrapped, Keypair, PublicKey, Signature};
 use crate::StoreMutationFence;
 
 mod anchor;
@@ -30,7 +30,6 @@ const EFFECT_SLOT_DIGEST_DOMAIN: &str = "chio.economy.effect-slot.digest.v1";
 const EXPECTED_HEADS_ROOT_DOMAIN: &str = "chio.economy.expected-heads-root.v1";
 const NEXT_HEADS_ROOT_DOMAIN: &str = "chio.economy.next-heads-root.v1";
 const BATCH_ID_DOMAIN: &str = "chio.economy.state-batch.id.v1";
-const BATCH_SIGNING_DOMAIN: &str = "CHIO-ECONOMIC-STATE-BATCH-V1";
 const CHECKPOINT_DIGEST_DOMAIN: &str = "chio.economy.state-batch.checkpoint.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -912,7 +911,11 @@ impl EconomicStateBatchV1 {
         self.expected_heads_root = expected_heads_root(&self.transitions)?;
         self.next_heads_root = next_heads_root(&self.transitions)?;
         self.batch_id = self.recompute_batch_id()?;
-        self.anchor_signature = keypair.sign(&self.signing_bytes()?).to_hex();
+        self.anchor_signature = sign_wrapped_hex(
+            keypair,
+            CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+            &self.signing_preimage(),
+        )?;
         self.checkpoint_digest = self.recompute_checkpoint_digest()?;
         self.validate()
     }
@@ -951,9 +954,12 @@ impl EconomicStateBatchV1 {
 
     pub fn verify_signature(&self, public_key: &PublicKey) -> Result<(), EconomicContinuityError> {
         self.validate()?;
-        let signature = Signature::from_hex(&self.anchor_signature)
-            .map_err(|_| EconomicContinuityError::InvalidSignature)?;
-        if public_key.verify(&self.signing_bytes()?, &signature) {
+        if verify_wrapped_hex(
+            public_key,
+            CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+            &self.signing_preimage(),
+            &self.anchor_signature,
+        ) {
             Ok(())
         } else {
             Err(EconomicContinuityError::InvalidSignature)
@@ -977,10 +983,6 @@ impl EconomicStateBatchV1 {
                 anchor_signature: &self.anchor_signature,
             },
         )
-    }
-
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, EconomicContinuityError> {
-        prefixed_canonical(BATCH_SIGNING_DOMAIN, &self.signing_preimage())
     }
 
     fn validate_body(
@@ -1472,6 +1474,29 @@ fn canonical<T: Serialize>(value: &T) -> Result<Vec<u8>, EconomicContinuityError
 
 fn domain_digest<T: Serialize>(domain: &str, value: &T) -> Result<String, EconomicContinuityError> {
     Ok(sha256_hex(&prefixed_canonical(domain, value)?))
+}
+
+fn sign_wrapped_hex<T: Serialize>(
+    keypair: &Keypair,
+    schema_id: &str,
+    value: &T,
+) -> Result<String, EconomicContinuityError> {
+    let canonical = CanonicalBytes::from_serializable(value)
+        .map_err(|error| EconomicContinuityError::Canonicalization(error.to_string()))?;
+    keypair
+        .sign_wrapped(schema_id, &canonical)
+        .map(|signature| signature.to_hex())
+        .map_err(|error| EconomicContinuityError::Canonicalization(error.to_string()))
+}
+
+fn verify_wrapped_hex<T: Serialize>(
+    public_key: &PublicKey,
+    schema_id: &str,
+    value: &T,
+    signature_hex: &str,
+) -> bool {
+    Signature::from_hex(signature_hex)
+        .is_ok_and(|signature| verify_wrapped(public_key, schema_id, value, &signature).is_ok())
 }
 
 fn prefixed_canonical<T: Serialize>(

@@ -22,6 +22,13 @@ pub enum RuntimeAssuranceTier {
     Verified,
 }
 
+/// Signing-wrapper schema id of a Chio-signed runtime attestation evidence record.
+pub const CHIO_RUNTIME_ATTESTATION_EVIDENCE_SCHEMA: &str = "chio.runtime-attestation-evidence.v1";
+
+impl crate::receipt::lineage::SignedExportPayload for RuntimeAttestationEvidence {
+    const SCHEMA_ID: &'static str = CHIO_RUNTIME_ATTESTATION_EVIDENCE_SCHEMA;
+}
+
 /// Normalized runtime attestation evidence carried with governed requests.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RuntimeAttestationEvidence {

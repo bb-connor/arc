@@ -41,8 +41,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 - `insert` rejects duplicate or padded/empty subject keys, advances the epoch,
   and keeps issuance time nondecreasing when the supplied clock moves backward.
-- `Ed25519RootVerifier` checks pinned signer ID, algorithm, signature size, and
-  domain-separated canonical root bytes. Freshness is a separate check.
+- `Ed25519RootVerifier` checks pinned signer ID, signature size, and the signing
+  wrapper over the canonical root under `chio.trust.passport-revocation-root.v1`.
+  The pinned key alone selects the algorithm. Freshness is a separate check.
 - `verify_fresh_epoch_root` rejects future roots and excessive age. Its default
   permits zero age; configured staleness and offline grace are added together.
 - General `NonInclusionProof` checks require the originating oracle state.

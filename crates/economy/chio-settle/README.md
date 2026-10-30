@@ -74,6 +74,10 @@ watchdog, and CCIP helpers share the `web3` gate.
 - `prepare_dual_sign_release` and `prepare_merkle_release` only prepare a
   release for a receipt whose `kernel_key` is a member of
   `kernel_authority.trusted_keys`, then verify it.
+- `prepare_solana_settlement` requires a nonempty
+  `SolanaSettlementConfig::kernel_authority`, refuses a receipt whose
+  `kernel_key` is outside it, and accepts only a binding certificate naming
+  that same trusted kernel key.
   Evidence flags declare integration prerequisites; they do not inspect a store.
 - `SettlementHook` requires bounded local acceptance, concurrent-call safety,
   receipt-id deduplication across lease versions, and ordered batching by

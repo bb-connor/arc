@@ -1,0 +1,13 @@
+{
+  "checkpointDigest": "b1c07495893bc82ea1200a1cee8691b273e45058b08cf07b07db3b8bba41f08b",
+  "issuerDid": "did:chio:db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d",
+  "predecessorCheckpointDigest": "bd72d272c9aa1a368d4f6061b1fa5020df06ff7c37c4ff352e8904b92ebc948f",
+  "resolverIdentity": "resolver-a",
+  "schema": "chio.financial.cross-issuer.lifecycle-checkpoint.v1",
+  "signerKeyEpoch": 2,
+  "signerKeyId": "resolver-key",
+  "sourceIndexCount": 1,
+  "sourceIndexRoot": "ea5fab8a2527ace745e58a4d4cdc54b0bcc5352143eef8183598ef3f52374c83",
+  "storeGeneration": 2,
+  "trustedClockHighWater": 1710000100
+}

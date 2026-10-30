@@ -3,6 +3,7 @@ use crate::XtaskError;
 mod go;
 mod python;
 mod rust;
+mod signed_ids;
 mod ts;
 
 pub(crate) use rust::errors_regen;
@@ -66,5 +67,6 @@ pub(crate) fn run_codegen(args: Vec<String>) -> Result<(), XtaskError> {
         other => Err(XtaskError::Usage(format!(
             "codegen: unknown language: {other} (expected rust|python|ts|go)"
         ))),
-    }
+    }?;
+    signed_ids::codegen_signed_ids(&lang, check_only)
 }

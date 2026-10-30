@@ -270,7 +270,7 @@ fn sample_risk_package() -> SignedCreditProviderRiskPackage {
 
 fn sign_export<T>(body: T) -> SignedExportEnvelope<T>
 where
-    T: serde::Serialize + Clone,
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
 {
     let keypair = crate::crypto::Keypair::generate();
     require_ok(SignedExportEnvelope::sign(body, &keypair), "sign export")
@@ -1435,16 +1435,61 @@ fn liability_claim_settlement_instruction_rejects_missing_custodian_approval() {
         .contains("missing the custody-provider execution step"));
 }
 
+fn settlement_chain_authority(
+    instruction: &LiabilityClaimSettlementInstructionArtifact,
+) -> crate::credit::TrustedCapitalAuthority {
+    require_ok(
+        crate::credit::TrustedCapitalAuthority::new(
+            instruction
+                .authority_chain
+                .iter()
+                .map(|step| step.authority_proof.signer_key.clone())
+                .collect(),
+        ),
+        "settlement chain authority",
+    )
+}
+
+#[test]
+fn liability_claim_settlement_instruction_accepts_pinned_capital_authority() {
+    let fixtures = sample_market_fixtures();
+    let instruction = &fixtures.settlement_instruction.body;
+    let trust = settlement_chain_authority(instruction);
+
+    assert!(instruction.validate_with_capital_authority(&trust).is_ok());
+}
+
+#[test]
+fn liability_claim_settlement_instruction_rejects_foreign_capital_authority() {
+    let fixtures = sample_market_fixtures();
+    let instruction = &fixtures.settlement_instruction.body;
+    let trust = require_ok(
+        crate::credit::TrustedCapitalAuthority::new(vec![
+            crate::crypto::Keypair::generate().public_key()
+        ]),
+        "foreign capital authority",
+    );
+
+    let error = require_err(
+        instruction.validate_with_capital_authority(&trust),
+        "foreign capital authority must reject",
+    );
+    assert_eq!(error.code(), crate::MarketErrorCode::AuthorityUntrusted);
+}
+
 #[test]
 fn liability_claim_settlement_instruction_rejects_self_asserted_authority_role() {
     let fixtures = sample_market_fixtures();
     let mut instruction = fixtures.settlement_instruction.body.clone();
+    let trust = settlement_chain_authority(&instruction);
     instruction.authority_chain[0].principal_id = "facility-provider-self-asserted".to_string();
 
-    let error = require_err(instruction.validate(), "self-asserted settlement authority");
-    assert!(error
-        .detail()
-        .contains("authority proof signer must match principalId"));
+    let error = require_err(
+        instruction.validate_with_capital_authority(&trust),
+        "self-asserted settlement authority",
+    );
+    assert_eq!(error.code(), crate::MarketErrorCode::SignatureInvalid);
+    assert!(error.detail().contains("signer must match principalId"));
 }
 
 #[test]

@@ -114,7 +114,7 @@ fn issued(output: &Output) -> Result<SignedLiabilityProvider, Box<dyn std::error
         String::from_utf8_lossy(&output.stderr)
     );
     let signed: SignedLiabilityProvider = serde_json::from_slice(&output.stdout)?;
-    assert!(signed.verify_signature()?);
+    assert!(signed.verify_signature(&signed.signer_key)?);
     Ok(signed)
 }
 

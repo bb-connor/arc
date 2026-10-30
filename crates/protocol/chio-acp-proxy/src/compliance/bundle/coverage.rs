@@ -37,13 +37,15 @@ impl ComplianceCoverage {
         else {
             return Ok(());
         };
-        let checkpoint = chio_kernel_core::evidence_verify::validate_checkpoint(checkpoint)
+        let checkpoint = chio_kernel_core::evidence_verify::validate_checkpoint(
+            checkpoint,
+            std::slice::from_ref(kernel_key),
+        )
             .map_err(|_| ComplianceBundleError::CoverageMismatch)?;
         if covered_session != session_id
             || *snapshot_end_entry_seq == 0
             || archived_through_entry_seq > snapshot_end_entry_seq
             || checkpoint.body.batch_end_seq != *snapshot_end_entry_seq
-            || checkpoint.body.kernel_key != *kernel_key
             || checkpoint.body.issued_at > issued_at
             || entries.iter().any(|entry| {
                 entry

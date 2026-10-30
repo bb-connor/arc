@@ -1,0 +1,22 @@
+{
+  "audience": {
+    "serverId": "srv-echo",
+    "toolName": "delegate"
+  },
+  "chainId": "chain-live-continuation",
+  "currentSubject": "64f7bedc04170ba7043520a8ba5edac53f270b092583174baf5de52ccbc884e4",
+  "delegatorSubject": "delegator-subject",
+  "expiresAt": 1793195536,
+  "issuedAt": 1793195231,
+  "nonce": "nonce-continuation-1",
+  "originSubject": "origin-subject",
+  "parentRequestId": "req-parent-live-continuation",
+  "parentSessionAnchor": {
+    "sessionAnchorHash": "e9c280e641d0444ccee81f0deda151c9f63868ccd509e6fa36e86c2a316a561c",
+    "sessionAnchorId": "sess-VciCFD9nyyBglT2TFZaf2g:anchor:0:e9c280e641d0"
+  },
+  "schema": "chio.call_chain_continuation.v1",
+  "signer": "e16a3169a0215994369e646a0649dfab550f94cf1838e3119687d4f2a40b2fa6",
+  "subject": "64f7bedc04170ba7043520a8ba5edac53f270b092583174baf5de52ccbc884e4",
+  "tokenId": "continuation-token-1"
+}

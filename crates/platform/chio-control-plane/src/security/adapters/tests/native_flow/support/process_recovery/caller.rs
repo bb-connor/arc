@@ -384,7 +384,7 @@ fn verify_restart(root: &Path, witness: &Witness, cut: Cut) -> TestResult {
                         "{cut:?}: {:?}",
                         completed.reason
                     );
-                    assert!(completed.receipt.verify_signature()?);
+                    assert!(completed.receipt.verify_integrity_embedded_key()?);
                     assert!(
                         matches!(&completed.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &report.report.output)
                     );

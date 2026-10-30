@@ -63,7 +63,7 @@ fn signing_algorithm_label(alg: SigningAlgorithm) -> &'static str {
     }
 }
 
-/// Errors raised by [`CapabilityToken::verify_signature_with_floor`].
+/// Errors raised by [`CapabilityToken::verify_integrity_embedded_key_with_floor`].
 ///
 /// Distinguishes floor-policy rejections from cryptographic verification
 /// failures so the kernel can surface a different audit-log row for each.
@@ -90,24 +90,6 @@ pub enum CapabilityFloorVerifyError {
         signature_algorithm: SigningAlgorithm,
     },
 
-    /// The optional `CapabilityToken::algorithm` envelope field disagrees
-    /// with the algorithm carried by `Signature`. Treated as a downgrade
-    /// signal and rejected fail-closed.
-    #[cfg_attr(
-        feature = "std",
-        error(
-            "capability algorithm envelope field {} disagrees with signature {}",
-            signing_algorithm_label(*declared),
-            signing_algorithm_label(*actual)
-        )
-    )]
-    AlgorithmMismatch {
-        /// The algorithm declared in the envelope field.
-        declared: SigningAlgorithm,
-        /// The algorithm carried by the signature material.
-        actual: SigningAlgorithm,
-    },
-
     /// Forwarded from the underlying canonical-JSON or signature
     /// verification path.
     #[cfg_attr(
@@ -129,12 +111,6 @@ impl core::fmt::Display for CapabilityFloorVerifyError {
                 "capability rejected by crypto_floor={}: signature algorithm {} not permitted",
                 floor.as_str(),
                 signing_algorithm_label(*signature_algorithm)
-            ),
-            Self::AlgorithmMismatch { declared, actual } => write!(
-                f,
-                "capability algorithm envelope field {} disagrees with signature {}",
-                signing_algorithm_label(*declared),
-                signing_algorithm_label(*actual)
             ),
             Self::Crypto(err) => write!(f, "capability cryptographic verification failed: {err}"),
         }

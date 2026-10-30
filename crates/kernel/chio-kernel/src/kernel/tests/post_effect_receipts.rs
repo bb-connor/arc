@@ -150,7 +150,7 @@ fn equal_request_ids_in_distinct_tenants_keep_separate_terminal_bindings() {
         .unwrap();
         assert_eq!(response.verdict, Verdict::Allow);
         assert_eq!(response.receipt.tenant_id.as_deref(), Some(tenant));
-        assert!(response.receipt.verify_signature().unwrap());
+        assert!(response.receipt.verify_integrity_embedded_key().unwrap());
         receipts.push(response.receipt);
     }
     assert_eq!(invocations.load(Ordering::SeqCst), 2);

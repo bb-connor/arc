@@ -12,13 +12,13 @@ fuzz_target!(|data: &[u8]| {
         // Signature verification is fail-closed: we accept Ok(false) /
         // Err(_) as expected outcomes. The point is that the call must
         // not panic on any structurally valid CapabilityToken.
-        let _ = token.verify_signature();
+        let _ = token.verify_integrity_embedded_key();
     }
 
     // Try ChioReceipt independently. Same byte stream, different typed
     // deserializer, different fail-closed surface.
     if let Ok(receipt) = serde_json::from_slice::<ChioReceipt>(data) {
-        let _ = receipt.verify_signature();
+        let _ = receipt.verify_integrity_embedded_key();
     }
 });
 

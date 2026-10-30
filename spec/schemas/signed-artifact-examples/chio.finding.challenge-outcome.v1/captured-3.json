@@ -1,0 +1,30 @@
+{
+  "authorization": "buyer_submission",
+  "backing_allocation_id": "9de1fce0b7a07a080f8ccbf37514930142bf0897c4537ce94868aa01861e2be1",
+  "challenge_envelope_sha256": "36fa69b9ea92ed4b2b6f9d9a448e4a7538e087f124d2c1fef07596f4a5d454f3",
+  "evaluated_at": 1750000001,
+  "evaluator_authority_id": "challenge-evaluator",
+  "evaluator_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "evaluator_key_epoch": 1,
+  "evaluator_revocation_status_ref": "revocations/finding-market",
+  "evaluator_valid_from": 1,
+  "evaluator_valid_until": 9007199254740991,
+  "evidence_bundle_digest": "b3c4662b27ebf5a5597666981fdab9a203a4af1b225d61be8501331cff7cb257",
+  "evidence_kind": "digest_mismatch",
+  "facet": {
+    "digest_mismatch": {
+      "committed_payload_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "delivered_output_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "realized_spend_units": 0,
+      "transform_profile": "identity"
+    }
+  },
+  "finding_id": "4546b5252e9b3ee87bd38c9348683715b885b0e3fd8fab7cb04f3a8d84435daa",
+  "listing_id": "listing-42",
+  "outcome_id": "d667596508e564ecd4be47bf518b293f310d547e0099374e77d71a01379f766f",
+  "reason": "denial_not_seller_origin",
+  "schema": "chio.finding.challenge-outcome.v1",
+  "trigger_digest": "ff301114ccb4163194032a4934f95bdfeace40c64a422965a2a62c4b8d61f46e",
+  "verdict": "rejected",
+  "verifier_profile_envelope_sha256": "90fb45c0aeb5a849868d4a2381dff27806cfb0efa09ad91b98ac94c96b762e07"
+}

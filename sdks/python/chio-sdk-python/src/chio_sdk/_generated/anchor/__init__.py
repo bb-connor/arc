@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,14 +10,18 @@
 
 from __future__ import annotations
 
+from .anchor_batch_body_schema import ChioAnchorBatchV1SignedBody, Inclusion, Proof, Receipt, Witness, WitnessState
 from .batch_schema import Body, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3
 
 __all__ = [
     "Body",
     "CheckpointId",
     "ChioAnchorBatchV1",
+    "ChioAnchorBatchV1SignedBody",
     "Inclusion",
     "Kind",
+    "Proof",
+    "Receipt",
     "Witness",
     "WitnessReceipt",
     "WitnessState",

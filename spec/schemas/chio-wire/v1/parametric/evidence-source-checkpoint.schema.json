@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/parametric/evidence-source-checkpoint.schema.json",
+  "title": "Chio parametric evidence source checkpoint signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorEpoch",
+    "checkpointAt",
+    "checkpointId",
+    "indexNamespace",
+    "queryIndexRoot",
+    "queryTreeSize",
+    "schema",
+    "signatureDomain",
+    "signerKeyEpoch",
+    "sourceId",
+    "sourceKind",
+    "sourcePrefixCutoff"
+  ],
+  "properties": {
+    "anchorEpoch": {
+      "type": "integer"
+    },
+    "checkpointAt": {
+      "type": "integer"
+    },
+    "checkpointId": {
+      "type": "string"
+    },
+    "indexNamespace": {
+      "type": "string"
+    },
+    "queryIndexRoot": {
+      "type": "string"
+    },
+    "queryTreeSize": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.parametric.evidence-source-checkpoint.v1"
+    },
+    "signatureDomain": {
+      "type": "string"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "sourceKind": {
+      "type": "string"
+    },
+    "sourcePrefixCutoff": {
+      "type": "integer"
+    }
+  }
+}

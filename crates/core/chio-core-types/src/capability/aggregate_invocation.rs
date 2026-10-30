@@ -4,15 +4,14 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
+use crate::canonical::{canonical_json_bytes, CanonicalBytes};
 use crate::crypto::{
-    is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey, Signature, SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-    sign_bytes_for_embedded_key,
+    sign_wrapped_for_embedded_key,
 };
 
 use super::attenuation::{
@@ -24,7 +23,6 @@ use super::token::{CapabilityToken, CapabilityTokenBody};
 pub const AGGREGATE_BUDGET_ROOT_SCHEMA: &str = "chio.aggregate-budget-root.v1";
 
 const ROOT_COMMITMENT_DOMAIN: &[u8] = b"chio.aggregate-budget-root-commitment.v1\0";
-const ROOT_SIGNATURE_DOMAIN: &[u8] = b"chio.aggregate-budget-root.v1\0";
 const ROOT_BINDING_DIGEST_DOMAIN: &[u8] = b"chio.aggregate-budget-root-binding-digest.v1\0";
 const FAMILY_KEY_DOMAIN: &[u8] = b"chio.aggregate-budget-family-key.v1\0";
 
@@ -61,8 +59,6 @@ pub struct AggregateBudgetRootBindingBody {
 #[serde(deny_unknown_fields)]
 pub struct AggregateBudgetRootBinding {
     pub body: AggregateBudgetRootBindingBody,
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -118,12 +114,11 @@ impl AggregateBudgetRootBinding {
             "aggregate budget root binding",
             "root_issuer",
         )?;
-        let signature = keypair.sign(&domain_message(ROOT_SIGNATURE_DOMAIN, &body)?);
-        Ok(Self {
-            body,
-            algorithm: None,
-            signature,
-        })
+        let signature = keypair.sign_wrapped(
+            AGGREGATE_BUDGET_ROOT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
+        Ok(Self { body, signature })
     }
 
     pub fn sign_with_backend(
@@ -136,37 +131,29 @@ impl AggregateBudgetRootBinding {
             "aggregate budget root binding",
             "root_issuer",
         )?;
-        let signature = sign_bytes_for_embedded_key(
+        let signature = sign_wrapped_for_embedded_key(
             &body.root_issuer,
             backend,
-            &domain_message(ROOT_SIGNATURE_DOMAIN, &body)?,
+            AGGREGATE_BUDGET_ROOT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
         )?
         .signature;
-        let algorithm = body.root_issuer.algorithm();
-        Ok(Self {
-            body,
-            algorithm: Some(algorithm),
-            signature,
-        })
+        Ok(Self { body, signature })
     }
 
-    pub fn verify_signature(&self) -> Result<bool> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         if self.body.schema != AGGREGATE_BUDGET_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported aggregate budget root schema {}",
                 self.body.schema
             )));
         }
-        if self
-            .algorithm
-            .is_some_and(|algorithm| algorithm != self.signature.algorithm())
-        {
-            return Err(violation(
-                "aggregate budget root signature algorithm does not match its envelope",
-            ));
-        }
-        Ok(self.body.root_issuer.verify(
-            &domain_message(ROOT_SIGNATURE_DOMAIN, &self.body)?,
+        wrapped_verdict(verify_wrapped(
+            &self.body.root_issuer,
+            AGGREGATE_BUDGET_ROOT_SCHEMA,
+            &self.body,
             &self.signature,
         ))
     }
@@ -214,7 +201,7 @@ pub fn verify_aggregate_invocation_budget(
     if !trusted_issuers.contains(&token.issuer) {
         return Err(violation("aggregate capability issuer is not trusted"));
     }
-    if !token.verify_signature()? {
+    if !token.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     if token.delegation_chain.is_empty() {
@@ -328,7 +315,7 @@ fn verify_descendant(
             "aggregate budget root evidence is not a direct token",
         ));
     }
-    if !root.verify_signature()? {
+    if !root.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let first = token
@@ -447,7 +434,7 @@ fn verify_binding_matches_root(
     root: &CapabilityToken,
     max_invocations: u32,
 ) -> Result<()> {
-    if !binding.verify_signature()? {
+    if !binding.verify_integrity_embedded_key()? {
         return Err(Error::SignatureVerificationFailed);
     }
     let expected_scope_hash = scope_hash(&root.scope)?;

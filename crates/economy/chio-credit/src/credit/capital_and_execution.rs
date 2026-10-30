@@ -40,8 +40,9 @@ pub use capital_execution::{
     CapitalExecutionWindow, SignedCapitalExecutionInstruction,
 };
 pub use capital_execution_authority::{
-    validate_capital_execution_authority_step_proof, CapitalExecutionAuthorityStep,
+    CapitalAuthorityTrustError, CapitalExecutionAuthorityStep,
     CapitalExecutionAuthorityStepProofBody, SignedCapitalExecutionAuthorityStepProof,
+    TrustedCapitalAuthority,
 };
 
 #[cfg(test)]

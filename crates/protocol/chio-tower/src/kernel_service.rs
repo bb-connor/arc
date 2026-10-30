@@ -892,7 +892,7 @@ mod tests {
         assert!(receipt.is_cancelled());
         assert_eq!(receipt.kernel_key, kernel_key);
         assert!(receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|error| panic!("cancellation signature invalid: {error}")));
     }
 
@@ -1020,7 +1020,7 @@ mod tests {
         let receipt = log.get(0).ok_or("recovered cancellation receipt missing")?;
         assert!(receipt.is_cancelled());
         assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         Ok(())
     }
 }

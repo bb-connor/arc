@@ -161,7 +161,7 @@ fn verify_under_floor(receipt: &ChioReceipt, floor: CryptoFloor) -> bool {
     if !floor.allows(receipt.signature.algorithm()) {
         return false;
     }
-    receipt.verify_signature().unwrap_or(false)
+    receipt.verify_integrity_embedded_key().unwrap_or(false)
 }
 
 fn build_classical_backend() -> Ed25519Backend {

@@ -1,0 +1,24 @@
+{
+  "agentId": "agent-123",
+  "authContext": {
+    "method": {
+      "kind": "static_bearer",
+      "principal": "static-bearer:abcd1234",
+      "token_fingerprint": "cafebabe"
+    },
+    "origin": "https://app.example",
+    "transport": "streamable_http"
+  },
+  "authContextHash": "e8b1af6dd49b37ab5f60821de5803265562e2cc359879f3d63f45f5db9e3978d",
+  "authEpoch": 4,
+  "authMethodHash": "30cc2f420dcafb2d7eeb74fb90ab4f182fdfd430eed0b433f77354cd104f6df7",
+  "id": "anchor-1",
+  "issuedAt": 1710000000,
+  "kernelKey": "a616a4c12fadee4af7aa051c8f75d3bdb9a2bf31d7a88cc3a5718a3c5f0f7c71",
+  "proofBinding": {
+    "dpopPublicKeyThumbprint": "dpop-thumbprint",
+    "tokenFingerprint": "cafebabe"
+  },
+  "schema": "chio.session_anchor.v1",
+  "sessionId": "sess-001"
+}

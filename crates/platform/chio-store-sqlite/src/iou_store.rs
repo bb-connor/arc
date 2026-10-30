@@ -126,7 +126,7 @@ fn decode_envelope(canonical: &str) -> Result<IouEnvelope, IouEnvelopeStoreError
 
 fn verify_envelope(envelope: &IouEnvelope) -> Result<(), IouEnvelopeStoreError> {
     if !envelope
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|_| IouEnvelopeStoreError::Integrity("signature"))?
     {
         return Err(IouEnvelopeStoreError::Integrity("signature"));

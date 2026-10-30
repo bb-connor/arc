@@ -17,7 +17,7 @@ pub use cognition_market::{
     CognitionMarketVerifierAuthorityStatusTrust, COGNITION_MARKET_CLAIMS,
 };
 pub use error::TransactionPassportError;
-pub use evidence_graph::validate_transaction_evidence_graph;
+pub use evidence_graph::{validate_transaction_evidence_graph, SIGNED_EVIDENCE_ROLE_SCHEMAS};
 pub use ids::{
     RUNTIME_EXECUTION_LEASE_SCHEMA_ID, RUNTIME_REVOCATION_FRESHNESS_PROOF_SCHEMA_ID,
     RUNTIME_SANDBOX_ATTESTATION_SCHEMA_ID, RUNTIME_TOOL_SERVER_ACK_SCHEMA_ID,
@@ -44,8 +44,9 @@ pub use minimal::{
     verify_transaction_passport_signature_with_evidence_graph, TransactionTrustAnchors,
 };
 pub use runtime_security::{
-    verify_runtime_security_claims, verify_runtime_security_claims_with_trust,
-    RuntimeSecurityBundle, RuntimeSecurityReport, RuntimeSecurityTrust,
+    sign_runtime_security_artifact, verify_runtime_security_claims,
+    verify_runtime_security_claims_with_trust, RuntimeSecurityBundle, RuntimeSecurityReport,
+    RuntimeSecurityTrust,
 };
 pub use types::{TransactionOmissionPolicyEntry, TransactionPassport, TransactionVerifierReport};
 pub use verifier_policy::validate_verifier_policy_artifact;

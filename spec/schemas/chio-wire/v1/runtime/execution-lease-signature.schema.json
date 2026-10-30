@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/execution-lease-signature.schema.json",
+  "title": "Chio runtime execution lease signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ancestorCapabilityDigest",
+    "budgetAllocationRef",
+    "budgetPoolRef",
+    "capabilityDigest",
+    "childTaskId",
+    "expiresAt",
+    "issuedAt",
+    "issuer",
+    "joinReceiptRef",
+    "leaseId",
+    "nonce",
+    "parentReceiptRef",
+    "policyDigest",
+    "requestDigest",
+    "responsePolicyDigest",
+    "revocationFreshnessRef",
+    "sandboxAttestationRef",
+    "schema",
+    "sideEffectClass",
+    "subjectAgent",
+    "subjectCapabilityDigest",
+    "taskGraphDigest",
+    "toolInstanceId",
+    "toolManifestDigest",
+    "toolServerId"
+  ],
+  "properties": {
+    "ancestorCapabilityDigest": {
+      "type": "string"
+    },
+    "budgetAllocationRef": {
+      "type": "string"
+    },
+    "budgetPoolRef": {
+      "type": "string"
+    },
+    "capabilityDigest": {
+      "type": "string"
+    },
+    "childTaskId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "joinReceiptRef": {
+      "type": "string"
+    },
+    "leaseId": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "parentReceiptRef": {
+      "type": "string"
+    },
+    "policyDigest": {
+      "type": "string"
+    },
+    "requestDigest": {
+      "type": "string"
+    },
+    "responsePolicyDigest": {
+      "type": "string"
+    },
+    "revocationEpochRef": {
+      "type": "string"
+    },
+    "revocationFreshnessRef": {
+      "type": "string"
+    },
+    "routePlanReceiptRef": {
+      "type": "string"
+    },
+    "sandboxAttestationRef": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.execution-lease-signature.v1"
+    },
+    "sideEffectClass": {
+      "type": "string"
+    },
+    "subjectAgent": {
+      "type": "string"
+    },
+    "subjectCapabilityDigest": {
+      "type": "string"
+    },
+    "taskGraphDigest": {
+      "type": "string"
+    },
+    "toolInstanceId": {
+      "type": "string"
+    },
+    "toolManifestDigest": {
+      "type": "string"
+    },
+    "toolServerId": {
+      "type": "string"
+    }
+  }
+}

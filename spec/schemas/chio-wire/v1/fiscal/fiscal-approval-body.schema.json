@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-approval-body.schema.json",
+  "title": "chio.fiscal.approval.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "admissionDigest",
+    "admissionId",
+    "approvalExpiresAt",
+    "approvalId",
+    "approvedAt",
+    "proposalDigest",
+    "proposalId",
+    "schema",
+    "signerKeyId"
+  ],
+  "properties": {
+    "admissionDigest": {
+      "type": "string"
+    },
+    "admissionId": {
+      "type": "string"
+    },
+    "approvalExpiresAt": {
+      "type": "integer"
+    },
+    "approvalId": {
+      "type": "string"
+    },
+    "approvedAt": {
+      "type": "integer"
+    },
+    "proposalDigest": {
+      "type": "string"
+    },
+    "proposalId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.approval.v1"
+    },
+    "signerKeyId": {
+      "type": "string"
+    }
+  }
+}

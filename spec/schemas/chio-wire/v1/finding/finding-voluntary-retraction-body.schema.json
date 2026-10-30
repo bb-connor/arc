@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-voluntary-retraction-body.schema.json",
+  "title": "chio.finding.voluntary-retraction.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "finding_id",
+    "inclusion_deadline",
+    "intent_id",
+    "issued_at",
+    "reason",
+    "schema",
+    "seller",
+    "status_feed_ref"
+  ],
+  "properties": {
+    "finding_id": {
+      "type": "string"
+    },
+    "inclusion_deadline": {
+      "type": "integer"
+    },
+    "intent_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.voluntary-retraction.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "status_feed_ref": {
+      "type": "string"
+    }
+  }
+}

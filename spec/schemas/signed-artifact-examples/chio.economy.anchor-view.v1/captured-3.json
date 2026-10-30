@@ -1,0 +1,40 @@
+{
+  "absentRequestKeys": [],
+  "absentResourceKeys": [],
+  "anchorId": "anchor-1",
+  "checkpointDigest": "11d1e687fafaa97754c11f33d46741d1a26021c5c1c2d274aa8184c62f23eaa0",
+  "checkpointSequence": 3,
+  "heads": [
+    {
+      "anchorId": "anchor-1",
+      "headVersion": 1,
+      "lifecycleFence": 1,
+      "lifecycleState": "open",
+      "namespace": "economy-prod",
+      "resourceKey": {
+        "resourceFamily": "clearing_round",
+        "resourceId": "round-1",
+        "scopeId": "tenant-1"
+      },
+      "resourceVersion": 1,
+      "schema": "chio.economy.resource-head.v1",
+      "state": {
+        "storage": "inline",
+        "value": {
+          "resourceId": "round-1",
+          "resourceVersion": 1
+        }
+      },
+      "stateDigest": "cdf56bd8fbaa7a1f34c501ae2d83465109e9ea20de6ef5bdef814a80e4be9507",
+      "trustedClockHighWater": 101
+    }
+  ],
+  "headsRoot": "e20f642a606bddcede6baf2b5a353bf8377edf36a0df1bf7c7618ba0e615f328",
+  "namespace": "economy-prod",
+  "observedAt": 500,
+  "requestReplays": [],
+  "requestReplaysRoot": "9ba93a2f0a4cfdb86bc80876acad09fbffd2c5db58b6088779d643a65467676d",
+  "schema": "chio.economy.anchor-view.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1"
+}

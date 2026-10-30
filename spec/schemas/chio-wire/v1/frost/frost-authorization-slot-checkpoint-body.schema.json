@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/frost/frost-authorization-slot-checkpoint-body.schema.json",
+  "title": "chio.frost.authorization-slot-checkpoint.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actionDigest",
+    "anchorId",
+    "anchorKeyId",
+    "authorizationId",
+    "clockHighWater",
+    "domain",
+    "keyEpoch",
+    "ladderActionClass",
+    "resourceFence",
+    "resourceId",
+    "resourceVersion",
+    "rosterDigest",
+    "schema",
+    "scopeId",
+    "sessionId",
+    "signingMessageDigest",
+    "slotId",
+    "slotVersion",
+    "state"
+  ],
+  "properties": {
+    "actionDigest": {
+      "type": "string"
+    },
+    "aggregateSignatureDigest": {
+      "type": "string"
+    },
+    "anchorId": {
+      "type": "string"
+    },
+    "anchorKeyId": {
+      "type": "string"
+    },
+    "authorizationBlobDigest": {
+      "type": "string"
+    },
+    "authorizationId": {
+      "type": "string"
+    },
+    "availabilityReceipt": {
+      "type": "string"
+    },
+    "clockHighWater": {
+      "type": "integer"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "ladderActionClass": {
+      "type": "string"
+    },
+    "predecessorDigest": {
+      "type": "string"
+    },
+    "resourceFence": {
+      "type": "integer"
+    },
+    "resourceId": {
+      "type": "string"
+    },
+    "resourceVersion": {
+      "type": "integer"
+    },
+    "rosterDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.frost.authorization-slot-checkpoint.v1"
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "signingMessageDigest": {
+      "type": "string"
+    },
+    "slotId": {
+      "type": "string"
+    },
+    "slotVersion": {
+      "type": "integer"
+    },
+    "state": {
+      "type": "string"
+    }
+  }
+}

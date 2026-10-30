@@ -690,12 +690,17 @@ pub fn issue_signed_liability_claim_settlement_instruction(
     authority_db_path: Option<&Path>,
     request: &LiabilityClaimSettlementInstructionIssueRequest,
     policy: &RosterPolicy,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
     let clock_now = unix_timestamp_now()?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let issued_at = clock_now;
-    let artifact =
-        build_liability_claim_settlement_instruction_artifact(request, issued_at, policy)?;
+    let artifact = build_liability_claim_settlement_instruction_artifact(
+        request,
+        issued_at,
+        policy,
+        capital_authority,
+    )?;
     let signed =
         SignedLiabilityClaimSettlementInstruction::sign(artifact, &keypair).map_err(|error| {
             CliError::cli_other_error(format!(
@@ -1308,6 +1313,7 @@ fn build_liability_claim_settlement_instruction_artifact(
     request: &LiabilityClaimSettlementInstructionIssueRequest,
     issued_at: u64,
     policy: &RosterPolicy,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<LiabilityClaimSettlementInstructionArtifact, CliError> {
     request
         .payout_receipt
@@ -1322,13 +1328,13 @@ fn build_liability_claim_settlement_instruction_artifact(
             &policy.roster_anchor,
         )
         .map_err(CliError::cli_other_error)?;
-    validate_capital_execution_envelope(
+    chio_kernel::validate_capital_execution_envelope(
         &request.authority_chain,
         &request.execution_window,
         &request.rail,
         issued_at,
     )
-    .map_err(CliError::from)?;
+    .map_err(CliError::cli_other_error)?;
     let artifact = LiabilityClaimSettlementInstructionArtifact {
         schema: LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
         settlement_instruction_id: format!(
@@ -1363,7 +1369,9 @@ fn build_liability_claim_settlement_instruction_artifact(
         settlement_reference: request.settlement_reference.clone(),
         note: request.note.clone(),
     };
-    artifact.validate().map_err(CliError::cli_other_error)?;
+    artifact
+        .validate_with_capital_authority(capital_authority)
+        .map_err(CliError::cli_other_error)?;
     Ok(artifact)
 }
 
@@ -1422,7 +1430,9 @@ mod roster_enforcement {
     const ADJUDICATION_ID_GOLDEN_ANCHOR_A: &str =
         "lca-96d5df5192950bcfbd3d140286c79347d800dce8d945dffd4da9752530e9a038";
 
-    fn sign_export<T: serde::Serialize + Clone>(body: T) -> SignedExportEnvelope<T> {
+    fn sign_export<T: chio_core::receipt::lineage::SignedExportPayload + Clone>(
+        body: T,
+    ) -> SignedExportEnvelope<T> {
         let kp = Keypair::generate();
         SignedExportEnvelope::sign(body, &kp).test_unwrap("sign export")
     }
@@ -2003,7 +2013,14 @@ mod roster_enforcement {
             settlement_reference: None,
             note: None,
         };
-        build_liability_claim_settlement_instruction_artifact(&request, 1_700_011_100, policy)
+        let capital_authority =
+            TrustedCapitalAuthority::new(vec![kp.public_key()]).test_unwrap("capital authority");
+        build_liability_claim_settlement_instruction_artifact(
+            &request,
+            1_700_011_100,
+            policy,
+            &capital_authority,
+        )
     }
 
     #[test]

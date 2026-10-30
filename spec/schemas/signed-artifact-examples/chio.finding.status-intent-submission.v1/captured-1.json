@@ -1,0 +1,26 @@
+{
+  "feed_id": "status-feed/test",
+  "finding_id": "8bf18252cb6dadd5f42fca108271e688696209cdb6fae22e32318b204e6eb37d",
+  "inclusion_deadline": 1800000600,
+  "intent_id": "49f4a47cb53f8676a0dc5d7b4aac2398d815d9086fa8019ef18650cfc58baa02",
+  "issued_at": 1800000000,
+  "key_domain_nonce": 3318287169837494,
+  "operator_id": "status-operator",
+  "operator_key_epoch": 4,
+  "schema": "chio.finding.status-intent-submission.v1",
+  "source": "voluntary",
+  "source_authority_id": "f80cccdce4ae1c07ae208a2adf99a310ae4207e0306fa0236110b06827bbb8d0",
+  "source_receipt": {
+    "body": {
+      "feed_id": "status-feed/test",
+      "finding_id": "8bf18252cb6dadd5f42fca108271e688696209cdb6fae22e32318b204e6eb37d",
+      "issued_at": 1800000000,
+      "key_domain_nonce": 3318287169837494,
+      "schema": "chio.finding.voluntary-retraction-receipt.v1",
+      "source_authority_id": "f80cccdce4ae1c07ae208a2adf99a310ae4207e0306fa0236110b06827bbb8d0"
+    },
+    "signature": "cb32b74e8275b70fd1d4a48d42d695f32bc9b21e80dd20e7e75844d6f4e0de10e2526bb83703c2485fb9457e9fd39c28a2ca3396fcfa028b468fc4910d945e08",
+    "signerKey": "f80cccdce4ae1c07ae208a2adf99a310ae4207e0306fa0236110b06827bbb8d0"
+  },
+  "source_receipt_sha256": "dc653005b2976df6871eb436ccd12d9d3574338bb9f13c7f2da37a4a04691501"
+}

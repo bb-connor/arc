@@ -15,7 +15,7 @@ use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportReceiptQue
 use chio_kernel::ReceiptStoreError;
 use chio_kernel_core::evidence_verify::{
     bind_checkpoint_publication_trust_anchor, build_inclusion_proof,
-    validate_checkpoint_transparency,
+    validate_checkpoint_transparency, verify_integrity_embedded_key_set,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -121,7 +121,8 @@ impl SqliteReceiptStore {
         &self,
         checkpoints: &[KernelCheckpoint],
     ) -> Result<CheckpointTransparencySummary, EvidenceExportError> {
-        let summary = validate_checkpoint_transparency(checkpoints)?;
+        let carried_kernel_keys = verify_integrity_embedded_key_set(checkpoints)?;
+        let summary = validate_checkpoint_transparency(checkpoints, &carried_kernel_keys)?;
         self.enrich_evidence_export_transparency_summary(summary)
     }
 
@@ -319,7 +320,8 @@ impl SqliteReceiptStore {
             }
         }
 
-        let transparency = validate_checkpoint_transparency(&checkpoints)?;
+        let carried_kernel_keys = verify_integrity_embedded_key_set(&checkpoints)?;
+        let transparency = validate_checkpoint_transparency(&checkpoints, &carried_kernel_keys)?;
         Ok((checkpoints, transparency))
     }
 
@@ -742,7 +744,15 @@ pub(crate) mod tests {
             .live_db_size_bytes
             .is_some_and(|size| size > 0));
 
-        let transparency = validate_checkpoint_transparency(&bundle.checkpoints).unwrap();
+        let transparency = validate_checkpoint_transparency(
+            &bundle.checkpoints,
+            &bundle
+                .checkpoints
+                .iter()
+                .map(|checkpoint| checkpoint.body.kernel_key.clone())
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
         assert_eq!(transparency.publications.len(), 1);
         assert!(transparency.witnesses.is_empty());
         assert!(transparency.equivocations.is_empty());
@@ -794,7 +804,7 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             &checkpoint_key,
             Some(
-                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                     .expect("verified predecessor"),
             ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],
@@ -870,7 +880,7 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             &checkpoint_key,
             Some(
-                &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+                &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                     .expect("verified predecessor"),
             ),
             &[checkpoint_chain_leaf_hash(&first.body).unwrap()],

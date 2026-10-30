@@ -1,0 +1,52 @@
+{
+  "attestationReference": "premium-window-proof",
+  "checkpointAuthorityEpoch": 1,
+  "checkpointAuthorityKey": "5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca",
+  "checkpointDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "checkpointSequence": 1,
+  "committedLeaves": [
+    {
+      "indexProof": {
+        "auditPath": [],
+        "leafIndex": 0,
+        "treeSize": 1
+      },
+      "leaf": {
+        "index": 0,
+        "queryKey": {
+          "artifactId": "decision-at-window-end",
+          "occurredAt": 200,
+          "sourceFamily": "premium_history",
+          "subject": "did:chio:9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07"
+        },
+        "sourceArtifactDigest": "89168320360b066723f4de7146401ca65332662bc156ff69cccf559c05da3946"
+      }
+    }
+  ],
+  "cutoff": 200,
+  "disclosureDigest": "0edfc133583c653ba6c77256482830086f802662be397a6b03be6a3fbe5ad1ad",
+  "expiresAt": 300,
+  "indexRoot": "2962fd0a38f9312a634ce85bed1fe77013e818ac6bf7ea87c7fbc3172e84e31f",
+  "issuedAt": 200,
+  "lowerBoundary": {
+    "kind": "source_edge"
+  },
+  "rangeRoot": "2962fd0a38f9312a634ce85bed1fe77013e818ac6bf7ea87c7fbc3172e84e31f",
+  "schema": "chio.fincred.source-completeness-attestation.v1",
+  "sourceArtifactDigests": [
+    "89168320360b066723f4de7146401ca65332662bc156ff69cccf559c05da3946"
+  ],
+  "sourceEvidenceClass": "asserted",
+  "sourceFamily": "premium_history",
+  "sourceId": "premium-source",
+  "sourceSignerKey": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+  "storeGeneration": 1,
+  "subject": "did:chio:9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07",
+  "upperBoundary": {
+    "kind": "source_edge"
+  },
+  "window": {
+    "endsAt": 200,
+    "startsAt": 100
+  }
+}

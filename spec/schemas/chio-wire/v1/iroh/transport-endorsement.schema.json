@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/iroh/transport-endorsement.schema.json",
+  "title": "Chio iroh transport endorsement signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kernel_id",
+    "transport_endpoint_id"
+  ],
+  "properties": {
+    "kernel_id": {
+      "type": "string"
+    },
+    "transport_endpoint_id": {
+      "type": "string"
+    }
+  }
+}

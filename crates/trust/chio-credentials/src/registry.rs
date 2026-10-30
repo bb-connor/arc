@@ -16,7 +16,8 @@ pub fn create_signed_passport_verifier_policy(
         policy,
     };
     verify_signed_passport_verifier_policy_body(&body)?;
-    let (signature, _) = signer_keypair.sign_canonical(&body)?;
+    let signature =
+        signer_keypair.sign_wrapped(PASSPORT_VERIFIER_POLICY_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body)?)?;
     let document = SignedPassportVerifierPolicy { body, signature };
     verify_signed_passport_verifier_policy(&document)?;
     Ok(document)
@@ -26,10 +27,13 @@ pub fn verify_signed_passport_verifier_policy(
     document: &SignedPassportVerifierPolicy,
 ) -> Result<(), CredentialError> {
     verify_signed_passport_verifier_policy_body(&document.body)?;
-    if !document
-        .body
-        .signer_public_key
-        .verify_canonical(&document.body, &document.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &document.body.signer_public_key,
+        PASSPORT_VERIFIER_POLICY_SCHEMA,
+        &document.body,
+        &document.signature,
+    )
+    .is_err()
     {
         return Err(CredentialError::InvalidSignedVerifierPolicySignature);
     }

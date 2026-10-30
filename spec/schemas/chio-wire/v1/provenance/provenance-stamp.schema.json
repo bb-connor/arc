@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/provenance/provenance-stamp.schema.json",
+  "title": "Chio provenance stamp signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "api_version",
+    "principal",
+    "provider",
+    "received_at",
+    "request_id"
+  ],
+  "properties": {
+    "api_version": {
+      "type": "string"
+    },
+    "principal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "account_id",
+        "assumed_role_session_arn",
+        "caller_arn",
+        "kind"
+      ],
+      "properties": {
+        "account_id": {
+          "type": "string"
+        },
+        "assumed_role_session_arn": {
+          "type": "null"
+        },
+        "caller_arn": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "provider": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nanos_since_epoch",
+        "secs_since_epoch"
+      ],
+      "properties": {
+        "nanos_since_epoch": {
+          "type": "integer"
+        },
+        "secs_since_epoch": {
+          "type": "integer"
+        }
+      }
+    },
+    "request_id": {
+      "type": "string"
+    }
+  }
+}

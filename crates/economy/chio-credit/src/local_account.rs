@@ -21,7 +21,7 @@
 //! The receipt is never mutated; the mint path is read-only over
 //! its inputs.
 
-use crate::crypto::{sha256_hex, sign_canonical_with_backend, SigningBackend};
+use crate::crypto::{sha256_hex, sign_wrapped, SigningBackend};
 use crate::hook::{
     CreditEvaluatorError, CreditEvaluatorHook, IouEnvelope, IouEnvelopeBody, IOU_ENVELOPE_SCHEMA,
 };
@@ -119,7 +119,7 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
     fn evaluate(&self, receipt: &ChioReceipt) -> Result<Option<IouEnvelope>, CreditEvaluatorError> {
         // Fail-closed signature gate. An unsigned or tampered receipt
         // mints nothing.
-        let verified = receipt.verify_signature().map_err(|err| {
+        let verified = receipt.verify_integrity_embedded_key().map_err(|err| {
             CreditEvaluatorError::Canonical(format!("receipt signature verification raised: {err}"))
         })?;
         if !verified {
@@ -173,7 +173,6 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
             .backend
             .public_key()
             .map_err(|err| CreditEvaluatorError::Signing(err.to_string()))?;
-        let algorithm = issuer_key.algorithm();
         let body = IouEnvelopeBody {
             schema: IOU_ENVELOPE_SCHEMA.to_string(),
             iou_id: derive_iou_id(&receipt.id),
@@ -188,13 +187,12 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
             issuer_key,
         };
 
-        let (signature, _bytes) = sign_canonical_with_backend(&self.backend, &body)
+        let (outcome, _) = sign_wrapped(&self.backend, IOU_ENVELOPE_SCHEMA, &body)
             .map_err(|err| CreditEvaluatorError::Signing(err.to_string()))?;
 
         Ok(Some(IouEnvelope {
             body,
-            algorithm: Some(algorithm),
-            signature,
+            signature: outcome.signature,
         }))
     }
 }
@@ -292,7 +290,7 @@ mod tests {
         assert_eq!(envelope.body.currency, "USD");
         assert_eq!(envelope.body.receipt_id, receipt.id);
         assert_eq!(envelope.body.tenant_id.as_deref(), Some("tenant-a"));
-        assert!(envelope.verify_signature().unwrap());
+        assert!(envelope.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

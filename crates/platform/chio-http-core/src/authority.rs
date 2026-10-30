@@ -1368,7 +1368,7 @@ fn validate_capability_token(
         return Err("capability issuer is not trusted".to_string().into());
     }
     let signature_valid = token
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|e| format!("capability signature verification failed: {e}"))?;
     if !signature_valid {
         return Err("capability signature verification failed"

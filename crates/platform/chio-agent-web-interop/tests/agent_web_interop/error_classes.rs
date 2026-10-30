@@ -131,7 +131,7 @@ fn invalid_receipt_signature_keeps_signature_class() {
         assert_receipt_crypto_valid(&receipt);
         receipt.signature = Signature::from_hex(&"00".repeat(64)).test_expect("signature decodes");
         assert!(!receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .test_expect("signature verification completes"));
         assert!(receipt
             .action
@@ -165,7 +165,9 @@ fn supported_protocols_and_signed_mediated_receipt_verify() {
 }
 
 fn assert_receipt_crypto_valid(receipt: &ChioReceipt) {
-    assert!(receipt.verify_signature().test_expect("signature verifies"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .test_expect("signature verifies"));
     assert!(receipt
         .action
         .verify_hash()

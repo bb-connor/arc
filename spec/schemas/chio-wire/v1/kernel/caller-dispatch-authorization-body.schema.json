@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller-dispatch-authorization-body.schema.json",
+  "title": "chio.caller-dispatch-authorization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "committed",
+    "executor",
+    "expires_at_unix_ms",
+    "invocation",
+    "kernel_public_key",
+    "not_before_unix_ms",
+    "schema"
+  ],
+  "properties": {
+    "committed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budget_hold_id",
+        "dispatch_commit",
+        "execution_nonce_id",
+        "frozen_context_digest"
+      ],
+      "properties": {
+        "budget_hold_id": {
+          "type": "string"
+        },
+        "dispatch_commit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "committed_version",
+            "coordinator_lease_epoch",
+            "coordinator_lease_id",
+            "dispatch_launch",
+            "provider_attempt",
+            "store_fence"
+          ],
+          "properties": {
+            "committed_version": {
+              "type": "integer"
+            },
+            "coordinator_lease_epoch": {
+              "type": "integer"
+            },
+            "coordinator_lease_id": {
+              "type": "string"
+            },
+            "dispatch_launch": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "native_launch",
+                "worker_profile"
+              ],
+              "properties": {
+                "native_launch": {
+                  "type": "null"
+                },
+                "worker_profile": {
+                  "type": "null"
+                }
+              }
+            },
+            "provider_attempt": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "attempt_id",
+                "operation_id",
+                "transport_id",
+                "transport_key_epoch"
+              ],
+              "properties": {
+                "attempt_id": {
+                  "type": "string"
+                },
+                "operation_id": {
+                  "type": "string"
+                },
+                "transport_id": {
+                  "type": "string"
+                },
+                "transport_key_epoch": {
+                  "type": "integer"
+                }
+              }
+            },
+            "store_fence": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lease_id",
+                "owner_epoch",
+                "store_uuid"
+              ],
+              "properties": {
+                "lease_id": {
+                  "type": "string"
+                },
+                "owner_epoch": {
+                  "type": "integer"
+                },
+                "store_uuid": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "execution_nonce_id": {
+          "type": "string"
+        },
+        "frozen_context_digest": {
+          "type": "string"
+        }
+      }
+    },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executor_id",
+        "key_epoch",
+        "public_key"
+      ],
+      "properties": {
+        "executor_id": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      }
+    },
+    "expires_at_unix_ms": {
+      "type": "integer"
+    },
+    "invocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_digest",
+        "capability_id",
+        "operation_id",
+        "parameters_digest",
+        "request_binding_hash",
+        "request_id",
+        "server_id",
+        "tool_name"
+      ],
+      "properties": {
+        "capability_digest": {
+          "type": "string"
+        },
+        "capability_id": {
+          "type": "string"
+        },
+        "operation_id": {
+          "type": "string"
+        },
+        "parameters_digest": {
+          "type": "string"
+        },
+        "request_binding_hash": {
+          "type": "string"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "tool_name": {
+          "type": "string"
+        }
+      }
+    },
+    "kernel_public_key": {
+      "type": "string"
+    },
+    "not_before_unix_ms": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.caller-dispatch-authorization.v1"
+    }
+  }
+}

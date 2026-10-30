@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-policy-body.schema.json",
+  "title": "chio.root-policy.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "crm/search"
+          ],
+          "properties": {
+            "crm/search": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "parameters",
+                "result"
+              ],
+              "properties": {
+                "parameters": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "inline_fields"
+                  ],
+                  "properties": {
+                    "inline_fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "result": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "inline_fields"
+                  ],
+                  "properties": {
+                    "inline_fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "exchange_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    },
+    "policy_id": {
+      "type": "string"
+    },
+    "policy_key": {
+      "type": "string"
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ceiling_scope",
+          "ceiling_scope_hash",
+          "holder_classes",
+          "match",
+          "recorded_claims",
+          "rule_id"
+        ],
+        "properties": {
+          "capability_ttl_secs": {
+            "type": "integer"
+          },
+          "ceiling_scope": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "grants"
+            ],
+            "properties": {
+              "grants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "operations",
+                    "server_id",
+                    "tool_name"
+                  ],
+                  "properties": {
+                    "dpop_required": {
+                      "type": "boolean"
+                    },
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "server_id": {
+                      "type": "string"
+                    },
+                    "tool_name": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "resource_grants": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "operations",
+                    "uri_pattern"
+                  ],
+                  "properties": {
+                    "operations": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "uri_pattern": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "ceiling_scope_hash": {
+            "type": "string"
+          },
+          "holder_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "idp_scope_projection": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "crm.read"
+            ],
+            "properties": {
+              "crm.admin": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "crm.read": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "crm.write": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "anchor_kind"
+            ],
+            "properties": {
+              "allowed_algs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "anchor_kind": {
+                "type": "string"
+              },
+              "claims": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "client_id": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "scope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "provider_identity_digest": {
+                "type": "string"
+              },
+              "provider_record_id": {
+                "type": "string"
+              }
+            }
+          },
+          "max_assertion_lifetime_secs": {
+            "type": "integer"
+          },
+          "max_clock_skew_secs": {
+            "type": "integer"
+          },
+          "principal": {
+            "type": "string"
+          },
+          "recorded_claims": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "client_id": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              }
+            }
+          },
+          "retain_idp_artifact": {
+            "type": "boolean"
+          },
+          "rule_id": {
+            "type": "string"
+          },
+          "tenant_value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.root-policy.v1"
+    },
+    "valid_from": {
+      "type": "integer"
+    },
+    "valid_until": {
+      "type": "integer"
+    }
+  }
+}

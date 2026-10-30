@@ -868,7 +868,14 @@ pub(crate) fn verify_bundle_signature(
         }
         let signature = Signature::from_hex(&entry.sig)
             .map_err(|error| format!("proof-room.signature.signature-invalid: {error}"))?;
-        if !public_key.verify(&signing_payload, &signature) {
+        if chio_core_types::crypto::verify_exempt(
+            &public_key,
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &signing_payload,
+            &signature,
+        )
+        .is_err()
+        {
             return Err(("proof-room.signature.verification-failed".to_string()).into());
         }
     }

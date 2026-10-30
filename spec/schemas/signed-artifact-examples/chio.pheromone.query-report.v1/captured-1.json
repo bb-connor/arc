@@ -1,0 +1,12 @@
+{
+  "accepted": true,
+  "concentration": {
+    "distinctOriginPairs": 1,
+    "evaluatedAtUnixMs": 2000,
+    "reputationEpoch": 7,
+    "subjectClass": "workflow.destructive_step",
+    "subjectClassNamespace": "chio.runtime",
+    "totalStrength": 0.1
+  },
+  "schema": "chio.pheromone.query-report.v1"
+}

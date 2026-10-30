@@ -16,6 +16,11 @@ use chio_test_support::prelude::*;
 #[path = "tests/http_receipts.rs"]
 mod http_receipts;
 
+#[path = "tests/hello_receipt_fixture.rs"]
+mod hello_receipt_fixture;
+
+const PACKAGE_EXPORTED_AT: u64 = 1_775_137_700;
+
 fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
     match err {
         CliError::Chio(chio) => {

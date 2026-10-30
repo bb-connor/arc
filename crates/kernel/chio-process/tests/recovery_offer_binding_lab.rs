@@ -71,7 +71,7 @@ async fn a_denied_operation_cannot_be_rewritten_with_a_grant_after_store_reopen(
     let original = runtime.tool_request("reader", "denied", "tools", "append", json!({}))?;
     let denied = runtime.invoke("reader", "denied", &original).await?;
     assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied.receipt.verify_signature()?);
+    assert!(denied.receipt.verify_integrity_embedded_key()?);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     drop(runtime);
 
@@ -87,7 +87,7 @@ async fn a_denied_operation_cannot_be_rewritten_with_a_grant_after_store_reopen(
     let replay = reopened.invoke("reader", "denied", &original).await?;
     assert_eq!(replay.verdict, Verdict::Deny);
     assert_eq!(replay.request_id, denied.request_id);
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
 
     // A continuation has a distinct identity and spends another logical call.
     // It still cannot repair missing capability authority by carrying a grant.
@@ -104,7 +104,7 @@ async fn a_denied_operation_cannot_be_rewritten_with_a_grant_after_store_reopen(
         .invoke("reader", "denied-continuation-1", &continuation)
         .await?;
     assert_eq!(denied_again.verdict, Verdict::Deny);
-    assert!(denied_again.receipt.verify_signature()?);
+    assert!(denied_again.receipt.verify_integrity_embedded_key()?);
     assert_eq!(reopened.process("root")?.tree_calls, 2);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     Ok(())
@@ -120,7 +120,7 @@ async fn attaching_a_grant_to_a_completed_operation_cannot_repeat_its_effect() -
     let original = runtime.tool_request("root", "publish", "tools", "append", json!({}))?;
     let completed = runtime.invoke("root", "publish", &original).await?;
     assert_eq!(completed.verdict, Verdict::Allow);
-    assert!(completed.receipt.verify_signature()?);
+    assert!(completed.receipt.verify_integrity_embedded_key()?);
     let mut changed = original.clone();
     changed.declassification_grant = Some(binding_fixture(&capability.id)?);
     assert!(matches!(

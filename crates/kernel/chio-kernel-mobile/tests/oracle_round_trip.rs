@@ -99,7 +99,7 @@ fn sign_fixture_receipt(fixture: &ReceiptFixture) -> Result<ChioReceipt, Box<dyn
         fixture.kernel_seed_hex.clone(),
     )?;
     let receipt: ChioReceipt = serde_json::from_str(&signed_json)?;
-    if !receipt.verify_signature()? {
+    if !receipt.verify_integrity_embedded_key()? {
         return Err(invalid_data("mobile receipt signature did not verify").into());
     }
     if receipt.kernel_key != keypair.public_key() {
@@ -165,7 +165,7 @@ fn hosted_oracle_accepts(
     if endpoint != "https://hosted-oracle.fixture.chio.local/audit-log/v1/receipts" {
         return Err(invalid_data("unexpected hosted oracle endpoint").into());
     }
-    if !receipt.verify_signature()? {
+    if !receipt.verify_integrity_embedded_key()? {
         return Ok(false);
     }
     Ok(

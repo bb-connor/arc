@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust-control/cluster-peer-request-body.schema.json",
+  "title": "Chio cluster peer request signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bodySha256",
+    "deployment",
+    "issuedAt",
+    "method",
+    "nodeId",
+    "nonce",
+    "path",
+    "query",
+    "recipient",
+    "scheme",
+    "term"
+  ],
+  "properties": {
+    "bodySha256": {
+      "type": "string"
+    },
+    "deployment": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "method": {
+      "type": "string"
+    },
+    "nodeId": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "query": {
+      "type": "string"
+    },
+    "recipient": {
+      "type": "string"
+    },
+    "scheme": {
+      "type": "string"
+    },
+    "term": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  }
+}

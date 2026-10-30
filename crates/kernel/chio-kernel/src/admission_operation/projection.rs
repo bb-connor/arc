@@ -227,7 +227,9 @@ impl VerifiedAdmissionReceipt {
     ) -> Result<Self, AdmissionOperationError> {
         let mismatch = || AdmissionOperationError::TerminalProjectionBindingMismatch;
         if receipt.kernel_key != *expected_kernel_public_key
-            || !receipt.verify_signature().map_err(|_| mismatch())?
+            || !receipt
+                .verify_integrity_embedded_key()
+                .map_err(|_| mismatch())?
             || receipt.decision.as_ref() != Some(expected_decision)
             || (projected_state == AdmissionOperationState::Completed
                 && !matches!(
@@ -1255,7 +1257,9 @@ pub(super) fn validate_receipt_projection(
         || receipt.capability_id != operation.binding.capability_id.as_str()
         || receipt.policy_hash != operation.binding.policy_hash.as_str()
         || receipt.tenant_id.as_deref() != expected_tenant
-        || !receipt.verify_signature().map_err(|_| mismatch())?
+        || !receipt
+            .verify_integrity_embedded_key()
+            .map_err(|_| mismatch())?
     {
         return Err(mismatch());
     }

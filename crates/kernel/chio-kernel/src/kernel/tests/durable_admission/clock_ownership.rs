@@ -19,7 +19,7 @@ fn aggregate_family_issuance_uses_kernel_time_at_both_epoch_extremes(
         let root = kernel.issue_aggregate_family_root(&subject, scope, 60, 2)?;
         assert_eq!(root.issued_at, now / 1_000);
         assert_eq!(root.expires_at, now / 1_000 + 60);
-        assert!(root.verify_signature()?);
+        assert!(root.verify_integrity_embedded_key()?);
     }
     Ok(())
 }

@@ -1,0 +1,25 @@
+{
+  "boundary_class": "prevent",
+  "caller_identity_hash": "abc123",
+  "content_hash": "deadbeef",
+  "id": "0ac436a08bf94dda52490d1eececa736305972940fa408e131a6d13691fd086f",
+  "kernel_key": "778bb608331eaf06bba38d13d88af7689c205ae743e3e48c05bf745f34706996",
+  "metadata": {
+    "chio_decision_receipt_id": "decision-001",
+    "chio_http_status_scope": "final"
+  },
+  "method": "GET",
+  "policy_hash": "cafebabe",
+  "receipt_kind": "mediated_decision",
+  "redaction_mode": "none",
+  "request_id": "req-001",
+  "response_status": 200,
+  "route_pattern": "/pets/{petId}",
+  "session_id": "sess-001",
+  "timestamp": 1700000000,
+  "tool_origin": "caller_executed",
+  "trust_level": "mediated",
+  "verdict": {
+    "verdict": "allow"
+  }
+}

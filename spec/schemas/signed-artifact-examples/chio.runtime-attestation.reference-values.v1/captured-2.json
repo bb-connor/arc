@@ -1,0 +1,13 @@
+{
+  "attestationSchema": "chio.runtime-attestation.google-confidential-vm.jwt.v1",
+  "descriptorId": "azure-prod",
+  "expiresAt": 300,
+  "issuedAt": 100,
+  "measurements": {
+    "hwModel": "GCP_AMD_SEV"
+  },
+  "referenceValueId": "google-rv-1",
+  "schema": "chio.runtime-attestation.reference-values.v1",
+  "state": "active",
+  "verifierFamily": "google_attestation"
+}

@@ -581,9 +581,8 @@ fn validate_mutation_retry_receipt(
     tenant_scope: &str,
     credential: &CredentialRef,
 ) -> Result<()> {
-    verify_admin_mutation_receipt(receipt)?;
-    if &receipt.signer != trusted_signer
-        || receipt.body.operation != operation
+    verify_admin_mutation_receipt(receipt, trusted_signer)?;
+    if receipt.body.operation != operation
         || receipt.body.tenant_scope != tenant_scope
         || &receipt.body.credential != credential
         || receipt.body.outcome != AdminMutationOutcome::Applied

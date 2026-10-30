@@ -1,4 +1,4 @@
-#![cfg(feature = "pq")]
+#![cfg(feature = "pq-kat")]
 
 use std::error::Error;
 use std::io::{Error as IoError, ErrorKind};

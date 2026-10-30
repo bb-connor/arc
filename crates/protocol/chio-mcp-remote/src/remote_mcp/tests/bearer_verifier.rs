@@ -593,7 +593,12 @@ fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> String {
     );
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).unwrap());
     let signing_input = format!("{header}.{payload}");
-    let signature = keypair.sign(signing_input.as_bytes()).to_bytes();
+    let signature = keypair
+        .sign_exempt(
+            chio_core::crypto::ExemptFormat::JwsSigningInput,
+            signing_input.as_bytes(),
+        )
+        .to_bytes();
     let signature = URL_SAFE_NO_PAD.encode(signature);
     format!("{signing_input}.{signature}")
 }
@@ -624,7 +629,15 @@ fn inbound_authority_jwt_rejects_weak_key_forgery() {
         |_| signature.to_vec(),
     );
     let signed_input = token.rsplit_once('.').unwrap().0.as_bytes();
-    assert!(key.verify(signed_input, &Ed25519Signature::from_bytes(&signature)));
+    assert!(matches!(
+        chio_core::crypto::verify_exempt(
+            &key,
+            chio_core::crypto::ExemptFormat::JwsSigningInput,
+            signed_input,
+            &Ed25519Signature::from_bytes(&signature)
+        ),
+        Err(chio_core::Error::SignatureRejected)
+    ));
     for key_source in [
         JwtVerificationKeySource::Static(key.clone()),
         JwtVerificationKeySource::Jwks(JwtJwksKeySet {

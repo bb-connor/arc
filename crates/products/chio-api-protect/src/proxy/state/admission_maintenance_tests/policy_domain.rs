@@ -113,7 +113,7 @@ async fn admission_reopened_under_v1_default_refuses_v2_default_operation() -> T
         admitted.reason
     );
     assert_eq!(admitted.receipt.policy_hash, current);
-    assert!(admitted.receipt.verify_signature()?);
+    assert!(admitted.receipt.verify_integrity_embedded_key()?);
     let (operations, _) = durable_rows(&fixture)?;
     assert_eq!(operations.len(), 2);
     let store = fixture.authority.admission_operation_store();

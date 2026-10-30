@@ -1475,7 +1475,12 @@ pub(crate) async fn handle_activate_finding(
     if let Err(error) = request.pricing_hint.body.validate() {
         return plain_http_error(StatusCode::BAD_REQUEST, &error);
     }
-    if !matches!(request.pricing_hint.verify_signature(), Ok(true)) {
+    if !matches!(
+        request
+            .pricing_hint
+            .verify_signature(&request.pricing_hint.signer_key),
+        Ok(true)
+    ) {
         return plain_http_error(StatusCode::BAD_REQUEST, "pricing hint signature is invalid");
     }
     if !request.pricing_hint.body.is_live_at(authorization_now) {

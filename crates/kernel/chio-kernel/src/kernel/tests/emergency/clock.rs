@@ -61,7 +61,7 @@ fn clock_failure_during_emergency_stop_cannot_resume_execution() {
         let denied = kernel.evaluate_tool_call_blocking(&stopped).unwrap();
         assert_eq!(denied.verdict, Verdict::Deny);
         assert_eq!(denied.reason.as_deref(), Some(EMERGENCY_STOP_DENY_REASON));
-        assert!(denied.receipt.verify_signature().unwrap());
+        assert!(denied.receipt.verify_integrity_embedded_key().unwrap());
         kernel.emergency_resume().unwrap();
         let resumed = make_request("explicitly-resumed", &cap, "read_file", "srv-a");
         assert_eq!(

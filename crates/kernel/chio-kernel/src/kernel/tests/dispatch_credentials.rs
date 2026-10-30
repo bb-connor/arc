@@ -1063,7 +1063,7 @@ fn hosted_url_elicitation_does_not_attempt_credential_rollback_after_dispatch(
     assert_eq!(fixture.rollback_calls.load(Ordering::SeqCst), 0);
     let receipt_log = fixture.kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
-    assert!(receipt_log.receipts()[0].verify_signature()?);
+    assert!(receipt_log.receipts()[0].verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -1113,7 +1113,7 @@ fn nested_url_elicitation_does_not_attempt_credential_rollback_after_dispatch(
     assert_eq!(fixture.rollback_calls.load(Ordering::SeqCst), 0);
     let receipt_log = fixture.kernel.receipt_log();
     assert_eq!(receipt_log.len(), 1);
-    assert!(receipt_log.receipts()[0].verify_signature()?);
+    assert!(receipt_log.receipts()[0].verify_integrity_embedded_key()?);
     fixture
         .kernel
         .complete_session_request(&session_id, &context.request_id)?;
@@ -1367,7 +1367,7 @@ async fn hosted_post_dispatch_approval_commit_failure_records_terminal_receipt(
         Decision::Cancelled { reason }
             if reason == "dispatch credential commit failed after tool execution"
     )));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -1419,7 +1419,7 @@ async fn nested_post_dispatch_approval_commit_failure_records_terminal_receipt(
         Decision::Cancelled { reason }
             if reason == "dispatch credential commit failed after tool execution"
     )));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 

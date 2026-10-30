@@ -21,7 +21,6 @@ use chio_open_market::penalty::{
     OpenMarketPenaltyState, SignedOpenMarketPenalty, OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA,
 };
 use chio_web3_bindings::IChioBondVault;
-use serde::Serialize;
 
 use crate::{
     EvmBondSnapshot, EvmTransactionReceipt, PreparedEvmCall, SettlementChainConfig,
@@ -178,7 +177,10 @@ fn snapshot_body() -> FindingFinalizedBondSnapshot {
     snapshot
 }
 
-fn sign<T: Serialize + Clone>(body: T, keypair: &Keypair) -> SignedExportEnvelope<T> {
+fn sign<T: chio_core::receipt::lineage::SignedExportPayload + Clone>(
+    body: T,
+    keypair: &Keypair,
+) -> SignedExportEnvelope<T> {
     SignedExportEnvelope::sign(body, keypair).test_expect("envelope signs")
 }
 

@@ -1,0 +1,206 @@
+{
+  "challenge": {
+    "body": {
+      "challengeDigest": "a384e6baa8e46c0e403e9763500c06f86f3e6b21c287e32c2f820da72f454539",
+      "challengeId": "challenge-a",
+      "expiresAt": "2024-03-09T16:01:40Z",
+      "issuedAt": "2024-03-09T16:00:00Z",
+      "nonce": "nonce-a",
+      "schema": "chio.financial-agent-passport-presentation-challenge.v1",
+      "selectors": [
+        {
+          "credentialRefDigest": "efdc8e6a8b1aae73d4899b872e2874b33297def148712663c24c872a7fa6eb09",
+          "family": "reputation"
+        }
+      ],
+      "sourcePassportId": "b10cf8618ac7f4cb40d9fe9a2884cac5b07c6c579daf73856278d684b5ac8ab3",
+      "verifier": "did:chio:31f3322d4923d36c41c109bdb0099193187bed99942096e4926a24c77efd0d2f",
+      "verifierKeyEpoch": 1
+    },
+    "signature": "d492941fd3b511d1e5aa8cbae0082ea86f30fb63d09dcb05374725d972158a74406057423dd739964613d5309cbe049406e845f14d48cccb2ec276c3a0ef1307",
+    "signerKey": "31f3322d4923d36c41c109bdb0099193187bed99942096e4926a24c77efd0d2f"
+  },
+  "presentation": {
+    "challengeDigest": "a384e6baa8e46c0e403e9763500c06f86f3e6b21c287e32c2f820da72f454539",
+    "credentials": [
+      {
+        "credential": {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://chio.world/credentials/v1"
+          ],
+          "credentialSubject": {
+            "id": "did:chio:0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc",
+            "metrics": {
+              "boundary_pressure": {
+                "deny_ratio": {
+                  "state": "known",
+                  "value": 0.1
+                },
+                "policies_observed": 1,
+                "receipts_observed": 3
+              },
+              "composite_score": {
+                "state": "known",
+                "value": 0.82
+              },
+              "computed_at": 1710000000,
+              "delegation_hygiene": {
+                "budget_reduction_rate": {
+                  "state": "known",
+                  "value": 1
+                },
+                "delegations_observed": 1,
+                "scope_reduction_rate": {
+                  "state": "known",
+                  "value": 1
+                },
+                "score": {
+                  "state": "known",
+                  "value": 0.9
+                },
+                "ttl_reduction_rate": {
+                  "state": "known",
+                  "value": 1
+                }
+              },
+              "effective_weight_sum": 0.9,
+              "history_depth": {
+                "active_days": 3,
+                "activity_ratio": {
+                  "state": "known",
+                  "value": 1
+                },
+                "first_seen": 1709999900,
+                "last_seen": 1710000000,
+                "receipt_count": 3,
+                "score": {
+                  "state": "known",
+                  "value": 0.7
+                },
+                "span_days": 3
+              },
+              "incident_correlation": {
+                "incidents_observed": null,
+                "score": {
+                  "state": "unknown"
+                }
+              },
+              "least_privilege": {
+                "capabilities_observed": 1,
+                "score": {
+                  "state": "known",
+                  "value": 0.8
+                }
+              },
+              "reliability": {
+                "cancellation_rate": {
+                  "state": "known",
+                  "value": 0
+                },
+                "completion_rate": {
+                  "state": "known",
+                  "value": 1
+                },
+                "incompletion_rate": {
+                  "state": "known",
+                  "value": 0
+                },
+                "receipts_observed": 3,
+                "score": {
+                  "state": "known",
+                  "value": 0.95
+                }
+              },
+              "resource_stewardship": {
+                "average_utilization": {
+                  "state": "known",
+                  "value": 0.6
+                },
+                "capped_grants_observed": 1,
+                "fit_score": {
+                  "state": "known",
+                  "value": 0.9
+                }
+              },
+              "specialization": {
+                "distinct_tools": 2,
+                "score": {
+                  "state": "known",
+                  "value": 0.5
+                }
+              },
+              "subject_key": "0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc"
+            }
+          },
+          "evidence": {
+            "checkpointRoots": [
+              "root"
+            ],
+            "lineageRecords": 1,
+            "query": {
+              "since": 1709999900,
+              "until": 1710000000
+            },
+            "receiptCount": 3,
+            "receiptIds": [
+              "r1",
+              "r2",
+              "r3"
+            ],
+            "uncheckpointedReceipts": 0
+          },
+          "expirationDate": "2024-03-10T16:00:00Z",
+          "issuanceDate": "2024-03-09T16:00:00Z",
+          "issuer": "did:chio:91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+          "proof": {
+            "created": "2024-03-09T16:00:00Z",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "fcf0ae818aa14997e874ed1f9e6c4f3db683caed9920e0b859ae990f38b04f9f9e4448cc32c68d3114543b820c1540783f9eb66bc1061594acc7e6c76f8f2508",
+            "type": "Ed25519Signature2020",
+            "verificationMethod": "did:chio:91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a#key-1"
+          },
+          "type": [
+            "VerifiableCredential",
+            "ChioReputationAttestation"
+          ]
+        },
+        "kind": "reputation"
+      }
+    ],
+    "membershipProofs": [
+      {
+        "leaf": {
+          "credentialId": "efdc8e6a8b1aae73d4899b872e2874b33297def148712663c24c872a7fa6eb09",
+          "credentialRefDigest": "efdc8e6a8b1aae73d4899b872e2874b33297def148712663c24c872a7fa6eb09",
+          "family": "reputation"
+        },
+        "proof": {
+          "audit_path": [],
+          "leaf_index": 0,
+          "tree_size": 1
+        }
+      }
+    ],
+    "presentationDigest": "3554f18eb5527c3c202ec6349cee1349c2f472f59262e42278a1c5f12c5b1a28",
+    "schema": "chio.financial-agent-passport.presentation.v1",
+    "sourceManifest": {
+      "body": {
+        "credentialCount": 1,
+        "credentialRoot": "5b925c2ef7fad0a7ee08cad1b62429bf09dd561da9760a3803d58d5355940380",
+        "expiresAt": 1710086400,
+        "issuedAt": 1710000000,
+        "issuer": "did:chio:91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+        "merkleRoots": [
+          "root"
+        ],
+        "schema": "chio.financial-agent-passport.source-manifest.v1",
+        "sourcePassportId": "b10cf8618ac7f4cb40d9fe9a2884cac5b07c6c579daf73856278d684b5ac8ab3",
+        "subject": "did:chio:0beef5a9e679e6a3e134fe27837bff32c7cb5f5d44ea09bcb0e542bad6a4c0cc"
+      },
+      "signature": "f2b77c5152597c553f8a8b22afab1d98432d7524fb5800602a756e1ebf6e53129efb2ffdb9fa2e34c3dbb9ba849df11f44b3b29a94a4bb0d2b92cf7edd22b701",
+      "signerKey": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+    }
+  },
+  "schema": "chio.financial-agent-passport-presentation-response.v1"
+}

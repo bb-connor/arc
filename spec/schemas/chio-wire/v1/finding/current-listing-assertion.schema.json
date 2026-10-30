@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/current-listing-assertion.schema.json",
+  "title": "Chio finding current listing assertion signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generated_at",
+    "listing_envelope_sha256",
+    "listing_id",
+    "max_age_secs",
+    "namespace",
+    "pricing_hint_envelope_sha256",
+    "registry_operator_id",
+    "schema",
+    "valid_until"
+  ],
+  "properties": {
+    "generated_at": {
+      "type": "integer"
+    },
+    "listing_envelope_sha256": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "max_age_secs": {
+      "type": "integer"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "pricing_hint_envelope_sha256": {
+      "type": "string"
+    },
+    "registry_operator_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.current-listing-assertion.v1"
+    },
+    "valid_until": {
+      "type": "integer"
+    }
+  }
+}

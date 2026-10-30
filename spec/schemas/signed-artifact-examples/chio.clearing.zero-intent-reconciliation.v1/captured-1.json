@@ -1,0 +1,37 @@
+{
+  "atomBindings": [
+    {
+      "expectedHeadDigest": "e8ae82850abe6fde3de74182ed338aa0cc2af6414960fb36fad0632f6232cefb",
+      "expectedLifecycleFence": 2,
+      "expectedResourceVersion": 5,
+      "obligationId": "10ce1174462cdf64208de1f53f7de491c437ec66d11000256385c618d188bb4b",
+      "sourceSequence": 2
+    },
+    {
+      "expectedHeadDigest": "20170ebc4ba77e59c08afaee097b49e8a7e22ea76db8c32f7af5870564324483",
+      "expectedLifecycleFence": 2,
+      "expectedResourceVersion": 5,
+      "obligationId": "93ea4aa60517497f9fcb3c7bbf517759e41e5f513e6d82677cadb8e9ee32df7b",
+      "sourceSequence": 1
+    }
+  ],
+  "authorityDigest": "061e5508c7cdef0e89ad7146f220bb3b3f263ef9a635857529df57cde4137840",
+  "dispositionAuthorityId": "obligation-authority",
+  "dispositionAuthorityKeyEpoch": 11,
+  "emptyIntentRoot": "81d3b401b593c3392e7a2db7693c3478f5669e8331fd0d63ea8731f932722da3",
+  "finalizationDigest": "86a0667a47c197e38d9c8b6589ceb7106f959f8c0c42bd09c6ba3305e1d60430",
+  "nextLifecycleFence": 5,
+  "nextLifecycleVersion": 5,
+  "outcome": "netted_without_rail",
+  "outputManifestDigest": "cd84800603397cb6426b6dc7899b26a4654fde4eb415d3e1df1a6e45a726ef24",
+  "reconciledAtUnixMs": 504,
+  "reservationCount": 2,
+  "reservationRoot": "5568169d269d465c3e802cb5a83b1e644a5d541578bb312d94c538b352aa2a80",
+  "roundCoreDigest": "b037529afb332163ef014cdb9d4f0d170984cf2c7b5739e2a9e18c56bfddbf74",
+  "roundId": "round-1",
+  "schema": "chio.clearing.zero-intent-reconciliation.v1",
+  "settlementIntentCount": 0,
+  "sourceLifecycleFence": 4,
+  "sourceLifecycleHeadDigest": "dd4414910300c012fc670aca6750eb29bfc7c3fcfcf8cb0bc17cd27da907a2f1",
+  "sourceLifecycleVersion": 4
+}

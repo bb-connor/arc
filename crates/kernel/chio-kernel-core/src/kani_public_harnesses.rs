@@ -12,7 +12,7 @@ use chio_core_types::capability::{
     scope::{ChioScope, Operation, ToolGrant},
     token::CapabilityToken,
 };
-use chio_core_types::crypto::{PublicKey, Signature, SigningAlgorithm, SigningBackend};
+use chio_core_types::crypto::{PublicKey, Signature, SigningBackend};
 use chio_core_types::hashing::Hash;
 use chio_core_types::merkle::node_hash;
 use chio_core_types::merkle_fixtures::bounded_merkle_case;
@@ -82,7 +82,6 @@ fn unsigned_capability(ttl: u64) -> CapabilityToken {
         issued_at: 10,
         expires_at: 10 + ttl,
         delegation_chain: vec![],
-        algorithm: None,
         caveats: vec![],
         scope_attenuations: None,
         attenuation_proof: None,
@@ -334,7 +333,10 @@ impl SigningBackend for DeterministicBackend {
         Ok(public_key(BACKEND_KEY_SEED))
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core_types::crypto::SigningMessage<'_>,
+    ) -> chio_core_types::Result<Signature> {
         let _ = message;
         Ok(Signature::from_bytes(&[0; 64]))
     }
@@ -401,7 +403,6 @@ pub fn public_sign_receipt_accepts_matching_kernel_key() {
     let receipt = sign_receipt_relaying_trusted_body(body, &backend)
         .unwrap_or_else(|_| unreachable!("matching key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     let expected_signature = Signature::from_bytes(&[0; 64]);
     assert_eq!(receipt.signature, expected_signature);
     core::mem::forget(expected_signature);
@@ -452,7 +453,6 @@ pub fn public_sign_receipt_accepts_matching_content_hash() {
     let receipt = sign_receipt(body, &backend, canonical_content)
         .unwrap_or_else(|_| unreachable!("matching content hash and key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     let expected_signature = Signature::from_bytes(&[0; 64]);
     assert_eq!(receipt.signature, expected_signature);
     core::mem::forget(expected_signature);
@@ -857,8 +857,8 @@ pub fn verify_delegation_chain_step() {
 }
 
 // Receipt sign/verify roundtrip integrity. The runtime path
-// `sign_receipt -> ChioReceipt::verify_signature` ultimately calls
-// `PublicKey::verify_canonical(body, signature)`, which canonicalizes `body`
+// `sign_receipt -> ChioReceipt::verify_integrity_embedded_key` ultimately calls
+// `verify_wrapped(key, schema_id, body, signature)`, which canonicalizes `body`
 // via RFC 8785 (serde_json) and then dispatches to ed25519-dalek (or ECDSA
 // on P-256/P-384). Both halves are intractable for symbolic execution: the
 // canonical-JSON encoder pulls in heap-allocating string manipulation, and
@@ -900,7 +900,7 @@ fn model_verify(verifier_id: u8, message_class: u8, signature: ModelSignature) -
     // the (signer_id, message) pair the signature commits to. This is
     // the EUF-CMA-style algebraic specification of a sound signature
     // scheme reduced to its observable predicate; the runtime's
-    // `PublicKey::verify_canonical` and the ed25519-dalek / aws-lc-rs
+    // `verify_wrapped` and the ed25519-dalek / aws-lc-rs
     // verifiers refine this predicate but cannot weaken it without
     // breaking the cryptographic soundness assumption recorded in
     // `formal/assumptions.toml`.
@@ -1827,4 +1827,19 @@ pub fn public_delivery_contract_allow_implies_digest_match() {
 
     let retry = delivery_denies_settlement(committed, observed_str, delivered_value);
     assert!(retry == denies);
+}
+
+#[kani::proof]
+pub fn verify_signing_wrapper_layout() {
+    let schema_digest: [u8; 32] = kani::any();
+    let body_digest: [u8; 32] = kani::any();
+    let wrapper = chio_core_types::crypto::assemble_wrapper(schema_digest, body_digest);
+    assert_eq!(
+        &wrapper[..24],
+        chio_core_types::crypto::SIGNING_WRAPPER_PREFIX
+    );
+    assert_eq!(wrapper[23], 0);
+    assert_eq!(&wrapper[24..56], &schema_digest);
+    assert_eq!(&wrapper[56..88], &body_digest);
+    kani::cover!(true, "verify_signing_wrapper_layout");
 }

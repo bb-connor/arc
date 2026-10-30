@@ -1,0 +1,24 @@
+{
+  "activationId": "activation-568dc5152044ec0daf88c2c1d4831246b846ecaedd4593267ec5cb700f01331e",
+  "appealOfCaseId": "case-missing",
+  "caseId": "case-640a4d0ba186b71717abb0f84534d15bcc62043fba1d023e45890f9f872400a2",
+  "charterId": "charter-b771ccbb4aebab61e343e01ecfecf76a557bdcb82cd970cde56e660ab47f7c6c",
+  "evidenceRefs": [
+    {
+      "kind": "external",
+      "referenceId": "appeal-1"
+    }
+  ],
+  "expiresAt": 500,
+  "governingOperatorId": "origin-a",
+  "issuedBy": "governance@chio.example",
+  "kind": "appeal",
+  "listingId": "listing-artifact-1",
+  "namespace": "https://registry.chio.example",
+  "note": "appeal",
+  "openedAt": 140,
+  "schema": "chio.registry.governance-case.v1",
+  "state": "open",
+  "subjectOperatorId": "origin-a",
+  "updatedAt": 140
+}

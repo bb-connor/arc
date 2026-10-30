@@ -115,7 +115,7 @@ fn verify_under_floor(receipt: &ChioReceipt, floor: CryptoFloor) -> bool {
     if !floor.allows(receipt.signature.algorithm()) {
         return false;
     }
-    receipt.verify_signature().unwrap_or(false)
+    receipt.verify_integrity_embedded_key().unwrap_or(false)
 }
 
 /// Reads the checked-in v3.18 fixture, materializing it as a `ChioReceipt`.
@@ -227,10 +227,9 @@ fn v318_fixture_round_trips_under_allow_classical() {
         "v3.18 receipt body canonical JSON drift"
     );
 
-    // Signature verifies via the issuer key. Caller path is the existing
-    // `verify_signature` (no floor enforcement) which is what
-    // `crypto_floor=allow_classical` accepts.
-    assert!(fixture.verify_signature().unwrap());
+    // Signature verifies via the issuer key with no floor enforcement, which
+    // is what `crypto_floor=allow_classical` accepts.
+    assert!(fixture.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -249,10 +248,10 @@ fn rolled_hybrid_bundle_round_trips_under_pq_required() {
     assert_eq!(rolled.signature.algorithm(), SigningAlgorithm::Hybrid);
 
     // Cryptographic verification dispatches off the signature material.
-    // verify_signature reconstructs the canonical signing body (the recomputed
+    // verify_integrity_embedded_key reconstructs the canonical signing body (the recomputed
     // content-addressed id plus the nonce-bound metadata) that sign_with_backend
     // actually signed over, then checks it against the hybrid signature.
-    assert!(rolled.verify_signature().unwrap());
+    assert!(rolled.verify_integrity_embedded_key().unwrap());
 
     // Floor enforcement: under pq_required, hybrid is the ONLY accepted
     // algorithm. No chio-policy / chio-kernel dep is permitted in

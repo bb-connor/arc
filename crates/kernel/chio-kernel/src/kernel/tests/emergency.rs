@@ -187,7 +187,7 @@ fn emergency_stop_receipt_records_deny_decision() {
 
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(
-        response.receipt.verify_signature().unwrap(),
+        response.receipt.verify_integrity_embedded_key().unwrap(),
         "emergency stop deny receipt must verify"
     );
     match response.receipt.decision.clone() {

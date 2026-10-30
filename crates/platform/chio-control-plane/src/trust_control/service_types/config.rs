@@ -111,6 +111,9 @@ pub struct TrustServiceConfig {
     /// seconds). Expiry and local clock floors receive no tolerance.
     pub authority_replication_max_future_skew_seconds: u64,
     pub roster_policy: Option<RosterPolicy>,
+    /// Trusted capital execution authority keys. `None` refuses every
+    /// capital issuance that carries an authority chain.
+    pub capital_authority: Option<TrustedCapitalAuthority>,
     /// Process memory budget for the trust control service. Its
     /// `admission_key_cap` bounds the federation admission rate limiter, so
     /// lowering it here actually tightens that guard rather than being silently
@@ -370,6 +373,7 @@ mod service_config_tests {
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
+            capital_authority: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
         }

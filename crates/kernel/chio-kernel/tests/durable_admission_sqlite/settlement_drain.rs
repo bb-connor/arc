@@ -85,7 +85,7 @@ fn settlement_drain_completes_257_persisted_claims() -> Result<(), Box<dyn Error
             bbs_projection_version: None,
         };
         let receipt = ChioReceipt::sign(body, &keypair)?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         receipts.append_chio_receipt_with_pending_observation_and_timeout(
             &receipt,
             &PendingSettlementObservation {

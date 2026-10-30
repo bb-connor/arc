@@ -838,7 +838,7 @@ fn governed_approval_token_binds_every_authorization_field_and_time_window(
         &approver,
     )?;
 
-    assert!(token.verify_signature_at(1_500)?);
+    assert!(token.verify_integrity_embedded_key_at(1_500)?);
 
     for mutation in [
         Mutation::RequestId,
@@ -862,19 +862,19 @@ fn governed_approval_token_binds_every_authorization_field_and_time_window(
             Mutation::ExpiresAt => mutated.expires_at = 2_001,
         }
         assert!(
-            matches!(mutated.verify_signature_at(1_500), Ok(false)),
+            matches!(mutated.verify_integrity_embedded_key_at(1_500), Ok(false)),
             "{mutation:?} mutation must invalidate the signature"
         );
     }
 
-    let not_yet_valid = token.verify_signature_at(999);
+    let not_yet_valid = token.verify_integrity_embedded_key_at(999);
     assert!(
         not_yet_valid
             .as_ref()
             .is_err_and(|error| error.to_string().contains("not yet valid")),
         "unexpected not-yet-valid result: {not_yet_valid:?}"
     );
-    let expired = token.verify_signature_at(2_000);
+    let expired = token.verify_integrity_embedded_key_at(2_000);
     assert!(
         expired
             .as_ref()

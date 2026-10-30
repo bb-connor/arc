@@ -156,3 +156,7 @@ pub fn verify_signed_failed_delivery(
         "failed_delivery",
     )
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingFailedDelivery {
+    const SCHEMA_ID: &'static str = FINDING_FAILED_DELIVERY_SCHEMA_V1;
+}

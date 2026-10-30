@@ -2,6 +2,7 @@
 //! pinned receipt authority; unpinned, forged or flag-mutated receipts never
 //! page.
 use super::*;
+use chio_core::crypto::ExemptFormat;
 use chio_core::receipt::body::chio_receipt_id;
 
 const SECRET: &str = "ev15-denied-secret-31ba";
@@ -84,7 +85,7 @@ async fn assert_no_unpinned_dispatch(event: SiemEvent) {
 async fn default_exporter_does_not_page_valid_unpinned_receipt() {
     let key = Keypair::generate();
     let receipt = signed_deny(&key);
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.action.verify_hash().unwrap());
     assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), receipt.id);
     assert_no_unpinned_dispatch(SiemEvent::from_receipt(receipt)).await;
@@ -100,8 +101,9 @@ async fn attacker_controlled_public_flags_cannot_enable_unpinned_paging() {
 async fn forged_signature_and_flags_do_not_page() {
     let key = Keypair::generate();
     let mut receipt = signed_deny(&key);
-    receipt.signature = Keypair::generate().sign(b"not a receipt");
-    assert!(!receipt.verify_signature().unwrap());
+    receipt.signature =
+        Keypair::generate().sign_exempt(ExemptFormat::JwsSigningInput, b"not a receipt");
+    assert!(!receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), receipt.id);
     assert_no_unpinned_dispatch(event_with_forged_flags(receipt)).await;
 }
@@ -121,7 +123,7 @@ async fn signed_inconsistent_action_hash_and_flags_do_not_page() {
     let mut body = signed_deny(&key).body();
     body.action.parameter_hash = "0".repeat(64);
     let receipt = ChioReceipt::sign(body, &key).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), receipt.id);
     assert!(!receipt.action.verify_hash().unwrap());
     assert_no_unpinned_dispatch(event_with_forged_flags(receipt)).await;
@@ -192,11 +194,12 @@ async fn configured_pin_rechecks_every_receipt_component_and_ignores_public_flag
         .build();
     let valid = signed_deny(&trusted);
     let untrusted = signed_deny(&attacker);
-    assert!(untrusted.verify_signature().unwrap());
+    assert!(untrusted.verify_integrity_embedded_key().unwrap());
     assert!(untrusted.action.verify_hash().unwrap());
     let mut bad_signature = valid.clone();
-    bad_signature.signature = attacker.sign(b"different message");
-    assert!(!bad_signature.verify_signature().unwrap());
+    bad_signature.signature =
+        attacker.sign_exempt(ExemptFormat::JwsSigningInput, b"different message");
+    assert!(!bad_signature.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         chio_receipt_id(&bad_signature.body()).unwrap(),
         bad_signature.id
@@ -207,7 +210,7 @@ async fn configured_pin_rechecks_every_receipt_component_and_ignores_public_flag
     let mut body = valid.body();
     body.action.parameter_hash = "0".repeat(64);
     let bad_hash = ChioReceipt::sign(body, &trusted).unwrap();
-    assert!(bad_hash.verify_signature().unwrap());
+    assert!(bad_hash.verify_integrity_embedded_key().unwrap());
     assert_eq!(chio_receipt_id(&bad_hash.body()).unwrap(), bad_hash.id);
     assert!(!bad_hash.action.verify_hash().unwrap());
     // Mutate after event construction so the event carries stale true flags.
@@ -298,7 +301,7 @@ async fn pinned_p256_receipt_pages() {
     assert_eq!(chio_receipt_id(&receipt.body()).unwrap(), receipt.id);
     assert!(receipt.action.verify_hash().unwrap());
     assert!(
-        receipt.verify_signature().unwrap(),
+        receipt.verify_integrity_embedded_key().unwrap(),
         "P-256 verifier feature must be enabled"
     );
     assert_eq!(
@@ -320,7 +323,7 @@ async fn nonverifying_p256_signature_never_pages() {
         .build();
     let mut receipt: ChioReceipt = serde_json::from_str(P256_RECEIPT).unwrap();
     receipt.signature = chio_core::crypto::Signature::from_p256_der(&[0]);
-    assert!(!receipt.verify_signature().unwrap());
+    assert!(!receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         exporter
             .export_batch(&[event_with_forged_flags(receipt)])

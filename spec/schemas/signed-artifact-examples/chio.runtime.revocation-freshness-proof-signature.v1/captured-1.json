@@ -1,0 +1,11 @@
+{
+  "epochId": "revocation-epoch-42",
+  "epochRoot": "3333333333333333333333333333333333333333333333333333333333333333",
+  "fetchedAt": "2026-06-10T00:00:00Z",
+  "maxStalenessMs": 5000,
+  "oracleId": "did:chio:6b734a8eff246fe734b38d4046c148eee5f04fe87b3a0a423955a77956de066b",
+  "proofId": "revocation-runtime-valid",
+  "revokedLeafResult": false,
+  "schema": "chio.runtime.revocation-freshness-proof-signature.v1",
+  "sequence": 42
+}

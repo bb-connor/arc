@@ -1,0 +1,91 @@
+{
+  "bondId": "cbd-1",
+  "expiresAt": 20,
+  "issuedAt": 10,
+  "lifecycleState": "active",
+  "report": {
+    "disposition": "hold",
+    "exposure": {
+      "actionableReceipts": 0,
+      "activeDecisions": 0,
+      "currencies": [
+        "USD"
+      ],
+      "failedSettlementReceipts": 0,
+      "matchingDecisions": 0,
+      "matchingReceipts": 1,
+      "mixedCurrencyBook": false,
+      "pendingSettlementReceipts": 0,
+      "returnedDecisions": 0,
+      "returnedReceipts": 1,
+      "supersededDecisions": 0,
+      "truncatedDecisions": false,
+      "truncatedReceipts": false
+    },
+    "filters": {
+      "agentSubject": "subject-1",
+      "decisionLimit": 50,
+      "receiptLimit": 100
+    },
+    "findings": [
+      {
+        "code": "reserve_held",
+        "description": "reserve state is held"
+      }
+    ],
+    "generatedAt": 10,
+    "latestFacilityId": "cfd-1",
+    "prerequisites": {
+      "activeFacilityMet": true,
+      "activeFacilityRequired": false,
+      "certificationMet": true,
+      "certificationRequired": false,
+      "currencyCoherent": true,
+      "runtimeAssuranceMet": true
+    },
+    "schema": "chio.credit.bond-report.v1",
+    "scorecard": {
+      "anomalyCount": 0,
+      "band": "prime",
+      "confidence": "high",
+      "currencies": [
+        "USD"
+      ],
+      "matchingDecisions": 0,
+      "matchingReceipts": 1,
+      "mixedCurrencyBook": false,
+      "overallScore": 0.95,
+      "probationary": false,
+      "returnedDecisions": 0,
+      "returnedReceipts": 1
+    },
+    "supportBoundary": {
+      "autonomyGatingSupported": false,
+      "externalEscrowExecutionSupported": false,
+      "reserveAccountingAuthoritative": true
+    },
+    "terms": {
+      "capitalSource": "operator_internal",
+      "collateralAmount": {
+        "currency": "USD",
+        "units": 400
+      },
+      "coverageRatioBps": 10000,
+      "creditLimit": {
+        "currency": "USD",
+        "units": 4000
+      },
+      "facilityId": "cfd-1",
+      "outstandingExposureAmount": {
+        "currency": "USD",
+        "units": 0
+      },
+      "reserveRatioBps": 1000,
+      "reserveRequirementAmount": {
+        "currency": "USD",
+        "units": 400
+      }
+    }
+  },
+  "schema": "chio.credit.bond.v1"
+}

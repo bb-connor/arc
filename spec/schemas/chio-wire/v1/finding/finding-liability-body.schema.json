@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-liability-body.schema.json",
+  "title": "chio.finding.liability.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "backing_allocation_id",
+    "chain_id",
+    "defect_key",
+    "finding_id",
+    "liability_key",
+    "listing_id",
+    "opened_at",
+    "schema",
+    "seller",
+    "state",
+    "updated_at",
+    "vault_contract",
+    "vault_id",
+    "venue_id"
+  ],
+  "properties": {
+    "backing_allocation_id": {
+      "type": "string"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "defect_key": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "liability_key": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "opened_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.liability.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "integer"
+    },
+    "vault_contract": {
+      "type": "string"
+    },
+    "vault_id": {
+      "type": "string"
+    },
+    "venue_id": {
+      "type": "string"
+    }
+  }
+}

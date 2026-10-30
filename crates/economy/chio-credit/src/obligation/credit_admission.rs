@@ -698,7 +698,7 @@ fn validate_facility_artifact(
     let body = &signed.body;
     if signed.signer_key != source.authority_key
         || !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|_| CreditAdmissionError::AuthorityVerification)?
         || body.schema != CREDIT_FACILITY_ARTIFACT_SCHEMA
         || body.report.schema != CREDIT_FACILITY_REPORT_SCHEMA
@@ -749,7 +749,7 @@ fn validate_capability_artifact(
         || signed.attenuation_proof.is_some()
         || signed.budget_share_bps.is_some()
         || !signed
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| CreditAdmissionError::AuthorityVerification)?
     {
         return Err(CreditAdmissionError::AuthorityVerification);

@@ -1,0 +1,111 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://chio.world/credentials/v1"
+  ],
+  "credentialSubject": {
+    "id": "did:chio:201ab6d694a0cb9c430238c675cb2c925dfd20ba9dbb3c5353370c70d45f5ada",
+    "metrics": {
+      "boundary_pressure": {
+        "deny_ratio": {
+          "state": "unknown"
+        },
+        "policies_observed": 0,
+        "receipts_observed": 0
+      },
+      "composite_score": {
+        "state": "unknown"
+      },
+      "computed_at": 999880,
+      "delegation_hygiene": {
+        "budget_reduction_rate": {
+          "state": "unknown"
+        },
+        "delegations_observed": 0,
+        "scope_reduction_rate": {
+          "state": "unknown"
+        },
+        "score": {
+          "state": "unknown"
+        },
+        "ttl_reduction_rate": {
+          "state": "unknown"
+        }
+      },
+      "effective_weight_sum": 0,
+      "history_depth": {
+        "active_days": 0,
+        "activity_ratio": {
+          "state": "unknown"
+        },
+        "first_seen": null,
+        "last_seen": null,
+        "receipt_count": 0,
+        "score": {
+          "state": "unknown"
+        },
+        "span_days": 0
+      },
+      "incident_correlation": {
+        "incidents_observed": null,
+        "score": {
+          "state": "unknown"
+        }
+      },
+      "least_privilege": {
+        "capabilities_observed": 0,
+        "score": {
+          "state": "unknown"
+        }
+      },
+      "reliability": {
+        "cancellation_rate": {
+          "state": "unknown"
+        },
+        "completion_rate": {
+          "state": "unknown"
+        },
+        "incompletion_rate": {
+          "state": "unknown"
+        },
+        "receipts_observed": 0,
+        "score": {
+          "state": "unknown"
+        }
+      },
+      "resource_stewardship": {
+        "average_utilization": {
+          "state": "unknown"
+        },
+        "capped_grants_observed": 0,
+        "fit_score": {
+          "state": "unknown"
+        }
+      },
+      "specialization": {
+        "distinct_tools": 0,
+        "score": {
+          "state": "unknown"
+        }
+      },
+      "subject_key": "201ab6d694a0cb9c430238c675cb2c925dfd20ba9dbb3c5353370c70d45f5ada"
+    }
+  },
+  "evidence": {
+    "checkpointRoots": [],
+    "lineageRecords": 0,
+    "query": {
+      "until": 999880
+    },
+    "receiptCount": 0,
+    "receiptIds": [],
+    "uncheckpointedReceipts": 0
+  },
+  "expirationDate": "1970-01-13T13:46:40Z",
+  "issuanceDate": "1970-01-12T13:44:40Z",
+  "issuer": "did:chio:53308a8f0bc72c35c31bf7137739ada9897e0a414deb0dfa855202e98965ae97",
+  "type": [
+    "VerifiableCredential",
+    "ChioReputationAttestation"
+  ]
+}

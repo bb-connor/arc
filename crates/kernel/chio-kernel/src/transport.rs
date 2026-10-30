@@ -313,7 +313,7 @@ mod tests {
             result,
             chio_core::message::ToolCallResult::Ok { .. }
         ));
-        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]

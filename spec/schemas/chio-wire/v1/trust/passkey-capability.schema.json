@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/passkey-capability.schema.json",
+  "title": "Chio passkey capability signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "audience",
+    "challenge_nonce",
+    "credential_id",
+    "exp",
+    "iat",
+    "scope_set",
+    "signature"
+  ],
+  "properties": {
+    "audience": {
+      "type": "string"
+    },
+    "challenge_nonce": {
+      "type": "string"
+    },
+    "credential_id": {
+      "type": "string"
+    },
+    "exp": {
+      "type": "string"
+    },
+    "iat": {
+      "type": "string"
+    },
+    "scope_set": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "signature": {
+      "type": "string"
+    }
+  }
+}

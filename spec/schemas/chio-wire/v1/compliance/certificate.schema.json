@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/compliance/certificate.schema.json",
+  "title": "Chio compliance certificate signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "all_signatures_valid",
+    "anomalies",
+    "budget_compliant",
+    "chain_continuous",
+    "checks",
+    "compliance_profile_digest",
+    "coverage",
+    "first_receipt_at",
+    "guards_compliant",
+    "invocation_count",
+    "issued_at",
+    "kernel_key",
+    "last_receipt_at",
+    "receipt_count",
+    "receipt_set_digest",
+    "schema",
+    "scope_compliant",
+    "session_id"
+  ],
+  "properties": {
+    "all_signatures_valid": {
+      "type": "boolean"
+    },
+    "anomalies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "budget_compliant": {
+      "type": "boolean"
+    },
+    "chain_continuous": {
+      "type": "boolean"
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_mediated_receipt_limit",
+        "required_guards",
+        "tenant",
+        "tool_targets"
+      ],
+      "properties": {
+        "allowed_mediated_receipt_limit": {
+          "type": "string"
+        },
+        "required_guards": {
+          "type": "string"
+        },
+        "tenant": {
+          "type": "string"
+        },
+        "tool_targets": {
+          "type": "string"
+        }
+      }
+    },
+    "compliance_profile_digest": {
+      "type": "string"
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "archived_through_entry_seq": {
+          "type": "integer"
+        },
+        "checkpoint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "batch_end_seq",
+                "batch_start_seq",
+                "chain_root",
+                "checkpoint_seq",
+                "issued_at",
+                "kernel_key",
+                "merkle_root",
+                "schema",
+                "tree_size"
+              ],
+              "properties": {
+                "batch_end_seq": {
+                  "type": "integer"
+                },
+                "batch_start_seq": {
+                  "type": "integer"
+                },
+                "chain_root": {
+                  "type": "string"
+                },
+                "checkpoint_seq": {
+                  "type": "integer"
+                },
+                "issued_at": {
+                  "type": "integer"
+                },
+                "kernel_key": {
+                  "type": "string"
+                },
+                "merkle_root": {
+                  "type": "string"
+                },
+                "previous_checkpoint_sha256": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "tree_size": {
+                  "type": "integer"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "snapshot_end_entry_seq": {
+          "type": "integer"
+        },
+        "tenant_id": {
+          "type": "null"
+        }
+      }
+    },
+    "first_receipt_at": {
+      "type": "integer"
+    },
+    "guards_compliant": {
+      "type": "boolean"
+    },
+    "invocation_count": {
+      "type": "integer"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "last_receipt_at": {
+      "type": "integer"
+    },
+    "receipt_count": {
+      "type": "integer"
+    },
+    "receipt_set_digest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.compliance.certificate.v1"
+    },
+    "scope_compliant": {
+      "type": "boolean"
+    },
+    "session_id": {
+      "type": "string"
+    }
+  }
+}

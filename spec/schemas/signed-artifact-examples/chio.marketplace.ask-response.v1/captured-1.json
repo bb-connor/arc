@@ -1,0 +1,41 @@
+{
+  "agentId": "agent-alpha",
+  "bidDigest": "fee8fc90de2a14002dba3422f62a9a55139cffd0aad667974ac586e7165bf4c0",
+  "expiresAt": 420,
+  "issuedAt": 120,
+  "listingId": "listing-1",
+  "quotedPrice": {
+    "currency": "USD",
+    "units": 100
+  },
+  "schema": "chio.marketplace.ask-response.v1",
+  "tokenOffer": {
+    "expires_at": 420,
+    "id": "token-1",
+    "issued_at": 120,
+    "issuer": "2b1edc6ee47d2a94ef677eac08d63cab82e50842ab7e06a1ef0db35bc75ca4d5",
+    "schema": "chio.capability.v1",
+    "scope": {
+      "grants": [
+        {
+          "max_cost_per_invocation": {
+            "currency": "USD",
+            "units": 100
+          },
+          "max_invocations": 10,
+          "max_total_cost": {
+            "currency": "USD",
+            "units": 1000
+          },
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "demo-server",
+          "tool_name": "search"
+        }
+      ]
+    },
+    "signature": "3902dfd064992fb19df63cee088e5827da2fd209781a16d21ae3def4c1f787793697b6f4182a4cb06df14113e4afacd6d1d5e35306cc3b277a7ad4bb2ef6c906",
+    "subject": "6772829a852979afca12c31cf644a5f9a5fc41ec8ff3702040c9278779b415e6"
+  }
+}

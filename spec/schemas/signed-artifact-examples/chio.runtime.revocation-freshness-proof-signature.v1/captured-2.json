@@ -1,0 +1,14 @@
+{
+  "ancestorCapabilityDigest": "8888888888888888888888888888888888888888888888888888888888888888",
+  "epochId": "revocation-epoch-42",
+  "epochRoot": "3333333333333333333333333333333333333333333333333333333333333333",
+  "fetchedAt": "2026-06-10T00:00:00Z",
+  "maxStalenessMs": 5000,
+  "oracleId": "did:chio:4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+  "proofId": "revocation-runtime-valid",
+  "revokedAncestorResult": false,
+  "revokedLeafResult": false,
+  "schema": "chio.runtime.revocation-freshness-proof-signature.v1",
+  "sequence": 42,
+  "subjectCapabilityDigest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+}

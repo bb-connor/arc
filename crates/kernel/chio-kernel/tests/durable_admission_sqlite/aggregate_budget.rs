@@ -61,7 +61,7 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
         first_response.reason
     );
 
-    assert!(first_response.receipt.verify_signature()?);
+    assert!(first_response.receipt.verify_integrity_embedded_key()?);
     let metadata: AdmissionReceiptMetadataV1 = serde_json::from_value(
         first_response
             .receipt
@@ -87,7 +87,7 @@ fn aggregate_invocation_budget_exhausts_across_grants_atomically(
         &chio_kernel::budget_store::BudgetQuotaKey::grant(first.capability.id.clone(), 1),
     )?;
     assert!(second_grant_usage.is_none());
-    assert!(second_response.receipt.verify_signature()?);
+    assert!(second_response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         second_response
             .receipt

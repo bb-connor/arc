@@ -79,7 +79,7 @@ impl Fixture {
         kernel.register_tool_server(Box::new(ReadServer(Arc::clone(&invocations))));
         let capabilities = crate::issue_default_capabilities(&kernel, &subject, &defaults)?;
         for capability in &capabilities {
-            assert!(capability.verify_signature()?);
+            assert!(capability.verify_integrity_embedded_key()?);
             assert_eq!(capability.subject, subject);
         }
         Ok(Self {

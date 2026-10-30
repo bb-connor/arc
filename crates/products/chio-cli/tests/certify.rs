@@ -15,11 +15,10 @@ use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chio_core::{
-    aggregate_generic_listing_reports, canonical_json_bytes, GenericListingActorKind,
-    GenericListingQuery, GenericListingReport, GenericListingStatus, GenericRegistryPublisherRole,
-    Keypair, PublicKey, Signature, SignedGenericGovernanceCase, SignedGenericGovernanceCharter,
-    SignedGenericListing, SignedGenericTrustActivation, SignedOpenMarketFeeSchedule,
-    SignedOpenMarketPenalty,
+    aggregate_generic_listing_reports, GenericListingActorKind, GenericListingQuery,
+    GenericListingReport, GenericListingStatus, GenericRegistryPublisherRole, Keypair, PublicKey,
+    Signature, SignedGenericGovernanceCase, SignedGenericGovernanceCharter, SignedGenericListing,
+    SignedGenericTrustActivation, SignedOpenMarketFeeSchedule, SignedOpenMarketPenalty,
 };
 use chio_credentials::{
     build_portable_negative_event_artifact, build_portable_reputation_summary_artifact,
@@ -600,8 +599,8 @@ fn certify_check_emits_signed_pass_artifact_and_report() {
     let signature: Signature =
         serde_json::from_value(artifact["signature"].clone()).expect("signature");
     let body = artifact["body"].clone();
-    let body_bytes = canonical_json_bytes(&body).expect("canonical body");
-    assert!(public_key.verify(&body_bytes, &signature));
+    chio_core::crypto::verify_wrapped(&public_key, "chio.certify.check.v1", &body, &signature)
+        .expect("certification signature verifies");
 
     let _ = fs::remove_dir_all(scenarios_dir);
     let _ = fs::remove_dir_all(results_dir);
@@ -662,8 +661,8 @@ fn certify_check_emits_signed_fail_artifact_with_findings() {
     let signature: Signature =
         serde_json::from_value(artifact["signature"].clone()).expect("signature");
     let body = artifact["body"].clone();
-    let body_bytes = canonical_json_bytes(&body).expect("canonical body");
-    assert!(public_key.verify(&body_bytes, &signature));
+    chio_core::crypto::verify_wrapped(&public_key, "chio.certify.check.v1", &body, &signature)
+        .expect("certification signature verifies");
 
     let _ = fs::remove_dir_all(scenarios_dir);
     let _ = fs::remove_dir_all(results_dir);

@@ -1,0 +1,52 @@
+{
+  "arguments": {
+    "message": "exact"
+  },
+  "capability_id": "cap-01a182d1-4820-7593-a2a8-1e5feebac5e8",
+  "created_at": 1793196116,
+  "decision": {
+    "approver": "455369a48f2bf98adb6532071739af141f7f4560997e37561550b4dc9d08cde6",
+    "decision": "approved",
+    "expires_at": 1793196236,
+    "governed_intent_hash": "09d166a45bc96c116c4dfa916a103891b59879c24773a5e09e96a69590db9d04",
+    "id": "approval-4c256883415ab8fe85dd44902d7630a80e9babb249c13eebb5298cd6ed53dac4-decision",
+    "issued_at": 1793196116,
+    "request_id": "ap23-bindings",
+    "signature": "f854ca9e4e9de090f8f871d25d62a818347a018fbd38259e49539372a6b93fc69186b6246bcd630754335cd033937c5a589921f74360c9f0ae1d023114cc6e0a",
+    "subject": "abbe8f2bdc519857742e492f15eab4525731734a997737ac890f65af2df400a1"
+  },
+  "expires_at": 1793196236,
+  "id": "approval-4c256883415ab8fe85dd44902d7630a80e9babb249c13eebb5298cd6ed53dac4",
+  "intent": {
+    "body": {
+      "kind": "bound_tool_invocation",
+      "value": {
+        "capability_id": "cap-01a182d1-4820-7593-a2a8-1e5feebac5e8",
+        "parameters_hash": "0xcb2f69376afa9440d7fdab0c8afd8d2f2418a28c9fabc00698542cf2f4504428"
+      }
+    },
+    "context": {
+      "chio_tool_approval": {
+        "arguments": {
+          "message": "exact"
+        },
+        "capability_hash": "450a41b5c334d21382156457ab68ad77007d0990c4937bb38ce7a1fb195dd103",
+        "policy_hash": "5d928ffabd19dbfff743206d10f70752d1f04e846b257b2a56dd449ed68382dc",
+        "request_id": "ap23-bindings",
+        "schema": "chio.tool-approval-context.v1",
+        "tenant_id": "ap23-mcp-tenant"
+      },
+      "mcpSessionId": "910a50d0a11dd5a2b1d837a7d425672fed0ee611d62f0cdb33306b44e85aa72a"
+    },
+    "id": "approval-4c256883415ab8fe85dd44902d7630a80e9babb249c13eebb5298cd6ed53dac4",
+    "purpose": "operator-approved native test",
+    "server_id": "wrapped-http-mock",
+    "tool_name": "echo_json"
+  },
+  "policy_fingerprint": "3af12025ff501d9584432dc0d74ee8abaf1ead7106ff808e7cc476f1bdb44815",
+  "request_id": "ap23-bindings",
+  "runtime_contract_fingerprint": "e911dfcc70af851d9234f810483a8c5fb7e0b2fbf3a7c27fb0a791fb77840f47",
+  "schema": "chio.mcp.operator-approval.v1",
+  "session_id": "910a50d0a11dd5a2b1d837a7d425672fed0ee611d62f0cdb33306b44e85aa72a",
+  "subject": "abbe8f2bdc519857742e492f15eab4525731734a997737ac890f65af2df400a1"
+}

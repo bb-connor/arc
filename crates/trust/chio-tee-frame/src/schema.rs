@@ -13,7 +13,8 @@
 //! validation on top without contradicting these checks.
 
 use base64::Engine;
-use chio_core::crypto::{PublicKey, Signature};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped_bytes, PublicKey, Signature, SigningWrapper};
 
 use crate::frame::{Frame, UpstreamSystem, Verdict};
 
@@ -100,9 +101,20 @@ pub fn validate_signed(
     verify_tenant_sig(frame, tenant_public_key_bytes)
 }
 
-/// Build the byte payload committed by `tenant_sig`: canonical JSON of every
-/// frame field except `tenant_sig`.
+/// Signing-wrapper schema id of a tenant-signed capture frame.
+pub const TEE_CAPTURE_FRAME_SCHEMA: &str = "chio.tee-capture-frame.v1";
+
+/// The 88-byte signing wrapper `tenant_sig` covers: the wrapper under
+/// [`TEE_CAPTURE_FRAME_SCHEMA`] over the canonical JSON of every frame field
+/// except `tenant_sig`.
 pub fn signing_payload(frame: &Frame) -> Result<Vec<u8>, SchemaError> {
+    let wrapper = SigningWrapper::new(TEE_CAPTURE_FRAME_SCHEMA, &signing_body(frame)?)
+        .map_err(|error| SchemaError::TenantSigPayload(error.to_string()))?;
+    Ok(wrapper.as_bytes().to_vec())
+}
+
+/// Canonical JSON of every frame field except `tenant_sig`.
+pub fn signing_body(frame: &Frame) -> Result<CanonicalBytes, SchemaError> {
     let mut value = serde_json::to_value(frame)
         .map_err(|error| SchemaError::TenantSigPayload(error.to_string()))?;
     let Some(map) = value.as_object_mut() else {
@@ -111,7 +123,7 @@ pub fn signing_payload(frame: &Frame) -> Result<Vec<u8>, SchemaError> {
         ));
     };
     map.remove("tenant_sig");
-    chio_core::canonical::canonical_json_bytes(&value)
+    CanonicalBytes::from_value(&value)
         .map_err(|error| SchemaError::TenantSigPayload(error.to_string()))
 }
 
@@ -120,12 +132,12 @@ pub fn verify_tenant_sig(
     frame: &Frame,
     tenant_public_key_bytes: &[u8; 32],
 ) -> Result<(), SchemaError> {
-    let payload = signing_payload(frame)?;
+    let body = signing_body(frame)?;
     let sig_bytes = decode_tenant_sig(&frame.tenant_sig)?;
     let signature = Signature::from_bytes(&sig_bytes);
     let public_key = PublicKey::from_bytes(tenant_public_key_bytes)
         .map_err(|error| SchemaError::TenantSigVerification(error.to_string()))?;
-    if public_key.verify(&payload, &signature) {
+    if verify_wrapped_bytes(&public_key, TEE_CAPTURE_FRAME_SCHEMA, &body, &signature).is_ok() {
         Ok(())
     } else {
         Err(SchemaError::TenantSigVerification(
@@ -446,10 +458,12 @@ mod tests {
             "ed25519:{}",
             base64::engine::general_purpose::STANDARD.encode([0u8; 64])
         );
-        let payload = signing_payload(&frame).unwrap();
+        let signature = keypair
+            .sign_wrapped(TEE_CAPTURE_FRAME_SCHEMA, &signing_body(&frame).unwrap())
+            .unwrap();
         frame.tenant_sig = format!(
             "ed25519:{}",
-            base64::engine::general_purpose::STANDARD.encode(keypair.sign(&payload).to_bytes())
+            base64::engine::general_purpose::STANDARD.encode(signature.to_bytes())
         );
         (frame, public_key)
     }

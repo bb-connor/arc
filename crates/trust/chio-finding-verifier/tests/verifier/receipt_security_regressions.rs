@@ -48,7 +48,10 @@ fn production_receipt_rejects_nonce_expired_at_receipt_issuance() -> TestResult 
     let mut nonces = fx.nonce_resolver.nonces.clone();
     let nonce = nonces.first_mut().ok_or("production nonce missing")?;
     nonce.nonce.expires_at = i64::try_from(fx.receipts[0].receipt.timestamp)?;
-    nonce.signature = keypair(21).sign(&canonical_json_bytes(&nonce.nonce)?);
+    nonce.signature = keypair(21).sign_wrapped(
+        chio_core_types::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&nonce.nonce)?,
+    )?;
     let resolver = TestNonceResolver { nonces };
     let mut evidence = bundle(&fx, clone_receipts(&fx));
     evidence.nonce_resolver = &resolver;
@@ -76,7 +79,10 @@ fn delivery_receipt_rejects_nonce_expired_at_receipt_issuance() -> TestResult {
     let mut resolver = nonce_resolver_with_delivery(&fx, &delivery)?;
     let nonce = resolver.nonces.last_mut().ok_or("delivery nonce missing")?;
     nonce.nonce.expires_at = i64::try_from(delivery_timestamp)?;
-    nonce.signature = keypair(12).sign(&canonical_json_bytes(&nonce.nonce)?);
+    nonce.signature = keypair(12).sign_wrapped(
+        chio_core_types::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&nonce.nonce)?,
+    )?;
     let mut evidence = bundle(&fx, clone_receipts(&fx));
     evidence.finding_delivery = Some(delivery);
     evidence.nonce_resolver = &resolver;
@@ -111,7 +117,10 @@ fn delivery_nonce_envelope_changes_the_bundle_commitment() -> TestResult {
         .last_mut()
         .ok_or("delivery nonce missing")?;
     changed_nonce.nonce.expires_at = changed_nonce.nonce.expires_at.saturating_add(1);
-    changed_nonce.signature = keypair(12).sign(&canonical_json_bytes(&changed_nonce.nonce)?);
+    changed_nonce.signature = keypair(12).sign_wrapped(
+        chio_core_types::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&changed_nonce.nonce)?,
+    )?;
     let mut changed_evidence = bundle(&fx, clone_receipts(&fx));
     changed_evidence.finding_delivery = Some(changed_delivery);
     changed_evidence.nonce_resolver = &changed_resolver;
@@ -147,8 +156,10 @@ fn revoked_production_receipt_signer_is_rejected() -> TestResult {
         .ok_or("production signer status missing")?;
     signed_status.body.revoked_from = Some(signed_status.body.observed_at.saturating_sub(1));
     signed_status.signature = fx
-        .checkpoint_status_authority
-        .sign(&canonical_json_bytes(&signed_status.body)?);
+        .checkpoint_status_authority.sign_wrapped(
+        <chio_finding::FindingAuthorityStatus as chio_core_types::receipt::lineage::SignedExportPayload>::SCHEMA_ID,
+        &chio_core_types::CanonicalBytes::from_serializable(&signed_status.body)?,
+    )?;
 
     let draft =
         verify_finding_evidence(&fx.raw_finding, &trust, &bundle(&fx, clone_receipts(&fx)))?;

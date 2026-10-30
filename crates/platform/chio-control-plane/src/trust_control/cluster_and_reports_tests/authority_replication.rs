@@ -472,7 +472,10 @@ fn assert_kernel_rejects_issuer(
         reason.contains("not found among trusted") || reason.contains("not a trusted CA"),
         "unexpected rejection: {reason}"
     );
-    assert!(response.receipt.verify_signature().test_unwrap());
+    assert!(response
+        .receipt
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 }
 
 #[test]

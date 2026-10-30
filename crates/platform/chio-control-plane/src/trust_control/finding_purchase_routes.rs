@@ -288,8 +288,10 @@ impl FindingPurchaseResult {
         {
             return Err("purchase result violates the price ceiling".to_owned());
         }
-        if !matches!(self.delivery_receipt.verify_signature(), Ok(true))
-            || !matches!(self.delivery_receipt.action.verify_hash(), Ok(true))
+        if !matches!(
+            self.delivery_receipt.verify_integrity_embedded_key(),
+            Ok(true)
+        ) || !matches!(self.delivery_receipt.action.verify_hash(), Ok(true))
         {
             return Err("delivery receipt signature or action hash is invalid".to_owned());
         }
@@ -330,12 +332,16 @@ impl FindingPurchaseResult {
         }
 
         if let Some(record) = self.purchase_record.as_ref() {
-            if record.body.validate().is_err() || !matches!(record.verify_signature(), Ok(true)) {
+            if record.body.validate().is_err()
+                || !matches!(record.verify_signature(&record.signer_key), Ok(true))
+            {
                 return Err("purchase record body or embedded signature is invalid".to_owned());
             }
         }
         if let Some(failed) = self.failed_delivery.as_ref() {
-            if failed.body.validate().is_err() || !matches!(failed.verify_signature(), Ok(true)) {
+            if failed.body.validate().is_err()
+                || !matches!(failed.verify_signature(&failed.signer_key), Ok(true))
+            {
                 return Err("failed-delivery body or embedded signature is invalid".to_owned());
             }
         }

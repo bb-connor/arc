@@ -1,8 +1,7 @@
 # Challenge-verifier profile fixture
 
-`profile.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The governance authority that signs the
+`profile.json` is generated deterministically by
+`chio proof fixture regenerate`. The governance authority that signs the
 envelope uses the test-only seed `[1_u8; 32]`; the embedded receipt-signer,
 checkpoint, verifier-report, purchase, and failed-delivery key policies use
 seeds `[11_u8; 32]` through `[17_u8; 32]`.

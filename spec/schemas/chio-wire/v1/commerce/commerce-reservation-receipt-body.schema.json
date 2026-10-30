@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-reservation-receipt-body.schema.json",
+  "title": "Chio commerce reservation receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "depositor_account",
+    "order_id",
+    "receipt_id",
+    "reserved_amount",
+    "schema",
+    "token_offer_id",
+    "token_offer_sha256"
+  ],
+  "properties": {
+    "depositor_account": {
+      "type": "string"
+    },
+    "order_id": {
+      "type": "string"
+    },
+    "receipt_id": {
+      "type": "string"
+    },
+    "reserved_amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.commerce.reservation-receipt.v1"
+    },
+    "token_offer_id": {
+      "type": "string"
+    },
+    "token_offer_sha256": {
+      "type": "string"
+    }
+  }
+}

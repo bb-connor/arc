@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/exposure-ledger.schema.json",
+  "title": "Chio credit exposure ledger signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "decisions",
+    "filters",
+    "generatedAt",
+    "positions",
+    "receipts",
+    "schema",
+    "summary",
+    "supportBoundary"
+  ],
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decisionLimit",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "decisionLimit": {
+          "type": "integer"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "activeQuotedPremiumUnits",
+          "currency",
+          "failedUnits",
+          "governedMaxExposureUnits",
+          "pendingUnits",
+          "provisionalLossUnits",
+          "quotedPremiumUnits",
+          "recoveredUnits",
+          "reservedUnits",
+          "settledUnits"
+        ],
+        "properties": {
+          "activeQuotedPremiumUnits": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "failedUnits": {
+            "type": "integer"
+          },
+          "governedMaxExposureUnits": {
+            "type": "integer"
+          },
+          "pendingUnits": {
+            "type": "integer"
+          },
+          "provisionalLossUnits": {
+            "type": "integer"
+          },
+          "quotedPremiumUnits": {
+            "type": "integer"
+          },
+          "recoveredUnits": {
+            "type": "integer"
+          },
+          "reservedUnits": {
+            "type": "integer"
+          },
+          "settledUnits": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "schema": {
+      "const": "chio.credit.exposure-ledger.v1"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actionableReceipts",
+        "activeDecisions",
+        "currencies",
+        "failedSettlementReceipts",
+        "matchingDecisions",
+        "matchingReceipts",
+        "mixedCurrencyBook",
+        "pendingSettlementReceipts",
+        "returnedDecisions",
+        "returnedReceipts",
+        "supersededDecisions",
+        "truncatedDecisions",
+        "truncatedReceipts"
+      ],
+      "properties": {
+        "actionableReceipts": {
+          "type": "integer"
+        },
+        "activeDecisions": {
+          "type": "integer"
+        },
+        "currencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failedSettlementReceipts": {
+          "type": "integer"
+        },
+        "matchingDecisions": {
+          "type": "integer"
+        },
+        "matchingReceipts": {
+          "type": "integer"
+        },
+        "mixedCurrencyBook": {
+          "type": "boolean"
+        },
+        "pendingSettlementReceipts": {
+          "type": "integer"
+        },
+        "returnedDecisions": {
+          "type": "integer"
+        },
+        "returnedReceipts": {
+          "type": "integer"
+        },
+        "supersededDecisions": {
+          "type": "integer"
+        },
+        "truncatedDecisions": {
+          "type": "boolean"
+        },
+        "truncatedReceipts": {
+          "type": "boolean"
+        }
+      }
+    },
+    "supportBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claimAdjudicationSupported",
+        "crossCurrencyNettingSupported",
+        "governedReceiptsAuthoritative",
+        "recoveryLifecycleSupported",
+        "settlementReconciliationAuthoritative",
+        "underwritingDecisionsAuthoritative"
+      ],
+      "properties": {
+        "claimAdjudicationSupported": {
+          "type": "boolean"
+        },
+        "crossCurrencyNettingSupported": {
+          "type": "boolean"
+        },
+        "governedReceiptsAuthoritative": {
+          "type": "boolean"
+        },
+        "recoveryLifecycleSupported": {
+          "type": "boolean"
+        },
+        "settlementReconciliationAuthoritative": {
+          "type": "boolean"
+        },
+        "underwritingDecisionsAuthoritative": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

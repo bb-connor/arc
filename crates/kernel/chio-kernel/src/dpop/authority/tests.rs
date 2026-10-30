@@ -117,7 +117,7 @@ fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
     body.issuer = issuer.public_key();
     body.subject = weak.clone();
     let cap = CapabilityToken::sign(body, &issuer).unwrap();
-    assert!(cap.verify_signature().unwrap());
+    assert!(cap.verify_integrity_embedded_key().unwrap());
     proof.body.agent_key = weak;
     let mut signature = [0_u8; 64];
     signature[0] = 1;
@@ -128,10 +128,6 @@ fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
 #[test]
 fn durable_dpop_rejects_weak_key_forgery() {
     let (cap, proof) = weak_key_forgery();
-    assert!(proof.body.agent_key.verify(
-        &canonical_json_bytes(&proof.body).unwrap(),
-        &proof.signature
-    ));
     assert!(matches!(
         verify(&proof, &cap, &authority(), NOW),
         Err(KernelError::Dpop(crate::dpop::DpopError::Signature))
@@ -437,4 +433,104 @@ fn proof_decode_rejects_unsigned_unknown_body_and_envelope_fields() {
     let mut envelope_extra = original;
     envelope_extra["dispatch_permit"] = true.into();
     assert!(serde_json::from_value::<DpopProof>(envelope_extra).is_err());
+}
+
+const FIXTURE_AGENT_SEED_HEX: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+#[derive(serde::Serialize)]
+struct WireBodyView<'a> {
+    action_hash: &'a str,
+    agent_key: &'a chio_core::crypto::PublicKey,
+    capability_id: &'a str,
+    issued_at: u64,
+    nonce: &'a str,
+    replay_authority: &'a DpopReplayAuthority,
+    schema: &'a str,
+    tool_name: &'a str,
+    tool_server: &'a str,
+}
+
+#[derive(serde::Serialize)]
+struct WireProofView<'a> {
+    body: WireBodyView<'a>,
+    signature: &'a chio_core::crypto::Signature,
+}
+
+#[derive(serde::Serialize)]
+struct WireVectorView<'a> {
+    description: &'static str,
+    agent_seed_hex: &'static str,
+    authority: &'a DpopReplayAuthority,
+    proof: WireProofView<'a>,
+    canonical_body: String,
+    proof_sha256: String,
+}
+
+fn wire_vector_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../tests/bindings/fixtures/dpop-authority-v1.json")
+}
+
+fn wire_vector_text() -> String {
+    let agent = Keypair::from_seed_hex(FIXTURE_AGENT_SEED_HEX).unwrap();
+    let replay_authority = authority();
+    let proof = DpopProof::sign(
+        DpopProofBody {
+            schema: DPOP_SCHEMA.into(),
+            replay_authority: replay_authority.clone(),
+            capability_id: "capability".into(),
+            tool_server: "server".into(),
+            tool_name: "tool".into(),
+            action_hash: sha256_hex(b"{}"),
+            nonce: "nonce".into(),
+            issued_at: NOW,
+            agent_key: agent.public_key(),
+        },
+        &agent,
+    )
+    .unwrap();
+    let body = &proof.body;
+    let view = WireVectorView {
+        description: "Public deterministic test seed. Non-consuming proof vector, not an activated authority or execution permit.",
+        agent_seed_hex: FIXTURE_AGENT_SEED_HEX,
+        authority: &replay_authority,
+        proof: WireProofView {
+            body: WireBodyView {
+                action_hash: &body.action_hash,
+                agent_key: &body.agent_key,
+                capability_id: &body.capability_id,
+                issued_at: body.issued_at,
+                nonce: &body.nonce,
+                replay_authority: &body.replay_authority,
+                schema: &body.schema,
+                tool_name: &body.tool_name,
+                tool_server: &body.tool_server,
+            },
+            signature: &proof.signature,
+        },
+        canonical_body: String::from_utf8(canonical_json_bytes(&proof.body).unwrap()).unwrap(),
+        proof_sha256: sha256_hex(&canonical_json_bytes(&proof).unwrap()),
+    };
+    let mut rendered = serde_json::to_string_pretty(&view).unwrap();
+    rendered.push('\n');
+    rendered
+}
+
+#[test]
+fn wire_vector_is_current() {
+    let path = wire_vector_path();
+    let committed = std::fs::read_to_string(&path).unwrap();
+    assert_eq!(
+        committed,
+        wire_vector_text(),
+        "fixture {} is out of date",
+        path.display()
+    );
+}
+
+#[test]
+#[ignore = "regenerator: rewrite tests/bindings/fixtures/dpop-authority-v1.json from the proof builder; run with --ignored"]
+fn regenerate_wire_vector() {
+    std::fs::write(wire_vector_path(), wire_vector_text()).unwrap();
 }

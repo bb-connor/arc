@@ -1,0 +1,17 @@
+{
+  "checkpointDigest": "b1c07495893bc82ea1200a1cee8691b273e45058b08cf07b07db3b8bba41f08b",
+  "generationPinDigest": "2d65368122bb87c1c277b98ae759cbd09d517f46d9337ed276872dc5142f35a8",
+  "issuerDid": "did:chio:db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d",
+  "pinDigest": "100e0570e840ca168a83e0b5b688d16905f453959f4ccc0fafbc88a03d6c31bd",
+  "previousPinDigest": "3d532f632c8f528b6c78102088ff738896099c28a9b05b1357a94a3b29513c7f",
+  "resolverIdentity": "resolver-a",
+  "resultDigest": "b759e3f89e18e42ed1673cee3692261713a223872ae08009724dcbf57eb74e8f",
+  "schema": "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1",
+  "signerKeyEpoch": 5,
+  "sourcePassportId": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+  "status": "revoked",
+  "statusVersion": 11,
+  "storeGeneration": 2,
+  "storeId": "high-water-a",
+  "trustedClockHighWater": 1710000100
+}

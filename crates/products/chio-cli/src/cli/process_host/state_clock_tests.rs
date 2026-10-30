@@ -56,7 +56,7 @@ capabilities:
         let token = host.kernel.issue_capability(&subject, scope.clone(), 60)?;
         assert_eq!(token.issued_at, epoch / 1000);
         assert_eq!(token.expires_at, epoch / 1000 + 60);
-        assert!(token.verify_signature()?);
+        assert!(token.verify_integrity_embedded_key()?);
         clock.unavailable.store(true, Ordering::SeqCst);
         assert!(host.kernel.issue_capability(&subject, scope, 60).is_err());
         assert!(host.kernel.revoke_capability(&token.id).is_err());

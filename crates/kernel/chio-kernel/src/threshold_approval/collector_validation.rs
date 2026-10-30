@@ -117,11 +117,8 @@ impl ThresholdApprovalCollectorProposal {
                 "threshold approval proposal exceeds its policy timeout",
             ));
         }
-        let algorithm = proposal.algorithm.unwrap_or_default();
         if !trusted_policy_authorities.contains(&body.policy_authority)
-            || body.policy_authority.algorithm() != algorithm
-            || proposal.signature.algorithm() != algorithm
-            || !proposal.verify_signature().map_err(conflict)?
+            || !proposal.verify_integrity_embedded_key().map_err(conflict)?
         {
             return Err(conflict(
                 "threshold approval proposal signer or signature is not trusted",
@@ -230,11 +227,7 @@ impl ThresholdApprovalCollectorProposal {
                 "threshold approval submitter cannot approve their own proposal",
             ));
         }
-        let algorithm = token.algorithm.unwrap_or_default();
-        if token.approver.algorithm() != algorithm
-            || token.signature.algorithm() != algorithm
-            || !token.verify_signature().map_err(conflict)?
-        {
+        if !token.verify_integrity_embedded_key().map_err(conflict)? {
             return Err(conflict(
                 "threshold approval token signature did not verify",
             ));

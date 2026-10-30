@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/capability-lease-body.schema.json",
+  "title": "chio.capability-lease.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actionClass",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "issuer",
+    "leaseId",
+    "schema",
+    "scopeDigest",
+    "subject"
+  ],
+  "properties": {
+    "actionClass": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "leaseId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.capability-lease.v1"
+    },
+    "scopeDigest": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

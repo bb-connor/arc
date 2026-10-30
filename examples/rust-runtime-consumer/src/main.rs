@@ -87,7 +87,7 @@ fn open(state: &Path) -> Result<(SqliteAuthorityStore, ChioKernel)> {
 }
 
 fn verify(receipt: &ChioReceipt) -> Result<()> {
-    if receipt.kernel_key != key().public_key() || !receipt.verify_signature()? {
+    if receipt.kernel_key != key().public_key() || !receipt.verify_integrity_embedded_key()? {
         return Err("receipt does not verify against the pinned example identity".into());
     }
     Ok(())

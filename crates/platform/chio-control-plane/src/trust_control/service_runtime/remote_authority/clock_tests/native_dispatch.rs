@@ -75,7 +75,7 @@ fn dispatch_after_refresh(
         },
         10,
     )?;
-    assert!(capability.verify_signature()?);
+    assert!(capability.verify_integrity_embedded_key()?);
     assert_eq!((capability.issued_at, capability.expires_at), (100, 110));
     assert_eq!(source.authority_public_key()?, capability.issuer);
     let status = crate::trust_control::report_validation::authority_status_response(
@@ -132,7 +132,7 @@ fn native_dispatch_refresh_accepts_before_token_expiry() -> TestResult {
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert_eq!(effects, 1);
     assert!(response.output.is_some());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -150,7 +150,7 @@ fn rejects_expired_token(value: u64) -> TestResult {
         .as_deref()
         .is_some_and(|reason| reason.contains("expired")));
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -182,7 +182,7 @@ fn native_dispatch_refresh_keeps_clock_failure_effect_free() -> TestResult {
                 "clock cause must survive the denial projection: {:?}",
                 response.reason,
             );
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
         }
         Err(error) => return Err(error.into()),
     }

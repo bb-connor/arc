@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/aggregate-budget-root-body.schema.json",
+  "title": "chio.aggregate-budget-root.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "max_invocations",
+    "root_capability_hash",
+    "root_capability_id",
+    "root_expires_at",
+    "root_issuer",
+    "root_scope_hash",
+    "root_subject",
+    "schema"
+  ],
+  "properties": {
+    "max_invocations": {
+      "type": "integer"
+    },
+    "root_capability_hash": {
+      "type": "string"
+    },
+    "root_capability_id": {
+      "type": "string"
+    },
+    "root_expires_at": {
+      "type": "integer"
+    },
+    "root_issuer": {
+      "type": "string"
+    },
+    "root_scope_hash": {
+      "type": "string"
+    },
+    "root_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.aggregate-budget-root.v1"
+    }
+  }
+}

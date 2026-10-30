@@ -1,0 +1,94 @@
+{
+  "body": {
+    "assetBinding": {
+      "chainId": "eip155:31337",
+      "currency": "USD",
+      "protocolMinorUnitDecimals": 2,
+      "schema": "chio.channel.asset-binding.v1",
+      "settlementPolicyDigest": "fe44fa1b875434fdeb14615cbf21cc87b56033d039708f45746a0fc51eeb8509",
+      "tokenAddress": "0x1111111111111111111111111111111111111111",
+      "tokenDecimals": 6,
+      "tokenSymbol": "USDC"
+    },
+    "blockPin": {
+      "blockHash": "0x3d6aa32dcaba8a32c6f3a0e58d30792223fad6db9a3dc31b190d48bd4470e109",
+      "blockNumber": 100,
+      "blockTimestampUnixSecs": 1,
+      "finalityMode": "l1_finalized",
+      "finalityStatus": "finalized",
+      "finalizedHeadHash": "0xb5eee6f3f24cb0e8fae12a5bd2e262dd6348b47122ccb2e126e82ae88639a41b",
+      "finalizedHeadNumber": 112,
+      "observedAtUnixMs": 1100,
+      "observedConfirmations": 12,
+      "requiredConfirmations": 12
+    },
+    "creationEvent": {
+      "beneficiary": "0x3333333333333333333333333333333333333333",
+      "capabilityId": "0x8790b1d8087faada027ba3940a1df850d8389b2e8f2089e43f6b5218baebb6d8",
+      "deadlineUnixSecs": 2000,
+      "depositor": "0x2222222222222222222222222222222222222222",
+      "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b",
+      "eventSignature": "0xe8a88b15f0a99de2321ccf5c2d8c75a9aa00f7e5498327577afceac1834d7a23",
+      "logEmitter": "0x5555555555555555555555555555555555555555",
+      "logIndex": 0,
+      "maxTokenBaseUnits": "1500000",
+      "operator": "0x4444444444444444444444444444444444444444",
+      "receiptBlockHash": "0x3d6aa32dcaba8a32c6f3a0e58d30792223fad6db9a3dc31b190d48bd4470e109",
+      "receiptBlockNumber": 100,
+      "tokenAddress": "0x1111111111111111111111111111111111111111",
+      "transactionHash": "0xd0cb6cec8580aba726654642f249734b4b042981cbfdd608dbe0b19b7ae32240",
+      "transactionSucceeded": true,
+      "transactionTo": "0x5555555555555555555555555555555555555555"
+    },
+    "escrowReference": {
+      "chainId": "eip155:31337",
+      "escrowContract": "0x5555555555555555555555555555555555555555",
+      "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b"
+    },
+    "escrowState": {
+      "depositedTokenBaseUnits": "1500000",
+      "refunded": false,
+      "refundedTokenBaseUnits": "0",
+      "releasedTokenBaseUnits": "0"
+    },
+    "escrowStateRead": {
+      "blockHash": "0x3d6aa32dcaba8a32c6f3a0e58d30792223fad6db9a3dc31b190d48bd4470e109",
+      "blockNumber": 100,
+      "callDataDigest": "0x0d4922a78f55b4fa33cf8100f213afacadfb8c1c2bc2192fca50765050a6310c",
+      "contract": "0x5555555555555555555555555555555555555555",
+      "returnDataDigest": "0x0f2f06e500c63dea31fce89440e90e14973962ff5a56696f9d2762d79a5ef83e"
+    },
+    "escrowTerms": {
+      "beneficiary": "0x3333333333333333333333333333333333333333",
+      "capabilityId": "0x8790b1d8087faada027ba3940a1df850d8389b2e8f2089e43f6b5218baebb6d8",
+      "deadlineUnixSecs": 2000,
+      "depositor": "0x2222222222222222222222222222222222222222",
+      "maxTokenBaseUnits": "1500000",
+      "operator": "0x4444444444444444444444444444444444444444",
+      "operatorKeyHash": "0xc9736463f555cdb7d2a78cfd7aa8b8c4f09d906d78f8dab9228eda30a28c2818",
+      "tokenAddress": "0x1111111111111111111111111111111111111111"
+    },
+    "evidenceExpiresAtUnixMs": 1900,
+    "identityObservation": {
+      "active": true,
+      "blockHash": "0x3d6aa32dcaba8a32c6f3a0e58d30792223fad6db9a3dc31b190d48bd4470e109",
+      "blockNumber": 100,
+      "operator": "0x4444444444444444444444444444444444444444",
+      "operatorKeyHash": "0xc9736463f555cdb7d2a78cfd7aa8b8c4f09d906d78f8dab9228eda30a28c2818",
+      "registryContract": "0x6666666666666666666666666666666666666666"
+    },
+    "schema": "chio.channel.funding-evidence.v1",
+    "tokenObservation": {
+      "allowed": true,
+      "blockHash": "0x3d6aa32dcaba8a32c6f3a0e58d30792223fad6db9a3dc31b190d48bd4470e109",
+      "blockNumber": 100,
+      "escrowContract": "0x5555555555555555555555555555555555555555",
+      "tokenAddress": "0x1111111111111111111111111111111111111111",
+      "tokenDecimals": 6,
+      "tokenSymbol": "USDC"
+    }
+  },
+  "keyEpoch": 4,
+  "signerId": "funding-authority",
+  "signerKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc"
+}

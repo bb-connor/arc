@@ -1,0 +1,49 @@
+{
+  "bondId": "cbd-bb75ba39aa2f25928f26d5ead5ee0f7ab16274aa67017f514e1bf95c19686dcf",
+  "eventId": "cll-capital-release-1",
+  "eventKind": "reserve_release",
+  "issuedAt": 1793189265,
+  "projectedBondLifecycleState": "released",
+  "report": {
+    "findings": [
+      {
+        "code": "reserve_released",
+        "description": "capital reserve release event"
+      }
+    ],
+    "generatedAt": 1793189265,
+    "query": {
+      "bondId": "cbd-bb75ba39aa2f25928f26d5ead5ee0f7ab16274aa67017f514e1bf95c19686dcf",
+      "eventKind": "reserve_release"
+    },
+    "schema": "chio.credit.loss-lifecycle-report.v1",
+    "summary": {
+      "agentSubject": "subject-capital-book-1",
+      "bondId": "cbd-bb75ba39aa2f25928f26d5ead5ee0f7ab16274aa67017f514e1bf95c19686dcf",
+      "currentBondLifecycleState": "active",
+      "currentReleasedReserveAmount": {
+        "currency": "USD",
+        "units": 50
+      },
+      "eventAmount": {
+        "currency": "USD",
+        "units": 50
+      },
+      "facilityId": "cfd-367ff9e23a5397c160f5573966b089e22c74f502a74b9ea61f6b09a51a890415",
+      "projectedBondLifecycleState": "released",
+      "releaseableReserveAmount": {
+        "currency": "USD",
+        "units": 57600
+      }
+    },
+    "supportBoundary": {
+      "appealWindowSupported": true,
+      "automaticCapitalExecutionSupported": false,
+      "bondLifecycleProjectionAuthoritative": true,
+      "externalClaimAdjudicationSupported": false,
+      "immutableLifecycleAuthoritative": true,
+      "reserveControlExecutionSupported": true
+    }
+  },
+  "schema": "chio.credit.loss-lifecycle.v1"
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/signer-readiness-probe.schema.json",
+  "title": "Chio signer readiness probe signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "probe",
+    "schema"
+  ],
+  "properties": {
+    "probe": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.signer-readiness-probe.v1"
+    }
+  }
+}

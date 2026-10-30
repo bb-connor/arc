@@ -1,0 +1,18 @@
+{
+  "actions": [
+    "switch_to_safe_state",
+    "cancel_pending_execution",
+    "require_human_approval"
+  ],
+  "issued_at": 1743379560,
+  "note": "Falls back to delegated pricing when automation drifts beyond the accepted envelope.",
+  "plan_id": "arp-1",
+  "requires_operator_ack": true,
+  "safe_state": "delegated_only",
+  "schema": "chio.autonomous-rollback-plan.v1",
+  "subject_key": "subject-1",
+  "triggers": [
+    "settlement_failure_rate",
+    "premium_variance"
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "action": "transfer_funds",
+  "amount": {
+    "currency": "USD",
+    "units": 4000
+  },
+  "authorityChain": [
+    {
+      "approvedAt": 1700000900,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 1700000900,
+          "expiresAt": 1700020500,
+          "principalId": "028e1fdaf00b3202b3e52e5cf42f726875fd64aa09cac92d75c3bd9711f6c760",
+          "role": "operator_treasury",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "b836fc92905f4be18e60a52297c725b815a9982a31883b28deb875c6a378070a47ba26a4adcdefadd98a9b26f96bee9f62267726a31d5202eb7ffe9d9840d10c",
+        "signerKey": "028e1fdaf00b3202b3e52e5cf42f726875fd64aa09cac92d75c3bd9711f6c760"
+      },
+      "expiresAt": 1700020500,
+      "note": "fixture authority",
+      "principalId": "028e1fdaf00b3202b3e52e5cf42f726875fd64aa09cac92d75c3bd9711f6c760",
+      "role": "operator_treasury"
+    },
+    {
+      "approvedAt": 1700000900,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 1700000900,
+          "expiresAt": 1700020500,
+          "principalId": "f2bcf6e9bc2e6779f84104672eba350e913a216982a83429eaa816668e36acaf",
+          "role": "custodian",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "26f104e33820db8363873a48ffa617339c2aff636d591d93acc2eb12a86a42782959593bd34f01209a46d6cdaf049d39564ec530dee31a44f3914d8b3f0a8b08",
+        "signerKey": "f2bcf6e9bc2e6779f84104672eba350e913a216982a83429eaa816668e36acaf"
+      },
+      "expiresAt": 1700020500,
+      "note": "fixture custody authority",
+      "principalId": "f2bcf6e9bc2e6779f84104672eba350e913a216982a83429eaa816668e36acaf",
+      "role": "custodian"
+    }
+  ],
+  "completionFlowRowId": "economic-completion-flow:rc-claim-1",
+  "counterpartyId": "subject-claim",
+  "counterpartyRole": "agent_counterparty",
+  "description": "fixture payout transfer",
+  "executionWindow": {
+    "notAfter": 1700020500,
+    "notBefore": 1700010000
+  },
+  "governedReceiptId": "rc-claim-1",
+  "instructionId": "capital-claim-payout-instruction-1",
+  "intendedState": "pending_execution",
+  "issuedAt": 1700000900,
+  "ownerRole": "operator_treasury",
+  "query": {
+    "agentSubject": "subject-claim",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "rail": {
+    "custodyProviderId": "f2bcf6e9bc2e6779f84104672eba350e913a216982a83429eaa816668e36acaf",
+    "destinationAccountRef": "acct-dst",
+    "jurisdiction": "us-ny",
+    "kind": "sandbox",
+    "railId": "rail-claim",
+    "sourceAccountRef": "acct-src"
+  },
+  "reconciledState": "not_observed",
+  "schema": "chio.credit.capital-instruction.v1",
+  "sourceId": "facility-source-claim",
+  "sourceKind": "facility_commitment",
+  "subjectKey": "subject-claim",
+  "supportBoundary": {
+    "automaticDispatchSupported": false,
+    "capitalBookAuthoritative": true,
+    "custodyNeutralInstructionSupported": true,
+    "externalExecutionAuthoritative": false
+  }
+}

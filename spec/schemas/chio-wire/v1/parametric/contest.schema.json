@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/parametric/contest.schema.json",
+  "title": "Chio parametric contest signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claimId",
+    "contestId",
+    "contestantId",
+    "evidenceDigests",
+    "expectedClaimVersion",
+    "expectedLifecycleFence",
+    "expiresAt",
+    "issuedAt",
+    "parametricPolicyBodyDigest",
+    "reasonCode",
+    "schema"
+  ],
+  "properties": {
+    "claimId": {
+      "type": "string"
+    },
+    "contestId": {
+      "type": "string"
+    },
+    "contestantId": {
+      "type": "string"
+    },
+    "evidenceDigests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expectedClaimVersion": {
+      "type": "integer"
+    },
+    "expectedLifecycleFence": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "parametricPolicyBodyDigest": {
+      "type": "string"
+    },
+    "reasonCode": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.parametric.contest.v1"
+    }
+  }
+}

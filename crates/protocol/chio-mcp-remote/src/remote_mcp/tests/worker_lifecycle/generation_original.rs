@@ -58,7 +58,7 @@ async fn mcp_generation_original_same_id_after_disconnect_waits_for_its_actual_a
     let receipt: chio_core::receipt::body::ChioReceipt =
         serde_json::from_value(terminals[0]["result"]["_meta"]["chioEvidence"]["receipt"].clone())
             .unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         receipt.action.parameter_hash,
         sha256_hex(&canonical_json_bytes(&new_call["params"]["arguments"]).unwrap()),

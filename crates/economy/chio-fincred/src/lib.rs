@@ -409,3 +409,17 @@ pub struct FinancialCredentialEvidenceV1 {
     pub source_disclosure: FinancialSourceDisclosureV1,
     pub source_completeness_attestations: Vec<SignedFinancialSourceCompletenessAttestationV1>,
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FinancialSourceCheckpointBodyV1 {
+    const SCHEMA_ID: &'static str = FINANCIAL_SOURCE_CHECKPOINT_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FinancialSourceCompletenessAttestationBodyV1
+{
+    const SCHEMA_ID: &'static str = FINANCIAL_SOURCE_COMPLETENESS_ATTESTATION_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FinancialSourceMemberBodyV1 {
+    const SCHEMA_ID: &'static str = FINANCIAL_SOURCE_MEMBER_SCHEMA_V1;
+}

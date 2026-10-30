@@ -65,7 +65,7 @@ fn default_handshake_signs_capabilities_and_tier() {
     assert!(challenge.get("capabilities").is_some());
     assert_eq!(challenge["conformanceTier"], "bronze");
     assert!(challenge.get("ladderManifestRef").is_none());
-    envelope.verify_signature().unwrap();
+    envelope.verify_integrity_embedded_key().unwrap();
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn ladder_manifest_ref_is_signed_and_pinned_when_requested() {
         envelope_b.challenge.ladder_manifest_ref.as_ref(),
         Some(&ladder_ref)
     );
-    envelope_b.verify_signature().unwrap();
+    envelope_b.verify_integrity_embedded_key().unwrap();
 
     let peer_b = exchange_a
         .accept_envelope(&envelope_b, "kernel.org-b", now)
@@ -117,7 +117,7 @@ fn explicit_t1_capabilities_are_signed_when_requested() {
     let challenge = serde_json::to_value(&envelope.challenge).unwrap();
 
     assert!(challenge.get("capabilities").is_some());
-    envelope.verify_signature().unwrap();
+    envelope.verify_integrity_embedded_key().unwrap();
 }
 
 fn assert_feature_negotiation(

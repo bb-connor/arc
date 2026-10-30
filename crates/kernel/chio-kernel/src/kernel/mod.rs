@@ -60,7 +60,7 @@ pub use active_response_admission::{
 pub use active_response_artifact::ActiveResponseArtifactAuthorityAttestationInput;
 pub use active_response_artifact::{
     active_response_admission_artifact_payload_digest,
-    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseArtifactAuthorityAttestationError,
     ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA,
@@ -817,21 +817,38 @@ pub(crate) enum LocalReceiptArtifact {
 }
 
 impl LocalReceiptArtifact {
+    /// `trusted` holds this kernel's receipt signer and its trusted issuer
+    /// keys; a parent signed under any other key is refused before its
+    /// signature is checked.
     fn verify_signature_with_floor(
         &self,
+        trusted: &[chio_core::PublicKey],
         floor: chio_core::receipt::crypto_floor::ReceiptCryptoFloor,
     ) -> Result<bool, KernelError> {
+        let signer = match self {
+            Self::Tool(receipt) => &receipt.kernel_key,
+            Self::Child(receipt) => &receipt.kernel_key,
+        };
+        let Some(trusted_signer) = trusted.iter().find(|key| *key == signer) else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain parent receipt signer is not trusted".to_string(),
+            ));
+        };
         match self {
-            Self::Tool(receipt) => receipt.verify_signature_with_floor(floor).map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "governed call_chain parent receipt failed signature verification: {error}"
-                ))
-            }),
-            Self::Child(receipt) => receipt.verify_signature_with_floor(floor).map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "governed call_chain parent receipt failed signature verification: {error}"
-                ))
-            }),
+            Self::Tool(receipt) => receipt
+                .verify_signature_with_floor(trusted_signer, floor)
+                .map_err(|error| {
+                    KernelError::GovernedTransactionDenied(format!(
+                        "governed call_chain parent receipt failed signature verification: {error}"
+                    ))
+                }),
+            Self::Child(receipt) => receipt
+                .verify_signature_with_floor(trusted_signer, floor)
+                .map_err(|error| {
+                    KernelError::GovernedTransactionDenied(format!(
+                        "governed call_chain parent receipt failed signature verification: {error}"
+                    ))
+                }),
         }
     }
 

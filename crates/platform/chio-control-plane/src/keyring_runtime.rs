@@ -60,7 +60,10 @@ impl SigningBackend for MigrationGuardedSigningBackend {
         self.inner.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> chio_core::error::Result<chio_core::Signature> {
         self.revalidate()?;
         let signature = self.inner.sign_bytes(message)?;
         self.revalidate()?;
@@ -69,7 +72,7 @@ impl SigningBackend for MigrationGuardedSigningBackend {
 
     fn sign_bytes_with_identity(
         &self,
-        message: &[u8],
+        message: chio_core::crypto::SigningMessage<'_>,
     ) -> chio_core::error::Result<chio_core::crypto::SigningOutcome> {
         self.revalidate()?;
         let outcome = self.inner.sign_bytes_with_identity(message)?;
@@ -80,24 +83,12 @@ impl SigningBackend for MigrationGuardedSigningBackend {
     fn sign_bytes_for_identity(
         &self,
         expected_key: &chio_core::PublicKey,
-        message: &[u8],
+        message: chio_core::crypto::SigningMessage<'_>,
     ) -> chio_core::error::Result<chio_core::crypto::SigningOutcome> {
         self.revalidate()?;
         let outcome = self.inner.sign_bytes_for_identity(expected_key, message)?;
         self.revalidate()?;
         Ok(outcome)
-    }
-
-    fn sign_canonical_bytes(
-        &self,
-        canonical: &chio_core::canonical::CanonicalBytes<
-            chio_core::canonical::CanonicalJsonWitness,
-        >,
-    ) -> chio_core::error::Result<chio_core::Signature> {
-        self.revalidate()?;
-        let signature = self.inner.sign_canonical_bytes(canonical)?;
-        self.revalidate()?;
-        Ok(signature)
     }
 }
 
@@ -1763,7 +1754,10 @@ pub(crate) mod tests {
             ))
         }
 
-        fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
+        fn sign_bytes(
+            &self,
+            message: chio_core::crypto::SigningMessage<'_>,
+        ) -> chio_core::error::Result<chio_core::Signature> {
             self.0.sign_bytes(message)
         }
     }

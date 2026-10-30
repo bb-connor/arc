@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chio_core_types::capability::attenuation::{validate_attenuation_proof, AttenuationWitness};
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 use serde::Serialize;
 
 use crate::error::SwarmAuthorityError;
@@ -17,7 +17,7 @@ use super::util::{
 
 pub(super) const DID_CHIO_PREFIX: &str = "did:chio:";
 
-const CHIO_SWARM_DELEGATION_WITNESS_HOP_SIGNATURE_SCHEMA: &str =
+pub(super) const CHIO_SWARM_DELEGATION_WITNESS_HOP_SIGNATURE_SCHEMA: &str =
     "chio.swarm.delegation-witness-hop-signature.v1";
 
 pub(super) fn validate_witness_chains(
@@ -202,9 +202,13 @@ fn verify_witness_signature(
         ))
     })?;
     let body = witness_signature_body(chain, hop);
-    let verified = public_key
-        .verify_canonical(&body, &signature)
-        .map_err(|error| SwarmAuthorityError::Canonical(error.to_string()))?;
+    let verified = verify_wrapped(
+        &public_key,
+        CHIO_SWARM_DELEGATION_WITNESS_HOP_SIGNATURE_SCHEMA,
+        &body,
+        &signature,
+    )
+    .is_ok();
     if verified {
         Ok(())
     } else {

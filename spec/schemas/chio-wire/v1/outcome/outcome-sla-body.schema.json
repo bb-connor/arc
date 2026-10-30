@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-sla-body.schema.json",
+  "title": "chio.outcome.sla.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "effectiveAtUnixMs",
+    "expiresAtUnixMs",
+    "listingDigest",
+    "maxFailureBps",
+    "minimumSampleCount",
+    "providerId",
+    "schema",
+    "slaId",
+    "windowAnchorUnixMs",
+    "windowSeconds"
+  ],
+  "properties": {
+    "effectiveAtUnixMs": {
+      "type": "integer"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "listingDigest": {
+      "type": "string"
+    },
+    "maxFailureBps": {
+      "type": "integer"
+    },
+    "minimumSampleCount": {
+      "type": "integer"
+    },
+    "providerId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.sla.v1"
+    },
+    "slaId": {
+      "type": "string"
+    },
+    "windowAnchorUnixMs": {
+      "type": "integer"
+    },
+    "windowSeconds": {
+      "type": "integer"
+    }
+  }
+}

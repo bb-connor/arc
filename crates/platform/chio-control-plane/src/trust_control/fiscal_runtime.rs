@@ -1053,7 +1053,7 @@ mod tests {
             issued_at: 50,
             issued_by: "operator.example".to_owned(),
         }
-        .sign(&charter, None, &Keypair::from_seed(&[1; 32]))?;
+        .sign(&charter, None, &Keypair::from_seed(&[9; 32]))?;
         let signed_proposal = FiscalProposalBuilder {
             target: FiscalProposalTarget::Schedule {
                 candidate: Box::new(candidate.clone()),

@@ -1,0 +1,19 @@
+{
+  "acknowledgementId": "4d1943fce72100d5678ae655b64545d52bb1f58c37c815ed4ad88a4310688f8d",
+  "deliveryAcceptedAtUnixMs": 1600,
+  "deliveryCheckpointDigest": "c2d5f5a51ca88c9c15ff17d3f04c6e6d4858441101d51c02cf85170c4875fe52",
+  "deliveryCheckpointSequence": 2,
+  "deliveryId": "delivery-1",
+  "durableBlobDigest": "ddf40bc9ac8f1890b2e48aa27df546577fda81ebe706397237c739cb38048845",
+  "durableBlobReference": "blob:sha256:output",
+  "eligibilityDigest": "8d2e3b34566f44d35b57399dcfed9f83daf6eb3405ad2edca57a7f9ceb107035",
+  "finalOutputDigest": "ddf40bc9ac8f1890b2e48aa27df546577fda81ebe706397237c739cb38048845",
+  "idempotencyKey": "delivery-idempotency-1",
+  "providerAcceptanceDigest": "43d810149c113c91cb4a46f74f63b69c42f64b1640a647f91c6d2f5af0000a4c",
+  "receiverBindingDigest": "c8146bdb1e9de877751182f91b38b622ea6f6fa86077d2409d40c13b18e321ca",
+  "receiverKeyEpoch": 9,
+  "receiverKeyId": "receiver-key-1",
+  "receiverQueueId": "receiver-queue-1",
+  "requestId": "req-outcome-1",
+  "schema": "chio.outcome.delivery-acknowledgement.v1"
+}

@@ -1095,10 +1095,10 @@ fn injected_policy_authority_uses_the_service_epoch() -> Result<(), Box<dyn std:
         let capability = authority.issue_capability(&subject, scope.clone(), 60)?;
         assert_eq!(capability.issued_at, now / 1000);
         assert_eq!(capability.expires_at, now / 1000 + 60);
-        assert!(capability.verify_signature()?);
+        assert!(capability.verify_integrity_embedded_key()?);
         let aggregate = authority.issue_aggregate_family_root(&subject, scope, 60, 2)?;
         assert_eq!(aggregate.issued_at, now / 1000);
-        assert!(aggregate.verify_signature()?);
+        assert!(aggregate.verify_integrity_embedded_key()?);
     }
     Ok(())
 }

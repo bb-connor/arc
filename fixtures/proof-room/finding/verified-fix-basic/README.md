@@ -1,8 +1,7 @@
 # Verified fix finding fixture
 
-`finding.json` is generated deterministically by the ignored
-`regenerate_golden_fixture` test in `chio-finding`, using the test-only seed
-`[9_u8; 32]`.
+`finding.json` is generated deterministically by
+`chio proof fixture regenerate`, using the test-only seed `[9_u8; 32]`.
 
 The fixture proves JSON Schema conformance, strict canonical parsing,
 content-address integrity, and issuer-signature integrity for

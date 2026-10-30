@@ -108,7 +108,7 @@ fn continuation_error_does_not_restore_pending_approval_after_terminal_dispatch(
     let receipts = kernel.receipt_log().receipts();
     assert_eq!(receipts.len(), 2);
     let terminal = receipts.last().ok_or("signed terminal cancellation")?;
-    assert!(terminal.verify_signature()?);
+    assert!(terminal.verify_integrity_embedded_key()?);
     assert_eq!(terminal.kernel_key, fixture.signer.public_key());
     assert_eq!(
         terminal.decision,
@@ -170,11 +170,11 @@ fn pending_approval_remains_observable_without_dispatch_or_new_receipts() -> Tes
     );
     assert_eq!(task["metadata"]["chio"]["decision"], "pending_approval");
     let receipt: ChioReceipt = serde_json::from_value(task["metadata"]["chio"]["receipt"].clone())?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.kernel_key, fixture.signer.public_key());
     let proposal: ThresholdApprovalProposal =
         serde_json::from_value(task["artifacts"][0]["parts"][0]["data"]["proposal"].clone())?;
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     assert_eq!(proposal.body.policy_authority, fixture.signer.public_key());
     assert_eq!(proposal.body.request_id, request.request_id);
     assert_eq!(proposal.body.threshold, 2);
@@ -256,7 +256,7 @@ fn signed_approval_continuation_completes_the_original_v1_task() -> TestResult {
     let id = task["id"].as_str().ok_or("pending task id")?;
     let proposal: ThresholdApprovalProposal =
         serde_json::from_value(task["artifacts"][0]["parts"][0]["data"]["proposal"].clone())?;
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     assert_eq!(proposal.body.request_id, request.request_id);
     let approved = fixture.approved_request(&request, proposal)?;
     let observed = call(&mut consumer, &approved, lookup("GetTask", id))?;
@@ -283,7 +283,7 @@ fn signed_approval_continuation_completes_the_original_v1_task() -> TestResult {
     );
     let receipt: ChioReceipt =
         serde_json::from_value(completed["result"]["task"]["metadata"]["chio"]["receipt"].clone())?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.kernel_key, fixture.signer.public_key());
     assert_eq!(receipt.capability_id, request.capability.id);
     assert_eq!(receipt.tool_name, TOOL);

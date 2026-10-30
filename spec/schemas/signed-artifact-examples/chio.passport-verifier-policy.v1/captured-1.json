@@ -1,0 +1,15 @@
+{
+  "createdAt": 1,
+  "expiresAt": 18446744073709551615,
+  "policy": {
+    "minCompositeScore": 0.1,
+    "requireActiveLifecycle": false,
+    "requireCheckpointCoverage": false,
+    "requireEnterpriseIdentityProvenance": false,
+    "requireReceiptLogUrls": false
+  },
+  "policyId": "ingress-policy",
+  "schema": "chio.passport-verifier-policy.v1",
+  "signerPublicKey": "7ea0e3bd52e207c9d3b0eba65c0704e66fca2d8e165a175218b174fc4160e413",
+  "verifier": "https://verifier.example"
+}

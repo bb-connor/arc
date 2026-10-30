@@ -140,7 +140,12 @@ fn make_receipt(
     let body = ("chio.receipt.fixture.v1", receipt_id, 1_000_000u64);
     let canonical = canonical_json_bytes(&body).expect("canonical JSON");
     let body_sha256 = sha256_hex(&canonical);
-    let signature = keypair.sign(&canonical);
+    let signature = keypair
+        .sign_wrapped(
+            chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+            &chio_core_types::CanonicalBytes::from_serializable(&body).expect("canonical body"),
+        )
+        .expect("wrapped receipt signature");
     let signer_key = keypair.public_key();
     (
         ReceiptFingerprint {

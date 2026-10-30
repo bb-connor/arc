@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-terminal-graph-receipt-body.schema.json",
+  "title": "chio.swarm.terminal-graph-receipt.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "budgetPoolId",
+    "budgetRollups",
+    "chainId",
+    "completedAtUnixMs",
+    "completedTaskIds",
+    "graphId",
+    "issuer",
+    "joinReceiptIds",
+    "receiptId",
+    "resultDigest",
+    "revocationEpochRef",
+    "routePlanReceiptIds",
+    "schema",
+    "terminalTaskIds"
+  ],
+  "properties": {
+    "budgetPoolId": {
+      "type": "string"
+    },
+    "budgetRollups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "activeUnits",
+          "consumedUnits",
+          "dimensionId",
+          "releasedUnits",
+          "reservedUnits",
+          "reversedUnits",
+          "totalUnits"
+        ],
+        "properties": {
+          "activeUnits": {
+            "type": "integer"
+          },
+          "consumedUnits": {
+            "type": "integer"
+          },
+          "dimensionId": {
+            "type": "string"
+          },
+          "releasedUnits": {
+            "type": "integer"
+          },
+          "reservedUnits": {
+            "type": "integer"
+          },
+          "reversedUnits": {
+            "type": "integer"
+          },
+          "totalUnits": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "chainId": {
+      "type": "string"
+    },
+    "completedAtUnixMs": {
+      "type": "integer"
+    },
+    "completedTaskIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "joinReceiptIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "resultDigest": {
+      "type": "string"
+    },
+    "revocationEpochRef": {
+      "type": "string"
+    },
+    "routePlanReceiptIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.swarm.terminal-graph-receipt.v1"
+    },
+    "terminalTaskIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

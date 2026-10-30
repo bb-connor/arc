@@ -1,0 +1,21 @@
+{
+  "childReceiptId": "receipt-child-1",
+  "childRequestId": "req-child-1",
+  "childSessionAnchor": {
+    "sessionAnchorHash": "anchor-child-hash-1",
+    "sessionAnchorId": "anchor-child-1"
+  },
+  "continuationTokenId": "continuation-1",
+  "evidenceClass": "verified",
+  "id": "statement-1",
+  "issuedAt": 1710000000,
+  "kernelKey": "2cccc2fef29aa3cae19f6c4ad6c4462cd7f64638868d47cbf69a3c86e48292be",
+  "parentReceiptId": "receipt-parent-1",
+  "parentRequestId": "req-parent-1",
+  "parentSessionAnchor": {
+    "sessionAnchorHash": "anchor-parent-hash-1",
+    "sessionAnchorId": "anchor-parent-1"
+  },
+  "relationKind": "continued",
+  "schema": "chio.receipt_lineage_statement.v1"
+}

@@ -16,7 +16,7 @@ fn required_swarm_kernel_dispatches_verified_capability_and_signs_binding() -> T
         "{response:#?}"
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata
@@ -55,7 +55,7 @@ fn required_swarm_kernel_denies_omission_or_capability_substitution_before_tool(
             "{response:#?}"
         );
         assert_eq!(invocations.load(Ordering::SeqCst), 0);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response
                 .receipt

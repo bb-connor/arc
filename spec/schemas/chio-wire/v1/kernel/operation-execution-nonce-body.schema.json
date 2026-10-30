@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/operation-execution-nonce-body.schema.json",
+  "title": "Chio operation execution nonce signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "nonce",
+    "operation_id"
+  ],
+  "properties": {
+    "nonce": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bound_to",
+        "expires_at",
+        "issued_at",
+        "nonce_id",
+        "schema"
+      ],
+      "properties": {
+        "bound_to": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability_id",
+            "parameter_hash",
+            "request_id",
+            "subject_id",
+            "tool_name",
+            "tool_server"
+          ],
+          "properties": {
+            "capability_id": {
+              "type": "string"
+            },
+            "parameter_hash": {
+              "type": "string"
+            },
+            "request_id": {
+              "type": "string"
+            },
+            "subject_id": {
+              "type": "string"
+            },
+            "tool_name": {
+              "type": "string"
+            },
+            "tool_server": {
+              "type": "string"
+            }
+          }
+        },
+        "expires_at": {
+          "type": "integer"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "nonce_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "operation_id": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "attester": "https://rp.example.com/migrations/a",
+  "continuityRef": "ledger://continuity/a",
+  "expiresAt": 1710086400,
+  "fromIssuer": "did:chio:8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "fromSubject": "did:chio:6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+  "issuedAt": 1710000000,
+  "migrationId": "migration-dup",
+  "priorPassportIds": [
+    "9080a1aab1a175e70059f9f32c4947b2c1018711826b9843c254216d49d1b6f3"
+  ],
+  "reason": "issuer migration",
+  "schema": "chio.cross-issuer-migration.v1",
+  "signerPublicKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+  "toIssuer": "did:chio:8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "toSubject": "did:chio:1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca"
+}

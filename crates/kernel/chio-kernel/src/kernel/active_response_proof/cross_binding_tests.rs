@@ -145,7 +145,7 @@ fn fixture(
         },
         &key,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let evidence = make_evidence(
         &request,
         prepared.authorization,
@@ -237,6 +237,38 @@ fn proof_authorization_rejects_fingerprint_different_from_sealed_execution() -> 
     );
     assert_eq!(canonical_json_bytes(&expected)?, before);
     assert_eq!(snapshot.execution_dispatch.as_ref(), Some(&expected));
+    Ok(())
+}
+
+#[test]
+fn completion_receipt_self_signed_by_a_non_executor_key_is_refused() -> TestResult {
+    use crate::kernel::active_response_coordinator::verify_active_response_completion_receipt;
+    let (request, original, snapshot) = fixture(35)?;
+    assert_eq!(
+        &original.completion_receipt().kernel_key,
+        request.executor_subject()
+    );
+    let outsider = Keypair::from_seed(&[96; 32]);
+    let resigned = ChioReceipt::sign(
+        ChioReceiptBody {
+            kernel_key: outsider.public_key(),
+            ..original.completion_receipt().body()
+        },
+        &outsider,
+    )?;
+    let alternate = make_evidence(
+        &request,
+        original.dispatch_authorization().clone(),
+        original.response_record().clone(),
+        &snapshot,
+        resigned,
+    )?;
+    let refused = verify_active_response_completion_receipt(&request, &alternate);
+    assert!(
+        matches!(&refused, Err(KernelError::Internal(reason))
+        if reason == "active-response admission failed: active-response completion receipt signer is not the executor"),
+        "{refused:?}"
+    );
     Ok(())
 }
 
@@ -464,7 +496,7 @@ fn sign_terminal_executor_binding_body(
         },
         &key,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(receipt)
 }
 
@@ -557,7 +589,11 @@ fn assert_terminal_executor_original_predicates(
         operation.dispatch_state(),
         AdmissionDispatchState::EffectCompleted
     );
-    setup_check!("genuine signature", receipt.verify_signature()?, true);
+    setup_check!(
+        "genuine signature",
+        receipt.verify_integrity_embedded_key()?,
+        true
+    );
     setup_check!(
         "identity vs operation authority",
         identity.authority_id().to_owned(),
@@ -832,6 +868,29 @@ fn reject_terminal_executor_artifact_mismatch(
         before
     );
     validate_active_response_terminal_executor_receipt(&operation, &anchor, &original)?;
+    Ok(())
+}
+
+#[test]
+fn terminal_executor_refuses_a_receipt_self_signed_by_an_unanchored_key() -> TestResult {
+    use crate::kernel::active_response_coordinator::validate_active_response_terminal_executor_receipt;
+    let (operation, anchor, original) = terminal_executor_binding_fixture(35)?;
+    validate_active_response_terminal_executor_receipt(&operation, &anchor, &original)?;
+    let unanchored = Keypair::from_seed(&[95; 32]);
+    let resigned = ChioReceipt::sign(
+        ChioReceiptBody {
+            kernel_key: unanchored.public_key(),
+            ..original.body()
+        },
+        &unanchored,
+    )?;
+    let refused =
+        validate_active_response_terminal_executor_receipt(&operation, &anchor, &resigned);
+    assert!(
+        matches!(&refused, Err(KernelError::Internal(reason))
+        if reason == "active-response admission failed: active-response terminal executor signer is not the anchored executor authority"),
+        "{refused:?}"
+    );
     Ok(())
 }
 

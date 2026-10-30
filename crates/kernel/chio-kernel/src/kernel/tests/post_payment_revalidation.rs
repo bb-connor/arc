@@ -58,7 +58,7 @@ async fn post_payment_without_dispatch_credentials(
         "payment-invalidated authority reached the tool"
     );
     assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(revalidations.load(Ordering::SeqCst), 1);
     assert_eq!(releases.load(Ordering::SeqCst), 1);
     Ok(())
@@ -246,7 +246,7 @@ fn assert_clean_payment_unwind_receipt(
     response: &ToolCallResponse,
     expected_credential_disposition: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata

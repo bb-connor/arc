@@ -1121,7 +1121,7 @@ impl SqliteAdmissionOperationStore {
         &self,
         envelope: &SignedAdmissionTerminalProjectionV1,
     ) -> Result<AdmissionTerminal, AdmissionOperationStoreError> {
-        let verified = envelope.verify()?;
+        let verified = envelope.verify_integrity_embedded_key()?;
         let context = verified.context();
         let mut connection = self.connection()?;
         let transaction = self.begin_write(&mut connection, Some(&context.store_fence))?;
@@ -1653,7 +1653,7 @@ fn decode_projection_receipt(bytes: Vec<u8>) -> Result<ChioReceipt, ReceiptStore
         .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         != bytes
         || !receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| ReceiptStoreError::CryptoDecode(error.to_string()))?
     {
         return Err(ReceiptStoreError::Conflict(

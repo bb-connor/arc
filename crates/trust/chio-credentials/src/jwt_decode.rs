@@ -98,9 +98,13 @@ mod tests {
         };
         let (_, payload, signing_input, signature) = decode(&compact).expect("valid JWT");
         assert_eq!(payload["sub"], "a");
-        assert!(key
-            .public_key()
-            .verify(signing_input.as_bytes(), &signature));
+        assert!(chio_core::crypto::verify_exempt(
+            &key.public_key(),
+            chio_core::crypto::ExemptFormat::JwsSigningInput,
+            signing_input.as_bytes(),
+            &signature
+        )
+        .is_ok());
 
         let original: Vec<_> = compact.split('.').collect();
         for (index, name, max) in [

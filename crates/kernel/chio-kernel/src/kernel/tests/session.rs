@@ -883,7 +883,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         child_receipt.terminal_state,
         OperationTerminalState::Completed
     );
-    assert!(child_receipt.verify_signature().unwrap());
+    assert!(child_receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         child_receipt.metadata.as_ref().unwrap()["outcome"],
         "result"
@@ -1292,7 +1292,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
             reason: "client cancelled nested request".to_string(),
         }
     );
-    assert!(child_receipt.verify_signature().unwrap());
+    assert!(child_receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         kernel
             .session(&session_id)
@@ -1651,7 +1651,7 @@ fn session_operation_read_resource_enforces_session_roots_for_filesystem_resourc
         _ => None,
     }
     .expect("expected signed resource read denial");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     let metadata = receipt.metadata.as_ref().unwrap();
     assert_eq!(metadata["chio_runtime"]["identity_disposition"], "reusable");
     assert_eq!(
@@ -1723,7 +1723,7 @@ fn session_operation_read_resource_fails_closed_when_filesystem_roots_are_missin
         _ => None,
     }
     .expect("expected signed resource read denial");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.is_denied());
     assert_eq!(
         receipt.decision,

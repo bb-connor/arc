@@ -77,7 +77,7 @@ pub fn verify_receipt(
         }
     }
 
-    match receipt.verify_signature() {
+    match receipt.verify_integrity_embedded_key() {
         Ok(true) => VerifyOutcome {
             ok: true,
             signer_key_hex,

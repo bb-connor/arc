@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-atom-transformation-body.schema.json",
+  "title": "chio.clearing.atom-transformation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "atomDigest",
+    "creditorIdentity",
+    "creditorParticipantId",
+    "debtorIdentity",
+    "debtorParticipantId",
+    "obligationId",
+    "roundCoreDigest",
+    "schema",
+    "sourceSequence"
+  ],
+  "properties": {
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "atomDigest": {
+      "type": "string"
+    },
+    "creditorIdentity": {
+      "type": "string"
+    },
+    "creditorParticipantId": {
+      "type": "string"
+    },
+    "debtorIdentity": {
+      "type": "string"
+    },
+    "debtorParticipantId": {
+      "type": "string"
+    },
+    "obligationId": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.atom-transformation.v1"
+    },
+    "sourceSequence": {
+      "type": "integer"
+    }
+  }
+}

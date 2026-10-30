@@ -1,0 +1,37 @@
+{
+  "algorithmVersion": "balance_match.v1",
+  "authorityId": "participant-authority",
+  "expiresAtUnixMs": 1000,
+  "keyEpoch": 7,
+  "participants": [
+    {
+      "acknowledgementKey": "43a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c",
+      "acknowledgementKeyEpoch": 1,
+      "identities": [
+        "A"
+      ],
+      "participantId": "A",
+      "settlementDestination": "acct:A"
+    },
+    {
+      "acknowledgementKey": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+      "acknowledgementKeyEpoch": 1,
+      "identities": [
+        "B"
+      ],
+      "participantId": "B",
+      "settlementDestination": "acct:B"
+    },
+    {
+      "acknowledgementKey": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d",
+      "acknowledgementKeyEpoch": 1,
+      "identities": [
+        "C"
+      ],
+      "participantId": "C",
+      "settlementDestination": "acct:C"
+    }
+  ],
+  "schema": "chio.clearing.participant-snapshot.v1",
+  "validFromUnixMs": 50
+}

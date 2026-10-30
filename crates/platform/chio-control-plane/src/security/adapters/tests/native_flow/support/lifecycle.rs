@@ -28,7 +28,7 @@ fn native_captured_lifecycle_invokes_once_and_replays_the_released_receipt() -> 
         assert!(
             matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
         let replay = fixture
             .kernel

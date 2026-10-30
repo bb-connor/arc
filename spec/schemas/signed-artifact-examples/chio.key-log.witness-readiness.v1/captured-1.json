@@ -1,0 +1,18 @@
+{
+  "configuration_binding": "0x2de9d76dd17c5d346d016208d39adeaba6c62e37cd422d29cbd1c86c93ced06c",
+  "conflict_count": 0,
+  "gossip_observation_count": 2,
+  "nonce": "final-2",
+  "pin": {
+    "checkpoint_hash": "0x9cb195fbeee9fdcc283c6dc455c757e1c19dd19eec42becd6fed321f5958239a",
+    "checkpoint_sequence": 0,
+    "root_hash": "0x888261605c54e3cce099e67f19a1c6c80d83203f8884f978678bfbd28c10021f",
+    "signing_epoch": 1,
+    "tree_size": 1
+  },
+  "process_id": 4173391,
+  "schema": "chio.key-log.witness-readiness.v1",
+  "started_at": 1793195596644,
+  "storage_identity": "0xc095991c089e8b36c399932647851a67c289ea2e4879faccf49e584807502c20",
+  "witness_id": "witness.c"
+}

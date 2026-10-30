@@ -42,11 +42,16 @@ url = "2"
 [features]
 default = []
 pq = ["chio-core-types/pq"]
+pq-kat = ["pq", "chio-core-types/pq-kat"]
 
 [dev-dependencies]
 serde_json = { workspace = true }
 proptest = { workspace = true }
 criterion = { workspace = true }
+
+[[test]]
+name = "pq_kats"
+required-features = ["pq-kat"]
 
 [lints]
 workspace = true

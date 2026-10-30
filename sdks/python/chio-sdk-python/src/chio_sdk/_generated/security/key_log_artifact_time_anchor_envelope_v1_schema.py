@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,8 +11,6 @@
 
 from __future__ import annotations
 
-from enum import Enum
-
 from pydantic import BaseModel, ConfigDict, RootModel, constr
 
 from . import key_log_artifact_time_anchor_body_v1_schema
@@ -20,13 +18,6 @@ from . import key_log_artifact_time_anchor_body_v1_schema
 
 class Hash(RootModel[constr(pattern=r"^0x[0-9a-f]{64}$")]):
     root: constr(pattern=r"^0x[0-9a-f]{64}$")
-
-
-class Algorithm(Enum):
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
 
 
 class Signature(
@@ -47,5 +38,4 @@ class ChioSignedKeyLogArtifactTimeAnchorV1(BaseModel):
     )
     body: key_log_artifact_time_anchor_body_v1_schema.ChioKeyLogArtifactTimeAnchorBodyV1
     anchor_key_id: Hash
-    algorithm: Algorithm
     signature: Signature

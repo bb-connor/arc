@@ -1,0 +1,13 @@
+{
+  "body": {
+    "channelId": "f3067aaff6227cfe4232186abb3b5670cb012a1654f8ebb99b3d9d744e4d969c",
+    "fundingAcknowledgementDigest": "8019ad3ef2ab48269121effef6d3c13ed555d78d2a6c3972a43c0c7e689cf63b",
+    "initialStateDigest": "23910fd046f8f963ae8f5cbbe58a404f884e09ab9ce8136b4247608875256523",
+    "openIntentDigest": "3c41fefa046dfd61527e2e780302209cb9359b89e68a1dc1b6059eab14513896",
+    "openedAtUnixMs": 1,
+    "schema": "chio.channel.open.v1"
+  },
+  "keyEpoch": 1,
+  "signerId": "payer",
+  "signerKey": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565"
+}

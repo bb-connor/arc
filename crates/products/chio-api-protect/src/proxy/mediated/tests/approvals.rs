@@ -273,7 +273,7 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         "{reserved}"
     );
     let receipt: ChioReceipt = serde_json::from_value(reserved["receipt"].clone())?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let (status, started) = post_json_with_bearer(
         state.clone(),
         "/v1/caller/start",
@@ -329,7 +329,7 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
     assert!(bundle
         .tool_receipts
         .iter()
-        .all(|row| row.receipt.verify_signature().unwrap_or(false)));
+        .all(|row| row.receipt.verify_integrity_embedded_key().unwrap_or(false)));
     drop(store);
     drop(state);
     // A replay against an operation awaiting its caller report is refused

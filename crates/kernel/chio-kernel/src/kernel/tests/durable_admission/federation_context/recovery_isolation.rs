@@ -323,7 +323,7 @@ fn concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id() -
                 .admission_report_sha256,
             reports[index]
         );
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
     }
     assert!(kernels[0].receipt_federation_admissions.is_empty());
     assert!(current_receipt_evaluation_scope_key().is_none());

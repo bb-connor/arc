@@ -132,7 +132,7 @@ fn prepared_treaty_admission_observes_epoch_commit_order_and_preserves_custody()
             Some(swarm_route_metadata()),
         )?;
         assert!(changed.load(Ordering::SeqCst));
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let history = faults::history(&fixture.inner)?;
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].intent.resources().len(), 3);

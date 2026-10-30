@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-participant-snapshot-body.schema.json",
+  "title": "chio.clearing.participant-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "algorithmVersion",
+    "authorityId",
+    "expiresAtUnixMs",
+    "keyEpoch",
+    "participants",
+    "schema",
+    "validFromUnixMs"
+  ],
+  "properties": {
+    "algorithmVersion": {
+      "type": "string"
+    },
+    "authorityId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acknowledgementKey",
+          "acknowledgementKeyEpoch",
+          "identities",
+          "participantId",
+          "settlementDestination"
+        ],
+        "properties": {
+          "acknowledgementKey": {
+            "type": "string"
+          },
+          "acknowledgementKeyEpoch": {
+            "type": "integer"
+          },
+          "identities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "participantId": {
+            "type": "string"
+          },
+          "settlementDestination": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.clearing.participant-snapshot.v1"
+    },
+    "validFromUnixMs": {
+      "type": "integer"
+    }
+  }
+}

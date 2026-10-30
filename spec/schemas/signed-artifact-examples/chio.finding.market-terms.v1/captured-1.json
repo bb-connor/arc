@@ -1,0 +1,44 @@
+{
+  "appeal_window_secs": 259200,
+  "audit_eligible": true,
+  "audit_epoch_length_secs": 2592000,
+  "backing_requirement": {
+    "base_finding_stake": {
+      "currency": "USD",
+      "units": 300
+    },
+    "collateral_policy": "venue_ledger_exclusive_v1",
+    "maximum_sale_exposure": {
+      "currency": "USD",
+      "units": 450
+    }
+  },
+  "challenge_bond_limits": [
+    {
+      "guarantee_class": "deterministic_replay",
+      "max_bond": {
+        "currency": "USD",
+        "units": 100
+      },
+      "min_bond": {
+        "currency": "USD",
+        "units": 10
+      }
+    }
+  ],
+  "claim_window_secs": 1,
+  "decision_rule_refs": [
+    "decision/replay-v1"
+  ],
+  "expires_at": 1900000000,
+  "filing_window_secs": 600,
+  "finding_artifact_sha256": "fe0c0c0400ba262ac8b636aaf0279806c4437e440c74700372ee7c06edc8fa16",
+  "finding_id": "4546b5252e9b3ee87bd38c9348683715b885b0e3fd8fab7cb04f3a8d84435daa",
+  "issued_at": 1749996400,
+  "listing_id": "listing-42",
+  "payout_policy": "pro_rata_capped_v1",
+  "schema": "chio.finding.market-terms.v1",
+  "seller": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+  "terms_id": "2560a784d79547b32119309d44ef69fcc1485d5ad630b1c20a081a81805cdda2",
+  "verifier_profile_envelope_sha256": "90fb45c0aeb5a849868d4a2381dff27806cfb0efa09ad91b98ac94c96b762e07"
+}

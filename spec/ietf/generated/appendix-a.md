@@ -42,17 +42,17 @@ pretty-printed here for reading. Capability tokens are defined in
       }
     ]
   },
-  "signature": "bf98e7d482dee58f37b6f859b9eddd54191dbb1145321be7dff9\
-      aa59fbf47e7647873dd40c585956ebc098b64f7f853d7ceb83685c01410c7d\
-      ecd6a477db920c",
+  "signature": "423e1a5ce4c07d2ef4aa8c11c065b1d778dba80d4e91242ca59c\
+      0a431529965bc6a332f9e431d4fd11c68b0431fde84b48991476dd5bea9137\
+      d8c8c8471c6804",
   "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da\
       8eb6e39f2d"
 }
 ~~~
 
-The signing input of the token is its canonical form without the
+The signing body of the token is its canonical form without the
 `signature` member. The member `"schema":"chio.capability.v1"` sorts
-between `issuer` and `scope`. The signing input is the
+between `issuer` and `scope`. The signing body is the
 `capability_signing_body_canonical_json` value of the case:
 {: keepWithNext="true"}
 
@@ -69,7 +69,19 @@ between `issuer` and `scope`. The signing input is the
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"}
 ~~~
 
-The `signature` member is an Ed25519 signature over these octets that
+The signing wrapper ({{signing-wrapper}}) of this body under the schema
+id `chio.capability.v1` is these 88 octets, in hex:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e7631005d8d33c3d56ece64cca5\
+a6fa61a763d04ce26ebfd9235ec1f75e81b28a6a535f89dfefe2ef217fd1b424ff7e\
+d5825d3920ae3258f527b25fc9c573a994bbdba3
+~~~
+
+The `signature` member is an Ed25519 signature over the wrapper that
 verifies under the key in `issuer`.
 
 ## Tool Call Request Frame {#example-frame}
@@ -92,9 +104,9 @@ not a case of the corpus, and its canonical form is:
 "schema":"chio.capability.v1","scope":{"grants":[{"constraints":\
 [{"type":"path_prefix","value":"/workspace/"}],"max_invocations":3,\
 "operations":["invoke","read_result"],"server_id":"srv-files",\
-"tool_name":"file_read"}]},"signature":"bf98e7d482dee58f37b6f859b9ed\
-dd54191dbb1145321be7dff9aa59fbf47e7647873dd40c585956ebc098b64f7f853d\
-7ceb83685c01410c7decd6a477db920c","subject":\
+"tool_name":"file_read"}]},"signature":"423e1a5ce4c07d2ef4aa8c11c065\
+b1d778dba80d4e91242ca59c0a431529965bc6a332f9e431d4fd11c68b0431fde84b\
+48991476dd5bea9137d8c8c8471c6804","subject":\
 "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"},\
 "id":"req-001","params":{"mode":"read","path":\
 "/workspace/docs/roadmap.md"},"server_id":"srv-files","tool":\
@@ -171,9 +183,9 @@ independent, so that value is not the `id` of the token in
   "policy_hash": "policy-bindings-v1",
   "receipt_kind": "mediated_decision",
   "redaction_mode": "none",
-  "signature": "276a4c59dbc5e0c4fbd47beefa33515d207e8f516aca296afee2\
-      cb95a443bb18d31031cae0b69943e7a930be03b2e0a60156e5a26e732e888e\
-      32d4653d059f03",
+  "signature": "67e3bfef7a6f3da592811e088d396f3186fbc1533632b273fbd3\
+      a2f6ce60eb099418d256853398661d802d179ea869acb584bed757681f501f\
+      2c40fd4fde790a",
   "timestamp": 1710000200,
   "tool_name": "file_read",
   "tool_origin": "caller_executed",
@@ -182,12 +194,12 @@ independent, so that value is not the `id` of the token in
 }
 ~~~
 
-The signing input of the receipt is the canonical form of a JSON object
+The signing body of the receipt is the canonical form of a JSON object
 with two members: `body`, which is the receipt without its `id` and
 `signature` members, and `id`, which is the SHA-256 digest of the
 canonical form of `body`, in lowercase hex. The
 `receipt_body_canonical_json` value of the case is the canonical form of
-the receipt without its `signature` member. The signing input is:
+the receipt without its `signature` member. The signing body is:
 {: keepWithNext="true"}
 
 ~~~ json
@@ -212,7 +224,19 @@ the receipt without its `signature` member. The signing input is:
 "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea"}
 ~~~
 
-The `signature` member is an Ed25519 signature over these octets that
+The signing wrapper ({{signing-wrapper}}) of this body under the schema
+id `chio.receipt.v1` is these 88 octets, in hex:
+{: keepWithNext="true"}
+
+~~~
+=============== NOTE: '\' line wrapping per RFC 8792 ================
+
+6368696f2e7369676e696e672d777261707065722e76310030a0a0cb00102ac64808\
+db450924b39544cc41b773e6d2b7f0d899021a6c2ae16d0752cbe80e4a4f8204063c\
+d20e9a17bbcb5c5ce16d3ea122fd05cfe80365ee
+~~~
+
+The `signature` member is an Ed25519 signature over the wrapper that
 verifies under the key in `kernel_key`. The `parameter_hash` member of
 `action` is the SHA-256 digest of the canonical form of its `parameters`
 member, in the same encoding.

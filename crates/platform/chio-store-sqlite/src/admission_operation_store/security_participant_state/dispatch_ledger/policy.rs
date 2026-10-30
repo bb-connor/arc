@@ -270,7 +270,7 @@ impl Policy {
                             &canonical_json_bytes(signed).map_err(invalid)?,
                         )
                         .as_bytes()
-                    && signed.verify_signature().map_err(invalid)? =>
+                    && signed.verify_integrity_embedded_key().map_err(invalid)? =>
             {
                 Ok(())
             }

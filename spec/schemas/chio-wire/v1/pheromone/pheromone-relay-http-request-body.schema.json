@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-relay-http-request-body.schema.json",
+  "title": "chio.pheromone.relay-http-request.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bodySha256",
+    "method",
+    "nonce",
+    "path",
+    "recipientKernelId",
+    "schema",
+    "senderKernelId",
+    "sentAtUnixMs"
+  ],
+  "properties": {
+    "bodySha256": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "path": {
+      "type": "string"
+    },
+    "recipientKernelId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.pheromone.relay-http-request.v1"
+    },
+    "senderKernelId": {
+      "type": "string"
+    },
+    "sentAtUnixMs": {
+      "type": "integer"
+    }
+  }
+}

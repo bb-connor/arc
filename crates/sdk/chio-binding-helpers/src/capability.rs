@@ -49,7 +49,7 @@ pub fn verify_capability(
     };
 
     Ok(CapabilityVerification {
-        signature_valid: capability.verify_signature()?,
+        signature_valid: capability.verify_integrity_embedded_key()?,
         delegation_chain_shape_valid: validate_delegation_chain(
             &capability.delegation_chain,
             max_delegation_depth,

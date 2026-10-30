@@ -421,7 +421,7 @@ pub fn authenticate_outcome_delivery_checkpoint(
     if signed.0.signer_key != *trust.key()
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -719,7 +719,7 @@ pub fn authenticate_outcome_delivery_acknowledgement(
     if signed.0.signer_key != *trust.key()
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -957,7 +957,7 @@ pub fn authenticate_outcome_delivery_nonacceptance(
     if signed.0.signer_key != *trust.key()
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| OutcomeError::Canonicalization(error.to_string()))?
     {
         return Err(OutcomeError::AuthorityVerification);
@@ -969,4 +969,18 @@ pub fn authenticate_outcome_delivery_nonacceptance(
         envelope_digest: envelope_digest(&signed)?,
         signed,
     })
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for OutcomeDeliveryAcknowledgementBodyV1
+{
+    const SCHEMA_ID: &'static str = OUTCOME_DELIVERY_ACKNOWLEDGEMENT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeDeliveryCheckpointBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_DELIVERY_CHECKPOINT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for OutcomeDeliveryNonacceptanceBodyV1 {
+    const SCHEMA_ID: &'static str = OUTCOME_DELIVERY_NONACCEPTANCE_SCHEMA;
 }

@@ -954,7 +954,7 @@ pub(super) fn authenticate_checkpoints(
         let checkpoint = parse_persisted_checkpoint_row(row.clone()).map_err(integrity)?;
         match next_previous.as_ref() {
             Some(predecessor) => {
-                chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+                chio_kernel_core::evidence_verify::verify_integrity_embedded_key_predecessor(
                     predecessor,
                     &checkpoint,
                 )

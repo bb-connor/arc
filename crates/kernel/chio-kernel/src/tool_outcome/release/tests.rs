@@ -586,7 +586,7 @@ fn external_effect_cancellation_constructs_bound_transport_no_acceptance() {
         &Keypair::from_seed(&[0x52; 32]),
     )
     .unwrap();
-    let verified = envelope.verify().unwrap();
+    let verified = envelope.verify_integrity_embedded_key().unwrap();
     assert!(verified.requires_anchored_economic_commit());
     assert_eq!(
         verify_economic_cancellation_terminal_advance(
@@ -678,7 +678,7 @@ fn external_effect_cancellation_constructs_bound_permanently_not_applied_result(
     assert!(verify_economic_cancellation_terminal_advance(
         cancellation.state_advance().current().view(),
         cancellation.batch(),
-        &envelope.verify().unwrap(),
+        &envelope.verify_integrity_embedded_key().unwrap(),
     )
     .is_ok());
     assert!(matches!(

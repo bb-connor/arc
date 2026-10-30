@@ -16,7 +16,6 @@
       "required": [
         "schema",
         "status_epoch_id",
-        "signature_domain",
         "status_map_version",
         "proof_semantics",
         "feed_id",
@@ -44,9 +43,6 @@
         },
         "status_epoch_id": {
           "$ref": "#/$defs/sha256"
-        },
-        "signature_domain": {
-          "const": "chio.finding.status.v1"
         },
         "status_map_version": {
           "const": "sparse_map_v1"

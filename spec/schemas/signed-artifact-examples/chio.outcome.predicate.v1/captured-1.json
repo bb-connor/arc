@@ -1,0 +1,26 @@
+{
+  "assertions": [
+    {
+      "comparator": {
+        "kind": "eq",
+        "value": {
+          "x": 1,
+          "y": 2
+        }
+      },
+      "pointer": "/a~1b/~0key"
+    },
+    {
+      "comparator": {
+        "kind": "gte",
+        "value": 5
+      },
+      "pointer": "/items/0"
+    }
+  ],
+  "expiresAtUnixMs": 2000,
+  "issuedAtUnixMs": 1000,
+  "predicateId": "4a44610deead73fd4a8bcaa5c6e75b2478393812e1f34f71015d843ab203a0ad",
+  "providerId": "provider-1",
+  "schema": "chio.outcome.predicate.v1"
+}

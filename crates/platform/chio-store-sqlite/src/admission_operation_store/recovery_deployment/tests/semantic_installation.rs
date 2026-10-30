@@ -480,11 +480,13 @@ fn semantic_modified_signed_bodies_refuse_without_writes() -> TestResult {
     deployment_json["body"]["generation"] = serde_json::json!(2);
     let mut altered_deployment = good.clone();
     altered_deployment.deployment = serde_json::from_value(deployment_json)?;
-    assert!(!altered_deployment.deployment.verify_signature()?);
+    assert!(!altered_deployment
+        .deployment
+        .verify_integrity_embedded_key()?);
     let mut package_json = serde_json::to_value(&good.packages.as_slice()[0])?;
     package_json["body"]["operations"][0]["external_influence"] = serde_json::json!(true);
     let altered_package: SignedSemanticPackageV1 = serde_json::from_value(package_json)?;
-    assert!(!altered_package.verify_signature()?);
+    assert!(!altered_package.verify_integrity_embedded_key()?);
     let mut package = good.clone();
     package.packages = NonEmptyBoundedList::new(vec![altered_package])?;
     for value in [altered_deployment, package] {

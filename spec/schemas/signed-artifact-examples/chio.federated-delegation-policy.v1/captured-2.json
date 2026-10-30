@@ -1,0 +1,12 @@
+{
+  "createdAt": 100,
+  "expiresAt": 900,
+  "issuer": "issuer",
+  "parentCapabilityId": "snapshot-token",
+  "partner": "partner",
+  "schema": "chio.federated-delegation-policy.v1",
+  "scope": {},
+  "signerPublicKey": "6c4b8a924b5110fab31684421d10cefe8589f832a45b807186bded3e9fdd4000",
+  "ttlSeconds": 100,
+  "verifier": "https://verifier.example"
+}

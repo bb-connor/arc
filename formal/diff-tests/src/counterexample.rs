@@ -236,7 +236,7 @@ pub fn replay_receipt_before_allow(
     }
     let response_signature_valid = response
         .receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| invalid(format!("response receipt signature failed: {error}")))?;
     if !response_signature_valid {
         return Err(invalid("response receipt signature is invalid"));
@@ -256,7 +256,7 @@ pub fn replay_receipt_before_allow(
         ));
     }
     let signature_valid = persisted
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| invalid(format!("persisted receipt signature failed: {error}")))?;
     if !signature_valid {
         return Err(invalid("persisted receipt signature is invalid"));

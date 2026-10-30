@@ -1,0 +1,10 @@
+{
+  "actionClass": "narrow_destructive",
+  "expiresAtUnixMs": 2000,
+  "issuedAtUnixMs": 1000,
+  "issuer": "did:chio:buyer",
+  "leaseId": "lease:buyer:refund:001",
+  "schema": "chio.capability-lease.v1",
+  "scopeDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "subject": "did:chio:vendor-payments"
+}

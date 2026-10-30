@@ -1,0 +1,35 @@
+{
+  "action": "bind",
+  "authority_envelope_ref": "ape-1",
+  "auto_bind_decision_ref": "auto-bind-1",
+  "bound_coverage_ref": "bound-coverage-1",
+  "currency": "USD",
+  "execution_id": "aed-1",
+  "issued_at": 1743379440,
+  "lifecycle_state": "executed",
+  "note": "Executes one bounded autonomous bind over the official web3 lane.",
+  "optimization_ref": "cpo-1",
+  "pricing_decision_ref": "apd-1",
+  "provider_id": "carrier-1",
+  "quote_response_ref": "quote-response-1",
+  "rollback_control": {
+    "human_interrupt_contact": "ops@chio.example",
+    "interruptible": true,
+    "rollback_plan_ref": "arp-1"
+  },
+  "safety_gates": [
+    {
+      "description": "Coverage and premium remain inside the active authority envelope.",
+      "name": "authority-within-envelope",
+      "passed": true
+    },
+    {
+      "description": "Capital-pool optimization preserved minimum reserve headroom.",
+      "name": "capital-headroom",
+      "passed": true
+    }
+  ],
+  "schema": "chio.autonomous-execution-decision.v1",
+  "settlement_dispatch_ref": "dispatch-web3-1",
+  "subject_key": "subject-1"
+}

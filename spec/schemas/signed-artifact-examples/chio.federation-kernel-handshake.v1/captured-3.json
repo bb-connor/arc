@@ -1,0 +1,17 @@
+{
+  "capabilities": {
+    "schema": "chio.capabilities.v1"
+  },
+  "conformanceTier": "bronze",
+  "ladderManifestRef": {
+    "expiresAtUnixMs": 1800003600000,
+    "issuedAtUnixMs": 1800000000000,
+    "manifestId": "ladder:payments:v1",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "localKernelId": "kernel.org-b",
+  "nonce": "nonce-ladder",
+  "remoteKernelId": "kernel.org-a",
+  "schema": "chio.federation-kernel-handshake.v1",
+  "timestamp": 1800000000
+}

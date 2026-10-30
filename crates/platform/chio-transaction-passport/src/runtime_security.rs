@@ -21,6 +21,7 @@ mod claims;
 mod evidence;
 mod policy;
 
+pub use artifacts::sign_runtime_security_artifact;
 use artifacts::{
     validate_allow_receipt, validate_attack_simulation_report, validate_chaos_run_report,
     validate_execution_lease, validate_execution_lease_context, validate_nonce_uniqueness,

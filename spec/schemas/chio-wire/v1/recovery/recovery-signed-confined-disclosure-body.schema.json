@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/recovery/recovery-signed-confined-disclosure-body.schema.json",
+  "title": "chio.recovery.signed-confined-disclosure.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact",
+    "boundary",
+    "content",
+    "contract",
+    "domain_version",
+    "evidence",
+    "expires_at_unix_ms",
+    "implementation",
+    "influence",
+    "issued_at_unix_ms",
+    "launch",
+    "observation",
+    "parent",
+    "policy",
+    "size_bytes",
+    "source",
+    "target"
+  ],
+  "properties": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact",
+        "provenance",
+        "scope",
+        "version"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority_domain",
+            "process_id",
+            "tenant_id"
+          ],
+          "properties": {
+            "authority_domain": {
+              "type": "string"
+            },
+            "process_id": {
+              "type": "string"
+            },
+            "tenant_id": {
+              "type": "string"
+            }
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "boundary": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "content": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "contract": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "domain_version": {
+      "type": "integer"
+    },
+    "evidence": {
+      "type": "string"
+    },
+    "expires_at_unix_ms": {
+      "type": "integer"
+    },
+    "implementation": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "influence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commitment",
+        "externally_influenced",
+        "unknown"
+      ],
+      "properties": {
+        "commitment": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "externally_influenced": {
+          "type": "boolean"
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      }
+    },
+    "issued_at_unix_ms": {
+      "type": "integer"
+    },
+    "launch": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact",
+        "provenance",
+        "scope",
+        "version"
+      ],
+      "properties": {
+        "artifact": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority_domain",
+            "process_id",
+            "tenant_id"
+          ],
+          "properties": {
+            "authority_domain": {
+              "type": "string"
+            },
+            "process_id": {
+              "type": "string"
+            },
+            "tenant_id": {
+              "type": "string"
+            }
+          }
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "parent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clearance",
+        "context_generation",
+        "isolation_epoch",
+        "lineage",
+        "principal",
+        "recipient",
+        "runtime",
+        "scope",
+        "sink"
+      ],
+      "properties": {
+        "clearance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "compartments",
+            "kind",
+            "owners"
+          ],
+          "properties": {
+            "compartments": {
+              "type": "array",
+              "maxItems": 64,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256,
+                "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                "x-maxUtf8Bytes": 256
+              }
+            },
+            "kind": {
+              "type": "string"
+            },
+            "owners": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {}
+            }
+          }
+        },
+        "context_generation": {
+          "type": "integer"
+        },
+        "isolation_epoch": {
+          "type": "string"
+        },
+        "lineage": {
+          "type": "string"
+        },
+        "principal": {
+          "type": "string"
+        },
+        "recipient": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "authority_domain",
+            "process_id",
+            "tenant_id"
+          ],
+          "properties": {
+            "authority_domain": {
+              "type": "string"
+            },
+            "process_id": {
+              "type": "string"
+            },
+            "tenant_id": {
+              "type": "string"
+            }
+          }
+        },
+        "sink": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "policy": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "size_bytes": {
+      "type": "integer"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compartments",
+        "kind",
+        "owners"
+      ],
+      "properties": {
+        "compartments": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+            "x-maxUtf8Bytes": 256
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "owners": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compartments",
+        "kind",
+        "owners"
+      ],
+      "properties": {
+        "compartments": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+            "x-maxUtf8Bytes": 256
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "owners": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {}
+        }
+      }
+    }
+  }
+}

@@ -21,13 +21,16 @@
 //!
 //! Threat model row `pq_signature_downgrade` is the surface this guards.
 
-use chio_core::canonical::canonical_json_bytes;
 use chio_core::crypto::{
-    sign_canonical_with_backend, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    sign_wrapped_for_identity, verify_wrapped, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::receipt_support::KernelCryptoFloor;
+
+/// Signing-wrapper schema id of a session compliance certificate.
+pub const SESSION_COMPLIANCE_CERTIFICATE_SCHEMA: &str = "chio.session-compliance-certificate.v1";
 
 /// Body of a session compliance certificate.
 ///
@@ -60,22 +63,21 @@ pub struct SessionComplianceCertificateBody {
 /// A signed session compliance certificate.
 ///
 /// Wraps a [`SessionComplianceCertificateBody`] with the issuing kernel's
-/// public key and a signature over canonical JSON of the body. Under
+/// public key and a signature over the signing wrapper of the body. Under
 /// `crypto_floor=allow_hybrid` or `pq_required` the signature is
 /// [`Signature::Hybrid`] and the public key is [`PublicKey::Hybrid`];
 /// otherwise both fields carry classical material (Ed25519 / P-256 /
 /// P-384) and remain byte-identical to the classical envelope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SessionComplianceCertificate {
     /// Body the signature covers.
     pub body: SessionComplianceCertificateBody,
-    /// Public key of the issuing kernel.
+    /// Public key of the issuing kernel; its encoding alone selects the
+    /// signature algorithm.
     pub signer_key: PublicKey,
-    /// Algorithm used for `signature`. Carried so consumers can branch
-    /// without parsing the self-describing prefix; informational only
-    /// (verification dispatches off the signature material).
-    pub algorithm: SigningAlgorithm,
-    /// Signature over canonical JSON of `body`.
+    /// Signature over the signing wrapper of the canonical `body` under
+    /// `chio.session-compliance-certificate.v1`.
     pub signature: Signature,
 }
 
@@ -103,17 +105,9 @@ pub enum ComplianceCertificateError {
     #[error("compliance certificate signature verification failed")]
     SignatureVerificationFailed,
 
-    /// The declared algorithm field was tampered or drifted from the
-    /// self-describing signature envelope.
-    #[error(
-        "compliance certificate algorithm field {declared} disagrees with signature algorithm {actual}"
-    )]
-    AlgorithmMismatch {
-        /// The informational algorithm field carried by the envelope.
-        declared: &'static str,
-        /// The algorithm parsed from the signature material.
-        actual: &'static str,
-    },
+    /// The certificate's signer is not the key the verifier trusts.
+    #[error("compliance certificate signer is not the expected signer")]
+    UntrustedSigner,
 
     /// The certificate's signature algorithm violates the configured
     /// `crypto_floor`. Threat model row `pq_signature_downgrade`.
@@ -159,29 +153,35 @@ pub fn issue_session_compliance_certificate(
     let signer_key = backend
         .public_key()
         .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
-    let (signature, _bytes) = sign_canonical_with_backend(backend, &body)
-        .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
+    let (outcome, _) = sign_wrapped_for_identity(
+        backend,
+        &signer_key,
+        SESSION_COMPLIANCE_CERTIFICATE_SCHEMA,
+        &body,
+    )
+    .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
 
     Ok(SessionComplianceCertificate {
         body,
-        algorithm: signer_key.algorithm(),
         signer_key,
-        signature,
+        signature: outcome.signature,
     })
 }
 
-/// Verify a session compliance certificate against the configured
-/// `crypto_floor`.
+/// Verify a session compliance certificate signed by `expected_signer`
+/// against the configured `crypto_floor`.
 ///
 /// Performs the same dispatch table as
-/// `CapabilityToken::verify_signature_with_floor`: floor rejection BEFORE
+/// `CapabilityToken::verify_integrity_embedded_key_with_floor`: floor rejection BEFORE
 /// cryptographic verification, fail-closed on a mismatch between the
 /// body's `crypto_floor` field and the verification floor, fail-closed on
 /// signature failures.
 ///
 /// # Errors
 ///
-/// Returns [`ComplianceCertificateError::RejectedByCryptoFloor`] when the
+/// Returns [`ComplianceCertificateError::UntrustedSigner`] when the signer
+/// is not `expected_signer`.
+/// [`ComplianceCertificateError::RejectedByCryptoFloor`] when the
 /// certificate's signature algorithm violates the configured floor.
 /// [`ComplianceCertificateError::CryptoFloorMismatch`] when the body's
 /// floor field disagrees with the verification floor.
@@ -189,17 +189,15 @@ pub fn issue_session_compliance_certificate(
 /// cryptographic check fails.
 pub fn verify_session_compliance_certificate(
     cert: &SessionComplianceCertificate,
+    expected_signer: &PublicKey,
     floor: KernelCryptoFloor,
 ) -> Result<(), ComplianceCertificateError> {
-    // Step 1: floor enforcement. Reject any algorithm the floor does not
-    // permit BEFORE running the cryptographic check.
-    let signature_algorithm = cert.signature.algorithm();
-    if cert.algorithm != signature_algorithm {
-        return Err(ComplianceCertificateError::AlgorithmMismatch {
-            declared: signing_algorithm_label(cert.algorithm),
-            actual: signing_algorithm_label(signature_algorithm),
-        });
+    if &cert.signer_key != expected_signer {
+        return Err(ComplianceCertificateError::UntrustedSigner);
     }
+    // Step 1: floor enforcement over the signer key's algorithm, BEFORE the
+    // cryptographic check.
+    let signature_algorithm = cert.signer_key.algorithm();
     let is_hybrid = matches!(signature_algorithm, SigningAlgorithm::Hybrid);
     let allowed = if is_hybrid {
         floor.allows_hybrid()
@@ -222,9 +220,14 @@ pub fn verify_session_compliance_certificate(
     }
 
     // Step 3: cryptographic verification.
-    let bytes = canonical_json_bytes(&cert.body)
-        .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
-    if !cert.signer_key.verify(&bytes, &cert.signature) {
+    if verify_wrapped(
+        expected_signer,
+        SESSION_COMPLIANCE_CERTIFICATE_SCHEMA,
+        &cert.body,
+        &cert.signature,
+    )
+    .is_err()
+    {
         return Err(ComplianceCertificateError::SignatureVerificationFailed);
     }
 
@@ -239,3 +242,7 @@ fn signing_algorithm_label(alg: SigningAlgorithm) -> &'static str {
         SigningAlgorithm::Hybrid => "hybrid",
     }
 }
+
+#[cfg(test)]
+#[path = "compliance_certificate/tests.rs"]
+mod tests;

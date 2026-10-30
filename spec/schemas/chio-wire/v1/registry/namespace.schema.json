@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/namespace.schema.json",
+  "title": "Chio registry namespace signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "boundary",
+    "lifecycleState",
+    "namespaceId",
+    "ownership",
+    "schema"
+  ],
+  "properties": {
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automaticTrustAdmission",
+        "explicitTrustActivationRequired",
+        "visibilityOnly"
+      ],
+      "properties": {
+        "automaticTrustAdmission": {
+          "type": "boolean"
+        },
+        "explicitTrustActivationRequired": {
+          "type": "boolean"
+        },
+        "visibilityOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "lifecycleState": {
+      "type": "string"
+    },
+    "namespaceId": {
+      "type": "string"
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "ownerId",
+        "registeredAt",
+        "registryUrl",
+        "signerPublicKey"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string"
+        },
+        "ownerId": {
+          "type": "string"
+        },
+        "registeredAt": {
+          "type": "integer"
+        },
+        "registryUrl": {
+          "type": "string"
+        },
+        "signerPublicKey": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.registry.namespace.v1"
+    }
+  }
+}

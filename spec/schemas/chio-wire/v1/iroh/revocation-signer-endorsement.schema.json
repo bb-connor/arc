@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/iroh/revocation-signer-endorsement.schema.json",
+  "title": "Chio iroh revocation signer endorsement signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kernel_id",
+    "oracle_public_key",
+    "signer_id"
+  ],
+  "properties": {
+    "kernel_id": {
+      "type": "string"
+    },
+    "oracle_public_key": {
+      "type": "string"
+    },
+    "signer_id": {
+      "type": "string"
+    }
+  }
+}

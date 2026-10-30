@@ -3,7 +3,8 @@
 use chio_bundle_verify::federation::{
     ensure_query_within_federation_policy, verify_federation_policy,
 };
-use chio_core_types::crypto::Keypair;
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{ExemptFormat, Keypair};
 use chio_core_types::receipt::evidence::{
     EvidenceExportQuery, FederationPolicyBody, FederationPolicyDocument, ReceiptReadBoundary,
     FEDERATION_POLICY_SCHEMA,
@@ -65,7 +66,12 @@ fn signed_policy(query: EvidenceExportQuery) -> FederationPolicyDocument {
         require_proofs: false,
         purpose: None,
     };
-    let (signature, _) = keypair.sign_canonical(&body).test_unwrap();
+    let signature = keypair
+        .sign_wrapped(
+            FEDERATION_POLICY_SCHEMA,
+            &CanonicalBytes::from_serializable(&body).test_unwrap(),
+        )
+        .test_unwrap();
     FederationPolicyDocument { body, signature }
 }
 
@@ -81,6 +87,17 @@ fn federation_policy_signature_covers_its_scope() {
     let mut policy = signed_policy(tenant("tenant-a"));
     verify_federation_policy(&policy).test_unwrap();
     policy.body.query = tenant("tenant-b");
+    let error = verify_federation_policy(&policy).test_unwrap_err();
+    assert!(error.message().contains("signature"), "{error}");
+}
+
+#[test]
+fn federation_policy_refuses_an_unwrapped_signature() {
+    let mut policy = signed_policy(tenant("tenant-a"));
+    let signer = Keypair::generate();
+    policy.body.signer_public_key = signer.public_key();
+    let canonical = CanonicalBytes::from_serializable(&policy.body).test_unwrap();
+    policy.signature = signer.sign_exempt(ExemptFormat::JwsSigningInput, canonical.as_bytes());
     let error = verify_federation_policy(&policy).test_unwrap_err();
     assert!(error.message().contains("signature"), "{error}");
 }

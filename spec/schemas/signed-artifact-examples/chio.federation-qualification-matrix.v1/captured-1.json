@@ -1,0 +1,64 @@
+{
+  "cases": [
+    {
+      "expectedOutcome": "pass",
+      "id": "activation-exchange",
+      "name": "Federated activation exchange stays visibility-first and locally reviewable",
+      "notes": "Remote trust activation remains an explicit exchange contract and never becomes ambient runtime trust.",
+      "observedOutcome": "pass",
+      "requirementIds": [
+        "TRUSTMAX-01"
+      ],
+      "scenario": "conflicting_activation"
+    },
+    {
+      "expectedOutcome": "pass",
+      "id": "quorum-conflict",
+      "name": "Quorum, freshness, and anti-eclipse posture remain machine-reviewable",
+      "notes": "Conflicting or stale publisher state fails closed instead of silently rewriting trust.",
+      "observedOutcome": "pass",
+      "requirementIds": [
+        "TRUSTMAX-02"
+      ],
+      "scenario": "insufficient_quorum"
+    },
+    {
+      "expectedOutcome": "pass",
+      "id": "open-admission-boundary",
+      "name": "Open admission stays bounded by explicit stake and review policy",
+      "notes": "Visibility and participation stay distinct from runtime trust, even when bond-backed admission is allowed.",
+      "observedOutcome": "pass",
+      "requirementIds": [
+        "TRUSTMAX-03"
+      ],
+      "scenario": "governance_interop"
+    },
+    {
+      "expectedOutcome": "pass",
+      "id": "shared-reputation-sybil",
+      "name": "Shared reputation clearing resists duplicate-issuer and oracle collapse",
+      "notes": "Accepted summaries come from distinct issuers and blocking negative events require corroboration.",
+      "observedOutcome": "pass",
+      "requirementIds": [
+        "TRUSTMAX-04"
+      ],
+      "scenario": "reputation_sybil"
+    },
+    {
+      "expectedOutcome": "pass",
+      "id": "adversarial-federation",
+      "name": "Hostile publisher and eclipse attempts fail closed under the federation boundary",
+      "notes": "Hostile federation inputs remain visible but do not collapse governance or admission into ambient trust.",
+      "observedOutcome": "pass",
+      "requirementIds": [
+        "TRUSTMAX-05"
+      ],
+      "scenario": "eclipse_attempt"
+    }
+  ],
+  "exchangeRef": "fex-1",
+  "profileId": "chio.federation.profile",
+  "quorumReportRef": "fqr-1",
+  "reputationClearingRef": "frc-1",
+  "schema": "chio.federation-qualification-matrix.v1"
+}

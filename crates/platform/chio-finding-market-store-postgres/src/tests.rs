@@ -50,3 +50,24 @@ fn canonical_payload_validation_fails_closed() {
     assert!(validate_canonical_json(br#"{ "b": 2, "a": 1 }"#, "payload").is_err());
     assert!(validate_canonical_json(&[], "payload").is_err());
 }
+
+#[test]
+fn signed_artifact_capture_quota_alert() {
+    let signer = chio_core_types::crypto::Keypair::from_seed(&[34_u8; 32]);
+    let signed = SignedHostedQuotaAlert::sign(
+        HostedQuotaAlertBody {
+            schema: HOSTED_QUOTA_ALERT_SCHEMA.to_owned(),
+            tenant_id: "tenant:quota".to_owned(),
+            quota_kind: "finding_bytes".to_owned(),
+            observed_value: 12,
+            limit_value: 10,
+            created_at: 1_700_000_002,
+        },
+        &signer,
+    )
+    .unwrap_or_else(|error| panic!("quota alert signing failed: {error}"));
+    assert!(matches!(
+        signed.verify_signature(&signer.public_key()),
+        Ok(true)
+    ));
+}

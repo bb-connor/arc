@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-quota-alert.schema.json",
+  "title": "Chio finding hosted quota alert signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "createdAt",
+    "limitValue",
+    "observedValue",
+    "quotaKind",
+    "schema",
+    "tenantId"
+  ],
+  "properties": {
+    "createdAt": {
+      "type": "integer"
+    },
+    "limitValue": {
+      "type": "integer"
+    },
+    "observedValue": {
+      "type": "integer"
+    },
+    "quotaKind": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.hosted-quota-alert.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

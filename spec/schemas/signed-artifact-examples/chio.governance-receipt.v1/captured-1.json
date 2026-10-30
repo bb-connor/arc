@@ -1,0 +1,11 @@
+{
+  "authorizedLeaseId": "lease:buyer:refund:001",
+  "authorizingKernel": "did:chio:buyer",
+  "caseKind": "destructive_authorization",
+  "expiresAtUnixMs": 1900,
+  "issuedAtUnixMs": 1100,
+  "receiptId": "gov:buyer:refund:001",
+  "schema": "chio.governance-receipt.v1",
+  "stepSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "workflowId": "wf-chio-refund-001"
+}

@@ -62,7 +62,7 @@ fn product_default_guards_wrap_denies_internal_network_before_child_effect() -> 
     assert!(!receipts.is_empty());
     assert!(receipts
         .iter()
-        .all(|receipt| receipt.verify_signature().unwrap_or(false)));
+        .all(|receipt| receipt.verify_integrity_embedded_key().unwrap_or(false)));
     assert!(receipts.iter().any(|receipt| matches!(
         receipt.decision.as_ref(),
         Some(chio_core::receipt::decision::Decision::Deny { .. })
@@ -89,7 +89,7 @@ fn product_default_guards_wrap_sanitizes_observed_output_with_signed_hook_eviden
         })
         .ok_or("observed redaction lacks signed hook evidence")?;
     assert_eq!(receipt.kernel_key, transport.kernel.public_key());
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.policy_hash, transport.kernel.policy_hash());
     assert_eq!(receipt.policy_hash.len(), 64);
     assert!(receipt

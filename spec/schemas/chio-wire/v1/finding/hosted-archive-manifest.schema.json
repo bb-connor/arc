@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-archive-manifest.schema.json",
+  "title": "Chio finding hosted archive manifest signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "configurationRevision",
+    "coveredCheckpointSha256",
+    "createdAt",
+    "objectSha256",
+    "objectSize",
+    "objectUri",
+    "previousArchiveSha256",
+    "schema",
+    "target",
+    "tenantId"
+  ],
+  "properties": {
+    "configurationRevision": {
+      "type": "string"
+    },
+    "coveredCheckpointSha256": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "objectSha256": {
+      "type": "string"
+    },
+    "objectSize": {
+      "type": "integer"
+    },
+    "objectUri": {
+      "type": "string"
+    },
+    "previousArchiveSha256": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "schema": {
+      "const": "chio.finding.hosted-archive-manifest.v1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resourceFamily",
+        "resourceId",
+        "resourceKind",
+        "resourceRevision",
+        "resourceSha256"
+      ],
+      "properties": {
+        "resourceFamily": {
+          "type": "string"
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "resourceKind": {
+          "type": "string"
+        },
+        "resourceRevision": {
+          "type": "integer"
+        },
+        "resourceSha256": {
+          "type": "string"
+        }
+      }
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

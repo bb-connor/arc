@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json",
+  "title": "Chio governed approval token signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approver",
+    "decision",
+    "expires_at",
+    "governed_intent_hash",
+    "id",
+    "issued_at",
+    "request_id",
+    "subject"
+  ],
+  "properties": {
+    "approver": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "governed_intent_hash": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "threshold_proposal_hash": {
+      "type": "string"
+    }
+  }
+}

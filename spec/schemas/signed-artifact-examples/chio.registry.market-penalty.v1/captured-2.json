@@ -1,0 +1,29 @@
+{
+  "abuseClass": "fraudulent_listing",
+  "action": "slash_bond",
+  "bondClass": "listing",
+  "caseId": "case-42",
+  "charterId": "charter-42",
+  "evidenceRefs": [
+    {
+      "kind": "governance_case",
+      "referenceId": "case-42"
+    }
+  ],
+  "feeScheduleId": "fees-42",
+  "governingOperatorId": "operator-42",
+  "issuedBy": "market-penalty",
+  "listingId": "listing-42",
+  "namespace": "cognition-market",
+  "openedAt": 100,
+  "penaltyAmount": {
+    "currency": "USD",
+    "units": 250
+  },
+  "penaltyId": "penalty-42",
+  "schema": "chio.registry.market-penalty.v1",
+  "state": "enforced",
+  "subjectOperatorId": "seller-42",
+  "supersedesPenaltyId": "hold-42",
+  "updatedAt": 100
+}

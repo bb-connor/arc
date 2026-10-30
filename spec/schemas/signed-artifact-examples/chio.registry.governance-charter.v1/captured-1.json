@@ -1,0 +1,29 @@
+{
+  "allowedCaseKinds": [
+    "dispute",
+    "freeze",
+    "sanction",
+    "appeal"
+  ],
+  "authorityScope": {
+    "allowedActorKinds": [
+      "tool_server"
+    ],
+    "allowedListingOperatorIds": [
+      "origin-a"
+    ],
+    "namespace": "https://registry.chio.example",
+    "policyReference": "policy/governance/default"
+  },
+  "charterId": "charter-b771ccbb4aebab61e343e01ecfecf76a557bdcb82cd970cde56e660ab47f7c6c",
+  "escalationOperatorIds": [
+    "network-audit.chio.example"
+  ],
+  "expiresAt": 800,
+  "governingOperatorId": "origin-a",
+  "governingOperatorName": "Origin A",
+  "issuedAt": 130,
+  "issuedBy": "governance@chio.example",
+  "note": "default governance charter",
+  "schema": "chio.registry.governance-charter.v1"
+}

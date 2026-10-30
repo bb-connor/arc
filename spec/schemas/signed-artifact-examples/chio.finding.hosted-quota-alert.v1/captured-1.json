@@ -1,0 +1,8 @@
+{
+  "createdAt": 1700000002,
+  "limitValue": 10,
+  "observedValue": 12,
+  "quotaKind": "finding_bytes",
+  "schema": "chio.finding.hosted-quota-alert.v1",
+  "tenantId": "tenant:quota"
+}

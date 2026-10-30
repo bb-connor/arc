@@ -79,7 +79,7 @@ async fn behavioral_report_after_seed_loss_leaves_following_issuance_refused() -
     );
     let feed: SignedBehavioralFeed = serde_json::from_slice(&body)?;
     assert_eq!(feed.signer_key, signer.public_key());
-    assert!(feed.verify_signature()?);
+    assert!(feed.verify_signature(&signer.public_key())?);
     let (status, body) = issue(&state).await?;
     assert_eq!(
         status,
@@ -89,7 +89,7 @@ async fn behavioral_report_after_seed_loss_leaves_following_issuance_refused() -
     );
     let issued: IssueCapabilityResponse = serde_json::from_slice(&body)?;
     assert_eq!(issued.capability.issuer, signer.public_key());
-    assert!(issued.capability.verify_signature()?);
+    assert!(issued.capability.verify_integrity_embedded_key()?);
 
     std::fs::remove_file(&seed)?;
     let (report_status, report_body) = report(&state).await?;

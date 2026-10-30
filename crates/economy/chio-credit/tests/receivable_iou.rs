@@ -3,10 +3,7 @@ mod credit_admission_support;
 
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{
-    sha256_hex, sign_canonical_with_backend, Ed25519Backend, Keypair, SigningAlgorithm,
-    SigningBackend,
-};
+use chio_core_types::crypto::{sha256_hex, sign_wrapped, Ed25519Backend, Keypair, SigningBackend};
 use chio_core_types::receipt::body::{ChioReceipt, ChioReceiptBody};
 use chio_core_types::receipt::crypto_floor::ReceiptCryptoFloor;
 use chio_core_types::receipt::decision::{Decision, ToolCallAction};
@@ -26,6 +23,7 @@ use chio_credit::obligation::{
     CreditFacilityBindTrustV1, ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1,
     ObligationDispositionRecordV1, ObligationSettlementLifecycleV1, VerifiedCreditFacilityBindV1,
 };
+use chio_credit::CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA;
 use chio_credit::{
     verify_receivable_iou, CreditEvaluatorHook, LocalCreditAccount, ReceivableIouCryptoFloor,
     ReceivableIouError, ReceivableIouIssuerTrust, ReceivableIouMintContext,
@@ -664,7 +662,7 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
     );
     let mut algorithm_value: serde_json::Value = serde_json::from_slice(&canonical)?;
     algorithm_value["algorithm"] = serde_json::json!("p256");
-    assert_eq!(
+    assert!(matches!(
         verify_receivable_iou(
             &canonical_json_bytes(&algorithm_value)?,
             &fixture.credit_admission_store.adapter(),
@@ -679,28 +677,9 @@ fn v2_rejects_unknown_noncanonical_legacy_and_untrusted_envelopes() -> TestResul
                 trusted_now_unix_ms: IOU_ISSUED_AT_MS,
             },
         ),
-        Err(ReceivableIouError::IssuerVerification)
-    );
+        Err(ReceivableIouError::Input(_))
+    ));
 
-    let mut mismatched_receipt = fixture.receipt.clone();
-    mismatched_receipt.algorithm = Some(SigningAlgorithm::P256);
-    assert_eq!(
-        verify_receivable_iou(
-            &canonical,
-            &fixture.credit_admission_store.adapter(),
-            &ReceivableIouVerificationContext {
-                atom: &fixture.atom,
-                disposition: &fixture.disposition,
-                settlement_lifecycle: &fixture.settlement_lifecycle,
-                receipt: &mismatched_receipt,
-                receipt_trust: fixture.account.receipt_trust(),
-                credit_facility_bind_trust: &fixture.credit_facility_bind_trust,
-                issuer_trust: &issuer_trust,
-                trusted_now_unix_ms: IOU_ISSUED_AT_MS,
-            },
-        ),
-        Err(ReceivableIouError::ReceiptVerification)
-    );
     Ok(())
 }
 
@@ -928,10 +907,13 @@ fn v2_verifier_rejects_source_receipt_key_reused_by_valid_iou_signature() -> Tes
     let signed = mint(&fixture)?;
     let mut value = serde_json::to_value(signed)?;
     let backend = Ed25519Backend::new(fixture.kernel_signer.clone());
-    let (signature, _) = sign_canonical_with_backend(&backend, &value["body"])?;
+    let (outcome, _) = sign_wrapped(
+        &backend,
+        CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
+        &value["body"],
+    )?;
     value["signerKey"] = serde_json::to_value(backend.public_key()?)?;
-    value["algorithm"] = serde_json::to_value(backend.public_key()?.algorithm())?;
-    value["signature"] = serde_json::to_value(signature)?;
+    value["signature"] = serde_json::to_value(outcome.signature)?;
     let canonical = canonical_json_bytes(&value)?;
     let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
@@ -988,10 +970,13 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
     let mut value = serde_json::to_value(signed)?;
     let backend = Ed25519Backend::new(fixture.creditor_signer.clone());
     value["body"]["issuerId"] = serde_json::json!("economy.credit.issuer");
-    let (signature, _) = sign_canonical_with_backend(&backend, &value["body"])?;
+    let (outcome, _) = sign_wrapped(
+        &backend,
+        CHIO_RECEIVABLE_IOU_ENVELOPE_V1_SCHEMA,
+        &value["body"],
+    )?;
     value["signerKey"] = serde_json::to_value(backend.public_key()?)?;
-    value["algorithm"] = serde_json::to_value(backend.public_key()?.algorithm())?;
-    value["signature"] = serde_json::to_value(signature)?;
+    value["signature"] = serde_json::to_value(outcome.signature)?;
     let canonical = canonical_json_bytes(&value)?;
     let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),

@@ -10,13 +10,12 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
 use crate::capability::governance::{
     GovernedApprovalToken, GovernedTransactionIntent, ThresholdApprovalProposal,
 };
 use crate::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use crate::capability::token::CapabilityToken;
-use crate::crypto::{PublicKey, Signature};
+use crate::crypto::{verify_wrapped, PublicKey, Signature};
 use crate::receipt::body::ChioReceipt;
 
 /// Fields that bind an execution nonce to one tool invocation.
@@ -46,6 +45,9 @@ pub struct ExecutionNonce {
 }
 
 /// Kernel-signed execution nonce carried across agent/kernel transports.
+/// Signing-wrapper schema id of a signed execution nonce.
+pub const CHIO_EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignedExecutionNonce {
     pub nonce: ExecutionNonce,
@@ -100,7 +102,13 @@ impl crate::receipt::authoritative_spend::PresentedNonceView for SignedExecution
     }
 
     fn verify_signed_by(&self, key: &PublicKey) -> bool {
-        canonical_json_bytes(&self.nonce).is_ok_and(|bytes| key.verify(&bytes, &self.signature))
+        verify_wrapped(
+            key,
+            CHIO_EXECUTION_NONCE_SCHEMA,
+            &self.nonce,
+            &self.signature,
+        )
+        .is_ok()
     }
 }
 
@@ -547,7 +555,7 @@ mod tests {
             } => {
                 assert_eq!(id, "req-001");
                 assert!(matches!(result, ToolCallResult::Ok { .. }));
-                assert!(receipt.verify_signature().unwrap());
+                assert!(receipt.verify_integrity_embedded_key().unwrap());
                 assert!(execution_nonce.is_none());
             }
             _ => panic!("wrong variant"),

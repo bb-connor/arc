@@ -45,7 +45,7 @@ use std::net::Ipv4Addr;
 
 // Build a real issuer-signed VerifiedDirectory as the membership oracle to pin
 // the production treaty-party gate.
-use crate::identity::transport_endorsement_preimage;
+use crate::identity::sign_transport_endorsement;
 use crate::identity::TransportDirectoryBundleBody;
 use crate::identity::TransportDirectoryBundleDocument;
 use crate::identity::TransportDirectoryBundleTrust;
@@ -153,10 +153,8 @@ fn party_verified_directory() -> crate::identity::VerifiedDirectory {
         kernel_id: "did:chio:alice".to_string(),
         passport_public_key: passport.public_key(),
         transport_endpoint_id: transport,
-        passport_endorsement: passport.sign(&transport_endorsement_preimage(
-            "did:chio:alice",
-            &transport,
-        )),
+        passport_endorsement: sign_transport_endorsement(&passport, "did:chio:alice", &transport)
+            .unwrap(),
         revocation_signers: Vec::new(),
         removed: false,
     };
@@ -180,7 +178,12 @@ fn party_verified_directory() -> crate::identity::VerifiedDirectory {
         issued_at_unix_ms: NOW - 1,
         expires_at_unix_ms: NOW + 1,
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = issuer
+        .sign_wrapped(
+            crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+            &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+        )
+        .unwrap();
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

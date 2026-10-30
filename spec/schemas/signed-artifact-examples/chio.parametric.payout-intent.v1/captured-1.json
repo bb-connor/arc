@@ -1,0 +1,171 @@
+{
+  "binding": {
+    "amount": {
+      "currency": "USD",
+      "units": 500
+    },
+    "beneficiaryId": "subject-1",
+    "boundCoverageBodyDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "capitalInstructionBodyDigest": "44e5607781a01f74ce81df065b448d718d67af2a355f6fefd53a3693ae73a392",
+    "capitalInstructionEnvelopeDigest": "e41ee203200760cdabc41ac13f69cc4a0a69bf070f65f1955045f17252b4bdd9",
+    "capitalInstructionId": "7dcf8957f61b6b742cac68a2c6377ae23fb172cc6c481e31dc8a65377f9a196b",
+    "capitalInstructionTemplateDigest": "742af14bfbf8e52b11294c2a7005c9cba56217e4c5913174100407549c1d466b",
+    "claimId": "8fe90f3d459a5478a0495db99578e9e703c94542ead767a58ad8710b2727d565",
+    "completionFlowRowId": "completion-1",
+    "coverageHeadDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "coverageReservationId": "5555555555555555555555555555555555555555555555555555555555555555",
+    "coverageReservationLifecycleFence": 1,
+    "coverageReservationVersion": 1,
+    "custodianAuthorityKeyEpoch": 3,
+    "effectIdempotencyKey": "a7f80d5cbadd4cf85f48ca2b81443cd6669ba1558e6f12eda0f577325811962f",
+    "effectSlot": {
+      "actionDigest": "39f698363ba4dc6e9c1cb1047f1f59b897ab6d5e9b5629ffeb08339e1bf7b924",
+      "admissionHandoff": {
+        "lifecycleFence": 2,
+        "operationVersion": 2,
+        "state": "mutation_submitted",
+        "storeFence": {
+          "lease_id": "lease-1",
+          "owner_epoch": 1,
+          "store_uuid": "store-1"
+        }
+      },
+      "anchorId": "anchor-1",
+      "effectKind": "parametric_payout",
+      "idempotencyKey": "a7f80d5cbadd4cf85f48ca2b81443cd6669ba1558e6f12eda0f577325811962f",
+      "namespace": "parametric",
+      "operationId": "6666666666666666666666666666666666666666666666666666666666666666",
+      "parametersDigest": "44e5607781a01f74ce81df065b448d718d67af2a355f6fefd53a3693ae73a392",
+      "request": {
+        "requestBindingDigest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "requestId": "request-1",
+        "requestNamespaceDigest": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      "resourceHeadDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "resourceKey": {
+        "resourceFamily": "liability_coverage",
+        "resourceId": "5555555555555555555555555555555555555555555555555555555555555555",
+        "scopeId": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "schema": "chio.economy.effect-slot.v1",
+      "slotId": "8375c9d6f925c1ef96e0f6e500ddbbc9a3bbc85a92538d96a0d7951a951e998a",
+      "state": "ready",
+      "target": {
+        "qualificationDigest": "147db431318a1b6414bea841b3e66a6be1dbcba6e1d8659d5dfa15bb4551f3e6",
+        "targetId": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+        "targetKeyEpoch": 3
+      }
+    },
+    "effectSlotId": "8375c9d6f925c1ef96e0f6e500ddbbc9a3bbc85a92538d96a0d7951a951e998a",
+    "expectedClaimVersion": 1,
+    "expectedLifecycleFence": 1,
+    "facilityAuthorityKeyEpoch": 4,
+    "fundingFacilityId": "facility-1",
+    "governedReceiptId": "receipt-1",
+    "instructionSignerKeyEpoch": 2,
+    "operationId": "6666666666666666666666666666666666666666666666666666666666666666",
+    "parametricPolicyBodyDigest": "1111111111111111111111111111111111111111111111111111111111111111",
+    "payerId": "payer-1",
+    "payoutRail": {
+      "destinationAccountDigest": "dfccf6bdb6e19dfc581f6a880ae7ce11d7c5b5de48cb43035459e6f52e8b4267",
+      "kind": "web3",
+      "railId": "rail-1"
+    },
+    "request": {
+      "requestBindingDigest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "requestId": "request-1",
+      "requestNamespaceDigest": "7777777777777777777777777777777777777777777777777777777777777777"
+    },
+    "schema": "chio.parametric.payout-binding.v1",
+    "sourceAccountDigest": "bc1c95fba21b2c511b382abb8f52e0fdc588823dc1d0b16c204304f5631e6f5c",
+    "triggerInstanceId": "8b86a7b356d8d0e52a518a3509b5ff942870ab886e3354fd78da2b6bff663287"
+  },
+  "capitalInstruction": {
+    "body": {
+      "action": "transfer_funds",
+      "amount": {
+        "currency": "USD",
+        "units": 500
+      },
+      "authorityChain": [
+        {
+          "approvedAt": 10,
+          "authorityProof": {
+            "body": {
+              "approvedAt": 10,
+              "expiresAt": 30,
+              "principalId": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d",
+              "role": "facility_provider",
+              "schema": "chio.credit.capital-authority-step-proof.v1"
+            },
+            "signature": "2aca23b908c89b7b08ffd4ef32009a20d9d08af71561b4e3248be73cb477e1e843c16564eeeb89e9fb61951c7b00227698c77fe0eca4b728c789f501cd741509",
+            "signerKey": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+          },
+          "expiresAt": 30,
+          "principalId": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d",
+          "role": "facility_provider"
+        },
+        {
+          "approvedAt": 10,
+          "authorityProof": {
+            "body": {
+              "approvedAt": 10,
+              "expiresAt": 30,
+              "principalId": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+              "role": "custodian",
+              "schema": "chio.credit.capital-authority-step-proof.v1"
+            },
+            "signature": "e2eb59bb06f2ec64a436b1472eccad1bb61a4a19d7009ade9d4b43dca06807f59b383362880e590d454410b8068d37d2b1a755c8b6c161cac242f3ae7ab8350a",
+            "signerKey": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+          },
+          "expiresAt": 30,
+          "principalId": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+          "role": "custodian"
+        }
+      ],
+      "completionFlowRowId": "completion-1",
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "description": "parametric payout",
+      "executionWindow": {
+        "notAfter": 30,
+        "notBefore": 10
+      },
+      "governedReceiptId": "receipt-1",
+      "instructionId": "7dcf8957f61b6b742cac68a2c6377ae23fb172cc6c481e31dc8a65377f9a196b",
+      "intendedState": "pending_execution",
+      "issuedAt": 10,
+      "ownerRole": "facility_provider",
+      "query": {
+        "agentSubject": "subject-1",
+        "bondLimit": 10,
+        "facilityLimit": 10,
+        "lossEventLimit": 25,
+        "receiptLimit": 100
+      },
+      "rail": {
+        "custodyProviderId": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+        "destinationAccountRef": "destination-1",
+        "jurisdiction": "US-NY",
+        "kind": "web3",
+        "railId": "rail-1",
+        "sourceAccountRef": "attacker-source"
+      },
+      "reconciledState": "not_observed",
+      "schema": "chio.credit.capital-instruction.v1",
+      "sourceId": "facility-1",
+      "sourceKind": "facility_commitment",
+      "subjectKey": "subject-1",
+      "supportBoundary": {
+        "automaticDispatchSupported": true,
+        "capitalBookAuthoritative": true,
+        "custodyNeutralInstructionSupported": true,
+        "externalExecutionAuthoritative": false
+      }
+    },
+    "signature": "c99c61c415089f2326fe1b154525227732d5c3a40385cbcb89233343d39a9e5d67205ac025d96ef2ceca2dee67653a661c79efeda2cc47d653176a302f95be0f",
+    "signerKey": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+  },
+  "payoutIntentId": "980a9449a5754a953d1e6a10330544f1046ddf90886eb3cd7f18b8464d8cb5c3",
+  "schema": "chio.parametric.payout-intent.v1"
+}

@@ -1,0 +1,66 @@
+{
+  "amount": {
+    "currency": "USD",
+    "units": 120000
+  },
+  "bond_snapshot_envelope_sha256": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  "destinations": [
+    {
+      "amount": {
+        "currency": "USD",
+        "units": 90000
+      },
+      "destination": "rail:venue-ledger:buyer-1"
+    },
+    {
+      "amount": {
+        "currency": "USD",
+        "units": 30000
+      },
+      "destination": "0xcccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "deterministic_allocation_digest": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "effect_intents": [
+    {
+      "intent_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "kind": "seller_impair"
+    },
+    {
+      "intent_id": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+      "kind": "root_intent"
+    },
+    {
+      "intent_id": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+      "kind": "retraction"
+    }
+  ],
+  "enforcement_id": "2b3409e7f613ab585d675ba7cd398486edec1054b0966891fb11221e57164461",
+  "finalization_authority_id": "venue-finalization",
+  "finalization_key": "a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f",
+  "finalization_key_epoch": 1,
+  "finalization_revocation_status_ref": "revocations/venue-finalization",
+  "finalization_valid_from": 1,
+  "finalization_valid_until": 1800000000,
+  "finalized_at": 1750100000,
+  "finding_id": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "liability_key": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "listing_id": "finding-listing-01",
+  "outcome_envelope_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "outcome_id": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  "penalty_authority_id": "market-penalty",
+  "penalty_envelope_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "penalty_key": "a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f",
+  "penalty_key_epoch": 1,
+  "penalty_revocation_status_ref": "revocations/market-penalty",
+  "penalty_valid_from": 1,
+  "penalty_valid_until": 1800000000,
+  "purchase_snapshot_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "schema": "chio.finding.challenge-enforcement.v1",
+  "seller_allocation_id": "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd",
+  "vault": {
+    "chain_id": "eip155:8453",
+    "vault_contract": "0x00000000000000000000000000000000000000bd",
+    "vault_id": "vault-42"
+  }
+}

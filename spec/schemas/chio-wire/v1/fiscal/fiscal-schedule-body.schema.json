@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-schedule-body.schema.json",
+  "title": "chio.fiscal.schedule.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "charterDigest",
+    "charterId",
+    "domain",
+    "issuedAt",
+    "issuedBy",
+    "params",
+    "scheduleId",
+    "schema",
+    "sequence",
+    "validFrom",
+    "validUntil"
+  ],
+  "properties": {
+    "charterDigest": {
+      "type": "string"
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "ceilings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "feeSchedule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bondRequirements",
+            "disputeFee",
+            "expiresAt",
+            "feeScheduleId",
+            "governingOperatorId",
+            "issuedAt",
+            "issuedBy",
+            "marketParticipationFee",
+            "namespace",
+            "publicationFee",
+            "schema",
+            "scope"
+          ],
+          "properties": {
+            "bondRequirements": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "bondClass",
+                  "collateralReferenceKind",
+                  "requiredAmount",
+                  "slashable"
+                ],
+                "properties": {
+                  "bondClass": {
+                    "type": "string"
+                  },
+                  "collateralReferenceKind": {
+                    "type": "string"
+                  },
+                  "requiredAmount": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "currency",
+                      "units"
+                    ],
+                    "properties": {
+                      "currency": {
+                        "type": "string"
+                      },
+                      "units": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "slashable": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "disputeFee": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "expiresAt": {
+              "type": "integer"
+            },
+            "feeScheduleId": {
+              "type": "string"
+            },
+            "governingOperatorId": {
+              "type": "string"
+            },
+            "issuedAt": {
+              "type": "integer"
+            },
+            "issuedBy": {
+              "type": "string"
+            },
+            "marketParticipationFee": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "publicationFee": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            },
+            "scope": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "allowedActorKinds",
+                "allowedAdmissionClasses",
+                "allowedListingOperatorIds",
+                "namespace"
+              ],
+              "properties": {
+                "allowedActorKinds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "allowedAdmissionClasses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "allowedListingOperatorIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "namespace": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "scheduleId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.schedule.v1"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "supersedesScheduleId": {
+      "type": "string"
+    },
+    "validFrom": {
+      "type": "integer"
+    },
+    "validUntil": {
+      "type": "integer"
+    }
+  }
+}

@@ -65,6 +65,7 @@ pub(crate) fn dispatch_trust(
             fiscal_anchor_timeout_seconds,
             certification_public_metadata_ttl_seconds,
             roster_policy_file,
+            capital_authority_keys,
         } => cmd_trust_serve(
             transport.into(),
             listen,
@@ -103,6 +104,7 @@ pub(crate) fn dispatch_trust(
             cluster_peer_replay_db.as_deref(),
             authority_replication_max_future_skew_seconds,
             roster_policy_file.as_deref(),
+            &capital_authority_keys,
         ),
         TrustCommands::Config { command } => match command {
             TrustConfigCommands::Check { access_config } => {
@@ -489,24 +491,28 @@ pub(crate) fn dispatch_trust(
             ),
         },
         TrustCommands::CapitalInstruction { command } => match command {
-            TrustCapitalInstructionCommands::Issue { input_file } => {
-                cmd_trust_capital_instruction_issue(
-                    &input_file,
-                    json_output,
-                    receipt_db.as_deref(),
-                    authority_seed_file.as_deref(),
-                    authority_db.as_deref(),
-                    control_url.as_deref(),
-                    control_token.as_deref(),
-                )
-            }
+            TrustCapitalInstructionCommands::Issue {
+                input_file,
+                capital_authority_keys,
+            } => cmd_trust_capital_instruction_issue(
+                &input_file,
+                json_output,
+                receipt_db.as_deref(),
+                authority_seed_file.as_deref(),
+                authority_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                &capital_authority_keys,
+            ),
         },
         TrustCommands::CapitalAllocation { command } => match command {
             TrustCapitalAllocationCommands::Issue {
                 input_file,
                 certification_registry_file,
+                capital_authority_keys,
             } => cmd_trust_capital_allocation_issue(
                 &input_file,
+                &capital_authority_keys,
                 SignedQueryBackend {
                     query: QueryBackend {
                         json_output,
@@ -769,6 +775,7 @@ pub(crate) fn dispatch_trust(
                 observed_execution_file,
                 appeal_window_ends_at,
                 description,
+                capital_authority_keys,
             } => cmd_trust_credit_loss_lifecycle_issue(
                 &bond_id,
                 &event_kind,
@@ -786,6 +793,7 @@ pub(crate) fn dispatch_trust(
                 authority_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                &capital_authority_keys,
             ),
             TrustCreditLossLifecycleCommands::List {
                 event_id,
@@ -1085,6 +1093,7 @@ pub(crate) fn dispatch_trust(
             TrustLiabilityMarketCommands::ClaimSettlementInstructionIssue {
                 input_file,
                 roster_policy_file,
+                capital_authority_keys,
             } => cmd_trust_liability_claim_settlement_instruction_issue(
                 &input_file,
                 json_output,
@@ -1094,6 +1103,7 @@ pub(crate) fn dispatch_trust(
                 roster_policy_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                &capital_authority_keys,
             ),
             TrustLiabilityMarketCommands::ClaimSettlementReceiptIssue { input_file } => {
                 cmd_trust_liability_claim_settlement_receipt_issue(

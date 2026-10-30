@@ -1,0 +1,57 @@
+{
+  "agentId": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "bidDigest": "a595e171dd0970bab4660e98d2a3adcc8aa6e90e48035dd6295225464c365eff",
+  "expiresAt": 1793195780,
+  "issuedAt": 1793192180,
+  "listingId": "listing-finding-purchase-0001",
+  "quotedPrice": {
+    "currency": "USD",
+    "units": 300
+  },
+  "schema": "chio.marketplace.ask-response.v1",
+  "tokenOffer": {
+    "expires_at": 1793195780,
+    "id": "finding-purchase-token-0001",
+    "issued_at": 1793192180,
+    "issuer": "53470962558a6e0839022ae65c6b2723b32772e5c0c5f4776cb8e6a3e10ba2f3",
+    "schema": "chio.capability.v1",
+    "scope": {
+      "grants": [
+        {
+          "constraints": [
+            {
+              "type": "output_digest_sha256",
+              "value": "4e89e34472c6a4d65141b4c8aff6dfe5c6a3feae26194127768da2d763415d2c"
+            },
+            {
+              "type": "require_finding_purchase",
+              "value": {
+                "finding_id": "eb42fce555e10ec2e99c03692a848091f08d95446a35713df6a747a413556e12",
+                "listing_id": "listing-finding-purchase-0001",
+                "settlement": {
+                  "mode": "local_reversible_hold"
+                }
+              }
+            }
+          ],
+          "max_cost_per_invocation": {
+            "currency": "USD",
+            "units": 300
+          },
+          "max_invocations": 1,
+          "max_total_cost": {
+            "currency": "USD",
+            "units": 300
+          },
+          "operations": [
+            "invoke"
+          ],
+          "server_id": "finding-server.seller.example",
+          "tool_name": "read_finding"
+        }
+      ]
+    },
+    "signature": "1e1dc34a776a850761399b2e038d8bdd58d857e93853f272949d1ceb2f4ec5d8f384bb4f02251c8ca4ecc7d185f23e5d29dccffc5f559d1800768fe2a3f21608",
+    "subject": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de"
+  }
+}

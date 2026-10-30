@@ -14,7 +14,6 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use chio_core::canonical::canonical_json_bytes;
 use chio_core::merkle::leaf_hash;
 use chio_core::Keypair;
 use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
@@ -38,7 +37,7 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
         &batch_two,
         &kp,
         Some(
-            &chio_kernel_core::evidence_verify::validate_checkpoint(&first)
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first)
                 .expect("verified predecessor"),
         ),
         &[first_leaf],
@@ -49,9 +48,21 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
         checkpoint_chain_leaf_hash(&second.body).unwrap(),
     ];
 
-    let honest = build_checkpoint_consistency_proof(&first, &second, &chain).unwrap();
+    let honest = build_checkpoint_consistency_proof(
+        &first,
+        &second,
+        &chain,
+        std::slice::from_ref(&first.body.kernel_key),
+    )
+    .unwrap();
     assert!(
-        verify_checkpoint_consistency_proof(&first, &second, &honest).unwrap(),
+        verify_checkpoint_consistency_proof(
+            &first,
+            &second,
+            &honest,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .unwrap(),
         "the honest chain extension must verify"
     );
 
@@ -60,14 +71,25 @@ fn checkpoint_consistency_proof_with_forged_chain_root_is_rejected() {
     let fabricated_root = checkpoint_chain_root(&[leaf_hash(b"fabricated-history")]).unwrap();
     let mut rewritten = second.clone();
     rewritten.body.chain_root = Some(fabricated_root);
-    rewritten.signature = kp.sign(&canonical_json_bytes(&rewritten.body).unwrap());
+    rewritten.signature = kp
+        .sign_wrapped(
+            chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&rewritten.body).unwrap(),
+        )
+        .unwrap();
 
     let mut forged = honest.clone();
     forged.to_checkpoint_sha256 = checkpoint_body_sha256(&rewritten.body).unwrap();
     forged.to_chain_root = fabricated_root;
 
     assert!(
-        !verify_checkpoint_consistency_proof(&first, &rewritten, &forged).unwrap(),
+        !verify_checkpoint_consistency_proof(
+            &first,
+            &rewritten,
+            &forged,
+            std::slice::from_ref(&first.body.kernel_key)
+        )
+        .unwrap(),
         "a chain root with no append-only relation to the predecessor must be rejected"
     );
 }

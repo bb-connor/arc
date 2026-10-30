@@ -1,0 +1,13 @@
+{
+  "attempt": 2,
+  "container_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "engine_identity": "test-engine",
+  "failed_at_unix_ms": 1000,
+  "failure_class": "profile_mismatch",
+  "image_id": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "inspected_config_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+  "process_id": "root",
+  "profile_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "schema": "chio.process.container-launch.v1",
+  "state": "rejected"
+}

@@ -1,0 +1,104 @@
+{
+  "antiEclipsePolicy": {
+    "maxUpstreamHops": 1,
+    "minimumDistinctOperators": 2,
+    "requireIndexerObservation": true,
+    "requireOriginPublisher": true
+  },
+  "finalState": "converged",
+  "generatedAt": 1743552060,
+  "listingId": "listing-liability-provider-1",
+  "maxReplicaAgeSecs": 300,
+  "namespace": "registry.chio.example/liability",
+  "note": "Requires origin plus independent mirror/indexer observation before a remote listing is treated as converged.",
+  "originOperatorId": "origin-operator",
+  "publishers": [
+    {
+      "freshness": {
+        "ageSecs": 30,
+        "generatedAt": 1743552030,
+        "maxAgeSecs": 300,
+        "state": "fresh",
+        "validUntil": 1743552360
+      },
+      "observedAt": 1743552030,
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "publisher": {
+        "operatorId": "origin-operator",
+        "operatorName": "Origin Operator",
+        "registryUrl": "https://origin.chio.example/registry",
+        "role": "origin"
+      },
+      "reportRef": {
+        "artifactId": "report-origin-1",
+        "kind": "listing_report",
+        "operatorId": "origin-operator",
+        "schema": "chio.registry.listing-report.v1",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "uri": "https://origin-operator.chio.example/artifacts/report-origin-1"
+      },
+      "upstreamHopCount": 0
+    },
+    {
+      "freshness": {
+        "ageSecs": 40,
+        "generatedAt": 1743552020,
+        "maxAgeSecs": 300,
+        "state": "fresh",
+        "validUntil": 1743552360
+      },
+      "observedAt": 1743552020,
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "publisher": {
+        "operatorId": "mirror-operator-a",
+        "operatorName": "Mirror Operator A",
+        "registryUrl": "https://mirror-a.chio.example/registry",
+        "role": "mirror",
+        "upstreamRegistryUrls": [
+          "https://origin.chio.example/registry"
+        ]
+      },
+      "reportRef": {
+        "artifactId": "report-mirror-a-1",
+        "kind": "listing_report",
+        "operatorId": "mirror-operator-a",
+        "schema": "chio.registry.listing-report.v1",
+        "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "uri": "https://mirror-operator-a.chio.example/artifacts/report-mirror-a-1"
+      },
+      "upstreamHopCount": 1
+    },
+    {
+      "freshness": {
+        "ageSecs": 45,
+        "generatedAt": 1743552015,
+        "maxAgeSecs": 300,
+        "state": "fresh",
+        "validUntil": 1743552360
+      },
+      "observedAt": 1743552015,
+      "observedListingSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "publisher": {
+        "operatorId": "indexer-operator-a",
+        "operatorName": "Indexer Operator A",
+        "registryUrl": "https://indexer-a.chio.example/registry",
+        "role": "indexer",
+        "upstreamRegistryUrls": [
+          "https://origin.chio.example/registry"
+        ]
+      },
+      "reportRef": {
+        "artifactId": "report-indexer-a-1",
+        "kind": "listing_report",
+        "operatorId": "indexer-operator-a",
+        "schema": "chio.registry.listing-report.v1",
+        "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "uri": "https://indexer-operator-a.chio.example/artifacts/report-indexer-a-1"
+      },
+      "upstreamHopCount": 1
+    }
+  ],
+  "quorumThreshold": 2,
+  "reportId": "fqr-1",
+  "schema": "chio.federation-quorum-report.v1"
+}

@@ -1,0 +1,19 @@
+{
+  "attesterId": "attester-a",
+  "continuityRef": "continuity-a",
+  "expiresAt": 1710000200,
+  "fromIssuer": "did:chio:70df9e2279adbec6d12bf2921184c9222eb24ed852005bf640139f52e59cd9ae",
+  "fromSubject": "did:chio:d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "issuedAt": 1710000090,
+  "migrationDigest": "3d1c740b8251337ac18b01df069c817832306e67a541894a11848a07cbe4949b",
+  "migrationId": "migration-b",
+  "priorSourcePassportIds": [
+    "0101010101010101010101010101010101010101010101010101010101010101"
+  ],
+  "reason": "rotation",
+  "schema": "chio.financial.cross-issuer-migration.v1",
+  "signerKeyEpoch": 9,
+  "signerKeyId": "migration-key",
+  "toIssuer": "did:chio:e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+  "toSubject": "did:chio:772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef"
+}

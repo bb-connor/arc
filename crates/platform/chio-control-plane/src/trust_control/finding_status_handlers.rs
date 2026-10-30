@@ -86,6 +86,14 @@ struct FindingStatusIntentSubmission {
 
 type SignedFindingStatusIntentSubmission = SignedExportEnvelope<FindingStatusIntentSubmission>;
 
+impl chio_core::receipt::lineage::SignedExportPayload for FindingVoluntaryRetractionReceipt {
+    const SCHEMA_ID: &'static str = FINDING_VOLUNTARY_RETRACTION_RECEIPT_SCHEMA;
+}
+
+impl chio_core::receipt::lineage::SignedExportPayload for FindingStatusIntentSubmission {
+    const SCHEMA_ID: &'static str = FINDING_STATUS_INTENT_SCHEMA;
+}
+
 #[derive(serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 struct FindingStatusRootResponse {
@@ -499,7 +507,7 @@ fn validate_intent_submission(
             "voluntary retraction source receipt bindings are invalid",
         ));
     }
-    if !matches!(source.verify_signature(), Ok(true)) {
+    if !matches!(source.verify_signature(&source.signer_key), Ok(true)) {
         return Err(plain_http_error(
             StatusCode::UNAUTHORIZED,
             "voluntary retraction source receipt signature is invalid",
@@ -955,6 +963,7 @@ fn service_state(
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
+            capital_authority: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: Some(market),
         },

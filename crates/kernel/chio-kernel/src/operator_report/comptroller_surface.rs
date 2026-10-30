@@ -114,6 +114,10 @@ impl ComptrollerSurfaceReport {
     }
 }
 
+impl chio_core::receipt::lineage::SignedExportPayload for ComptrollerSurfaceReport {
+    const SCHEMA_ID: &'static str = COMPTROLLER_SURFACE_REPORT_SCHEMA;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

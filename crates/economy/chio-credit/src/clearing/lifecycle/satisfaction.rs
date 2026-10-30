@@ -218,7 +218,7 @@ pub fn compose_clearing_satisfaction_transition(
     )?;
     if expected != *body
         || signed_satisfaction.signer_key != trust.obligation_authority_key
-        || !signed_satisfaction.verify_signature()?
+        || !signed_satisfaction.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }

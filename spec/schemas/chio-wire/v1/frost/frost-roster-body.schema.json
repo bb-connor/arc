@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/frost/frost-roster-body.schema.json",
+  "title": "chio.frost.roster.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowedDomains",
+    "authorityScope",
+    "ceremonyTranscriptDigest",
+    "groupPublicKey",
+    "keyEpoch",
+    "keyOrigin",
+    "participantCount",
+    "participants",
+    "rosterAuthorityKeyId",
+    "rosterId",
+    "schema",
+    "scopeId",
+    "suiteId",
+    "threshold",
+    "validFrom",
+    "validUntil"
+  ],
+  "properties": {
+    "allowedDomains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authorityScope": {
+      "type": "string"
+    },
+    "ceremonyTranscriptDigest": {
+      "type": "string"
+    },
+    "groupPublicKey": {
+      "type": "string"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "keyOrigin": {
+      "type": "string"
+    },
+    "participantCount": {
+      "type": "integer"
+    },
+    "participants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "participantId",
+          "verificationShare"
+        ],
+        "properties": {
+          "participantId": {
+            "type": "string"
+          },
+          "verificationShare": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "predecessorRosterDigest": {
+      "type": "string"
+    },
+    "rosterAuthorityKeyId": {
+      "type": "string"
+    },
+    "rosterId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.frost.roster.v1"
+    },
+    "scopeId": {
+      "type": "string"
+    },
+    "suiteId": {
+      "type": "string"
+    },
+    "threshold": {
+      "type": "integer"
+    },
+    "validFrom": {
+      "type": "integer"
+    },
+    "validUntil": {
+      "type": "integer"
+    }
+  }
+}

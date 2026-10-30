@@ -284,3 +284,7 @@ pub fn verify_signed_admission(
     }
     crate::envelope::verify_pinned_envelope(signed, pinned_venue_authority, "admission")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingAdmission {
+    const SCHEMA_ID: &'static str = FINDING_ADMISSION_SCHEMA_V1;
+}

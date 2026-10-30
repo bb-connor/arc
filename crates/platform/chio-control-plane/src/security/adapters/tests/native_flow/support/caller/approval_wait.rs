@@ -170,7 +170,7 @@ impl ParkedApproval {
             "{:?}",
             parked.reason
         );
-        assert!(parked.receipt.verify_signature()?);
+        assert!(parked.receipt.verify_integrity_embedded_key()?);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
         let Some(chio_kernel::ToolCallOutput::Value(value)) = parked.output else {
             return Err("pending approval proposal".into());
@@ -482,7 +482,7 @@ fn deliver_approved(window: NonceWindow) -> TestResult {
     assert!(
         matches!(&completed.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &executed.report.report.output)
     );
-    assert!(completed.receipt.verify_signature()?);
+    assert!(completed.receipt.verify_integrity_embedded_key()?);
     assert!(completed.execution_nonce.is_none());
     assert_retained_horizon_is_exact(
         &parked, window, &evidence, &operation, &original, &nonce, &frame,
@@ -730,7 +730,7 @@ impl Refusal {
     fn observed(result: &Result<chio_kernel::ToolCallResponse, KernelError>) -> TestResult<Self> {
         Ok(match result {
             Ok(response) => {
-                if !response.receipt.verify_signature()? {
+                if !response.receipt.verify_integrity_embedded_key()? {
                     return Err("refusal receipt signature is invalid".into());
                 }
                 Self::Denied {

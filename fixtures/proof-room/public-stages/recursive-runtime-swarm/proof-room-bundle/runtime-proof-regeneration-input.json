@@ -1,28 +1,28 @@
 {
   "schema": "chio.runtime.proof-regeneration-input.v1",
   "runId": "runtime-loopback-1",
-  "evidenceManifestSha256": "80ba31a6a6feb6625cb30d0f67ea5dacd90ca9354e4fab1937fa07bd96905e2a",
-  "workflowRunReportSha256": "87fa58f99e678018c70b8b2dfa2d5956a17903a89d4ace669676eab16af1e51c",
-  "trustBundleSha256": "d8eeda883ce021ca9f4642c16249f8aa42d7aaa14d71dd770c89880fd7c3228e",
+  "evidenceManifestSha256": "415fb0c72b9c611faf26ad19fce1ad2dc96a61738913631cd8a8ad4165dcb9ed",
+  "workflowRunReportSha256": "fdd6bc959bc70258fd317a94acf497e2dff3f1ad5d29b9e19eda5ca34e720329",
+  "trustBundleSha256": "32f6e8402970734e1837e60d7b3af51746c28ac58084682db102b649db6c1d63",
   "verificationContextSha256": "4758a93f2dbc16256105ce6d47a4efdd39d477733dcb2a5e80075a3e1aaddcce",
   "sourceRecords": [
     {
       "stepIndex": 0,
-      "toolReceiptSha256": "ce73cf17406ccdb979aa3a78dd337a2c6fc3ea19a5297b4bf5282332538877a0",
-      "bilateralDsseSha256": "8ced14baf403a311ec5be60dcf035b20bace01b0eaa4a713dcff15aa845b5a46",
-      "workflowStepSha256": "f89dd97c8c5eb6e8329e896911d8714b533fee87234691edfb5a0aa2bf2ffeaa"
+      "toolReceiptSha256": "5c697fe3b4cf982ff1e23ec5486b5e99ad131d133082e58b62faadbaa7b8b960",
+      "bilateralDsseSha256": "8d267b1ad67870f0427605b116e56746369b8d9b0764e61a87fd1c31d29d1ab1",
+      "workflowStepSha256": "da7367a3c4c33d151700d2587596ffecc3eeef74d2161973ffb6281d390089e6"
     },
     {
       "stepIndex": 1,
-      "toolReceiptSha256": "26f2755f30e22cc74f7ce1678f6d61cc6eda51f9dc5be48a47ba75f04cca2617",
-      "bilateralDsseSha256": "a74fa0e7768fc9aa986648fe14f379826d2dc26618bdda39cd835a6382bceb7a",
-      "workflowStepSha256": "ebc2d9edfb63f45158fb86d69e7bfadae0adf81492b7401f086cb8d29cf5bf65"
+      "toolReceiptSha256": "6a41e9ecba8dcb96a380627ddf024084aea5ae0170e5c735268ae42f470891c0",
+      "bilateralDsseSha256": "d01a3b797cece3d92fe3030e11872626136e8d7fc752b33ec9a1786dbb3512fb",
+      "workflowStepSha256": "1cf19fae17bd1b005959efdc06b679e2a53ae7a22cb09ef86c0022e27803787b"
     },
     {
       "stepIndex": 2,
-      "toolReceiptSha256": "9313836647f2ddb7100e3d10b93e3128af38bc6eaac8a0523ab6267001c94d73",
-      "bilateralDsseSha256": "2041463551de3bb92e3839cce564f2678f770e6f63031170b6f8eb02a49dfe01",
-      "workflowStepSha256": "8615d0d37e6a832eb23d26cf846fdb1caa6fb957f9c41e5cbee70a7b270cbc03"
+      "toolReceiptSha256": "0f807495c65fae2d6794d7b4e196b3ba6a46842b8f8e8207e5682a77bfe97903",
+      "bilateralDsseSha256": "099001e3734d0ba748af80c9993b4bee0102a71b754af66129c694fbfbbbc567",
+      "workflowStepSha256": "f8e631d501e838a72f08b3f0d55fdd488400380e0f1681b96d212584474337f0"
     }
   ]
 }

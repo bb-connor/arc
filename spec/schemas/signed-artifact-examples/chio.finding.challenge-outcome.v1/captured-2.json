@@ -1,0 +1,33 @@
+{
+  "audit_epoch_envelope_sha256": "a220372d821453ef42090d472744a852ef1d4317df6bd075668f3cf0d1d30243",
+  "authorization": "venue_audit",
+  "backing_allocation_id": "9de1fce0b7a07a080f8ccbf37514930142bf0897c4537ce94868aa01861e2be1",
+  "challenge_envelope_sha256": "bc394108e9ace60e4afe9a72ce2040d38e5cdefef612ed0ddd54287c695f02ef",
+  "evaluated_at": 1750000002,
+  "evaluator_authority_id": "challenge-evaluator",
+  "evaluator_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "evaluator_key_epoch": 1,
+  "evaluator_revocation_status_ref": "revocations/finding-market",
+  "evaluator_valid_from": 1,
+  "evaluator_valid_until": 9007199254740991,
+  "evidence_bundle_digest": "0f1aed6bc6d7cc4ae4e60b1a39d49c0e40ef84360419848dc3d593a5c281458a",
+  "evidence_kind": "evidence_invalid",
+  "facet": {
+    "evidence_invalid": {
+      "challenged_receipt_ids": [
+        "7238c9a343d8dbabacedf8ec6528658490ea38dc4d5fb2a5126e4c4114a9fbbd",
+        "54cfa6905c19f2bb08b495e4224c804c3adc9d950845516d990dc27d71abfc60"
+      ],
+      "invalidity": "inputs_unavailable"
+    }
+  },
+  "finding_id": "4546b5252e9b3ee87bd38c9348683715b885b0e3fd8fab7cb04f3a8d84435daa",
+  "listing_id": "listing-42",
+  "outcome_id": "28aab16d051875c32f4d08eae57e68a25545a5fca30a5c6fe84be202cf9bd2be",
+  "reason": "evidence_key_revocation_not_established",
+  "retry_deadline": 1750996400,
+  "schema": "chio.finding.challenge-outcome.v1",
+  "trigger_digest": "fa40da39887e33697d35bbc3daa713ee9b35c20d5f5b52888cc6d2470b0b1318",
+  "verdict": "indeterminate",
+  "verifier_profile_envelope_sha256": "90fb45c0aeb5a849868d4a2381dff27806cfb0efa09ad91b98ac94c96b762e07"
+}

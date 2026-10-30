@@ -14,7 +14,7 @@ use fips204::traits::{KeyGen, SerDes, Signer, Verifier};
 use rand_core::OsRng;
 
 use crate::crypto::{
-    PublicKey, Signature, SigningAlgorithm, SigningBackend, HYBRID_ED25519_MLDSA65,
+    PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningMessage, HYBRID_ED25519_MLDSA65,
     HYBRID_P256_MLDSA65, HYBRID_P384_MLDSA65, ML_DSA_65_PUBLIC_KEY_LEN, ML_DSA_65_SIGNATURE_LEN,
 };
 use crate::error::{Error, Result};
@@ -81,15 +81,16 @@ impl MlDsa65Backend {
     }
 
     /// Produce a randomized ML-DSA-65 signature over `message`.
-    pub fn sign_bytes(&self, message: &[u8]) -> Result<Vec<u8>> {
+    pub fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Vec<u8>> {
         let signature = self
             .private_key
-            .try_sign_with_rng(&mut OsRng, message, &[])
+            .try_sign_with_rng(&mut OsRng, message.as_bytes(), &[])
             .map_err(|e| Error::InvalidSignature(format!("ML-DSA-65 sign failed: {e}")))?;
         Ok(signature.to_vec())
     }
 
     /// Produce a deterministic ML-DSA-65 signature for KAT replay.
+    #[cfg(any(test, feature = "pq-kat"))]
     pub fn sign_bytes_with_seed(&self, message: &[u8], seed: &[u8; 32]) -> Result<Vec<u8>> {
         #[allow(deprecated)]
         let signature = ml_dsa_65::_internal_sign(&self.private_key, message, &[], *seed)
@@ -162,7 +163,7 @@ impl SigningBackend for HybridBackend {
         Ok(self.public_key.clone())
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
         let classical = self.classical.sign_bytes(message)?;
         let pq = self.pq.sign_bytes(message)?;
         Signature::from_hybrid_parts(classical, &pq, self.alg_set)

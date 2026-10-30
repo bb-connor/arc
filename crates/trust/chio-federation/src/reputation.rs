@@ -94,6 +94,12 @@ pub struct FederatedReputationClearingArtifact {
 pub type SignedFederatedReputationClearing =
     SignedExportEnvelope<FederatedReputationClearingArtifact>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for FederatedReputationClearingArtifact
+{
+    const SCHEMA_ID: &'static str = CHIO_FEDERATION_REPUTATION_CLEARING_SCHEMA;
+}
+
 pub fn validate_federated_reputation_clearing(
     clearing: &FederatedReputationClearingArtifact,
 ) -> Result<(), FederationContractError> {

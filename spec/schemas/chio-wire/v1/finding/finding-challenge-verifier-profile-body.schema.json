@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-challenge-verifier-profile-body.schema.json",
+  "title": "chio.finding.challenge-verifier-profile.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allowed_predicates",
+    "allowed_runner_manifests",
+    "bbs_projection_issuer",
+    "checkpoint_logs",
+    "expires_at",
+    "failed_delivery_authority",
+    "governance_authority",
+    "issued_at",
+    "operator",
+    "predicate_engine",
+    "profile_id",
+    "purchase_authority",
+    "receipt_signers",
+    "required_facets",
+    "required_receipt_semantics",
+    "resolver_policy_ref",
+    "resource_caps",
+    "retention_policy_ref",
+    "schema",
+    "verifier_report_signer"
+  ],
+  "properties": {
+    "allowed_predicates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "allowed_runner_manifests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bbs_projection_issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer_fingerprint",
+        "key_epoch",
+        "key_hex",
+        "registry_ref",
+        "revocation_status_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "issuer_fingerprint": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "key_hex": {
+          "type": "string"
+        },
+        "registry_ref": {
+          "type": "string"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "checkpoint_logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "log_id",
+          "signer"
+        ],
+        "properties": {
+          "log_id": {
+            "type": "string"
+          },
+          "signer": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority_id",
+              "key",
+              "key_epoch",
+              "revocation_status_ref",
+              "rotation_policy_ref",
+              "valid_from",
+              "valid_until"
+            ],
+            "properties": {
+              "authority_id": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "key_epoch": {
+                "type": "integer"
+              },
+              "revocation_status_ref": {
+                "type": "string"
+              },
+              "rotation_policy_ref": {
+                "type": "string"
+              },
+              "valid_from": {
+                "type": "integer"
+              },
+              "valid_until": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "failed_delivery_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "governance_authority": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "operator": {
+      "type": "string"
+    },
+    "predicate_engine": {
+      "type": "string"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "purchase_authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "receipt_signers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "policy",
+          "role"
+        ],
+        "properties": {
+          "policy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority_id",
+              "key",
+              "key_epoch",
+              "revocation_status_ref",
+              "rotation_policy_ref",
+              "valid_from",
+              "valid_until"
+            ],
+            "properties": {
+              "authority_id": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "key_epoch": {
+                "type": "integer"
+              },
+              "revocation_status_ref": {
+                "type": "string"
+              },
+              "rotation_policy_ref": {
+                "type": "string"
+              },
+              "valid_from": {
+                "type": "integer"
+              },
+              "valid_until": {
+                "type": "integer"
+              }
+            }
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "required_facets": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_receipt_semantics": {
+      "type": "string"
+    },
+    "resolver_policy_ref": {
+      "type": "string"
+    },
+    "resource_caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_evidence_receipts",
+        "max_memory_bytes",
+        "max_recipe_bytes",
+        "max_runtime_secs"
+      ],
+      "properties": {
+        "max_evidence_receipts": {
+          "type": "integer"
+        },
+        "max_memory_bytes": {
+          "type": "integer"
+        },
+        "max_recipe_bytes": {
+          "type": "integer"
+        },
+        "max_runtime_secs": {
+          "type": "integer"
+        }
+      }
+    },
+    "retention_policy_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.challenge-verifier-profile.v1"
+    },
+    "verifier_report_signer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

@@ -251,7 +251,10 @@ impl SigningBackend for FailingSigner {
         Ok(self.key.public_key())
     }
 
-    fn sign_bytes(&self, _: &[u8]) -> Result<Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        _: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<Signature, chio_core::Error> {
         Err(chio_core::Error::InvalidSignature(
             "injected tripwire signing failure".to_string(),
         ))

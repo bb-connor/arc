@@ -1,0 +1,19 @@
+{
+  "attenuationDecision": "accepted",
+  "bridgeId": "mcp",
+  "candidateSetDigest": "204139abcfee74f760940a1ac2df63998e5fe4ba08308489f61d3ab564b2e070",
+  "egressConstraints": [
+    "deny-private-network"
+  ],
+  "egressContractId": "mcp:egress-contract-task-root",
+  "expiresAtUnixMs": 1800003600000,
+  "graphId": "swarm-graph-runtime",
+  "issuer": "did:chio:43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "policyDigest": "58d22090b2dce8548331cb3c08cfb28db25dba53978f558c2356b76460a4b44a",
+  "protocolTarget": "mcp://provider-runtime",
+  "registrySnapshotHash": "0ee0f0bb64339ae3137d399d922ed6d6c3a55b1afd1066b3dbe482b3281c0c2b",
+  "routePlanId": "route-root",
+  "schema": "chio.swarm.route-plan-receipt.v1",
+  "selectedRoute": "mcp:task-root",
+  "taskId": "task-root"
+}

@@ -60,12 +60,12 @@ fn request(nonce: &str) -> MintRequest {
 /// - empty signatures NEVER verify,
 /// - audience must match,
 /// - now < exp,
-/// - signature verifies under issuer public key over signing_message.
+/// - signature verifies under issuer public key over signing_body.
 mod kernel_shim {
     use chio_core_types::crypto::{PublicKey, Signature};
     use chio_custody_hw::capability::PasskeyCapability;
     use chio_custody_hw::error::CustodyError;
-    use chio_custody_hw::mint::signing_message;
+    use chio_custody_hw::mint::signing_body;
     use chrono::{DateTime, Utc};
 
     pub struct KernelVerifier {
@@ -84,10 +84,17 @@ mod kernel_shim {
             }
             cap.require_audience(&self.audience)?;
             cap.require_live(now)?;
-            let message = signing_message(cap)?;
+            let message = signing_body(cap)?;
             let signature = Signature::from_hex(&cap.signature)
                 .map_err(|err| CustodyError::AssertionRejected(format!("hex decode: {err}")))?;
-            if !self.issuer_public_key.verify(&message, &signature) {
+            if chio_core_types::crypto::verify_wrapped_bytes(
+                &self.issuer_public_key,
+                chio_custody_hw::PASSKEY_CAPABILITY_SCHEMA,
+                &message,
+                &signature,
+            )
+            .is_err()
+            {
                 return Err(CustodyError::AssertionRejected("bad signature".into()));
             }
             Ok(())

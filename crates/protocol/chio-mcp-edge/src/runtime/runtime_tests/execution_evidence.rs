@@ -76,7 +76,7 @@ fn execution_evidence_is_advertised_and_binds_real_kernel_result() {
     assert_eq!(evidence["outputKind"], "value");
     assert_eq!(evidence["terminalState"], "completed");
     assert_eq!(receipt.kernel_key, signer.public_key());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.capability_id, capability_id);
     assert_eq!(receipt.tool_server, "srv");
     assert_eq!(receipt.tool_name, "read_file");
@@ -106,7 +106,7 @@ fn execution_evidence_is_advertised_and_binds_real_kernel_result() {
     let mut substituted = receipt.clone();
     substituted.metadata.as_mut().unwrap()["receipt_context"]["request_id"] =
         json!("another-request");
-    assert!(!substituted.verify_signature().unwrap());
+    assert!(!substituted.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn execution_evidence_overwrites_upstream_metadata_and_preserves_hash_preimage()
         let receipt: ChioReceipt = serde_json::from_value(evidence["receipt"].clone()).unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         assert_eq!(evidence["output"], output);
-        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.verify_integrity_embedded_key().unwrap());
         assert_eq!(
             receipt.content_hash,
             sha256_hex(&canonical_json_bytes(&output).unwrap())
@@ -164,7 +164,7 @@ fn execution_evidence_reports_kernel_denial_without_invoking_or_exposing_output(
     assert_eq!(evidence["outputKind"], "none");
     assert!(evidence["output"].is_null());
     assert_eq!(receipt.kernel_key, signer.public_key());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(matches!(receipt.decision, Some(Decision::Deny { .. })));
     assert!(!response.to_string().contains("must not be read"));
 }
@@ -194,7 +194,7 @@ fn execution_evidence_does_not_project_streams_as_verified_values() {
     let receipt: ChioReceipt = serde_json::from_value(evidence["receipt"].clone()).unwrap();
     assert_eq!(evidence["outputKind"], "stream");
     assert!(evidence["output"].is_null());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_ne!(receipt.content_hash, sha256_hex(b"null"));
 }
 

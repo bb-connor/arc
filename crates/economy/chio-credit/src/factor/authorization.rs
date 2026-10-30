@@ -323,7 +323,7 @@ pub fn verify_assignment_bind_authorization(
         || signed.0.signer_key != context.trust.authority_key
         || !signed
             .0
-            .verify_signature()
+            .verify_signature(&signed.0.signer_key)
             .map_err(|error| FactorError::Canonicalization(error.to_string()))?
     {
         return Err(FactorError::AuthorityVerification);
@@ -696,8 +696,10 @@ impl AssignmentAgreementSignatureV1 {
     ) -> Result<Self, FactorError> {
         validate_text("agreement_party_id", &party_id)?;
         validate_positive("agreement_party_key_epoch", party_key_epoch)?;
-        let (signature, _) = signer
-            .sign_canonical(body)
+        let signature = CanonicalBytes::from_serializable(body)
+            .and_then(|canonical| {
+                signer.sign_wrapped(FACTOR_ASSIGNMENT_AGREEMENT_SCHEMA, &canonical)
+            })
             .map_err(|error| FactorError::Canonicalization(error.to_string()))?;
         Ok(Self {
             party_id,
@@ -708,9 +710,16 @@ impl AssignmentAgreementSignatureV1 {
     }
 
     fn verify(&self, body: &AssignmentAgreementBodyV1) -> Result<bool, FactorError> {
-        self.signer_key
-            .verify_canonical(body, &self.signature)
-            .map_err(|error| FactorError::Canonicalization(error.to_string()))
+        match verify_wrapped(
+            &self.signer_key,
+            FACTOR_ASSIGNMENT_AGREEMENT_SCHEMA,
+            body,
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core_types::Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(FactorError::Canonicalization(error.to_string())),
+        }
     }
 
     fn digest(&self) -> Result<String, FactorError> {
@@ -1078,4 +1087,8 @@ impl VerifiedAssignmentAuthorizationSetV1 {
     pub(crate) fn ensure_current(&self, trusted_now_unix_ms: u64) -> Result<(), FactorError> {
         self.bind_authorization.ensure_current(trusted_now_unix_ms)
     }
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AssignmentBindAuthorizationBodyV1 {
+    const SCHEMA_ID: &'static str = FACTOR_ASSIGNMENT_BIND_AUTHORIZATION_SCHEMA;
 }

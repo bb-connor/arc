@@ -78,7 +78,7 @@ pub use admission::{
     FINDING_ADMISSION_SCHEMA_V1,
 };
 pub use audit_epoch::{
-    audit_seed_witness_signing_bytes, compute_audit_epoch_id, derive_audit_seed_commitment,
+    compute_audit_epoch_id, derive_audit_seed_commitment, sign_audit_seed_witness,
     verify_signed_audit_epoch, FindingAuditEpoch, SignedFindingAuditEpoch,
     FINDING_AUDIT_EPOCH_SCHEMA_V1, MAX_PUBLISHED_RATE_BPS,
 };
@@ -195,10 +195,10 @@ pub use status::{
     FindingStatusFreshnessPolicy, FindingStatusInclusionProofInput,
     FindingStatusNonInclusionProofInput, FindingStatusOperatorAuthorization,
     FindingStatusOperatorRole, FindingStatusProofInput, FindingStatusValue,
-    SignedFindingStatusEpoch, FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
-    FINDING_STATUS_SIGNATURE_DOMAIN, MAX_FINDING_STATUS_ANCHOR_REFS,
-    MAX_FINDING_STATUS_ENCODED_BYTES, MAX_FINDING_STATUS_EPOCH_BYTES,
-    MAX_FINDING_STATUS_PROOF_BYTES,
+    SignedFindingStatusEpoch, FINDING_STATUS_EPOCH_SCHEMA_V1,
+    FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1, FINDING_STATUS_PROOF_INPUT_SCHEMA_V1,
+    MAX_FINDING_STATUS_ANCHOR_REFS, MAX_FINDING_STATUS_ENCODED_BYTES,
+    MAX_FINDING_STATUS_EPOCH_BYTES, MAX_FINDING_STATUS_PROOF_BYTES,
 };
 pub use status_admission::{
     decide_finding_status, FindingStatusAdmissionError, FindingStatusAdmissionRequest,

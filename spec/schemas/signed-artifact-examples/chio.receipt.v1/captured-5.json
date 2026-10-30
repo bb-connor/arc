@@ -1,0 +1,199 @@
+{
+  "body": {
+    "action": {
+      "parameter_hash": "7e9430c1a62e1bf920068a52dd3e91fe3be0ff07986b3a26e2ef908063dc0f1b",
+      "parameters": {
+        "record": "vendor-ledger-7",
+        "value": "closed"
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "cap-live-1",
+    "content_hash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+    "decision": {
+      "reason": "execution nonce preflight requires retry with presented nonce",
+      "verdict": "incomplete"
+    },
+    "kernel_key": "4b9e7e5689eb550095b5331c5396ab9b9b771ebac043f0ed350049588fa4d2ee",
+    "metadata": {
+      "attribution": {
+        "delegation_depth": 0,
+        "grant_index": 0,
+        "issuer_key": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+        "subject_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565"
+      },
+      "budget_authority": {
+        "authority": {
+          "authority_id": "01a182e6-3876-70e1-86f7-42287f25b8db",
+          "lease_epoch": 1,
+          "lease_id": "01a182e6-3bf8-7b62-89ca-0f913c9bee05"
+        },
+        "authority_profile": "authoritative_hold_event",
+        "authorize": {
+          "budget_commit_index": 1,
+          "committed_cost_units_after": 0,
+          "event_id": "nonce-preflight-authorize:ed752d1e8a3334d8df7dd8078fd32f4496298c08da8f1403391088d94defda22:0",
+          "exposure_units": 0
+        },
+        "budget_term": "01a182e6-3876-70e1-86f7-42287f25b8db:1",
+        "cleanup_custody": "fresh",
+        "guarantee_level": "single_node_atomic",
+        "hold_id": "nonce-preflight-hold:ed752d1e8a3334d8df7dd8078fd32f4496298c08da8f1403391088d94defda22:0",
+        "metering_profile": "max_cost_preauthorize_then_reconcile_actual",
+        "terminal": {
+          "budget_commit_index": 2,
+          "committed_cost_units_after": 0,
+          "disposition": "reversed",
+          "event_id": "nonce-preflight-authorize:ed752d1e8a3334d8df7dd8078fd32f4496298c08da8f1403391088d94defda22:0:rollback:1",
+          "exposure_units": 0,
+          "realized_spend_units": 0
+        }
+      },
+      "chio_receipt_signing_nonce": "rcpt-01a182e6-3f3a-7422-b955-10177781aa31",
+      "chio_runtime": {
+        "accepted": true,
+        "admission_id": "adm-live-1",
+        "destructive": true,
+        "failure_code": null,
+        "federation_treaty_dsse": {
+          "capability_lease_ref": {
+            "expires_at_unix_ms": 1800003600000,
+            "issuer": "kernel.buyer",
+            "lease_id": "lease-live-1"
+          },
+          "consistency_anchor": "anchor-live",
+          "consistency_model": "totally-ordered",
+          "cross_org_visibility": "treaty_only",
+          "governance_receipt_ref": {
+            "digest": {
+              "alg": "sha256",
+              "value": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+            },
+            "kernel_id": "kernel.vendor-b",
+            "receipt_id": "gov-live-1"
+          },
+          "policy_evaluation_summary": {
+            "joint_disposition": "allow",
+            "server_a_verdict": {
+              "policy_id": "policy-buyer",
+              "policy_version": "v1",
+              "verdict": "allow"
+            },
+            "server_b_verdict": {
+              "policy_id": "policy-vendor",
+              "policy_version": "v1",
+              "verdict": "allow"
+            }
+          },
+          "treaty_binding_ref": {
+            "action_class_id": "workflow.destructive.vendor_call",
+            "admission_report_sha256": "0ca0857bf87ec563f4234a81171b4a619527c76292e1e444afa703a91382fc1d",
+            "consistency_model": "totally-ordered",
+            "continuation_sha256": "8a96add7d2645b7f5d32b54b9dd13e7c86a3adfebc1e185f58928196069b6720",
+            "governance_refs": [
+              "gov-live-1"
+            ],
+            "ladder_intersection_sha256": "8b3a8c08b13f184450f7fb62b538c6dfdb726372261add05a0305b6222443181",
+            "lease_refs": [
+              "lease-live-1"
+            ],
+            "lineage_bundle_sha256": "19766bfba8455bea5461e74de5056c270fde6268e370d5a057ac000dc58af073",
+            "local_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+            "outcome_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+            "remote_receipt_sha256": "ff708c8b90384153ecce2fb55c165f40cd61300f8103a23e17c05f5a4ab39273",
+            "request_sha256": "7e9430c1a62e1bf920068a52dd3e91fe3be0ff07986b3a26e2ef908063dc0f1b",
+            "signer_kernel_ids": [
+              "kernel.buyer",
+              "kernel.vendor-b"
+            ],
+            "treaty_id": "treaty-buyer-vendor",
+            "treaty_scope_sha256": "a987b95693a8443470e39a29bc315f5aa2d59d01db59ecfec2e15dc0f984fee8"
+          }
+        },
+        "governance_receipt_id": "gov-live-1",
+        "lease_id": "lease-live-1",
+        "operation_owned_replay": {
+          "bundle_sha256": "84a52a8bee9f5cbd027330d96fe2bf9aa0cb71607b14ee59c6f3e138a6bff8f5",
+          "plan_sha256": "bfbc25b063ac3b60b07e8e20d59c153cf7727a8e1a7c3cebb218104a8df30f42",
+          "reference": {
+            "claimDigest": "5f84afee450e1e74309bd6fc5610ab9ed0996e9ea01ab2ae7ee652506747a80f",
+            "episodeId": "01a182e6-3da9-7291-b3b3-4c031acd8872",
+            "operationId": "a9cff86c146f3e524e359628b303708ab1147e03615226d16fbdb5096ed2afe1"
+          },
+          "resources_sha256": "30a1933ff21aa31c3163cc506760c4d0650ccbbf9d83c1aad0bdad0870dd95ad",
+          "swarm_evidence_sha256": "ecb456acea6981e5cd71e2be9d1d21e9561c44eeebb2d7664468e4dfacca4a44",
+          "treaty_evidence_sha256": "7f04f9e9e4c367eadb9b8c9b7c2b402d62f9f2699e54cf1436d64cf5d18a1a34"
+        },
+        "pheromone_advisory": {
+          "accepted": true,
+          "distinctOriginPairs": 1,
+          "evaluatedAtUnixMs": 1800000001000,
+          "observeOnly": true,
+          "reputationEpoch": 7,
+          "sourceReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+          "subjectClass": "workflow.destructive_step",
+          "subjectClassNamespace": "chio.runtime",
+          "totalStrength": 0.1
+        },
+        "pheromone_policy_decision": {
+          "decision": "allow",
+          "enforced": true,
+          "peerWeightsSha256": "76d0e582d1073a18fe175c9841bd36f77535763d9f956dd15b707c969b07607a",
+          "policyId": "policy-runtime-risk",
+          "policySha256": "057d34bda50e239a86d871dcc68fdf37288733854638b3b43e69db488e682b4b",
+          "queryReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+          "reasonCode": "runtime_pheromone_policy_allow",
+          "reputationEpoch": 7,
+          "schema": "chio.runtime.pheromone-policy-decision.v1"
+        },
+        "step_index": 1,
+        "trust_bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "verification_context_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "verified_swarm_request_binding": {
+          "capability_sha256": "16f9c1f7746f283806f598f179f6dc136ccb56f825cf14d41aab7f351b6b848b",
+          "evidence_refs_sha256": "11b1e74141556b831a260059dda2cc260951af3316245a22473573cc55b126a7",
+          "graph_id": "swarm-graph-runtime",
+          "scope_sha256": "5b5e3fdf3c7243180df7a0826a2c487ff4bb023711d091f80b2f67c49efb13e7",
+          "task_id": "task-child-a"
+        },
+        "verified_swarm_route_metadata": {
+          "route": {
+            "bridge": "mcp",
+            "protocolTarget": "mcp://provider-runtime",
+            "selectedRoute": "mcp:task-child-a"
+          }
+        },
+        "workflow_grant_id": "grant-live-1",
+        "workflow_id": "wf-live-1"
+      },
+      "execution_nonce": {
+        "stage": "preflight",
+        "tool_dispatched": false
+      },
+      "governed_transaction": {
+        "intent_hash": "dcf059a08473480e560c7a33a4caed12b89db31fecd6f9d8f88188901d2975e8",
+        "intent_id": "intent-live-1",
+        "purpose": "close governed vendor account",
+        "server_id": "vendor-ledger",
+        "tool_name": "close_account"
+      },
+      "receipt_context": {
+        "request_id": "req-live-destructive"
+      },
+      "route": {
+        "bridge": "mcp",
+        "protocolTarget": "mcp://provider-runtime",
+        "selectedRoute": "mcp:task-child-a"
+      }
+    },
+    "policy_hash": "989bed2a26d4be7bdf3fd3c48f645ea2f0ae2d556fe270c6a4463a9b35ac875d",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "timestamp": 1800000001,
+    "tool_name": "close_account",
+    "tool_origin": "caller_executed",
+    "tool_server": "vendor-ledger",
+    "trust_level": "mediated"
+  },
+  "id": "8db68085a28c056bbaedfbdff397b38290c1ccd69e739e4f74c029b1a87d6e5e"
+}

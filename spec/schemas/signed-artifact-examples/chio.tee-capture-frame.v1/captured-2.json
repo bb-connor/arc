@@ -1,0 +1,26 @@
+{
+  "deny_reason": "guard:fs.write",
+  "event_id": "01JSQ1E7HRXJ2ASNP3Z5TP476H",
+  "invocation": {
+    "cmd": "rm -rf /"
+  },
+  "provenance": {
+    "otel": {
+      "span_id": "0000000000000000",
+      "trace_id": "00000000000000000000000000000000"
+    }
+  },
+  "redaction_pass_id": "redactors@1.5.0+default",
+  "request_blob_sha256": "2f0094579f2368e06e0479531d30eeb5aa29cedc53e7c5c01a30765ed4753bb1",
+  "response_blob_sha256": "fd3fab6fcbc01c32d95e71e26b4ffa81d74f1b1421c6c3e71dd6b6e8fcf19b25",
+  "schema_version": "1",
+  "tee_id": "tee-runner-test",
+  "ts": "2025-04-25T17:55:31.000Z",
+  "upstream": {
+    "api_version": "unknown",
+    "operation": "send_email",
+    "system": "mcp"
+  },
+  "verdict": "deny",
+  "would_have_blocked": true
+}

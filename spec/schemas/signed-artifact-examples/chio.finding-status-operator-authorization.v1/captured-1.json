@@ -1,0 +1,14 @@
+{
+  "feed_id": "finding-status/test",
+  "operator": {
+    "authority_id": "qualified-status-operator",
+    "key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+    "key_epoch": 1,
+    "revocation_status_ref": "revocations/qualified-status-v1",
+    "rotation_policy_ref": "rotation/qualified-status-v1",
+    "valid_from": 1784879940,
+    "valid_until": 1784880600
+  },
+  "revoked_from": 1784880030,
+  "role": "finding_status_operator"
+}

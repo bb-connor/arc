@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{
     canonical_json_bytes, sha256_hex, PublicKey, SigningAlgorithm, SigningBackend,
 };
@@ -58,6 +58,10 @@ pub enum HostedApiKeyLifecycleOperation {
 /// Signed lifecycle event envelope.
 pub type SignedHostedApiKeyLifecycleEvent = SignedExportEnvelope<HostedApiKeyLifecycleEvent>;
 
+impl SignedExportPayload for HostedApiKeyLifecycleEvent {
+    const SCHEMA_ID: &'static str = HOSTED_API_KEY_LIFECYCLE_SCHEMA;
+}
+
 /// Fail closed unless the envelope verifies under the expected signer
 /// and carries the pinned schema.
 pub fn verify_signed_hosted_api_key_lifecycle_event(
@@ -71,7 +75,7 @@ pub fn verify_signed_hosted_api_key_lifecycle_event(
         return Err(HostedEdgeError::AuthenticationFailed);
     }
     validate_event(&receipt.body)?;
-    match pinned_signer.verify_canonical_strict(&receipt.body, &receipt.signature) {
+    match receipt.verify_signature(pinned_signer) {
         Ok(true) => Ok(()),
         _ => Err(HostedEdgeError::AuthenticationFailed),
     }
@@ -282,10 +286,7 @@ impl HostedApiKeyManager {
         event.event_id = compute_event_id(&event)?;
         let receipt = SignedExportEnvelope::sign_with_backend(event, self.signer.as_ref())
             .map_err(|_| HostedEdgeError::DependencyUnavailable)?;
-        match receipt
-            .signer_key
-            .verify_canonical_strict(&receipt.body, &receipt.signature)
-        {
+        match receipt.verify_signature(&receipt.signer_key) {
             Ok(true) => Ok(receipt),
             _ => Err(HostedEdgeError::DependencyUnavailable),
         }
@@ -491,14 +492,16 @@ mod tests {
             })
             .await?;
         assert_eq!(issued.secret.expose().len(), 43);
-        assert!(issued.receipt.verify_signature()?);
+        assert!(issued
+            .receipt
+            .verify_signature(&issued.receipt.signer_key)?);
         verify_signed_hosted_api_key_lifecycle_event(&issued.receipt, &issued.receipt.signer_key)?;
         let serialized = canonical_json_bytes(&issued.receipt)?;
         assert!(!serialized
             .windows(issued.secret.expose().len())
             .any(|window| window == issued.secret.expose().as_bytes()));
         let revoked = manager.revoke(tenant, "key-2".to_owned(), 200).await?;
-        assert!(revoked.verify_signature()?);
+        assert!(revoked.verify_signature(&revoked.signer_key)?);
         assert_eq!(
             repository.artifacts.lock().map_err(|_| "poisoned")?.len(),
             2

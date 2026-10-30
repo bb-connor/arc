@@ -4,6 +4,7 @@ use crate::admission_operation::{
     AdmissionCallerDispatchContextV1, AdmissionExecutionNonceReservationV1, AdmissionOperationV1,
     NativeCallerReleaseCustodyV1, RetainedToolAdmissionRequestV1,
 };
+use chio_core::canonical::canonical_json_bytes;
 
 impl CallerDeliveryEvidenceV1 {
     /// All arguments must be independently read from the original fenced

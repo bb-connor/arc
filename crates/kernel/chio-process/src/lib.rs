@@ -239,6 +239,7 @@ impl ProcessRuntime {
     ) -> Result<ProcessSnapshot, ProcessError> {
         validate_id(id)?;
         limits.validate()?;
+        self.require_trusted_issuer(capability)?;
         verify_capability(capability)?;
         if !capability.delegation_chain.is_empty() {
             return Err(ProcessError::Invalid(
@@ -258,8 +259,20 @@ impl ProcessRuntime {
         capability: &CapabilityToken,
     ) -> Result<ProcessSnapshot, ProcessError> {
         validate_id(child_id)?;
+        self.require_trusted_issuer(capability)?;
         verify_capability(capability)?;
         self.with_store(|store| store.spawn(parent_id, child_id, capability, validate_child))
+    }
+
+    /// A presented capability's issuer must be one the kernel trusts; this is
+    /// checked before its signature.
+    fn require_trusted_issuer(&self, capability: &CapabilityToken) -> Result<(), ProcessError> {
+        if !self.kernel.capability_issuer_is_trusted(&capability.issuer) {
+            return Err(ProcessError::Invalid(
+                "capability issuer is not trusted by the kernel",
+            ));
+        }
+        Ok(())
     }
 
     pub fn process(&self, id: &str) -> Result<ProcessSnapshot, ProcessError> {
@@ -671,7 +684,7 @@ fn validate_id(id: &str) -> Result<(), ProcessError> {
 
 fn verify_capability(capability: &CapabilityToken) -> Result<(), ProcessError> {
     capability.validate_schema()?;
-    if !capability.verify_signature()? {
+    if !capability.verify_integrity_embedded_key()? {
         return Err(ProcessError::Invalid("invalid capability signature"));
     }
     Ok(())
@@ -701,7 +714,7 @@ fn validate_child(parent: &CapabilityToken, child: &CapabilityToken) -> Result<(
         || link.delegator != parent.subject
         || link.delegatee != child.subject
         || link.scope_hash.as_ref() != Some(&scope_hash(&parent.scope)?)
-        || !link.verify_signature()?
+        || !link.verify_integrity_embedded_key()?
     {
         return Err(ProcessError::Invalid(
             "child is not a signed direct delegation of this parent",

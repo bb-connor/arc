@@ -1,0 +1,18 @@
+{
+  "agent_id": "agent-1",
+  "allowed": false,
+  "capability_id": "<none>",
+  "classification": "display",
+  "denial_reason": "no capability token provided",
+  "event_id": "evt-test",
+  "event_type": "text_stream",
+  "id": "agui-evt-test",
+  "kernel_key": "8ea51acfa97e543b7dea1b774d3006acf23893804fd83f5ed60e335a0ab22f2e",
+  "payload_hash": "e7b995efa755c5ff3b84d2188b58cb4ae916a59470eb3761df8a814f11763500",
+  "session_id": "sess-1",
+  "target": {
+    "component_type": "chat"
+  },
+  "timestamp": 1700000000,
+  "transport": "sse"
+}

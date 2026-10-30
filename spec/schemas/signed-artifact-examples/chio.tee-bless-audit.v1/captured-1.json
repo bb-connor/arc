@@ -1,0 +1,22 @@
+{
+  "capture": {
+    "frames_after_dedupe": 1,
+    "frames_after_redact": 1,
+    "frames_in": 2,
+    "path": "captures/01JTEE00000000000000000000.ndjson"
+  },
+  "control_plane_capability": "chio:tee/bless@1",
+  "event": "tee.bless",
+  "fixture": {
+    "family": "openai_responses_shadow",
+    "name": "tool_call_with_pii",
+    "path": "tests/replay/fixtures/openai_responses_shadow/tool_call_with_pii/",
+    "receipts_root": "a3de666e42b04a72f2f0b6acbb691fc220ebd76fea73d23d742676c630694e85"
+  },
+  "operator": {
+    "git_user": "alice@chio.world",
+    "id": "did:web:integrations.chio.world:alice"
+  },
+  "redaction_pass_id": "redactors@1.5.0+default",
+  "ts": "2026-04-25T18:02:11.418Z"
+}

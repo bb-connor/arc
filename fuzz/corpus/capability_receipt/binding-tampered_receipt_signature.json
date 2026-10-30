@@ -1,9 +1,18 @@
 {
   "description": "Receipt payload was modified after signing, so signature verification fails.",
   "expected": {
+    "authorized": false,
+    "boundary_class": "prevent",
     "decision": "allow",
+    "ok": false,
     "parameter_hash_valid": true,
-    "signature_valid": false
+    "receipt_id_valid": false,
+    "receipt_kind": "mediated_decision",
+    "result": "Authorized",
+    "signature_valid": false,
+    "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signer_trusted": false,
+    "trust_level": "mediated"
   },
   "id": "tampered_receipt_signature",
   "receipt": {
@@ -14,6 +23,7 @@
         "path": "/workspace/docs/roadmap.md"
       }
     },
+    "boundary_class": "prevent",
     "capability_id": "cap-bindings-001",
     "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
     "decision": {
@@ -31,17 +41,21 @@
         "verdict": true
       }
     ],
-    "id": "rcpt-bindings-invalid-signature",
+    "id": "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea",
     "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
     "metadata": {
       "surface": "bindings-vectors",
       "version": 1
     },
-    "policy_hash": "policy-bindings-v2",
-    "signature": "403a76d11a30eef531374cb83f9fd9618d44c40892cc909928e3cf784e1255572bff3267fec538507c4d82a5616d64ab65eff79452aa989c414f7141bb71c70e",
+    "policy_hash": "policy-bindings-v1-tampered",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "signature": "bcc218fd9af3126577113b00a38f3ee3fe562e12ba9813910a0410012aaa474d9bb7a1f816715eb37809eea37f70a13688082b3a9949d1f628b008e528673805",
     "timestamp": 1710000200,
     "tool_name": "file_read",
-    "tool_server": "srv-files"
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-files",
+    "trust_level": "mediated"
   },
-  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-invalid-signature\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v2\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1-tampered\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"mediated\"}"
 }

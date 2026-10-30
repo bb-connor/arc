@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-continuation-token-body.schema.json",
+  "title": "chio.swarm.continuation-token.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "budgetAllocationId",
+    "childTaskId",
+    "expiresAtUnixMs",
+    "graphId",
+    "graphSha256",
+    "issuedAtUnixMs",
+    "issuer",
+    "mode",
+    "nonce",
+    "parentReceiptIds",
+    "revocationEpochRef",
+    "revocationEpochRootHash",
+    "routePlanReceiptId",
+    "schema",
+    "sessionAnchorRef",
+    "tokenId"
+  ],
+  "properties": {
+    "budgetAllocationId": {
+      "type": "string"
+    },
+    "childTaskId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "graphSha256": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "joinReceiptId": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "parentReceiptIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "parentTaskId": {
+      "type": "string"
+    },
+    "revocationEpochRef": {
+      "type": "string"
+    },
+    "revocationEpochRootHash": {
+      "type": "string"
+    },
+    "routePlanReceiptId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.swarm.continuation-token.v1"
+    },
+    "sessionAnchorRef": {
+      "type": "string"
+    },
+    "tokenId": {
+      "type": "string"
+    },
+    "witnessChainRef": {
+      "type": "string"
+    },
+    "witnessChainSha256": {
+      "type": "string"
+    }
+  }
+}

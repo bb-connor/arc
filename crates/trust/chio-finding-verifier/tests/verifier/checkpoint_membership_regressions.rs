@@ -5,9 +5,18 @@ fn checkpoint_equivocation_fails_before_membership() -> TestResult {
     let fx = fixture()?;
     let mut fork = fx.checkpoint.clone();
     fork.body.issued_at = fork.body.issued_at.saturating_add(1);
-    fork.signature = keypair(23).sign(&canonical_json_bytes(&fork.body)?);
+    fork.signature = keypair(23).sign_wrapped(
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core_types::CanonicalBytes::from_serializable(&fork.body)?,
+    )?;
     let checkpoints = vec![fx.checkpoint.clone(), fork];
-    let transparency = build_checkpoint_transparency(&checkpoints)?;
+    let transparency = build_checkpoint_transparency(
+        &checkpoints,
+        &checkpoints
+            .iter()
+            .map(|checkpoint| checkpoint.body.kernel_key.clone())
+            .collect::<Vec<_>>(),
+    )?;
 
     assert_eq!(
         verify_checkpoint_membership(

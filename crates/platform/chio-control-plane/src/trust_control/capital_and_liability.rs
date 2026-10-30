@@ -624,11 +624,12 @@ fn validate_capital_book_receipts(
 pub(crate) fn build_capital_execution_instruction_artifact_from_store(
     receipt_store: &SqliteReceiptStore,
     request: &CapitalExecutionInstructionRequest,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
     let clock_now = unix_timestamp_now()?;
     let issued_at = clock_now;
     let transfer_governed_receipt_id =
-        validate_capital_execution_instruction_request(request, issued_at)?;
+        validate_capital_execution_instruction_request(request, issued_at, capital_authority)?;
 
     let capital_book = build_capital_book_report_from_store(receipt_store, &request.query)?;
     let source = capital_book
@@ -904,6 +905,7 @@ pub(crate) fn build_capital_execution_instruction_artifact_from_store(
 fn validate_capital_execution_instruction_request(
     request: &CapitalExecutionInstructionRequest,
     issued_at: u64,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<Option<String>, TrustHttpError> {
     request
         .query
@@ -934,15 +936,19 @@ fn validate_capital_execution_instruction_request(
         &request.execution_window,
         &request.rail,
         issued_at,
+        capital_authority,
     )?;
     Ok(transfer_governed_receipt_id)
 }
 
+/// Structural envelope checks, then every authority step verified under the
+/// trusted capital authority key matching its signer.
 pub(crate) fn validate_capital_execution_envelope(
     authority_chain: &[CapitalExecutionAuthorityStep],
     execution_window: &CapitalExecutionWindow,
     rail: &CapitalExecutionRail,
     issued_at: u64,
+    capital_authority: &TrustedCapitalAuthority,
 ) -> Result<(), TrustHttpError> {
     chio_kernel::validate_capital_execution_envelope(
         authority_chain,
@@ -950,7 +956,28 @@ pub(crate) fn validate_capital_execution_envelope(
         rail,
         issued_at,
     )
-    .map_err(capital_execution_validation_error)
+    .map_err(capital_execution_validation_error)?;
+    capital_authority
+        .verify_chain(authority_chain)
+        .map_err(capital_authority_http_error)
+}
+
+/// Refuses capital issuance when the service has no trusted capital
+/// authority keys configured.
+pub(crate) fn require_capital_authority(
+    capital_authority: Option<&TrustedCapitalAuthority>,
+) -> Result<&TrustedCapitalAuthority, TrustHttpError> {
+    capital_authority
+        .ok_or_else(|| capital_authority_http_error(CapitalAuthorityTrustError::Unconfigured))
+}
+
+pub(crate) fn capital_authority_http_error(error: CapitalAuthorityTrustError) -> TrustHttpError {
+    let status = match error {
+        CapitalAuthorityTrustError::Unconfigured => StatusCode::CONFLICT,
+        CapitalAuthorityTrustError::UntrustedSigner { .. } => StatusCode::FORBIDDEN,
+        CapitalAuthorityTrustError::InvalidProof(_) => StatusCode::BAD_REQUEST,
+    };
+    TrustHttpError::new(status, error.to_string())
 }
 
 pub(crate) fn ensure_capital_execution_owner_authority(
@@ -1207,12 +1234,14 @@ pub fn issue_signed_credit_loss_lifecycle(
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
     request: &CreditLossLifecycleIssueRequest,
+    capital_authority: Option<&TrustedCapitalAuthority>,
 ) -> Result<SignedCreditLossLifecycle, CliError> {
     issue_signed_credit_loss_lifecycle_detailed(
         receipt_store,
         authority_seed_path,
         authority_db_path,
         request,
+        capital_authority,
     )
     .map_err(CliError::from)
 }
@@ -1501,5 +1530,93 @@ mod capital_and_liability_tests {
         assert!(error
             .message
             .contains("governed receipt ids must be unique"));
+    }
+
+    fn capital_authority_fixture() -> (
+        Vec<CapitalExecutionAuthorityStep>,
+        CapitalExecutionWindow,
+        CapitalExecutionRail,
+        TrustedCapitalAuthority,
+    ) {
+        let treasury = chio_core::crypto::Keypair::generate();
+        let custodian = chio_core::crypto::Keypair::generate();
+        let authority_chain = vec![
+            CapitalExecutionAuthorityStep::signed(
+                CapitalExecutionRole::OperatorTreasury,
+                &treasury,
+                9,
+                30,
+                None,
+            )
+            .test_unwrap(),
+            CapitalExecutionAuthorityStep::signed(
+                CapitalExecutionRole::Custodian,
+                &custodian,
+                9,
+                30,
+                None,
+            )
+            .test_unwrap(),
+        ];
+        let rail = CapitalExecutionRail {
+            kind: chio_kernel::CapitalExecutionRailKind::Manual,
+            rail_id: "reserve-manual-1".to_string(),
+            custody_provider_id: custodian.public_key().to_hex(),
+            source_account_ref: Some("reserve-book-main".to_string()),
+            destination_account_ref: None,
+            jurisdiction: None,
+        };
+        let trust =
+            TrustedCapitalAuthority::new(vec![treasury.public_key(), custodian.public_key()])
+                .test_unwrap();
+        (
+            authority_chain,
+            CapitalExecutionWindow {
+                not_before: 10,
+                not_after: 20,
+            },
+            rail,
+            trust,
+        )
+    }
+
+    #[test]
+    fn capital_issuance_refuses_when_capital_authority_is_unconfigured() {
+        let error = require_capital_authority(None).test_unwrap_err();
+
+        assert_eq!(error.status, StatusCode::CONFLICT);
+        assert_eq!(
+            error.message,
+            CapitalAuthorityTrustError::Unconfigured.to_string()
+        );
+    }
+
+    #[test]
+    fn capital_envelope_refuses_chain_signed_outside_trusted_capital_authority() {
+        let (authority_chain, window, rail, _) = capital_authority_fixture();
+        let foreign =
+            TrustedCapitalAuthority::new(vec![chio_core::crypto::Keypair::generate().public_key()])
+                .test_unwrap();
+
+        let error =
+            validate_capital_execution_envelope(&authority_chain, &window, &rail, 10, &foreign)
+                .test_unwrap_err();
+
+        assert_eq!(error.status, StatusCode::FORBIDDEN);
+        assert_eq!(
+            error.message,
+            CapitalAuthorityTrustError::UntrustedSigner {
+                principal_id: authority_chain[0].principal_id.clone(),
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn capital_envelope_accepts_chain_signed_by_trusted_capital_authority() {
+        let (authority_chain, window, rail, trust) = capital_authority_fixture();
+
+        validate_capital_execution_envelope(&authority_chain, &window, &rail, 10, &trust)
+            .test_unwrap();
     }
 }

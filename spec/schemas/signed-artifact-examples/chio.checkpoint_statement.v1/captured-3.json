@@ -1,0 +1,12 @@
+{
+  "batch_end_seq": 1,
+  "batch_start_seq": 1,
+  "chain_root": "0x647d346059deb04ca4ae6258908f3608e908db0a1bddf8e71c009fd19a7e1bdd",
+  "checkpoint_seq": 1,
+  "issued_at": 1749000000,
+  "kernel_key": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+  "merkle_root": "0x452d1bdf4bdfeef999947b7f28ea537daad7e6164eea028d065769ad9ef450fe",
+  "previous_checkpoint_sha256": null,
+  "schema": "chio.checkpoint_statement.v1",
+  "tree_size": 1
+}

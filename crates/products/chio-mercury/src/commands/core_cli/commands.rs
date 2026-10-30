@@ -111,7 +111,16 @@ pub fn cmd_mercury_verify(
             MercuryPackageKind::Proof => "proof",
             MercuryPackageKind::Inquiry => "inquiry",
         };
-        println!("mercury {package_kind} package verified");
+        match report.scope {
+            MercuryVerificationScope::TrustedKernelAuthority => {
+                println!("mercury {package_kind} package verified");
+            }
+            MercuryVerificationScope::IntegrityOnly => {
+                println!(
+                    "mercury {package_kind} package integrity-only: kernel signer authority was not evaluated"
+                );
+            }
+        }
         println!("package_id:          {}", report.package_id);
         println!("workflow_id:         {}", report.workflow_id);
         println!("receipt_count:       {}", report.receipt_count);

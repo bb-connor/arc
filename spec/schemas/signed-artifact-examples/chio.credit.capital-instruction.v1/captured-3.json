@@ -1,0 +1,95 @@
+{
+  "action": "lock_reserve",
+  "amount": {
+    "currency": "USD",
+    "units": 400
+  },
+  "authorityChain": [
+    {
+      "approvedAt": 9,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 9,
+          "expiresAt": 20,
+          "principalId": "2dc50ac8784ab6d9af4c340c98428d2cf990046e2b8497dccd63133c5dcf424a",
+          "role": "operator_treasury",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "58eef62faf7d82d5871058987245b2cbba7dc5b3b58c47f3919c57854f93762d719aed6f228cee6a3dc28b45931b7261d610a646c04d95960bec4305af38390b",
+        "signerKey": "2dc50ac8784ab6d9af4c340c98428d2cf990046e2b8497dccd63133c5dcf424a"
+      },
+      "expiresAt": 20,
+      "principalId": "2dc50ac8784ab6d9af4c340c98428d2cf990046e2b8497dccd63133c5dcf424a",
+      "role": "operator_treasury"
+    },
+    {
+      "approvedAt": 9,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 9,
+          "expiresAt": 20,
+          "principalId": "700c348404dbd12407dd6215e3491f8398f24913094cc068f80d8be25ebc51e2",
+          "role": "custodian",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "a3e8e91c6a358023fd66a61381f064632dedb4d4b2027e817e8a1ed3f40466484ab0c6df71f9fcf9800e71566765311ab506ac517fb7f7dcca69e75198b39708",
+        "signerKey": "700c348404dbd12407dd6215e3491f8398f24913094cc068f80d8be25ebc51e2"
+      },
+      "expiresAt": 20,
+      "principalId": "700c348404dbd12407dd6215e3491f8398f24913094cc068f80d8be25ebc51e2",
+      "role": "custodian"
+    }
+  ],
+  "counterpartyId": "subject-1",
+  "counterpartyRole": "agent_counterparty",
+  "description": "lock reserve",
+  "evidenceRefs": [
+    {
+      "kind": "credit_bond",
+      "locator": "credit-bond:cbd-1",
+      "observedAt": 10,
+      "referenceId": "cbd-1"
+    }
+  ],
+  "executionWindow": {
+    "notAfter": 20,
+    "notBefore": 10
+  },
+  "instructionId": "cei-1",
+  "intendedState": "pending_execution",
+  "issuedAt": 10,
+  "observedExecution": {
+    "amount": {
+      "currency": "USD",
+      "units": 400
+    },
+    "externalReferenceId": "wire-1",
+    "observedAt": 12
+  },
+  "ownerRole": "operator_treasury",
+  "query": {
+    "agentSubject": "subject-1",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "rail": {
+    "custodyProviderId": "700c348404dbd12407dd6215e3491f8398f24913094cc068f80d8be25ebc51e2",
+    "jurisdiction": "US-NY",
+    "kind": "manual",
+    "railId": "rail-1",
+    "sourceAccountRef": "reserve-main"
+  },
+  "reconciledState": "matched",
+  "schema": "chio.credit.capital-instruction.v1",
+  "sourceId": "capital-source:bond:cbd-1",
+  "sourceKind": "reserve_book",
+  "subjectKey": "subject-1",
+  "supportBoundary": {
+    "automaticDispatchSupported": false,
+    "capitalBookAuthoritative": true,
+    "custodyNeutralInstructionSupported": true,
+    "externalExecutionAuthoritative": false
+  }
+}

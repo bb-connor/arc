@@ -434,3 +434,7 @@ pub struct UnderwritingAppealResolveRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement_decision_id: Option<String>,
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for UnderwritingPolicyInput {
+    const SCHEMA_ID: &'static str = UNDERWRITING_POLICY_INPUT_SCHEMA;
+}

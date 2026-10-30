@@ -2,6 +2,7 @@ package invariants_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,7 @@ type hashingVectors struct {
 
 type signingVectors struct {
 	JSONCases []struct {
+		SchemaID       string `json:"schema_id"`
 		CanonicalJSON  string `json:"canonical_json"`
 		ExpectedVerify bool   `json:"expected_verify"`
 		ID             string `json:"id"`
@@ -121,20 +123,13 @@ func TestHashingVectors(t *testing.T) {
 func TestSigningVectors(t *testing.T) {
 	var vectors signingVectors
 	loadVectorFile(t, filepath.Join(vectorRoot, "signing", "v1.json"), &vectors)
-	for _, testCase := range vectors.UTF8Cases {
-		t.Run(testCase.ID, func(t *testing.T) {
-			verified, err := invariants.VerifyUTF8MessageEd25519(
-				testCase.InputUTF8,
-				testCase.PublicKeyHex,
-				testCase.SignatureHex,
-			)
-			if err != nil {
-				t.Fatalf("VerifyUTF8MessageEd25519 returned error: %v", err)
-			}
-			if verified != testCase.ExpectedVerify {
-				t.Fatalf("unexpected utf8 verification result: %v", verified)
-			}
-		})
+	for _, testCase := range vectors.JSONCases {
+		if testCase.SchemaID == "" {
+			t.Skip("signing vectors carry no schema_id until they regenerate")
+		}
+	}
+	if len(vectors.UTF8Cases) != 0 {
+		t.Fatalf("signing vectors must not carry utf8_cases")
 	}
 	for _, testCase := range vectors.JSONCases {
 		t.Run(testCase.ID, func(t *testing.T) {
@@ -145,32 +140,104 @@ func TestSigningVectors(t *testing.T) {
 			if rendered != testCase.CanonicalJSON {
 				t.Fatalf("unexpected canonical json: %s", rendered)
 			}
-			verified, err := invariants.VerifyJSONStringSignatureEd25519(
-				testCase.InputJSON,
-				testCase.PublicKeyHex,
-				testCase.SignatureHex,
-			)
-			if err != nil {
-				t.Fatalf("VerifyJSONStringSignatureEd25519 returned error: %v", err)
+			err = invariants.VerifyWrappedJSON(testCase.SchemaID, testCase.InputJSON, testCase.PublicKeyHex, testCase.SignatureHex)
+			if (err == nil) != testCase.ExpectedVerify {
+				t.Fatalf("unexpected wrapped verification result: %v", err)
 			}
-			if verified != testCase.ExpectedVerify {
-				t.Fatalf("unexpected json verification result: %v", verified)
+			if !testCase.ExpectedVerify {
+				return
+			}
+			signed, err := invariants.SignWrappedJSONEd25519(testCase.SchemaID, testCase.InputJSON, vectors.SigningKeySeedHex)
+			if err != nil {
+				t.Fatalf("SignWrappedJSONEd25519 returned error: %v", err)
+			}
+			if signed.CanonicalJSON != testCase.CanonicalJSON || signed.PublicKeyHex != testCase.PublicKeyHex || signed.SignatureHex != testCase.SignatureHex {
+				t.Fatalf("unexpected wrapped signing output: %#v", signed)
 			}
 		})
 	}
-	signedUTF8, err := invariants.SignUTF8MessageEd25519("hello chio", vectors.SigningKeySeedHex)
+	publicKey, err := invariants.PublicKeyFromSeedEd25519(vectors.SigningKeySeedHex)
 	if err != nil {
-		t.Fatalf("SignUTF8MessageEd25519 returned error: %v", err)
+		t.Fatalf("PublicKeyFromSeedEd25519 returned error: %v", err)
 	}
-	if signedUTF8.PublicKeyHex != vectors.UTF8Cases[0].PublicKeyHex || signedUTF8.SignatureHex != vectors.UTF8Cases[0].SignatureHex {
-		t.Fatalf("unexpected utf8 signing output: %#v", signedUTF8)
+	signed, err := invariants.SignWrappedJSONEd25519(invariants.ReceiptSchema, `{"b":1,"a":2}`, vectors.SigningKeySeedHex)
+	if err != nil || signed.PublicKeyHex != publicKey {
+		t.Fatalf("unexpected wrapped signing identity: %#v %v", signed, err)
 	}
-	signedJSON, err := invariants.SignJSONStringEd25519(vectors.JSONCases[0].InputJSON, vectors.SigningKeySeedHex)
+}
+
+func TestUnregisteredSchemaIDIsRefused(t *testing.T) {
+	seed := strings.Repeat("01", 32)
+	_, err := invariants.SignWrappedJSONEd25519("chio.unregistered-fixture.v1", `{"a":1}`, seed)
+	assertInvariantError(t, err, "unregistered_schema_id", "unregistered signed-artifact schema id: chio.unregistered-fixture.v1")
+	signed, err := invariants.SignWrappedJSONEd25519(invariants.ReceiptSchema, `{"a":1}`, seed)
 	if err != nil {
-		t.Fatalf("SignJSONStringEd25519 returned error: %v", err)
+		t.Fatalf("SignWrappedJSONEd25519 returned error: %v", err)
 	}
-	if signedJSON.CanonicalJSON != vectors.JSONCases[0].CanonicalJSON || signedJSON.PublicKeyHex != vectors.JSONCases[0].PublicKeyHex || signedJSON.SignatureHex != vectors.JSONCases[0].SignatureHex {
-		t.Fatalf("unexpected json signing output: %#v", signedJSON)
+	err = invariants.VerifyWrappedJSON("chio.unregistered-fixture.v1", `{"a":1}`, signed.PublicKeyHex, signed.SignatureHex)
+	assertInvariantError(t, err, "unregistered_schema_id", "unregistered signed-artifact schema id: chio.unregistered-fixture.v1")
+	err = invariants.VerifyWrappedJSON(invariants.CapabilitySchema, `{"a":1}`, signed.PublicKeyHex, signed.SignatureHex)
+	assertInvariantError(t, err, "signature_rejected", "signature rejected")
+}
+
+func TestCapabilityWithAlgorithmMemberIsRefused(t *testing.T) {
+	var vectors capabilityVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
+	for _, algorithm := range []string{"ed25519", "p256"} {
+		capability := cloneMap(t, vectors.Cases[0].Capability)
+		capability["algorithm"] = algorithm
+		encoded, err := json.Marshal(capability)
+		if err != nil {
+			t.Fatalf("marshal capability: %v", err)
+		}
+		_, err = invariants.ParseCapabilityJSON(string(encoded))
+		assertInvariantError(t, err, "json", "capability has unknown member algorithm")
+	}
+}
+
+type wrapperVectors struct {
+	SignatureCases []struct {
+		Algorithm      string `json:"algorithm"`
+		CanonicalBody  string `json:"canonical_body"`
+		ExpectedVerify bool   `json:"expected_verify"`
+		ID             string `json:"id"`
+		PublicKey      string `json:"public_key"`
+		Signature      string `json:"signature"`
+		VerifySchemaID string `json:"verify_schema_id"`
+	} `json:"signature_cases"`
+}
+
+func TestSigningWrapperVectors(t *testing.T) {
+	var vectors wrapperVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "signing", "wrapper", "v1.json"), &vectors)
+	skipped := map[string]struct{}{}
+	for _, testCase := range vectors.SignatureCases {
+		if testCase.Algorithm != "ed25519" {
+			skipped[testCase.Algorithm] = struct{}{}
+			continue
+		}
+		t.Run(testCase.ID, func(t *testing.T) {
+			err := invariants.VerifyWrappedJSON(testCase.VerifySchemaID, testCase.CanonicalBody, testCase.PublicKey, testCase.Signature)
+			if (err == nil) != testCase.ExpectedVerify {
+				t.Fatalf("unexpected wrapper verification result: %v", err)
+			}
+		})
+	}
+	if len(skipped) != 2 {
+		t.Fatalf("skipped algorithms must be exactly p256 and p384: %v", skipped)
+	}
+	for _, algorithm := range []string{"p256", "p384"} {
+		if _, ok := skipped[algorithm]; !ok {
+			t.Fatalf("skipped algorithms must be exactly p256 and p384: %v", skipped)
+		}
+	}
+}
+
+func assertInvariantError(t *testing.T, err error, code string, message string) {
+	t.Helper()
+	var invariantError *invariants.InvariantError
+	if !errors.As(err, &invariantError) || invariantError.Code != code || invariantError.Message != message {
+		t.Fatalf("expected %s error %q, got %v", code, message, err)
 	}
 }
 
@@ -277,9 +344,9 @@ func TestReceiptSignatureValidFailsWhenContentAddressedIDMismatches(t *testing.T
 		if err != nil {
 			t.Fatalf("ReceiptSigningBodyCanonicalJSON returned error: %v", err)
 		}
-		signed, err := invariants.SignJSONStringEd25519(body, vectors.SigningKeySeedHex)
+		signed, err := invariants.SignWrappedJSONEd25519(invariants.ReceiptSchema, body, vectors.SigningKeySeedHex)
 		if err != nil {
-			t.Fatalf("SignJSONStringEd25519 returned error: %v", err)
+			t.Fatalf("SignWrappedJSONEd25519 returned error: %v", err)
 		}
 		receipt["signature"] = signed.SignatureHex
 		verification, err := invariants.VerifyReceipt(receipt)

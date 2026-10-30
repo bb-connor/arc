@@ -382,7 +382,9 @@ fn store_checkpoint_accepts_contiguous_predecessor() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -436,7 +438,9 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
         seqs[3],
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &checkpoint_kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -468,8 +472,12 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
             second.body.previous_checkpoint_sha256.clone().test_unwrap(),
         )]
     );
-    let first_publication = build_checkpoint_publication(&first).test_unwrap();
-    let second_publication = build_checkpoint_publication(&second).test_unwrap();
+    let first_publication =
+        build_checkpoint_publication(&first, std::slice::from_ref(&first.body.kernel_key))
+            .test_unwrap();
+    let second_publication =
+        build_checkpoint_publication(&second, std::slice::from_ref(&second.body.kernel_key))
+            .test_unwrap();
     let publications = load_checkpoint_publication_metadata_rows(&store);
     assert_eq!(
         publications,
@@ -541,7 +549,9 @@ fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_
         second_seq,
         &canonical_receipt_bytes(&store, second_seq, second_seq),
         &checkpoint_kp,
-        Some(&chio_kernel_core::evidence_verify::validate_checkpoint(&first).test_unwrap()),
+        Some(
+            &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(&first).test_unwrap(),
+        ),
         &[
             chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
                 .test_unwrap(),
@@ -552,7 +562,9 @@ fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_
     store.store_checkpoint(&first).test_unwrap();
     store.store_checkpoint(&second).test_unwrap();
 
-    let second_publication = build_checkpoint_publication(&second).test_unwrap();
+    let second_publication =
+        build_checkpoint_publication(&second, std::slice::from_ref(&second.body.kernel_key))
+            .test_unwrap();
     let binding = chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
         publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
             chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,

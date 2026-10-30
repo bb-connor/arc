@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Portable passport verification integration tests.
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::crypto::{Keypair, PublicKey, Signature};
 use chio_kernel_core::passport_verify::{
@@ -32,8 +33,15 @@ fn build_envelope(
         expires_at,
         payload_canonical_bytes,
     };
-    let (signature, _) = issuer.sign_canonical(&body).expect("sign canonical");
+    let signature = sign_body(issuer, &body);
     PortablePassportEnvelope { body, signature }
+}
+
+fn sign_body(issuer: &Keypair, body: &PortablePassportBody) -> Signature {
+    let canonical = CanonicalBytes::from_serializable(body).expect("canonical body");
+    issuer
+        .sign_wrapped(PORTABLE_PASSPORT_SCHEMA, &canonical)
+        .expect("sign wrapper")
 }
 
 fn serialize_envelope(envelope: &PortablePassportEnvelope) -> Vec<u8> {
@@ -113,7 +121,7 @@ fn verify_passport_denies_wrong_signature() {
     let issuer = Keypair::generate();
     let other = Keypair::generate();
     let body = build_envelope(&issuer, "did:chio:agent-6", ISSUED_AT, EXPIRES_AT).body;
-    let (foreign_signature, _) = other.sign_canonical(&body).expect("sign with other key");
+    let foreign_signature = sign_body(&other, &body);
     let envelope = PortablePassportEnvelope {
         body,
         signature: foreign_signature,

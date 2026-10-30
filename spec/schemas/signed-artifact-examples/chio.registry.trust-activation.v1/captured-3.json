@@ -1,0 +1,50 @@
+{
+  "activationId": "activation-568dc5152044ec0daf88c2c1d4831246b846ecaedd4593267ec5cb700f01331e",
+  "admissionClass": "reviewable",
+  "disposition": "approved",
+  "eligibility": {
+    "allowedActorKinds": [
+      "tool_server"
+    ],
+    "allowedPublisherRoles": [
+      "origin"
+    ],
+    "allowedStatuses": [
+      "active"
+    ],
+    "policyReference": "policy/open-registry/default",
+    "requireBondBacking": false,
+    "requireFreshListing": true,
+    "requiredListingOperatorIds": [
+      "origin-a"
+    ]
+  },
+  "expiresAt": 500,
+  "listingId": "listing-artifact-1",
+  "listingPublishedAt": 110,
+  "listingSha256": "0da9577b4330d5ae298b7b9d3d3d1691021d8c683e037d365fb7effb11171d00",
+  "localOperatorId": "origin-a",
+  "localOperatorName": "Origin A",
+  "namespace": "https://registry.chio.example",
+  "note": "approved",
+  "requestedAt": 120,
+  "requestedBy": "ops@chio.example",
+  "reviewContext": {
+    "freshness": {
+      "ageSecs": 5,
+      "generatedAt": 100,
+      "maxAgeSecs": 300,
+      "state": "fresh",
+      "validUntil": 400
+    },
+    "publisher": {
+      "operatorId": "origin-a",
+      "operatorName": "Operator origin-a",
+      "registryUrl": "https://origin-a.chio.example",
+      "role": "origin"
+    }
+  },
+  "reviewedAt": 121,
+  "reviewedBy": "reviewer@chio.example",
+  "schema": "chio.registry.trust-activation.v1"
+}

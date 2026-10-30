@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-deposit-body.schema.json",
+  "title": "chio.pheromone-deposit.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_passport_jwk_thumbprint",
+    "agent_passport_key_hash",
+    "confidence",
+    "decay_half_life_secs",
+    "indicator",
+    "kernel_id",
+    "nonce",
+    "schema",
+    "severity",
+    "subject_class",
+    "subject_class_namespace",
+    "timestamp_unix_ms",
+    "treaty_scope"
+  ],
+  "properties": {
+    "agent_passport_jwk_thumbprint": {
+      "type": "string"
+    },
+    "agent_passport_key_hash": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "decay_half_life_secs": {
+      "type": "integer"
+    },
+    "evaporation_floor": {
+      "type": "number"
+    },
+    "indicator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "admission_envelope_sha256": {
+          "type": "string"
+        },
+        "blob": {
+          "type": "string"
+        },
+        "capability_scope": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "finding_id": {
+          "type": "string"
+        },
+        "indicatorDigest": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "listing_envelope_sha256": {
+          "type": "string"
+        },
+        "listing_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "workflowId": {
+          "type": "string"
+        }
+      }
+    },
+    "kernel_id": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.pheromone-deposit.v1"
+    },
+    "severity": {
+      "type": "string"
+    },
+    "subject_class": {
+      "type": "string"
+    },
+    "subject_class_namespace": {
+      "type": "string"
+    },
+    "timestamp_unix_ms": {
+      "type": "integer"
+    },
+    "treaty_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "workflow_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bilateral_dsse_sha256",
+        "consistency_anchor",
+        "schema",
+        "step_index",
+        "tool_receipt_id",
+        "workflow_id",
+        "workflow_intersection_id",
+        "workflow_intersection_sha256",
+        "workflow_receipt_id",
+        "workflow_receipt_sha256"
+      ],
+      "properties": {
+        "bilateral_dsse_sha256": {
+          "type": "string"
+        },
+        "consistency_anchor": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "step_index": {
+          "type": "integer"
+        },
+        "tool_receipt_id": {
+          "type": "string"
+        },
+        "workflow_id": {
+          "type": "string"
+        },
+        "workflow_intersection_id": {
+          "type": "string"
+        },
+        "workflow_intersection_sha256": {
+          "type": "string"
+        },
+        "workflow_receipt_id": {
+          "type": "string"
+        },
+        "workflow_receipt_sha256": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

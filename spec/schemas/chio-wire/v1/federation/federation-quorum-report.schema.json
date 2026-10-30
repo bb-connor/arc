@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-quorum-report.schema.json",
+  "title": "Chio federation quorum report signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "antiEclipsePolicy",
+    "finalState",
+    "generatedAt",
+    "listingId",
+    "maxReplicaAgeSecs",
+    "namespace",
+    "note",
+    "originOperatorId",
+    "publishers",
+    "quorumThreshold",
+    "reportId",
+    "schema"
+  ],
+  "properties": {
+    "antiEclipsePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxUpstreamHops",
+        "minimumDistinctOperators",
+        "requireIndexerObservation",
+        "requireOriginPublisher"
+      ],
+      "properties": {
+        "maxUpstreamHops": {
+          "type": "integer"
+        },
+        "minimumDistinctOperators": {
+          "type": "integer"
+        },
+        "requireIndexerObservation": {
+          "type": "boolean"
+        },
+        "requireOriginPublisher": {
+          "type": "boolean"
+        }
+      }
+    },
+    "finalState": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "maxReplicaAgeSecs": {
+      "type": "integer"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "originOperatorId": {
+      "type": "string"
+    },
+    "publishers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "freshness",
+          "observedAt",
+          "observedListingSha256",
+          "publisher",
+          "reportRef",
+          "upstreamHopCount"
+        ],
+        "properties": {
+          "freshness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "ageSecs",
+              "generatedAt",
+              "maxAgeSecs",
+              "state",
+              "validUntil"
+            ],
+            "properties": {
+              "ageSecs": {
+                "type": "integer"
+              },
+              "generatedAt": {
+                "type": "integer"
+              },
+              "maxAgeSecs": {
+                "type": "integer"
+              },
+              "state": {
+                "type": "string"
+              },
+              "validUntil": {
+                "type": "integer"
+              }
+            }
+          },
+          "observedAt": {
+            "type": "integer"
+          },
+          "observedListingSha256": {
+            "type": "string"
+          },
+          "publisher": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operatorId",
+              "operatorName",
+              "registryUrl",
+              "role"
+            ],
+            "properties": {
+              "operatorId": {
+                "type": "string"
+              },
+              "operatorName": {
+                "type": "string"
+              },
+              "registryUrl": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "upstreamRegistryUrls": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "reportRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactId",
+              "kind",
+              "operatorId",
+              "schema",
+              "sha256",
+              "uri"
+            ],
+            "properties": {
+              "artifactId": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "operatorId": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              }
+            }
+          },
+          "upstreamHopCount": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "quorumThreshold": {
+      "type": "integer"
+    },
+    "reportId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federation-quorum-report.v1"
+    }
+  }
+}

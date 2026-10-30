@@ -23,9 +23,8 @@
 //! 2. Sender constraint -- `agent_key` must equal `capability.subject`
 //! 3. Binding fields -- capability_id, tool_server, tool_name, action_hash all match
 //! 4. Freshness -- `issued_at + proof_ttl_secs >= now` and `issued_at <= now + max_clock_skew_secs`
-//! 5. Signature -- verified through the signing backend negotiated between
-//!    agent and kernel; dispatches off the algorithm carried by `agent_key`
-//!    and the proof's `signature` field
+//! 5. Signature -- the signing wrapper under `chio.dpop_proof.v1`, verified
+//!    against `capability.subject`, whose encoding alone selects the algorithm
 //! 6. Durable custody -- dispatch acquires an exact operation-owned replay claim
 
 use chio_security_types::clock::{Clock, SystemClock};
@@ -36,11 +35,9 @@ use std::time::Duration;
 #[cfg(test)]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use chio_core::canonical::canonical_json_bytes;
+use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::token::CapabilityToken;
-use chio_core::crypto::{
-    sign_canonical_with_backend, Keypair, PublicKey, Signature, SigningBackend,
-};
+use chio_core::crypto::{verify_wrapped, Keypair, PublicKey, Signature, SigningBackend};
 use chio_kernel_core::{dpop_freshness_valid, nonce_admits};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -113,13 +110,13 @@ pub struct DpopProofBody {
 
 /// A signed DPoP proof ready for transmission.
 ///
-/// The `signature` covers the canonical JSON of `body`.
+/// The `signature` covers the signing wrapper of the canonical `body`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DpopProof {
     /// The proof body that was signed.
     pub body: DpopProofBody,
-    /// Ed25519 signature over `canonical_json_bytes(&body)`.
+    /// Signature over the signing wrapper of the canonical `body`.
     pub signature: Signature,
 }
 
@@ -127,11 +124,14 @@ impl DpopProof {
     /// Sign a proof body with the agent's Ed25519 keypair.
     ///
     /// The `keypair` must be the one corresponding to `body.agent_key`.
-    /// The signature covers the canonical JSON of the body.
+    /// The signature covers the signing wrapper of the canonical body under
+    /// `chio.dpop_proof.v1`.
     pub fn sign(body: DpopProofBody, keypair: &Keypair) -> Result<DpopProof, KernelError> {
-        let body_bytes =
-            canonical_json_bytes(&body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
-        let signature = keypair.sign(&body_bytes);
+        let canonical = CanonicalBytes::from_serializable(&body)
+            .map_err(|e| DpopError::Encoding(Box::new(e)))?;
+        let signature = keypair
+            .sign_wrapped(DPOP_SCHEMA, &canonical)
+            .map_err(|e| DpopError::Signing(Box::new(e)))?;
         Ok(DpopProof { body, signature })
     }
 
@@ -144,8 +144,12 @@ impl DpopProof {
         body: DpopProofBody,
         backend: &dyn SigningBackend,
     ) -> Result<DpopProof, KernelError> {
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)
-            .map_err(|e| DpopError::Signing(Box::new(e)))?;
+        let canonical = CanonicalBytes::from_serializable(&body)
+            .map_err(|e| DpopError::Encoding(Box::new(e)))?;
+        let signature = backend
+            .sign_wrapped(DPOP_SCHEMA, &canonical)
+            .map_err(|e| DpopError::Signing(Box::new(e)))?
+            .signature;
         Ok(DpopProof { body, signature })
     }
 }
@@ -535,13 +539,14 @@ fn verify_dpop_bindings_at(
         return Err(DpopError::Expired.into());
     }
 
-    // Step 5: Signature verification.
-    let body_bytes =
-        canonical_json_bytes(&proof.body).map_err(|e| DpopError::Encoding(Box::new(e)))?;
-    if !proof
-        .body
-        .agent_key
-        .verify_strict(&body_bytes, &proof.signature)
+    // Step 5: Signature verification against the capability subject.
+    if verify_wrapped(
+        &capability.subject,
+        DPOP_SCHEMA,
+        &proof.body,
+        &proof.signature,
+    )
+    .is_err()
     {
         return Err(KernelError::Dpop(DpopError::Signature));
     }
@@ -592,11 +597,6 @@ mod backend_tests {
 
     #[test]
     fn ed25519_backend_produces_equivalent_dpop_proof() {
-        // Signing via `DpopProof::sign_with_backend(..., &Ed25519Backend)` must
-        // be verifier-equivalent to the `DpopProof::sign(..., &Keypair)`
-        // path. The stored `agent_key.verify(...)` pathway already dispatches
-        // on algorithm tag, so either signing entry point must produce a proof
-        // whose verification succeeds.
         let kp = Keypair::generate();
         let backend = Ed25519Backend::new(kp.clone());
         let body = DpopProofBody {
@@ -611,8 +611,14 @@ mod backend_tests {
             agent_key: kp.public_key(),
         };
         let proof = DpopProof::sign_with_backend(body.clone(), &backend).unwrap();
-        let bytes = canonical_json_bytes(&proof.body).unwrap();
-        assert!(proof.body.agent_key.verify(&bytes, &proof.signature));
+        verify_wrapped(
+            &proof.body.agent_key,
+            DPOP_SCHEMA,
+            &proof.body,
+            &proof.signature,
+        )
+        .unwrap();
+        assert_eq!(proof, DpopProof::sign(body, &kp).unwrap());
     }
 
     #[test]

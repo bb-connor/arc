@@ -14,7 +14,7 @@ use chio_core::receipt::lineage::SignedExportEnvelope;
 use chio_finding::{
     build_status_inclusion_proof_input, build_status_non_inclusion_proof_input,
     compute_status_epoch_id, verify_status_proof_input, FindingStatusEpoch,
-    FindingStatusFreshnessPolicy, FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_SIGNATURE_DOMAIN,
+    FindingStatusFreshnessPolicy, FINDING_STATUS_EPOCH_SCHEMA_V1,
 };
 use chio_revocation_oracle::{
     finding_status_empty_leaf_hash, FindingStatusSparseMap, FINDING_STATUS_BRANCH_DOMAIN,
@@ -170,7 +170,6 @@ impl FindingStatusEpochPublisher {
         let mut body = FindingStatusEpoch {
             schema: FINDING_STATUS_EPOCH_SCHEMA_V1.to_owned(),
             status_epoch_id: String::new(),
-            signature_domain: FINDING_STATUS_SIGNATURE_DOMAIN.to_owned(),
             status_map_version: FINDING_STATUS_MAP_VERSION.to_owned(),
             proof_semantics: FINDING_STATUS_PROOF_SEMANTICS.to_owned(),
             feed_id: self.operator.feed_id.clone(),
@@ -222,7 +221,7 @@ impl FindingStatusEpochPublisher {
         signed.body.validate().map_err(|error| error.to_string())?;
         if signed.signer_key != signed.body.operator_key
             || !signed
-                .verify_signature()
+                .verify_signature(&signed.body.operator_key)
                 .map_err(|error| error.to_string())?
         {
             return Err("current finding status epoch signature is invalid".to_owned());

@@ -47,7 +47,7 @@ impl NativeEgressCommand {
         signed: &chio_core::SignedDeclassificationGrant,
     ) -> PortResult<Self> {
         if !signed
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| PortError::invalid_data())?
         {
             return Err(PortError::invalid_data());

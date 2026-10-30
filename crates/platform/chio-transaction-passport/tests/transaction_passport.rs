@@ -140,13 +140,25 @@ fn transaction_verifier_report_schema_requires_machine_result_fields() {
     );
 }
 
-fn signed_json_bytes(mut value: Value, keypair: &Keypair) -> Vec<u8> {
+fn signed_json_bytes(value: Value, keypair: &Keypair) -> Vec<u8> {
+    let schema_id = value["schema"]
+        .as_str()
+        .test_expect("signed artifact names its schema")
+        .to_string();
+    signed_json_bytes_under(value, keypair, &schema_id)
+}
+
+fn signed_json_bytes_under(mut value: Value, keypair: &Keypair, schema_id: &str) -> Vec<u8> {
     value
         .as_object_mut()
         .test_expect("signed artifact is an object")
         .remove("signature");
-    let (signature, _) = keypair
-        .sign_canonical(&value)
+    let signature = keypair
+        .sign_wrapped(
+            schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(&value)
+                .test_expect("signed artifact canonicalizes"),
+        )
         .test_expect("signed artifact signs");
     value["signature"] = Value::String(signature.to_hex());
     serde_json::to_vec(&value).test_expect("signed artifact serializes")
@@ -170,6 +182,9 @@ fn replace_signed_artifact_key(
         signed_json_bytes(artifact, keypair),
     );
 }
+
+const MINIMAL_RECEIPT_SIGNATURE_INVALID: &str =
+    "invalid evidence graph artifact: minimal governed action evidence invalid: receipt signature invalid";
 
 fn valid_minimal_passport() -> chio_transaction_passport::TransactionPassport {
     chio_transaction_passport::TransactionPassport {
@@ -1462,6 +1477,114 @@ fn standalone_minimal_passport_rejects_forged_governed_action_signatures() {
 }
 
 #[test]
+fn standalone_minimal_passport_rejects_chio_receipt_signature_as_minimal_receipt() {
+    let mut artifacts = governed_action_artifacts();
+    let receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    artifacts.insert(
+        "kernel-receipt.json".to_string(),
+        signed_json_bytes_under(
+            receipt,
+            &Keypair::from_seed(&[53u8; 32]),
+            chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+        ),
+    );
+    let evidence_graph_bytes = governed_action_evidence_graph_bytes(&artifacts);
+    let verifier_policy_bytes = valid_verifier_policy_bytes();
+    let passport =
+        standalone_passport_for_artifact_bytes(&evidence_graph_bytes, verifier_policy_bytes);
+
+    let error = chio_transaction_passport::verify_standalone_minimal_passport_artifacts(
+        &passport,
+        "transaction-passport.json".to_string(),
+        &evidence_graph_bytes,
+        verifier_policy_bytes,
+        &artifacts,
+        &governed_action_trusted_root_keys(),
+    )
+    .test_expect_err("a chio.receipt.v1 signature must not verify as a minimal receipt");
+
+    assert_eq!(error.to_string(), MINIMAL_RECEIPT_SIGNATURE_INVALID);
+}
+
+#[test]
+fn standalone_minimal_passport_rejects_minimal_receipt_schema_member_mismatch() {
+    let mut artifacts = governed_action_artifacts();
+    let mut receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    receipt["schema"] = json!(chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA);
+    artifacts.insert(
+        "kernel-receipt.json".to_string(),
+        signed_json_bytes_under(
+            receipt,
+            &Keypair::from_seed(&[53u8; 32]),
+            chio_core_types::signed_artifact::CHIO_PROOF_ROOM_RECEIPT_EVIDENCE_V1_SCHEMA,
+        ),
+    );
+    let evidence_graph_bytes = governed_action_evidence_graph_bytes(&artifacts);
+    let verifier_policy_bytes = valid_verifier_policy_bytes();
+    let passport =
+        standalone_passport_for_artifact_bytes(&evidence_graph_bytes, verifier_policy_bytes);
+
+    let error = chio_transaction_passport::verify_standalone_minimal_passport_artifacts(
+        &passport,
+        "transaction-passport.json".to_string(),
+        &evidence_graph_bytes,
+        verifier_policy_bytes,
+        &artifacts,
+        &governed_action_trusted_root_keys(),
+    )
+    .test_expect_err("a minimal receipt must carry its own schema member");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid evidence graph artifact: minimal governed action evidence invalid: \
+         receipt schema is not chio.proof-room.receipt-evidence.v1"
+    );
+}
+
+#[test]
+fn minimal_receipt_signature_is_rejected_as_chio_receipt() {
+    let artifacts = governed_action_artifacts();
+    let mut receipt: Value = serde_json::from_slice(
+        artifacts
+            .get("kernel-receipt.json")
+            .test_expect("minimal receipt exists"),
+    )
+    .test_expect("minimal receipt parses");
+    let signature = chio_core_types::crypto::Signature::from_hex(
+        receipt["signature"]
+            .as_str()
+            .test_expect("minimal receipt carries a signature"),
+    )
+    .test_expect("minimal receipt signature decodes");
+    receipt
+        .as_object_mut()
+        .test_expect("minimal receipt is an object")
+        .remove("signature");
+
+    let verdict = chio_core_types::crypto::verify_wrapped(
+        &Keypair::from_seed(&[53u8; 32]).public_key(),
+        chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+        &receipt,
+        &signature,
+    );
+
+    assert!(
+        matches!(verdict, Err(chio_core_types::Error::SignatureRejected)),
+        "{verdict:?}"
+    );
+}
+
+#[test]
 fn standalone_minimal_passport_rejects_evidence_node_id_digest_mismatch() {
     let artifacts = governed_action_artifacts();
     let mut evidence_graph: Value =
@@ -2451,10 +2574,12 @@ fn transparency_anchored_fixture(
         "chain_root": format!("0x{}", chain_root.to_hex())
     });
     let statement_signature = root_key
-        .sign(
-            &chio_core_types::canonical_json_bytes(&statement_body)
+        .sign_wrapped(
+            "chio.checkpoint_statement.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(&statement_body)
                 .test_expect("canonical statement body"),
         )
+        .test_expect("statement signs")
         .to_hex();
 
     let log_id = transparency_checkpoint_log_id();
@@ -2565,187 +2690,8 @@ fn verify_standalone_anchored_with_checkpoint_keys(
     )
 }
 
-#[test]
-fn standalone_minimal_passport_promotes_verified_transparency_anchor() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|_| {});
-
-    let report =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect("verified transparency anchor promotes");
-
-    assert_eq!(report.transparency_state, "trust_anchored");
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_receipt_anchor_without_checkpoint_statement() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            let object = artifact
-                .as_object_mut()
-                .test_expect("inclusion artifact is an object");
-            object.remove("checkpoint_statement");
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("a receipt inclusion proof without its signed anchor must deny");
-
-    assert!(
-        matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
-    );
-    assert!(std::error::Error::source(&error).is_some());
-}
-
-#[test]
-fn standalone_minimal_passport_requires_the_complete_receipt_inclusion_envelope() {
-    for field in ["proof_id", "log_id", "checkpoint", "verified_at"] {
-        let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-            transparency_anchored_fixture(|artifact| {
-                artifact
-                    .as_object_mut()
-                    .test_expect("inclusion artifact is an object")
-                    .remove(field);
-            });
-
-        let error =
-            verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-                .test_expect_err("an incomplete v2 envelope must deny");
-        assert!(
-            matches!(&error, chio_transaction_passport::TransactionPassportError::Input(source) if source.code() == "urn:chio:error:attest:signed-json-invalid-shape")
-        );
-        assert!(std::error::Error::source(&error).is_some());
-    }
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_unknown_receipt_inclusion_envelope_fields() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            artifact["smuggled"] = json!("field");
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("a field-smuggled v2 envelope must deny");
-    assert!(matches!(
-        &error,
-        chio_transaction_passport::TransactionPassportError::Input(_)
-    ));
-    assert!(std::error::Error::source(&error).is_some());
-    assert!(!error.to_string().contains("smuggled"));
-}
-
-#[test]
-fn standalone_minimal_passport_keeps_selective_disclosure_proofs_at_preview() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            artifact["schema"] = json!("chio.transparency.inclusion-proof.v1");
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err(
-                "selective-disclosure proof hashing must not qualify as an RFC 6962 anchor",
-            );
-
-    assert!(
-        error
-            .to_string()
-            .contains("transparency state not accepted by verifier policy: transparency_preview"),
-        "{error}"
-    );
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_transparency_anchor_from_untrusted_signer() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            let rogue = Keypair::from_seed(&[99u8; 32]);
-            let mut body = artifact["checkpoint_statement"]["body"].clone();
-            body["kernel_key"] = json!(rogue.public_key().to_hex());
-            let signature = rogue
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
-                        .test_expect("canonical rogue statement body"),
-                )
-                .to_hex();
-            artifact["checkpoint_statement"] = json!({
-                "body": body,
-                "signature": signature
-            });
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("a checkpoint signed outside the pinned key set must not promote");
-
-    assert!(
-        error
-            .to_string()
-            .contains("transparency state not accepted by verifier policy: transparency_preview"),
-        "{error}"
-    );
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_transparency_anchor_with_tampered_root() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            artifact["root_hash"] = json!(format!("0x{}", "0".repeat(64)));
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("a root the checkpoint does not commit must not promote");
-
-    assert!(
-        error
-            .to_string()
-            .contains("inclusion proof does not target the committed checkpoint tree"),
-        "{error}"
-    );
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_transparency_anchor_with_unbound_subject() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|artifact| {
-            artifact["artifact_ref"] = json!("b".repeat(64));
-        });
-
-    let error =
-        verify_standalone_anchored(&artifacts, &evidence_graph_bytes, &verifier_policy_bytes)
-            .test_expect_err("an anchor not bound to a graph artifact must not promote");
-
-    assert!(
-        error
-            .to_string()
-            .contains("inclusion proof subject is not this transaction's receipt"),
-        "{error}"
-    );
-}
-
-#[test]
-fn standalone_minimal_passport_rejects_checkpoint_keys_shared_with_passport_roots() {
-    let (artifacts, evidence_graph_bytes, verifier_policy_bytes) =
-        transparency_anchored_fixture(|_| {});
-
-    let error = verify_standalone_anchored_with_checkpoint_keys(
-        &artifacts,
-        &evidence_graph_bytes,
-        &verifier_policy_bytes,
-        &governed_action_trusted_root_keys(),
-    )
-    .test_expect_err("a passport root key must not double as a checkpoint signer");
-
-    assert!(
-        error.to_string().contains(
-            "trusted checkpoint signer keys must be disjoint from passport root signer keys"
-        ),
-        "{error}"
-    );
-}
+#[path = "transaction_passport/transparency_anchor_tests.rs"]
+mod transparency_anchor_tests;
 
 #[path = "transaction_passport/transparency_anchor_edge_tests.rs"]
 mod transparency_anchor_edge_tests;

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -51,7 +51,7 @@ class Header(Header_1):
     prior_receipt_ids: list | None = Field(None, max_length=1)
 
 
-class Target1(BaseModel):
+class Target(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -59,7 +59,7 @@ class Target1(BaseModel):
     tenant_id: response_state_transition_receipt_body_v1_schema.Identifier
 
 
-class Target2(BaseModel):
+class Target7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -67,7 +67,7 @@ class Target2(BaseModel):
     session_id: response_state_transition_receipt_body_v1_schema.Identifier
 
 
-class Target3(BaseModel):
+class Target8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -75,7 +75,7 @@ class Target3(BaseModel):
     lineage_id: response_state_transition_receipt_body_v1_schema.Identifier
 
 
-class Target4(BaseModel):
+class Target9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -83,8 +83,8 @@ class Target4(BaseModel):
     affected_set_hash: response_state_transition_receipt_body_v1_schema.Digest
 
 
-class Target(RootModel[Target1 | Target2 | Target3 | Target4]):
-    root: Target1 | Target2 | Target3 | Target4
+class Target5(RootModel[Target | Target7 | Target8 | Target9]):
+    root: Target | Target7 | Target8 | Target9
 
 
 class Effect(BaseModel):
@@ -94,7 +94,7 @@ class Effect(BaseModel):
     effect_id: response_state_transition_receipt_body_v1_schema.Identifier
     ordinal: conint(ge=0, le=65535)
     kind: Kind
-    target: Target
+    target: Target5
     contribution_hash: response_state_transition_receipt_body_v1_schema.Digest
     observed_base_version_hash: response_state_transition_receipt_body_v1_schema.Digest
 

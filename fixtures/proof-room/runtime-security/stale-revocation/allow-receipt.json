@@ -1,9 +1,1 @@
-{
-  "execution_lease_ref": "lease-runtime-valid",
-  "kernel_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
-  "policy_digest": "3ef61f665f58362585af0237105bac37a93554952f010664f31468c3ca94f7b6",
-  "receipt_id": "receipt-runtime-valid",
-  "schema": "chio.runtime.terminal-receipt.v1",
-  "signature": "ddac340dca27ebda632af99e40c7be52024d86c600bdda654133a3fbc3aaf3d26442cc88570687062af81fd1545e823a420d3cd41fd406141cee45af9a47a202",
-  "terminal_status": "allowed_executed"
-}
+{"execution_lease_ref":"lease-runtime-valid","kernel_key":"31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc","policy_digest":"3ef61f665f58362585af0237105bac37a93554952f010664f31468c3ca94f7b6","receipt_id":"receipt-runtime-valid","schema":"chio.runtime.terminal-receipt.v1","signature":"23c36f046cfec438695da2ac56be9549410159120beb7fb4dacdd41c859b12b563f34d1ca7030c5e913e9e3832f98adc40749c7e897a70adcd1031ca503d1500","terminal_status":"allowed_executed"}

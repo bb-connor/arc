@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { signDpopProof, DPOP_SCHEMA } from "../src/dpop.ts";
 import { DpopSignError } from "../src/errors.ts";
-import { verifyEd25519Signature } from "../src/invariants/crypto.ts";
+import { wrappedSignatureValid } from "../src/invariants/crypto.ts";
 import { canonicalizeJson } from "../src/invariants/json.ts";
 import { sha256Hex } from "../src/invariants/crypto.ts";
 
@@ -68,11 +68,11 @@ test("body.agent_key is the Ed25519 public key derived from the seed", () => {
   assert.ok(/^[0-9a-f]+$/.test(proof.body.agent_key), "agent_key must be lowercase hex");
 });
 
-test("signature verifies against canonical JSON of body using verifyEd25519Signature", () => {
+test("signature verifies over the signing wrapper of the canonical body", () => {
   const proof = signDpopProof({ ...BASE_PARAMS });
   const bodyCanonical = canonicalizeJson(proof.body);
-  const valid = verifyEd25519Signature(bodyCanonical, proof.body.agent_key, proof.signature);
-  assert.equal(valid, true, "signature must verify against canonical JSON of body");
+  const valid = wrappedSignatureValid(DPOP_SCHEMA, bodyCanonical, proof.body.agent_key, proof.signature);
+  assert.equal(valid, true, "signature must verify over the signing wrapper of the canonical body");
 });
 
 test("canonical JSON of body has fields in alphabetical order (matching Rust serde)", () => {

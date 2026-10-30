@@ -187,7 +187,6 @@ pub fn validate_capital_execution_envelope(
             &step.principal_id,
             "capital execution authorityChain principalId",
         )?;
-        validate_capital_execution_authority_step_proof(step)?;
         if step.approved_at > step.expires_at {
             return Err(
                 "capital execution authorityChain requires approvedAt <= expiresAt".to_string(),
@@ -372,4 +371,8 @@ fn validate_positive_amount(amount: &MonetaryAmount, label: &str) -> Result<(), 
         return Err(format!("{label} must be greater than zero"));
     }
     validate_non_empty_clean(&amount.currency, &format!("{label} currency"))
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalExecutionInstructionArtifact {
+    const SCHEMA_ID: &'static str = crate::CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA;
 }

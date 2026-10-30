@@ -24,7 +24,7 @@ fn signed_receipts_preserve_uncapped_and_full_width_grant_ceilings() {
                 ))
                 .unwrap();
             assert_eq!(response.verdict, Verdict::Allow);
-            assert!(response.receipt.verify_signature().unwrap());
+            assert!(response.receipt.verify_integrity_embedded_key().unwrap());
             let financial: FinancialReceiptMetadata = serde_json::from_value(
                 response.receipt.metadata.as_ref().unwrap()["financial"].clone(),
             )
@@ -55,7 +55,7 @@ fn denial_receipt_reports_the_committed_balance_not_the_original_ceiling() {
         .evaluate_tool_call_blocking(&make_request("second", &cap, "compute", "cost-srv"))
         .unwrap();
     assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied.receipt.verify_signature().unwrap());
+    assert!(denied.receipt.verify_integrity_embedded_key().unwrap());
     let financial = &denied.receipt.metadata.as_ref().unwrap()["financial"];
     assert_eq!(financial["budget_remaining"], serde_json::json!(75));
     assert_eq!(financial["cost_charged"], serde_json::json!(0));

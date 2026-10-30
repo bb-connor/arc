@@ -939,3 +939,19 @@ pub struct CreditBondListReport {
 }
 
 include!("credit/capital_and_execution.rs");
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CreditBondArtifact {
+    const SCHEMA_ID: &'static str = CREDIT_BOND_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CreditFacilityArtifact {
+    const SCHEMA_ID: &'static str = CREDIT_FACILITY_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CreditScorecardReport {
+    const SCHEMA_ID: &'static str = CREDIT_SCORECARD_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ExposureLedgerReport {
+    const SCHEMA_ID: &'static str = EXPOSURE_LEDGER_SCHEMA;
+}

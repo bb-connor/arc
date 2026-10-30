@@ -314,7 +314,7 @@ impl Fixture {
         assert_eq!(self.counters.authorizations.load(Ordering::SeqCst), 1);
         assert_eq!(self.counters.invocations.load(Ordering::SeqCst), 1);
         assert_eq!(self.counters.captures.load(Ordering::SeqCst), 1);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let terminals: Vec<_> = self
             .kernel
             .receipt_log()

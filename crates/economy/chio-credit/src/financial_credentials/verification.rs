@@ -53,9 +53,8 @@ pub(super) fn verify_source_completeness_attestation(
     {
         return Err(FinancialCredentialProjectionError::InvalidSourceAttestationBinding);
     }
-    if !checkpoint_body
-        .checkpoint_authority_key
-        .verify_canonical(body, &proof.signature)
+    if !proof
+        .verify_signature(&checkpoint_body.checkpoint_authority_key)
         .map_err(|_| FinancialCredentialProjectionError::InvalidSourceAttestationSignature)?
     {
         return Err(FinancialCredentialProjectionError::InvalidSourceAttestationSignature);

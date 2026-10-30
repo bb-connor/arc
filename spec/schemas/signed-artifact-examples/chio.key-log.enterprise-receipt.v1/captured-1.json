@@ -1,0 +1,25 @@
+{
+  "checkpoint_hash": "0x36bcbc80cac506e897abf3205e4d23e975ab275090fa5ca3035a2263b680740b",
+  "checkpoint_sequence": 0,
+  "event_envelope_hash": "0xc800005ae1ba62061e458ef0200d56b0dfacd55867792c83ddba3f629fc1359b",
+  "event_id": "event.genesis",
+  "event_sequence": 0,
+  "event_signers": [
+    {
+      "key_id": "0xf54188cfca31f9014c03515e6b2444f9462c44aae5231cd3d48fe3df3258f230",
+      "role": "bootstrap"
+    }
+  ],
+  "issued_at": 5000,
+  "log_id": "log.snapshot",
+  "operator_key_id": "0x6bd66dfc77930771af45dc94ec2fa7d1e78cd5af8a483fa79954b44f48f1f485",
+  "outcome": "pending_committed",
+  "receipt_id": "key-receipt:323192248afb342de2bd8592ac4e27272a171366a7a8c65b263717f4ba24458c",
+  "root_hash": "0xd5548b37a8c48461a7634956eac612c741e1ff0ee8e7e6117726fd03f7c3e36e",
+  "schema": "chio.key-log.enterprise-receipt.v1",
+  "stage": "pending",
+  "transaction_id": "key-tx:0fe548f2f0310fe1a58d3f4f08e09ddf01ce49c3bb2ddd6911846fc6e490e4b3",
+  "tree_size": 1,
+  "witness_roster_id": "roster.snapshot",
+  "witness_signatures": []
+}

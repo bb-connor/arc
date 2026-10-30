@@ -20,7 +20,7 @@ fn formal_closure_kernel_with_store(prefix: &str) -> (ChioKernel, std::path::Pat
 
 fn formal_closure_assert_one_signed_receipt(path: &std::path::Path, response: &ToolCallResponse) {
     assert_eq!(formal_closure_receipt_count(path), 1);
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 struct FormalClosureGuardError;

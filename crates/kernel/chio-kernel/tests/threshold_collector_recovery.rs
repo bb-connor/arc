@@ -9,7 +9,7 @@ use chio_core::capability::governance::{
 use chio_core::capability::threshold_approval::{
     ThresholdApprovalRequest, ThresholdApprovalRequirement, ThresholdApproverIdentity,
 };
-use chio_core::crypto::{sha256_hex, Keypair, SigningAlgorithm};
+use chio_core::crypto::{sha256_hex, Keypair};
 use chio_kernel::approval::{
     ApprovalStoreError, ThresholdApprovalProposalCreationContext,
     ThresholdApprovalProposalCreationParameters,
@@ -272,22 +272,6 @@ fn recovery_rejects_missing_submitter_and_self_approval() -> TestResult {
     ] {
         let mut fixture = Fixture::new()?;
         fixture.record.submitter = submitter.map(|index| fixture.approvers[index].public_key());
-        fixture.assert_recovery_rejected(expected)?;
-    }
-    Ok(())
-}
-
-#[test]
-fn recovery_rejects_algorithm_metadata_substitution() -> TestResult {
-    for proposal in [false, true] {
-        let mut fixture = Fixture::new()?;
-        let expected = if proposal {
-            fixture.record.proposal.algorithm = Some(SigningAlgorithm::P256);
-            SIGNER_NOT_TRUSTED
-        } else {
-            fixture.record.tokens[0].algorithm = Some(SigningAlgorithm::P256);
-            TOKEN_UNVERIFIED
-        };
         fixture.assert_recovery_rejected(expected)?;
     }
     Ok(())

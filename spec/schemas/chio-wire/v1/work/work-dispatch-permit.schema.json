@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/work/work-dispatch-permit.schema.json",
+  "title": "Chio work dispatch permit signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signer"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allocation_hash",
+        "issued_at",
+        "root_id",
+        "selection",
+        "slot"
+      ],
+      "properties": {
+        "allocation_hash": {
+          "type": "string"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "root_id": {
+          "type": "string"
+        },
+        "selection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature",
+            "signer"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "capability_hash",
+                "expected_revision",
+                "offer",
+                "request_id"
+              ],
+              "properties": {
+                "capability_hash": {
+                  "type": "string"
+                },
+                "expected_revision": {
+                  "type": "integer"
+                },
+                "offer": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "body",
+                    "signature",
+                    "signer"
+                  ],
+                  "properties": {
+                    "body": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "allocation_hash",
+                        "arguments_hash",
+                        "contract_hash",
+                        "effect",
+                        "expires_at",
+                        "price_units",
+                        "receiver",
+                        "slot_id"
+                      ],
+                      "properties": {
+                        "allocation_hash": {
+                          "type": "string"
+                        },
+                        "arguments_hash": {
+                          "type": "string"
+                        },
+                        "contract_hash": {
+                          "type": "string"
+                        },
+                        "effect": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "server",
+                            "tool"
+                          ],
+                          "properties": {
+                            "server": {
+                              "type": "string"
+                            },
+                            "tool": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "expires_at": {
+                          "type": "integer"
+                        },
+                        "price_units": {
+                          "type": "integer"
+                        },
+                        "receiver": {
+                          "type": "string"
+                        },
+                        "slot_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "signature": {
+                      "type": "string"
+                    },
+                    "signer": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "request_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signer": {
+              "type": "string"
+            }
+          }
+        },
+        "slot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract",
+            "holder",
+            "id"
+          ],
+          "properties": {
+            "contract": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "acceptance",
+                "currency",
+                "depth",
+                "effects",
+                "expires_at",
+                "max_units",
+                "readers"
+              ],
+              "properties": {
+                "acceptance": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "clauses"
+                  ],
+                  "properties": {
+                    "clauses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "max",
+                          "min",
+                          "pointer"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "max": {
+                            "type": "integer"
+                          },
+                          "min": {
+                            "type": "integer"
+                          },
+                          "pointer": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "depth": {
+                  "type": "integer"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "server",
+                      "tool"
+                    ],
+                    "properties": {
+                      "server": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "expires_at": {
+                  "type": "integer"
+                },
+                "max_units": {
+                  "type": "integer"
+                },
+                "readers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "holder": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "signer": {
+      "type": "string"
+    }
+  }
+}

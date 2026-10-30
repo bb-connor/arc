@@ -77,9 +77,7 @@ fn web3_settlement_registry_accepts_v1_and_refuses_v2() {
 #[test]
 fn economic_continuity_schemas_are_registered() {
     for (schema, artifact_kind) in [
-        ("chio.economy.resource-head.v1", "economic_resource_head"),
         ("chio.economy.state-batch.v1", "economic_state_batch"),
-        ("chio.economy.effect-slot.v1", "economic_effect_slot"),
         ("chio.economy.anchor-view.v1", "economic_state_anchor_view"),
         (
             "chio.economy.effect-dispatch-commit.v1",
@@ -348,13 +346,20 @@ fn econsim_qualification_matrix_is_registered_and_unknown_versions_fail_closed()
     )))
     .expect("econsim qualification fixture parses");
     assert_eq!(body["schema"], schema);
+    #[derive(Clone, serde::Serialize)]
+    #[serde(transparent)]
+    struct QualificationMatrix(serde_json::Value);
+    impl chio_core_types::receipt::lineage::SignedExportPayload for QualificationMatrix {
+        const SCHEMA_ID: &'static str = "chio.econsim.qualification-matrix.v1";
+    }
+    let key = chio_core_types::Keypair::from_seed(&[91; 32]);
     let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(
-        body,
-        &chio_core_types::Keypair::from_seed(&[91; 32]),
+        QualificationMatrix(body),
+        &key,
     )
     .expect("econsim qualification fixture signs");
     assert!(signed
-        .verify_signature()
+        .verify_signature(&key.public_key())
         .expect("econsim signature verifies"));
 }
 
@@ -429,7 +434,7 @@ fn new_economy_artifact_families_are_registered_exactly() {
         "/../../../spec/schemas/registry.json"
     )))
     .expect("schema registry parses");
-    let rows: Vec<(&str, &str, &str, &str)> = registry
+    let mut rows: Vec<(&str, &str, &str, &str)> = registry
         .get("artifacts")
         .and_then(serde_json::Value::as_array)
         .expect("registry artifacts are present")
@@ -471,83 +476,83 @@ fn new_economy_artifact_families_are_registered_exactly() {
         })
         .collect();
 
-    assert_eq!(
-        rows,
-        [
-            (
-                "chio.obligation.status-proof.v1",
-                "obligation_status_proof",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/obligation-status-proof.v1.json",
-            ),
-            (
-                "chio.credit.facility-bind.v1",
-                "credit_facility_bind",
-                "credit-admission-v1",
-                "spec/schemas/chio-economy/credit-facility-bind.v1.json",
-            ),
-            (
-                "chio.credit.receivable-iou-envelope.v1",
-                "credit_iou_envelope",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/receivable-iou-envelope.v1.json",
-            ),
-            (
-                "chio.factor.normalized-assignment-request.v1",
-                "factor_normalized_assignment_request",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-normalized-assignment-request.v1.json",
-            ),
-            (
-                "chio.factor.receivable-claim.v1",
-                "factor_receivable_claim",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-receivable-claim.v1.json",
-            ),
-            (
-                "chio.factor.assignment-offer.v1",
-                "factor_assignment_offer",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-offer.v1.json",
-            ),
-            (
-                "chio.factor.discount-quote.v1",
-                "factor_discount_quote",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-discount-quote.v1.json",
-            ),
-            (
-                "chio.factor.assignment-bind-authorization.v1",
-                "factor_assignment_bind_authorization",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json",
-            ),
-            (
-                "chio.factor.assignment-agreement.v1",
-                "factor_assignment_agreement",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-agreement.v1.json",
-            ),
-            (
-                "chio.factor.assignment-acknowledgement.v1",
-                "factor_assignment_acknowledgement",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json",
-            ),
-            (
-                "chio.factor.assignment-not-applied.v1",
-                "factor_assignment_not_applied",
-                "receivables-factoring-v1",
-                "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json",
-            ),
-            (
-                "chio.parametric.policy.v1",
-                "parametric_policy",
-                "parametric-insurance-v1",
-                "spec/schemas/chio-parametric/v1/policy.schema.json",
-            ),
-        ]
-    );
+    let mut expected = [
+        (
+            "chio.obligation.status-proof.v1",
+            "obligation_status_proof",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/obligation-status-proof.v1.json",
+        ),
+        (
+            "chio.credit.facility-bind.v1",
+            "credit_facility_bind",
+            "credit-admission-v1",
+            "spec/schemas/chio-economy/credit-facility-bind.v1.json",
+        ),
+        (
+            "chio.credit.receivable-iou-envelope.v1",
+            "credit_iou_envelope",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/receivable-iou-envelope.v1.json",
+        ),
+        (
+            "chio.factor.normalized-assignment-request.v1",
+            "factor_normalized_assignment_request",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-normalized-assignment-request.v1.json",
+        ),
+        (
+            "chio.factor.receivable-claim.v1",
+            "factor_receivable_claim",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-receivable-claim.v1.json",
+        ),
+        (
+            "chio.factor.assignment-offer.v1",
+            "factor_assignment_offer",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-offer.v1.json",
+        ),
+        (
+            "chio.factor.discount-quote.v1",
+            "factor_discount_quote",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-discount-quote.v1.json",
+        ),
+        (
+            "chio.factor.assignment-bind-authorization.v1",
+            "factor_assignment_bind_authorization",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-bind-authorization.v1.json",
+        ),
+        (
+            "chio.factor.assignment-agreement.v1",
+            "factor_assignment_agreement",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-agreement.v1.json",
+        ),
+        (
+            "chio.factor.assignment-acknowledgement.v1",
+            "factor_assignment_acknowledgement",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-acknowledgement.v1.json",
+        ),
+        (
+            "chio.factor.assignment-not-applied.v1",
+            "factor_assignment_not_applied",
+            "receivables-factoring-v1",
+            "spec/schemas/chio-economy/factor-assignment-not-applied.v1.json",
+        ),
+        (
+            "chio.parametric.policy.v1",
+            "parametric_policy",
+            "parametric-insurance-v1",
+            "spec/schemas/chio-parametric/v1/policy.schema.json",
+        ),
+    ];
+    rows.sort_unstable();
+    expected.sort_unstable();
+    assert_eq!(rows, expected);
     assert!(chio_core_types::is_supported_signed_artifact_schema(
         "chio.obligation.status-proof.v1"
     ));
@@ -615,7 +620,7 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
         "/../../../spec/schemas/registry.json"
     )))
     .expect("schema registry parses");
-    let rows: Vec<(&str, &str, &str, &str)> = registry
+    let mut rows: Vec<(&str, &str, &str, &str)> = registry
         .get("artifacts")
         .and_then(serde_json::Value::as_array)
         .expect("registry artifacts are present")
@@ -641,7 +646,7 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
             })
         })
         .collect();
-    let expected = [
+    let mut expected = [
         (
             chio_core_types::CHIO_OUTCOME_PREDICATE_V1_SCHEMA,
             "outcome_predicate",
@@ -698,6 +703,8 @@ fn outcome_signed_artifact_schemas_are_registered_exactly() {
         ),
     ];
 
+    rows.sort_unstable();
+    expected.sort_unstable();
     assert_eq!(rows, expected);
     for (schema, ..) in expected {
         assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
@@ -837,6 +844,156 @@ fn finding_family_schema_registry_parity_is_bidirectional() {
     }
 
     const EXPECTED_SIGNED: &[(&str, &str, &str, &str)] = &[
+        (
+            "chio.finding.audit-seed-witness.v1",
+            "finding_audit_seed_witness",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/audit-seed-witness.schema.json",
+        ),
+        (
+            "chio.finding.bond-store-snapshot.v1",
+            "finding_bond_store_snapshot",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/bond-store-snapshot.schema.json",
+        ),
+        (
+            "chio.finding.current-listing-assertion.v1",
+            "finding_current_listing_assertion",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/current-listing-assertion.schema.json",
+        ),
+        (
+            "chio.finding.hosted-api-key-lifecycle.v1",
+            "finding_hosted_api_key_lifecycle",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-api-key-lifecycle.schema.json",
+        ),
+        (
+            "chio.finding.hosted-archive-manifest.v1",
+            "hosted_archive_manifest",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-archive-manifest.schema.json",
+        ),
+        (
+            "chio.finding.hosted-authority-transition.v1",
+            "hosted_authority_transition",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-authority-transition.schema.json",
+        ),
+        (
+            "chio.finding.hosted-canary-observation.v1",
+            "finding_hosted_canary_observation",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-canary-observation.schema.json",
+        ),
+        (
+            "chio.finding.hosted-gc-receipt.v1",
+            "hosted_gc_receipt",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-gc-receipt.schema.json",
+        ),
+        (
+            "chio.finding.hosted-journal-checkpoint.v1",
+            "hosted_journal_checkpoint",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-journal-checkpoint.schema.json",
+        ),
+        (
+            "chio.finding.hosted-legal-hold.v1",
+            "hosted_legal_hold",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-legal-hold.schema.json",
+        ),
+        (
+            "chio.finding.hosted-principal-lifecycle.v1",
+            "hosted_principal_lifecycle",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-principal-lifecycle.schema.json",
+        ),
+        (
+            "chio.finding.hosted-principal-replication-event.v1",
+            "hosted_principal_replication_event",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-principal-replication-event.schema.json",
+        ),
+        (
+            "chio.finding.hosted-quota-alert.v1",
+            "hosted_quota_alert",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-quota-alert.schema.json",
+        ),
+        (
+            "chio.finding.hosted-replication-check.v1",
+            "hosted_replication_check",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-replication-check.schema.json",
+        ),
+        (
+            "chio.finding.hosted-replication-event.v1",
+            "hosted_replication_event",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-replication-event.schema.json",
+        ),
+        (
+            "chio.finding.hosted-restore-verification.v1",
+            "hosted_restore_verification",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-restore-verification.schema.json",
+        ),
+        (
+            "chio.finding.hosted-sqlite-import-batch.v1",
+            "hosted_sqlite_import_batch",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-sqlite-import-batch.schema.json",
+        ),
+        (
+            "chio.finding.hosted.aggregate-checkpoint.v1",
+            "hosted_aggregate_checkpoint",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/hosted-aggregate-checkpoint.schema.json",
+        ),
+        (
+            "chio.finding.operator-purchase-job.v1",
+            "finding_operator_purchase_job",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/operator-purchase-job.schema.json",
+        ),
+        (
+            "chio.finding.pool-debit-authorization.v1",
+            "finding_pool_debit_authorization",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/pool-debit-authorization.schema.json",
+        ),
+        (
+            "chio.finding.status-intent-submission.v1",
+            "finding_status_intent_submission",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/status-intent-submission.schema.json",
+        ),
+        (
+            "chio.finding.voluntary-retraction-receipt.v1",
+            "finding_voluntary_retraction_receipt",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/voluntary-retraction-receipt.schema.json",
+        ),
+        (
+            "chio.finding.worker-attested-result.v1",
+            "finding_worker_attested_result",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/worker-attested-result.schema.json",
+        ),
+        (
+            "chio.finding.worker-capability.v1",
+            "finding_worker_capability",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/worker-capability.schema.json",
+        ),
+        (
+            "chio.finding.anchor-checkpoint-publication.v1",
+            "finding_anchor_checkpoint_publication",
+            "signing-wrapper-v1",
+            "spec/schemas/chio-wire/v1/finding/anchor-checkpoint-publication.schema.json",
+        ),
         (
             "chio.finding.v1",
             "finding",
@@ -1301,8 +1458,13 @@ fn request_lineage_record() -> RequestLineageRecord {
     )
 }
 
-fn sign_body<T: serde::Serialize>(body: &T, keypair: &Keypair) -> Signature {
-    keypair.sign_canonical(body).expect("body signs").0
+fn sign_body<T: serde::Serialize>(schema_id: &str, body: &T, keypair: &Keypair) -> Signature {
+    keypair
+        .sign_wrapped(
+            schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(body).expect("body canonicalizes"),
+        )
+        .expect("body signs")
 }
 
 fn session_anchor_from_body(body: SessionAnchorBody, signature: Signature) -> SessionAnchor {
@@ -1395,21 +1557,33 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
 
     let mut anchor_body = session_anchor_body(&keypair);
     anchor_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let anchor_signature = sign_body(&anchor_body, &keypair);
+    let anchor_signature = sign_body(
+        chio_core_types::session::CHIO_SESSION_ANCHOR_SCHEMA,
+        &anchor_body,
+        &keypair,
+    );
     let anchor = session_anchor_from_body(anchor_body, anchor_signature);
-    assert!(anchor.verify_signature().is_err());
+    assert!(anchor.verify_integrity_embedded_key().is_err());
 
     let mut lineage_body = receipt_lineage_body(&keypair);
     lineage_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let lineage_signature = sign_body(&lineage_body, &keypair);
+    let lineage_signature = sign_body(
+        chio_core_types::receipt::lineage::CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+        &lineage_body,
+        &keypair,
+    );
     let lineage = receipt_lineage_from_body(lineage_body, lineage_signature);
-    assert!(lineage.verify_signature().is_err());
+    assert!(lineage.verify_integrity_embedded_key().is_err());
 
     let mut continuation_body = continuation_body(&keypair);
     continuation_body.schema = UNSUPPORTED_SCHEMA.to_string();
-    let continuation_signature = sign_body(&continuation_body, &keypair);
+    let continuation_signature = sign_body(
+        chio_core_types::capability::governance::CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
+        &continuation_body,
+        &keypair,
+    );
     let continuation = continuation_from_body(continuation_body, continuation_signature);
-    assert!(continuation.verify_signature().is_err());
+    assert!(continuation.verify_integrity_embedded_key().is_err());
 }
 
 #[test]

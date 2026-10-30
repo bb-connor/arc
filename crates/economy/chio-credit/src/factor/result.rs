@@ -1364,7 +1364,7 @@ pub fn classify_assignment_not_applied(
     Ok(None)
 }
 
-fn verify_result_authority<T: Serialize + Clone>(
+fn verify_result_authority<T: chio_core_types::receipt::lineage::SignedExportPayload + Clone>(
     authority_id: &str,
     authority_key_epoch: u64,
     signed: &SignedExportEnvelope<T>,
@@ -1378,10 +1378,18 @@ fn verify_result_authority<T: Serialize + Clone>(
         || signed.signer_key != trust.authority_key
         || &signed.signer_key != status_proof.signer_key()
         || !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| FactorError::Canonicalization(error.to_string()))?
     {
         return Err(FactorError::AuthorityVerification);
     }
     Ok(())
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AssignmentAcknowledgementBodyV1 {
+    const SCHEMA_ID: &'static str = FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AssignmentNotAppliedBodyV1 {
+    const SCHEMA_ID: &'static str = FACTOR_ASSIGNMENT_NOT_APPLIED_SCHEMA;
 }

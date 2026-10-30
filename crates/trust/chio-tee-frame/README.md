@@ -12,7 +12,7 @@ Create and sign a local frame, then validate it against the chosen tenant key:
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chio_core::crypto::Keypair;
 use chio_tee_frame::{
-    canonicalize, parse, signing_payload, validate_signed,
+    canonicalize, parse, signing_body, validate_signed, TEE_CAPTURE_FRAME_SCHEMA,
     Frame, FrameInputs, Otel, Provenance, Upstream, UpstreamSystem, Verdict,
 };
 let key = Keypair::from_seed(&[7; 32]);
@@ -34,7 +34,7 @@ let mut frame = Frame::build(FrameInputs {
     tenant_sig: format!("ed25519:{}", STANDARD.encode([0u8; 64])),
 })?;
 frame.tenant_sig = format!("ed25519:{}",
-    STANDARD.encode(key.sign(&signing_payload(&frame)?).to_bytes()));
+    STANDARD.encode(key.sign_wrapped(TEE_CAPTURE_FRAME_SCHEMA, &signing_body(&frame)?)?.to_bytes()));
 let decoded = parse(&canonicalize(&frame)?)?;
 validate_signed(&decoded, &key.public_key_bytes())?;
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -48,7 +48,8 @@ rehash referenced blobs, select trusted tenant keys, and enforce freshness.
 - `Frame::build`, `parse`, and `canonicalize` validate structural invariants:
   schema, identifiers, time format, object invocation, hashes, and reason gate.
 - `parse` bounds original JSON to 16 MiB and rejects duplicate members.
-- `signing_payload` excludes only `tenant_sig` from canonical frame bytes.
+- `signing_body` excludes only `tenant_sig` from canonical frame bytes; `signing_payload`
+  is the 88-byte signing wrapper over it under `chio.tee-capture-frame.v1`.
   `validate_signed` adds Ed25519 verification using a caller-resolved key.
 - Deny/rewrite require a namespaced reason; allow requires its absence.
 

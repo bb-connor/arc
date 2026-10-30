@@ -77,6 +77,11 @@ Optional shared registries and federation state:
 - `--certification-registry-file <path>`
 - `--policy <path>` when using reputation-gated issuance or runtime-assurance
   issuance tiers
+- one or more `--capital-authority-key <hex>` values when serving capital
+  instruction, capital allocation, reserve-control loss lifecycle, or claim
+  settlement instruction issuance; these Ed25519 public keys are the only
+  signers accepted for capital authority steps, and those endpoints refuse
+  with `409 Conflict` when none is configured
 
 Clustered deployments additionally require:
 

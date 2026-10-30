@@ -1,5 +1,5 @@
 import { canonicalizeJson } from "./json.ts";
-import { verifyEd25519Signature } from "./crypto.ts";
+import { wrappedSignatureValid } from "./crypto.ts";
 import { ChioInvariantError, parseJsonText } from "./errors.ts";
 
 export type CapabilityTimeStatus = "valid" | "not_yet_valid" | "expired";
@@ -15,6 +15,44 @@ export interface DelegationLink {
 }
 
 export const CAPABILITY_SCHEMA = "chio.capability.v1";
+export const DELEGATION_LINK_SCHEMA = "chio.delegation-link.v1";
+
+const CAPABILITY_MEMBERS: ReadonlySet<string> = new Set([
+  "schema",
+  "id",
+  "issuer",
+  "subject",
+  "scope",
+  "issued_at",
+  "expires_at",
+  "delegation_chain",
+  "aggregate_invocation_budget",
+  "caveats",
+  "scope_attenuations",
+  "attenuation_proof",
+  "budget_share_bps",
+  "signature",
+]);
+
+const DELEGATION_LINK_MEMBERS: ReadonlySet<string> = new Set([
+  "capability_id",
+  "delegator",
+  "delegatee",
+  "attenuations",
+  "timestamp",
+  "scope_hash",
+  "aggregate_budget",
+  "cumulative_approval",
+  "signature",
+]);
+
+function rejectUnknownMembers(value: object, allowed: ReadonlySet<string>, kind: string): void {
+  for (const key of Object.keys(value).sort()) {
+    if (!allowed.has(key)) {
+      throw new ChioInvariantError("json", `${kind} has unknown member ${key}`);
+    }
+  }
+}
 
 export interface CapabilityToken {
   schema: typeof CAPABILITY_SCHEMA;
@@ -25,7 +63,7 @@ export interface CapabilityToken {
   issued_at: number;
   expires_at: number;
   delegation_chain?: DelegationLink[];
-  algorithm?: unknown;
+  aggregate_invocation_budget?: unknown;
   caveats?: unknown[];
   scope_attenuations?: unknown[];
   attenuation_proof?: unknown;
@@ -56,7 +94,15 @@ function verifyDelegationChain(chain: DelegationLink[], maxDelegationDepth?: num
 
   let previous: DelegationLink | undefined;
   for (const current of chain) {
-    if (!verifyEd25519Signature(canonicalizeJson(delegationLinkBody(current)), current.delegator, current.signature)) {
+    rejectUnknownMembers(current, DELEGATION_LINK_MEMBERS, "delegation link");
+    if (
+      !wrappedSignatureValid(
+        DELEGATION_LINK_SCHEMA,
+        canonicalizeJson(delegationLinkBody(current)),
+        current.delegator,
+        current.signature,
+      )
+    ) {
       return false;
     }
 
@@ -87,11 +133,11 @@ function requireCapabilitySchema(capability: CapabilityToken): void {
   if (capability.schema !== CAPABILITY_SCHEMA) {
     throw new ChioInvariantError("json", `capability schema must be "${CAPABILITY_SCHEMA}"`);
   }
+  rejectUnknownMembers(capability, CAPABILITY_MEMBERS, "capability");
 }
 
 function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {
   const {
-    algorithm: _algorithm,
     attenuation_proof: _attenuationProof,
     budget_share_bps: _budgetShareBps,
     caveats: _caveats,
@@ -145,7 +191,8 @@ export function verifyCapability(
   }
 
   return {
-    signature_valid: verifyEd25519Signature(
+    signature_valid: wrappedSignatureValid(
+      CAPABILITY_SCHEMA,
       capabilitySigningBodyCanonicalJson(capability),
       capability.issuer,
       capability.signature,

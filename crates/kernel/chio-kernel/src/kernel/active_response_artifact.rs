@@ -1,6 +1,9 @@
 use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
 use chio_core::capability::token::CapabilityToken;
-use chio_core::{canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningBackend};
+use chio_core::crypto::verify_wrapped_bytes;
+use chio_core::{
+    canonical_json_bytes, sha256, CanonicalBytes, Hash, PublicKey, Signature, SigningBackend,
+};
 use chio_security_types::ports::{ActionId, AdmissionArtifactRef, Digest32, TenantId};
 use chio_security_types::ResponsePlanAuthorizationBody;
 use serde::{Deserialize, Serialize};
@@ -17,8 +20,6 @@ pub const ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA: &str =
     "chio.active-response-artifact-authority-attestation.v1";
 pub const ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA: &str =
     "chio.attested-finding-admission-artifact-payload.v1";
-const ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_SIGNATURE_DOMAIN: &[u8] =
-    b"chio.active-response-artifact-authority-attestation.v1\0";
 const ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_DIGEST_DOMAIN: &[u8] =
     b"chio.attested-finding-admission-artifact-payload.v1\0";
 const ACTIVE_RESPONSE_SUBMISSION_PROOF_DIGEST_DOMAIN: &[u8] =
@@ -140,20 +141,25 @@ impl ActiveResponseArtifactAuthorityAttestation {
     ) -> Result<Self, ActiveResponseArtifactAuthorityAttestationError> {
         body.validate()?;
         let expected_authority = body.authority.clone();
+        let signing_body = active_response_artifact_authority_signing_body(&body)?;
         let outcome = backend
-            .sign_bytes_for_identity(
+            .sign_wrapped_for_identity(
                 &expected_authority,
-                &active_response_artifact_authority_signing_bytes(&body)?,
+                ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+                &signing_body,
             )
             .map_err(|error| {
                 ActiveResponseArtifactAuthorityAttestationError::Signing(error.to_string())
             })?;
-        let signing_bytes = active_response_artifact_authority_signing_bytes(&body)?;
-        let expected_algorithm = expected_authority.algorithm();
         if outcome.public_key != expected_authority
-            || outcome.algorithm != expected_algorithm
-            || outcome.signature.algorithm() != expected_algorithm
-            || !expected_authority.verify(&signing_bytes, &outcome.signature)
+            || outcome.algorithm != expected_authority.algorithm()
+            || verify_wrapped_bytes(
+                &expected_authority,
+                ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+                &signing_body,
+                &outcome.signature,
+            )
+            .is_err()
         {
             return Err(ActiveResponseArtifactAuthorityAttestationError::Signing(
                 "backend returned an invalid authority identity or signature".to_string(),
@@ -165,17 +171,19 @@ impl ActiveResponseArtifactAuthorityAttestation {
         })
     }
 
-    pub fn verify_signature(
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(
         &self,
     ) -> Result<bool, ActiveResponseArtifactAuthorityAttestationError> {
         self.body.validate()?;
-        if self.signature.algorithm() != self.body.authority.algorithm() {
-            return Ok(false);
-        }
-        Ok(self.body.authority.verify(
-            &active_response_artifact_authority_signing_bytes(&self.body)?,
+        Ok(verify_wrapped_bytes(
+            &self.body.authority,
+            ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_ATTESTATION_SCHEMA,
+            &active_response_artifact_authority_signing_body(&self.body)?,
             &self.signature,
-        ))
+        )
+        .is_ok())
     }
 }
 
@@ -187,19 +195,15 @@ pub enum ActiveResponseArtifactAuthorityAttestationError {
     Signing(String),
 }
 
-pub fn active_response_artifact_authority_signing_bytes(
+/// Validated canonical signing body; the wrapper binds it to
+/// `chio.active-response-artifact-authority-attestation.v1`.
+pub fn active_response_artifact_authority_signing_body(
     body: &ActiveResponseArtifactAuthorityAttestationBody,
-) -> Result<Vec<u8>, ActiveResponseArtifactAuthorityAttestationError> {
+) -> Result<CanonicalBytes, ActiveResponseArtifactAuthorityAttestationError> {
     body.validate()?;
-    let canonical = canonical_json_bytes(body).map_err(|error| {
+    CanonicalBytes::from_serializable(body).map_err(|error| {
         ActiveResponseArtifactAuthorityAttestationError::Invalid(error.to_string())
-    })?;
-    let mut signing_bytes = Vec::with_capacity(
-        ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_SIGNATURE_DOMAIN.len() + canonical.len(),
-    );
-    signing_bytes.extend_from_slice(ACTIVE_RESPONSE_ARTIFACT_AUTHORITY_SIGNATURE_DOMAIN);
-    signing_bytes.extend_from_slice(&canonical);
-    Ok(signing_bytes)
+    })
 }
 
 #[derive(Serialize)]
@@ -389,7 +393,7 @@ impl ChioKernel {
             ));
         }
         if !attestation
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| denied(&error.to_string()))?
         {
             return Err(denied(
@@ -461,3 +465,7 @@ fn public_key_material_is_zero(encoded: &str) -> bool {
 fn denied(message: &str) -> KernelError {
     KernelError::GovernedTransactionDenied(format!("active response denied: {message}"))
 }
+
+#[cfg(test)]
+#[path = "active_response_artifact/wrapper_refusal_tests.rs"]
+mod wrapper_refusal_tests;

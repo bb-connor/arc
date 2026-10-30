@@ -626,3 +626,31 @@ def test_bedrock_chio_client_emit_metering_requires_trusted_keys() -> None:
             receipt=receipt,
             invocation_parameters=params,
         )
+
+
+def test_verify_trusted_receipt_refuses_raw_body_signature_and_algorithm_member() -> None:
+    from cryptography.hazmat.primitives.asymmetric import ed25519 as _ed25519
+
+    params = {"modelId": "model-a", "messages": []}
+    receipt = _authoritative_receipt(parameters=params)
+
+    raw = dict(receipt)
+    signing_body = {"id": raw["id"], "body": _receipt_id_input(raw)}
+    raw["signature"] = (
+        _ed25519.Ed25519PrivateKey.from_private_bytes(_TRUSTED_SEED)
+        .sign(_canonical_json(signing_body).encode("utf-8"))
+        .hex()
+    )
+    raw_outcome = verify_trusted_receipt(
+        raw, trusted_kernel_keys=[_TRUSTED_PUB_HEX], invocation_parameters=params
+    )
+    assert raw_outcome.signature_ok is False
+    assert "ed25519 signature did not verify" in raw_outcome.reasons
+
+    with_algorithm = dict(receipt)
+    with_algorithm["algorithm"] = "ed25519"
+    algorithm_outcome = verify_trusted_receipt(
+        with_algorithm, trusted_kernel_keys=[_TRUSTED_PUB_HEX], invocation_parameters=params
+    )
+    assert algorithm_outcome.signature_ok is False
+    assert "receipt has unknown member algorithm" in algorithm_outcome.reasons

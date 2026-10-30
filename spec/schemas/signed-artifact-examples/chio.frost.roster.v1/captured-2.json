@@ -1,0 +1,34 @@
+{
+  "allowedDomains": [
+    "chio.frost.channel-close.v1"
+  ],
+  "authorityScope": "treaty",
+  "ceremonyTranscriptDigest": "4444444444444444444444444444444444444444444444444444444444444444",
+  "groupPublicKey": "15d21ccd7ee42959562fc8aa63224c8851fb3ec85a3faf66040d380fb9738673",
+  "keyEpoch": 4,
+  "keyOrigin": "distributed_dkg",
+  "participantCount": 3,
+  "participants": [
+    {
+      "participantId": "operator-1",
+      "verificationShare": "fc2c9b8e335c132d9ebe0403c9317aac480bbbf8cbdb1bc3730bb68eb60dadf9"
+    },
+    {
+      "participantId": "operator-2",
+      "verificationShare": "f7c3031debffbaf121022409d057e6e1034a532636301d12e26beddff58d05c7"
+    },
+    {
+      "participantId": "operator-3",
+      "verificationShare": "2cff4148a2f965801fb1f25f1d2a4e5df2f75b3a57cd06f30471c2c774419a41"
+    }
+  ],
+  "predecessorRosterDigest": "5555555555555555555555555555555555555555555555555555555555555555",
+  "rosterAuthorityKeyId": "authority.treaty.v1",
+  "rosterId": "157aedd90defcc5f35cc0b8fa85d18e35ef53f8627f0a866dc2064fafaf6bb80",
+  "schema": "chio.frost.roster.v1",
+  "scopeId": "treaty.atlantic.v1",
+  "suiteId": "FROST-ED25519-SHA512-v1",
+  "threshold": 2,
+  "validFrom": 100,
+  "validUntil": 1000
+}

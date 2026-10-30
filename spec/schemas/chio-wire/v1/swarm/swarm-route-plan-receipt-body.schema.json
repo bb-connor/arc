@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-route-plan-receipt-body.schema.json",
+  "title": "chio.swarm.route-plan-receipt.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attenuationDecision",
+    "bridgeId",
+    "candidateSetDigest",
+    "egressConstraints",
+    "egressContractId",
+    "expiresAtUnixMs",
+    "graphId",
+    "issuer",
+    "policyDigest",
+    "protocolTarget",
+    "registrySnapshotHash",
+    "routePlanId",
+    "schema",
+    "selectedRoute",
+    "taskId"
+  ],
+  "properties": {
+    "attenuationDecision": {
+      "type": "string"
+    },
+    "bridgeId": {
+      "type": "string"
+    },
+    "candidateSetDigest": {
+      "type": "string"
+    },
+    "egressConstraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "egressContractId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "policyDigest": {
+      "type": "string"
+    },
+    "protocolTarget": {
+      "type": "string"
+    },
+    "registrySnapshotHash": {
+      "type": "string"
+    },
+    "routePlanId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.swarm.route-plan-receipt.v1"
+    },
+    "selectedRoute": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    }
+  }
+}

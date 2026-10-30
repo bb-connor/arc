@@ -31,7 +31,7 @@ fn receipt_id_and_span_id_lookup_is_bidirectional() -> Result<(), Box<dyn Error>
     assert_eq!(receipt.tool_server, TOOL_SERVER);
     assert_eq!(receipt.tool_name, TOOL_NAME);
     assert_eq!(receipt.tenant_id.as_deref(), Some(TENANT_ID));
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
 
     let metadata = receipt
         .metadata

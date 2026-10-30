@@ -142,7 +142,7 @@ fn verify_package_inner(
 
     if !package
         .workflow_receipt
-        .verify()
+        .verify_integrity_embedded_key()
         .map_err(|error| ChioPackageError::Workflow(error.to_string()))?
     {
         return Err(ChioPackageError::Workflow(

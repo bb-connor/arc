@@ -1,0 +1,58 @@
+{
+  "dimensions": [],
+  "filters": {
+    "agentSubject": "subject",
+    "decisionLimit": 50,
+    "receiptLimit": 100
+  },
+  "generatedAt": 2,
+  "positions": [
+    {
+      "activeQuotedPremiumUnits": 0,
+      "currency": "USD",
+      "failedUnits": 0,
+      "governedMaxExposureUnits": 4000,
+      "pendingUnits": 0,
+      "provisionalLossUnits": 0,
+      "quotedPremiumUnits": 0,
+      "recoveredUnits": 0,
+      "reservedUnits": 0,
+      "settledUnits": 4000
+    }
+  ],
+  "probation": {
+    "probationary": false,
+    "receiptCount": 1,
+    "spanDays": 1,
+    "targetReceiptCount": 1,
+    "targetSpanDays": 1
+  },
+  "reputation": {
+    "acceptedImportedSignalCount": 0,
+    "effectiveScore": 0.95,
+    "importedSignalCount": 0,
+    "probationary": false
+  },
+  "schema": "chio.credit.scorecard.v1",
+  "summary": {
+    "anomalyCount": 0,
+    "band": "prime",
+    "confidence": "high",
+    "currencies": [
+      "USD"
+    ],
+    "matchingDecisions": 0,
+    "matchingReceipts": 1,
+    "mixedCurrencyBook": false,
+    "overallScore": 0.95,
+    "probationary": false,
+    "returnedDecisions": 0,
+    "returnedReceipts": 1
+  },
+  "supportBoundary": {
+    "capitalAllocationSupported": false,
+    "crossCurrencyNettingSupported": false,
+    "facilityPolicySupported": false,
+    "subjectScopedOnly": true
+  }
+}

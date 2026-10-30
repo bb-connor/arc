@@ -202,7 +202,7 @@ fn retained(path: &FsPath, id: &str, trusted_key: &PublicKey) -> TestResult<Chio
     let receipt: ChioReceipt = serde_json::from_str(&raw)?;
     assert_eq!(&receipt.kernel_key, trusted_key);
     assert_eq!(receipt.id, id);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert!(receipt.action.verify_hash()?);
     Ok(receipt)
 }

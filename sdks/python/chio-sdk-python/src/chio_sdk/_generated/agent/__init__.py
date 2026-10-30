@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,15 +11,15 @@
 from __future__ import annotations
 
 from .active_response_governed_intent_schema import ChioGovernedActiveResponseIntentBody, OrderedEffect
-from .governed_transaction_intent_schema import Body, Body5, Body6, BoundToolInvocationBinding, ChioGovernedTransactionIntent, MaxAmount
+from .governed_transaction_intent_schema import Body, Body169, Body170, BoundToolInvocationBinding, ChioGovernedTransactionIntent, MaxAmount
 from .heartbeat_schema import ChioAgentmessageHeartbeat
 from .list_capabilities_schema import ChioAgentmessageListCapabilities
 from .tool_call_request_schema import ChioAgentmessageToolCallRequest
 
 __all__ = [
     "Body",
-    "Body5",
-    "Body6",
+    "Body169",
+    "Body170",
     "BoundToolInvocationBinding",
     "ChioAgentmessageHeartbeat",
     "ChioAgentmessageListCapabilities",

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/caller-delivery-report-body.schema.json",
+  "title": "chio.caller-delivery-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorization_digest",
+    "claim_id",
+    "completed_at_unix_ms",
+    "execution_started_at_unix_ms",
+    "executor",
+    "output",
+    "realized_cost",
+    "schema"
+  ],
+  "properties": {
+    "authorization_digest": {
+      "type": "string"
+    },
+    "claim_id": {
+      "type": "string"
+    },
+    "completed_at_unix_ms": {
+      "type": "integer"
+    },
+    "execution_started_at_unix_ms": {
+      "type": "integer"
+    },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executor_id",
+        "key_epoch",
+        "public_key"
+      ],
+      "properties": {
+        "executor_id": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "public_key": {
+          "type": "string"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "closed": {
+          "type": "boolean"
+        },
+        "effect": {
+          "type": "string"
+        },
+        "external": {
+          "type": "boolean"
+        },
+        "historical": {
+          "type": "boolean"
+        },
+        "original_native_effect": {
+          "type": "boolean"
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "private_result": {
+          "type": "string"
+        },
+        "result_sha256": {
+          "type": "string"
+        },
+        "returned": {
+          "type": "boolean"
+        },
+        "safe": {
+          "type": "boolean"
+        }
+      }
+    },
+    "realized_cost": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        }
+      ]
+    },
+    "schema": {
+      "const": "chio.caller-delivery-report.v1"
+    }
+  }
+}

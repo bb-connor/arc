@@ -225,7 +225,7 @@ fn receipt_sign_and_verify() {
     let expected_id = chio_receipt_id(&expected_body).unwrap();
     let receipt = ChioReceipt::sign(body, &kp).unwrap();
     assert_eq!(receipt.id, expected_id);
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.is_allowed());
     assert!(!receipt.is_denied());
     assert_eq!(
@@ -244,7 +244,7 @@ fn receipt_floor_rejects_ed25519_under_pq_required() {
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
 
     let err = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)
         .expect_err("ed25519 receipt must reject under pq_required");
 
     assert!(err.to_string().contains("crypto_floor=pq_required"));
@@ -257,7 +257,7 @@ fn receipt_floor_accepts_ed25519_under_allow_classical() {
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
 
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .unwrap());
 }
 
@@ -278,7 +278,7 @@ fn receipt_floor_accepts_hybrid_under_pq_required() {
 
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Hybrid);
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::PqRequired)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::PqRequired)
         .unwrap());
 }
 
@@ -296,7 +296,7 @@ fn receipt_floor_rejects_hybrid_under_allow_classical() {
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     let err = receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowClassical)
         .expect_err("hybrid receipt must reject under allow_classical");
 
     assert!(err.to_string().contains("crypto_floor=allow_classical"));
@@ -313,7 +313,7 @@ fn receipt_id_is_authoritative_and_content_addressed() {
 
     let mut tampered = receipt.clone();
     tampered.id = "not-the-content-address".to_string();
-    assert!(!tampered.verify_signature().unwrap());
+    assert!(!tampered.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -344,8 +344,8 @@ fn receipt_signing_nonce_preserves_repeated_invocation_identity() {
             .and_then(serde_json::Value::as_str),
         Some("request-2")
     );
-    assert!(first_receipt.verify_signature().unwrap());
-    assert!(second_receipt.verify_signature().unwrap());
+    assert!(first_receipt.verify_integrity_embedded_key().unwrap());
+    assert!(second_receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -357,14 +357,22 @@ fn receipt_signature_binds_typed_id_and_body_wrapper() {
 
     assert_eq!(signing_body.id, receipt.id);
     assert_eq!(chio_receipt_id(&body).unwrap(), receipt.id);
-    assert!(receipt
-        .kernel_key
-        .verify_canonical(&signing_body, &receipt.signature)
-        .unwrap());
-    assert!(!receipt
-        .kernel_key
-        .verify_canonical(&body, &receipt.signature)
-        .unwrap());
+    crate::crypto::verify_wrapped(
+        &receipt.kernel_key,
+        super::body::CHIO_RECEIPT_SCHEMA,
+        &signing_body,
+        &receipt.signature,
+    )
+    .unwrap();
+    assert!(matches!(
+        crate::crypto::verify_wrapped(
+            &receipt.kernel_key,
+            super::body::CHIO_RECEIPT_SCHEMA,
+            &body,
+            &receipt.signature,
+        ),
+        Err(crate::Error::SignatureRejected)
+    ));
 }
 
 #[test]
@@ -419,7 +427,7 @@ fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
 
     let decoded: ChioReceipt = serde_json::from_value(json).unwrap();
     assert_eq!(decoded.tool_origin, ToolOrigin::ChioInternal);
-    assert!(decoded.verify_signature().unwrap());
+    assert!(decoded.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -488,7 +496,7 @@ fn trace_receipt_omits_decision_field() {
     assert!(json.get("decision").is_none());
     assert!(receipt.decision.is_none());
     assert!(!receipt.is_allowed());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -524,6 +532,10 @@ fn signed_export_envelope_roundtrip() {
         exported_at: u64,
     }
 
+    impl super::lineage::SignedExportPayload for ExampleExport {
+        const SCHEMA_ID: &'static str = crate::CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA;
+    }
+
     let kp = Keypair::generate();
     let export = ExampleExport {
         schema: "chio.example-export.v1".to_string(),
@@ -531,7 +543,7 @@ fn signed_export_envelope_roundtrip() {
     };
     let envelope = SignedExportEnvelope::sign(export.clone(), &kp).unwrap();
     assert_eq!(envelope.body, export);
-    assert!(envelope.verify_signature().unwrap());
+    assert!(envelope.verify_signature(&kp.public_key()).unwrap());
 }
 
 #[test]
@@ -551,7 +563,7 @@ fn receipt_deny_decision() {
         ..make_receipt_body(&kp)
     };
     let receipt = ChioReceipt::sign(body, &kp).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.is_denied());
     assert!(!receipt.is_allowed());
 }
@@ -572,7 +584,7 @@ fn receipt_cancelled_decision() {
         ..make_receipt_body(&kp)
     };
     let receipt = ChioReceipt::sign(body, &kp).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.is_cancelled());
     assert!(!receipt.is_allowed());
     assert!(!receipt.is_denied());
@@ -594,7 +606,7 @@ fn receipt_incomplete_decision() {
         ..make_receipt_body(&kp)
     };
     let receipt = ChioReceipt::sign(body, &kp).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert!(receipt.is_incomplete());
     assert!(!receipt.is_allowed());
     assert!(!receipt.is_denied());
@@ -613,7 +625,7 @@ fn receipt_serde_roundtrip() {
     assert_eq!(receipt.capability_id, restored.capability_id);
     assert_eq!(receipt.tool_name, restored.tool_name);
     assert_eq!(receipt.content_hash, restored.content_hash);
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -646,7 +658,7 @@ fn receipt_round_trips_bbs_projection_metadata() {
         Some(CHIO_RECEIPT_BBS_PROJECTION_VERSION_V1)
     );
     assert_eq!(restored.bbs_signature.as_ref(), Some(&bbs_signature));
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -694,7 +706,7 @@ fn sign_prepared_with_bbs_using_handle_accepts_matching_content() {
         handle,
     )
     .unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.content_hash, sha256_hex(content));
 }
 
@@ -713,10 +725,10 @@ fn receipt_rejects_invalid_bbs_projection_bindings() {
     let mut receipt = ChioReceipt::sign_with_bbs(body, &kp, bbs_signature).unwrap();
 
     receipt.bbs_projection_version = None;
-    assert!(!receipt.verify_signature().unwrap());
+    assert!(!receipt.verify_integrity_embedded_key().unwrap());
 
     receipt.bbs_projection_version = Some("chio.bbs-projection.receipt.v999".to_string());
-    assert!(!receipt.verify_signature().unwrap());
+    assert!(!receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -766,7 +778,7 @@ fn receipt_wrong_key_fails() {
     let mut receipt = ChioReceipt::sign(body, &kp).unwrap();
     receipt.kernel_key = other_kp.public_key();
     // Tampering the embedded verifier key after signing should fail.
-    assert!(!receipt.verify_signature().unwrap());
+    assert!(!receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -840,7 +852,7 @@ fn child_receipt_sign_and_verify() {
     let kp = Keypair::generate();
     let body = make_child_receipt_body(&kp);
     let receipt = ChildRequestReceipt::sign(body, &kp).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.operation_kind, OperationKind::CreateMessage);
     assert_eq!(receipt.request_id, RequestId::new("child-001"));
 }
@@ -1248,7 +1260,7 @@ fn receipt_lineage_statement_sign_and_verify() {
     let encoded = serde_json::to_string(&statement).unwrap();
     let decoded: ReceiptLineageStatement = serde_json::from_str(&encoded).unwrap();
 
-    assert!(decoded.verify_signature().unwrap());
+    assert!(decoded.verify_integrity_embedded_key().unwrap());
     assert!(decoded.is_verified());
     assert_eq!(decoded.parent_receipt_id, "receipt-parent-1");
     assert_eq!(decoded.child_receipt_id, "receipt-child-1");
@@ -1351,7 +1363,7 @@ fn child_receipt_serde_roundtrip() {
     assert_eq!(receipt.id, restored.id);
     assert_eq!(receipt.parent_request_id, restored.parent_request_id);
     assert_eq!(receipt.outcome_hash, restored.outcome_hash);
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -1371,21 +1383,17 @@ fn ed25519_receipt_is_byte_identical_without_algorithm_field() {
     // might later add and ensure it still verifies.
     let wire = serde_json::to_string(&receipt).unwrap();
     let restored: ChioReceipt = serde_json::from_str(&wire).unwrap();
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
-fn ed25519_receipt_without_algorithm_field_verifies() {
-    // Generate an Ed25519 receipt, then assert that parsing its JSON (which
-    // has no `algorithm` key) produces a receipt whose `algorithm` is
-    // `None` and whose signature still verifies.
+fn receipt_wire_carries_no_algorithm_member() {
     let kp = Keypair::generate();
     let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
     let wire = serde_json::to_string(&receipt).unwrap();
     assert!(!wire.contains("\"algorithm\""));
     let restored: ChioReceipt = serde_json::from_str(&wire).unwrap();
-    assert!(restored.algorithm.is_none());
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[cfg(feature = "fips")]
@@ -1396,11 +1404,11 @@ fn receipt_signs_and_verifies_under_p256_backend() {
     let mut body = make_receipt_body(&Keypair::generate());
     body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
-    assert!(receipt.verify_signature().unwrap());
+    assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::P256);
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     // And through the wire.
     let wire = serde_json::to_string(&receipt).unwrap();
     assert!(wire.contains("\"p256:"));
     let restored: ChioReceipt = serde_json::from_str(&wire).unwrap();
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }

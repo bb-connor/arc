@@ -15,7 +15,7 @@ fn durable_nonce_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
     assert_eq!(key.algorithm(), SigningAlgorithm::Hybrid);
     let request = fixture.request(&runtime, "durable-hybrid-signing")?;
     assert_eq!(request.capability.issuer, key);
-    assert!(request.capability.verify_signature()?);
+    assert!(request.capability.verify_integrity_embedded_key()?);
     let nonce = preflight(&runtime, &request)?;
     let (operation_id, _) =
         operation_state(&fixture, &request.request_id)?.ok_or("nonce operation")?;
@@ -139,7 +139,7 @@ fn changed_receipt_backend_refuses_before_durable_nonce_mutation() -> TestResult
     });
     let mut runtime = fixture.open()?;
     let request = fixture.request(&runtime, "changed-durable-signing")?;
-    assert!(request.capability.verify_signature()?);
+    assert!(request.capability.verify_integrity_embedded_key()?);
     let original_key = runtime.kernel.receipt_signing_public_key()?;
     let changed = HybridSigningConfig {
         crypto_floor: KernelCryptoFloor::PqRequired,

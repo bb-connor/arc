@@ -594,6 +594,7 @@ fn market_state(
         cluster_sync_interval: std::time::Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
+        capital_authority: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: Some(config),
     };
@@ -2262,7 +2263,9 @@ fn handshake_at(
         &web.finding,
     )?;
     let ask_digest = digest_of(&ask.body)?;
-    let buyer_signature_hex = buyer.sign(ask_digest.as_bytes()).to_hex();
+    let buyer_signature_hex =
+        crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(buyer, &ask.body)?
+            .to_hex();
     let reservation_id = derive_reservation_id(&ask_digest, &buyer.public_key().to_hex());
     Ok(Handshake {
         bid,
@@ -3317,7 +3320,7 @@ fn buyer_memory_write(
     let statement = store
         .load_receipt_lineage_statement(&write.receipt.id)?
         .ok_or_else(|| missing("kernel-persisted Finding memory lineage statement"))?;
-    assert!(statement.verify_signature()?);
+    assert!(statement.verify_integrity_embedded_key()?);
     let links = store.list_receipt_lineage_statement_links(&write.receipt.id)?;
     let link = links
         .first()
@@ -4284,7 +4287,11 @@ async fn wedge_purchase_reservation_authenticates_the_buyer_and_replays() -> Tes
     let exchange = handshake(&deployment.web, &witness, &buyer, BUYER_PAYOUT, TOKEN_ID)?;
 
     // A signature by a key that is not the token subject never reserves.
-    let interloper = keypair(9).sign(exchange.ask_digest.as_bytes()).to_hex();
+    let interloper = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+        &keypair(9),
+        &exchange.ask.body,
+    )?
+    .to_hex();
     let rejected = coordinator.reserve(
         &exchange.bid,
         &exchange.ask,
@@ -5106,7 +5113,11 @@ async fn wedge_purchase_reserve_refuses_a_self_minted_ask() -> TestResult {
     let forged: SignedAskResponse = SignedExportEnvelope::sign(forged_body, &interloper)?;
     let forged_bid = SignedBidRequest::sign(fixture.exchange.bid.body.clone(), &interloper)?;
     let forged_digest = digest_of(&forged.body)?;
-    let forged_signature = interloper.sign(forged_digest.as_bytes()).to_hex();
+    let forged_signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+        &interloper,
+        &forged.body,
+    )?
+    .to_hex();
 
     assert!(matches!(
         fixture.coordinator.reserve(
@@ -5185,8 +5196,11 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
         mutate(grant);
         body.token_offer = CapabilityToken::sign(token.body(), &operator)?;
         let signed: SignedAskResponse = SignedExportEnvelope::sign(body, &operator)?;
-        let digest = digest_of(&signed.body)?;
-        let signature = buyer.sign(digest.as_bytes()).to_hex();
+        let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+            &buyer,
+            &signed.body,
+        )?
+        .to_hex();
         Ok((signed, signature))
     };
 
@@ -5260,7 +5274,10 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
             let mut body = fixture.exchange.ask.body.clone();
             body.token_offer = token;
             let ask: SignedAskResponse = SignedExportEnvelope::sign(body, &operator)?;
-            let signature = buyer.sign(digest_of(&ask.body)?.as_bytes()).to_hex();
+            let signature = crate::trust_control::finding_purchase_coordinator::sign_buyer_ask(
+                &buyer, &ask.body,
+            )?
+            .to_hex();
             Ok((ask, signature))
         };
     let mut resource_token = fixture.exchange.ask.body.token_offer.clone();
@@ -5337,9 +5354,9 @@ async fn wedge_purchase_reserve_refuses_a_malformed_purchase_grant() -> TestResu
     Ok(())
 }
 
-/// The reservation freezes the exact buyer-signed bid envelope, not only
-/// its body digest. Re-signing the same body under another key must fail at
-/// the admission-time reservation gate before payment or dispatch.
+/// The bid envelope must be signed by the token offer subject. Re-signing
+/// the same body under another key fails the deterministic handshake
+/// binding before the reservation gate, payment, or dispatch.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
     let lane = open_lane(LaneOptions::standard()).await?;
@@ -5365,7 +5382,7 @@ async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
         nonce: "nonce-resigned-bid-1",
     })?;
     let response = lane.kernel.evaluate_tool_call_blocking(&request)?;
-    assert_denied_with(&response, "reservation does not bind this purchase");
+    assert_denied_with(&response, "purchase context verification failed");
     assert_eq!(lane.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.authorizations.load(Ordering::SeqCst), 0);
     assert_eq!(lane.calls.captures.load(Ordering::SeqCst), 0);

@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 459df52a530f6a5733f96ec030997b7f9413e961351cb40000ea5ec8204f1bf6
+// Schema SHA: 3e8e51422168badb635820e4894962c4ca99733a4e9e31eede7818a2f0ec0ba3
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -230,7 +230,6 @@ export namespace Agent_ToolCallRequest {
     expires_at: number;
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * At most one caveat, which must be bind_security_context.
      *
@@ -361,7 +360,6 @@ export namespace Agent_ToolCallRequest {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface CumulativeRootMonetaryAmount {
@@ -423,7 +421,6 @@ export namespace Agent_ToolCallRequest {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface AttenuationProof {
@@ -548,7 +545,6 @@ export namespace Agent_ToolCallRequest {
     issued_at: number;
     expires_at: number;
     decision: "approved" | "denied";
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioThresholdApprovalProposal {
@@ -564,7 +560,6 @@ export namespace Agent_ToolCallRequest {
     proposal_created_at: number;
     proposal_deadline: number;
     policy_authority: string;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioOpaqueSupplementalAuthorization {
@@ -614,6 +609,72 @@ export namespace Agent_ToolCallRequest {
       reserving_request_id?: string;
     };
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/agent-web/agent-web-proof-envelope-body.schema.json
+export namespace AgentWeb_AgentWebProofEnvelopeBody {
+  export interface ChioAgentWebProofEnvelopeV1SignedBody {
+    agent_web_passport_scope_sha256?: string;
+    chio_claim_refs: string[];
+    disclosure_capsule_refs: string[];
+    envelope_id: string;
+    external_subject: string;
+    external_subject_digest: string;
+    external_subject_path: string;
+    external_subject_signature_ref: string;
+    limitations: string[];
+    projection_manifest_ref: string;
+    projection_manifest_sha256: string;
+    receipt_refs: string[];
+    risk_refs: string[];
+    schema: "chio.agent-web-proof-envelope.v1";
+    settlement_refs: string[];
+    source_protocol: string;
+    source_protocol_version: string;
+    transaction_passport_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/anchor/anchor-batch-body.schema.json
+export namespace Anchor_AnchorBatchBody {
+  export interface ChioAnchorBatchV1SignedBody {
+    checkpointIds: string[];
+    inclusions: {
+      checkpointId: string;
+      leafHash: string;
+      proof: {
+        audit_path: string[];
+        leaf_index: number;
+        tree_size: number;
+      };
+    }[];
+    issuedAt: number;
+    schema: "chio.anchor_batch.v1";
+    signerKey: string;
+    treeRoot: string;
+    witness: {
+      kind: string;
+      observedAt: number;
+      root: string;
+      witnessId: string;
+    };
+    witnessState: {
+      error?: string;
+      kind: string;
+      last_verified?: number;
+      observed_at?: number;
+      receipt?: {
+        bodyHash: string;
+        externalUuid: string;
+        inclusionProof: string;
+        kind: string;
+        publishedAt: number;
+        witnessRoot: string;
+      };
+    };
   }
 }
 
@@ -688,10 +749,24 @@ export namespace Anchor_Batch {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/aggregate-budget-root-body.schema.json
+export namespace Capability_AggregateBudgetRootBody {
+  export interface ChioAggregateBudgetRootV1SignedBody {
+    max_invocations: number;
+    root_capability_hash: string;
+    root_capability_id: string;
+    root_expires_at: number;
+    root_issuer: string;
+    root_scope_hash: string;
+    root_subject: string;
+    schema: "chio.aggregate-budget-root.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/aggregate-budget-root.schema.json
 export namespace Capability_AggregateBudgetRoot {
   export type AggregateRootPublicKey = string;
-  export type AggregateRootSigningAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type AggregateRootSignature = string;
 
   export interface ChioAggregateBudgetRootBinding {
@@ -705,7 +780,6 @@ export namespace Capability_AggregateBudgetRoot {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: AggregateRootSigningAlgorithm;
     signature: AggregateRootSignature;
   }
 }
@@ -736,8 +810,39 @@ export namespace Capability_AggregateInvocationBudget {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/call-chain-continuation.schema.json
+export namespace Capability_CallChainContinuation {
+  export interface ChioCallChainContinuationSignedBody {
+    audience?: {
+      serverId: string;
+      toolName: string;
+    };
+    chainId: string;
+    currentSubject: string;
+    delegationLinkHash?: string;
+    delegatorSubject: string;
+    expiresAt: number;
+    governedIntentHash?: string;
+    issuedAt: number;
+    nonce: string;
+    originSubject: string;
+    parentCapabilityId?: string;
+    parentReceiptHash?: string;
+    parentReceiptId?: string;
+    parentRequestId: string;
+    parentSessionAnchor?: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    schema: "chio.call_chain_continuation.v1";
+    signer: string;
+    subject: string;
+    tokenId: string;
   }
 }
 
@@ -759,10 +864,195 @@ export namespace Capability_Capabilities {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/capability-body.schema.json
+export namespace Capability_CapabilityBody {
+  export interface ChioCapabilityV1SignedBody {
+    aggregate_invocation_budget?: {
+      max_invocations: number;
+      root_binding: {
+        body: {
+          max_invocations: number;
+          root_capability_hash: string;
+          root_capability_id: string;
+          root_expires_at: number;
+          root_issuer: string;
+          root_scope_hash: string;
+          root_subject: string;
+          schema: string;
+        };
+        signature: string;
+      };
+      scope: string;
+    };
+    attenuation_proof?: {
+      childScopeHash: string;
+      normalizedSubsetProof: {
+        cumulativeApproval?: {
+          bindings: {
+            approval_budget_epoch: number;
+            approval_budget_id: string;
+            currency: string;
+            root_binding_digest: string;
+          }[];
+        };
+        normalizedChildScope: string;
+        normalizedParentScope: string;
+        restrictedPredicates: string[];
+        subsetRelations: {
+          childIndex: number;
+          grantKind: string;
+          parentIndex: number;
+          subset: boolean;
+        }[];
+      };
+      parentScopeHash: string;
+    };
+    budget_share_bps?: number;
+    delegation_chain?: {
+      aggregate_budget?: {
+        max_invocations: number;
+        root_binding_digest: string;
+      };
+      attenuations?: {
+        constraint?: {
+          type: string;
+          value: number;
+        };
+        max_invocations?: number;
+        server_id: string;
+        tool_name: string;
+        type: string;
+      }[];
+      capability_id: string;
+      cumulative_approval?: {
+        bindings: {
+          approval_budget_epoch: number;
+          approval_budget_id: string;
+          currency: string;
+          root_binding_digest: string;
+        }[];
+      };
+      delegatee: string;
+      delegator: string;
+      scope_hash?: string;
+      signature: string;
+      timestamp: number;
+    }[];
+    expires_at?: number;
+    fixture?: string;
+    id?: string;
+    issued_at?: number;
+    issuer?: string;
+    n?: number;
+    schema?: "chio.capability.v1";
+    scope?: {
+      grants?: {
+        constraints?: {
+          type: string;
+          value?:
+            | number
+            | string
+            | {
+                allowed_model_ids?: string[];
+                approval_budget_epoch?: number;
+                approval_budget_id?: string;
+                cumulative_approval_root_binding?: {
+                  body: {
+                    approval_budget_epoch: number;
+                    approval_budget_id: string;
+                    root_capability_hash: string;
+                    root_capability_id: string;
+                    root_expires_at: number;
+                    root_grant_hash: string;
+                    root_issuer: string;
+                    root_scope_hash: string;
+                    root_subject: string;
+                    schema: string;
+                    signer_key_epoch: number;
+                    threshold: {
+                      currency: string;
+                      units: number;
+                    };
+                  };
+                  signature: string;
+                };
+                finding_id?: string;
+                listing_id?: string;
+                max_recoveries?: number;
+                min_safety_tier?: string;
+                original_capability_id?: string;
+                original_delivery_receipt_id?: string;
+                purchase_key?: string;
+                recovery_id?: string;
+                settlement?: {
+                  mode: string;
+                };
+                threshold?: {
+                  currency: string;
+                  units: number;
+                };
+                threshold_units?: number;
+              };
+        }[];
+        dpop_required?: boolean;
+        max_cost_per_invocation?: {
+          currency: string;
+          units: number;
+        };
+        max_invocations?: number;
+        max_total_cost?: {
+          currency: string;
+          units: number;
+        };
+        operations: string[];
+        server_id: string;
+        tool_name: string;
+      }[];
+      prompt_grants?: {
+        operations: string[];
+        prompt_name: string;
+      }[];
+      resource_grants?: {
+        operations: string[];
+        uri_pattern: string;
+      }[];
+    };
+    scope_attenuations?: {
+      operation: string;
+      server_id: string;
+      tool_name: string;
+      type: string;
+    }[];
+    subject?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/cumulative-approval-root-body.schema.json
+export namespace Capability_CumulativeApprovalRootBody {
+  export interface ChioCumulativeApprovalRootV1SignedBody {
+    approval_budget_epoch: number;
+    approval_budget_id: string;
+    root_capability_hash: string;
+    root_capability_id: string;
+    root_expires_at: number;
+    root_grant_hash: string;
+    root_issuer: string;
+    root_scope_hash: string;
+    root_subject: string;
+    schema: "chio.cumulative-approval-root.v1";
+    signer_key_epoch: number;
+    threshold: {
+      currency: string;
+      units: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/cumulative-approval-root.schema.json
 export namespace Capability_CumulativeApprovalRoot {
   export type CumulativeRootPublicKey = string;
-  export type CumulativeRootSigningAlgorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type CumulativeRootSignature = string;
 
   export interface ChioCumulativeApprovalRootBinding {
@@ -780,12 +1070,64 @@ export namespace Capability_CumulativeApprovalRoot {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: CumulativeRootSigningAlgorithm;
     signature: CumulativeRootSignature;
   }
   export interface CumulativeRootMonetaryAmount {
     units: number;
     currency: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/delegation-link.schema.json
+export namespace Capability_DelegationLink {
+  export interface ChioDelegationLinkSignedBody {
+    aggregate_budget?: {
+      max_invocations: number;
+      root_binding_digest: string;
+    };
+    attenuations?: {
+      constraint?: {
+        type: string;
+        value: number | string;
+      };
+      max_invocations?: number;
+      operation?: string;
+      server_id: string;
+      tool_name: string;
+      type: string;
+    }[];
+    capability_id?: string;
+    cumulative_approval?: {
+      bindings: {
+        approval_budget_epoch: number;
+        approval_budget_id: string;
+        currency: string;
+        root_binding_digest: string;
+      }[];
+    };
+    delegatee?: string;
+    delegator?: string;
+    fixture?: string;
+    n?: number;
+    scope_hash?: string;
+    timestamp?: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/governed-approval-token-body.schema.json
+export namespace Capability_GovernedApprovalTokenBody {
+  export interface ChioGovernedApprovalTokenSignedBody {
+    approver: string;
+    decision: string;
+    expires_at: number;
+    governed_intent_hash: string;
+    id: string;
+    issued_at: number;
+    request_id: string;
+    subject: string;
+    threshold_proposal_hash?: string;
   }
 }
 
@@ -805,8 +1147,23 @@ export namespace Capability_GovernedApprovalToken {
     issued_at: number;
     expires_at: number;
     decision: "approved" | "denied";
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: GovernedApprovalSignature;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/governed-upstream-call-chain-proof.schema.json
+export namespace Capability_GovernedUpstreamCallChainProof {
+  export interface ChioGovernedUpstreamCallChainProofSignedBody {
+    chainId: string;
+    delegatorSubject: string;
+    expiresAt: number;
+    issuedAt: number;
+    originSubject: string;
+    parentReceiptId: string;
+    parentRequestId: string;
+    signer: string;
+    subject: string;
   }
 }
 
@@ -898,7 +1255,6 @@ export namespace Capability_Presentation {
     expires_at: number;
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * At most one caveat, which must be bind_security_context.
      *
@@ -1249,7 +1605,6 @@ export namespace Capability_Presentation {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface CumulativeRootMonetaryAmount {
@@ -1311,7 +1666,6 @@ export namespace Capability_Presentation {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface AttenuationProof {
@@ -1490,6 +1844,25 @@ export namespace Capability_SupplementalAuthorization {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/threshold-approval-proposal-body.schema.json
+export namespace Capability_ThresholdApprovalProposalBody {
+  export interface ChioThresholdApprovalProposalV1SignedBody {
+    authorizing_capability_digest: string;
+    eligible_set_digest: string;
+    governed_intent_hash: string;
+    policy_authority: string;
+    policy_hash: string;
+    proposal_created_at: number;
+    proposal_deadline: number;
+    proposal_id: string;
+    request_id: string;
+    schema: "chio.threshold-approval-proposal.v1";
+    subject: string;
+    threshold: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/capability/threshold-approval-proposal.schema.json
 export namespace Capability_ThresholdApprovalProposal {
   export type ThresholdProposalPublicKey = string;
@@ -1508,7 +1881,6 @@ export namespace Capability_ThresholdApprovalProposal {
     proposal_created_at: number;
     proposal_deadline: number;
     policy_authority: ThresholdProposalPublicKey;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: ThresholdProposalSignature;
   }
 }
@@ -1531,7 +1903,6 @@ export namespace Capability_Token {
     expires_at: number;
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * At most one caveat, which must be bind_security_context.
      *
@@ -1660,7 +2031,6 @@ export namespace Capability_Token {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface CumulativeRootMonetaryAmount {
@@ -1716,7 +2086,6 @@ export namespace Capability_Token {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface AttenuationProof {
@@ -1758,6 +2127,3488 @@ export namespace Capability_VerifiedApprovalSet {
     proposal_id: string;
     proposal_created_at: number;
     proposal_deadline: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/certify/check.schema.json
+export namespace Certify_Check {
+  export interface ChioCertifyCheckSignedBody {
+    checkedAt: number;
+    criteria: {
+      description: string;
+      id: string;
+      status: string;
+    }[];
+    criteriaProfile: string;
+    evidence: {
+      evidenceProfile: string;
+      generatedReportBytes: number;
+      generatedReportMediaType: string;
+      generatedReportSha256: string;
+      normalizedResultsSha256: string;
+      normalizedScenariosSha256: string;
+      provenanceMode: string;
+      resultsDir: string;
+      scenariosDir: string;
+    };
+    findings: {
+      kind: string;
+      message: string;
+    }[];
+    schema: "chio.certify.check.v1";
+    summary: {
+      evaluatedPeerCount: number;
+      failCount: number;
+      missingScenariosCount: number;
+      passCount: number;
+      resultCount: number;
+      scenarioCount: number;
+      skippedCount: number;
+      unknownResultsCount: number;
+      unsupportedCount: number;
+      xfailCount: number;
+    };
+    target: {
+      toolServerId: string;
+      toolServerName?: string;
+    };
+    verdict: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-escrow-acceptance-body.schema.json
+export namespace Commerce_CommerceEscrowAcceptanceBody {
+  export interface ChioCommerceEscrowAcceptanceSignedBody {
+    accepted_at: number;
+    buyer_subject: string;
+    order_id: string;
+    quote_sha256: string;
+    schema: "chio.commerce.escrow-acceptance.v1";
+    token_offer_id: string;
+    token_offer_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-federation-trust-bundle-body.schema.json
+export namespace Commerce_CommerceFederationTrustBundleBody {
+  export interface ChioCommerceFederationTrustBundleV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.federation-trust-bundle.v1";
+    status: string;
+    trust_domain: string;
+    trust_root_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-payment-lifecycle-body.schema.json
+export namespace Commerce_CommercePaymentLifecycleBody {
+  export interface ChioCommercePaymentLifecycleV1SignedBody {
+    amount_minor: number;
+    authorization_ref: string;
+    balance_transaction_ref: string;
+    capture_before: string;
+    capture_mode: string;
+    capture_ref: string;
+    captured_at: string;
+    charge_ref: string;
+    chargeback_status: string;
+    currency: string;
+    dispute_status: string;
+    fraud_outcome: string;
+    id: string;
+    issued_at: string;
+    issuer: string;
+    merchant_subject: string;
+    order_id: string;
+    payment_intent_id: string;
+    payment_status: string;
+    psp: string;
+    quote_sha256: string;
+    refund_status: string;
+    schema: "chio.commerce.payment-lifecycle.v1";
+    transfer_group: string;
+    transfer_reversal_status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-discovery-snapshot-body.schema.json
+export namespace Commerce_CommerceProviderDiscoverySnapshotBody {
+  export interface ChioCommerceProviderDiscoverySnapshotV1SignedBody {
+    discovery_authority_ref: string;
+    freshness_window: {
+      valid_from: string;
+      valid_until: string;
+    };
+    id: string;
+    issued_at: string;
+    market_scope: string;
+    order_id: string;
+    order_intent_ref: string;
+    passport_id: string;
+    provider_candidates: {
+      availability_ref: string;
+      excluded: boolean;
+      jurisdiction_ref: string;
+      pricing_surface_ref: string;
+      provider_passport_ref: string;
+      service_manifest_ref: string;
+      subject: string;
+    }[];
+    schema: "chio.commerce.provider-discovery-snapshot.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-passport-body.schema.json
+export namespace Commerce_CommerceProviderPassportBody {
+  export interface ChioCommerceProviderPassportV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.provider-passport.v1";
+    service_families: string[];
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-provider-selection-report-body.schema.json
+export namespace Commerce_CommerceProviderSelectionReportBody {
+  export interface ChioCommerceProviderSelectionReportV1SignedBody {
+    discovery_snapshot_ref: string;
+    id: string;
+    issued_at: string;
+    order_id: string;
+    override_receipt_ref: string;
+    passport_id: string;
+    price_quote_ref: string;
+    ranking_policy_ref: string;
+    ranking_results: {
+      provider_subject: string;
+      rank: number;
+      total_score: number;
+    }[];
+    rejected_candidate_summaries: {
+      provider_subject: string;
+      reason_codes: string[];
+      redacted_fields: string[];
+    }[];
+    risk_report_ref: string;
+    schema: "chio.commerce.provider-selection-report.v1";
+    scorecard_ref: string;
+    selected_provider_subject: string;
+    selection_reason_codes: string[];
+    sla_commitment_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-reputation-snapshot-body.schema.json
+export namespace Commerce_CommerceReputationSnapshotBody {
+  export interface ChioCommerceReputationSnapshotV1SignedBody {
+    id: string;
+    issued_at: string;
+    provider_subject: string;
+    schema: "chio.commerce.reputation-snapshot.v1";
+    score_bps: number;
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-reservation-receipt-body.schema.json
+export namespace Commerce_CommerceReservationReceiptBody {
+  export interface ChioCommerceReservationReceiptSignedBody {
+    depositor_account: string;
+    order_id: string;
+    receipt_id: string;
+    reserved_amount: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.commerce.reservation-receipt.v1";
+    token_offer_id: string;
+    token_offer_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-sla-commitment-body.schema.json
+export namespace Commerce_CommerceSlaCommitmentBody {
+  export interface ChioCommerceSlaCommitmentV1SignedBody {
+    buyer_subject: string;
+    collateral_position_ref: string;
+    effective_window: {
+      end: string;
+      start: string;
+    };
+    exclusions_ref: string;
+    guarantee_decision_ref: string;
+    id: string;
+    issued_at: string;
+    measurement_policy_ref: string;
+    metric_definitions: {
+      metric: string;
+      target: number;
+      unit: string;
+    }[];
+    order_id: string;
+    provider_subject: string;
+    remedy_policy_ref: string;
+    schema: "chio.commerce.sla-commitment.v1";
+    service_scope: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/commerce/commerce-sla-performance-report-body.schema.json
+export namespace Commerce_CommerceSlaPerformanceReportBody {
+  export interface ChioCommerceSlaPerformanceReportV1SignedBody {
+    breach_verdict: string;
+    computed_metric_results: {
+      metric: string;
+      passed: boolean;
+      unit: string;
+      value: number;
+    }[];
+    dispute_ref: string;
+    id: string;
+    issued_at: string;
+    measured_at: string;
+    measurement_evidence_refs: string[];
+    measurement_policy_ref: string;
+    order_id: string;
+    performance_id: string;
+    provider_subject: string;
+    remedy_ref: string;
+    schema: "chio.commerce.sla-performance-report.v1";
+    sla_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/compliance/certificate.schema.json
+export namespace Compliance_Certificate {
+  export interface ChioComplianceCertificateSignedBody {
+    all_signatures_valid: boolean;
+    anomalies: string[];
+    budget_compliant: boolean;
+    chain_continuous: boolean;
+    checks: {
+      allowed_mediated_receipt_limit: string;
+      required_guards: string;
+      tenant: string;
+      tool_targets: string;
+    };
+    compliance_profile_digest: string;
+    coverage: {
+      archived_through_entry_seq?: number;
+      checkpoint?: {
+        body: {
+          batch_end_seq: number;
+          batch_start_seq: number;
+          chain_root: string;
+          checkpoint_seq: number;
+          issued_at: number;
+          kernel_key: string;
+          merkle_root: string;
+          previous_checkpoint_sha256?: string;
+          schema: string;
+          tree_size: number;
+        };
+        signature: string;
+      };
+      kind: string;
+      session_id?: string;
+      snapshot_end_entry_seq?: number;
+      tenant_id?: null;
+    };
+    first_receipt_at: number;
+    guards_compliant: boolean;
+    invocation_count: number;
+    issued_at: number;
+    kernel_key: string;
+    last_receipt_at: number;
+    receipt_count: number;
+    receipt_set_digest: string;
+    schema: "chio.compliance.certificate.v1";
+    scope_compliant: boolean;
+    session_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/bond.schema.json
+export namespace Credit_Bond {
+  export interface ChioCreditBondSignedBody {
+    bondId: string;
+    expiresAt: number;
+    issuedAt: number;
+    lifecycleState: string;
+    report: {
+      disposition: string;
+      exposure: {
+        actionableReceipts: number;
+        activeDecisions: number;
+        currencies: string[];
+        failedSettlementReceipts: number;
+        matchingDecisions: number;
+        matchingReceipts: number;
+        mixedCurrencyBook: boolean;
+        pendingSettlementReceipts: number;
+        returnedDecisions: number;
+        returnedReceipts: number;
+        supersededDecisions: number;
+        truncatedDecisions: boolean;
+        truncatedReceipts: boolean;
+      };
+      filters: {
+        agentSubject: string;
+        capabilityId?: string;
+        decisionLimit: number;
+        receiptLimit: number;
+        toolName?: string;
+        toolServer?: string;
+      };
+      findings?: {
+        code: string;
+        description: string;
+      }[];
+      generatedAt: number;
+      latestFacilityId?: string;
+      prerequisites: {
+        activeFacilityMet: boolean;
+        activeFacilityRequired: boolean;
+        certificationMet: boolean;
+        certificationRequired: boolean;
+        currencyCoherent: boolean;
+        runtimeAssuranceMet: boolean;
+      };
+      schema: string;
+      scorecard: {
+        anomalyCount: number;
+        band: string;
+        confidence: string;
+        currencies: string[];
+        matchingDecisions: number;
+        matchingReceipts: number;
+        mixedCurrencyBook: boolean;
+        overallScore: number;
+        probationary: boolean;
+        returnedDecisions: number;
+        returnedReceipts: number;
+      };
+      supportBoundary: {
+        autonomyGatingSupported: boolean;
+        externalEscrowExecutionSupported: boolean;
+        reserveAccountingAuthoritative: boolean;
+      };
+      terms?: {
+        capitalSource: string;
+        collateralAmount: {
+          currency: string;
+          units: number;
+        };
+        coverageRatioBps: number;
+        creditLimit: {
+          currency: string;
+          units: number;
+        };
+        facilityId: string;
+        outstandingExposureAmount: {
+          currency: string;
+          units: number;
+        };
+        reserveRatioBps: number;
+        reserveRequirementAmount: {
+          currency: string;
+          units: number;
+        };
+      };
+    };
+    schema: "chio.credit.bond.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/capital-allocation.schema.json
+export namespace Credit_CapitalAllocation {
+  export interface ChioCreditCapitalAllocationSignedBody {
+    allocationId: string;
+    approvalTokenId: string;
+    authorityChain: {
+      approvedAt: number;
+      authorityProof: {
+        body: {
+          approvedAt: number;
+          expiresAt: number;
+          principalId: string;
+          role: string;
+          schema: string;
+        };
+        signature: string;
+        signerKey: string;
+      };
+      expiresAt: number;
+      principalId: string;
+      role: string;
+    }[];
+    bondId: string;
+    capabilityId: string;
+    concentrationCapAmount: {
+      currency: string;
+      units: number;
+    };
+    currentOutstandingAmount: {
+      currency: string;
+      units: number;
+    };
+    currentReserveAmount: {
+      currency: string;
+      units: number;
+    };
+    description: string;
+    evidenceRefs: {
+      kind: string;
+      locator: string;
+      observedAt: number;
+      referenceId: string;
+    }[];
+    executionWindow: {
+      notAfter: number;
+      notBefore: number;
+    };
+    facilityId: string;
+    governedReceiptId: string;
+    instructionDrafts: {
+      action: string;
+      amount: {
+        currency: string;
+        units: number;
+      };
+      description: string;
+      sourceId: string;
+      sourceKind: string;
+    }[];
+    intentId: string;
+    issuedAt: number;
+    outcome: string;
+    projectedOutstandingAmount: {
+      currency: string;
+      units: number;
+    };
+    query: {
+      agentSubject: string;
+      bondLimit: number;
+      facilityLimit: number;
+      lossEventLimit: number;
+      receiptLimit: number;
+    };
+    rail: {
+      custodyProviderId: string;
+      destinationAccountRef: string;
+      jurisdiction: string;
+      kind: string;
+      railId: string;
+      sourceAccountRef: string;
+    };
+    requestedAmount: {
+      currency: string;
+      units: number;
+    };
+    requiredReserveAmount: {
+      currency: string;
+      units: number;
+    };
+    reserveSourceId: string;
+    schema: "chio.credit.capital-allocation.v1";
+    sourceId: string;
+    sourceKind: string;
+    subjectKey: string;
+    supportBoundary: {
+      automaticDispatchSupported: boolean;
+      capitalBookAuthoritative: boolean;
+      externalExecutionAuthoritative: boolean;
+      simulationFirstOnly: boolean;
+    };
+    toolName: string;
+    toolServer: string;
+    utilizationCeilingAmount: {
+      currency: string;
+      units: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/capital-authority-step-proof.schema.json
+export namespace Credit_CapitalAuthorityStepProof {
+  export interface ChioCreditCapitalAuthorityStepProofSignedBody {
+    approvedAt: number;
+    expiresAt: number;
+    principalId: string;
+    role: string;
+    schema: "chio.credit.capital-authority-step-proof.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/capital-book.schema.json
+export namespace Credit_CapitalBook {
+  export interface ChioCreditCapitalBookSignedBody {
+    events: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      counterpartyId: string;
+      counterpartyRole: string;
+      description: string;
+      eventId: string;
+      evidenceRefs: {
+        kind: string;
+        locator: string;
+        observedAt: number;
+        referenceId: string;
+      }[];
+      facilityId: string;
+      kind: string;
+      occurredAt: number;
+      ownerRole: string;
+      sourceId: string;
+    }[];
+    generatedAt: number;
+    query: {
+      agentSubject: string;
+      bondLimit: number;
+      facilityLimit: number;
+      lossEventLimit: number;
+      receiptLimit: number;
+    };
+    schema: "chio.credit.capital-book.v1";
+    sources: {
+      bondId?: string;
+      capitalSource: string;
+      committedAmount?: {
+        currency: string;
+        units: number;
+      };
+      counterpartyId: string;
+      counterpartyRole: string;
+      currency: string;
+      description: string;
+      disbursedAmount?: {
+        currency: string;
+        units: number;
+      };
+      drawnAmount?: {
+        currency: string;
+        units: number;
+      };
+      facilityId: string;
+      heldAmount?: {
+        currency: string;
+        units: number;
+      };
+      impairedAmount?: {
+        currency: string;
+        units: number;
+      };
+      jurisdiction?: string;
+      kind: string;
+      ownerRole: string;
+      releasedAmount?: {
+        currency: string;
+        units: number;
+      };
+      repaidAmount?: {
+        currency: string;
+        units: number;
+      };
+      sourceId: string;
+    }[];
+    subjectKey: string;
+    summary: {
+      currencies: string[];
+      fundingSources: number;
+      ledgerEvents: number;
+      matchingBonds: number;
+      matchingFacilities: number;
+      matchingLossEvents: number;
+      matchingReceipts: number;
+      mixedCurrencyBook: boolean;
+      returnedBonds: number;
+      returnedFacilities: number;
+      returnedLossEvents: number;
+      returnedReceipts: number;
+      truncatedBonds: boolean;
+      truncatedFacilities: boolean;
+      truncatedLossEvents: boolean;
+      truncatedReceipts: boolean;
+    };
+    supportBoundary: {
+      automaticCapitalExecutionSupported: boolean;
+      custodyExecutionSupported: boolean;
+      mixedCurrencyNettingSupported: boolean;
+      sourceOfFundsAuthoritative: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/capital-instruction.schema.json
+export namespace Credit_CapitalInstruction {
+  export interface ChioCreditCapitalInstructionSignedBody {
+    action: string;
+    amount: {
+      currency: string;
+      units: number;
+    };
+    authorityChain: {
+      approvedAt: number;
+      authorityProof: {
+        body: {
+          approvedAt: number;
+          expiresAt: number;
+          principalId: string;
+          role: string;
+          schema: string;
+        };
+        signature: string;
+        signerKey: string;
+      };
+      expiresAt: number;
+      note?: string;
+      principalId: string;
+      role: string;
+    }[];
+    completionFlowRowId?: string;
+    counterpartyId: string;
+    counterpartyRole: string;
+    description: string;
+    evidenceRefs?: {
+      kind: string;
+      locator: string;
+      observedAt: number;
+      referenceId: string;
+    }[];
+    executionWindow: {
+      notAfter: number;
+      notBefore: number;
+    };
+    governedReceiptId?: string;
+    instructionId: string;
+    intendedState: string;
+    issuedAt: number;
+    observedExecution?: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      externalReferenceId: string;
+      observedAt: number;
+    };
+    ownerRole: string;
+    query: {
+      agentSubject: string;
+      bondLimit: number;
+      facilityLimit: number;
+      lossEventLimit: number;
+      receiptLimit: number;
+    };
+    rail: {
+      custodyProviderId: string;
+      destinationAccountRef?: string;
+      jurisdiction?: string;
+      kind: string;
+      railId: string;
+      sourceAccountRef?: string;
+    };
+    reconciledState: string;
+    schema: "chio.credit.capital-instruction.v1";
+    sourceId: string;
+    sourceKind: string;
+    subjectKey: string;
+    supportBoundary: {
+      automaticDispatchSupported: boolean;
+      capitalBookAuthoritative: boolean;
+      custodyNeutralInstructionSupported: boolean;
+      externalExecutionAuthoritative: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/exposure-ledger.schema.json
+export namespace Credit_ExposureLedger {
+  export interface ChioCreditExposureLedgerSignedBody {
+    decisions: {}[];
+    filters: {
+      agentSubject?: string;
+      decisionLimit: number;
+      receiptLimit: number;
+    };
+    generatedAt: number;
+    positions: {
+      activeQuotedPremiumUnits: number;
+      currency: string;
+      failedUnits: number;
+      governedMaxExposureUnits: number;
+      pendingUnits: number;
+      provisionalLossUnits: number;
+      quotedPremiumUnits: number;
+      recoveredUnits: number;
+      reservedUnits: number;
+      settledUnits: number;
+    }[];
+    receipts: {}[];
+    schema: "chio.credit.exposure-ledger.v1";
+    summary: {
+      actionableReceipts: number;
+      activeDecisions: number;
+      currencies: string[];
+      failedSettlementReceipts: number;
+      matchingDecisions: number;
+      matchingReceipts: number;
+      mixedCurrencyBook: boolean;
+      pendingSettlementReceipts: number;
+      returnedDecisions: number;
+      returnedReceipts: number;
+      supersededDecisions: number;
+      truncatedDecisions: boolean;
+      truncatedReceipts: boolean;
+    };
+    supportBoundary: {
+      claimAdjudicationSupported: boolean;
+      crossCurrencyNettingSupported: boolean;
+      governedReceiptsAuthoritative: boolean;
+      recoveryLifecycleSupported: boolean;
+      settlementReconciliationAuthoritative: boolean;
+      underwritingDecisionsAuthoritative: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/facility.schema.json
+export namespace Credit_Facility {
+  export interface ChioCreditFacilitySignedBody {
+    expiresAt: number;
+    facilityId: string;
+    issuedAt: number;
+    lifecycleState: string;
+    report: {
+      disposition: string;
+      filters: {
+        agentSubject: string;
+        capabilityId?: string;
+        decisionLimit?: number;
+        receiptLimit?: number;
+        toolName?: string;
+        toolServer?: string;
+      };
+      findings?: {
+        code: string;
+        description: string;
+        evidenceRefs: {
+          kind: string;
+          locator: string;
+          referenceId: string;
+        }[];
+      }[];
+      generatedAt: number;
+      prerequisites: {
+        certificationMet: boolean;
+        certificationRequired: boolean;
+        manualReviewRequired: boolean;
+        minimumRuntimeAssuranceTier: string;
+        runtimeAssuranceMet: boolean;
+      };
+      schema: string;
+      scorecard: {
+        anomalyCount: number;
+        band: string;
+        confidence: string;
+        currencies: string[];
+        matchingDecisions: number;
+        matchingReceipts: number;
+        mixedCurrencyBook: boolean;
+        overallScore: number;
+        probationary: boolean;
+        returnedDecisions: number;
+        returnedReceipts: number;
+      };
+      supportBoundary: {
+        bondExecutionSupported: boolean;
+        crossCurrencyAllocationSupported: boolean;
+        providerNeutralPolicy: boolean;
+      };
+      terms?: {
+        capitalSource: string;
+        concentrationCapBps: number;
+        creditLimit: {
+          currency: string;
+          units: number;
+        };
+        reserveRatioBps: number;
+        ttlSeconds: number;
+        utilizationCeilingBps: number;
+      };
+    };
+    schema: "chio.credit.facility.v1";
+    supersedesFacilityId?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/iou-envelope.schema.json
+export namespace Credit_IouEnvelope {
+  export interface ChioCreditIouEnvelopeSignedBody {
+    amount_units: number;
+    capability_id: string;
+    currency: string;
+    iou_id: string;
+    issuer_key: string;
+    receipt_id: string;
+    receipt_timestamp: number;
+    schema: "chio.credit.iou-envelope.v1";
+    tenant_id?: string;
+    tool_name: string;
+    tool_server: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/loss-lifecycle.schema.json
+export namespace Credit_LossLifecycle {
+  export interface ChioCreditLossLifecycleSignedBody {
+    bondId: string;
+    description?: string;
+    eventId: string;
+    eventKind: string;
+    issuedAt: number;
+    projectedBondLifecycleState: string;
+    report: {
+      findings?: {
+        code: string;
+        description: string;
+      }[];
+      generatedAt: number;
+      query: {
+        amount?: {
+          currency: string;
+          units: number;
+        };
+        bondId: string;
+        eventKind: string;
+      };
+      schema: string;
+      summary: {
+        agentSubject: string;
+        bondId: string;
+        capabilityId?: string;
+        currentBondLifecycleState: string;
+        currentDelinquentAmount?: {
+          currency: string;
+          units: number;
+        };
+        currentRecoveredAmount?: {
+          currency: string;
+          units: number;
+        };
+        currentReleasedReserveAmount?: {
+          currency: string;
+          units: number;
+        };
+        eventAmount: {
+          currency: string;
+          units: number;
+        };
+        facilityId?: string;
+        outstandingDelinquentAmount?: {
+          currency: string;
+          units: number;
+        };
+        projectedBondLifecycleState: string;
+        releaseableReserveAmount?: {
+          currency: string;
+          units: number;
+        };
+        toolName?: string;
+        toolServer?: string;
+      };
+      supportBoundary: {
+        appealWindowSupported: boolean;
+        automaticCapitalExecutionSupported: boolean;
+        bondLifecycleProjectionAuthoritative: boolean;
+        externalClaimAdjudicationSupported: boolean;
+        immutableLifecycleAuthoritative: boolean;
+        reserveControlExecutionSupported: boolean;
+      };
+    };
+    schema: "chio.credit.loss-lifecycle.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/provider-risk-package.schema.json
+export namespace Credit_ProviderRiskPackage {
+  export interface ChioCreditProviderRiskPackageSignedBody {
+    certification: {
+      required: boolean;
+    };
+    exposure: {
+      body: {
+        decisions: {}[];
+        filters: {
+          agentSubject: string;
+          decisionLimit: number;
+          receiptLimit: number;
+        };
+        generatedAt: number;
+        positions: {
+          activeQuotedPremiumUnits: number;
+          currency: string;
+          failedUnits: number;
+          governedMaxExposureUnits: number;
+          pendingUnits: number;
+          provisionalLossUnits: number;
+          quotedPremiumUnits: number;
+          recoveredUnits: number;
+          reservedUnits: number;
+          settledUnits: number;
+        }[];
+        receipts: {}[];
+        schema: string;
+        summary: {
+          actionableReceipts: number;
+          activeDecisions: number;
+          currencies: string[];
+          failedSettlementReceipts: number;
+          matchingDecisions: number;
+          matchingReceipts: number;
+          mixedCurrencyBook: boolean;
+          pendingSettlementReceipts: number;
+          returnedDecisions: number;
+          returnedReceipts: number;
+          supersededDecisions: number;
+          truncatedDecisions: boolean;
+          truncatedReceipts: boolean;
+        };
+        supportBoundary: {
+          claimAdjudicationSupported: boolean;
+          crossCurrencyNettingSupported: boolean;
+          governedReceiptsAuthoritative: boolean;
+          recoveryLifecycleSupported: boolean;
+          settlementReconciliationAuthoritative: boolean;
+          underwritingDecisionsAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    facilityReport: {
+      disposition: string;
+      filters: {
+        agentSubject: string;
+        decisionLimit: number;
+        receiptLimit: number;
+      };
+      generatedAt: number;
+      prerequisites: {
+        certificationMet: boolean;
+        certificationRequired: boolean;
+        manualReviewRequired: boolean;
+        minimumRuntimeAssuranceTier: string;
+        runtimeAssuranceMet: boolean;
+      };
+      schema: string;
+      scorecard: {
+        anomalyCount: number;
+        band: string;
+        confidence: string;
+        currencies: string[];
+        matchingDecisions: number;
+        matchingReceipts: number;
+        mixedCurrencyBook: boolean;
+        overallScore: number;
+        probationary: boolean;
+        returnedDecisions: number;
+        returnedReceipts: number;
+      };
+      supportBoundary: {
+        bondExecutionSupported: boolean;
+        crossCurrencyAllocationSupported: boolean;
+        providerNeutralPolicy: boolean;
+      };
+      terms?: {
+        capitalSource: string;
+        concentrationCapBps: number;
+        creditLimit: {
+          currency: string;
+          units: number;
+        };
+        reserveRatioBps: number;
+        ttlSeconds: number;
+        utilizationCeilingBps: number;
+      };
+    };
+    filters: {
+      agentSubject: string;
+      decisionLimit: number;
+      receiptLimit: number;
+      recentLossLimit: number;
+    };
+    generatedAt: number;
+    latestFacility?: {
+      creditLimit: {
+        currency: string;
+        units: number;
+      };
+      disposition: string;
+      expiresAt: number;
+      facilityId: string;
+      issuedAt: number;
+      lifecycleState: string;
+      signerKey: string;
+    };
+    recentLossHistory: {
+      entries: {}[];
+      summary: {
+        failedSettlementEvents: number;
+        matchingLossEvents: number;
+        provisionalLossEvents: number;
+        recoveredEvents: number;
+        returnedLossEvents: number;
+      };
+    };
+    runtimeAssurance?: {
+      governedReceipts: number;
+      highestTier: string;
+      latestEvidenceSha256: string;
+      latestSchema: string;
+      latestVerifier: string;
+      latestVerifierFamily: string;
+      observedVerifierFamilies: string[];
+      runtimeAssuranceReceipts: number;
+      stale: boolean;
+    };
+    schema: "chio.credit.provider-risk-package.v1";
+    scorecard: {
+      body: {
+        dimensions: {}[];
+        filters: {
+          agentSubject: string;
+          decisionLimit: number;
+          receiptLimit: number;
+        };
+        generatedAt: number;
+        positions: {
+          activeQuotedPremiumUnits: number;
+          currency: string;
+          failedUnits: number;
+          governedMaxExposureUnits: number;
+          pendingUnits: number;
+          provisionalLossUnits: number;
+          quotedPremiumUnits: number;
+          recoveredUnits: number;
+          reservedUnits: number;
+          settledUnits: number;
+        }[];
+        probation: {
+          probationary: boolean;
+          receiptCount: number;
+          spanDays: number;
+          targetReceiptCount: number;
+          targetSpanDays: number;
+        };
+        reputation: {
+          acceptedImportedSignalCount: number;
+          effectiveScore: number;
+          importedSignalCount: number;
+          probationary: boolean;
+        };
+        schema: string;
+        summary: {
+          anomalyCount: number;
+          band: string;
+          confidence: string;
+          currencies: string[];
+          matchingDecisions: number;
+          matchingReceipts: number;
+          mixedCurrencyBook: boolean;
+          overallScore: number;
+          probationary: boolean;
+          returnedDecisions: number;
+          returnedReceipts: number;
+        };
+        supportBoundary: {
+          capitalAllocationSupported: boolean;
+          crossCurrencyNettingSupported: boolean;
+          facilityPolicySupported: boolean;
+          subjectScopedOnly: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    subjectKey: string;
+    supportBoundary: {
+      autonomousPricingSupported: boolean;
+      complianceScoreReferenceSupported: boolean;
+      externalCapitalReviewSupported: boolean;
+      facilityPolicyAuthoritative: boolean;
+      liabilityMarketSupported: boolean;
+      signedExposureAuthoritative: boolean;
+      signedScorecardAuthoritative: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/credit/scorecard.schema.json
+export namespace Credit_Scorecard {
+  export interface ChioCreditScorecardSignedBody {
+    dimensions: {}[];
+    filters: {
+      agentSubject: string;
+      decisionLimit: number;
+      receiptLimit: number;
+    };
+    generatedAt: number;
+    positions: {
+      activeQuotedPremiumUnits: number;
+      currency: string;
+      failedUnits: number;
+      governedMaxExposureUnits: number;
+      pendingUnits: number;
+      provisionalLossUnits: number;
+      quotedPremiumUnits: number;
+      recoveredUnits: number;
+      reservedUnits: number;
+      settledUnits: number;
+    }[];
+    probation: {
+      probationary: boolean;
+      receiptCount: number;
+      spanDays: number;
+      targetReceiptCount: number;
+      targetSpanDays: number;
+    };
+    reputation: {
+      acceptedImportedSignalCount: number;
+      effectiveScore: number;
+      importedSignalCount: number;
+      probationary: boolean;
+    };
+    schema: "chio.credit.scorecard.v1";
+    summary: {
+      anomalyCount: number;
+      band: string;
+      confidence: string;
+      currencies: string[];
+      matchingDecisions: number;
+      matchingReceipts: number;
+      mixedCurrencyBook: boolean;
+      overallScore: number;
+      probationary: boolean;
+      returnedDecisions: number;
+      returnedReceipts: number;
+    };
+    supportBoundary: {
+      capitalAllocationSupported: boolean;
+      crossCurrencyNettingSupported: boolean;
+      facilityPolicySupported: boolean;
+      subjectScopedOnly: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/disclosure/disclosure-crypto-context-report-body.schema.json
+export namespace Disclosure_DisclosureCryptoContextReportBody {
+  export interface ChioDisclosureCryptoContextReportV1SignedBody {
+    artifact_ref: string;
+    context_id: string;
+    cryptographic_proof_verified: boolean;
+    disclosed_fields: string[];
+    evidence_class: string;
+    id: string;
+    projection_manifest_ref: string;
+    rejected_checks: {
+      code: string;
+      message: string;
+    }[];
+    schema: "chio.disclosure.crypto-context-report.v1";
+    verdict: string;
+    verified_claims: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-comparison-report.schema.json
+export namespace Economy_AutonomousComparisonReport {
+  export interface ChioAutonomousComparisonReportSignedBody {
+    comparison_id: string;
+    deltas: {
+      automated_value: string;
+      description: string;
+      field: string;
+      manual_value: string;
+    }[];
+    disposition: string;
+    generated_at: number;
+    manual_decision_ref: string;
+    note: string;
+    pricing_decision_ref: string;
+    schema: "chio.autonomous-comparison-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-drift-report.schema.json
+export namespace Economy_AutonomousDriftReport {
+  export interface ChioAutonomousDriftReportSignedBody {
+    comparison_report: {
+      comparison_id: string;
+      deltas: {
+        automated_value: string;
+        description: string;
+        field: string;
+        manual_value: string;
+      }[];
+      disposition: string;
+      generated_at: number;
+      manual_decision_ref: string;
+      note: string;
+      pricing_decision_ref: string;
+      schema: string;
+    };
+    drift_report_id: string;
+    drift_signals: {
+      description: string;
+      evidence_refs: {
+        kind: string;
+        locator: string;
+        observed_at: number;
+        reference_id: string;
+      }[];
+      kind: string;
+      metric_name: string;
+      observed_value: number;
+      severity: string;
+      threshold_value: number;
+    }[];
+    fail_safe_engaged: boolean;
+    generated_at: number;
+    note: string;
+    optimization_ref: string;
+    pricing_decision_ref: string;
+    rollback_plan: {
+      actions: string[];
+      issued_at: number;
+      note: string;
+      plan_id: string;
+      requires_operator_ack: boolean;
+      safe_state: string;
+      schema: string;
+      subject_key: string;
+      triggers: string[];
+    };
+    schema: "chio.autonomous-drift-report.v1";
+    subject_key: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-execution-decision.schema.json
+export namespace Economy_AutonomousExecutionDecision {
+  export interface ChioAutonomousExecutionDecisionSignedBody {
+    action: string;
+    authority_envelope_ref: string;
+    auto_bind_decision_ref: string;
+    bound_coverage_ref: string;
+    currency: string;
+    execution_id: string;
+    issued_at: number;
+    lifecycle_state: string;
+    note: string;
+    optimization_ref: string;
+    pricing_decision_ref: string;
+    provider_id: string;
+    quote_response_ref: string;
+    rollback_control: {
+      human_interrupt_contact: string;
+      interruptible: boolean;
+      rollback_plan_ref: string;
+    };
+    safety_gates: {
+      description: string;
+      name: string;
+      passed: boolean;
+    }[];
+    schema: "chio.autonomous-execution-decision.v1";
+    settlement_dispatch_ref: string;
+    subject_key: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-pricing-authority-envelope.schema.json
+export namespace Economy_AutonomousPricingAuthorityEnvelope {
+  export interface ChioAutonomousPricingAuthorityEnvelopeSignedBody {
+    authority_chain_refs: string[];
+    automation_mode: string;
+    currency: string;
+    delegated_authority_reference: string;
+    envelope_id: string;
+    issued_at: number;
+    kind: string;
+    max_coverage_amount: {
+      currency: string;
+      units: number;
+    };
+    max_daily_decisions: number;
+    max_premium_amount: {
+      currency: string;
+      units: number;
+    };
+    max_rate_change_bps: number;
+    not_after: number;
+    not_before: number;
+    note: string;
+    permitted_actions: string[];
+    provider_id: string;
+    requires_human_review_above_premium: {
+      currency: string;
+      units: number;
+    };
+    requires_human_review_for_bind: boolean;
+    schema: "chio.autonomous-pricing-authority-envelope.v1";
+    subject_key: string;
+    support_boundary: {
+      delegated_authority_required: boolean;
+      live_bind_supported: boolean;
+      operator_override_supported: boolean;
+      reserve_optimization_required: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-pricing-decision.schema.json
+export namespace Economy_AutonomousPricingDecision {
+  export interface ChioAutonomousPricingDecisionSignedBody {
+    authority_envelope: {
+      authority_chain_refs: string[];
+      automation_mode: string;
+      currency: string;
+      delegated_authority_reference: string;
+      envelope_id: string;
+      issued_at: number;
+      kind: string;
+      max_coverage_amount: {
+        currency: string;
+        units: number;
+      };
+      max_daily_decisions: number;
+      max_premium_amount: {
+        currency: string;
+        units: number;
+      };
+      max_rate_change_bps: number;
+      not_after: number;
+      not_before: number;
+      note: string;
+      permitted_actions: string[];
+      provider_id: string;
+      requires_human_review_above_premium: {
+        currency: string;
+        units: number;
+      };
+      requires_human_review_for_bind: boolean;
+      schema: string;
+      subject_key: string;
+      support_boundary: {
+        delegated_authority_required: boolean;
+        live_bind_supported: boolean;
+        operator_override_supported: boolean;
+        reserve_optimization_required: boolean;
+      };
+    };
+    comparison_baseline_ref: string;
+    confidence_bps: number;
+    decision_id: string;
+    disposition: string;
+    explanation_factors: {
+      code: string;
+      description: string;
+      direction: string;
+      evidence_refs: {
+        kind: string;
+        locator: string;
+        observed_at: number;
+        reference_id: string;
+      }[];
+      weight_bps: number;
+    }[];
+    issued_at: number;
+    model: {
+      engine_family: string;
+      explanation_version: string;
+      input_hash: string;
+      model_id: string;
+      model_version: string;
+      published_at: number;
+      supports_counterfactuals: boolean;
+      supports_shadow_evaluation: boolean;
+      training_cutoff: number;
+    };
+    note: string;
+    pricing_input: {
+      available_capital_units: number;
+      coverage_class: string;
+      currency: string;
+      evidence_refs: {
+        kind: string;
+        locator: string;
+        observed_at: number;
+        reference_id: string;
+      }[];
+      generated_at: number;
+      input_id: string;
+      latest_web3_settlement_state: string;
+      note: string;
+      pending_loss_units: number;
+      provider_id: string;
+      receipt_history_window_secs: number;
+      reputation_score_bps: number;
+      requested_coverage_amount: {
+        currency: string;
+        units: number;
+      };
+      runtime_assurance_tier: string;
+      schema: string;
+      settled_loss_units: number;
+      subject_key: string;
+      support_boundary: {
+        delegated_authority_required: boolean;
+        live_bind_supported: boolean;
+        operator_override_supported: boolean;
+        reserve_optimization_required: boolean;
+      };
+    };
+    review_state: string;
+    schema: "chio.autonomous-pricing-decision.v1";
+    suggested_ceiling_factor_bps: number;
+    suggested_coverage_amount: {
+      currency: string;
+      units: number;
+    };
+    suggested_premium_amount: {
+      currency: string;
+      units: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-pricing-input.schema.json
+export namespace Economy_AutonomousPricingInput {
+  export interface ChioAutonomousPricingInputSignedBody {
+    available_capital_units: number;
+    coverage_class: string;
+    currency: string;
+    evidence_refs: {
+      kind: string;
+      locator: string;
+      observed_at: number;
+      reference_id: string;
+    }[];
+    generated_at: number;
+    input_id: string;
+    latest_web3_settlement_state: string;
+    note: string;
+    pending_loss_units: number;
+    provider_id: string;
+    receipt_history_window_secs: number;
+    reputation_score_bps: number;
+    requested_coverage_amount: {
+      currency: string;
+      units: number;
+    };
+    runtime_assurance_tier: string;
+    schema: "chio.autonomous-pricing-input.v1";
+    settled_loss_units: number;
+    subject_key: string;
+    support_boundary: {
+      delegated_authority_required: boolean;
+      live_bind_supported: boolean;
+      operator_override_supported: boolean;
+      reserve_optimization_required: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/autonomous-rollback-plan.schema.json
+export namespace Economy_AutonomousRollbackPlan {
+  export interface ChioAutonomousRollbackPlanSignedBody {
+    actions: string[];
+    issued_at: number;
+    note: string;
+    plan_id: string;
+    requires_operator_ack: boolean;
+    safe_state: string;
+    schema: "chio.autonomous-rollback-plan.v1";
+    subject_key: string;
+    triggers: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/capital-pool-optimization.schema.json
+export namespace Economy_CapitalPoolOptimization {
+  export interface ChioCapitalPoolOptimizationSignedBody {
+    capital_book_ref: string;
+    currency: string;
+    facility_refs: string[];
+    issued_at: number;
+    max_bind_capacity_units: number;
+    max_facility_utilization_bps: number;
+    note: string;
+    optimization_id: string;
+    pending_claim_refs: string[];
+    pricing_decision_ref: string;
+    recommendations: {
+      action: string;
+      amount: {
+        currency: string;
+        units: number;
+      };
+      destination_ref?: string;
+      rationale: string;
+      source_ref: string;
+    }[];
+    schema: "chio.capital-pool-optimization.v1";
+    subject_key: string;
+    support_boundary: {
+      cross_currency_optimization_supported: boolean;
+      live_mutation_supported: boolean;
+      operator_override_required: boolean;
+      scenario_comparison_supported: boolean;
+      web3_reconciliation_required: boolean;
+    };
+    target_reserve_ratio_bps: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/capital-pool-simulation-report.schema.json
+export namespace Economy_CapitalPoolSimulationReport {
+  export interface ChioCapitalPoolSimulationReportSignedBody {
+    baseline_optimization: {
+      capital_book_ref: string;
+      currency: string;
+      facility_refs: string[];
+      issued_at: number;
+      max_bind_capacity_units: number;
+      max_facility_utilization_bps: number;
+      note: string;
+      optimization_id: string;
+      pending_claim_refs: string[];
+      pricing_decision_ref: string;
+      recommendations: {
+        action: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        destination_ref?: string;
+        rationale: string;
+        source_ref: string;
+      }[];
+      schema: string;
+      subject_key: string;
+      support_boundary: {
+        cross_currency_optimization_supported: boolean;
+        live_mutation_supported: boolean;
+        operator_override_required: boolean;
+        scenario_comparison_supported: boolean;
+        web3_reconciliation_required: boolean;
+      };
+      target_reserve_ratio_bps: number;
+    };
+    candidate_optimization: {
+      capital_book_ref: string;
+      currency: string;
+      facility_refs: string[];
+      issued_at: number;
+      max_bind_capacity_units: number;
+      max_facility_utilization_bps: number;
+      note: string;
+      optimization_id: string;
+      pending_claim_refs: string[];
+      pricing_decision_ref: string;
+      recommendations: {
+        action: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        destination_ref?: string;
+        rationale: string;
+        source_ref: string;
+      }[];
+      schema: string;
+      subject_key: string;
+      support_boundary: {
+        cross_currency_optimization_supported: boolean;
+        live_mutation_supported: boolean;
+        operator_override_required: boolean;
+        scenario_comparison_supported: boolean;
+        web3_reconciliation_required: boolean;
+      };
+      target_reserve_ratio_bps: number;
+    };
+    currency: string;
+    deltas: {
+      baseline_units: number;
+      candidate_units: number;
+      description: string;
+      metric_name: string;
+    }[];
+    generated_at: number;
+    note: string;
+    recommended_operator_action: string;
+    schema: "chio.capital-pool-simulation-report.v1";
+    simulation_id: string;
+    simulation_mode: string;
+    subject_key: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-close-body.schema.json
+export namespace Economy_ChannelCloseBody {
+  export interface ChioChannelCloseV1SignedBody {
+    body: {
+      channelId: string;
+      channelStateVersion: number;
+      closeKind: string;
+      closeSubmissionCutoffUnixSecs: number;
+      disputeDeadlineUnixMs: number;
+      disputeWindowSecs: number;
+      escrowReservationVersion: number;
+      expectedRefundAfterReleaseTokenBaseUnits: string;
+      expectedReleaseTokenBaseUnits: string;
+      finalCumulativeOwed: {
+        currency: string;
+        units: number;
+      };
+      finalStateDigest: string;
+      finalStateSequence: number;
+      lifecycleFence: number;
+      openDigest: string;
+      proposedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-dispute-body.schema.json
+export namespace Economy_ChannelDisputeBody {
+  export interface ChioChannelDisputeV1SignedBody {
+    body: {
+      channelId: string;
+      closeDigest: string;
+      closeStateDigest: string;
+      closeStateSequence: number;
+      competingStateDigest: string;
+      competingStateSequence: number;
+      disputeId: string;
+      reason: string;
+      schema: string;
+      stateChainProofDigest: string;
+      submittedAtUnixMs: number;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-funding-acknowledgement-body.schema.json
+export namespace Economy_ChannelFundingAcknowledgementBody {
+  export interface ChioChannelFundingAcknowledgementV1SignedBody {
+    body: {
+      anchoredHeadDigest: string;
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      expiresAtUnixMs: number;
+      newState: string;
+      newVersion: number;
+      openIntentDigest: string;
+      priorHeadDigest: string;
+      priorState: string;
+      priorVersion: number;
+      reservedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-funding-evidence-body.schema.json
+export namespace Economy_ChannelFundingEvidenceBody {
+  export interface ChioChannelFundingEvidenceV1SignedBody {
+    body: {
+      assetBinding: {
+        chainId: string;
+        currency: string;
+        protocolMinorUnitDecimals: number;
+        schema: string;
+        settlementPolicyDigest: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+      blockPin: {
+        blockHash: string;
+        blockNumber: number;
+        blockTimestampUnixSecs: number;
+        finalityMode: string;
+        finalityStatus: string;
+        finalizedHeadHash: string;
+        finalizedHeadNumber: number;
+        observedAtUnixMs: number;
+        observedConfirmations: number;
+        requiredConfirmations: number;
+      };
+      creationEvent: {
+        beneficiary: string;
+        capabilityId: string;
+        deadlineUnixSecs: number;
+        depositor: string;
+        escrowId: string;
+        eventSignature: string;
+        logEmitter: string;
+        logIndex: number;
+        maxTokenBaseUnits: string;
+        operator: string;
+        receiptBlockHash: string;
+        receiptBlockNumber: number;
+        tokenAddress: string;
+        transactionHash: string;
+        transactionSucceeded: boolean;
+        transactionTo: string;
+      };
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      escrowState: {
+        depositedTokenBaseUnits: string;
+        refunded: boolean;
+        refundedTokenBaseUnits: string;
+        releasedTokenBaseUnits: string;
+      };
+      escrowStateRead: {
+        blockHash: string;
+        blockNumber: number;
+        callDataDigest: string;
+        contract: string;
+        returnDataDigest: string;
+      };
+      escrowTerms: {
+        beneficiary: string;
+        capabilityId: string;
+        deadlineUnixSecs: number;
+        depositor: string;
+        maxTokenBaseUnits: string;
+        operator: string;
+        operatorKeyHash: string;
+        tokenAddress: string;
+      };
+      evidenceExpiresAtUnixMs: number;
+      identityObservation: {
+        active: boolean;
+        blockHash: string;
+        blockNumber: number;
+        operator: string;
+        operatorKeyHash: string;
+        registryContract: string;
+      };
+      schema: string;
+      tokenObservation: {
+        allowed: boolean;
+        blockHash: string;
+        blockNumber: number;
+        escrowContract: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-open-body.schema.json
+export namespace Economy_ChannelOpenBody {
+  export interface ChioChannelOpenV1SignedBody {
+    body: {
+      channelId: string;
+      fundingAcknowledgementDigest: string;
+      initialStateDigest: string;
+      openIntentDigest: string;
+      openedAtUnixMs: number;
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-open-intent-body.schema.json
+export namespace Economy_ChannelOpenIntentBody {
+  export interface ChioChannelOpenIntentV1SignedBody {
+    body: {
+      assetBinding: {
+        chainId: string;
+        currency: string;
+        protocolMinorUnitDecimals: number;
+        schema: string;
+        settlementPolicyDigest: string;
+        tokenAddress: string;
+        tokenDecimals: number;
+        tokenSymbol: string;
+      };
+      bound: {
+        currency: string;
+        units: number;
+      };
+      boundTokenBaseUnits: string;
+      channelExpiryUnixSecs: number;
+      closeSubmissionCutoffUnixSecs: number;
+      currency: string;
+      disputeTierUpperBoundUnits: number;
+      disputeWindowSecs: number;
+      escrowReference: {
+        chainId: string;
+        escrowContract: string;
+        escrowId: string;
+      };
+      finalityMode: string;
+      fixedFinalityBroadcastMarginSecs: number;
+      fundingEvidenceDigest: string;
+      openIntentId: string;
+      originalOperator: string;
+      originalOperatorKeyHash: string;
+      originalWeb3DispatchDigest: string;
+      participantSnapshotDigest: string;
+      payeeBeneficiaryAddress: string;
+      payeeId: string;
+      payeeKey: string;
+      payeeKeyEpoch: number;
+      payerId: string;
+      payerKey: string;
+      payerKeyEpoch: number;
+      payerRefundAddress: string;
+      requiredConfirmations: number;
+      schema: string;
+      settlementAuthorityScopeId: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-release-authorization-body.schema.json
+export namespace Economy_ChannelReleaseAuthorizationBody {
+  export interface ChioChannelReleaseAuthorizationV1SignedBody {
+    body: {
+      authority: {
+        assetBindingDigest: string;
+        authorizedAtUnixMs: number;
+        boundTokenBaseUnits: string;
+        channelExpiryUnixMs: number;
+        channelId: string;
+        channelStateVersion: number;
+        closeBodyDigest: string;
+        closeDigest: string;
+        closeSubmissionCutoffUnixMs: number;
+        disputeDeadlineUnixMs: number;
+        effectiveCloseDigest: string;
+        escrowDeadlineUnixMs: number;
+        escrowReference: {
+          chainId: string;
+          escrowContract: string;
+          escrowId: string;
+        };
+        escrowReservationVersion: number;
+        expectedRefundTokenBaseUnits: string;
+        expectedReleaseTokenBaseUnits: string;
+        finalCumulativeOwed: {
+          currency: string;
+          units: number;
+        };
+        finalStateDigest: string;
+        finalStateSequence: number;
+        frost: {
+          actionDigest: string;
+          authorizationId: string;
+          authorizationSlotId: string;
+          signedEnvelopeDigest: string;
+        };
+        frostIssuedAtUnixMs: number;
+        frostKeyEpoch: number;
+        frostResourceFence: number;
+        frostResourceId: string;
+        frostResourceVersion: number;
+        frostRosterDigest: string;
+        frostScopeId: string;
+        lifecycleFence: number;
+        openDigest: string;
+        originalOperator: string;
+        originalOperatorKeyHash: string;
+        originalWeb3DispatchDigest: string;
+        payeeBeneficiaryAddress: string;
+        publisherFence: number;
+      };
+      publicationRoot: string;
+      releaseBroadcast: {
+        callDigest: string;
+        effectKind: string;
+        effectSlotId: string;
+        idempotencyKey: string;
+        operationId: string;
+        resourceHeadDigest: string;
+        scopeId: string;
+      };
+      rootPublication: {
+        callDigest: string;
+        effectKind: string;
+        effectSlotId: string;
+        idempotencyKey: string;
+        operationId: string;
+        resourceHeadDigest: string;
+        scopeId: string;
+      };
+      schema: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-reservation-body.schema.json
+export namespace Economy_ChannelReservationBody {
+  export interface ChioChannelReservationV1SignedBody {
+    body: {
+      channelId: string;
+      channelStateExpectedVersion: number;
+      dispositionExpectedVersion: number;
+      expiresAtUnixMs: number;
+      lifecycleFence: number;
+      maximumCharge: {
+        currency: string;
+        units: number;
+      };
+      maximumTokenBaseUnits: string;
+      nextSequence: number;
+      openDigest: string;
+      operationId: string;
+      priorStateDigest: string;
+      receiptAuthorityDigest: string;
+      requestId: string;
+      reservationId: string;
+      schema: string;
+      serviceBindingDigest: string;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-state-body.schema.json
+export namespace Economy_ChannelStateBody {
+  export interface ChioChannelStateV1SignedBody {
+    body: {
+      actualCharge: {
+        currency: string;
+        units: number;
+      };
+      assetBindingDigest: string;
+      channelId: string;
+      cumulativeOwed: {
+        currency: string;
+        units: number;
+      };
+      cumulativeTokenBaseUnits: string;
+      obligationAtomDigest?: string;
+      prevStateDigest: string;
+      receiptAuthorityDigest: string;
+      receiptCount: number;
+      receiptDigest: string;
+      receiptId: string;
+      receiptIdRoot: string;
+      reservationDigest: string;
+      schema: string;
+      seq: number;
+    };
+    keyEpoch: number;
+    signerId: string;
+    signerKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/channel-terminal-outcome-commitment-body.schema.json
+export namespace Economy_ChannelTerminalOutcomeCommitmentBody {
+  export interface ChioChannelTerminalOutcomeCommitmentV1SignedBody {
+    operationId: string;
+    outcomeRecordedAtUnixMs: number;
+    receiptDigest: string;
+    receiptId: string;
+    reservationDigest: string;
+    reservationId: string;
+    schema: "chio.channel.terminal-outcome-commitment.v1";
+    terminalResult: {
+      result: {
+        storage: string;
+        value: unknown;
+      };
+      resultDigest: string;
+      resultId: string;
+    };
+    terminalizedAtUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-atom-transformation-body.schema.json
+export namespace Economy_ClearingAtomTransformationBody {
+  export interface ChioClearingAtomTransformationV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    atomDigest: string;
+    creditorIdentity: string;
+    creditorParticipantId: string;
+    debtorIdentity: string;
+    debtorParticipantId: string;
+    obligationId: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.atom-transformation.v1";
+    sourceSequence: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-input-manifest-body.schema.json
+export namespace Economy_ClearingInputManifestBody {
+  export interface ChioClearingInputManifestV1SignedBody {
+    authorityId: string;
+    endCheckpointDigest: string;
+    entries: {
+      atomDigest: string;
+      dispositionDigest: string;
+      dispositionVersion: number;
+      lifecycleFence: number;
+      obligationId: string;
+      roundId: string;
+      sourceSequence: number;
+    }[];
+    epoch: number;
+    expiresAtUnixMs: number;
+    hasMore: boolean;
+    issuedAtUnixMs: number;
+    keyEpoch: number;
+    rangeEndSequence: number;
+    rangeStartSequence: number;
+    schema: "chio.clearing.input-manifest.v1";
+    sourceId: string;
+    startCheckpointDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-netting-round-core-body.schema.json
+export namespace Economy_ClearingNettingRoundCoreBody {
+  export interface ChioClearingNettingRoundCoreV1SignedBody {
+    algorithmVersion: string;
+    clearingAuthorityId: string;
+    clearingAuthorityKeyEpoch: number;
+    currency: string;
+    disputeWindowEndsAtUnixMs: number;
+    epoch: number;
+    generatedAtUnixMs: number;
+    governanceScopeId: string;
+    inputCount: number;
+    inputManifestDigest: string;
+    participantSnapshotDigest: string;
+    reservationRoot: string;
+    roundId: string;
+    schema: "chio.clearing.netting-round-core.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-output-manifest-body.schema.json
+export namespace Economy_ClearingOutputManifestBody {
+  export interface ChioClearingOutputManifestV1SignedBody {
+    atomTransformationCount: number;
+    atomTransformationRoot: string;
+    participantStatementCount: number;
+    participantStatementRoot: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.output-manifest.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-acceptance-body.schema.json
+export namespace Economy_ClearingParticipantAcceptanceBody {
+  export interface ChioClearingParticipantAcceptanceV1SignedBody {
+    acceptedAtUnixMs: number;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    outputManifestDigest: string;
+    participantId: string;
+    participantStatementDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.participant-acceptance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-snapshot-acknowledgement-body.schema.json
+export namespace Economy_ClearingParticipantSnapshotAcknowledgementBody {
+  export interface ChioClearingParticipantSnapshotAcknowledgementV1SignedBody {
+    acceptedAtUnixMs: number;
+    algorithmVersion: string;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    participantId: string;
+    participantSnapshotDigest: string;
+    schema: "chio.clearing.participant-snapshot-acknowledgement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-snapshot-body.schema.json
+export namespace Economy_ClearingParticipantSnapshotBody {
+  export interface ChioClearingParticipantSnapshotV1SignedBody {
+    algorithmVersion: string;
+    authorityId: string;
+    expiresAtUnixMs: number;
+    keyEpoch: number;
+    participants: {
+      acknowledgementKey: string;
+      acknowledgementKeyEpoch: number;
+      identities: string[];
+      participantId: string;
+      settlementDestination: string;
+    }[];
+    schema: "chio.clearing.participant-snapshot.v1";
+    validFromUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-participant-statement-body.schema.json
+export namespace Economy_ClearingParticipantStatementBody {
+  export interface ChioClearingParticipantStatementV1SignedBody {
+    bilateralCreditCancelledUnits: number;
+    bilateralDebitCancelledUnits: number;
+    contributingAtomDigests: string[];
+    grossCreditUnits: number;
+    grossDebitUnits: number;
+    netBalance: {
+      direction: string;
+      units: number;
+    };
+    participantId: string;
+    roundCoreDigest: string;
+    schema: "chio.clearing.participant-statement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-abort-body.schema.json
+export namespace Economy_ClearingRoundAbortBody {
+  export interface ChioClearingRoundAbortV1SignedBody {
+    authorityDigest: string;
+    authorizedAtUnixMs: number;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    governanceScopeId: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outputManifestDigest: string;
+    reason: string;
+    reservationCount: number;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.round-abort.v1";
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+    zeroDispatchProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-finalization-body.schema.json
+export namespace Economy_ClearingRoundFinalizationBody {
+  export interface ChioClearingRoundFinalizationV1SignedBody {
+    clearingAuthorityId: string;
+    clearingAuthorityKeyEpoch: number;
+    finalizedAtUnixMs: number;
+    governanceScopeId: string;
+    outputManifestDigest: string;
+    participantAcceptanceCount: number;
+    participantAcceptanceRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.round-finalization.v1";
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-round-satisfaction-body.schema.json
+export namespace Economy_ClearingRoundSatisfactionBody {
+  export interface ChioClearingRoundSatisfactionV1SignedBody {
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    finalizationDigest: string;
+    intentProgressRoot: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outputManifestDigest: string;
+    reservationCount: number;
+    reservationHeadRoot: string;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    satisfiedAtUnixMs: number;
+    schema: "chio.clearing.round-satisfaction.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-settlement-intent-body.schema.json
+export namespace Economy_ClearingSettlementIntentBody {
+  export interface ChioClearingSettlementIntentV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    contributingReservationRoot: string;
+    creditorParticipantId: string;
+    creditorSettlementDestination: string;
+    debtorParticipantId: string;
+    dispatchIdempotencyKey: string;
+    intentId: string;
+    ordinal: number;
+    roundCoreDigest: string;
+    schema: "chio.clearing.settlement-intent.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-settlement-reconciliation-body.schema.json
+export namespace Economy_ClearingSettlementReconciliationBody {
+  export interface ChioClearingSettlementReconciliationV1SignedBody {
+    attemptNumber: number;
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    effectSlotId: string;
+    externalReferences: string[];
+    intentDigest: string;
+    intentId: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    observedAtUnixMs: number;
+    observedStatus: string;
+    outputManifestDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.settlement-reconciliation.v1";
+    settlementOutcomeDigest: string;
+    sourceEffectSlotDigest: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-zero-dispatch-proof-body.schema.json
+export namespace Economy_ClearingZeroDispatchProofBody {
+  export interface ChioClearingZeroDispatchProofV1SignedBody {
+    admissionCommitDigest: string;
+    admissionCommitSequence: number;
+    admissionStoreId: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    dispatchStatusCount: number;
+    dispatchStatusRoot: string;
+    dispatchStatuses: {
+      dispatchIdempotencyKey: string;
+      disposition: {
+        kind: string;
+      };
+      intentDigest: string;
+      intentId: string;
+    }[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    outputManifestDigest: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.zero-dispatch-proof.v1";
+    settlementIntentCount: number;
+    settlementIntentRoot: string;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/clearing-zero-intent-reconciliation-body.schema.json
+export namespace Economy_ClearingZeroIntentReconciliationBody {
+  export interface ChioClearingZeroIntentReconciliationV1SignedBody {
+    atomBindings: {
+      expectedHeadDigest: string;
+      expectedLifecycleFence: number;
+      expectedResourceVersion: number;
+      obligationId: string;
+      sourceSequence: number;
+    }[];
+    authorityDigest: string;
+    dispositionAuthorityId: string;
+    dispositionAuthorityKeyEpoch: number;
+    emptyIntentRoot: string;
+    finalizationDigest: string;
+    nextLifecycleFence: number;
+    nextLifecycleVersion: number;
+    outcome: string;
+    outputManifestDigest: string;
+    reconciledAtUnixMs: number;
+    reservationCount: number;
+    reservationRoot: string;
+    roundCoreDigest: string;
+    roundId: string;
+    schema: "chio.clearing.zero-intent-reconciliation.v1";
+    settlementIntentCount: number;
+    sourceLifecycleFence: number;
+    sourceLifecycleHeadDigest: string;
+    sourceLifecycleVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/credit-facility-bind-body.schema.json
+export namespace Economy_CreditFacilityBindBody {
+  export interface ChioCreditFacilityBindV1SignedBody {
+    actionNonce: string;
+    amount: {
+      currency: string;
+      units: number;
+    };
+    authorityId: string;
+    authorityKeyEpoch: number;
+    authoritySetDigest: string;
+    bindId: string;
+    capabilityId: string;
+    creditorKeyEpoch: number;
+    debtorId: string;
+    debtorKeyEpoch: number;
+    dueAtUnixMs: number;
+    economicIntentDigest: string;
+    effectiveCeiling: {
+      currency: string;
+      units: number;
+    };
+    expectedExposureFence: number;
+    expectedExposureVersion: number;
+    expiresAtUnixMs: number;
+    facilityArtifactDigest: string;
+    facilityId: string;
+    issuedAtUnixMs: number;
+    operationId: string;
+    originalCreditorId: string;
+    originalSettlementDestinationRef: string;
+    payeeBindingDigest: string;
+    requestId: string;
+    schema: "chio.credit.facility-bind.v1";
+    scopeDigest: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/credit-receivable-iou-envelope-body.schema.json
+export namespace Economy_CreditReceivableIouEnvelopeBody {
+  export interface ChioCreditReceivableIouEnvelopeV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    capabilityId: string;
+    creditAuthorityDigest: string;
+    creditFacilityBind: {
+      authoritySignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+      body: {
+        actionNonce: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        authorityId: string;
+        authorityKeyEpoch: number;
+        authoritySetDigest: string;
+        bindId: string;
+        capabilityId: string;
+        creditorKeyEpoch: number;
+        debtorId: string;
+        debtorKeyEpoch: number;
+        dueAtUnixMs: number;
+        economicIntentDigest: string;
+        effectiveCeiling: {
+          currency: string;
+          units: number;
+        };
+        expectedExposureFence: number;
+        expectedExposureVersion: number;
+        expiresAtUnixMs: number;
+        facilityArtifactDigest: string;
+        facilityId: string;
+        issuedAtUnixMs: number;
+        operationId: string;
+        originalCreditorId: string;
+        originalSettlementDestinationRef: string;
+        payeeBindingDigest: string;
+        requestId: string;
+        schema: string;
+        scopeDigest: string;
+        toolName: string;
+        toolServer: string;
+      };
+      creditorSignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+      debtorSignature: {
+        partyId: string;
+        partyKeyEpoch: number;
+        signature: string;
+        signerKey: string;
+      };
+    };
+    currentDispositionDigest: string;
+    debtorId: string;
+    dueAtUnixMs: number;
+    facilityId: string;
+    iouId: string;
+    issuedAtUnixMs: number;
+    issuerId: string;
+    issuerKeyEpoch: number;
+    obligationAtomDigest: string;
+    obligationId: string;
+    operationId: string;
+    originalCreditorId: string;
+    originalSettlementDestinationRef: string;
+    payeeBindingDigest: string;
+    receiptContentHash: string;
+    receiptDigest: string;
+    receiptId: string;
+    receiptPolicyHash: string;
+    receiptTimestampUnixSeconds: number;
+    schema: "chio.credit.receivable-iou-envelope.v1";
+    tenantId?: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-anchor-view-body.schema.json
+export namespace Economy_EconomyAnchorViewBody {
+  export interface ChioEconomyAnchorViewV1SignedBody {
+    absentRequestKeys: {
+      requestId: string;
+      requestNamespaceDigest: string;
+    }[];
+    absentResourceKeys: {
+      resourceFamily: string;
+      resourceId: string;
+      scopeId: string;
+    }[];
+    anchorId: string;
+    checkpointDigest: string;
+    checkpointSequence: number;
+    heads: {
+      anchorId: string;
+      effectIdempotencyKey?: string;
+      frost?: {
+        actionDigest: string;
+        authorizationId: string;
+        authorizationSlotId: string;
+        signedEnvelopeDigest: string;
+      };
+      headVersion: number;
+      lifecycleFence: number;
+      lifecycleState: string;
+      namespace: string;
+      operationId?: string;
+      predecessorDigest?: string;
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      resourceVersion: number;
+      schema: string;
+      state: {
+        storage: string;
+        value: {
+          actionDigest?: string;
+          admissionHandoff?: {
+            lifecycleFence: number;
+            operationVersion: number;
+            state: string;
+            storeFence: {
+              lease_id: string;
+              owner_epoch: number;
+              store_uuid: string;
+            };
+          };
+          admittedDisputeDigest?: string;
+          anchorId?: string;
+          atomDigest?: string;
+          channelId?: string;
+          claim?: {
+            beneficiaryId: string;
+            contestDeadline: number;
+            contestDigest?: string;
+            coverageAuthorityId: string;
+            fundingFacilityId: string;
+            identity: {
+              claimId: string;
+              key: {
+                boundCoverageBodyDigest: string;
+                evidenceRangeDigest: string;
+                parametricPolicyBodyDigest: string;
+                subjectKey: string;
+                triggerPredicateBodyDigest: string;
+                windowEnd: number;
+                windowStart: number;
+              };
+              triggerInstanceId: string;
+            };
+            lifecycleFence: number;
+            openedAt: number;
+            payerId: string;
+            payoutAmount: {
+              currency: string;
+              units: number;
+            };
+            payoutMode: {
+              kind: string;
+              windowSeconds: number;
+            };
+            payoutRail: {
+              destinationAccountDigest: string;
+              kind: string;
+              railId: string;
+            };
+            schema: string;
+            state: string;
+            triggerMagnitude: {
+              kind: string;
+              value: number;
+            };
+            version: number;
+          };
+          disposition?: {
+            kind: string;
+            round_id: string;
+          };
+          effectKind?: string;
+          escrowReference?: {
+            chainId: string;
+            escrowContract: string;
+            escrowId: string;
+          };
+          fence?: number;
+          finalizationDigest?: string;
+          firstDispatchOperationId?: string;
+          governanceScopeId?: string;
+          idempotencyKey?: string;
+          inputManifestDigest?: string;
+          intentProgress?: {
+            ambiguityCount: number;
+            attemptCount: number;
+            completedEffectSlotId: string;
+            intentDigest: string;
+            intentId: string;
+            noEffectCount: number;
+            reconciliationChainDigest: string;
+            reconciliationCount: number;
+          }[];
+          lastTransition?: {
+            authority_digest: string;
+            kind: string;
+            round_id: string;
+          };
+          lastTransitionDigest?: string;
+          latestSequence?: number;
+          latestStateDigest?: string;
+          lifecycleFence?: number;
+          namespace?: string;
+          obligationId?: string;
+          openDigest?: string;
+          operationId?: string;
+          outputManifestDigest?: string;
+          parametersDigest?: string;
+          participantAcceptanceCount?: number;
+          participantAcceptanceRoot?: string;
+          pendingCloseBodyDigest?: string;
+          request?: {
+            requestBindingDigest: string;
+            requestId: string;
+            requestNamespaceDigest: string;
+          };
+          reservationCount?: number;
+          reservationRoot?: string;
+          resourceHeadDigest?: string;
+          resourceId?: string;
+          resourceKey?: {
+            resourceFamily: string;
+            resourceId: string;
+            scopeId: string;
+          };
+          resourceVersion?: number;
+          roundCoreDigest?: string;
+          roundId?: string;
+          rowVersion?: number;
+          schema?: string;
+          slotId?: string;
+          state?: string;
+          stateVersion?: number;
+          status?: string;
+          target?: {
+            qualificationDigest: string;
+            targetId: string;
+            targetKeyEpoch: number;
+          };
+          terminal?: {
+            kind?: string;
+            outcome: string;
+            proof?: {
+              storage: string;
+              value: {
+                cancellation: string;
+              };
+            };
+            proof_digest?: string;
+            proof_id?: string;
+            result?: {
+              storage: string;
+              value: unknown;
+            };
+            result_digest?: string;
+            result_id?: string;
+          };
+          trigger?: {
+            evidenceManifest: {
+              ranges: {
+                anchorEpoch: number;
+                checkpointAt: number;
+                checkpointId: string;
+                checkpointRoot: string;
+                expectedCount: number;
+                indexNamespace: string;
+                queryIndexRoot: string;
+                rangeProofDigest: string;
+                selectedMemberRoot: string;
+                sequenceRange: {
+                  first: number;
+                  last: number;
+                };
+                signerKeyEpoch: number;
+                sourceId: string;
+                sourceKind: string;
+                sourcePrefixCutoff: number;
+                subjectKey: string;
+                window: {
+                  endAt: number;
+                  startAt: number;
+                };
+              }[];
+            };
+            identity: {
+              claimId: string;
+              key: {
+                boundCoverageBodyDigest: string;
+                evidenceRangeDigest: string;
+                parametricPolicyBodyDigest: string;
+                subjectKey: string;
+                triggerPredicateBodyDigest: string;
+                windowEnd: number;
+                windowStart: number;
+              };
+              triggerInstanceId: string;
+            };
+            magnitude: {
+              kind: string;
+              value: number;
+            };
+            schema: string;
+            signedPolicy: {
+              body: {
+                beneficiaryId: string;
+                boundCoverageBodyDigest: string;
+                boundCoverageEnvelopeDigest: string;
+                coverageAmount: {
+                  currency: string;
+                  units: number;
+                };
+                coverageAuthorityId: string;
+                effectiveFrom: number;
+                effectiveUntil: number;
+                evaluatorAuthority: {
+                  authorityId: string;
+                  keyEpoch: number;
+                  keyId: string;
+                };
+                fundingFacilityId: string;
+                issuedAt: number;
+                maxCheckpointLagSeconds: number;
+                payerId: string;
+                payoutMode: {
+                  kind: string;
+                  windowSeconds: number;
+                };
+                payoutRail: {
+                  destinationAccountDigest: string;
+                  kind: string;
+                  railId: string;
+                };
+                payoutSchedule: {
+                  amount: {
+                    currency: string;
+                    units: number;
+                  };
+                  kind: string;
+                };
+                preActionAuthorityDigest: string;
+                predicate: {
+                  kind: string;
+                  minEvents: number;
+                  thresholdBps: number;
+                };
+                schema: string;
+                subjectKey: string;
+                windowAnchor: number;
+                windowSeconds: number;
+              };
+              signature: string;
+              signerKey: string;
+            };
+          };
+          trustedOpenedAt?: number;
+          version?: number;
+        };
+      };
+      stateDigest: string;
+      terminalResult?: {
+        result: {
+          storage: string;
+          value: unknown;
+        };
+        resultDigest: string;
+        resultId: string;
+      };
+      trustedClockHighWater: number;
+    }[];
+    headsRoot: string;
+    namespace: string;
+    observedAt: number;
+    requestReplays: {
+      effectSlotIds: string[];
+      operationId: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+    }[];
+    requestReplaysRoot: string;
+    schema: "chio.economy.anchor-view.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-effect-dispatch-commit-body.schema.json
+export namespace Economy_EconomyEffectDispatchCommitBody {
+  export interface ChioEconomyEffectDispatchCommitV1SignedBody {
+    anchorId: string;
+    casNonceDigest: string;
+    commitId: string;
+    committedAt: number;
+    committedCheckpointDigest: string;
+    effectHeadDigest: string;
+    effectSlotId: string;
+    namespace: string;
+    previousCheckpointDigest: string;
+    schema: "chio.economy.effect-dispatch-commit.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/economy-state-batch-body.schema.json
+export namespace Economy_EconomyStateBatchBody {
+  export interface ChioEconomyStateBatchV1SignedBody {
+    anchorId: string;
+    batchId: string;
+    checkpointSequence: number;
+    effectSlots: {
+      actionDigest: string;
+      admissionHandoff: {
+        lifecycleFence: number;
+        operationVersion: number;
+        state: string;
+        storeFence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      anchorId: string;
+      effectKind: string;
+      idempotencyKey: string;
+      namespace: string;
+      operationId: string;
+      parametersDigest: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+      resourceHeadDigest: string;
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      schema: string;
+      slotId: string;
+      state: string;
+      target: {
+        qualificationDigest: string;
+        targetId: string;
+        targetKeyEpoch: number;
+      };
+    }[];
+    expectedHeadsRoot: string;
+    issuedAt: number;
+    namespace: string;
+    nextHeadsRoot: string;
+    operationId?: string;
+    previousCheckpointDigest: string;
+    requestReplays: {
+      effectSlotIds: string[];
+      operationId: string;
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+    }[];
+    schema: "chio.economy.state-batch.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    transitions: {
+      expectedHeadDigest?: string;
+      nextHead: {
+        anchorId: string;
+        effectIdempotencyKey?: string;
+        frost?: {
+          actionDigest: string;
+          authorizationId: string;
+          authorizationSlotId: string;
+          signedEnvelopeDigest: string;
+        };
+        headVersion: number;
+        lifecycleFence: number;
+        lifecycleState: string;
+        namespace: string;
+        operationId?: string;
+        predecessorDigest?: string;
+        resourceKey: {
+          resourceFamily: string;
+          resourceId: string;
+          scopeId: string;
+        };
+        resourceVersion: number;
+        schema: string;
+        state: {
+          storage: string;
+          value: {
+            actionDigest?: string;
+            admissionHandoff?: {
+              lifecycleFence: number;
+              operationVersion: number;
+              state: string;
+              storeFence: {
+                lease_id: string;
+                owner_epoch: number;
+                store_uuid: string;
+              };
+            };
+            anchorId?: string;
+            atomDigest?: string;
+            channelId?: string;
+            claim?: {
+              beneficiaryId: string;
+              contestDeadline: number;
+              coverageAuthorityId: string;
+              fundingFacilityId: string;
+              identity: {
+                claimId: string;
+                key: {
+                  boundCoverageBodyDigest: string;
+                  evidenceRangeDigest: string;
+                  parametricPolicyBodyDigest: string;
+                  subjectKey: string;
+                  triggerPredicateBodyDigest: string;
+                  windowEnd: number;
+                  windowStart: number;
+                };
+                triggerInstanceId: string;
+              };
+              lifecycleFence: number;
+              openedAt: number;
+              payerId: string;
+              payoutAmount: {
+                currency: string;
+                units: number;
+              };
+              payoutMode: {
+                kind: string;
+                windowSeconds: number;
+              };
+              payoutRail: {
+                destinationAccountDigest: string;
+                kind: string;
+                railId: string;
+              };
+              schema: string;
+              state: string;
+              triggerMagnitude: {
+                kind: string;
+                value: number;
+              };
+              version: number;
+            };
+            disposition?: {
+              kind: string;
+              round_id: string;
+              satisfaction_digest?: string;
+            };
+            effectKind?: string;
+            escrowReference?: {
+              chainId: string;
+              escrowContract: string;
+              escrowId: string;
+            };
+            fence?: number;
+            finalizationDigest?: string;
+            firstDispatchOperationId?: string;
+            governanceScopeId?: string;
+            idempotencyKey?: string;
+            inputManifestDigest?: string;
+            intentProgress?: {
+              activeEffectSlotId?: string;
+              ambiguityCount: number;
+              attemptCount: number;
+              completedEffectSlotId?: string;
+              intentDigest: string;
+              intentId: string;
+              noEffectCount: number;
+              reconciliationChainDigest?: string;
+              reconciliationCount: number;
+            }[];
+            lastTransition?: {
+              authority_digest: string;
+              kind: string;
+              round_id: string;
+              satisfaction_digest?: string;
+            };
+            lastTransitionDigest?: string;
+            latestSequence?: number;
+            latestStateDigest?: string;
+            lifecycleFence?: number;
+            namespace?: string;
+            obligationId?: string;
+            openDigest?: string;
+            operationId?: string;
+            outputManifestDigest?: string;
+            parametersDigest?: string;
+            participantAcceptanceCount?: number;
+            participantAcceptanceRoot?: string;
+            request?: {
+              requestBindingDigest: string;
+              requestId: string;
+              requestNamespaceDigest: string;
+            };
+            reservationCount?: number;
+            reservationRoot?: string;
+            resourceHeadDigest?: string;
+            resourceId?: string;
+            resourceKey?: {
+              resourceFamily: string;
+              resourceId: string;
+              scopeId: string;
+            };
+            resourceVersion?: number;
+            roundCoreDigest?: string;
+            roundId?: string;
+            rowVersion?: number;
+            schema?: string;
+            slotId?: string;
+            state?: string;
+            stateVersion?: number;
+            status?: string;
+            target?: {
+              qualificationDigest: string;
+              targetId: string;
+              targetKeyEpoch: number;
+            };
+            terminal?: {
+              kind?: string;
+              outcome: string;
+              proof?: {
+                storage: string;
+                value: {
+                  actionDigest?: string;
+                  admissionHandoff?: {
+                    lifecycleFence: number;
+                    operationVersion: number;
+                    state: string;
+                    storeFence: {
+                      lease_id: string;
+                      owner_epoch: number;
+                      store_uuid: string;
+                    };
+                  };
+                  authenticatedClockUnixMs?: number;
+                  cancellation?: string;
+                  channelId?: string;
+                  idempotencyKey?: string;
+                  issuedAt?: number;
+                  operationId?: string;
+                  parametersDigest?: string;
+                  provider?: {
+                    qualificationDigest: string;
+                    targetId: string;
+                    targetKeyEpoch: number;
+                  };
+                  request?: {
+                    requestBindingDigest: string;
+                    requestId: string;
+                    requestNamespaceDigest: string;
+                  };
+                  reservationDigest?: string;
+                  reservationId?: string;
+                  reservationProposalDigest?: string;
+                  schema?: string;
+                  serviceBindingDigest?: string;
+                  sourceChannelHeadDigest?: string;
+                  sourceCheckpointDigest?: string;
+                  sourceCheckpointSequence?: number;
+                  sourceEffectHeadDigest?: string;
+                  sourceEscrowHeadDigest?: string;
+                };
+              };
+              proof_digest?: string;
+              proof_id?: string;
+              result?: {
+                storage: string;
+                value: unknown;
+              };
+              result_digest?: string;
+              result_id?: string;
+            };
+            trigger?: {
+              evidenceManifest: {
+                ranges: {
+                  anchorEpoch: number;
+                  checkpointAt: number;
+                  checkpointId: string;
+                  checkpointRoot: string;
+                  expectedCount: number;
+                  indexNamespace: string;
+                  queryIndexRoot: string;
+                  rangeProofDigest: string;
+                  selectedMemberRoot: string;
+                  sequenceRange: {
+                    first: number;
+                    last: number;
+                  };
+                  signerKeyEpoch: number;
+                  sourceId: string;
+                  sourceKind: string;
+                  sourcePrefixCutoff: number;
+                  subjectKey: string;
+                  window: {
+                    endAt: number;
+                    startAt: number;
+                  };
+                }[];
+              };
+              identity: {
+                claimId: string;
+                key: {
+                  boundCoverageBodyDigest: string;
+                  evidenceRangeDigest: string;
+                  parametricPolicyBodyDigest: string;
+                  subjectKey: string;
+                  triggerPredicateBodyDigest: string;
+                  windowEnd: number;
+                  windowStart: number;
+                };
+                triggerInstanceId: string;
+              };
+              magnitude: {
+                kind: string;
+                value: number;
+              };
+              schema: string;
+              signedPolicy: {
+                body: {
+                  beneficiaryId: string;
+                  boundCoverageBodyDigest: string;
+                  boundCoverageEnvelopeDigest: string;
+                  coverageAmount: {
+                    currency: string;
+                    units: number;
+                  };
+                  coverageAuthorityId: string;
+                  effectiveFrom: number;
+                  effectiveUntil: number;
+                  evaluatorAuthority: {
+                    authorityId: string;
+                    keyEpoch: number;
+                    keyId: string;
+                  };
+                  fundingFacilityId: string;
+                  issuedAt: number;
+                  maxCheckpointLagSeconds: number;
+                  payerId: string;
+                  payoutMode: {
+                    kind: string;
+                    windowSeconds: number;
+                  };
+                  payoutRail: {
+                    destinationAccountDigest: string;
+                    kind: string;
+                    railId: string;
+                  };
+                  payoutSchedule: {
+                    amount: {
+                      currency: string;
+                      units: number;
+                    };
+                    kind: string;
+                  };
+                  preActionAuthorityDigest: string;
+                  predicate: {
+                    kind: string;
+                    minEvents: number;
+                    thresholdBps: number;
+                  };
+                  schema: string;
+                  subjectKey: string;
+                  windowAnchor: number;
+                  windowSeconds: number;
+                };
+                signature: string;
+                signerKey: string;
+              };
+            };
+            trustedOpenedAt?: number;
+            version?: number;
+          };
+        };
+        stateDigest: string;
+        terminalResult?: {
+          result: {
+            storage: string;
+            value: unknown;
+          };
+          resultDigest: string;
+          resultId: string;
+        };
+        trustedClockHighWater: number;
+      };
+      preparedEffect?: {
+        actionDigest: string;
+        authorization: {
+          mode: string;
+        };
+        effectSlotDigest: string;
+        effectSlotId: string;
+        operationId: string;
+      };
+      resourceKey: {
+        resourceFamily: string;
+        resourceId: string;
+        scopeId: string;
+      };
+      transitionProofDigest: string;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-acknowledgement-body.schema.json
+export namespace Economy_FactorAssignmentAcknowledgementBody {
+  export interface ChioFactorAssignmentAcknowledgementV1SignedBody {
+    acknowledgedAtUnixMs: number;
+    acknowledgementId: string;
+    agreementBodyDigest: string;
+    agreementId: string;
+    assignmentAuthorizationSetDigest: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    dueAtUnixMs: number;
+    effectiveAtUnixMs: number;
+    expectedResourceFence: number;
+    expectedSnapshotVersion: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    operationId: string;
+    priorDispositionDigest: string;
+    priorDispositionKind: string;
+    priorDispositionLifecycleFence: number;
+    priorDispositionVersion: number;
+    resultingDispositionDigest: string;
+    resultingDispositionLifecycleFence: number;
+    resultingDispositionVersion: number;
+    resultingResourceFence: number;
+    resultingSnapshotVersion: number;
+    schema: "chio.factor.assignment-acknowledgement.v1";
+    statusProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-agreement-body.schema.json
+export namespace Economy_FactorAssignmentAgreementBody {
+  export interface ChioFactorAssignmentAgreementV1SignedBody {
+    agreedDiscountBps: number;
+    agreedPrice: {
+      currency: string;
+      units: number;
+    };
+    agreementId: string;
+    assignmentAuthorityDigest: string;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    claimDigest: string;
+    claimId: string;
+    dueAtUnixMs: number;
+    effectiveAtUnixMs: number;
+    expectedDispositionLifecycleFence: number;
+    expectedDispositionVersion: number;
+    expectedSettlementLifecycleFence: number;
+    expectedSettlementLifecycleVersion: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    offerDigest: string;
+    offerId: string;
+    operationId: string;
+    schema: "chio.factor.assignment-agreement.v1";
+    sellerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-bind-authorization-body.schema.json
+export namespace Economy_FactorAssignmentBindAuthorizationBody {
+  export interface ChioFactorAssignmentBindAuthorizationV1SignedBody {
+    action: string;
+    actionNonce: string;
+    agreementId: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    buyerId: string;
+    buyerSettlementDestinationRef: string;
+    effectiveAtUnixMs: number;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    operationId: string;
+    schema: "chio.factor.assignment-bind-authorization.v1";
+    sellerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/factor-assignment-not-applied-body.schema.json
+export namespace Economy_FactorAssignmentNotAppliedBody {
+  export interface ChioFactorAssignmentNotAppliedV1SignedBody {
+    agreementBodyDigest: string;
+    agreementId: string;
+    assignmentAuthorizationSetDigest: string;
+    authorityId: string;
+    authorityKeyEpoch: number;
+    decidedAtUnixMs: number;
+    expectedDispositionLifecycleFence: number;
+    expectedDispositionVersion: number;
+    expectedResourceFence: number;
+    expectedSettlementLifecycleFence: number;
+    expectedSettlementLifecycleVersion: number;
+    expectedSnapshotVersion: number;
+    noMutationProofDigest: string;
+    normalizedRequestDigest: string;
+    obligationAtomDigest: string;
+    obligationId: string;
+    observedDispositionDigest: string;
+    observedDispositionLifecycleFence: number;
+    observedDispositionVersion: number;
+    observedSettlementLifecycleDigest: string;
+    observedSettlementLifecycleFence: number;
+    observedSettlementLifecycleVersion: number;
+    observedSnapshotVersion: number;
+    operationId: string;
+    reason: string;
+    resourceFence: number;
+    resultId: string;
+    schema: "chio.factor.assignment-not-applied.v1";
+    statusProofDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/economy/obligation-status-proof-body.schema.json
+export namespace Economy_ObligationStatusProofBody {
+  export interface ChioObligationStatusProofV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    currentCreditorId: string;
+    currentSettlementDestinationRef: string;
+    debtorId: string;
+    disposition: {
+      kind: string;
+    };
+    dispositionDigest: string;
+    dispositionLifecycleFence: number;
+    dispositionVersion: number;
+    dueAtUnixMs: number;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    obligationAtomDigest: string;
+    obligationId: string;
+    originalCreditorId: string;
+    proofId: string;
+    resourceFence: number;
+    schema: "chio.obligation.status-proof.v1";
+    settlementLifecycleDigest: string;
+    settlementLifecycleFence: number;
+    settlementLifecycleVersion: number;
+    settlementState: {
+      evidence_digest?: string;
+      kind: string;
+      settlement_id?: string;
+    };
+    snapshotVersion: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/enterprise/enterprise-approval-case-body.schema.json
+export namespace Enterprise_EnterpriseApprovalCaseBody {
+  export interface ChioEnterpriseApprovalCaseV1SignedBody {
+    approvers: string[];
+    decision: string;
+    decision_subject: string;
+    evidence_export_bundle_digest: string;
+    expires_at: string;
+    id: string;
+    issued_at: string;
+    passport_id: string;
+    required_quorum: number;
+    risk_comptroller_report_ref: string;
+    schema: "chio.enterprise.approval-case.v1";
   }
 }
 
@@ -1960,6 +5811,2561 @@ export namespace Federation_BilateralSignatureSlice {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/capability-lease-body.schema.json
+export namespace Federation_CapabilityLeaseBody {
+  export interface ChioCapabilityLeaseV1SignedBody {
+    actionClass: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    issuer: string;
+    leaseId: string;
+    schema: "chio.capability-lease.v1";
+    scopeDigest: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/cross-issuer-migration.schema.json
+export namespace Federation_CrossIssuerMigration {
+  export interface ChioCrossIssuerMigrationSignedBody {
+    attester: string;
+    continuityRef: string;
+    expiresAt: number;
+    fromIssuer: string;
+    fromSubject: string;
+    issuedAt: number;
+    migrationId: string;
+    priorPassportIds: string[];
+    reason: string;
+    schema: "chio.cross-issuer-migration.v1";
+    signerPublicKey: string;
+    toIssuer: string;
+    toSubject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/enterprise-migration-transition.schema.json
+export namespace Federation_EnterpriseMigrationTransition {
+  export interface ChioEnterpriseMigrationTransitionSignedBody {
+    authorization_digest: number[];
+    evidence_digest: number[];
+    intent_digest: number[];
+    key: {
+      control: string;
+      deployment_id: string;
+      scope_id: string;
+      scope_kind: string;
+    };
+    posture_digest: number[];
+    schema_version: number;
+    signature_domain: string;
+    signer_public_key: string;
+    trusted_at_unix_ms: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federated-delegation-policy.schema.json
+export namespace Federation_FederatedDelegationPolicy {
+  export interface ChioFederatedDelegationPolicySignedBody {
+    createdAt: number;
+    expiresAt: number;
+    issuer: string;
+    parentCapabilityId?: string;
+    partner: string;
+    schema: "chio.federated-delegation-policy.v1";
+    scope: {};
+    signerPublicKey: string;
+    ttlSeconds: number;
+    verifier: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-activation-exchange.schema.json
+export namespace Federation_FederationActivationExchange {
+  export interface ChioFederationActivationExchangeSignedBody {
+    activationRef: {
+      artifactId: string;
+      kind: string;
+      operatorId: string;
+      schema: string;
+      sha256: string;
+      uri: string;
+    };
+    delegationControl: {
+      attenuationRequired: boolean;
+      delegateOperatorId: string;
+      delegatorOperatorId: string;
+      maxHops: number;
+      visibilityOnlyUntilLocalActivation: boolean;
+    };
+    exchangeId: string;
+    expiresAt: number;
+    governingCharterRef: {
+      artifactId: string;
+      kind: string;
+      operatorId: string;
+      schema: string;
+      sha256: string;
+      uri: string;
+    };
+    importControl: {
+      allowVisibilityWithoutRuntimeTrust: boolean;
+      explicitLocalActivationRequired: boolean;
+      manualReviewRequired: boolean;
+      prohibitAmbientRuntimeAdmission: boolean;
+      rejectStaleInputs: boolean;
+    };
+    issuedAt: number;
+    listingId: string;
+    listingRef: {
+      artifactId: string;
+      kind: string;
+      operatorId: string;
+      schema: string;
+      sha256: string;
+      uri: string;
+    };
+    note: string;
+    schema: "chio.federation-activation-exchange.v1";
+    scope: {
+      allowedActorKinds: string[];
+      allowedAdmissionClasses: string[];
+      namespace: string;
+      policyReference: string;
+      subjectOperatorId: string;
+    };
+    sourceOperatorId: string;
+    targetOperatorId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-kernel-handshake.schema.json
+export namespace Federation_FederationKernelHandshake {
+  export interface ChioFederationKernelHandshakeSignedBody {
+    capabilities: {
+      features?: {
+        accepts_anchor_batch_v1?: boolean;
+        aggregate_invocation_budget?: boolean;
+        cumulative_approval_budget?: boolean;
+        delegation_chain_binding?: boolean;
+        governed_active_response_plan?: boolean;
+        threshold_governed_approvals?: boolean;
+      };
+      schema: string;
+    };
+    conformanceTier: string;
+    ladderManifestRef?: {
+      expiresAtUnixMs: number;
+      issuedAtUnixMs: number;
+      manifestId: string;
+      sha256: string;
+    };
+    localKernelId: string;
+    nonce: string;
+    remoteKernelId: string;
+    schema: "chio.federation-kernel-handshake.v1";
+    timestamp: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-open-admission-policy.schema.json
+export namespace Federation_FederationOpenAdmissionPolicy {
+  export interface ChioFederationOpenAdmissionPolicySignedBody {
+    allowedAdmissionClasses: string[];
+    explicitLocalReviewRequired: boolean;
+    feeScheduleRef: {
+      artifactId: string;
+      kind: string;
+      operatorId: string;
+      schema: string;
+      sha256: string;
+      uri?: string;
+    };
+    governingCharterRef: {
+      artifactId: string;
+      kind: string;
+      operatorId: string;
+      schema: string;
+      sha256: string;
+      uri?: string;
+    };
+    governingOperatorId: string;
+    issuedAt: number;
+    namespace: string;
+    note?: string;
+    policyId: string;
+    schema: "chio.federation-open-admission-policy.v1";
+    stakeRequirements?: {
+      admissionClass: string;
+      governanceCaseRequired: boolean;
+      minimumBondAmount: {
+        currency: string;
+        units: number;
+      };
+      requiredBondClass: string;
+      slashable: boolean;
+    }[];
+    visibilityOnlyWithoutActivation: boolean;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-policy.schema.json
+export namespace Federation_FederationPolicy {
+  export interface ChioFederationPolicySignedBody {
+    createdAt: number;
+    expiresAt: number;
+    issuer: string;
+    partner: string;
+    query: {};
+    requireProofs: boolean;
+    schema: "chio.federation-policy.v1";
+    signerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-qualification-matrix.schema.json
+export namespace Federation_FederationQualificationMatrix {
+  export interface ChioFederationQualificationMatrixSignedBody {
+    cases: {
+      expectedOutcome: string;
+      id: string;
+      name: string;
+      notes: string;
+      observedOutcome: string;
+      requirementIds: string[];
+      scenario: string;
+    }[];
+    exchangeRef: string;
+    profileId: string;
+    quorumReportRef: string;
+    reputationClearingRef: string;
+    schema: "chio.federation-qualification-matrix.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-quorum-report.schema.json
+export namespace Federation_FederationQuorumReport {
+  export interface ChioFederationQuorumReportSignedBody {
+    antiEclipsePolicy: {
+      maxUpstreamHops: number;
+      minimumDistinctOperators: number;
+      requireIndexerObservation: boolean;
+      requireOriginPublisher: boolean;
+    };
+    finalState: string;
+    generatedAt: number;
+    listingId: string;
+    maxReplicaAgeSecs: number;
+    namespace: string;
+    note: string;
+    originOperatorId: string;
+    publishers: {
+      freshness: {
+        ageSecs: number;
+        generatedAt: number;
+        maxAgeSecs: number;
+        state: string;
+        validUntil: number;
+      };
+      observedAt: number;
+      observedListingSha256: string;
+      publisher: {
+        operatorId: string;
+        operatorName: string;
+        registryUrl: string;
+        role: string;
+        upstreamRegistryUrls?: string[];
+      };
+      reportRef: {
+        artifactId: string;
+        kind: string;
+        operatorId: string;
+        schema: string;
+        sha256: string;
+        uri: string;
+      };
+      upstreamHopCount: number;
+    }[];
+    quorumThreshold: number;
+    reportId: string;
+    schema: "chio.federation-quorum-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/federation-reputation-clearing.schema.json
+export namespace Federation_FederationReputationClearing {
+  export interface ChioFederationReputationClearingSignedBody {
+    acceptedInputIds: string[];
+    admissionPolicyRef: string;
+    clearingId: string;
+    continuity: {
+      continuityId: string;
+    };
+    effectiveAdmissionClass: string;
+    generatedAt: number;
+    inputs: {
+      artifactRef: {
+        artifactId: string;
+        kind: string;
+        operatorId: string;
+        schema: string;
+        sha256: string;
+        uri: string;
+      };
+      blocking: boolean;
+      expiresAt: number;
+      issuerIndependenceGroupId: string;
+      issuerOperatorId: string;
+      kind: string;
+      note: string;
+      publishedAt: number;
+      subjectKey: string;
+      weightBps: number;
+    }[];
+    localWeightingPolicyRef: string;
+    namespace: string;
+    note: string;
+    participatingOperatorIds: string[];
+    rejectedInputIds: string[];
+    schema: "chio.federation-reputation-clearing.v1";
+    subjectKey: string;
+    sybilControl: {
+      localWeightingRequired: boolean;
+      maximumInputsPerIssuer: number;
+      minimumIndependentIssuers: number;
+      negativeEventCorroborationRequired: boolean;
+      oracleCapBps: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/governance-receipt-body.schema.json
+export namespace Federation_GovernanceReceiptBody {
+  export interface ChioGovernanceReceiptV1SignedBody {
+    authorizedLeaseId: string;
+    authorizingKernel: string;
+    caseKind: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    receiptId: string;
+    schema: "chio.governance-receipt.v1";
+    stepSha256: string;
+    workflowId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/federation/transport-iroh-peer-directory-bundle.schema.json
+export namespace Federation_TransportIrohPeerDirectoryBundle {
+  export interface ChioFederationTransportIrohPeerDirectoryBundleSignedBody {
+    directorySha256: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    issuer: string;
+    keyId: string;
+    previousVersionSha256: null | string;
+    schema: "chio.federation.transport.iroh.peer-directory-bundle.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-entry-activation-decision.schema.json
+export namespace Financial_CrossIssuerEntryActivationDecision {
+  export interface ChioFinancialCrossIssuerEntryActivationDecisionSignedBody {
+    certificationRefs: string[];
+    credentialBindings: {
+      credentialId: string;
+      envelopeDigest: string;
+      family: string;
+    }[];
+    decidedAt: number;
+    decision: string;
+    decisionDigest: string;
+    entryId: string;
+    issuer: string;
+    lifecycleEvidenceDigest: string;
+    lifecyclePinDigest: string;
+    migrationEnvelopeDigests: string[];
+    packId: string;
+    presentationDigest: string;
+    profileFamily: string;
+    reason: string;
+    schema: "chio.financial.cross-issuer-entry-activation-decision.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    sourceKind: string;
+    sourceManifestDigest: string;
+    sourcePassportId: string;
+    verifierId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint-pin.schema.json
+export namespace Financial_CrossIssuerLifecycleCheckpointPin {
+  export interface ChioFinancialCrossIssuerLifecycleCheckpointPinSignedBody {
+    checkpointDigest: string;
+    generationPinDigest: string;
+    issuerDid: string;
+    pinDigest: string;
+    previousPinDigest?: string;
+    resolverIdentity: string;
+    resultDigest: string;
+    schema: "chio.financial.cross-issuer.lifecycle-checkpoint-pin.v1";
+    signerKeyEpoch: number;
+    sourcePassportId: string;
+    status: string;
+    statusVersion: number;
+    storeGeneration: number;
+    storeId: string;
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-checkpoint.schema.json
+export namespace Financial_CrossIssuerLifecycleCheckpoint {
+  export interface ChioFinancialCrossIssuerLifecycleCheckpointSignedBody {
+    checkpointDigest: string;
+    issuerDid: string;
+    predecessorCheckpointDigest?: string;
+    resolverIdentity: string;
+    schema: "chio.financial.cross-issuer.lifecycle-checkpoint.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    sourceIndexCount: number;
+    sourceIndexRoot: string;
+    storeGeneration: number;
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-generation-pin.schema.json
+export namespace Financial_CrossIssuerLifecycleGenerationPin {
+  export interface ChioFinancialCrossIssuerLifecycleGenerationPinSignedBody {
+    anchorId: string;
+    checkpointDigest: string;
+    issuerDid: string;
+    pinDigest: string;
+    previousPinDigest?: string;
+    resolverIdentity: string;
+    schema: "chio.financial.cross-issuer.lifecycle-generation-pin.v1";
+    signerKeyEpoch: number;
+    sourceIndexCount: number;
+    sourceIndexRoot: string;
+    storeGeneration: number;
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-result.schema.json
+export namespace Financial_CrossIssuerLifecycleResult {
+  export interface ChioFinancialCrossIssuerLifecycleResultSignedBody {
+    effectiveAt: number;
+    issuerDid: string;
+    resolverIdentity: string;
+    resultDigest: string;
+    schema: "chio.financial.cross-issuer.lifecycle-result.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    sourceIndexLeaf: {
+      resultDigest: string;
+      sourcePassportId: string;
+    };
+    sourceIndexProof: {
+      audit_path: string[];
+      leaf_index: number;
+      tree_size: number;
+    };
+    sourceManifestDigest: string;
+    sourcePassportId: string;
+    status: string;
+    statusVersion: number;
+    storeGeneration: number;
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-migration.schema.json
+export namespace Financial_CrossIssuerMigration {
+  export interface ChioFinancialCrossIssuerMigrationSignedBody {
+    attesterId: string;
+    continuityRef: string;
+    expiresAt: number;
+    fromIssuer: string;
+    fromSubject: string;
+    issuedAt: number;
+    migrationDigest: string;
+    migrationId: string;
+    priorSourcePassportIds: string[];
+    reason: string;
+    schema: "chio.financial.cross-issuer-migration.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    toIssuer: string;
+    toSubject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/financial/cross-issuer-trust-pack.schema.json
+export namespace Financial_CrossIssuerTrustPack {
+  export interface ChioFinancialCrossIssuerTrustPackSignedBody {
+    createdAt: number;
+    decisions: {
+      body: {
+        certificationRefs: string[];
+        credentialBindings: {
+          credentialId: string;
+          envelopeDigest: string;
+          family: string;
+        }[];
+        decidedAt: number;
+        decision: string;
+        decisionDigest: string;
+        entryId: string;
+        issuer: string;
+        lifecycleEvidenceDigest: string;
+        lifecyclePinDigest: string;
+        migrationEnvelopeDigests: string[];
+        packId: string;
+        presentationDigest: string;
+        profileFamily: string;
+        reason: string;
+        schema: string;
+        signerKeyEpoch: number;
+        signerKeyId: string;
+        sourceKind: string;
+        sourceManifestDigest: string;
+        sourcePassportId: string;
+        verifierId: string;
+      };
+      signature: string;
+      signerKey: string;
+    }[];
+    expiresAt: number;
+    packId: string;
+    policy: {};
+    schema: "chio.financial.cross-issuer-trust-pack.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    verifierId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/anchor-checkpoint-publication.schema.json
+export namespace Finding_AnchorCheckpointPublication {
+  export interface ChioFindingAnchorCheckpointPublicationSignedBody {
+    checkpointSeq: number;
+    checkpointStatementSha256: string;
+    observedAt: number;
+    publishedAt: number;
+    schema: "chio.finding.anchor-checkpoint-publication.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/audit-seed-witness.schema.json
+export namespace Finding_AuditSeedWitness {
+  export interface ChioFindingAuditSeedWitnessSignedBody {
+    audit_authority: string;
+    eligible_snapshot_at: number;
+    eligible_snapshot_digest: string;
+    epoch_index: number;
+    seed_commitment: string;
+    seed_witnessed_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/bond-store-snapshot.schema.json
+export namespace Finding_BondStoreSnapshot {
+  export interface ChioFindingBondStoreSnapshotSignedBody {
+    accepted_at: number;
+    allocation_id: string;
+    backing_envelope_sha256: string;
+    bond_ref: string;
+    finding_id: string;
+    live: boolean;
+    observed_at: number;
+    schema: "chio.finding.bond-store-snapshot.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/current-listing-assertion.schema.json
+export namespace Finding_CurrentListingAssertion {
+  export interface ChioFindingCurrentListingAssertionSignedBody {
+    generated_at: number;
+    listing_envelope_sha256: string;
+    listing_id: string;
+    max_age_secs: number;
+    namespace: string;
+    pricing_hint_envelope_sha256: string;
+    registry_operator_id: string;
+    schema: "chio.finding.current-listing-assertion.v1";
+    valid_until: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-admission-body.schema.json
+export namespace Finding_FindingAdmissionBody {
+  export interface ChioFindingAdmissionV1SignedBody {
+    admission_id: string;
+    audit_pool: {
+      authority_epoch: number;
+      currency: string;
+      principal_id: string;
+      rail_destination: string;
+    };
+    backing_allocation_id: string;
+    backing_envelope_sha256: string;
+    capability_scope: string;
+    challenge_administration_pool: {
+      authority_epoch: number;
+      currency: string;
+      principal_id: string;
+      rail_destination: string;
+    };
+    community_fund_destination: string;
+    expires_at: number;
+    failed_delivery_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    fee_schedule_envelope_sha256: string;
+    fee_terminals: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      event:
+        | string
+        | {
+            participation_epoch: {
+              epoch_index: number;
+            };
+          };
+      fee_schedule_envelope_sha256: string;
+      instruction_sha256: string;
+      observation_sha256: string;
+      payer: string;
+      pool_principal_id: string;
+      rail_destination: string;
+    }[];
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_envelope_sha256: string;
+    listing_id: string;
+    metadata_url: string;
+    payee_destination: string;
+    pricing_hint_envelope_sha256: string;
+    profile_envelope_sha256: string;
+    publisher_operator_id: string;
+    purchase_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    schema: "chio.finding.admission.v1";
+    seller_authorization_envelope_sha256: string;
+    server_id: string;
+    status_feed_operator_ref: string;
+    terms_envelope_sha256: string;
+    venue: string;
+    venue_id: string;
+    verifier_report_envelope_sha256: string;
+    verifier_report_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-epoch-body.schema.json
+export namespace Finding_FindingAuditEpochBody {
+  export interface ChioFindingAuditEpochV1SignedBody {
+    audit_authority: string;
+    audit_epoch_id: string;
+    authorization_digest: string;
+    available_budget: {
+      currency: string;
+      units: number;
+    };
+    committed_at: number;
+    eligible_listing_count: number;
+    eligible_snapshot_at: number;
+    eligible_snapshot_digest: string;
+    epoch_index: number;
+    fee_schedule_envelope_sha256: string;
+    published_rate_bps: number;
+    schema: "chio.finding.audit-epoch.v1";
+    seed_commitment: string;
+    seed_witness: string;
+    seed_witness_signature: string;
+    seed_witnessed_at: number;
+    selection_algorithm_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-report-body.schema.json
+export namespace Finding_FindingAuditReportBody {
+  export interface ChioFindingAuditReportV1SignedBody {
+    attempt_envelope_sha256s: string[];
+    audit_epoch_envelope_sha256: string;
+    audit_report_id: string;
+    missed_attempts: {
+      finding_id: string;
+      reason: string;
+    }[];
+    outcome_envelope_digests: string[];
+    reported_at: number;
+    revealed_seed: string;
+    schema: "chio.finding.audit-report.v1";
+    selected_finding_ids: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-audit-round-authorization-body.schema.json
+export namespace Finding_FindingAuditRoundAuthorizationBody {
+  export interface ChioFindingAuditRoundAuthorizationV1SignedBody {
+    authorized_at: number;
+    epoch_precommitment_sha256: string;
+    expires_at: number;
+    schema: "chio.finding.audit-round-authorization.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-authority-status-body.schema.json
+export namespace Finding_FindingAuthorityStatusBody {
+  export interface ChioFindingAuthorityStatusV1SignedBody {
+    authority_id: string;
+    key: string;
+    key_epoch: number;
+    observed_at: number;
+    revoked_from: number | null;
+    schema: "chio.finding.authority-status.v1";
+    status_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-body.schema.json
+export namespace Finding_FindingBody {
+  export interface ChioFindingV1SignedBody {
+    bond_ref: string;
+    descriptor: {
+      context_sha256: string;
+      outcome_class: string;
+      topic: string;
+    };
+    evidence_checkpoint_ref: string;
+    evidence_class: string;
+    evidence_cost: {
+      currency: string;
+      units: number;
+    };
+    evidence_receipt_ids: string[];
+    expires_at: number;
+    finding_id: string;
+    guarantee_class: string;
+    issued_at: number;
+    issuer: string;
+    payload_media_type: string;
+    payload_sha256: string;
+    price_hint_ref?: string;
+    replay_recipe_sha256?: string;
+    runtime_assurance_tier?: string;
+    schema: "chio.finding.v1";
+    signature: string;
+    status_feed_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-bond-backing-body.schema.json
+export namespace Finding_FindingBondBackingBody {
+  export interface ChioFindingBondBackingV1SignedBody {
+    allocation_id: string;
+    appeal_horizon_secs: number;
+    audit_horizon_secs: number;
+    authorization_envelope_sha256: string;
+    bond_class: string;
+    claim_horizon_secs: number;
+    collateral_authority: string;
+    expires_at: number;
+    fee_requirement_sha256: string;
+    fee_schedule_envelope_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_id: string;
+    locked_amount: {
+      currency: string;
+      units: number;
+    };
+    maximum_sale_exposure: {
+      currency: string;
+      units: number;
+    };
+    profile_envelope_sha256: string;
+    schema: "chio.finding.bond-backing.v1";
+    seller: string;
+    settlement_buffer_secs: number;
+    terms_envelope_sha256: string;
+    vault: {
+      venue_ledger: {
+        ledger_account: string;
+        operator_epoch: number;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-body.schema.json
+export namespace Finding_FindingChallengeBody {
+  export interface ChioFindingChallengeV1SignedBody {
+    affected_deliveries: {
+      checkpoint_ref: string;
+      checkpoint_sha256: string;
+      receipt_id: string;
+      receipt_sha256: string;
+    }[];
+    authorization: {
+      buyer_submission?: {
+        challenger: string;
+        dispute_fee_terminal: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          beneficiary_pool_principal_id: string;
+          event: string;
+          fee_schedule_envelope_sha256: string;
+          payer: string;
+          rail_destination: string;
+        };
+        dispute_lock_ref: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          class: string;
+          expiry: number;
+          fee_schedule_envelope_sha256: string;
+          lock_id: string;
+        };
+        standing: {
+          failed_delivery: {
+            failed_delivery_envelope_sha256: string;
+            failed_delivery_id: string;
+          };
+        };
+      };
+      venue_audit?: {
+        audit_epoch_envelope_sha256: string;
+        authorization_digest: string;
+        selection_digest: string;
+      };
+    };
+    backing_envelope_sha256: string;
+    challenge_id: string;
+    evidence: {
+      digest_mismatch?: {
+        deny_checkpoint_ref: {
+          checkpoint_ref: string;
+          checkpoint_sha256: string;
+        };
+        deny_receipt_ref: {
+          receipt_id: string;
+          receipt_sha256: string;
+        };
+        failed_delivery_envelope_sha256: string;
+      };
+      evidence_invalid?: {
+        challenged_checkpoint_ref: {
+          checkpoint_ref: string;
+          checkpoint_sha256: string;
+        };
+        challenged_evidence_receipt_refs: {
+          receipt_id: string;
+          receipt_sha256: string;
+        }[];
+        purchase_record_envelope_sha256: string;
+      };
+    };
+    filed_at: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    listing_id: string;
+    profile_envelope_sha256: string;
+    schema: "chio.finding.challenge.v1";
+    terms_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-enforcement-body.schema.json
+export namespace Finding_FindingChallengeEnforcementBody {
+  export interface ChioFindingChallengeEnforcementV1SignedBody {
+    amount: {
+      currency: string;
+      units: number;
+    };
+    bond_snapshot_envelope_sha256: string;
+    destinations: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      destination: string;
+    }[];
+    deterministic_allocation_digest: string;
+    effect_intents: {
+      intent_id: string;
+      kind: string;
+    }[];
+    enforcement_id: string;
+    finalization_authority_id: string;
+    finalization_key: string;
+    finalization_key_epoch: number;
+    finalization_revocation_status_ref: string;
+    finalization_valid_from: number;
+    finalization_valid_until: number;
+    finalized_at: number;
+    finding_id: string;
+    liability_key: string;
+    listing_id: string;
+    outcome_envelope_sha256: string;
+    outcome_id: string;
+    penalty_authority_id: string;
+    penalty_envelope_sha256: string;
+    penalty_key: string;
+    penalty_key_epoch: number;
+    penalty_revocation_status_ref: string;
+    penalty_valid_from: number;
+    penalty_valid_until: number;
+    purchase_snapshot_digest: string;
+    schema: "chio.finding.challenge-enforcement.v1";
+    seller_allocation_id: string;
+    vault: {
+      chain_id: string;
+      vault_contract: string;
+      vault_id: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-outcome-body.schema.json
+export namespace Finding_FindingChallengeOutcomeBody {
+  export interface ChioFindingChallengeOutcomeV1SignedBody {
+    audit_epoch_envelope_sha256?: string;
+    authorization: string;
+    backing_allocation_id: string;
+    challenge_envelope_sha256: string;
+    evaluated_at: number;
+    evaluator_authority_id: string;
+    evaluator_key: string;
+    evaluator_key_epoch: number;
+    evaluator_revocation_status_ref: string;
+    evaluator_valid_from: number;
+    evaluator_valid_until: number;
+    evidence_bundle_digest: string;
+    evidence_kind: string;
+    facet: {
+      digest_mismatch?: {
+        committed_payload_sha256: string;
+        delivered_output_sha256: string;
+        realized_spend_units: number;
+        transform_profile: string;
+      };
+      evidence_invalid?: {
+        challenged_receipt_ids: string[];
+        invalidity: string;
+      };
+      replay_contradiction?: {
+        observation_digests: string[];
+        predicate: string;
+        predicate_result: string;
+        recipe_sha256: string;
+        replay_run_id: string;
+      };
+    };
+    finding_id: string;
+    listing_id: string;
+    outcome_id: string;
+    penalty_calculation?: {
+      base_finding_stake_units: number;
+      computed_exposure_units: number;
+      listing_required_amount_units: number;
+      live_allocated_collateral_units: number;
+      open_per_sale_encumbrance_units: number;
+      penalty_amount: {
+        currency: string;
+        units: number;
+      };
+    };
+    reason: string;
+    retry_deadline?: number;
+    schema: "chio.finding.challenge-outcome.v1";
+    trigger_digest: string;
+    verdict: string;
+    verifier_profile_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-challenge-verifier-profile-body.schema.json
+export namespace Finding_FindingChallengeVerifierProfileBody {
+  export interface ChioFindingChallengeVerifierProfileV1SignedBody {
+    allowed_predicates: string[];
+    allowed_runner_manifests: string[];
+    bbs_projection_issuer: {
+      issuer_fingerprint: string;
+      key_epoch: number;
+      key_hex: string;
+      registry_ref: string;
+      revocation_status_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    checkpoint_logs: {
+      log_id: string;
+      signer: {
+        authority_id: string;
+        key: string;
+        key_epoch: number;
+        revocation_status_ref: string;
+        rotation_policy_ref: string;
+        valid_from: number;
+        valid_until: number;
+      };
+    }[];
+    expires_at: number;
+    failed_delivery_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    governance_authority: string;
+    issued_at: number;
+    operator: string;
+    predicate_engine: string;
+    profile_id: string;
+    purchase_authority: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    receipt_signers: {
+      policy: {
+        authority_id: string;
+        key: string;
+        key_epoch: number;
+        revocation_status_ref: string;
+        rotation_policy_ref: string;
+        valid_from: number;
+        valid_until: number;
+      };
+      role: string;
+    }[];
+    required_facets: string[];
+    required_receipt_semantics: string;
+    resolver_policy_ref: string;
+    resource_caps: {
+      max_evidence_receipts: number;
+      max_memory_bytes: number;
+      max_recipe_bytes: number;
+      max_runtime_secs: number;
+    };
+    retention_policy_ref: string;
+    schema: "chio.finding.challenge-verifier-profile.v1";
+    verifier_report_signer: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-claim-allocation-body.schema.json
+export namespace Finding_FindingClaimAllocationBody {
+  export interface ChioFindingClaimAllocationV1SignedBody {
+    allocation_id: string;
+    buyer_pool_units: number;
+    community_fund_units: number;
+    cutoff_slot: number;
+    deterministic_allocation_sha256: string;
+    entries: {
+      amount_units: number;
+      beneficiary_kind: string;
+      destination: string;
+    }[];
+    liability_key: string;
+    purchase_snapshot_sha256: string;
+    recorded_at: number;
+    schema: "chio.finding.claim-allocation.v1";
+    slash: {
+      currency: string;
+      units: number;
+    };
+    total_realized_spend_units: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-failed-delivery-body.schema.json
+export namespace Finding_FindingFailedDeliveryBody {
+  export interface ChioFindingFailedDeliveryV1SignedBody {
+    accepted_bid_envelope_sha256: string;
+    authoritative_payment_operation_id: string;
+    buyer: string;
+    currency: string;
+    deny_checkpoint_ref: string;
+    deny_checkpoint_sha256: string;
+    deny_receipt_id: string;
+    deny_receipt_sha256: string;
+    failed_delivery_id: string;
+    finding_id: string;
+    hold_attempt_reference: string;
+    listing_id: string;
+    payout_eligible: boolean;
+    purchase_intent_id: string;
+    realized_spend_units: number;
+    recorded_at: number;
+    release_terminal: string;
+    reservation_id: string;
+    schema: "chio.finding.failed-delivery.v1";
+    seller_backing_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-finalized-bond-snapshot-body.schema.json
+export namespace Finding_FindingFinalizedBondSnapshotBody {
+  export interface ChioFindingFinalizedBondSnapshotV1SignedBody {
+    allocation_id: string;
+    block_hash: string;
+    block_number: number;
+    chain_id: string;
+    currency: string;
+    finality_policy: string;
+    held_amount: number;
+    identity_registry_record: string;
+    locked_amount: number;
+    observed_at: number;
+    observed_finality:
+      | string
+      | {
+          confirmations: {
+            depth: number;
+          };
+        };
+    operator_key_epoch: number;
+    operator_key_hash: string;
+    schema: "chio.finding.finalized-bond-snapshot.v1";
+    seller: string;
+    slashed_amount: number;
+    snapshot_id: string;
+    vault_contract: string;
+    vault_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-key-revocation-body.schema.json
+export namespace Finding_FindingKeyRevocationBody {
+  export interface ChioFindingKeyRevocationV1SignedBody {
+    authority_id: string;
+    key: string;
+    key_epoch: number;
+    recorded_at: number;
+    revocation_status_ref: string;
+    revoked_from: number;
+    schema: "chio.finding.key-revocation.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-liability-body.schema.json
+export namespace Finding_FindingLiabilityBody {
+  export interface ChioFindingLiabilityV1SignedBody {
+    backing_allocation_id: string;
+    chain_id: string;
+    defect_key: string;
+    finding_id: string;
+    liability_key: string;
+    listing_id: string;
+    opened_at: number;
+    schema: "chio.finding.liability.v1";
+    seller: string;
+    state: string;
+    updated_at: number;
+    vault_contract: string;
+    vault_id: string;
+    venue_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-market-terms-body.schema.json
+export namespace Finding_FindingMarketTermsBody {
+  export interface ChioFindingMarketTermsV1SignedBody {
+    appeal_window_secs: number;
+    audit_eligible: boolean;
+    audit_epoch_length_secs: number;
+    backing_requirement: {
+      base_finding_stake: {
+        currency: string;
+        units: number;
+      };
+      collateral_policy: string;
+      maximum_sale_exposure: {
+        currency: string;
+        units: number;
+      };
+    };
+    challenge_bond_limits: {
+      guarantee_class: string;
+      max_bond: {
+        currency: string;
+        units: number;
+      };
+      min_bond: {
+        currency: string;
+        units: number;
+      };
+    }[];
+    claim_window_secs: number;
+    decision_rule_refs: string[];
+    expires_at: number;
+    filing_window_secs: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    listing_id: string;
+    payout_policy: string;
+    schema: "chio.finding.market-terms.v1";
+    seller: string;
+    terms_id: string;
+    verifier_profile_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-pool-allocation-body.schema.json
+export namespace Finding_FindingPoolAllocationBody {
+  export interface ChioFindingPoolAllocationV1SignedBody {
+    allocation_id: string;
+    amount_units: string;
+    authority: string;
+    currency: string;
+    expires_at_unix_ms: number;
+    graph_id: string;
+    issued_at_unix_ms: number;
+    ledger_domain: string;
+    ledger_store_binding_sha256: string;
+    nonce: string;
+    pool_id: string;
+    pool_sha256: string;
+    purchaser_id: string;
+    purchaser_key: string;
+    purpose: string;
+    schema: "chio.finding.pool-allocation.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-purchase-record-body.schema.json
+export namespace Finding_FindingPurchaseRecordBody {
+  export interface ChioFindingPurchaseRecordV1SignedBody {
+    accepted_bid_envelope_sha256: string;
+    accepted_price: {
+      currency: string;
+      units: number;
+    };
+    authoritative_payment_operation_id: string;
+    buyer: string;
+    delivery_receipt_id: string;
+    encumbrance_id: string;
+    finding_id: string;
+    listing_id: string;
+    payer: string;
+    payment_reference: string;
+    payout_destination: string;
+    purchase_intent_id: string;
+    purchase_key: string;
+    realized_spend: {
+      currency: string;
+      units: number;
+    };
+    recorded_at: number;
+    schema: "chio.finding.purchase-record.v1";
+    seller_backing_envelope_sha256: string;
+    venue_admission_envelope_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-purchase-result-body.schema.json
+export namespace Finding_FindingPurchaseResultBody {
+  export interface ChioFindingPurchaseResultV1SignedBody {
+    accepted_price: {
+      currency: string;
+      units: number;
+    };
+    authoritative_payment_operation_id: string;
+    delivery_receipt_sha256: string;
+    failed_delivery_sha256?: string;
+    finding_id: string;
+    output_sha256?: string;
+    payer: string;
+    purchase_intent_id: string;
+    purchase_record_sha256?: string;
+    realized_spend: {
+      currency: string;
+      units: number;
+    };
+    recorded_at: number;
+    request_id: string;
+    reservation_id: string;
+    result_id: string;
+    schema: "chio.finding.purchase-result.v1";
+    settlement: string;
+    verdict: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-seller-authorization-body.schema.json
+export namespace Finding_FindingSellerAuthorizationBody {
+  export interface ChioFindingSellerAuthorizationV1SignedBody {
+    authorization_id: string;
+    expires_at: number;
+    finding_artifact_sha256: string;
+    finding_id: string;
+    issued_at: number;
+    issuer: string;
+    listing_id: string;
+    payee: {
+      beneficiary: {
+        currency: string;
+        destination: string;
+      };
+    };
+    provider_server_id: string;
+    provider_tool: string;
+    revocation_status_ref: string;
+    schema: "chio.finding.seller-authorization.v1";
+    seller: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-status-epoch-body.schema.json
+export namespace Finding_FindingStatusEpochBody {
+  export interface ChioFindingStatusEpochV1SignedBody {
+    anchor_refs: string[];
+    branch_domain: string;
+    empty_leaf_domain: string;
+    empty_leaf_hash: string;
+    feed_id: string;
+    generated_at: number;
+    hash_algorithm: string;
+    key_domain_nonce: number;
+    key_hash_domain: string;
+    map_epoch: number;
+    occupied_leaf_domain: string;
+    operator_id: string;
+    operator_key: string;
+    operator_key_epoch: number;
+    proof_semantics: string;
+    root_hash: string;
+    schema: "chio.finding.status-epoch.v1";
+    status_epoch_id: string;
+    status_map_version: string;
+    tree_depth: number;
+    valid_from: number;
+    valid_until: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-verified-fix-submission-body.schema.json
+export namespace Finding_FindingVerifiedFixSubmissionBody {
+  export interface ChioFindingVerifiedFixSubmissionV1SignedBody {
+    activation_sha256: string;
+    finding_id: string;
+    proof_bundle_sha256: string;
+    schema: "chio.finding.verified-fix-submission.v1";
+    seller: string;
+    submission_id: string;
+    submitted_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-verifier-report-body.schema.json
+export namespace Finding_FindingVerifierReportBody {
+  export interface ChioFindingVerifierReportV1SignedBody {
+    backing_allocation_id?: string;
+    evaluation_time: number;
+    facets: {
+      facet: string;
+      outcome: string;
+      reason: string;
+    }[];
+    finding_artifact_sha256: string;
+    finding_delivery?: {
+      accepted_bid_envelope_sha256: string;
+      authoritative_payment_operation_id: string;
+      digest_check: string;
+      finding_id: string;
+      listing_id: string;
+      media_type_check: string;
+      purchase_intent_id: string;
+      reservation_id: string;
+      schema: string;
+      settlement_mode: string;
+      transform_profile: string;
+      venue_admission_envelope_sha256: string;
+    };
+    finding_delivery_receipt_id?: string;
+    finding_id: string;
+    replay_recipe_input_sha256?: string;
+    report_id: string;
+    resolved_evidence_bundle_sha256: string;
+    resolver_policy_sha256: string;
+    schema: "chio.finding.verifier-report.v1";
+    status_proof_input_sha256?: string;
+    trust_root_snapshot_sha256: string;
+    trusted_time_input_sha256: string;
+    verifier_authority: string;
+    verifier_implementation_id: string;
+    verifier_key_epoch: number;
+    verifier_profile_envelope_sha256: string;
+    verifier_profile_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/finding-voluntary-retraction-body.schema.json
+export namespace Finding_FindingVoluntaryRetractionBody {
+  export interface ChioFindingVoluntaryRetractionV1SignedBody {
+    finding_id: string;
+    inclusion_deadline: number;
+    intent_id: string;
+    issued_at: number;
+    reason: string;
+    schema: "chio.finding.voluntary-retraction.v1";
+    seller: string;
+    status_feed_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-aggregate-checkpoint.schema.json
+export namespace Finding_HostedAggregateCheckpoint {
+  export interface ChioFindingHostedAggregateCheckpointSignedBody {
+    aggregateId: string;
+    aggregateKind: string;
+    createdAt: number;
+    eventSha256: string;
+    previousCheckpointSha256: null;
+    revision: number;
+    schema: "chio.finding.hosted.aggregate-checkpoint.v1";
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-api-key-lifecycle.schema.json
+export namespace Finding_HostedApiKeyLifecycle {
+  export interface ChioFindingHostedApiKeyLifecycleSignedBody {
+    eventId: string;
+    keyId: string;
+    occurredAt: number;
+    operation: {
+      activeFrom?: number;
+      allowedActions?: string[];
+      expiresAt?: number;
+      kind: string;
+      principalId?: string;
+      rotatedFromKeyId?: null | string;
+    };
+    schema: "chio.finding.hosted-api-key-lifecycle.v1";
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-archive-manifest.schema.json
+export namespace Finding_HostedArchiveManifest {
+  export interface ChioFindingHostedArchiveManifestSignedBody {
+    configurationRevision: string;
+    coveredCheckpointSha256: string;
+    createdAt: number;
+    objectSha256: string;
+    objectSize: number;
+    objectUri: string;
+    previousArchiveSha256: null | string;
+    schema: "chio.finding.hosted-archive-manifest.v1";
+    target: {
+      resourceFamily: string;
+      resourceId: string;
+      resourceKind: string;
+      resourceRevision: number;
+      resourceSha256: string;
+    };
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-authority-transition.schema.json
+export namespace Finding_HostedAuthorityTransition {
+  export interface ChioFindingHostedAuthorityTransitionSignedBody {
+    configurationRevision: string;
+    createdAt: number;
+    fromAuthority: string;
+    fromEpoch: number;
+    operation: string;
+    rollbackWindowEndsAt: number | null;
+    schema: "chio.finding.hosted-authority-transition.v1";
+    sourceCheckpointSha256: string;
+    targetCheckpointSha256: string;
+    tenantId: string;
+    throughSequence: number;
+    toAuthority: string;
+    toEpoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-canary-observation.schema.json
+export namespace Finding_HostedCanaryObservation {
+  export interface ChioFindingHostedCanaryObservationSignedBody {
+    artifactSha256: string;
+    configurationRevision: string;
+    durableIntegrityFailures: number;
+    errorCount: number;
+    observedSecs: number;
+    oldestQueueAgeSecs: number;
+    p99LatencyMillis: number;
+    paymentAmbiguities: number;
+    readyReplicas: number;
+    requestCount: number;
+    schema: "chio.finding.hosted-canary-observation.v1";
+    signatureFailures: number;
+    tenantIsolationViolations: number;
+    windowEndedAtUnixSecs: number;
+    windowStartedAtUnixSecs: number;
+    workerIsolationFailures: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-gc-receipt.schema.json
+export namespace Finding_HostedGcReceipt {
+  export interface ChioFindingHostedGcReceiptSignedBody {
+    archiveSha256: string;
+    completedAt: number;
+    schema: "chio.finding.hosted-gc-receipt.v1";
+    target: {
+      resourceFamily: string;
+      resourceId: string;
+      resourceKind: string;
+      resourceRevision: number;
+      resourceSha256: string;
+    };
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-journal-checkpoint.schema.json
+export namespace Finding_HostedJournalCheckpoint {
+  export interface ChioFindingHostedJournalCheckpointSignedBody {
+    aggregateHeadsSha256: string;
+    configurationRevision: string;
+    createdAt: number;
+    migrationVersion: number;
+    previousCheckpointSha256: null | string;
+    schema: "chio.finding.hosted-journal-checkpoint.v1";
+    tenantId: string;
+    terminalJobsSha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-legal-hold.schema.json
+export namespace Finding_HostedLegalHold {
+  export interface ChioFindingHostedLegalHoldSignedBody {
+    action: string;
+    createdAt: number;
+    holdId: string;
+    previousHoldEventSha256: null | string;
+    schema: "chio.finding.hosted-legal-hold.v1";
+    target: {
+      resourceFamily: string;
+      resourceId: string;
+      resourceKind: string;
+      resourceRevision: number;
+      resourceSha256: string;
+    };
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-principal-lifecycle.schema.json
+export namespace Finding_HostedPrincipalLifecycle {
+  export interface ChioFindingHostedPrincipalLifecycleSignedBody {
+    capabilityPublicKeyHex: string;
+    createdAt: number;
+    operation: string;
+    overlapExpiresAt: number | null;
+    previousEventSha256: null | string;
+    principalId: string;
+    role: string;
+    schema: "chio.finding.hosted-principal-lifecycle.v1";
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-principal-replication-event.schema.json
+export namespace Finding_HostedPrincipalReplicationEvent {
+  export interface ChioFindingHostedPrincipalReplicationEventSignedBody {
+    authorityEpoch: number;
+    committedAt: number;
+    lifecycleEvent: {
+      body: {
+        capabilityPublicKeyHex: string;
+        createdAt: number;
+        operation: string;
+        overlapExpiresAt: number | null;
+        previousEventSha256: null | string;
+        principalId: string;
+        role: string;
+        schema: string;
+        tenantId: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    schema: "chio.finding.hosted-principal-replication-event.v1";
+    sequence: number;
+    sourceAuthority: string;
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-quota-alert.schema.json
+export namespace Finding_HostedQuotaAlert {
+  export interface ChioFindingHostedQuotaAlertSignedBody {
+    createdAt: number;
+    limitValue: number;
+    observedValue: number;
+    quotaKind: string;
+    schema: "chio.finding.hosted-quota-alert.v1";
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-replication-check.schema.json
+export namespace Finding_HostedReplicationCheck {
+  export interface ChioFindingHostedReplicationCheckSignedBody {
+    authorityEpoch: number;
+    checkedAt: number;
+    lagSeconds: number;
+    projectionDifferenceCount: number;
+    schema: "chio.finding.hosted-replication-check.v1";
+    securityCounterCount: number;
+    sourceAuthority: string;
+    sourceProjectionSha256: string;
+    targetProjectionSha256: string;
+    tenantId: string;
+    throughSequence: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-replication-event.schema.json
+export namespace Finding_HostedReplicationEvent {
+  export interface ChioFindingHostedReplicationEventSignedBody {
+    aggregateId: string;
+    artifactSignerKey: string;
+    authorityEpoch: number;
+    committedAt: number;
+    eventId: string;
+    eventKind: string;
+    expectedEventSha256: null;
+    expectedRevision: number;
+    payload: {
+      bond_ref?: string;
+      descriptor?: {
+        context_sha256: string;
+        outcome_class: string;
+        topic: string;
+      };
+      evidence_checkpoint_ref?: string;
+      evidence_class?: string;
+      evidence_cost?: {
+        currency: string;
+        units: number;
+      };
+      evidence_receipt_ids?: string[];
+      expires_at?: number;
+      finding_id?: string;
+      guarantee_class?: string;
+      invalid?: boolean;
+      issued_at?: number;
+      issuer?: string;
+      payload_media_type?: string;
+      payload_sha256?: string;
+      schema?: string;
+      signature?: string;
+      status_feed_ref?: string;
+    };
+    schema: "chio.finding.hosted-replication-event.v1";
+    sequence: number;
+    sourceAuthority: string;
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-restore-verification.schema.json
+export namespace Finding_HostedRestoreVerification {
+  export interface ChioFindingHostedRestoreVerificationSignedBody {
+    archiveSha256: string;
+    restoredResourceSha256: string;
+    schema: "chio.finding.hosted-restore-verification.v1";
+    tenantId: string;
+    verifiedAt: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/hosted-sqlite-import-batch.schema.json
+export namespace Finding_HostedSqliteImportBatch {
+  export interface ChioFindingHostedSqliteImportBatchSignedBody {
+    authorityEpoch: number;
+    entries: {
+      entry_kind: string;
+      event: {
+        body: {
+          aggregateId: string;
+          artifactSignerKey: string;
+          authorityEpoch: number;
+          committedAt: number;
+          eventId: string;
+          eventKind: string;
+          expectedEventSha256: null;
+          expectedRevision: number;
+          payload: {
+            invalid: boolean;
+          };
+          schema: string;
+          sequence: number;
+          sourceAuthority: string;
+          tenantId: string;
+        };
+        signature: string;
+        signerKey: string;
+      };
+    }[];
+    exportedAt: number;
+    firstSequence: number;
+    lastSequence: number;
+    schema: "chio.finding.hosted-sqlite-import-batch.v1";
+    sourceProjectionSha256: string;
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/operator-purchase-job.schema.json
+export namespace Finding_OperatorPurchaseJob {
+  export interface ChioFindingOperatorPurchaseJobSignedBody {
+    agentId: string;
+    bidDigest: string;
+    expiresAt: number;
+    issuedAt: number;
+    listingId: string;
+    quotedPrice: {
+      currency: string;
+      units: number;
+    };
+    schema: string;
+    tokenOffer: {
+      expires_at: number;
+      id: string;
+      issued_at: number;
+      issuer: string;
+      schema: string;
+      scope: {
+        grants: {
+          constraints: {
+            type: string;
+            value:
+              | string
+              | {
+                  finding_id: string;
+                  listing_id: string;
+                  settlement: {
+                    mode: string;
+                  };
+                };
+          }[];
+          dpop_required?: boolean;
+          max_cost_per_invocation: {
+            currency: string;
+            units: number;
+          };
+          max_invocations: number;
+          max_total_cost: {
+            currency: string;
+            units: number;
+          };
+          operations: string[];
+          server_id: string;
+          tool_name: string;
+        }[];
+        prompt_grants?: {
+          operations: string[];
+          prompt_name: string;
+        }[];
+        resource_grants?: {
+          operations: string[];
+          uri_pattern: string;
+        }[];
+      };
+      signature: string;
+      subject: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/pool-debit-authorization.schema.json
+export namespace Finding_PoolDebitAuthorization {
+  export interface ChioFindingPoolDebitAuthorizationSignedBody {
+    allocation_envelope_sha256: string;
+    arguments_sha256: string;
+    capability_id: string;
+    expected_output_digest: string;
+    expires_at_unix_ms: string;
+    purchase_context_sha256: string;
+    purchase_id: string;
+    purchaser_id: string;
+    schema: "chio.finding.pool-debit-authorization.v1";
+    server_id: string;
+    tool_name: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/registry-market-penalty-body.schema.json
+export namespace Finding_RegistryMarketPenaltyBody {
+  export interface ChioRegistryMarketPenaltyV1SignedBody {
+    abuseClass: string;
+    action: string;
+    activationId?: string;
+    bondClass: string;
+    caseId: string;
+    charterId: string;
+    evidenceRefs: {
+      kind: string;
+      referenceId: string;
+      sha256?: string;
+    }[];
+    expiresAt?: number;
+    feeScheduleId: string;
+    governingOperatorId: string;
+    issuedBy: string;
+    listingId: string;
+    namespace: string;
+    openedAt: number;
+    penaltyAmount: {
+      currency: string;
+      units: number;
+    };
+    penaltyId: string;
+    schema: "chio.registry.market-penalty.v1";
+    state: string;
+    subjectOperatorId?: string;
+    supersedesPenaltyId?: string;
+    updatedAt: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/status-intent-submission.schema.json
+export namespace Finding_StatusIntentSubmission {
+  export interface ChioFindingStatusIntentSubmissionSignedBody {
+    feed_id: string;
+    finding_id: string;
+    inclusion_deadline: number;
+    intent_id: string;
+    issued_at: number;
+    key_domain_nonce: number;
+    operator_id: string;
+    operator_key_epoch: number;
+    schema: "chio.finding.status-intent-submission.v1";
+    source: string;
+    source_authority_id: string;
+    source_receipt: {
+      body: {
+        feed_id: string;
+        finding_id: string;
+        issued_at: number;
+        key_domain_nonce: number;
+        schema: string;
+        source_authority_id: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    source_receipt_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/status-operator-authorization.schema.json
+export namespace Finding_StatusOperatorAuthorization {
+  export interface ChioFindingStatusOperatorAuthorizationSignedBody {
+    feed_id: string;
+    operator: {
+      authority_id: string;
+      key: string;
+      key_epoch: number;
+      revocation_status_ref: string;
+      rotation_policy_ref: string;
+      valid_from: number;
+      valid_until: number;
+    };
+    revoked_from: number | null;
+    role: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/store-identity-proof.schema.json
+export namespace Finding_StoreIdentityProof {
+  export interface ChioFindingPoolStoreIdentityProofSignedBody {
+    challenge: string;
+    schema: "chio.finding-pool.store-identity-proof.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/voluntary-retraction-receipt.schema.json
+export namespace Finding_VoluntaryRetractionReceipt {
+  export interface ChioFindingVoluntaryRetractionReceiptSignedBody {
+    feed_id: string;
+    finding_id: string;
+    issued_at: number;
+    key_domain_nonce: number;
+    schema: "chio.finding.voluntary-retraction-receipt.v1";
+    source_authority_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/worker-attested-result.schema.json
+export namespace Finding_WorkerAttestedResult {
+  export interface ChioFindingWorkerAttestedResultSignedBody {
+    completedAtUnixSecs: number;
+    firecrackerSha256: string;
+    guestResultSha256: string;
+    jailerSha256: string;
+    jobId: string;
+    kernelSha256: string;
+    requestSha256: string;
+    result: {
+      classification: string;
+      diagnostics: {}[];
+      findingArtifactSha256: string;
+      guestEnforcement: {
+        openFilesBoundary: string;
+        openFilesHardLimit: number;
+        openFilesLimitHits: number;
+        openFilesLimitProbePassed: boolean;
+        openFilesSoftLimit: number;
+        processBoundary: string;
+        processLimit: number;
+        processLimitHits: number;
+        processLimitProbePassed: boolean;
+        schema: string;
+      };
+      jobId: string;
+      outputArtifacts: {
+        name: string;
+        sha256: string;
+        sizeBytes: number;
+      }[];
+      requestSha256: string;
+      resourceUsage: {
+        cpuTimeMillis: number;
+        openFilesPeak: number;
+        outputBytes: number;
+        peakMemoryBytes: number;
+        processPeak: number;
+        wallTimeMillis: number;
+        workspaceBytes: number;
+      };
+      schema: string;
+      tenantId: string;
+    };
+    rootfsSha256: string;
+    schema: "chio.finding.worker-attested-result.v1";
+    tenantId: string;
+    workerBinarySha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/finding/worker-capability.schema.json
+export namespace Finding_WorkerCapability {
+  export interface ChioFindingWorkerCapabilitySignedBody {
+    capabilityId: string;
+    expiresAtUnixSecs: number;
+    jobId: string;
+    jobKind: string;
+    jobSpecSha256: string;
+    maxAttempts: number;
+    notBeforeUnixSecs: number;
+    requestSha256: string;
+    schema: "chio.finding.worker-capability.v1";
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-activation-body.schema.json
+export namespace Fiscal_FiscalActivationBody {
+  export interface ChioFiscalActivationV1SignedBody {
+    activatedAt: number;
+    activationId: string;
+    activationNotBefore: number;
+    admissionDigest: string;
+    admissionId: string;
+    approvalSetDigest: string;
+    approvals: {
+      body: {
+        admissionDigest: string;
+        admissionId: string;
+        approvalExpiresAt: number;
+        approvalId: string;
+        approvedAt: number;
+        proposalDigest: string;
+        proposalId: string;
+        schema: string;
+        signerKeyId: string;
+      };
+      signature: string;
+      signerKey: string;
+    }[];
+    charterDigest: string;
+    charterId: string;
+    issuedBy: string;
+    proposalDigest: string;
+    proposalId: string;
+    schema: "chio.fiscal.activation.v1";
+    target: {
+      kind: string;
+      predecessorCharterDigest?: string;
+      scheduleId?: string;
+      successorCharterDigest?: string;
+      successorSchedules?: {
+        body: {
+          charterDigest: string;
+          charterId: string;
+          domain: string;
+          issuedAt: number;
+          issuedBy: string;
+          params: {
+            ceilings: {
+              currency: string;
+              units: number;
+            }[];
+            kind: string;
+          };
+          scheduleId: string;
+          schema: string;
+          sequence: number;
+          supersedesScheduleId: string;
+          validFrom: number;
+          validUntil: number;
+        };
+        signature: string;
+        signerKey: string;
+      }[];
+      supersedesScheduleId?: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-approval-body.schema.json
+export namespace Fiscal_FiscalApprovalBody {
+  export interface ChioFiscalApprovalV1SignedBody {
+    admissionDigest: string;
+    admissionId: string;
+    approvalExpiresAt: number;
+    approvalId: string;
+    approvedAt: number;
+    proposalDigest: string;
+    proposalId: string;
+    schema: "chio.fiscal.approval.v1";
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-charter-body.schema.json
+export namespace Fiscal_FiscalCharterBody {
+  export interface ChioFiscalCharterV1SignedBody {
+    approvalThreshold: number;
+    approvalTtlSeconds: number;
+    charterId: string;
+    expiresAt: number;
+    governedDomains: string[];
+    governingOperatorId: string;
+    issuedAt: number;
+    issuedBy: string;
+    predecessorCharterDigest?: string;
+    proposalTtlSeconds: number;
+    schema: "chio.fiscal.charter.v1";
+    sequence: number;
+    signerSet: {
+      keyId: string;
+      publicKey: string;
+    }[];
+    timelockSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-consumer-readiness-body.schema.json
+export namespace Fiscal_FiscalConsumerReadinessBody {
+  export interface ChioFiscalConsumerReadinessV1SignedBody {
+    attestedAt: number;
+    genesisPolicyDigest: string;
+    genesisPolicyId: string;
+    governingOperatorId: string;
+    readinessId: string;
+    readinessSequence: number;
+    readyDomains: string[];
+    runtimeRegistryDigest: string;
+    schema: "chio.fiscal.consumer-readiness.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-continuity-checkpoint-body.schema.json
+export namespace Fiscal_FiscalContinuityCheckpointBody {
+  export interface ChioFiscalContinuityCheckpointV1SignedBody {
+    anchorId: string;
+    anchorNamespace: string;
+    checkpointId: string;
+    continuitySequence: number;
+    domains: {
+      active?: {
+        scheduleDigest: string;
+        scheduleId: string;
+        sequence: number;
+      };
+      domain: string;
+      everActivated: boolean;
+      lastKnownGood?: {
+        scheduleDigest: string;
+        scheduleId: string;
+        sequence: number;
+      };
+    }[];
+    genesisPolicyDigest: string;
+    genesisPolicyId: string;
+    governingOperatorId: string;
+    pinnedCharterDigest: string;
+    pinnedCharterId: string;
+    pinnedCharterSequence: number;
+    previousCheckpointDigest?: string;
+    runtimeReadinessDigest: string;
+    schema: "chio.fiscal.continuity-checkpoint.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+    stagedTransition?: {
+      transitionDigest: string;
+      transitionId: string;
+    };
+    trustedClockHighWater: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-proposal-admission-body.schema.json
+export namespace Fiscal_FiscalProposalAdmissionBody {
+  export interface ChioFiscalProposalAdmissionV1SignedBody {
+    admissionAuthorityId: string;
+    admissionId: string;
+    admissionSequence: number;
+    admittedAt: number;
+    governingOperatorId: string;
+    predecessorCharterDigest: string;
+    predecessorCharterId: string;
+    predecessorCharterSequence: number;
+    proposalDigest: string;
+    proposalExpiresAt: number;
+    proposalId: string;
+    schema: "chio.fiscal.proposal-admission.v1";
+    signerKeyEpoch: number;
+    signerKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-proposal-body.schema.json
+export namespace Fiscal_FiscalProposalBody {
+  export interface ChioFiscalProposalV1SignedBody {
+    proposalId: string;
+    proposedAt: number;
+    proposedBy: string;
+    rationaleDigest: string;
+    schema: "chio.fiscal.proposal.v1";
+    target: {
+      candidate?: {
+        body: {
+          charterDigest: string;
+          charterId: string;
+          domain: string;
+          issuedAt: number;
+          issuedBy: string;
+          params: {
+            ceilings?: {
+              currency: string;
+              units: number;
+            }[];
+            feeSchedule?: {
+              bondRequirements: {
+                bondClass: string;
+                collateralReferenceKind: string;
+                requiredAmount: {
+                  currency: string;
+                  units: number;
+                };
+                slashable: boolean;
+              }[];
+              disputeFee: {
+                currency: string;
+                units: number;
+              };
+              expiresAt: number;
+              feeScheduleId: string;
+              governingOperatorId: string;
+              issuedAt: number;
+              issuedBy: string;
+              marketParticipationFee: {
+                currency: string;
+                units: number;
+              };
+              namespace: string;
+              publicationFee: {
+                currency: string;
+                units: number;
+              };
+              schema: string;
+              scope: {
+                allowedActorKinds: string[];
+                allowedAdmissionClasses: string[];
+                allowedListingOperatorIds: string[];
+                namespace: string;
+              };
+            };
+            kind: string;
+          };
+          scheduleId: string;
+          schema: string;
+          sequence: number;
+          supersedesScheduleId?: string;
+          validFrom: number;
+          validUntil: number;
+        };
+        signature: string;
+        signerKey: string;
+      };
+      kind: string;
+      successor?: {
+        body: {
+          approvalThreshold: number;
+          approvalTtlSeconds: number;
+          charterId: string;
+          expiresAt: number;
+          governedDomains: string[];
+          governingOperatorId: string;
+          issuedAt: number;
+          issuedBy: string;
+          predecessorCharterDigest: string;
+          proposalTtlSeconds: number;
+          schema: string;
+          sequence: number;
+          signerSet: {
+            keyId: string;
+            publicKey: string;
+          }[];
+          timelockSeconds: number;
+        };
+        signature: string;
+        signerKey: string;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/fiscal/fiscal-schedule-body.schema.json
+export namespace Fiscal_FiscalScheduleBody {
+  export interface ChioFiscalScheduleV1SignedBody {
+    charterDigest: string;
+    charterId: string;
+    domain: string;
+    issuedAt: number;
+    issuedBy: string;
+    params: {
+      ceilings?: {
+        currency: string;
+        units: number;
+      }[];
+      feeSchedule?: {
+        bondRequirements: {
+          bondClass: string;
+          collateralReferenceKind: string;
+          requiredAmount: {
+            currency: string;
+            units: number;
+          };
+          slashable: boolean;
+        }[];
+        disputeFee: {
+          currency: string;
+          units: number;
+        };
+        expiresAt: number;
+        feeScheduleId: string;
+        governingOperatorId: string;
+        issuedAt: number;
+        issuedBy: string;
+        marketParticipationFee: {
+          currency: string;
+          units: number;
+        };
+        namespace: string;
+        publicationFee: {
+          currency: string;
+          units: number;
+        };
+        schema: string;
+        scope: {
+          allowedActorKinds: string[];
+          allowedAdmissionClasses: string[];
+          allowedListingOperatorIds: string[];
+          namespace: string;
+        };
+      };
+      kind: string;
+    };
+    scheduleId: string;
+    schema: "chio.fiscal.schedule.v1";
+    sequence: number;
+    supersedesScheduleId?: string;
+    validFrom: number;
+    validUntil: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/dkg-package.schema.json
+export namespace Frost_DkgPackage {
+  export interface ChioFrostDkgPackageSignedBody {
+    ceremonyId: string;
+    keyEpoch: number;
+    packageDigest: string;
+    participantSetDigest: string;
+    round: string;
+    schema: "chio.frost.dkg-package.v1";
+    senderParticipantId: string;
+    transportKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-authorization-slot-checkpoint-body.schema.json
+export namespace Frost_FrostAuthorizationSlotCheckpointBody {
+  export interface ChioFrostAuthorizationSlotCheckpointV1SignedBody {
+    actionDigest: string;
+    aggregateSignatureDigest?: string;
+    anchorId: string;
+    anchorKeyId: string;
+    authorizationBlobDigest?: string;
+    authorizationId: string;
+    availabilityReceipt?: string;
+    clockHighWater: number;
+    domain: string;
+    keyEpoch: number;
+    ladderActionClass: string;
+    predecessorDigest?: string;
+    resourceFence: number;
+    resourceId: string;
+    resourceVersion: number;
+    rosterDigest: string;
+    schema: "chio.frost.authorization-slot-checkpoint.v1";
+    scopeId: string;
+    sessionId: string;
+    signingMessageDigest: string;
+    slotId: string;
+    slotVersion: number;
+    state: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-dkg-round2-sealed-body.schema.json
+export namespace Frost_FrostDkgRound2SealedBody {
+  export interface ChioFrostDkgRound2SealedV1SignedBody {
+    ciphertext: string;
+    metadata: {
+      ceremonyId: string;
+      keyEpoch: number;
+      participantSetDigest: string;
+      recipientParticipantId: string;
+      recipientSealingKeyId: string;
+      round: number;
+      schema: string;
+      senderEphemeralPublicKey: number[];
+      senderParticipantId: string;
+      suite: string;
+      transportKeyId: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-epoch-checkpoint-body.schema.json
+export namespace Frost_FrostEpochCheckpointBody {
+  export interface ChioFrostEpochCheckpointV1SignedBody {
+    activationFence: number;
+    activeRosterDigest: string;
+    activeRosterId: string;
+    anchorId: string;
+    anchorKeyId: string;
+    checkpointSequence: number;
+    clockHighWater: number;
+    groupPublicKeyDigest: string;
+    keyEpoch: number;
+    predecessorDigest?: string;
+    rotationAuthorizationDigest?: string;
+    schema: "chio.frost.epoch-checkpoint.v1";
+    scopeId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/frost/frost-roster-body.schema.json
+export namespace Frost_FrostRosterBody {
+  export interface ChioFrostRosterV1SignedBody {
+    allowedDomains: string[];
+    authorityScope: string;
+    ceremonyTranscriptDigest: string;
+    groupPublicKey: string;
+    keyEpoch: number;
+    keyOrigin: string;
+    participantCount: number;
+    participants: {
+      participantId: string;
+      verificationShare: string;
+    }[];
+    predecessorRosterDigest?: string;
+    rosterAuthorityKeyId: string;
+    rosterId: string;
+    schema: "chio.frost.roster.v1";
+    scopeId: string;
+    suiteId: string;
+    threshold: number;
+    validFrom: number;
+    validUntil: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/iroh/revocation-signer-endorsement.schema.json
+export namespace Iroh_RevocationSignerEndorsement {
+  export interface ChioIrohRevocationSignerEndorsementSignedBody {
+    kernel_id: string;
+    oracle_public_key: string;
+    signer_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/iroh/transport-endorsement.schema.json
+export namespace Iroh_TransportEndorsement {
+  export interface ChioIrohTransportEndorsementSignedBody {
+    kernel_id: string;
+    transport_endpoint_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/jsonrpc/notification.schema.json
 export namespace Jsonrpc_Notification {
   /**
@@ -2050,6 +8456,296 @@ export namespace Jsonrpc_Response {
   } & {
     [k: string]: unknown;
   };
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/active-response-artifact-authority-attestation.schema.json
+export namespace Kernel_ActiveResponseArtifactAuthorityAttestation {
+  export interface ChioActiveResponseArtifactAuthorityAttestationSignedBody {
+    actionId: string;
+    artifactPayloadDigest: number[];
+    artifactRef: string;
+    authority: string;
+    expiresAtUnixMs: number;
+    governedIntentHash: number[];
+    issuedAtUnixMs: number;
+    planBodyHash: number[];
+    schema: "chio.active-response-artifact-authority-attestation.v1";
+    submissionProofDigest: number[];
+    submitter: string;
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/active-response-policy-authority-request.schema.json
+export namespace Kernel_ActiveResponsePolicyAuthorityRequest {
+  export interface ChioActiveResponsePolicyAuthorityRequestSignedBody {
+    client: string;
+    deploymentDigest: number[];
+    issuedAtUnixSeconds: number;
+    operation: {
+      operation: string;
+    };
+    requestId: string;
+    schema: "chio.active-response-policy-authority-request.v1";
+    storeDigest: number[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/active-response-policy-authority-response.schema.json
+export namespace Kernel_ActiveResponsePolicyAuthorityResponse {
+  export interface ChioActiveResponsePolicyAuthorityResponseSignedBody {
+    authority: string;
+    deploymentDigest: number[];
+    issuedAtUnixSeconds: number;
+    requestDigest: string;
+    requestId: string;
+    result: {
+      output: {
+        classification?: string;
+        code?: string;
+        deploymentDigest?: number[];
+        protocol?: string;
+        storeDigest?: number[];
+      };
+      result: string;
+    };
+    schema: "chio.active-response-policy-authority-response.v1";
+    storeDigest: number[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/active-response-submission.schema.json
+export namespace Kernel_ActiveResponseSubmission {
+  export interface ChioActiveResponseSubmissionSignedBody {
+    actionId: string;
+    expiresAtUnixMs: number;
+    governedIntentHash: string;
+    issuedAtUnixMs: number;
+    planBodyHash: string;
+    schema: "chio.active-response-submission.v1";
+    submitter: string;
+    tenantId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/authority-lifecycle.schema.json
+export namespace Kernel_AuthorityLifecycle {
+  export interface ChioAuthorityLifecycleSignedBody {
+    anchorDigest: string;
+    change: {
+      operation: string;
+      publicKeyHex?: string;
+      verifyUntil?: number;
+    };
+    generation: number;
+    issuerSetDigest: string;
+    previousCommitment: string;
+    publicKeyHex: string;
+    rotatedAt: number;
+    schema: "chio.authority-lifecycle.v1";
+    streamId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/authority-snapshot.schema.json
+export namespace Kernel_AuthoritySnapshot {
+  export interface ChioAuthoritySnapshotSignedBody {
+    anchorDigest: string;
+    chainCommitment: string;
+    expiresAt: number;
+    issuedAt: number;
+    schema: "chio.authority-snapshot.v1";
+    snapshot: {
+      generation: number;
+      publicKeyHex: string;
+      rotatedAt: number;
+      trustedKeys: {
+        activatedAt: number;
+        generation: number;
+        lifecycle: {
+          at?: number;
+          issueUntil?: number;
+          state: string;
+          verifyUntil?: number;
+        };
+        publicKeyHex: string;
+      }[];
+    };
+    streamId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/behavioral-feed.schema.json
+export namespace Kernel_BehavioralFeed {
+  export interface ChioBehavioralFeedSignedBody {
+    decisions: {
+      allowCount: number;
+      cancelledCount: number;
+      denyCount: number;
+      incompleteCount: number;
+    };
+    filters: {
+      receiptLimit: number;
+    };
+    generatedAt: number;
+    governedActions: {
+      approvalReceipts: number;
+      approvedReceipts: number;
+      commerceReceipts: number;
+      governedReceipts: number;
+      maxAmountReceipts: number;
+    };
+    meteredBilling: {
+      actionableReceipts: number;
+      evidenceAttachedReceipts: number;
+      financialMismatchReceipts: number;
+      meteredReceipts: number;
+      missingEvidenceReceipts: number;
+      overMaxBilledUnitsReceipts: number;
+      overQuotedCostReceipts: number;
+      overQuotedUnitsReceipts: number;
+      reconciledReceipts: number;
+    };
+    privacy: {
+      childReceiptScope: string;
+      directEvidenceExportSupported: boolean;
+      exportQuery: {
+        readBoundary: {
+          kind: string;
+        };
+      };
+      matchingReceipts: number;
+      proofsComplete: boolean;
+      returnedReceipts: number;
+    };
+    receipts: {}[];
+    schema: "chio.behavioral-feed.v1";
+    settlements: {
+      actionableReceipts: number;
+      failedReceipts: number;
+      notApplicableReceipts: number;
+      pendingReceipts: number;
+      reconciledReceipts: number;
+      settledReceipts: number;
+    };
+    sharedEvidence: {
+      distinctRemoteSubjects: number;
+      matchingLocalReceipts: number;
+      matchingReferences: number;
+      matchingShares: number;
+      proofRequiredShares: number;
+      remoteLineageRecords: number;
+      remoteToolReceipts: number;
+      truncated: boolean;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/budget-snapshot-anchor-commitment.schema.json
+export namespace Kernel_BudgetSnapshotAnchorCommitment {
+  export interface ChioBudgetSnapshotAnchorCommitmentSignedBody {
+    anchorSetDigest: string;
+    chainDigest: string;
+    commitSequence: number;
+    committedAt: number;
+    electionTerm: number;
+    leaderUrl: string;
+    previousChainDigest: string;
+    schema: "chio.budget-snapshot-anchor-commitment.v1";
+    signerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller-delivery-report-body.schema.json
+export namespace Kernel_CallerDeliveryReportBody {
+  export interface ChioCallerDeliveryReportV1SignedBody {
+    authorization_digest: string;
+    claim_id: string;
+    completed_at_unix_ms: number;
+    execution_started_at_unix_ms: number;
+    executor: {
+      executor_id: string;
+      key_epoch: number;
+      public_key: string;
+    };
+    output: {
+      closed?: boolean;
+      effect?: string;
+      external?: boolean;
+      historical?: boolean;
+      original_native_effect?: boolean;
+      outcome?: string;
+      private_result?: string;
+      result_sha256?: string;
+      returned?: boolean;
+      safe?: boolean;
+    };
+    realized_cost: null | {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.caller-delivery-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/caller-dispatch-authorization-body.schema.json
+export namespace Kernel_CallerDispatchAuthorizationBody {
+  export interface ChioCallerDispatchAuthorizationV1SignedBody {
+    committed: {
+      budget_hold_id: string;
+      dispatch_commit: {
+        committed_version: number;
+        coordinator_lease_epoch: number;
+        coordinator_lease_id: string;
+        dispatch_launch: {
+          native_launch: null;
+          worker_profile: null;
+        };
+        provider_attempt: {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        store_fence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      execution_nonce_id: string;
+      frozen_context_digest: string;
+    };
+    executor: {
+      executor_id: string;
+      key_epoch: number;
+      public_key: string;
+    };
+    expires_at_unix_ms: number;
+    invocation: {
+      capability_digest: string;
+      capability_id: string;
+      operation_id: string;
+      parameters_digest: string;
+      request_binding_hash: string;
+      request_id: string;
+      server_id: string;
+      tool_name: string;
+    };
+    kernel_public_key: string;
+    not_before_unix_ms: number;
+    schema: "chio.caller-dispatch-authorization.v1";
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -2183,7 +8879,6 @@ export namespace Kernel_CapabilityList {
     expires_at: number;
     delegation_chain?: DelegationLink[];
     aggregate_invocation_budget?: ChioAggregateInvocationBudget;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * At most one caveat, which must be bind_security_context.
      *
@@ -2318,7 +9013,6 @@ export namespace Kernel_CapabilityList {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface CumulativeRootMonetaryAmount {
@@ -2380,7 +9074,6 @@ export namespace Kernel_CapabilityList {
       root_expires_at: number;
       root_scope_hash: string;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface AttenuationProof {
@@ -2408,6 +9101,24 @@ export namespace Kernel_CapabilityRevoked {
   export interface ChioKernelMessageCapabilityRevoked {
     type: "capability_revoked";
     id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/checkpoint-statement.schema.json
+export namespace Kernel_CheckpointStatement {
+  export interface ChioCheckpointStatementSignedBody {
+    batch_end_seq: number;
+    batch_start_seq: number;
+    chain_root?: string;
+    checkpoint_seq?: number;
+    issued_at: number;
+    kernel_key: string;
+    merkle_root: string;
+    previous_checkpoint_sha256?: null | string;
+    schema: "chio.checkpoint_statement.v1";
+    smuggled?: string;
+    tree_size: number;
   }
 }
 
@@ -2627,6 +9338,28 @@ export namespace Kernel_CombinedCaptureMetadata {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/dpop-proof-body.schema.json
+export namespace Kernel_DpopProofBody {
+  export interface ChioDpopProofV1SignedBody {
+    action_hash: string;
+    agent_key: string;
+    capability_id: string;
+    issued_at: number;
+    nonce: string;
+    replay_authority: {
+      destination_store_uuid: string;
+      dpop_authority_id: string;
+      expectation_id: string;
+      max_clock_skew_secs: number;
+      proof_ttl_secs: number;
+    };
+    schema: "chio.dpop_proof.v1";
+    tool_name: string;
+    tool_server: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json
 export namespace Kernel_DpopProof {
   export interface ChioInvocationProofOfPossession {
@@ -2648,6 +9381,37 @@ export namespace Kernel_DpopProof {
       issued_at: number;
       agent_key: string;
     };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/evidence-export-commitment.schema.json
+export namespace Kernel_EvidenceExportCommitment {
+  export interface ChioEvidenceExportCommitmentSignedBody {
+    manifestSha256: string;
+    payloadSha256: string;
+    schema: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/execution-nonce-body.schema.json
+export namespace Kernel_ExecutionNonceBody {
+  export interface ChioExecutionNonceSignedBody {
+    bound_to: {
+      capability_id: string;
+      parameter_hash: string;
+      request_id: string;
+      subject_id: string;
+      tool_name: string;
+      tool_server: string;
+    };
+    expires_at: number;
+    issued_at: number;
+    nonce_id: string;
+    reserved_hold_id?: string;
+    reserving_request_id?: string;
+    schema: "chio.execution_nonce.v1";
   }
 }
 
@@ -2683,6 +9447,386 @@ export namespace Kernel_ExecutionNonce {
 export namespace Kernel_Heartbeat {
   export interface ChioKernelMessageHeartbeat {
     type: "heartbeat";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/operation-execution-nonce-body.schema.json
+export namespace Kernel_OperationExecutionNonceBody {
+  export interface ChioOperationExecutionNonceSignedBody {
+    nonce: {
+      bound_to: {
+        capability_id: string;
+        parameter_hash: string;
+        request_id: string;
+        subject_id: string;
+        tool_name: string;
+        tool_server: string;
+      };
+      expires_at: number;
+      issued_at: number;
+      nonce_id: string;
+      schema: string;
+    };
+    operation_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/request-lineage-record.schema.json
+export namespace Kernel_RequestLineageRecord {
+  export interface ChioRequestLineageRecordSignedBody {
+    capabilityId: string;
+    continuationTokenId: string;
+    evidenceClass: string;
+    intentHash: string;
+    issuerKey: string;
+    lineageMode: string;
+    operationKind: string;
+    parentRequestId: string;
+    requestId: string;
+    schema: "chio.request_lineage_record.v1";
+    sessionAnchor: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    startedAt: number;
+    subjectKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/session-anchor.schema.json
+export namespace Kernel_SessionAnchor {
+  export interface ChioSessionAnchorSignedBody {
+    agentId: string;
+    authContext: {
+      method: {
+        audience?: string;
+        enterpriseIdentity?: {
+          attributeSources?: {
+            clientId: string;
+            groups?: string;
+            principal: string;
+            tenantId?: string;
+          };
+          clientId?: string;
+          federationMethod: string;
+          groups?: string[];
+          principal: string;
+          providerId: string;
+          providerKind: string;
+          sourceSubject?: string;
+          subjectKey: string;
+          tenantId?: string;
+        };
+        federatedClaims?: {
+          clientId?: string;
+          groups?: string[];
+          tenantId?: string;
+        };
+        issuer?: string;
+        kind: string;
+        principal?: string;
+        scopes?: string[];
+        subject?: string;
+        token_fingerprint?: string;
+      };
+      origin?: string;
+      transport: string;
+    };
+    authContextHash: string;
+    authEpoch: number;
+    authMethodHash: string;
+    id: string;
+    issuedAt: number;
+    kernelKey: string;
+    proofBinding?: {
+      dpopPublicKeyThumbprint?: string;
+      tokenFingerprint: string;
+    };
+    schema: "chio.session_anchor.v1";
+    sessionId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/session-compliance-certificate.schema.json
+export namespace Kernel_SessionComplianceCertificate {
+  export interface ChioSessionComplianceCertificateSignedBody {
+    all_signatures_valid: boolean;
+    crypto_floor: string;
+    issued_at: number;
+    policy_hash: string;
+    receipt_count: number;
+    session_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/signed-admission-terminal-projection.schema.json
+export namespace Kernel_SignedAdmissionTerminalProjection {
+  export interface ChioSignedAdmissionTerminalProjectionSignedBody {
+    authorization_consumption: null | {
+      authorizationReceiptId: string;
+      consumedAtUnixMs: number;
+      consumerReceiptId: string;
+      parameterHash: string;
+      requestId: string;
+      sessionId: string;
+      tenantId?: string;
+      toolCallId: string;
+    };
+    context: {
+      coordinator_lease_epoch: number;
+      coordinator_lease_id: string;
+      expected_operation_version: number;
+      operation_id: string;
+      request_id: string;
+      store_fence: {
+        lease_id: string;
+        owner_epoch: number;
+        store_uuid: string;
+      };
+      trusted_time_unix_ms: number;
+    };
+    manifest_json: string;
+    observer: null | {
+      pending: {
+        next_visible_at_ms: number;
+      };
+      receipt_id: string;
+    };
+    projection_json: string;
+    records: {
+      canonical_json: string;
+      kind: string;
+      record_digest: string;
+      record_id: string;
+    }[];
+    schema: "chio.signed-admission-terminal-projection.v1";
+    signer_key: string;
+    source_operation: {
+      attachments: {
+        ApprovalSetHash?: string;
+        BrokerAttempt?: {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        BudgetHoldId?: string;
+        ChannelReservationDigest?: string;
+        ChannelReservationProposalDigest?: string;
+        ExecutionNonceId?: string;
+        ExecutionNonceIssuanceDigest?: string;
+        ExecutionNoncePreflightDigest?: string;
+        PaymentParticipantId?: string;
+        SupplementalAuthorizationDigest?: string;
+        ThresholdProposalHash?: string;
+        ToolOutcomeId?: string;
+      }[];
+      binding: {
+        authenticated_tenant_id: string;
+        authorization_capability_hash: string;
+        capability_id: string;
+        coordinator_authority_id: string;
+        effect_class: string;
+        kind: string;
+        operation_id: string;
+        policy_hash: string;
+        request_binding: {
+          action_parameter_hash: string;
+          immutable_request_hash: string;
+          participant_requirements: {
+            approval: boolean;
+            authorization_consumption: boolean;
+            broker_attempt: boolean;
+            budget_capture: boolean;
+            channel?: boolean;
+            execution_nonce: boolean;
+            obligation: boolean;
+            observation_attempt_zero: boolean;
+            outcome_eligibility: boolean;
+            payment: boolean;
+            supplemental_authorization?: boolean;
+          };
+          request_binding_hash: string;
+        };
+        request_id: string;
+        request_namespace_digest: string;
+      };
+      coordinator_lease_epoch: number;
+      dispatch_commit: null | {
+        committed_version: number;
+        coordinator_lease_epoch: number;
+        coordinator_lease_id: string;
+        dispatch_launch: {
+          native_launch: null;
+          worker_profile: null;
+        };
+        provider_attempt: null | {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        store_fence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      dispatch_state: string;
+      last_error: null;
+      schema: string;
+      state: string;
+      terminal_replay: null;
+      version: number;
+    };
+    terminal_operation: {
+      attachments: {
+        ApprovalSetHash?: string;
+        BrokerAttempt?: {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        BudgetHoldId?: string;
+        ChannelReservationDigest?: string;
+        ChannelReservationProposalDigest?: string;
+        ExecutionNonceId?: string;
+        ExecutionNonceIssuanceDigest?: string;
+        ExecutionNoncePreflightDigest?: string;
+        PaymentParticipantId?: string;
+        SupplementalAuthorizationDigest?: string;
+        ThresholdProposalHash?: string;
+        ToolOutcomeId?: string;
+      }[];
+      binding: {
+        authenticated_tenant_id: string;
+        authorization_capability_hash: string;
+        capability_id: string;
+        coordinator_authority_id: string;
+        effect_class: string;
+        kind: string;
+        operation_id: string;
+        policy_hash: string;
+        request_binding: {
+          action_parameter_hash: string;
+          immutable_request_hash: string;
+          participant_requirements: {
+            approval: boolean;
+            authorization_consumption: boolean;
+            broker_attempt: boolean;
+            budget_capture: boolean;
+            channel?: boolean;
+            execution_nonce: boolean;
+            obligation: boolean;
+            observation_attempt_zero: boolean;
+            outcome_eligibility: boolean;
+            payment: boolean;
+            supplemental_authorization?: boolean;
+          };
+          request_binding_hash: string;
+        };
+        request_id: string;
+        request_namespace_digest: string;
+      };
+      coordinator_lease_epoch: number;
+      dispatch_commit: null | {
+        committed_version: number;
+        coordinator_lease_epoch: number;
+        coordinator_lease_id: string;
+        dispatch_launch: {
+          native_launch: null;
+          worker_profile: null;
+        };
+        provider_attempt: null | {
+          attempt_id: string;
+          operation_id: string;
+          transport_id: string;
+          transport_key_epoch: number;
+        };
+        store_fence: {
+          lease_id: string;
+          owner_epoch: number;
+          store_uuid: string;
+        };
+      };
+      dispatch_state: string;
+      last_error: null;
+      schema: string;
+      state: string;
+      terminal_replay: {
+        economic_mutation?: {
+          projection_digest: string;
+          result_digest: string;
+          result_id: string;
+        };
+        incident?: {
+          incident_id: string;
+          projection_digest: string;
+        };
+        receipt?: {
+          projection_digest: string;
+          receipt_id: string;
+        };
+      };
+      version: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/signer-readiness-probe.schema.json
+export namespace Kernel_SignerReadinessProbe {
+  export interface ChioSignerReadinessProbeSignedBody {
+    probe: string;
+    schema: "chio.signer-readiness-probe.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/stop-operator-config-approval.schema.json
+export namespace Kernel_StopOperatorConfigApproval {
+  export interface ChioStopOperatorConfigApprovalSignedBody {
+    config_digest: string;
+    principal: string;
+    schema: "chio.stop-operator-config-approval.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/kernel/stop-operator-config.schema.json
+export namespace Kernel_StopOperatorConfig {
+  export interface ChioStopOperatorConfigSignedBody {
+    authority_id: string;
+    config_authority_key: string;
+    deployment_generation: number;
+    predecessor_digest?: string;
+    resume_policy: string;
+    rosters: {
+      principals: {
+        permissions: {
+          relax: boolean;
+          restrict: boolean;
+          resume: boolean;
+          stop: boolean;
+        };
+        principal: string;
+        subject_key: string;
+      }[];
+      quorum_k: number;
+      scope: {
+        kind: string;
+      };
+    }[];
+    same_principal_cooldown_ms?: number;
+    schema: "chio.stop-operator-config.v1";
+    stop_quorum_max: number;
+    time_attestation_key: string;
   }
 }
 
@@ -2845,10 +9989,6 @@ export namespace Kernel_ToolCallResponse {
     kernel_key: string;
     bbs_signature?: BbsReceiptSignature;
     /**
-     * Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
-     */
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
-    /**
      * Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Supports Ed25519, byte-aligned DER P-256/P-384, and algorithm-coupled classical plus ML-DSA-65 hybrid envelopes; cryptographic DER validity is checked by the verifier.
      */
     signature: string;
@@ -2903,7 +10043,6 @@ export namespace Kernel_ToolCallResponse {
     proposal_created_at: number;
     proposal_deadline: number;
     policy_authority: string;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   /**
@@ -2976,6 +10115,8983 @@ export namespace Kernel_ToolCallResponse {
       reserving_request_id?: string;
     };
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/lineage/frontier-signature.schema.json
+export namespace Lineage_FrontierSignature {
+  export interface ChioLineageFrontierSignatureSignedBody {
+    frontier: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/lineage/lineage-signed-subgraph-body.schema.json
+export namespace Lineage_LineageSignedSubgraphBody {
+  export interface ChioLineageSignedSubgraphV1SignedBody {
+    audience: string;
+    challenge_nonce: string;
+    checkpoint_inclusion_sha256: string;
+    checkpoint_ref: string;
+    edges: {
+      disclosure_state: string;
+      edge_id: string;
+      evidence_class: string;
+      from: string;
+      kind: string;
+      relation: string;
+      source_artifact_sha256: string;
+      statement_sha256: string;
+      to: string;
+    }[];
+    frontier_sha256: string;
+    generated_at: string;
+    id: string;
+    leakage_ledger_sha256: string;
+    lineage_anchor_ref: string;
+    max_depth: number;
+    nodes: {
+      artifact_schema: string;
+      artifact_sha256: string;
+      depth: number;
+      disclosure_state: string;
+      evidence_class: string;
+      id: string;
+      kind: string;
+      parent_ids: string[];
+      receipt_ref: string;
+      source_id_hash: string;
+      source_table: string;
+      tenant_hash: string;
+    }[];
+    policy_profile_id: string;
+    projection_manifest_sha256: string;
+    redaction_map_sha256: string;
+    redactions: {
+      node_id: string;
+      reason: string;
+    }[];
+    required_evidence_class: string;
+    root_receipt_ids: string[];
+    transaction_passport_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/auto-bind.schema.json
+export namespace Market_AutoBind {
+  export interface ChioMarketAutoBindSignedBody {
+    authority: {
+      body: {
+        authorityId: string;
+        autoBindEnabled: boolean;
+        capitalBook: {
+          body: {
+            events: {}[];
+            generatedAt: number;
+            query: {
+              agentSubject: string;
+              bondLimit: number;
+              facilityLimit: number;
+              lossEventLimit: number;
+              receiptLimit: number;
+            };
+            schema: string;
+            sources: {
+              capitalSource: string;
+              committedAmount: {
+                currency: string;
+                units: number;
+              };
+              counterpartyId: string;
+              counterpartyRole: string;
+              currency: string;
+              description: string;
+              disbursedAmount: {
+                currency: string;
+                units: number;
+              };
+              facilityId: string;
+              impairedAmount: {
+                currency: string;
+                units: number;
+              };
+              jurisdiction: string;
+              kind: string;
+              ownerRole: string;
+              sourceId: string;
+            }[];
+            subjectKey: string;
+            summary: {
+              currencies: string[];
+              fundingSources: number;
+              ledgerEvents: number;
+              matchingBonds: number;
+              matchingFacilities: number;
+              matchingLossEvents: number;
+              matchingReceipts: number;
+              mixedCurrencyBook: boolean;
+              returnedBonds: number;
+              returnedFacilities: number;
+              returnedLossEvents: number;
+              returnedReceipts: number;
+              truncatedBonds: boolean;
+              truncatedFacilities: boolean;
+              truncatedLossEvents: boolean;
+              truncatedReceipts: boolean;
+            };
+            supportBoundary: {
+              automaticCapitalExecutionSupported: boolean;
+              custodyExecutionSupported: boolean;
+              mixedCurrencyNettingSupported: boolean;
+              sourceOfFundsAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        envelope: {
+          authorityChainRef: string;
+          delegateId: string;
+          kind: string;
+        };
+        expiresAt: number;
+        facility: {
+          body: {
+            expiresAt: number;
+            facilityId: string;
+            issuedAt: number;
+            lifecycleState: string;
+            report: {
+              disposition: string;
+              filters: {
+                agentSubject: string;
+                decisionLimit: number;
+                receiptLimit: number;
+              };
+              generatedAt: number;
+              prerequisites: {
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                manualReviewRequired: boolean;
+                minimumRuntimeAssuranceTier: string;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                bondExecutionSupported: boolean;
+                crossCurrencyAllocationSupported: boolean;
+                providerNeutralPolicy: boolean;
+              };
+              terms: {
+                capitalSource: string;
+                concentrationCapBps: number;
+                creditLimit: {
+                  currency: string;
+                  units: number;
+                };
+                reserveRatioBps: number;
+                ttlSeconds: number;
+                utilizationCeilingBps: number;
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        issuedAt: number;
+        maxCoverageAmount: {
+          currency: string;
+          units: number;
+        };
+        maxPremiumAmount: {
+          currency: string;
+          units: number;
+        };
+        notes: string;
+        providerPolicy: {
+          boundCoverageSupported: boolean;
+          claimsSupported: boolean;
+          coverageClass: string;
+          currency: string;
+          displayName: string;
+          jurisdiction: string;
+          maxCoverageAmount: {
+            currency: string;
+            units: number;
+          };
+          providerId: string;
+          providerRecordId: string;
+          quoteTtlSeconds: number;
+          requiredEvidence: string[];
+        };
+        quoteRequest: {
+          body: {
+            issuedAt: number;
+            notes: string;
+            providerPolicy: {
+              boundCoverageSupported: boolean;
+              claimsSupported: boolean;
+              coverageClass: string;
+              currency: string;
+              displayName: string;
+              jurisdiction: string;
+              maxCoverageAmount: {
+                currency: string;
+                units: number;
+              };
+              providerId: string;
+              providerRecordId: string;
+              quoteTtlSeconds: number;
+              requiredEvidence: string[];
+            };
+            quoteRequestId: string;
+            requestedCoverageAmount: {
+              currency: string;
+              units: number;
+            };
+            requestedEffectiveFrom: number;
+            requestedEffectiveUntil: number;
+            riskPackage: {
+              body: {
+                certification: {
+                  required: boolean;
+                };
+                exposure: {
+                  body: {
+                    decisions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    receipts: {}[];
+                    schema: string;
+                    summary: {
+                      actionableReceipts: number;
+                      activeDecisions: number;
+                      currencies: string[];
+                      failedSettlementReceipts: number;
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      pendingSettlementReceipts: number;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                      supersededDecisions: number;
+                      truncatedDecisions: boolean;
+                      truncatedReceipts: boolean;
+                    };
+                    supportBoundary: {
+                      claimAdjudicationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      governedReceiptsAuthoritative: boolean;
+                      recoveryLifecycleSupported: boolean;
+                      settlementReconciliationAuthoritative: boolean;
+                      underwritingDecisionsAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                facilityReport: {
+                  disposition: string;
+                  filters: {
+                    agentSubject: string;
+                    decisionLimit: number;
+                    receiptLimit: number;
+                  };
+                  generatedAt: number;
+                  prerequisites: {
+                    certificationMet: boolean;
+                    certificationRequired: boolean;
+                    manualReviewRequired: boolean;
+                    minimumRuntimeAssuranceTier: string;
+                    runtimeAssuranceMet: boolean;
+                  };
+                  schema: string;
+                  scorecard: {
+                    anomalyCount: number;
+                    band: string;
+                    confidence: string;
+                    currencies: string[];
+                    matchingDecisions: number;
+                    matchingReceipts: number;
+                    mixedCurrencyBook: boolean;
+                    overallScore: number;
+                    probationary: boolean;
+                    returnedDecisions: number;
+                    returnedReceipts: number;
+                  };
+                  supportBoundary: {
+                    bondExecutionSupported: boolean;
+                    crossCurrencyAllocationSupported: boolean;
+                    providerNeutralPolicy: boolean;
+                  };
+                  terms: {
+                    capitalSource: string;
+                    concentrationCapBps: number;
+                    creditLimit: {
+                      currency: string;
+                      units: number;
+                    };
+                    reserveRatioBps: number;
+                    ttlSeconds: number;
+                    utilizationCeilingBps: number;
+                  };
+                };
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                  recentLossLimit: number;
+                };
+                generatedAt: number;
+                latestFacility: {
+                  creditLimit: {
+                    currency: string;
+                    units: number;
+                  };
+                  disposition: string;
+                  expiresAt: number;
+                  facilityId: string;
+                  issuedAt: number;
+                  lifecycleState: string;
+                  signerKey: string;
+                };
+                recentLossHistory: {
+                  entries: {}[];
+                  summary: {
+                    failedSettlementEvents: number;
+                    matchingLossEvents: number;
+                    provisionalLossEvents: number;
+                    recoveredEvents: number;
+                    returnedLossEvents: number;
+                  };
+                };
+                runtimeAssurance: {
+                  governedReceipts: number;
+                  highestTier: string;
+                  latestEvidenceSha256: string;
+                  latestSchema: string;
+                  latestVerifier: string;
+                  latestVerifierFamily: string;
+                  observedVerifierFamilies: string[];
+                  runtimeAssuranceReceipts: number;
+                  stale: boolean;
+                };
+                schema: string;
+                scorecard: {
+                  body: {
+                    dimensions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    probation: {
+                      probationary: boolean;
+                      receiptCount: number;
+                      spanDays: number;
+                      targetReceiptCount: number;
+                      targetSpanDays: number;
+                    };
+                    reputation: {
+                      acceptedImportedSignalCount: number;
+                      effectiveScore: number;
+                      importedSignalCount: number;
+                      probationary: boolean;
+                    };
+                    schema: string;
+                    summary: {
+                      anomalyCount: number;
+                      band: string;
+                      confidence: string;
+                      currencies: string[];
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      overallScore: number;
+                      probationary: boolean;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                    };
+                    supportBoundary: {
+                      capitalAllocationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      facilityPolicySupported: boolean;
+                      subjectScopedOnly: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                subjectKey: string;
+                supportBoundary: {
+                  autonomousPricingSupported: boolean;
+                  complianceScoreReferenceSupported: boolean;
+                  externalCapitalReviewSupported: boolean;
+                  facilityPolicyAuthoritative: boolean;
+                  liabilityMarketSupported: boolean;
+                  signedExposureAuthoritative: boolean;
+                  signedScorecardAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        schema: string;
+        underwritingDecision: {
+          body: {
+            budget: {
+              action: string;
+              ceilingFactor: number;
+              rationale: string;
+            };
+            decisionId: string;
+            evaluation: {
+              generatedAt: number;
+              input: {
+                certification: {
+                  artifactId: string;
+                  checkedAt: number;
+                  publishedAt: number;
+                  state: string;
+                  toolServerId: string;
+                  verdict: string;
+                };
+                filters: {
+                  agentSubject: string;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                receipts: {
+                  actionableMeteredReceipts: number;
+                  actionableSettlementReceipts: number;
+                  allowCount: number;
+                  approvalReceipts: number;
+                  approvedReceipts: number;
+                  callChainReceipts: number;
+                  cancelledCount: number;
+                  denyCount: number;
+                  failedSettlementReceipts: number;
+                  governedReceipts: number;
+                  incompleteCount: number;
+                  matchingReceipts: number;
+                  meteredReceipts: number;
+                  pendingSettlementReceipts: number;
+                  returnedReceipts: number;
+                  runtimeAssuranceReceipts: number;
+                  sharedEvidenceProofRequiredCount: number;
+                  sharedEvidenceReferenceCount: number;
+                };
+                reputation: {
+                  acceptedImportedSignalCount: number;
+                  effectiveScore: number;
+                  importedSignalCount: number;
+                  probationary: boolean;
+                  resolvedTier: string;
+                  subjectKey: string;
+                };
+                runtimeAssurance: {
+                  governedReceipts: number;
+                  highestTier: string;
+                  latestEvidenceSha256: string;
+                  latestSchema: string;
+                  latestVerifier: string;
+                  latestVerifierFamily: string;
+                  observedVerifierFamilies: string[];
+                  runtimeAssuranceReceipts: number;
+                };
+                schema: string;
+                taxonomy: {
+                  supportedClasses: string[];
+                  supportedReasons: string[];
+                  version: string;
+                };
+              };
+              outcome: string;
+              policy: {
+                denyReputationScoreBelow: number;
+                maximumReceiptAgeSeconds: number;
+                minimumApproveReputationScore: number;
+                minimumApproveRuntimeAssuranceTier: string;
+                minimumReceiptHistory: number;
+                minimumStepUpRuntimeAssuranceTier: string;
+                reduceCeilingFactor: number;
+                requireActiveToolCertification: boolean;
+                requireComplianceScoreReference: boolean;
+                schema: string;
+                version: string;
+              };
+              riskClass: string;
+              schema: string;
+              suggestedCeilingFactor: number;
+            };
+            issuedAt: number;
+            lifecycleState: string;
+            premium: {
+              basisPoints: number;
+              quotedAmount: {
+                currency: string;
+                units: number;
+              };
+              rationale: string;
+              state: string;
+            };
+            reviewState: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    decisionId: string;
+    disposition: string;
+    findings: {
+      code: string;
+      description: string;
+    }[];
+    issuedAt: number;
+    quoteResponse: {
+      body: {
+        disposition: string;
+        issuedAt: number;
+        providerQuoteRef: string;
+        quoteRequest: {
+          body: {
+            issuedAt: number;
+            notes: string;
+            providerPolicy: {
+              boundCoverageSupported: boolean;
+              claimsSupported: boolean;
+              coverageClass: string;
+              currency: string;
+              displayName: string;
+              jurisdiction: string;
+              maxCoverageAmount: {
+                currency: string;
+                units: number;
+              };
+              providerId: string;
+              providerRecordId: string;
+              quoteTtlSeconds: number;
+              requiredEvidence: string[];
+            };
+            quoteRequestId: string;
+            requestedCoverageAmount: {
+              currency: string;
+              units: number;
+            };
+            requestedEffectiveFrom: number;
+            requestedEffectiveUntil: number;
+            riskPackage: {
+              body: {
+                certification: {
+                  required: boolean;
+                };
+                exposure: {
+                  body: {
+                    decisions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    receipts: {}[];
+                    schema: string;
+                    summary: {
+                      actionableReceipts: number;
+                      activeDecisions: number;
+                      currencies: string[];
+                      failedSettlementReceipts: number;
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      pendingSettlementReceipts: number;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                      supersededDecisions: number;
+                      truncatedDecisions: boolean;
+                      truncatedReceipts: boolean;
+                    };
+                    supportBoundary: {
+                      claimAdjudicationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      governedReceiptsAuthoritative: boolean;
+                      recoveryLifecycleSupported: boolean;
+                      settlementReconciliationAuthoritative: boolean;
+                      underwritingDecisionsAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                facilityReport: {
+                  disposition: string;
+                  filters: {
+                    agentSubject: string;
+                    decisionLimit: number;
+                    receiptLimit: number;
+                  };
+                  generatedAt: number;
+                  prerequisites: {
+                    certificationMet: boolean;
+                    certificationRequired: boolean;
+                    manualReviewRequired: boolean;
+                    minimumRuntimeAssuranceTier: string;
+                    runtimeAssuranceMet: boolean;
+                  };
+                  schema: string;
+                  scorecard: {
+                    anomalyCount: number;
+                    band: string;
+                    confidence: string;
+                    currencies: string[];
+                    matchingDecisions: number;
+                    matchingReceipts: number;
+                    mixedCurrencyBook: boolean;
+                    overallScore: number;
+                    probationary: boolean;
+                    returnedDecisions: number;
+                    returnedReceipts: number;
+                  };
+                  supportBoundary: {
+                    bondExecutionSupported: boolean;
+                    crossCurrencyAllocationSupported: boolean;
+                    providerNeutralPolicy: boolean;
+                  };
+                  terms: {
+                    capitalSource: string;
+                    concentrationCapBps: number;
+                    creditLimit: {
+                      currency: string;
+                      units: number;
+                    };
+                    reserveRatioBps: number;
+                    ttlSeconds: number;
+                    utilizationCeilingBps: number;
+                  };
+                };
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                  recentLossLimit: number;
+                };
+                generatedAt: number;
+                latestFacility: {
+                  creditLimit: {
+                    currency: string;
+                    units: number;
+                  };
+                  disposition: string;
+                  expiresAt: number;
+                  facilityId: string;
+                  issuedAt: number;
+                  lifecycleState: string;
+                  signerKey: string;
+                };
+                recentLossHistory: {
+                  entries: {}[];
+                  summary: {
+                    failedSettlementEvents: number;
+                    matchingLossEvents: number;
+                    provisionalLossEvents: number;
+                    recoveredEvents: number;
+                    returnedLossEvents: number;
+                  };
+                };
+                runtimeAssurance: {
+                  governedReceipts: number;
+                  highestTier: string;
+                  latestEvidenceSha256: string;
+                  latestSchema: string;
+                  latestVerifier: string;
+                  latestVerifierFamily: string;
+                  observedVerifierFamilies: string[];
+                  runtimeAssuranceReceipts: number;
+                  stale: boolean;
+                };
+                schema: string;
+                scorecard: {
+                  body: {
+                    dimensions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    probation: {
+                      probationary: boolean;
+                      receiptCount: number;
+                      spanDays: number;
+                      targetReceiptCount: number;
+                      targetSpanDays: number;
+                    };
+                    reputation: {
+                      acceptedImportedSignalCount: number;
+                      effectiveScore: number;
+                      importedSignalCount: number;
+                      probationary: boolean;
+                    };
+                    schema: string;
+                    summary: {
+                      anomalyCount: number;
+                      band: string;
+                      confidence: string;
+                      currencies: string[];
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      overallScore: number;
+                      probationary: boolean;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                    };
+                    supportBoundary: {
+                      capitalAllocationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      facilityPolicySupported: boolean;
+                      subjectScopedOnly: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                subjectKey: string;
+                supportBoundary: {
+                  autonomousPricingSupported: boolean;
+                  complianceScoreReferenceSupported: boolean;
+                  externalCapitalReviewSupported: boolean;
+                  facilityPolicyAuthoritative: boolean;
+                  liabilityMarketSupported: boolean;
+                  signedExposureAuthoritative: boolean;
+                  signedScorecardAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        quoteResponseId: string;
+        quotedTerms: {
+          expiresAt: number;
+          quotedCoverageAmount: {
+            currency: string;
+            units: number;
+          };
+          quotedDeductibleAmount: {
+            currency: string;
+            units: number;
+          };
+          quotedPremiumAmount: {
+            currency: string;
+            units: number;
+          };
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    schema: "chio.market.auto-bind.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/bound-coverage.schema.json
+export namespace Market_BoundCoverage {
+  export interface ChioMarketBoundCoverageSignedBody {
+    boundAt: number;
+    boundCoverageId: string;
+    carrierReference?: string;
+    coverageAmount: {
+      currency: string;
+      units: number;
+    };
+    effectiveFrom: number;
+    effectiveUntil: number;
+    issuedAt: number;
+    placement: {
+      body: {
+        effectiveFrom: number;
+        effectiveUntil: number;
+        issuedAt: number;
+        notes?: string;
+        placementId: string;
+        placementRef?: string;
+        quoteResponse: {
+          body: {
+            disposition: string;
+            issuedAt: number;
+            providerQuoteRef: string;
+            quoteRequest: {
+              body: {
+                issuedAt: number;
+                notes?: string;
+                providerPolicy: {
+                  boundCoverageSupported: boolean;
+                  claimsSupported: boolean;
+                  coverageClass: string;
+                  currency: string;
+                  displayName: string;
+                  jurisdiction: string;
+                  maxCoverageAmount: {
+                    currency: string;
+                    units: number;
+                  };
+                  providerId: string;
+                  providerRecordId: string;
+                  quoteTtlSeconds: number;
+                  requiredEvidence: string[];
+                };
+                quoteRequestId: string;
+                requestedCoverageAmount: {
+                  currency: string;
+                  units: number;
+                };
+                requestedEffectiveFrom: number;
+                requestedEffectiveUntil: number;
+                riskPackage: {
+                  body: {
+                    certification: {
+                      required: boolean;
+                    };
+                    exposure: {
+                      body: {
+                        decisions: {}[];
+                        filters: {
+                          agentSubject: string;
+                          decisionLimit: number;
+                          receiptLimit: number;
+                        };
+                        generatedAt: number;
+                        positions: {
+                          activeQuotedPremiumUnits: number;
+                          currency: string;
+                          failedUnits: number;
+                          governedMaxExposureUnits: number;
+                          pendingUnits: number;
+                          provisionalLossUnits: number;
+                          quotedPremiumUnits: number;
+                          recoveredUnits: number;
+                          reservedUnits: number;
+                          settledUnits: number;
+                        }[];
+                        receipts: {}[];
+                        schema: string;
+                        summary: {
+                          actionableReceipts: number;
+                          activeDecisions: number;
+                          currencies: string[];
+                          failedSettlementReceipts: number;
+                          matchingDecisions: number;
+                          matchingReceipts: number;
+                          mixedCurrencyBook: boolean;
+                          pendingSettlementReceipts: number;
+                          returnedDecisions: number;
+                          returnedReceipts: number;
+                          supersededDecisions: number;
+                          truncatedDecisions: boolean;
+                          truncatedReceipts: boolean;
+                        };
+                        supportBoundary: {
+                          claimAdjudicationSupported: boolean;
+                          crossCurrencyNettingSupported: boolean;
+                          governedReceiptsAuthoritative: boolean;
+                          recoveryLifecycleSupported: boolean;
+                          settlementReconciliationAuthoritative: boolean;
+                          underwritingDecisionsAuthoritative: boolean;
+                        };
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    facilityReport: {
+                      disposition: string;
+                      filters: {
+                        agentSubject: string;
+                        decisionLimit: number;
+                        receiptLimit: number;
+                      };
+                      generatedAt: number;
+                      prerequisites: {
+                        certificationMet: boolean;
+                        certificationRequired: boolean;
+                        manualReviewRequired: boolean;
+                        minimumRuntimeAssuranceTier: string;
+                        runtimeAssuranceMet: boolean;
+                      };
+                      schema: string;
+                      scorecard: {
+                        anomalyCount: number;
+                        band: string;
+                        confidence: string;
+                        currencies: string[];
+                        matchingDecisions: number;
+                        matchingReceipts: number;
+                        mixedCurrencyBook: boolean;
+                        overallScore: number;
+                        probationary: boolean;
+                        returnedDecisions: number;
+                        returnedReceipts: number;
+                      };
+                      supportBoundary: {
+                        bondExecutionSupported: boolean;
+                        crossCurrencyAllocationSupported: boolean;
+                        providerNeutralPolicy: boolean;
+                      };
+                      terms?: {
+                        capitalSource: string;
+                        concentrationCapBps: number;
+                        creditLimit: {
+                          currency: string;
+                          units: number;
+                        };
+                        reserveRatioBps: number;
+                        ttlSeconds: number;
+                        utilizationCeilingBps: number;
+                      };
+                    };
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                      recentLossLimit: number;
+                    };
+                    generatedAt: number;
+                    latestFacility?: {
+                      creditLimit: {
+                        currency: string;
+                        units: number;
+                      };
+                      disposition: string;
+                      expiresAt: number;
+                      facilityId: string;
+                      issuedAt: number;
+                      lifecycleState: string;
+                      signerKey: string;
+                    };
+                    recentLossHistory: {
+                      entries: {}[];
+                      summary: {
+                        failedSettlementEvents: number;
+                        matchingLossEvents: number;
+                        provisionalLossEvents: number;
+                        recoveredEvents: number;
+                        returnedLossEvents: number;
+                      };
+                    };
+                    runtimeAssurance?: {
+                      governedReceipts: number;
+                      highestTier: string;
+                      latestEvidenceSha256: string;
+                      latestSchema: string;
+                      latestVerifier: string;
+                      latestVerifierFamily: string;
+                      observedVerifierFamilies: string[];
+                      runtimeAssuranceReceipts: number;
+                      stale: boolean;
+                    };
+                    schema: string;
+                    scorecard: {
+                      body: {
+                        dimensions: {}[];
+                        filters: {
+                          agentSubject: string;
+                          decisionLimit: number;
+                          receiptLimit: number;
+                        };
+                        generatedAt: number;
+                        positions: {
+                          activeQuotedPremiumUnits: number;
+                          currency: string;
+                          failedUnits: number;
+                          governedMaxExposureUnits: number;
+                          pendingUnits: number;
+                          provisionalLossUnits: number;
+                          quotedPremiumUnits: number;
+                          recoveredUnits: number;
+                          reservedUnits: number;
+                          settledUnits: number;
+                        }[];
+                        probation: {
+                          probationary: boolean;
+                          receiptCount: number;
+                          spanDays: number;
+                          targetReceiptCount: number;
+                          targetSpanDays: number;
+                        };
+                        reputation: {
+                          acceptedImportedSignalCount: number;
+                          effectiveScore: number;
+                          importedSignalCount: number;
+                          probationary: boolean;
+                        };
+                        schema: string;
+                        summary: {
+                          anomalyCount: number;
+                          band: string;
+                          confidence: string;
+                          currencies: string[];
+                          matchingDecisions: number;
+                          matchingReceipts: number;
+                          mixedCurrencyBook: boolean;
+                          overallScore: number;
+                          probationary: boolean;
+                          returnedDecisions: number;
+                          returnedReceipts: number;
+                        };
+                        supportBoundary: {
+                          capitalAllocationSupported: boolean;
+                          crossCurrencyNettingSupported: boolean;
+                          facilityPolicySupported: boolean;
+                          subjectScopedOnly: boolean;
+                        };
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    subjectKey: string;
+                    supportBoundary: {
+                      autonomousPricingSupported: boolean;
+                      complianceScoreReferenceSupported: boolean;
+                      externalCapitalReviewSupported: boolean;
+                      facilityPolicyAuthoritative: boolean;
+                      liabilityMarketSupported: boolean;
+                      signedExposureAuthoritative: boolean;
+                      signedScorecardAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            quoteResponseId: string;
+            quotedTerms: {
+              expiresAt: number;
+              quotedCoverageAmount: {
+                currency: string;
+                units: number;
+              };
+              quotedDeductibleAmount?: {
+                currency: string;
+                units: number;
+              };
+              quotedPremiumAmount: {
+                currency: string;
+                units: number;
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        schema: string;
+        selectedCoverageAmount: {
+          currency: string;
+          units: number;
+        };
+        selectedPremiumAmount: {
+          currency: string;
+          units: number;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    policyNumber: string;
+    premiumAmount: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.market.bound-coverage.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-adjudication.schema.json
+export namespace Market_ClaimAdjudication {
+  export interface ChioMarketClaimAdjudicationSignedBody {
+    adjudicationId: string;
+    adjudicator: string;
+    awardedAmount: {
+      currency: string;
+      units: number;
+    };
+    decisionRuleRef?: string;
+    dispute: {
+      body: {
+        disputeId: string;
+        issuedAt: number;
+        note?: string;
+        openedBy: string;
+        providerResponse: {
+          body: {
+            claim: {
+              body: {
+                bond: {
+                  body: {
+                    bondId: string;
+                    expiresAt: number;
+                    issuedAt: number;
+                    lifecycleState: string;
+                    report: {
+                      disposition: string;
+                      exposure: {
+                        actionableReceipts: number;
+                        activeDecisions: number;
+                        currencies: string[];
+                        failedSettlementReceipts: number;
+                        matchingDecisions: number;
+                        matchingReceipts: number;
+                        mixedCurrencyBook: boolean;
+                        pendingSettlementReceipts: number;
+                        returnedDecisions: number;
+                        returnedReceipts: number;
+                        supersededDecisions: number;
+                        truncatedDecisions: boolean;
+                        truncatedReceipts: boolean;
+                      };
+                      filters: {
+                        agentSubject: string;
+                        capabilityId?: string;
+                        decisionLimit: number;
+                        receiptLimit: number;
+                        toolName?: string;
+                        toolServer?: string;
+                      };
+                      generatedAt: number;
+                      latestFacilityId?: string;
+                      prerequisites: {
+                        activeFacilityMet: boolean;
+                        activeFacilityRequired: boolean;
+                        certificationMet: boolean;
+                        certificationRequired: boolean;
+                        currencyCoherent: boolean;
+                        runtimeAssuranceMet: boolean;
+                      };
+                      schema: string;
+                      scorecard: {
+                        anomalyCount: number;
+                        band: string;
+                        confidence: string;
+                        currencies: string[];
+                        matchingDecisions: number;
+                        matchingReceipts: number;
+                        mixedCurrencyBook: boolean;
+                        overallScore: number;
+                        probationary: boolean;
+                        returnedDecisions: number;
+                        returnedReceipts: number;
+                      };
+                      supportBoundary: {
+                        autonomyGatingSupported: boolean;
+                        externalEscrowExecutionSupported: boolean;
+                        reserveAccountingAuthoritative: boolean;
+                      };
+                      terms?: {
+                        capitalSource: string;
+                        collateralAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        coverageRatioBps: number;
+                        creditLimit: {
+                          currency: string;
+                          units: number;
+                        };
+                        facilityId: string;
+                        outstandingExposureAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        reserveRatioBps: number;
+                        reserveRequirementAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                      };
+                    };
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                boundCoverage: {
+                  body: {
+                    boundAt: number;
+                    boundCoverageId: string;
+                    carrierReference?: string;
+                    coverageAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    effectiveFrom: number;
+                    effectiveUntil: number;
+                    issuedAt: number;
+                    placement: {
+                      body: {
+                        effectiveFrom: number;
+                        effectiveUntil: number;
+                        issuedAt: number;
+                        notes?: string;
+                        placementId: string;
+                        placementRef?: string;
+                        quoteResponse: {
+                          body: {
+                            disposition: string;
+                            issuedAt: number;
+                            providerQuoteRef: string;
+                            quoteRequest: {
+                              body: {
+                                issuedAt: number;
+                                notes?: string;
+                                providerPolicy: {
+                                  boundCoverageSupported: boolean;
+                                  claimsSupported: boolean;
+                                  coverageClass: string;
+                                  currency: string;
+                                  displayName: string;
+                                  jurisdiction: string;
+                                  maxCoverageAmount: {
+                                    currency: string;
+                                    units: number;
+                                  };
+                                  providerId: string;
+                                  providerRecordId: string;
+                                  quoteTtlSeconds: number;
+                                  requiredEvidence: string[];
+                                };
+                                quoteRequestId: string;
+                                requestedCoverageAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                requestedEffectiveFrom: number;
+                                requestedEffectiveUntil: number;
+                                riskPackage: {
+                                  body: {
+                                    certification: {
+                                      required: boolean;
+                                    };
+                                    exposure: {
+                                      body: {
+                                        decisions: {}[];
+                                        filters: {
+                                          agentSubject: string;
+                                          decisionLimit: number;
+                                          receiptLimit: number;
+                                        };
+                                        generatedAt: number;
+                                        positions: {
+                                          activeQuotedPremiumUnits: number;
+                                          currency: string;
+                                          failedUnits: number;
+                                          governedMaxExposureUnits: number;
+                                          pendingUnits: number;
+                                          provisionalLossUnits: number;
+                                          quotedPremiumUnits: number;
+                                          recoveredUnits: number;
+                                          reservedUnits: number;
+                                          settledUnits: number;
+                                        }[];
+                                        receipts: {}[];
+                                        schema: string;
+                                        summary: {
+                                          actionableReceipts: number;
+                                          activeDecisions: number;
+                                          currencies: string[];
+                                          failedSettlementReceipts: number;
+                                          matchingDecisions: number;
+                                          matchingReceipts: number;
+                                          mixedCurrencyBook: boolean;
+                                          pendingSettlementReceipts: number;
+                                          returnedDecisions: number;
+                                          returnedReceipts: number;
+                                          supersededDecisions: number;
+                                          truncatedDecisions: boolean;
+                                          truncatedReceipts: boolean;
+                                        };
+                                        supportBoundary: {
+                                          claimAdjudicationSupported: boolean;
+                                          crossCurrencyNettingSupported: boolean;
+                                          governedReceiptsAuthoritative: boolean;
+                                          recoveryLifecycleSupported: boolean;
+                                          settlementReconciliationAuthoritative: boolean;
+                                          underwritingDecisionsAuthoritative: boolean;
+                                        };
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    facilityReport: {
+                                      disposition: string;
+                                      filters: {
+                                        agentSubject: string;
+                                        decisionLimit: number;
+                                        receiptLimit: number;
+                                      };
+                                      generatedAt: number;
+                                      prerequisites: {
+                                        certificationMet: boolean;
+                                        certificationRequired: boolean;
+                                        manualReviewRequired: boolean;
+                                        minimumRuntimeAssuranceTier: string;
+                                        runtimeAssuranceMet: boolean;
+                                      };
+                                      schema: string;
+                                      scorecard: {
+                                        anomalyCount: number;
+                                        band: string;
+                                        confidence: string;
+                                        currencies: string[];
+                                        matchingDecisions: number;
+                                        matchingReceipts: number;
+                                        mixedCurrencyBook: boolean;
+                                        overallScore: number;
+                                        probationary: boolean;
+                                        returnedDecisions: number;
+                                        returnedReceipts: number;
+                                      };
+                                      supportBoundary: {
+                                        bondExecutionSupported: boolean;
+                                        crossCurrencyAllocationSupported: boolean;
+                                        providerNeutralPolicy: boolean;
+                                      };
+                                      terms?: {
+                                        capitalSource: string;
+                                        concentrationCapBps: number;
+                                        creditLimit: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        reserveRatioBps: number;
+                                        ttlSeconds: number;
+                                        utilizationCeilingBps: number;
+                                      };
+                                    };
+                                    filters: {
+                                      agentSubject: string;
+                                      decisionLimit: number;
+                                      receiptLimit: number;
+                                      recentLossLimit: number;
+                                    };
+                                    generatedAt: number;
+                                    latestFacility?: {
+                                      creditLimit: {
+                                        currency: string;
+                                        units: number;
+                                      };
+                                      disposition: string;
+                                      expiresAt: number;
+                                      facilityId: string;
+                                      issuedAt: number;
+                                      lifecycleState: string;
+                                      signerKey: string;
+                                    };
+                                    recentLossHistory: {
+                                      entries: {}[];
+                                      summary: {
+                                        failedSettlementEvents: number;
+                                        matchingLossEvents: number;
+                                        provisionalLossEvents: number;
+                                        recoveredEvents: number;
+                                        returnedLossEvents: number;
+                                      };
+                                    };
+                                    runtimeAssurance?: {
+                                      governedReceipts: number;
+                                      highestTier: string;
+                                      latestEvidenceSha256: string;
+                                      latestSchema: string;
+                                      latestVerifier: string;
+                                      latestVerifierFamily: string;
+                                      observedVerifierFamilies: string[];
+                                      runtimeAssuranceReceipts: number;
+                                      stale: boolean;
+                                    };
+                                    schema: string;
+                                    scorecard: {
+                                      body: {
+                                        dimensions: {}[];
+                                        filters: {
+                                          agentSubject: string;
+                                          decisionLimit: number;
+                                          receiptLimit: number;
+                                        };
+                                        generatedAt: number;
+                                        positions: {
+                                          activeQuotedPremiumUnits: number;
+                                          currency: string;
+                                          failedUnits: number;
+                                          governedMaxExposureUnits: number;
+                                          pendingUnits: number;
+                                          provisionalLossUnits: number;
+                                          quotedPremiumUnits: number;
+                                          recoveredUnits: number;
+                                          reservedUnits: number;
+                                          settledUnits: number;
+                                        }[];
+                                        probation: {
+                                          probationary: boolean;
+                                          receiptCount: number;
+                                          spanDays: number;
+                                          targetReceiptCount: number;
+                                          targetSpanDays: number;
+                                        };
+                                        reputation: {
+                                          acceptedImportedSignalCount: number;
+                                          effectiveScore: number;
+                                          importedSignalCount: number;
+                                          probationary: boolean;
+                                        };
+                                        schema: string;
+                                        summary: {
+                                          anomalyCount: number;
+                                          band: string;
+                                          confidence: string;
+                                          currencies: string[];
+                                          matchingDecisions: number;
+                                          matchingReceipts: number;
+                                          mixedCurrencyBook: boolean;
+                                          overallScore: number;
+                                          probationary: boolean;
+                                          returnedDecisions: number;
+                                          returnedReceipts: number;
+                                        };
+                                        supportBoundary: {
+                                          capitalAllocationSupported: boolean;
+                                          crossCurrencyNettingSupported: boolean;
+                                          facilityPolicySupported: boolean;
+                                          subjectScopedOnly: boolean;
+                                        };
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    subjectKey: string;
+                                    supportBoundary: {
+                                      autonomousPricingSupported: boolean;
+                                      complianceScoreReferenceSupported: boolean;
+                                      externalCapitalReviewSupported: boolean;
+                                      facilityPolicyAuthoritative: boolean;
+                                      liabilityMarketSupported: boolean;
+                                      signedExposureAuthoritative: boolean;
+                                      signedScorecardAuthoritative: boolean;
+                                    };
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            quoteResponseId: string;
+                            quotedTerms: {
+                              expiresAt: number;
+                              quotedCoverageAmount: {
+                                currency: string;
+                                units: number;
+                              };
+                              quotedDeductibleAmount?: {
+                                currency: string;
+                                units: number;
+                              };
+                              quotedPremiumAmount: {
+                                currency: string;
+                                units: number;
+                              };
+                            };
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        schema: string;
+                        selectedCoverageAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        selectedPremiumAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    policyNumber: string;
+                    premiumAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                claimAmount: {
+                  currency: string;
+                  units: number;
+                };
+                claimEventAt: number;
+                claimId: string;
+                claimRef?: string;
+                claimant: string;
+                exposure: {
+                  body: {
+                    decisions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    receipts: {}[];
+                    schema: string;
+                    summary: {
+                      actionableReceipts: number;
+                      activeDecisions: number;
+                      currencies: string[];
+                      failedSettlementReceipts: number;
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      pendingSettlementReceipts: number;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                      supersededDecisions: number;
+                      truncatedDecisions: boolean;
+                      truncatedReceipts: boolean;
+                    };
+                    supportBoundary: {
+                      claimAdjudicationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      governedReceiptsAuthoritative: boolean;
+                      recoveryLifecycleSupported: boolean;
+                      settlementReconciliationAuthoritative: boolean;
+                      underwritingDecisionsAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                issuedAt: number;
+                lossEvent: {
+                  body: {
+                    bondId: string;
+                    description: string;
+                    eventId: string;
+                    eventKind: string;
+                    issuedAt: number;
+                    projectedBondLifecycleState: string;
+                    report: {
+                      generatedAt: number;
+                      query: {
+                        amount: {
+                          currency: string;
+                          units: number;
+                        };
+                        bondId: string;
+                        eventKind: string;
+                      };
+                      schema: string;
+                      summary: {
+                        agentSubject: string;
+                        bondId: string;
+                        capabilityId?: string;
+                        currentBondLifecycleState: string;
+                        currentDelinquentAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        eventAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        facilityId?: string;
+                        outstandingDelinquentAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        projectedBondLifecycleState: string;
+                        releaseableReserveAmount?: {
+                          currency: string;
+                          units: number;
+                        };
+                        toolName?: string;
+                        toolServer?: string;
+                      };
+                      supportBoundary: {
+                        appealWindowSupported: boolean;
+                        automaticCapitalExecutionSupported: boolean;
+                        bondLifecycleProjectionAuthoritative: boolean;
+                        externalClaimAdjudicationSupported: boolean;
+                        immutableLifecycleAuthoritative: boolean;
+                        reserveControlExecutionSupported: boolean;
+                      };
+                    };
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                narrative: string;
+                receiptIds: string[];
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            claimResponseId: string;
+            coveredAmount?: {
+              currency: string;
+              units: number;
+            };
+            denialReason?: string;
+            disposition: string;
+            issuedAt: number;
+            providerResponseRef: string;
+            responseNote?: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        reason: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    issuedAt: number;
+    note?: string;
+    outcome: string;
+    rosterAnchorRef?: string;
+    schema: "chio.market.claim-adjudication.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-dispute.schema.json
+export namespace Market_ClaimDispute {
+  export interface ChioMarketClaimDisputeSignedBody {
+    disputeId: string;
+    issuedAt: number;
+    note?: string;
+    openedBy: string;
+    providerResponse: {
+      body: {
+        claim: {
+          body: {
+            bond: {
+              body: {
+                bondId: string;
+                expiresAt: number;
+                issuedAt: number;
+                lifecycleState: string;
+                report: {
+                  disposition: string;
+                  exposure: {
+                    actionableReceipts: number;
+                    activeDecisions: number;
+                    currencies: string[];
+                    failedSettlementReceipts: number;
+                    matchingDecisions: number;
+                    matchingReceipts: number;
+                    mixedCurrencyBook: boolean;
+                    pendingSettlementReceipts: number;
+                    returnedDecisions: number;
+                    returnedReceipts: number;
+                    supersededDecisions: number;
+                    truncatedDecisions: boolean;
+                    truncatedReceipts: boolean;
+                  };
+                  filters: {
+                    agentSubject: string;
+                    capabilityId?: string;
+                    decisionLimit: number;
+                    receiptLimit: number;
+                    toolName?: string;
+                    toolServer?: string;
+                  };
+                  generatedAt: number;
+                  latestFacilityId?: string;
+                  prerequisites: {
+                    activeFacilityMet: boolean;
+                    activeFacilityRequired: boolean;
+                    certificationMet: boolean;
+                    certificationRequired: boolean;
+                    currencyCoherent: boolean;
+                    runtimeAssuranceMet: boolean;
+                  };
+                  schema: string;
+                  scorecard: {
+                    anomalyCount: number;
+                    band: string;
+                    confidence: string;
+                    currencies: string[];
+                    matchingDecisions: number;
+                    matchingReceipts: number;
+                    mixedCurrencyBook: boolean;
+                    overallScore: number;
+                    probationary: boolean;
+                    returnedDecisions: number;
+                    returnedReceipts: number;
+                  };
+                  supportBoundary: {
+                    autonomyGatingSupported: boolean;
+                    externalEscrowExecutionSupported: boolean;
+                    reserveAccountingAuthoritative: boolean;
+                  };
+                  terms?: {
+                    capitalSource: string;
+                    collateralAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    coverageRatioBps: number;
+                    creditLimit: {
+                      currency: string;
+                      units: number;
+                    };
+                    facilityId: string;
+                    outstandingExposureAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    reserveRatioBps: number;
+                    reserveRequirementAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                  };
+                };
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            boundCoverage: {
+              body: {
+                boundAt: number;
+                boundCoverageId: string;
+                carrierReference?: string;
+                coverageAmount: {
+                  currency: string;
+                  units: number;
+                };
+                effectiveFrom: number;
+                effectiveUntil: number;
+                issuedAt: number;
+                placement: {
+                  body: {
+                    effectiveFrom: number;
+                    effectiveUntil: number;
+                    issuedAt: number;
+                    notes?: string;
+                    placementId: string;
+                    placementRef?: string;
+                    quoteResponse: {
+                      body: {
+                        disposition: string;
+                        issuedAt: number;
+                        providerQuoteRef: string;
+                        quoteRequest: {
+                          body: {
+                            issuedAt: number;
+                            notes?: string;
+                            providerPolicy: {
+                              boundCoverageSupported: boolean;
+                              claimsSupported: boolean;
+                              coverageClass: string;
+                              currency: string;
+                              displayName: string;
+                              jurisdiction: string;
+                              maxCoverageAmount: {
+                                currency: string;
+                                units: number;
+                              };
+                              providerId: string;
+                              providerRecordId: string;
+                              quoteTtlSeconds: number;
+                              requiredEvidence: string[];
+                            };
+                            quoteRequestId: string;
+                            requestedCoverageAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            requestedEffectiveFrom: number;
+                            requestedEffectiveUntil: number;
+                            riskPackage: {
+                              body: {
+                                certification: {
+                                  required: boolean;
+                                };
+                                exposure: {
+                                  body: {
+                                    decisions: {}[];
+                                    filters: {
+                                      agentSubject: string;
+                                      decisionLimit: number;
+                                      receiptLimit: number;
+                                    };
+                                    generatedAt: number;
+                                    positions: {
+                                      activeQuotedPremiumUnits: number;
+                                      currency: string;
+                                      failedUnits: number;
+                                      governedMaxExposureUnits: number;
+                                      pendingUnits: number;
+                                      provisionalLossUnits: number;
+                                      quotedPremiumUnits: number;
+                                      recoveredUnits: number;
+                                      reservedUnits: number;
+                                      settledUnits: number;
+                                    }[];
+                                    receipts: {}[];
+                                    schema: string;
+                                    summary: {
+                                      actionableReceipts: number;
+                                      activeDecisions: number;
+                                      currencies: string[];
+                                      failedSettlementReceipts: number;
+                                      matchingDecisions: number;
+                                      matchingReceipts: number;
+                                      mixedCurrencyBook: boolean;
+                                      pendingSettlementReceipts: number;
+                                      returnedDecisions: number;
+                                      returnedReceipts: number;
+                                      supersededDecisions: number;
+                                      truncatedDecisions: boolean;
+                                      truncatedReceipts: boolean;
+                                    };
+                                    supportBoundary: {
+                                      claimAdjudicationSupported: boolean;
+                                      crossCurrencyNettingSupported: boolean;
+                                      governedReceiptsAuthoritative: boolean;
+                                      recoveryLifecycleSupported: boolean;
+                                      settlementReconciliationAuthoritative: boolean;
+                                      underwritingDecisionsAuthoritative: boolean;
+                                    };
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                facilityReport: {
+                                  disposition: string;
+                                  filters: {
+                                    agentSubject: string;
+                                    decisionLimit: number;
+                                    receiptLimit: number;
+                                  };
+                                  generatedAt: number;
+                                  prerequisites: {
+                                    certificationMet: boolean;
+                                    certificationRequired: boolean;
+                                    manualReviewRequired: boolean;
+                                    minimumRuntimeAssuranceTier: string;
+                                    runtimeAssuranceMet: boolean;
+                                  };
+                                  schema: string;
+                                  scorecard: {
+                                    anomalyCount: number;
+                                    band: string;
+                                    confidence: string;
+                                    currencies: string[];
+                                    matchingDecisions: number;
+                                    matchingReceipts: number;
+                                    mixedCurrencyBook: boolean;
+                                    overallScore: number;
+                                    probationary: boolean;
+                                    returnedDecisions: number;
+                                    returnedReceipts: number;
+                                  };
+                                  supportBoundary: {
+                                    bondExecutionSupported: boolean;
+                                    crossCurrencyAllocationSupported: boolean;
+                                    providerNeutralPolicy: boolean;
+                                  };
+                                  terms?: {
+                                    capitalSource: string;
+                                    concentrationCapBps: number;
+                                    creditLimit: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    reserveRatioBps: number;
+                                    ttlSeconds: number;
+                                    utilizationCeilingBps: number;
+                                  };
+                                };
+                                filters: {
+                                  agentSubject: string;
+                                  decisionLimit: number;
+                                  receiptLimit: number;
+                                  recentLossLimit: number;
+                                };
+                                generatedAt: number;
+                                latestFacility?: {
+                                  creditLimit: {
+                                    currency: string;
+                                    units: number;
+                                  };
+                                  disposition: string;
+                                  expiresAt: number;
+                                  facilityId: string;
+                                  issuedAt: number;
+                                  lifecycleState: string;
+                                  signerKey: string;
+                                };
+                                recentLossHistory: {
+                                  entries: {}[];
+                                  summary: {
+                                    failedSettlementEvents: number;
+                                    matchingLossEvents: number;
+                                    provisionalLossEvents: number;
+                                    recoveredEvents: number;
+                                    returnedLossEvents: number;
+                                  };
+                                };
+                                runtimeAssurance?: {
+                                  governedReceipts: number;
+                                  highestTier: string;
+                                  latestEvidenceSha256: string;
+                                  latestSchema: string;
+                                  latestVerifier: string;
+                                  latestVerifierFamily: string;
+                                  observedVerifierFamilies: string[];
+                                  runtimeAssuranceReceipts: number;
+                                  stale: boolean;
+                                };
+                                schema: string;
+                                scorecard: {
+                                  body: {
+                                    dimensions: {}[];
+                                    filters: {
+                                      agentSubject: string;
+                                      decisionLimit: number;
+                                      receiptLimit: number;
+                                    };
+                                    generatedAt: number;
+                                    positions: {
+                                      activeQuotedPremiumUnits: number;
+                                      currency: string;
+                                      failedUnits: number;
+                                      governedMaxExposureUnits: number;
+                                      pendingUnits: number;
+                                      provisionalLossUnits: number;
+                                      quotedPremiumUnits: number;
+                                      recoveredUnits: number;
+                                      reservedUnits: number;
+                                      settledUnits: number;
+                                    }[];
+                                    probation: {
+                                      probationary: boolean;
+                                      receiptCount: number;
+                                      spanDays: number;
+                                      targetReceiptCount: number;
+                                      targetSpanDays: number;
+                                    };
+                                    reputation: {
+                                      acceptedImportedSignalCount: number;
+                                      effectiveScore: number;
+                                      importedSignalCount: number;
+                                      probationary: boolean;
+                                    };
+                                    schema: string;
+                                    summary: {
+                                      anomalyCount: number;
+                                      band: string;
+                                      confidence: string;
+                                      currencies: string[];
+                                      matchingDecisions: number;
+                                      matchingReceipts: number;
+                                      mixedCurrencyBook: boolean;
+                                      overallScore: number;
+                                      probationary: boolean;
+                                      returnedDecisions: number;
+                                      returnedReceipts: number;
+                                    };
+                                    supportBoundary: {
+                                      capitalAllocationSupported: boolean;
+                                      crossCurrencyNettingSupported: boolean;
+                                      facilityPolicySupported: boolean;
+                                      subjectScopedOnly: boolean;
+                                    };
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                subjectKey: string;
+                                supportBoundary: {
+                                  autonomousPricingSupported: boolean;
+                                  complianceScoreReferenceSupported: boolean;
+                                  externalCapitalReviewSupported: boolean;
+                                  facilityPolicyAuthoritative: boolean;
+                                  liabilityMarketSupported: boolean;
+                                  signedExposureAuthoritative: boolean;
+                                  signedScorecardAuthoritative: boolean;
+                                };
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        quoteResponseId: string;
+                        quotedTerms: {
+                          expiresAt: number;
+                          quotedCoverageAmount: {
+                            currency: string;
+                            units: number;
+                          };
+                          quotedDeductibleAmount?: {
+                            currency: string;
+                            units: number;
+                          };
+                          quotedPremiumAmount: {
+                            currency: string;
+                            units: number;
+                          };
+                        };
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    schema: string;
+                    selectedCoverageAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    selectedPremiumAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                policyNumber: string;
+                premiumAmount: {
+                  currency: string;
+                  units: number;
+                };
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            claimAmount: {
+              currency: string;
+              units: number;
+            };
+            claimEventAt: number;
+            claimId: string;
+            claimRef?: string;
+            claimant: string;
+            exposure: {
+              body: {
+                decisions: {}[];
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                positions: {
+                  activeQuotedPremiumUnits: number;
+                  currency: string;
+                  failedUnits: number;
+                  governedMaxExposureUnits: number;
+                  pendingUnits: number;
+                  provisionalLossUnits: number;
+                  quotedPremiumUnits: number;
+                  recoveredUnits: number;
+                  reservedUnits: number;
+                  settledUnits: number;
+                }[];
+                receipts: {}[];
+                schema: string;
+                summary: {
+                  actionableReceipts: number;
+                  activeDecisions: number;
+                  currencies: string[];
+                  failedSettlementReceipts: number;
+                  matchingDecisions: number;
+                  matchingReceipts: number;
+                  mixedCurrencyBook: boolean;
+                  pendingSettlementReceipts: number;
+                  returnedDecisions: number;
+                  returnedReceipts: number;
+                  supersededDecisions: number;
+                  truncatedDecisions: boolean;
+                  truncatedReceipts: boolean;
+                };
+                supportBoundary: {
+                  claimAdjudicationSupported: boolean;
+                  crossCurrencyNettingSupported: boolean;
+                  governedReceiptsAuthoritative: boolean;
+                  recoveryLifecycleSupported: boolean;
+                  settlementReconciliationAuthoritative: boolean;
+                  underwritingDecisionsAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            issuedAt: number;
+            lossEvent: {
+              body: {
+                bondId: string;
+                description: string;
+                eventId: string;
+                eventKind: string;
+                issuedAt: number;
+                projectedBondLifecycleState: string;
+                report: {
+                  generatedAt: number;
+                  query: {
+                    amount: {
+                      currency: string;
+                      units: number;
+                    };
+                    bondId: string;
+                    eventKind: string;
+                  };
+                  schema: string;
+                  summary: {
+                    agentSubject: string;
+                    bondId: string;
+                    capabilityId?: string;
+                    currentBondLifecycleState: string;
+                    currentDelinquentAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    eventAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    facilityId?: string;
+                    outstandingDelinquentAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    projectedBondLifecycleState: string;
+                    releaseableReserveAmount?: {
+                      currency: string;
+                      units: number;
+                    };
+                    toolName?: string;
+                    toolServer?: string;
+                  };
+                  supportBoundary: {
+                    appealWindowSupported: boolean;
+                    automaticCapitalExecutionSupported: boolean;
+                    bondLifecycleProjectionAuthoritative: boolean;
+                    externalClaimAdjudicationSupported: boolean;
+                    immutableLifecycleAuthoritative: boolean;
+                    reserveControlExecutionSupported: boolean;
+                  };
+                };
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            narrative: string;
+            receiptIds: string[];
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        claimResponseId: string;
+        coveredAmount?: {
+          currency: string;
+          units: number;
+        };
+        denialReason?: string;
+        disposition: string;
+        issuedAt: number;
+        providerResponseRef: string;
+        responseNote?: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    reason: string;
+    schema: "chio.market.claim-dispute.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-package.schema.json
+export namespace Market_ClaimPackage {
+  export interface ChioMarketClaimPackageSignedBody {
+    bond: {
+      body: {
+        bondId: string;
+        expiresAt: number;
+        issuedAt: number;
+        lifecycleState: string;
+        report: {
+          disposition: string;
+          exposure: {
+            actionableReceipts: number;
+            activeDecisions: number;
+            currencies: string[];
+            failedSettlementReceipts: number;
+            matchingDecisions: number;
+            matchingReceipts: number;
+            mixedCurrencyBook: boolean;
+            pendingSettlementReceipts: number;
+            returnedDecisions: number;
+            returnedReceipts: number;
+            supersededDecisions: number;
+            truncatedDecisions: boolean;
+            truncatedReceipts: boolean;
+          };
+          filters: {
+            agentSubject: string;
+            capabilityId?: string;
+            decisionLimit: number;
+            receiptLimit: number;
+            toolName?: string;
+            toolServer?: string;
+          };
+          generatedAt: number;
+          latestFacilityId?: string;
+          prerequisites: {
+            activeFacilityMet: boolean;
+            activeFacilityRequired: boolean;
+            certificationMet: boolean;
+            certificationRequired: boolean;
+            currencyCoherent: boolean;
+            runtimeAssuranceMet: boolean;
+          };
+          schema: string;
+          scorecard: {
+            anomalyCount: number;
+            band: string;
+            confidence: string;
+            currencies: string[];
+            matchingDecisions: number;
+            matchingReceipts: number;
+            mixedCurrencyBook: boolean;
+            overallScore: number;
+            probationary: boolean;
+            returnedDecisions: number;
+            returnedReceipts: number;
+          };
+          supportBoundary: {
+            autonomyGatingSupported: boolean;
+            externalEscrowExecutionSupported: boolean;
+            reserveAccountingAuthoritative: boolean;
+          };
+          terms?: {
+            capitalSource: string;
+            collateralAmount: {
+              currency: string;
+              units: number;
+            };
+            coverageRatioBps: number;
+            creditLimit: {
+              currency: string;
+              units: number;
+            };
+            facilityId: string;
+            outstandingExposureAmount: {
+              currency: string;
+              units: number;
+            };
+            reserveRatioBps: number;
+            reserveRequirementAmount: {
+              currency: string;
+              units: number;
+            };
+          };
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    boundCoverage: {
+      body: {
+        boundAt: number;
+        boundCoverageId: string;
+        carrierReference?: string;
+        coverageAmount: {
+          currency: string;
+          units: number;
+        };
+        effectiveFrom: number;
+        effectiveUntil: number;
+        issuedAt: number;
+        placement: {
+          body: {
+            effectiveFrom: number;
+            effectiveUntil: number;
+            issuedAt: number;
+            notes?: string;
+            placementId: string;
+            placementRef?: string;
+            quoteResponse: {
+              body: {
+                disposition: string;
+                issuedAt: number;
+                providerQuoteRef: string;
+                quoteRequest: {
+                  body: {
+                    issuedAt: number;
+                    notes?: string;
+                    providerPolicy: {
+                      boundCoverageSupported: boolean;
+                      claimsSupported: boolean;
+                      coverageClass: string;
+                      currency: string;
+                      displayName: string;
+                      jurisdiction: string;
+                      maxCoverageAmount: {
+                        currency: string;
+                        units: number;
+                      };
+                      providerId: string;
+                      providerRecordId: string;
+                      quoteTtlSeconds: number;
+                      requiredEvidence: string[];
+                    };
+                    quoteRequestId: string;
+                    requestedCoverageAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    requestedEffectiveFrom: number;
+                    requestedEffectiveUntil: number;
+                    riskPackage: {
+                      body: {
+                        certification: {
+                          required: boolean;
+                        };
+                        exposure: {
+                          body: {
+                            decisions: {}[];
+                            filters: {
+                              agentSubject: string;
+                              decisionLimit: number;
+                              receiptLimit: number;
+                            };
+                            generatedAt: number;
+                            positions: {
+                              activeQuotedPremiumUnits: number;
+                              currency: string;
+                              failedUnits: number;
+                              governedMaxExposureUnits: number;
+                              pendingUnits: number;
+                              provisionalLossUnits: number;
+                              quotedPremiumUnits: number;
+                              recoveredUnits: number;
+                              reservedUnits: number;
+                              settledUnits: number;
+                            }[];
+                            receipts: {}[];
+                            schema: string;
+                            summary: {
+                              actionableReceipts: number;
+                              activeDecisions: number;
+                              currencies: string[];
+                              failedSettlementReceipts: number;
+                              matchingDecisions: number;
+                              matchingReceipts: number;
+                              mixedCurrencyBook: boolean;
+                              pendingSettlementReceipts: number;
+                              returnedDecisions: number;
+                              returnedReceipts: number;
+                              supersededDecisions: number;
+                              truncatedDecisions: boolean;
+                              truncatedReceipts: boolean;
+                            };
+                            supportBoundary: {
+                              claimAdjudicationSupported: boolean;
+                              crossCurrencyNettingSupported: boolean;
+                              governedReceiptsAuthoritative: boolean;
+                              recoveryLifecycleSupported: boolean;
+                              settlementReconciliationAuthoritative: boolean;
+                              underwritingDecisionsAuthoritative: boolean;
+                            };
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        facilityReport: {
+                          disposition: string;
+                          filters: {
+                            agentSubject: string;
+                            decisionLimit: number;
+                            receiptLimit: number;
+                          };
+                          generatedAt: number;
+                          prerequisites: {
+                            certificationMet: boolean;
+                            certificationRequired: boolean;
+                            manualReviewRequired: boolean;
+                            minimumRuntimeAssuranceTier: string;
+                            runtimeAssuranceMet: boolean;
+                          };
+                          schema: string;
+                          scorecard: {
+                            anomalyCount: number;
+                            band: string;
+                            confidence: string;
+                            currencies: string[];
+                            matchingDecisions: number;
+                            matchingReceipts: number;
+                            mixedCurrencyBook: boolean;
+                            overallScore: number;
+                            probationary: boolean;
+                            returnedDecisions: number;
+                            returnedReceipts: number;
+                          };
+                          supportBoundary: {
+                            bondExecutionSupported: boolean;
+                            crossCurrencyAllocationSupported: boolean;
+                            providerNeutralPolicy: boolean;
+                          };
+                          terms?: {
+                            capitalSource: string;
+                            concentrationCapBps: number;
+                            creditLimit: {
+                              currency: string;
+                              units: number;
+                            };
+                            reserveRatioBps: number;
+                            ttlSeconds: number;
+                            utilizationCeilingBps: number;
+                          };
+                        };
+                        filters: {
+                          agentSubject: string;
+                          decisionLimit: number;
+                          receiptLimit: number;
+                          recentLossLimit: number;
+                        };
+                        generatedAt: number;
+                        latestFacility?: {
+                          creditLimit: {
+                            currency: string;
+                            units: number;
+                          };
+                          disposition: string;
+                          expiresAt: number;
+                          facilityId: string;
+                          issuedAt: number;
+                          lifecycleState: string;
+                          signerKey: string;
+                        };
+                        recentLossHistory: {
+                          entries: {}[];
+                          summary: {
+                            failedSettlementEvents: number;
+                            matchingLossEvents: number;
+                            provisionalLossEvents: number;
+                            recoveredEvents: number;
+                            returnedLossEvents: number;
+                          };
+                        };
+                        runtimeAssurance?: {
+                          governedReceipts: number;
+                          highestTier: string;
+                          latestEvidenceSha256: string;
+                          latestSchema: string;
+                          latestVerifier: string;
+                          latestVerifierFamily: string;
+                          observedVerifierFamilies: string[];
+                          runtimeAssuranceReceipts: number;
+                          stale: boolean;
+                        };
+                        schema: string;
+                        scorecard: {
+                          body: {
+                            dimensions: {}[];
+                            filters: {
+                              agentSubject: string;
+                              decisionLimit: number;
+                              receiptLimit: number;
+                            };
+                            generatedAt: number;
+                            positions: {
+                              activeQuotedPremiumUnits: number;
+                              currency: string;
+                              failedUnits: number;
+                              governedMaxExposureUnits: number;
+                              pendingUnits: number;
+                              provisionalLossUnits: number;
+                              quotedPremiumUnits: number;
+                              recoveredUnits: number;
+                              reservedUnits: number;
+                              settledUnits: number;
+                            }[];
+                            probation: {
+                              probationary: boolean;
+                              receiptCount: number;
+                              spanDays: number;
+                              targetReceiptCount: number;
+                              targetSpanDays: number;
+                            };
+                            reputation: {
+                              acceptedImportedSignalCount: number;
+                              effectiveScore: number;
+                              importedSignalCount: number;
+                              probationary: boolean;
+                            };
+                            schema: string;
+                            summary: {
+                              anomalyCount: number;
+                              band: string;
+                              confidence: string;
+                              currencies: string[];
+                              matchingDecisions: number;
+                              matchingReceipts: number;
+                              mixedCurrencyBook: boolean;
+                              overallScore: number;
+                              probationary: boolean;
+                              returnedDecisions: number;
+                              returnedReceipts: number;
+                            };
+                            supportBoundary: {
+                              capitalAllocationSupported: boolean;
+                              crossCurrencyNettingSupported: boolean;
+                              facilityPolicySupported: boolean;
+                              subjectScopedOnly: boolean;
+                            };
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        subjectKey: string;
+                        supportBoundary: {
+                          autonomousPricingSupported: boolean;
+                          complianceScoreReferenceSupported: boolean;
+                          externalCapitalReviewSupported: boolean;
+                          facilityPolicyAuthoritative: boolean;
+                          liabilityMarketSupported: boolean;
+                          signedExposureAuthoritative: boolean;
+                          signedScorecardAuthoritative: boolean;
+                        };
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                quoteResponseId: string;
+                quotedTerms: {
+                  expiresAt: number;
+                  quotedCoverageAmount: {
+                    currency: string;
+                    units: number;
+                  };
+                  quotedDeductibleAmount?: {
+                    currency: string;
+                    units: number;
+                  };
+                  quotedPremiumAmount: {
+                    currency: string;
+                    units: number;
+                  };
+                };
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            schema: string;
+            selectedCoverageAmount: {
+              currency: string;
+              units: number;
+            };
+            selectedPremiumAmount: {
+              currency: string;
+              units: number;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        policyNumber: string;
+        premiumAmount: {
+          currency: string;
+          units: number;
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    claimAmount: {
+      currency: string;
+      units: number;
+    };
+    claimEventAt: number;
+    claimId: string;
+    claimRef?: string;
+    claimant: string;
+    exposure: {
+      body: {
+        decisions: {}[];
+        filters: {
+          agentSubject: string;
+          decisionLimit: number;
+          receiptLimit: number;
+        };
+        generatedAt: number;
+        positions: {
+          activeQuotedPremiumUnits: number;
+          currency: string;
+          failedUnits: number;
+          governedMaxExposureUnits: number;
+          pendingUnits: number;
+          provisionalLossUnits: number;
+          quotedPremiumUnits: number;
+          recoveredUnits: number;
+          reservedUnits: number;
+          settledUnits: number;
+        }[];
+        receipts: {}[];
+        schema: string;
+        summary: {
+          actionableReceipts: number;
+          activeDecisions: number;
+          currencies: string[];
+          failedSettlementReceipts: number;
+          matchingDecisions: number;
+          matchingReceipts: number;
+          mixedCurrencyBook: boolean;
+          pendingSettlementReceipts: number;
+          returnedDecisions: number;
+          returnedReceipts: number;
+          supersededDecisions: number;
+          truncatedDecisions: boolean;
+          truncatedReceipts: boolean;
+        };
+        supportBoundary: {
+          claimAdjudicationSupported: boolean;
+          crossCurrencyNettingSupported: boolean;
+          governedReceiptsAuthoritative: boolean;
+          recoveryLifecycleSupported: boolean;
+          settlementReconciliationAuthoritative: boolean;
+          underwritingDecisionsAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    issuedAt: number;
+    lossEvent: {
+      body: {
+        bondId: string;
+        description: string;
+        eventId: string;
+        eventKind: string;
+        issuedAt: number;
+        projectedBondLifecycleState: string;
+        report: {
+          generatedAt: number;
+          query: {
+            amount: {
+              currency: string;
+              units: number;
+            };
+            bondId: string;
+            eventKind: string;
+          };
+          schema: string;
+          summary: {
+            agentSubject: string;
+            bondId: string;
+            capabilityId?: string;
+            currentBondLifecycleState: string;
+            currentDelinquentAmount: {
+              currency: string;
+              units: number;
+            };
+            eventAmount: {
+              currency: string;
+              units: number;
+            };
+            facilityId?: string;
+            outstandingDelinquentAmount: {
+              currency: string;
+              units: number;
+            };
+            projectedBondLifecycleState: string;
+            releaseableReserveAmount?: {
+              currency: string;
+              units: number;
+            };
+            toolName?: string;
+            toolServer?: string;
+          };
+          supportBoundary: {
+            appealWindowSupported: boolean;
+            automaticCapitalExecutionSupported: boolean;
+            bondLifecycleProjectionAuthoritative: boolean;
+            externalClaimAdjudicationSupported: boolean;
+            immutableLifecycleAuthoritative: boolean;
+            reserveControlExecutionSupported: boolean;
+          };
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    narrative: string;
+    receiptIds: string[];
+    schema: "chio.market.claim-package.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-payout-instruction.schema.json
+export namespace Market_ClaimPayoutInstruction {
+  export interface ChioMarketClaimPayoutInstructionSignedBody {
+    adjudication: {
+      body: {
+        adjudicationId: string;
+        adjudicator: string;
+        awardedAmount: {
+          currency: string;
+          units: number;
+        };
+        decisionRuleRef?: string;
+        dispute: {
+          body: {
+            disputeId: string;
+            issuedAt: number;
+            note?: string;
+            openedBy: string;
+            providerResponse: {
+              body: {
+                claim: {
+                  body: {
+                    bond: {
+                      body: {
+                        bondId: string;
+                        expiresAt: number;
+                        issuedAt: number;
+                        lifecycleState: string;
+                        report: {
+                          disposition: string;
+                          exposure: {
+                            actionableReceipts: number;
+                            activeDecisions: number;
+                            currencies: string[];
+                            failedSettlementReceipts: number;
+                            matchingDecisions: number;
+                            matchingReceipts: number;
+                            mixedCurrencyBook: boolean;
+                            pendingSettlementReceipts: number;
+                            returnedDecisions: number;
+                            returnedReceipts: number;
+                            supersededDecisions: number;
+                            truncatedDecisions: boolean;
+                            truncatedReceipts: boolean;
+                          };
+                          filters: {
+                            agentSubject: string;
+                            capabilityId?: string;
+                            decisionLimit: number;
+                            receiptLimit: number;
+                            toolName?: string;
+                            toolServer?: string;
+                          };
+                          generatedAt: number;
+                          latestFacilityId?: string;
+                          prerequisites: {
+                            activeFacilityMet: boolean;
+                            activeFacilityRequired: boolean;
+                            certificationMet: boolean;
+                            certificationRequired: boolean;
+                            currencyCoherent: boolean;
+                            runtimeAssuranceMet: boolean;
+                          };
+                          schema: string;
+                          scorecard: {
+                            anomalyCount: number;
+                            band: string;
+                            confidence: string;
+                            currencies: string[];
+                            matchingDecisions: number;
+                            matchingReceipts: number;
+                            mixedCurrencyBook: boolean;
+                            overallScore: number;
+                            probationary: boolean;
+                            returnedDecisions: number;
+                            returnedReceipts: number;
+                          };
+                          supportBoundary: {
+                            autonomyGatingSupported: boolean;
+                            externalEscrowExecutionSupported: boolean;
+                            reserveAccountingAuthoritative: boolean;
+                          };
+                          terms?: {
+                            capitalSource: string;
+                            collateralAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            coverageRatioBps: number;
+                            creditLimit: {
+                              currency: string;
+                              units: number;
+                            };
+                            facilityId: string;
+                            outstandingExposureAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            reserveRatioBps: number;
+                            reserveRequirementAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                          };
+                        };
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    boundCoverage: {
+                      body: {
+                        boundAt: number;
+                        boundCoverageId: string;
+                        carrierReference?: string;
+                        coverageAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        effectiveFrom: number;
+                        effectiveUntil: number;
+                        issuedAt: number;
+                        placement: {
+                          body: {
+                            effectiveFrom: number;
+                            effectiveUntil: number;
+                            issuedAt: number;
+                            notes?: string;
+                            placementId: string;
+                            placementRef?: string;
+                            quoteResponse: {
+                              body: {
+                                disposition: string;
+                                issuedAt: number;
+                                providerQuoteRef: string;
+                                quoteRequest: {
+                                  body: {
+                                    issuedAt: number;
+                                    notes?: string;
+                                    providerPolicy: {
+                                      boundCoverageSupported: boolean;
+                                      claimsSupported: boolean;
+                                      coverageClass: string;
+                                      currency: string;
+                                      displayName: string;
+                                      jurisdiction: string;
+                                      maxCoverageAmount: {
+                                        currency: string;
+                                        units: number;
+                                      };
+                                      providerId: string;
+                                      providerRecordId: string;
+                                      quoteTtlSeconds: number;
+                                      requiredEvidence: string[];
+                                    };
+                                    quoteRequestId: string;
+                                    requestedCoverageAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    requestedEffectiveFrom: number;
+                                    requestedEffectiveUntil: number;
+                                    riskPackage: {
+                                      body: {
+                                        certification: {
+                                          required: boolean;
+                                        };
+                                        exposure: {
+                                          body: {
+                                            decisions: {}[];
+                                            filters: {
+                                              agentSubject: string;
+                                              decisionLimit: number;
+                                              receiptLimit: number;
+                                            };
+                                            generatedAt: number;
+                                            positions: {
+                                              activeQuotedPremiumUnits: number;
+                                              currency: string;
+                                              failedUnits: number;
+                                              governedMaxExposureUnits: number;
+                                              pendingUnits: number;
+                                              provisionalLossUnits: number;
+                                              quotedPremiumUnits: number;
+                                              recoveredUnits: number;
+                                              reservedUnits: number;
+                                              settledUnits: number;
+                                            }[];
+                                            receipts: {}[];
+                                            schema: string;
+                                            summary: {
+                                              actionableReceipts: number;
+                                              activeDecisions: number;
+                                              currencies: string[];
+                                              failedSettlementReceipts: number;
+                                              matchingDecisions: number;
+                                              matchingReceipts: number;
+                                              mixedCurrencyBook: boolean;
+                                              pendingSettlementReceipts: number;
+                                              returnedDecisions: number;
+                                              returnedReceipts: number;
+                                              supersededDecisions: number;
+                                              truncatedDecisions: boolean;
+                                              truncatedReceipts: boolean;
+                                            };
+                                            supportBoundary: {
+                                              claimAdjudicationSupported: boolean;
+                                              crossCurrencyNettingSupported: boolean;
+                                              governedReceiptsAuthoritative: boolean;
+                                              recoveryLifecycleSupported: boolean;
+                                              settlementReconciliationAuthoritative: boolean;
+                                              underwritingDecisionsAuthoritative: boolean;
+                                            };
+                                          };
+                                          signature: string;
+                                          signerKey: string;
+                                        };
+                                        facilityReport: {
+                                          disposition: string;
+                                          filters: {
+                                            agentSubject: string;
+                                            decisionLimit: number;
+                                            receiptLimit: number;
+                                          };
+                                          generatedAt: number;
+                                          prerequisites: {
+                                            certificationMet: boolean;
+                                            certificationRequired: boolean;
+                                            manualReviewRequired: boolean;
+                                            minimumRuntimeAssuranceTier: string;
+                                            runtimeAssuranceMet: boolean;
+                                          };
+                                          schema: string;
+                                          scorecard: {
+                                            anomalyCount: number;
+                                            band: string;
+                                            confidence: string;
+                                            currencies: string[];
+                                            matchingDecisions: number;
+                                            matchingReceipts: number;
+                                            mixedCurrencyBook: boolean;
+                                            overallScore: number;
+                                            probationary: boolean;
+                                            returnedDecisions: number;
+                                            returnedReceipts: number;
+                                          };
+                                          supportBoundary: {
+                                            bondExecutionSupported: boolean;
+                                            crossCurrencyAllocationSupported: boolean;
+                                            providerNeutralPolicy: boolean;
+                                          };
+                                          terms?: {
+                                            capitalSource: string;
+                                            concentrationCapBps: number;
+                                            creditLimit: {
+                                              currency: string;
+                                              units: number;
+                                            };
+                                            reserveRatioBps: number;
+                                            ttlSeconds: number;
+                                            utilizationCeilingBps: number;
+                                          };
+                                        };
+                                        filters: {
+                                          agentSubject: string;
+                                          decisionLimit: number;
+                                          receiptLimit: number;
+                                          recentLossLimit: number;
+                                        };
+                                        generatedAt: number;
+                                        latestFacility?: {
+                                          creditLimit: {
+                                            currency: string;
+                                            units: number;
+                                          };
+                                          disposition: string;
+                                          expiresAt: number;
+                                          facilityId: string;
+                                          issuedAt: number;
+                                          lifecycleState: string;
+                                          signerKey: string;
+                                        };
+                                        recentLossHistory: {
+                                          entries: {}[];
+                                          summary: {
+                                            failedSettlementEvents: number;
+                                            matchingLossEvents: number;
+                                            provisionalLossEvents: number;
+                                            recoveredEvents: number;
+                                            returnedLossEvents: number;
+                                          };
+                                        };
+                                        runtimeAssurance?: {
+                                          governedReceipts: number;
+                                          highestTier: string;
+                                          latestEvidenceSha256: string;
+                                          latestSchema: string;
+                                          latestVerifier: string;
+                                          latestVerifierFamily: string;
+                                          observedVerifierFamilies: string[];
+                                          runtimeAssuranceReceipts: number;
+                                          stale: boolean;
+                                        };
+                                        schema: string;
+                                        scorecard: {
+                                          body: {
+                                            dimensions: {}[];
+                                            filters: {
+                                              agentSubject: string;
+                                              decisionLimit: number;
+                                              receiptLimit: number;
+                                            };
+                                            generatedAt: number;
+                                            positions: {
+                                              activeQuotedPremiumUnits: number;
+                                              currency: string;
+                                              failedUnits: number;
+                                              governedMaxExposureUnits: number;
+                                              pendingUnits: number;
+                                              provisionalLossUnits: number;
+                                              quotedPremiumUnits: number;
+                                              recoveredUnits: number;
+                                              reservedUnits: number;
+                                              settledUnits: number;
+                                            }[];
+                                            probation: {
+                                              probationary: boolean;
+                                              receiptCount: number;
+                                              spanDays: number;
+                                              targetReceiptCount: number;
+                                              targetSpanDays: number;
+                                            };
+                                            reputation: {
+                                              acceptedImportedSignalCount: number;
+                                              effectiveScore: number;
+                                              importedSignalCount: number;
+                                              probationary: boolean;
+                                            };
+                                            schema: string;
+                                            summary: {
+                                              anomalyCount: number;
+                                              band: string;
+                                              confidence: string;
+                                              currencies: string[];
+                                              matchingDecisions: number;
+                                              matchingReceipts: number;
+                                              mixedCurrencyBook: boolean;
+                                              overallScore: number;
+                                              probationary: boolean;
+                                              returnedDecisions: number;
+                                              returnedReceipts: number;
+                                            };
+                                            supportBoundary: {
+                                              capitalAllocationSupported: boolean;
+                                              crossCurrencyNettingSupported: boolean;
+                                              facilityPolicySupported: boolean;
+                                              subjectScopedOnly: boolean;
+                                            };
+                                          };
+                                          signature: string;
+                                          signerKey: string;
+                                        };
+                                        subjectKey: string;
+                                        supportBoundary: {
+                                          autonomousPricingSupported: boolean;
+                                          complianceScoreReferenceSupported: boolean;
+                                          externalCapitalReviewSupported: boolean;
+                                          facilityPolicyAuthoritative: boolean;
+                                          liabilityMarketSupported: boolean;
+                                          signedExposureAuthoritative: boolean;
+                                          signedScorecardAuthoritative: boolean;
+                                        };
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    schema: string;
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                quoteResponseId: string;
+                                quotedTerms: {
+                                  expiresAt: number;
+                                  quotedCoverageAmount: {
+                                    currency: string;
+                                    units: number;
+                                  };
+                                  quotedDeductibleAmount?: {
+                                    currency: string;
+                                    units: number;
+                                  };
+                                  quotedPremiumAmount: {
+                                    currency: string;
+                                    units: number;
+                                  };
+                                };
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            schema: string;
+                            selectedCoverageAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            selectedPremiumAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        policyNumber: string;
+                        premiumAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    claimAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    claimEventAt: number;
+                    claimId: string;
+                    claimRef?: string;
+                    claimant: string;
+                    exposure: {
+                      body: {
+                        decisions: {}[];
+                        filters: {
+                          agentSubject: string;
+                          decisionLimit: number;
+                          receiptLimit: number;
+                        };
+                        generatedAt: number;
+                        positions: {
+                          activeQuotedPremiumUnits: number;
+                          currency: string;
+                          failedUnits: number;
+                          governedMaxExposureUnits: number;
+                          pendingUnits: number;
+                          provisionalLossUnits: number;
+                          quotedPremiumUnits: number;
+                          recoveredUnits: number;
+                          reservedUnits: number;
+                          settledUnits: number;
+                        }[];
+                        receipts: {}[];
+                        schema: string;
+                        summary: {
+                          actionableReceipts: number;
+                          activeDecisions: number;
+                          currencies: string[];
+                          failedSettlementReceipts: number;
+                          matchingDecisions: number;
+                          matchingReceipts: number;
+                          mixedCurrencyBook: boolean;
+                          pendingSettlementReceipts: number;
+                          returnedDecisions: number;
+                          returnedReceipts: number;
+                          supersededDecisions: number;
+                          truncatedDecisions: boolean;
+                          truncatedReceipts: boolean;
+                        };
+                        supportBoundary: {
+                          claimAdjudicationSupported: boolean;
+                          crossCurrencyNettingSupported: boolean;
+                          governedReceiptsAuthoritative: boolean;
+                          recoveryLifecycleSupported: boolean;
+                          settlementReconciliationAuthoritative: boolean;
+                          underwritingDecisionsAuthoritative: boolean;
+                        };
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    issuedAt: number;
+                    lossEvent: {
+                      body: {
+                        bondId: string;
+                        description: string;
+                        eventId: string;
+                        eventKind: string;
+                        issuedAt: number;
+                        projectedBondLifecycleState: string;
+                        report: {
+                          generatedAt: number;
+                          query: {
+                            amount: {
+                              currency: string;
+                              units: number;
+                            };
+                            bondId: string;
+                            eventKind: string;
+                          };
+                          schema: string;
+                          summary: {
+                            agentSubject: string;
+                            bondId: string;
+                            capabilityId?: string;
+                            currentBondLifecycleState: string;
+                            currentDelinquentAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            eventAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            facilityId?: string;
+                            outstandingDelinquentAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            projectedBondLifecycleState: string;
+                            releaseableReserveAmount?: {
+                              currency: string;
+                              units: number;
+                            };
+                            toolName?: string;
+                            toolServer?: string;
+                          };
+                          supportBoundary: {
+                            appealWindowSupported: boolean;
+                            automaticCapitalExecutionSupported: boolean;
+                            bondLifecycleProjectionAuthoritative: boolean;
+                            externalClaimAdjudicationSupported: boolean;
+                            immutableLifecycleAuthoritative: boolean;
+                            reserveControlExecutionSupported: boolean;
+                          };
+                        };
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    narrative: string;
+                    receiptIds: string[];
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                claimResponseId: string;
+                coveredAmount?: {
+                  currency: string;
+                  units: number;
+                };
+                denialReason?: string;
+                disposition: string;
+                issuedAt: number;
+                providerResponseRef: string;
+                responseNote?: string;
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            reason: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        issuedAt: number;
+        note?: string;
+        outcome: string;
+        rosterAnchorRef?: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    capitalInstruction: {
+      body: {
+        action: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        authorityChain: {
+          approvedAt: number;
+          authorityProof: {
+            body: {
+              approvedAt: number;
+              expiresAt: number;
+              principalId: string;
+              role: string;
+              schema: string;
+            };
+            signature: string;
+            signerKey: string;
+          };
+          expiresAt: number;
+          note: string;
+          principalId: string;
+          role: string;
+        }[];
+        completionFlowRowId?: string;
+        counterpartyId: string;
+        counterpartyRole: string;
+        description: string;
+        executionWindow: {
+          notAfter: number;
+          notBefore: number;
+        };
+        governedReceiptId?: string;
+        instructionId: string;
+        intendedState: string;
+        issuedAt: number;
+        ownerRole: string;
+        query: {
+          agentSubject: string;
+          bondLimit: number;
+          facilityLimit: number;
+          lossEventLimit: number;
+          receiptLimit: number;
+        };
+        rail: {
+          custodyProviderId: string;
+          destinationAccountRef?: string;
+          jurisdiction?: string;
+          kind: string;
+          railId: string;
+          sourceAccountRef?: string;
+        };
+        reconciledState: string;
+        schema: string;
+        sourceId: string;
+        sourceKind: string;
+        subjectKey: string;
+        supportBoundary: {
+          automaticDispatchSupported: boolean;
+          capitalBookAuthoritative: boolean;
+          custodyNeutralInstructionSupported: boolean;
+          externalExecutionAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    issuedAt: number;
+    note?: string;
+    payoutAmount: {
+      currency: string;
+      units: number;
+    };
+    payoutInstructionId: string;
+    schema: "chio.market.claim-payout-instruction.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-payout-receipt.schema.json
+export namespace Market_ClaimPayoutReceipt {
+  export interface ChioMarketClaimPayoutReceiptSignedBody {
+    issuedAt: number;
+    note?: string;
+    observedExecution: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      externalReferenceId: string;
+      observedAt: number;
+    };
+    payoutInstruction: {
+      body: {
+        adjudication: {
+          body: {
+            adjudicationId: string;
+            adjudicator: string;
+            awardedAmount: {
+              currency: string;
+              units: number;
+            };
+            decisionRuleRef?: string;
+            dispute: {
+              body: {
+                disputeId: string;
+                issuedAt: number;
+                note?: string;
+                openedBy: string;
+                providerResponse: {
+                  body: {
+                    claim: {
+                      body: {
+                        bond: {
+                          body: {
+                            bondId: string;
+                            expiresAt: number;
+                            issuedAt: number;
+                            lifecycleState: string;
+                            report: {
+                              disposition: string;
+                              exposure: {
+                                actionableReceipts: number;
+                                activeDecisions: number;
+                                currencies: string[];
+                                failedSettlementReceipts: number;
+                                matchingDecisions: number;
+                                matchingReceipts: number;
+                                mixedCurrencyBook: boolean;
+                                pendingSettlementReceipts: number;
+                                returnedDecisions: number;
+                                returnedReceipts: number;
+                                supersededDecisions: number;
+                                truncatedDecisions: boolean;
+                                truncatedReceipts: boolean;
+                              };
+                              filters: {
+                                agentSubject: string;
+                                capabilityId?: string;
+                                decisionLimit: number;
+                                receiptLimit: number;
+                                toolName?: string;
+                                toolServer?: string;
+                              };
+                              generatedAt: number;
+                              latestFacilityId?: string;
+                              prerequisites: {
+                                activeFacilityMet: boolean;
+                                activeFacilityRequired: boolean;
+                                certificationMet: boolean;
+                                certificationRequired: boolean;
+                                currencyCoherent: boolean;
+                                runtimeAssuranceMet: boolean;
+                              };
+                              schema: string;
+                              scorecard: {
+                                anomalyCount: number;
+                                band: string;
+                                confidence: string;
+                                currencies: string[];
+                                matchingDecisions: number;
+                                matchingReceipts: number;
+                                mixedCurrencyBook: boolean;
+                                overallScore: number;
+                                probationary: boolean;
+                                returnedDecisions: number;
+                                returnedReceipts: number;
+                              };
+                              supportBoundary: {
+                                autonomyGatingSupported: boolean;
+                                externalEscrowExecutionSupported: boolean;
+                                reserveAccountingAuthoritative: boolean;
+                              };
+                              terms?: {
+                                capitalSource: string;
+                                collateralAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                coverageRatioBps: number;
+                                creditLimit: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                facilityId: string;
+                                outstandingExposureAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                reserveRatioBps: number;
+                                reserveRequirementAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                              };
+                            };
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        boundCoverage: {
+                          body: {
+                            boundAt: number;
+                            boundCoverageId: string;
+                            carrierReference?: string;
+                            coverageAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            effectiveFrom: number;
+                            effectiveUntil: number;
+                            issuedAt: number;
+                            placement: {
+                              body: {
+                                effectiveFrom: number;
+                                effectiveUntil: number;
+                                issuedAt: number;
+                                notes?: string;
+                                placementId: string;
+                                placementRef?: string;
+                                quoteResponse: {
+                                  body: {
+                                    disposition: string;
+                                    issuedAt: number;
+                                    providerQuoteRef: string;
+                                    quoteRequest: {
+                                      body: {
+                                        issuedAt: number;
+                                        notes?: string;
+                                        providerPolicy: {
+                                          boundCoverageSupported: boolean;
+                                          claimsSupported: boolean;
+                                          coverageClass: string;
+                                          currency: string;
+                                          displayName: string;
+                                          jurisdiction: string;
+                                          maxCoverageAmount: {
+                                            currency: string;
+                                            units: number;
+                                          };
+                                          providerId: string;
+                                          providerRecordId: string;
+                                          quoteTtlSeconds: number;
+                                          requiredEvidence: string[];
+                                        };
+                                        quoteRequestId: string;
+                                        requestedCoverageAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        requestedEffectiveFrom: number;
+                                        requestedEffectiveUntil: number;
+                                        riskPackage: {
+                                          body: {
+                                            certification: {
+                                              required: boolean;
+                                            };
+                                            exposure: {
+                                              body: {
+                                                decisions: {}[];
+                                                filters: {
+                                                  agentSubject: string;
+                                                  decisionLimit: number;
+                                                  receiptLimit: number;
+                                                };
+                                                generatedAt: number;
+                                                positions: {
+                                                  activeQuotedPremiumUnits: number;
+                                                  currency: string;
+                                                  failedUnits: number;
+                                                  governedMaxExposureUnits: number;
+                                                  pendingUnits: number;
+                                                  provisionalLossUnits: number;
+                                                  quotedPremiumUnits: number;
+                                                  recoveredUnits: number;
+                                                  reservedUnits: number;
+                                                  settledUnits: number;
+                                                }[];
+                                                receipts: {}[];
+                                                schema: string;
+                                                summary: {
+                                                  actionableReceipts: number;
+                                                  activeDecisions: number;
+                                                  currencies: string[];
+                                                  failedSettlementReceipts: number;
+                                                  matchingDecisions: number;
+                                                  matchingReceipts: number;
+                                                  mixedCurrencyBook: boolean;
+                                                  pendingSettlementReceipts: number;
+                                                  returnedDecisions: number;
+                                                  returnedReceipts: number;
+                                                  supersededDecisions: number;
+                                                  truncatedDecisions: boolean;
+                                                  truncatedReceipts: boolean;
+                                                };
+                                                supportBoundary: {
+                                                  claimAdjudicationSupported: boolean;
+                                                  crossCurrencyNettingSupported: boolean;
+                                                  governedReceiptsAuthoritative: boolean;
+                                                  recoveryLifecycleSupported: boolean;
+                                                  settlementReconciliationAuthoritative: boolean;
+                                                  underwritingDecisionsAuthoritative: boolean;
+                                                };
+                                              };
+                                              signature: string;
+                                              signerKey: string;
+                                            };
+                                            facilityReport: {
+                                              disposition: string;
+                                              filters: {
+                                                agentSubject: string;
+                                                decisionLimit: number;
+                                                receiptLimit: number;
+                                              };
+                                              generatedAt: number;
+                                              prerequisites: {
+                                                certificationMet: boolean;
+                                                certificationRequired: boolean;
+                                                manualReviewRequired: boolean;
+                                                minimumRuntimeAssuranceTier: string;
+                                                runtimeAssuranceMet: boolean;
+                                              };
+                                              schema: string;
+                                              scorecard: {
+                                                anomalyCount: number;
+                                                band: string;
+                                                confidence: string;
+                                                currencies: string[];
+                                                matchingDecisions: number;
+                                                matchingReceipts: number;
+                                                mixedCurrencyBook: boolean;
+                                                overallScore: number;
+                                                probationary: boolean;
+                                                returnedDecisions: number;
+                                                returnedReceipts: number;
+                                              };
+                                              supportBoundary: {
+                                                bondExecutionSupported: boolean;
+                                                crossCurrencyAllocationSupported: boolean;
+                                                providerNeutralPolicy: boolean;
+                                              };
+                                              terms?: {
+                                                capitalSource: string;
+                                                concentrationCapBps: number;
+                                                creditLimit: {
+                                                  currency: string;
+                                                  units: number;
+                                                };
+                                                reserveRatioBps: number;
+                                                ttlSeconds: number;
+                                                utilizationCeilingBps: number;
+                                              };
+                                            };
+                                            filters: {
+                                              agentSubject: string;
+                                              decisionLimit: number;
+                                              receiptLimit: number;
+                                              recentLossLimit: number;
+                                            };
+                                            generatedAt: number;
+                                            latestFacility?: {
+                                              creditLimit: {
+                                                currency: string;
+                                                units: number;
+                                              };
+                                              disposition: string;
+                                              expiresAt: number;
+                                              facilityId: string;
+                                              issuedAt: number;
+                                              lifecycleState: string;
+                                              signerKey: string;
+                                            };
+                                            recentLossHistory: {
+                                              entries: {}[];
+                                              summary: {
+                                                failedSettlementEvents: number;
+                                                matchingLossEvents: number;
+                                                provisionalLossEvents: number;
+                                                recoveredEvents: number;
+                                                returnedLossEvents: number;
+                                              };
+                                            };
+                                            runtimeAssurance?: {
+                                              governedReceipts: number;
+                                              highestTier: string;
+                                              latestEvidenceSha256: string;
+                                              latestSchema: string;
+                                              latestVerifier: string;
+                                              latestVerifierFamily: string;
+                                              observedVerifierFamilies: string[];
+                                              runtimeAssuranceReceipts: number;
+                                              stale: boolean;
+                                            };
+                                            schema: string;
+                                            scorecard: {
+                                              body: {
+                                                dimensions: {}[];
+                                                filters: {
+                                                  agentSubject: string;
+                                                  decisionLimit: number;
+                                                  receiptLimit: number;
+                                                };
+                                                generatedAt: number;
+                                                positions: {
+                                                  activeQuotedPremiumUnits: number;
+                                                  currency: string;
+                                                  failedUnits: number;
+                                                  governedMaxExposureUnits: number;
+                                                  pendingUnits: number;
+                                                  provisionalLossUnits: number;
+                                                  quotedPremiumUnits: number;
+                                                  recoveredUnits: number;
+                                                  reservedUnits: number;
+                                                  settledUnits: number;
+                                                }[];
+                                                probation: {
+                                                  probationary: boolean;
+                                                  receiptCount: number;
+                                                  spanDays: number;
+                                                  targetReceiptCount: number;
+                                                  targetSpanDays: number;
+                                                };
+                                                reputation: {
+                                                  acceptedImportedSignalCount: number;
+                                                  effectiveScore: number;
+                                                  importedSignalCount: number;
+                                                  probationary: boolean;
+                                                };
+                                                schema: string;
+                                                summary: {
+                                                  anomalyCount: number;
+                                                  band: string;
+                                                  confidence: string;
+                                                  currencies: string[];
+                                                  matchingDecisions: number;
+                                                  matchingReceipts: number;
+                                                  mixedCurrencyBook: boolean;
+                                                  overallScore: number;
+                                                  probationary: boolean;
+                                                  returnedDecisions: number;
+                                                  returnedReceipts: number;
+                                                };
+                                                supportBoundary: {
+                                                  capitalAllocationSupported: boolean;
+                                                  crossCurrencyNettingSupported: boolean;
+                                                  facilityPolicySupported: boolean;
+                                                  subjectScopedOnly: boolean;
+                                                };
+                                              };
+                                              signature: string;
+                                              signerKey: string;
+                                            };
+                                            subjectKey: string;
+                                            supportBoundary: {
+                                              autonomousPricingSupported: boolean;
+                                              complianceScoreReferenceSupported: boolean;
+                                              externalCapitalReviewSupported: boolean;
+                                              facilityPolicyAuthoritative: boolean;
+                                              liabilityMarketSupported: boolean;
+                                              signedExposureAuthoritative: boolean;
+                                              signedScorecardAuthoritative: boolean;
+                                            };
+                                          };
+                                          signature: string;
+                                          signerKey: string;
+                                        };
+                                        schema: string;
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    quoteResponseId: string;
+                                    quotedTerms: {
+                                      expiresAt: number;
+                                      quotedCoverageAmount: {
+                                        currency: string;
+                                        units: number;
+                                      };
+                                      quotedDeductibleAmount?: {
+                                        currency: string;
+                                        units: number;
+                                      };
+                                      quotedPremiumAmount: {
+                                        currency: string;
+                                        units: number;
+                                      };
+                                    };
+                                    schema: string;
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                schema: string;
+                                selectedCoverageAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                selectedPremiumAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            policyNumber: string;
+                            premiumAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        claimAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        claimEventAt: number;
+                        claimId: string;
+                        claimRef?: string;
+                        claimant: string;
+                        exposure: {
+                          body: {
+                            decisions: {}[];
+                            filters: {
+                              agentSubject: string;
+                              decisionLimit: number;
+                              receiptLimit: number;
+                            };
+                            generatedAt: number;
+                            positions: {
+                              activeQuotedPremiumUnits: number;
+                              currency: string;
+                              failedUnits: number;
+                              governedMaxExposureUnits: number;
+                              pendingUnits: number;
+                              provisionalLossUnits: number;
+                              quotedPremiumUnits: number;
+                              recoveredUnits: number;
+                              reservedUnits: number;
+                              settledUnits: number;
+                            }[];
+                            receipts: {}[];
+                            schema: string;
+                            summary: {
+                              actionableReceipts: number;
+                              activeDecisions: number;
+                              currencies: string[];
+                              failedSettlementReceipts: number;
+                              matchingDecisions: number;
+                              matchingReceipts: number;
+                              mixedCurrencyBook: boolean;
+                              pendingSettlementReceipts: number;
+                              returnedDecisions: number;
+                              returnedReceipts: number;
+                              supersededDecisions: number;
+                              truncatedDecisions: boolean;
+                              truncatedReceipts: boolean;
+                            };
+                            supportBoundary: {
+                              claimAdjudicationSupported: boolean;
+                              crossCurrencyNettingSupported: boolean;
+                              governedReceiptsAuthoritative: boolean;
+                              recoveryLifecycleSupported: boolean;
+                              settlementReconciliationAuthoritative: boolean;
+                              underwritingDecisionsAuthoritative: boolean;
+                            };
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        issuedAt: number;
+                        lossEvent: {
+                          body: {
+                            bondId: string;
+                            description: string;
+                            eventId: string;
+                            eventKind: string;
+                            issuedAt: number;
+                            projectedBondLifecycleState: string;
+                            report: {
+                              generatedAt: number;
+                              query: {
+                                amount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                bondId: string;
+                                eventKind: string;
+                              };
+                              schema: string;
+                              summary: {
+                                agentSubject: string;
+                                bondId: string;
+                                capabilityId?: string;
+                                currentBondLifecycleState: string;
+                                currentDelinquentAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                eventAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                facilityId?: string;
+                                outstandingDelinquentAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                projectedBondLifecycleState: string;
+                                releaseableReserveAmount?: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                toolName?: string;
+                                toolServer?: string;
+                              };
+                              supportBoundary: {
+                                appealWindowSupported: boolean;
+                                automaticCapitalExecutionSupported: boolean;
+                                bondLifecycleProjectionAuthoritative: boolean;
+                                externalClaimAdjudicationSupported: boolean;
+                                immutableLifecycleAuthoritative: boolean;
+                                reserveControlExecutionSupported: boolean;
+                              };
+                            };
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        narrative: string;
+                        receiptIds: string[];
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    claimResponseId: string;
+                    coveredAmount?: {
+                      currency: string;
+                      units: number;
+                    };
+                    denialReason?: string;
+                    disposition: string;
+                    issuedAt: number;
+                    providerResponseRef: string;
+                    responseNote?: string;
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                reason: string;
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            issuedAt: number;
+            note?: string;
+            outcome: string;
+            rosterAnchorRef?: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        capitalInstruction: {
+          body: {
+            action: string;
+            amount: {
+              currency: string;
+              units: number;
+            };
+            authorityChain: {
+              approvedAt: number;
+              authorityProof: {
+                body: {
+                  approvedAt: number;
+                  expiresAt: number;
+                  principalId: string;
+                  role: string;
+                  schema: string;
+                };
+                signature: string;
+                signerKey: string;
+              };
+              expiresAt: number;
+              note: string;
+              principalId: string;
+              role: string;
+            }[];
+            completionFlowRowId?: string;
+            counterpartyId: string;
+            counterpartyRole: string;
+            description: string;
+            executionWindow: {
+              notAfter: number;
+              notBefore: number;
+            };
+            governedReceiptId?: string;
+            instructionId: string;
+            intendedState: string;
+            issuedAt: number;
+            ownerRole: string;
+            query: {
+              agentSubject: string;
+              bondLimit: number;
+              facilityLimit: number;
+              lossEventLimit: number;
+              receiptLimit: number;
+            };
+            rail: {
+              custodyProviderId: string;
+              destinationAccountRef?: string;
+              jurisdiction?: string;
+              kind: string;
+              railId: string;
+              sourceAccountRef?: string;
+            };
+            reconciledState: string;
+            schema: string;
+            sourceId: string;
+            sourceKind: string;
+            subjectKey: string;
+            supportBoundary: {
+              automaticDispatchSupported: boolean;
+              capitalBookAuthoritative: boolean;
+              custodyNeutralInstructionSupported: boolean;
+              externalExecutionAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        issuedAt: number;
+        note?: string;
+        payoutAmount: {
+          currency: string;
+          units: number;
+        };
+        payoutInstructionId: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    payoutReceiptId: string;
+    payoutReceiptRef: string;
+    reconciliationState: string;
+    schema: "chio.market.claim-payout-receipt.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-response.schema.json
+export namespace Market_ClaimResponse {
+  export interface ChioMarketClaimResponseSignedBody {
+    claim: {
+      body: {
+        bond: {
+          body: {
+            bondId: string;
+            expiresAt: number;
+            issuedAt: number;
+            lifecycleState: string;
+            report: {
+              disposition: string;
+              exposure: {
+                actionableReceipts: number;
+                activeDecisions: number;
+                currencies: string[];
+                failedSettlementReceipts: number;
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                pendingSettlementReceipts: number;
+                returnedDecisions: number;
+                returnedReceipts: number;
+                supersededDecisions: number;
+                truncatedDecisions: boolean;
+                truncatedReceipts: boolean;
+              };
+              filters: {
+                agentSubject: string;
+                capabilityId?: string;
+                decisionLimit: number;
+                receiptLimit: number;
+                toolName?: string;
+                toolServer?: string;
+              };
+              generatedAt: number;
+              latestFacilityId?: string;
+              prerequisites: {
+                activeFacilityMet: boolean;
+                activeFacilityRequired: boolean;
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                currencyCoherent: boolean;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                autonomyGatingSupported: boolean;
+                externalEscrowExecutionSupported: boolean;
+                reserveAccountingAuthoritative: boolean;
+              };
+              terms?: {
+                capitalSource: string;
+                collateralAmount: {
+                  currency: string;
+                  units: number;
+                };
+                coverageRatioBps: number;
+                creditLimit: {
+                  currency: string;
+                  units: number;
+                };
+                facilityId: string;
+                outstandingExposureAmount: {
+                  currency: string;
+                  units: number;
+                };
+                reserveRatioBps: number;
+                reserveRequirementAmount: {
+                  currency: string;
+                  units: number;
+                };
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        boundCoverage: {
+          body: {
+            boundAt: number;
+            boundCoverageId: string;
+            carrierReference?: string;
+            coverageAmount: {
+              currency: string;
+              units: number;
+            };
+            effectiveFrom: number;
+            effectiveUntil: number;
+            issuedAt: number;
+            placement: {
+              body: {
+                effectiveFrom: number;
+                effectiveUntil: number;
+                issuedAt: number;
+                notes?: string;
+                placementId: string;
+                placementRef?: string;
+                quoteResponse: {
+                  body: {
+                    disposition: string;
+                    issuedAt: number;
+                    providerQuoteRef: string;
+                    quoteRequest: {
+                      body: {
+                        issuedAt: number;
+                        notes?: string;
+                        providerPolicy: {
+                          boundCoverageSupported: boolean;
+                          claimsSupported: boolean;
+                          coverageClass: string;
+                          currency: string;
+                          displayName: string;
+                          jurisdiction: string;
+                          maxCoverageAmount: {
+                            currency: string;
+                            units: number;
+                          };
+                          providerId: string;
+                          providerRecordId: string;
+                          quoteTtlSeconds: number;
+                          requiredEvidence: string[];
+                        };
+                        quoteRequestId: string;
+                        requestedCoverageAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        requestedEffectiveFrom: number;
+                        requestedEffectiveUntil: number;
+                        riskPackage: {
+                          body: {
+                            certification: {
+                              required: boolean;
+                            };
+                            exposure: {
+                              body: {
+                                decisions: {}[];
+                                filters: {
+                                  agentSubject: string;
+                                  decisionLimit: number;
+                                  receiptLimit: number;
+                                };
+                                generatedAt: number;
+                                positions: {
+                                  activeQuotedPremiumUnits: number;
+                                  currency: string;
+                                  failedUnits: number;
+                                  governedMaxExposureUnits: number;
+                                  pendingUnits: number;
+                                  provisionalLossUnits: number;
+                                  quotedPremiumUnits: number;
+                                  recoveredUnits: number;
+                                  reservedUnits: number;
+                                  settledUnits: number;
+                                }[];
+                                receipts: {}[];
+                                schema: string;
+                                summary: {
+                                  actionableReceipts: number;
+                                  activeDecisions: number;
+                                  currencies: string[];
+                                  failedSettlementReceipts: number;
+                                  matchingDecisions: number;
+                                  matchingReceipts: number;
+                                  mixedCurrencyBook: boolean;
+                                  pendingSettlementReceipts: number;
+                                  returnedDecisions: number;
+                                  returnedReceipts: number;
+                                  supersededDecisions: number;
+                                  truncatedDecisions: boolean;
+                                  truncatedReceipts: boolean;
+                                };
+                                supportBoundary: {
+                                  claimAdjudicationSupported: boolean;
+                                  crossCurrencyNettingSupported: boolean;
+                                  governedReceiptsAuthoritative: boolean;
+                                  recoveryLifecycleSupported: boolean;
+                                  settlementReconciliationAuthoritative: boolean;
+                                  underwritingDecisionsAuthoritative: boolean;
+                                };
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            facilityReport: {
+                              disposition: string;
+                              filters: {
+                                agentSubject: string;
+                                decisionLimit: number;
+                                receiptLimit: number;
+                              };
+                              generatedAt: number;
+                              prerequisites: {
+                                certificationMet: boolean;
+                                certificationRequired: boolean;
+                                manualReviewRequired: boolean;
+                                minimumRuntimeAssuranceTier: string;
+                                runtimeAssuranceMet: boolean;
+                              };
+                              schema: string;
+                              scorecard: {
+                                anomalyCount: number;
+                                band: string;
+                                confidence: string;
+                                currencies: string[];
+                                matchingDecisions: number;
+                                matchingReceipts: number;
+                                mixedCurrencyBook: boolean;
+                                overallScore: number;
+                                probationary: boolean;
+                                returnedDecisions: number;
+                                returnedReceipts: number;
+                              };
+                              supportBoundary: {
+                                bondExecutionSupported: boolean;
+                                crossCurrencyAllocationSupported: boolean;
+                                providerNeutralPolicy: boolean;
+                              };
+                              terms?: {
+                                capitalSource: string;
+                                concentrationCapBps: number;
+                                creditLimit: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                reserveRatioBps: number;
+                                ttlSeconds: number;
+                                utilizationCeilingBps: number;
+                              };
+                            };
+                            filters: {
+                              agentSubject: string;
+                              decisionLimit: number;
+                              receiptLimit: number;
+                              recentLossLimit: number;
+                            };
+                            generatedAt: number;
+                            latestFacility?: {
+                              creditLimit: {
+                                currency: string;
+                                units: number;
+                              };
+                              disposition: string;
+                              expiresAt: number;
+                              facilityId: string;
+                              issuedAt: number;
+                              lifecycleState: string;
+                              signerKey: string;
+                            };
+                            recentLossHistory: {
+                              entries: {}[];
+                              summary: {
+                                failedSettlementEvents: number;
+                                matchingLossEvents: number;
+                                provisionalLossEvents: number;
+                                recoveredEvents: number;
+                                returnedLossEvents: number;
+                              };
+                            };
+                            runtimeAssurance?: {
+                              governedReceipts: number;
+                              highestTier: string;
+                              latestEvidenceSha256: string;
+                              latestSchema: string;
+                              latestVerifier: string;
+                              latestVerifierFamily: string;
+                              observedVerifierFamilies: string[];
+                              runtimeAssuranceReceipts: number;
+                              stale: boolean;
+                            };
+                            schema: string;
+                            scorecard: {
+                              body: {
+                                dimensions: {}[];
+                                filters: {
+                                  agentSubject: string;
+                                  decisionLimit: number;
+                                  receiptLimit: number;
+                                };
+                                generatedAt: number;
+                                positions: {
+                                  activeQuotedPremiumUnits: number;
+                                  currency: string;
+                                  failedUnits: number;
+                                  governedMaxExposureUnits: number;
+                                  pendingUnits: number;
+                                  provisionalLossUnits: number;
+                                  quotedPremiumUnits: number;
+                                  recoveredUnits: number;
+                                  reservedUnits: number;
+                                  settledUnits: number;
+                                }[];
+                                probation: {
+                                  probationary: boolean;
+                                  receiptCount: number;
+                                  spanDays: number;
+                                  targetReceiptCount: number;
+                                  targetSpanDays: number;
+                                };
+                                reputation: {
+                                  acceptedImportedSignalCount: number;
+                                  effectiveScore: number;
+                                  importedSignalCount: number;
+                                  probationary: boolean;
+                                };
+                                schema: string;
+                                summary: {
+                                  anomalyCount: number;
+                                  band: string;
+                                  confidence: string;
+                                  currencies: string[];
+                                  matchingDecisions: number;
+                                  matchingReceipts: number;
+                                  mixedCurrencyBook: boolean;
+                                  overallScore: number;
+                                  probationary: boolean;
+                                  returnedDecisions: number;
+                                  returnedReceipts: number;
+                                };
+                                supportBoundary: {
+                                  capitalAllocationSupported: boolean;
+                                  crossCurrencyNettingSupported: boolean;
+                                  facilityPolicySupported: boolean;
+                                  subjectScopedOnly: boolean;
+                                };
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            subjectKey: string;
+                            supportBoundary: {
+                              autonomousPricingSupported: boolean;
+                              complianceScoreReferenceSupported: boolean;
+                              externalCapitalReviewSupported: boolean;
+                              facilityPolicyAuthoritative: boolean;
+                              liabilityMarketSupported: boolean;
+                              signedExposureAuthoritative: boolean;
+                              signedScorecardAuthoritative: boolean;
+                            };
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    quoteResponseId: string;
+                    quotedTerms: {
+                      expiresAt: number;
+                      quotedCoverageAmount: {
+                        currency: string;
+                        units: number;
+                      };
+                      quotedDeductibleAmount?: {
+                        currency: string;
+                        units: number;
+                      };
+                      quotedPremiumAmount: {
+                        currency: string;
+                        units: number;
+                      };
+                    };
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                schema: string;
+                selectedCoverageAmount: {
+                  currency: string;
+                  units: number;
+                };
+                selectedPremiumAmount: {
+                  currency: string;
+                  units: number;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            policyNumber: string;
+            premiumAmount: {
+              currency: string;
+              units: number;
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        claimAmount: {
+          currency: string;
+          units: number;
+        };
+        claimEventAt: number;
+        claimId: string;
+        claimRef?: string;
+        claimant: string;
+        exposure: {
+          body: {
+            decisions: {}[];
+            filters: {
+              agentSubject: string;
+              decisionLimit: number;
+              receiptLimit: number;
+            };
+            generatedAt: number;
+            positions: {
+              activeQuotedPremiumUnits: number;
+              currency: string;
+              failedUnits: number;
+              governedMaxExposureUnits: number;
+              pendingUnits: number;
+              provisionalLossUnits: number;
+              quotedPremiumUnits: number;
+              recoveredUnits: number;
+              reservedUnits: number;
+              settledUnits: number;
+            }[];
+            receipts: {}[];
+            schema: string;
+            summary: {
+              actionableReceipts: number;
+              activeDecisions: number;
+              currencies: string[];
+              failedSettlementReceipts: number;
+              matchingDecisions: number;
+              matchingReceipts: number;
+              mixedCurrencyBook: boolean;
+              pendingSettlementReceipts: number;
+              returnedDecisions: number;
+              returnedReceipts: number;
+              supersededDecisions: number;
+              truncatedDecisions: boolean;
+              truncatedReceipts: boolean;
+            };
+            supportBoundary: {
+              claimAdjudicationSupported: boolean;
+              crossCurrencyNettingSupported: boolean;
+              governedReceiptsAuthoritative: boolean;
+              recoveryLifecycleSupported: boolean;
+              settlementReconciliationAuthoritative: boolean;
+              underwritingDecisionsAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        issuedAt: number;
+        lossEvent: {
+          body: {
+            bondId: string;
+            description: string;
+            eventId: string;
+            eventKind: string;
+            issuedAt: number;
+            projectedBondLifecycleState: string;
+            report: {
+              generatedAt: number;
+              query: {
+                amount: {
+                  currency: string;
+                  units: number;
+                };
+                bondId: string;
+                eventKind: string;
+              };
+              schema: string;
+              summary: {
+                agentSubject: string;
+                bondId: string;
+                capabilityId?: string;
+                currentBondLifecycleState: string;
+                currentDelinquentAmount: {
+                  currency: string;
+                  units: number;
+                };
+                eventAmount: {
+                  currency: string;
+                  units: number;
+                };
+                facilityId?: string;
+                outstandingDelinquentAmount: {
+                  currency: string;
+                  units: number;
+                };
+                projectedBondLifecycleState: string;
+                releaseableReserveAmount?: {
+                  currency: string;
+                  units: number;
+                };
+                toolName?: string;
+                toolServer?: string;
+              };
+              supportBoundary: {
+                appealWindowSupported: boolean;
+                automaticCapitalExecutionSupported: boolean;
+                bondLifecycleProjectionAuthoritative: boolean;
+                externalClaimAdjudicationSupported: boolean;
+                immutableLifecycleAuthoritative: boolean;
+                reserveControlExecutionSupported: boolean;
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        narrative: string;
+        receiptIds: string[];
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    claimResponseId: string;
+    coveredAmount?: {
+      currency: string;
+      units: number;
+    };
+    denialReason?: string;
+    disposition: string;
+    issuedAt: number;
+    providerResponseRef: string;
+    responseNote?: string;
+    schema: "chio.market.claim-response.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-settlement-instruction.schema.json
+export namespace Market_ClaimSettlementInstruction {
+  export interface ChioMarketClaimSettlementInstructionSignedBody {
+    authorityChain: {
+      approvedAt: number;
+      authorityProof: {
+        body: {
+          approvedAt: number;
+          expiresAt: number;
+          principalId: string;
+          role: string;
+          schema: string;
+        };
+        signature: string;
+        signerKey: string;
+      };
+      expiresAt: number;
+      principalId: string;
+      role: string;
+    }[];
+    capitalBook: {
+      body: {
+        events: {}[];
+        generatedAt: number;
+        query: {
+          agentSubject: string;
+          bondLimit: number;
+          facilityLimit: number;
+          lossEventLimit: number;
+          receiptLimit: number;
+        };
+        schema: string;
+        sources: {
+          capitalSource: string;
+          committedAmount: {
+            currency: string;
+            units: number;
+          };
+          counterpartyId: string;
+          counterpartyRole: string;
+          currency: string;
+          description: string;
+          disbursedAmount: {
+            currency: string;
+            units: number;
+          };
+          facilityId: string;
+          impairedAmount: {
+            currency: string;
+            units: number;
+          };
+          jurisdiction: string;
+          kind: string;
+          ownerRole: string;
+          sourceId: string;
+        }[];
+        subjectKey: string;
+        summary: {
+          currencies: string[];
+          fundingSources: number;
+          ledgerEvents: number;
+          matchingBonds: number;
+          matchingFacilities: number;
+          matchingLossEvents: number;
+          matchingReceipts: number;
+          mixedCurrencyBook: boolean;
+          returnedBonds: number;
+          returnedFacilities: number;
+          returnedLossEvents: number;
+          returnedReceipts: number;
+          truncatedBonds: boolean;
+          truncatedFacilities: boolean;
+          truncatedLossEvents: boolean;
+          truncatedReceipts: boolean;
+        };
+        supportBoundary: {
+          automaticCapitalExecutionSupported: boolean;
+          custodyExecutionSupported: boolean;
+          mixedCurrencyNettingSupported: boolean;
+          sourceOfFundsAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    executionWindow: {
+      notAfter: number;
+      notBefore: number;
+    };
+    issuedAt: number;
+    payoutReceipt: {
+      body: {
+        issuedAt: number;
+        observedExecution: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          externalReferenceId: string;
+          observedAt: number;
+        };
+        payoutInstruction: {
+          body: {
+            adjudication: {
+              body: {
+                adjudicationId: string;
+                adjudicator: string;
+                awardedAmount: {
+                  currency: string;
+                  units: number;
+                };
+                dispute: {
+                  body: {
+                    disputeId: string;
+                    issuedAt: number;
+                    openedBy: string;
+                    providerResponse: {
+                      body: {
+                        claim: {
+                          body: {
+                            bond: {
+                              body: {
+                                bondId: string;
+                                expiresAt: number;
+                                issuedAt: number;
+                                lifecycleState: string;
+                                report: {
+                                  disposition: string;
+                                  exposure: {
+                                    actionableReceipts: number;
+                                    activeDecisions: number;
+                                    currencies: string[];
+                                    failedSettlementReceipts: number;
+                                    matchingDecisions: number;
+                                    matchingReceipts: number;
+                                    mixedCurrencyBook: boolean;
+                                    pendingSettlementReceipts: number;
+                                    returnedDecisions: number;
+                                    returnedReceipts: number;
+                                    supersededDecisions: number;
+                                    truncatedDecisions: boolean;
+                                    truncatedReceipts: boolean;
+                                  };
+                                  filters: {
+                                    agentSubject: string;
+                                    decisionLimit: number;
+                                    receiptLimit: number;
+                                  };
+                                  generatedAt: number;
+                                  latestFacilityId: string;
+                                  prerequisites: {
+                                    activeFacilityMet: boolean;
+                                    activeFacilityRequired: boolean;
+                                    certificationMet: boolean;
+                                    certificationRequired: boolean;
+                                    currencyCoherent: boolean;
+                                    runtimeAssuranceMet: boolean;
+                                  };
+                                  schema: string;
+                                  scorecard: {
+                                    anomalyCount: number;
+                                    band: string;
+                                    confidence: string;
+                                    currencies: string[];
+                                    matchingDecisions: number;
+                                    matchingReceipts: number;
+                                    mixedCurrencyBook: boolean;
+                                    overallScore: number;
+                                    probationary: boolean;
+                                    returnedDecisions: number;
+                                    returnedReceipts: number;
+                                  };
+                                  supportBoundary: {
+                                    autonomyGatingSupported: boolean;
+                                    externalEscrowExecutionSupported: boolean;
+                                    reserveAccountingAuthoritative: boolean;
+                                  };
+                                  terms: {
+                                    capitalSource: string;
+                                    collateralAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    coverageRatioBps: number;
+                                    creditLimit: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    facilityId: string;
+                                    outstandingExposureAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    reserveRatioBps: number;
+                                    reserveRequirementAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                  };
+                                };
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            boundCoverage: {
+                              body: {
+                                boundAt: number;
+                                boundCoverageId: string;
+                                carrierReference: string;
+                                coverageAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                effectiveFrom: number;
+                                effectiveUntil: number;
+                                issuedAt: number;
+                                placement: {
+                                  body: {
+                                    effectiveFrom: number;
+                                    effectiveUntil: number;
+                                    issuedAt: number;
+                                    placementId: string;
+                                    placementRef: string;
+                                    quoteResponse: {
+                                      body: {
+                                        disposition: string;
+                                        issuedAt: number;
+                                        providerQuoteRef: string;
+                                        quoteRequest: {
+                                          body: {
+                                            issuedAt: number;
+                                            notes: string;
+                                            providerPolicy: {
+                                              boundCoverageSupported: boolean;
+                                              claimsSupported: boolean;
+                                              coverageClass: string;
+                                              currency: string;
+                                              displayName: string;
+                                              jurisdiction: string;
+                                              maxCoverageAmount: {
+                                                currency: string;
+                                                units: number;
+                                              };
+                                              providerId: string;
+                                              providerRecordId: string;
+                                              quoteTtlSeconds: number;
+                                              requiredEvidence: string[];
+                                            };
+                                            quoteRequestId: string;
+                                            requestedCoverageAmount: {
+                                              currency: string;
+                                              units: number;
+                                            };
+                                            requestedEffectiveFrom: number;
+                                            requestedEffectiveUntil: number;
+                                            riskPackage: {
+                                              body: {
+                                                certification: {
+                                                  required: boolean;
+                                                };
+                                                exposure: {
+                                                  body: {
+                                                    decisions: {}[];
+                                                    filters: {
+                                                      agentSubject: string;
+                                                      decisionLimit: number;
+                                                      receiptLimit: number;
+                                                    };
+                                                    generatedAt: number;
+                                                    positions: {
+                                                      activeQuotedPremiumUnits: number;
+                                                      currency: string;
+                                                      failedUnits: number;
+                                                      governedMaxExposureUnits: number;
+                                                      pendingUnits: number;
+                                                      provisionalLossUnits: number;
+                                                      quotedPremiumUnits: number;
+                                                      recoveredUnits: number;
+                                                      reservedUnits: number;
+                                                      settledUnits: number;
+                                                    }[];
+                                                    receipts: {}[];
+                                                    schema: string;
+                                                    summary: {
+                                                      actionableReceipts: number;
+                                                      activeDecisions: number;
+                                                      currencies: string[];
+                                                      failedSettlementReceipts: number;
+                                                      matchingDecisions: number;
+                                                      matchingReceipts: number;
+                                                      mixedCurrencyBook: boolean;
+                                                      pendingSettlementReceipts: number;
+                                                      returnedDecisions: number;
+                                                      returnedReceipts: number;
+                                                      supersededDecisions: number;
+                                                      truncatedDecisions: boolean;
+                                                      truncatedReceipts: boolean;
+                                                    };
+                                                    supportBoundary: {
+                                                      claimAdjudicationSupported: boolean;
+                                                      crossCurrencyNettingSupported: boolean;
+                                                      governedReceiptsAuthoritative: boolean;
+                                                      recoveryLifecycleSupported: boolean;
+                                                      settlementReconciliationAuthoritative: boolean;
+                                                      underwritingDecisionsAuthoritative: boolean;
+                                                    };
+                                                  };
+                                                  signature: string;
+                                                  signerKey: string;
+                                                };
+                                                facilityReport: {
+                                                  disposition: string;
+                                                  filters: {
+                                                    agentSubject: string;
+                                                    decisionLimit: number;
+                                                    receiptLimit: number;
+                                                  };
+                                                  generatedAt: number;
+                                                  prerequisites: {
+                                                    certificationMet: boolean;
+                                                    certificationRequired: boolean;
+                                                    manualReviewRequired: boolean;
+                                                    minimumRuntimeAssuranceTier: string;
+                                                    runtimeAssuranceMet: boolean;
+                                                  };
+                                                  schema: string;
+                                                  scorecard: {
+                                                    anomalyCount: number;
+                                                    band: string;
+                                                    confidence: string;
+                                                    currencies: string[];
+                                                    matchingDecisions: number;
+                                                    matchingReceipts: number;
+                                                    mixedCurrencyBook: boolean;
+                                                    overallScore: number;
+                                                    probationary: boolean;
+                                                    returnedDecisions: number;
+                                                    returnedReceipts: number;
+                                                  };
+                                                  supportBoundary: {
+                                                    bondExecutionSupported: boolean;
+                                                    crossCurrencyAllocationSupported: boolean;
+                                                    providerNeutralPolicy: boolean;
+                                                  };
+                                                  terms: {
+                                                    capitalSource: string;
+                                                    concentrationCapBps: number;
+                                                    creditLimit: {
+                                                      currency: string;
+                                                      units: number;
+                                                    };
+                                                    reserveRatioBps: number;
+                                                    ttlSeconds: number;
+                                                    utilizationCeilingBps: number;
+                                                  };
+                                                };
+                                                filters: {
+                                                  agentSubject: string;
+                                                  decisionLimit: number;
+                                                  receiptLimit: number;
+                                                  recentLossLimit: number;
+                                                };
+                                                generatedAt: number;
+                                                latestFacility: {
+                                                  creditLimit: {
+                                                    currency: string;
+                                                    units: number;
+                                                  };
+                                                  disposition: string;
+                                                  expiresAt: number;
+                                                  facilityId: string;
+                                                  issuedAt: number;
+                                                  lifecycleState: string;
+                                                  signerKey: string;
+                                                };
+                                                recentLossHistory: {
+                                                  entries: {}[];
+                                                  summary: {
+                                                    failedSettlementEvents: number;
+                                                    matchingLossEvents: number;
+                                                    provisionalLossEvents: number;
+                                                    recoveredEvents: number;
+                                                    returnedLossEvents: number;
+                                                  };
+                                                };
+                                                runtimeAssurance: {
+                                                  governedReceipts: number;
+                                                  highestTier: string;
+                                                  latestEvidenceSha256: string;
+                                                  latestSchema: string;
+                                                  latestVerifier: string;
+                                                  latestVerifierFamily: string;
+                                                  observedVerifierFamilies: string[];
+                                                  runtimeAssuranceReceipts: number;
+                                                  stale: boolean;
+                                                };
+                                                schema: string;
+                                                scorecard: {
+                                                  body: {
+                                                    dimensions: {}[];
+                                                    filters: {
+                                                      agentSubject: string;
+                                                      decisionLimit: number;
+                                                      receiptLimit: number;
+                                                    };
+                                                    generatedAt: number;
+                                                    positions: {
+                                                      activeQuotedPremiumUnits: number;
+                                                      currency: string;
+                                                      failedUnits: number;
+                                                      governedMaxExposureUnits: number;
+                                                      pendingUnits: number;
+                                                      provisionalLossUnits: number;
+                                                      quotedPremiumUnits: number;
+                                                      recoveredUnits: number;
+                                                      reservedUnits: number;
+                                                      settledUnits: number;
+                                                    }[];
+                                                    probation: {
+                                                      probationary: boolean;
+                                                      receiptCount: number;
+                                                      spanDays: number;
+                                                      targetReceiptCount: number;
+                                                      targetSpanDays: number;
+                                                    };
+                                                    reputation: {
+                                                      acceptedImportedSignalCount: number;
+                                                      effectiveScore: number;
+                                                      importedSignalCount: number;
+                                                      probationary: boolean;
+                                                    };
+                                                    schema: string;
+                                                    summary: {
+                                                      anomalyCount: number;
+                                                      band: string;
+                                                      confidence: string;
+                                                      currencies: string[];
+                                                      matchingDecisions: number;
+                                                      matchingReceipts: number;
+                                                      mixedCurrencyBook: boolean;
+                                                      overallScore: number;
+                                                      probationary: boolean;
+                                                      returnedDecisions: number;
+                                                      returnedReceipts: number;
+                                                    };
+                                                    supportBoundary: {
+                                                      capitalAllocationSupported: boolean;
+                                                      crossCurrencyNettingSupported: boolean;
+                                                      facilityPolicySupported: boolean;
+                                                      subjectScopedOnly: boolean;
+                                                    };
+                                                  };
+                                                  signature: string;
+                                                  signerKey: string;
+                                                };
+                                                subjectKey: string;
+                                                supportBoundary: {
+                                                  autonomousPricingSupported: boolean;
+                                                  complianceScoreReferenceSupported: boolean;
+                                                  externalCapitalReviewSupported: boolean;
+                                                  facilityPolicyAuthoritative: boolean;
+                                                  liabilityMarketSupported: boolean;
+                                                  signedExposureAuthoritative: boolean;
+                                                  signedScorecardAuthoritative: boolean;
+                                                };
+                                              };
+                                              signature: string;
+                                              signerKey: string;
+                                            };
+                                            schema: string;
+                                          };
+                                          signature: string;
+                                          signerKey: string;
+                                        };
+                                        quoteResponseId: string;
+                                        quotedTerms: {
+                                          expiresAt: number;
+                                          quotedCoverageAmount: {
+                                            currency: string;
+                                            units: number;
+                                          };
+                                          quotedDeductibleAmount: {
+                                            currency: string;
+                                            units: number;
+                                          };
+                                          quotedPremiumAmount: {
+                                            currency: string;
+                                            units: number;
+                                          };
+                                        };
+                                        schema: string;
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    schema: string;
+                                    selectedCoverageAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    selectedPremiumAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                policyNumber: string;
+                                premiumAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            claimAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            claimEventAt: number;
+                            claimId: string;
+                            claimRef: string;
+                            claimant: string;
+                            exposure: {
+                              body: {
+                                decisions: {}[];
+                                filters: {
+                                  agentSubject: string;
+                                  decisionLimit: number;
+                                  receiptLimit: number;
+                                };
+                                generatedAt: number;
+                                positions: {
+                                  activeQuotedPremiumUnits: number;
+                                  currency: string;
+                                  failedUnits: number;
+                                  governedMaxExposureUnits: number;
+                                  pendingUnits: number;
+                                  provisionalLossUnits: number;
+                                  quotedPremiumUnits: number;
+                                  recoveredUnits: number;
+                                  reservedUnits: number;
+                                  settledUnits: number;
+                                }[];
+                                receipts: {}[];
+                                schema: string;
+                                summary: {
+                                  actionableReceipts: number;
+                                  activeDecisions: number;
+                                  currencies: string[];
+                                  failedSettlementReceipts: number;
+                                  matchingDecisions: number;
+                                  matchingReceipts: number;
+                                  mixedCurrencyBook: boolean;
+                                  pendingSettlementReceipts: number;
+                                  returnedDecisions: number;
+                                  returnedReceipts: number;
+                                  supersededDecisions: number;
+                                  truncatedDecisions: boolean;
+                                  truncatedReceipts: boolean;
+                                };
+                                supportBoundary: {
+                                  claimAdjudicationSupported: boolean;
+                                  crossCurrencyNettingSupported: boolean;
+                                  governedReceiptsAuthoritative: boolean;
+                                  recoveryLifecycleSupported: boolean;
+                                  settlementReconciliationAuthoritative: boolean;
+                                  underwritingDecisionsAuthoritative: boolean;
+                                };
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            issuedAt: number;
+                            lossEvent: {
+                              body: {
+                                bondId: string;
+                                description: string;
+                                eventId: string;
+                                eventKind: string;
+                                issuedAt: number;
+                                projectedBondLifecycleState: string;
+                                report: {
+                                  generatedAt: number;
+                                  query: {
+                                    amount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    bondId: string;
+                                    eventKind: string;
+                                  };
+                                  schema: string;
+                                  summary: {
+                                    agentSubject: string;
+                                    bondId: string;
+                                    capabilityId: string;
+                                    currentBondLifecycleState: string;
+                                    currentDelinquentAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    eventAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    facilityId: string;
+                                    outstandingDelinquentAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    projectedBondLifecycleState: string;
+                                    releaseableReserveAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    toolName: string;
+                                    toolServer: string;
+                                  };
+                                  supportBoundary: {
+                                    appealWindowSupported: boolean;
+                                    automaticCapitalExecutionSupported: boolean;
+                                    bondLifecycleProjectionAuthoritative: boolean;
+                                    externalClaimAdjudicationSupported: boolean;
+                                    immutableLifecycleAuthoritative: boolean;
+                                    reserveControlExecutionSupported: boolean;
+                                  };
+                                };
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            narrative: string;
+                            receiptIds: string[];
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        claimResponseId: string;
+                        coveredAmount: {
+                          currency: string;
+                          units: number;
+                        };
+                        disposition: string;
+                        issuedAt: number;
+                        providerResponseRef: string;
+                        responseNote: string;
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    reason: string;
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                issuedAt: number;
+                note: string;
+                outcome: string;
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            capitalInstruction: {
+              body: {
+                action: string;
+                amount: {
+                  currency: string;
+                  units: number;
+                };
+                authorityChain: {}[];
+                completionFlowRowId: string;
+                counterpartyId: string;
+                counterpartyRole: string;
+                description: string;
+                executionWindow: {
+                  notAfter: number;
+                  notBefore: number;
+                };
+                governedReceiptId: string;
+                instructionId: string;
+                intendedState: string;
+                issuedAt: number;
+                ownerRole: string;
+                query: {
+                  agentSubject: string;
+                  bondLimit: number;
+                  facilityLimit: number;
+                  lossEventLimit: number;
+                  receiptLimit: number;
+                };
+                rail: {
+                  custodyProviderId: string;
+                  jurisdiction: string;
+                  kind: string;
+                  railId: string;
+                };
+                reconciledState: string;
+                schema: string;
+                sourceId: string;
+                sourceKind: string;
+                subjectKey: string;
+                supportBoundary: {
+                  automaticDispatchSupported: boolean;
+                  capitalBookAuthoritative: boolean;
+                  custodyNeutralInstructionSupported: boolean;
+                  externalExecutionAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            issuedAt: number;
+            payoutAmount: {
+              currency: string;
+              units: number;
+            };
+            payoutInstructionId: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        payoutReceiptId: string;
+        payoutReceiptRef: string;
+        reconciliationState: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    rail: {
+      custodyProviderId: string;
+      jurisdiction: string;
+      kind: string;
+      railId: string;
+    };
+    schema: "chio.market.claim-settlement-instruction.v1";
+    settlementAmount: {
+      currency: string;
+      units: number;
+    };
+    settlementInstructionId: string;
+    settlementKind: string;
+    settlementReference: string;
+    topology: {
+      payee: {
+        jurisdiction: string;
+        partyId: string;
+        role: string;
+      };
+      payer: {
+        jurisdiction: string;
+        partyId: string;
+        role: string;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/claim-settlement-receipt.schema.json
+export namespace Market_ClaimSettlementReceipt {
+  export interface ChioMarketClaimSettlementReceiptSignedBody {
+    issuedAt: number;
+    observedExecution: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      externalReferenceId: string;
+      observedAt: number;
+    };
+    observedPayeeId: string;
+    observedPayerId: string;
+    reconciliationState: string;
+    schema: "chio.market.claim-settlement-receipt.v1";
+    settlementInstruction: {
+      body: {
+        authorityChain: {
+          approvedAt: number;
+          authorityProof: {
+            body: {
+              approvedAt: number;
+              expiresAt: number;
+              principalId: string;
+              role: string;
+              schema: string;
+            };
+            signature: string;
+            signerKey: string;
+          };
+          expiresAt: number;
+          principalId: string;
+          role: string;
+        }[];
+        capitalBook: {
+          body: {
+            events: {}[];
+            generatedAt: number;
+            query: {
+              agentSubject: string;
+              bondLimit: number;
+              facilityLimit: number;
+              lossEventLimit: number;
+              receiptLimit: number;
+            };
+            schema: string;
+            sources: {
+              capitalSource: string;
+              committedAmount: {
+                currency: string;
+                units: number;
+              };
+              counterpartyId: string;
+              counterpartyRole: string;
+              currency: string;
+              description: string;
+              disbursedAmount: {
+                currency: string;
+                units: number;
+              };
+              facilityId: string;
+              impairedAmount: {
+                currency: string;
+                units: number;
+              };
+              jurisdiction: string;
+              kind: string;
+              ownerRole: string;
+              sourceId: string;
+            }[];
+            subjectKey: string;
+            summary: {
+              currencies: string[];
+              fundingSources: number;
+              ledgerEvents: number;
+              matchingBonds: number;
+              matchingFacilities: number;
+              matchingLossEvents: number;
+              matchingReceipts: number;
+              mixedCurrencyBook: boolean;
+              returnedBonds: number;
+              returnedFacilities: number;
+              returnedLossEvents: number;
+              returnedReceipts: number;
+              truncatedBonds: boolean;
+              truncatedFacilities: boolean;
+              truncatedLossEvents: boolean;
+              truncatedReceipts: boolean;
+            };
+            supportBoundary: {
+              automaticCapitalExecutionSupported: boolean;
+              custodyExecutionSupported: boolean;
+              mixedCurrencyNettingSupported: boolean;
+              sourceOfFundsAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        executionWindow: {
+          notAfter: number;
+          notBefore: number;
+        };
+        issuedAt: number;
+        payoutReceipt: {
+          body: {
+            issuedAt: number;
+            observedExecution: {
+              amount: {
+                currency: string;
+                units: number;
+              };
+              externalReferenceId: string;
+              observedAt: number;
+            };
+            payoutInstruction: {
+              body: {
+                adjudication: {
+                  body: {
+                    adjudicationId: string;
+                    adjudicator: string;
+                    awardedAmount: {
+                      currency: string;
+                      units: number;
+                    };
+                    dispute: {
+                      body: {
+                        disputeId: string;
+                        issuedAt: number;
+                        openedBy: string;
+                        providerResponse: {
+                          body: {
+                            claim: {
+                              body: {
+                                bond: {
+                                  body: {
+                                    bondId: string;
+                                    expiresAt: number;
+                                    issuedAt: number;
+                                    lifecycleState: string;
+                                    report: {
+                                      disposition: string;
+                                      exposure: {
+                                        actionableReceipts: number;
+                                        activeDecisions: number;
+                                        currencies: string[];
+                                        failedSettlementReceipts: number;
+                                        matchingDecisions: number;
+                                        matchingReceipts: number;
+                                        mixedCurrencyBook: boolean;
+                                        pendingSettlementReceipts: number;
+                                        returnedDecisions: number;
+                                        returnedReceipts: number;
+                                        supersededDecisions: number;
+                                        truncatedDecisions: boolean;
+                                        truncatedReceipts: boolean;
+                                      };
+                                      filters: {
+                                        agentSubject: string;
+                                        decisionLimit: number;
+                                        receiptLimit: number;
+                                      };
+                                      generatedAt: number;
+                                      latestFacilityId: string;
+                                      prerequisites: {
+                                        activeFacilityMet: boolean;
+                                        activeFacilityRequired: boolean;
+                                        certificationMet: boolean;
+                                        certificationRequired: boolean;
+                                        currencyCoherent: boolean;
+                                        runtimeAssuranceMet: boolean;
+                                      };
+                                      schema: string;
+                                      scorecard: {
+                                        anomalyCount: number;
+                                        band: string;
+                                        confidence: string;
+                                        currencies: string[];
+                                        matchingDecisions: number;
+                                        matchingReceipts: number;
+                                        mixedCurrencyBook: boolean;
+                                        overallScore: number;
+                                        probationary: boolean;
+                                        returnedDecisions: number;
+                                        returnedReceipts: number;
+                                      };
+                                      supportBoundary: {
+                                        autonomyGatingSupported: boolean;
+                                        externalEscrowExecutionSupported: boolean;
+                                        reserveAccountingAuthoritative: boolean;
+                                      };
+                                      terms: {
+                                        capitalSource: string;
+                                        collateralAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        coverageRatioBps: number;
+                                        creditLimit: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        facilityId: string;
+                                        outstandingExposureAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        reserveRatioBps: number;
+                                        reserveRequirementAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                      };
+                                    };
+                                    schema: string;
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                boundCoverage: {
+                                  body: {
+                                    boundAt: number;
+                                    boundCoverageId: string;
+                                    carrierReference: string;
+                                    coverageAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    effectiveFrom: number;
+                                    effectiveUntil: number;
+                                    issuedAt: number;
+                                    placement: {
+                                      body: {
+                                        effectiveFrom: number;
+                                        effectiveUntil: number;
+                                        issuedAt: number;
+                                        placementId: string;
+                                        placementRef: string;
+                                        quoteResponse: {
+                                          body: {
+                                            disposition: string;
+                                            issuedAt: number;
+                                            providerQuoteRef: string;
+                                            quoteRequest: {
+                                              body: {
+                                                issuedAt: number;
+                                                notes: string;
+                                                providerPolicy: {
+                                                  boundCoverageSupported: boolean;
+                                                  claimsSupported: boolean;
+                                                  coverageClass: string;
+                                                  currency: string;
+                                                  displayName: string;
+                                                  jurisdiction: string;
+                                                  maxCoverageAmount: {
+                                                    currency: string;
+                                                    units: number;
+                                                  };
+                                                  providerId: string;
+                                                  providerRecordId: string;
+                                                  quoteTtlSeconds: number;
+                                                  requiredEvidence: string[];
+                                                };
+                                                quoteRequestId: string;
+                                                requestedCoverageAmount: {
+                                                  currency: string;
+                                                  units: number;
+                                                };
+                                                requestedEffectiveFrom: number;
+                                                requestedEffectiveUntil: number;
+                                                riskPackage: {
+                                                  body: {
+                                                    certification: {
+                                                      required: boolean;
+                                                    };
+                                                    exposure: {
+                                                      body: {
+                                                        decisions: {}[];
+                                                        filters: {
+                                                          agentSubject: string;
+                                                          decisionLimit: number;
+                                                          receiptLimit: number;
+                                                        };
+                                                        generatedAt: number;
+                                                        positions: {
+                                                          activeQuotedPremiumUnits: number;
+                                                          currency: string;
+                                                          failedUnits: number;
+                                                          governedMaxExposureUnits: number;
+                                                          pendingUnits: number;
+                                                          provisionalLossUnits: number;
+                                                          quotedPremiumUnits: number;
+                                                          recoveredUnits: number;
+                                                          reservedUnits: number;
+                                                          settledUnits: number;
+                                                        }[];
+                                                        receipts: {}[];
+                                                        schema: string;
+                                                        summary: {
+                                                          actionableReceipts: number;
+                                                          activeDecisions: number;
+                                                          currencies: string[];
+                                                          failedSettlementReceipts: number;
+                                                          matchingDecisions: number;
+                                                          matchingReceipts: number;
+                                                          mixedCurrencyBook: boolean;
+                                                          pendingSettlementReceipts: number;
+                                                          returnedDecisions: number;
+                                                          returnedReceipts: number;
+                                                          supersededDecisions: number;
+                                                          truncatedDecisions: boolean;
+                                                          truncatedReceipts: boolean;
+                                                        };
+                                                        supportBoundary: {
+                                                          claimAdjudicationSupported: boolean;
+                                                          crossCurrencyNettingSupported: boolean;
+                                                          governedReceiptsAuthoritative: boolean;
+                                                          recoveryLifecycleSupported: boolean;
+                                                          settlementReconciliationAuthoritative: boolean;
+                                                          underwritingDecisionsAuthoritative: boolean;
+                                                        };
+                                                      };
+                                                      signature: string;
+                                                      signerKey: string;
+                                                    };
+                                                    facilityReport: {
+                                                      disposition: string;
+                                                      filters: {
+                                                        agentSubject: string;
+                                                        decisionLimit: number;
+                                                        receiptLimit: number;
+                                                      };
+                                                      generatedAt: number;
+                                                      prerequisites: {
+                                                        certificationMet: boolean;
+                                                        certificationRequired: boolean;
+                                                        manualReviewRequired: boolean;
+                                                        minimumRuntimeAssuranceTier: string;
+                                                        runtimeAssuranceMet: boolean;
+                                                      };
+                                                      schema: string;
+                                                      scorecard: {
+                                                        anomalyCount: number;
+                                                        band: string;
+                                                        confidence: string;
+                                                        currencies: string[];
+                                                        matchingDecisions: number;
+                                                        matchingReceipts: number;
+                                                        mixedCurrencyBook: boolean;
+                                                        overallScore: number;
+                                                        probationary: boolean;
+                                                        returnedDecisions: number;
+                                                        returnedReceipts: number;
+                                                      };
+                                                      supportBoundary: {
+                                                        bondExecutionSupported: boolean;
+                                                        crossCurrencyAllocationSupported: boolean;
+                                                        providerNeutralPolicy: boolean;
+                                                      };
+                                                      terms: {
+                                                        capitalSource: string;
+                                                        concentrationCapBps: number;
+                                                        creditLimit: {
+                                                          currency: string;
+                                                          units: number;
+                                                        };
+                                                        reserveRatioBps: number;
+                                                        ttlSeconds: number;
+                                                        utilizationCeilingBps: number;
+                                                      };
+                                                    };
+                                                    filters: {
+                                                      agentSubject: string;
+                                                      decisionLimit: number;
+                                                      receiptLimit: number;
+                                                      recentLossLimit: number;
+                                                    };
+                                                    generatedAt: number;
+                                                    latestFacility: {
+                                                      creditLimit: {
+                                                        currency: string;
+                                                        units: number;
+                                                      };
+                                                      disposition: string;
+                                                      expiresAt: number;
+                                                      facilityId: string;
+                                                      issuedAt: number;
+                                                      lifecycleState: string;
+                                                      signerKey: string;
+                                                    };
+                                                    recentLossHistory: {
+                                                      entries: {}[];
+                                                      summary: {
+                                                        failedSettlementEvents: number;
+                                                        matchingLossEvents: number;
+                                                        provisionalLossEvents: number;
+                                                        recoveredEvents: number;
+                                                        returnedLossEvents: number;
+                                                      };
+                                                    };
+                                                    runtimeAssurance: {
+                                                      governedReceipts: number;
+                                                      highestTier: string;
+                                                      latestEvidenceSha256: string;
+                                                      latestSchema: string;
+                                                      latestVerifier: string;
+                                                      latestVerifierFamily: string;
+                                                      observedVerifierFamilies: string[];
+                                                      runtimeAssuranceReceipts: number;
+                                                      stale: boolean;
+                                                    };
+                                                    schema: string;
+                                                    scorecard: {
+                                                      body: {
+                                                        dimensions: {}[];
+                                                        filters: {
+                                                          agentSubject: string;
+                                                          decisionLimit: number;
+                                                          receiptLimit: number;
+                                                        };
+                                                        generatedAt: number;
+                                                        positions: {
+                                                          activeQuotedPremiumUnits: number;
+                                                          currency: string;
+                                                          failedUnits: number;
+                                                          governedMaxExposureUnits: number;
+                                                          pendingUnits: number;
+                                                          provisionalLossUnits: number;
+                                                          quotedPremiumUnits: number;
+                                                          recoveredUnits: number;
+                                                          reservedUnits: number;
+                                                          settledUnits: number;
+                                                        }[];
+                                                        probation: {
+                                                          probationary: boolean;
+                                                          receiptCount: number;
+                                                          spanDays: number;
+                                                          targetReceiptCount: number;
+                                                          targetSpanDays: number;
+                                                        };
+                                                        reputation: {
+                                                          acceptedImportedSignalCount: number;
+                                                          effectiveScore: number;
+                                                          importedSignalCount: number;
+                                                          probationary: boolean;
+                                                        };
+                                                        schema: string;
+                                                        summary: {
+                                                          anomalyCount: number;
+                                                          band: string;
+                                                          confidence: string;
+                                                          currencies: string[];
+                                                          matchingDecisions: number;
+                                                          matchingReceipts: number;
+                                                          mixedCurrencyBook: boolean;
+                                                          overallScore: number;
+                                                          probationary: boolean;
+                                                          returnedDecisions: number;
+                                                          returnedReceipts: number;
+                                                        };
+                                                        supportBoundary: {
+                                                          capitalAllocationSupported: boolean;
+                                                          crossCurrencyNettingSupported: boolean;
+                                                          facilityPolicySupported: boolean;
+                                                          subjectScopedOnly: boolean;
+                                                        };
+                                                      };
+                                                      signature: string;
+                                                      signerKey: string;
+                                                    };
+                                                    subjectKey: string;
+                                                    supportBoundary: {
+                                                      autonomousPricingSupported: boolean;
+                                                      complianceScoreReferenceSupported: boolean;
+                                                      externalCapitalReviewSupported: boolean;
+                                                      facilityPolicyAuthoritative: boolean;
+                                                      liabilityMarketSupported: boolean;
+                                                      signedExposureAuthoritative: boolean;
+                                                      signedScorecardAuthoritative: boolean;
+                                                    };
+                                                  };
+                                                  signature: string;
+                                                  signerKey: string;
+                                                };
+                                                schema: string;
+                                              };
+                                              signature: string;
+                                              signerKey: string;
+                                            };
+                                            quoteResponseId: string;
+                                            quotedTerms: {
+                                              expiresAt: number;
+                                              quotedCoverageAmount: {
+                                                currency: string;
+                                                units: number;
+                                              };
+                                              quotedDeductibleAmount: {
+                                                currency: string;
+                                                units: number;
+                                              };
+                                              quotedPremiumAmount: {
+                                                currency: string;
+                                                units: number;
+                                              };
+                                            };
+                                            schema: string;
+                                          };
+                                          signature: string;
+                                          signerKey: string;
+                                        };
+                                        schema: string;
+                                        selectedCoverageAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        selectedPremiumAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                      };
+                                      signature: string;
+                                      signerKey: string;
+                                    };
+                                    policyNumber: string;
+                                    premiumAmount: {
+                                      currency: string;
+                                      units: number;
+                                    };
+                                    schema: string;
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                claimAmount: {
+                                  currency: string;
+                                  units: number;
+                                };
+                                claimEventAt: number;
+                                claimId: string;
+                                claimRef: string;
+                                claimant: string;
+                                exposure: {
+                                  body: {
+                                    decisions: {}[];
+                                    filters: {
+                                      agentSubject: string;
+                                      decisionLimit: number;
+                                      receiptLimit: number;
+                                    };
+                                    generatedAt: number;
+                                    positions: {
+                                      activeQuotedPremiumUnits: number;
+                                      currency: string;
+                                      failedUnits: number;
+                                      governedMaxExposureUnits: number;
+                                      pendingUnits: number;
+                                      provisionalLossUnits: number;
+                                      quotedPremiumUnits: number;
+                                      recoveredUnits: number;
+                                      reservedUnits: number;
+                                      settledUnits: number;
+                                    }[];
+                                    receipts: {}[];
+                                    schema: string;
+                                    summary: {
+                                      actionableReceipts: number;
+                                      activeDecisions: number;
+                                      currencies: string[];
+                                      failedSettlementReceipts: number;
+                                      matchingDecisions: number;
+                                      matchingReceipts: number;
+                                      mixedCurrencyBook: boolean;
+                                      pendingSettlementReceipts: number;
+                                      returnedDecisions: number;
+                                      returnedReceipts: number;
+                                      supersededDecisions: number;
+                                      truncatedDecisions: boolean;
+                                      truncatedReceipts: boolean;
+                                    };
+                                    supportBoundary: {
+                                      claimAdjudicationSupported: boolean;
+                                      crossCurrencyNettingSupported: boolean;
+                                      governedReceiptsAuthoritative: boolean;
+                                      recoveryLifecycleSupported: boolean;
+                                      settlementReconciliationAuthoritative: boolean;
+                                      underwritingDecisionsAuthoritative: boolean;
+                                    };
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                issuedAt: number;
+                                lossEvent: {
+                                  body: {
+                                    bondId: string;
+                                    description: string;
+                                    eventId: string;
+                                    eventKind: string;
+                                    issuedAt: number;
+                                    projectedBondLifecycleState: string;
+                                    report: {
+                                      generatedAt: number;
+                                      query: {
+                                        amount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        bondId: string;
+                                        eventKind: string;
+                                      };
+                                      schema: string;
+                                      summary: {
+                                        agentSubject: string;
+                                        bondId: string;
+                                        capabilityId: string;
+                                        currentBondLifecycleState: string;
+                                        currentDelinquentAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        eventAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        facilityId: string;
+                                        outstandingDelinquentAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        projectedBondLifecycleState: string;
+                                        releaseableReserveAmount: {
+                                          currency: string;
+                                          units: number;
+                                        };
+                                        toolName: string;
+                                        toolServer: string;
+                                      };
+                                      supportBoundary: {
+                                        appealWindowSupported: boolean;
+                                        automaticCapitalExecutionSupported: boolean;
+                                        bondLifecycleProjectionAuthoritative: boolean;
+                                        externalClaimAdjudicationSupported: boolean;
+                                        immutableLifecycleAuthoritative: boolean;
+                                        reserveControlExecutionSupported: boolean;
+                                      };
+                                    };
+                                    schema: string;
+                                  };
+                                  signature: string;
+                                  signerKey: string;
+                                };
+                                narrative: string;
+                                receiptIds: string[];
+                                schema: string;
+                              };
+                              signature: string;
+                              signerKey: string;
+                            };
+                            claimResponseId: string;
+                            coveredAmount: {
+                              currency: string;
+                              units: number;
+                            };
+                            disposition: string;
+                            issuedAt: number;
+                            providerResponseRef: string;
+                            responseNote: string;
+                            schema: string;
+                          };
+                          signature: string;
+                          signerKey: string;
+                        };
+                        reason: string;
+                        schema: string;
+                      };
+                      signature: string;
+                      signerKey: string;
+                    };
+                    issuedAt: number;
+                    note: string;
+                    outcome: string;
+                    schema: string;
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                capitalInstruction: {
+                  body: {
+                    action: string;
+                    amount: {
+                      currency: string;
+                      units: number;
+                    };
+                    authorityChain: {}[];
+                    completionFlowRowId: string;
+                    counterpartyId: string;
+                    counterpartyRole: string;
+                    description: string;
+                    executionWindow: {
+                      notAfter: number;
+                      notBefore: number;
+                    };
+                    governedReceiptId: string;
+                    instructionId: string;
+                    intendedState: string;
+                    issuedAt: number;
+                    ownerRole: string;
+                    query: {
+                      agentSubject: string;
+                      bondLimit: number;
+                      facilityLimit: number;
+                      lossEventLimit: number;
+                      receiptLimit: number;
+                    };
+                    rail: {
+                      custodyProviderId: string;
+                      jurisdiction: string;
+                      kind: string;
+                      railId: string;
+                    };
+                    reconciledState: string;
+                    schema: string;
+                    sourceId: string;
+                    sourceKind: string;
+                    subjectKey: string;
+                    supportBoundary: {
+                      automaticDispatchSupported: boolean;
+                      capitalBookAuthoritative: boolean;
+                      custodyNeutralInstructionSupported: boolean;
+                      externalExecutionAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                issuedAt: number;
+                payoutAmount: {
+                  currency: string;
+                  units: number;
+                };
+                payoutInstructionId: string;
+                schema: string;
+              };
+              signature: string;
+              signerKey: string;
+            };
+            payoutReceiptId: string;
+            payoutReceiptRef: string;
+            reconciliationState: string;
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        rail: {
+          custodyProviderId: string;
+          jurisdiction: string;
+          kind: string;
+          railId: string;
+        };
+        schema: string;
+        settlementAmount: {
+          currency: string;
+          units: number;
+        };
+        settlementInstructionId: string;
+        settlementKind: string;
+        settlementReference: string;
+        topology: {
+          payee: {
+            jurisdiction: string;
+            partyId: string;
+            role: string;
+          };
+          payer: {
+            jurisdiction: string;
+            partyId: string;
+            role: string;
+          };
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    settlementReceiptId: string;
+    settlementReceiptRef: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/placement.schema.json
+export namespace Market_Placement {
+  export interface ChioMarketPlacementSignedBody {
+    effectiveFrom: number;
+    effectiveUntil: number;
+    issuedAt: number;
+    notes?: string;
+    placementId: string;
+    placementRef?: string;
+    quoteResponse: {
+      body: {
+        disposition: string;
+        issuedAt: number;
+        providerQuoteRef: string;
+        quoteRequest: {
+          body: {
+            issuedAt: number;
+            notes?: string;
+            providerPolicy: {
+              boundCoverageSupported: boolean;
+              claimsSupported: boolean;
+              coverageClass: string;
+              currency: string;
+              displayName: string;
+              jurisdiction: string;
+              maxCoverageAmount: {
+                currency: string;
+                units: number;
+              };
+              providerId: string;
+              providerRecordId: string;
+              quoteTtlSeconds: number;
+              requiredEvidence: string[];
+            };
+            quoteRequestId: string;
+            requestedCoverageAmount: {
+              currency: string;
+              units: number;
+            };
+            requestedEffectiveFrom: number;
+            requestedEffectiveUntil: number;
+            riskPackage: {
+              body: {
+                certification: {
+                  required: boolean;
+                };
+                exposure: {
+                  body: {
+                    decisions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    receipts: {}[];
+                    schema: string;
+                    summary: {
+                      actionableReceipts: number;
+                      activeDecisions: number;
+                      currencies: string[];
+                      failedSettlementReceipts: number;
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      pendingSettlementReceipts: number;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                      supersededDecisions: number;
+                      truncatedDecisions: boolean;
+                      truncatedReceipts: boolean;
+                    };
+                    supportBoundary: {
+                      claimAdjudicationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      governedReceiptsAuthoritative: boolean;
+                      recoveryLifecycleSupported: boolean;
+                      settlementReconciliationAuthoritative: boolean;
+                      underwritingDecisionsAuthoritative: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                facilityReport: {
+                  disposition: string;
+                  filters: {
+                    agentSubject: string;
+                    decisionLimit: number;
+                    receiptLimit: number;
+                  };
+                  generatedAt: number;
+                  prerequisites: {
+                    certificationMet: boolean;
+                    certificationRequired: boolean;
+                    manualReviewRequired: boolean;
+                    minimumRuntimeAssuranceTier: string;
+                    runtimeAssuranceMet: boolean;
+                  };
+                  schema: string;
+                  scorecard: {
+                    anomalyCount: number;
+                    band: string;
+                    confidence: string;
+                    currencies: string[];
+                    matchingDecisions: number;
+                    matchingReceipts: number;
+                    mixedCurrencyBook: boolean;
+                    overallScore: number;
+                    probationary: boolean;
+                    returnedDecisions: number;
+                    returnedReceipts: number;
+                  };
+                  supportBoundary: {
+                    bondExecutionSupported: boolean;
+                    crossCurrencyAllocationSupported: boolean;
+                    providerNeutralPolicy: boolean;
+                  };
+                  terms?: {
+                    capitalSource: string;
+                    concentrationCapBps: number;
+                    creditLimit: {
+                      currency: string;
+                      units: number;
+                    };
+                    reserveRatioBps: number;
+                    ttlSeconds: number;
+                    utilizationCeilingBps: number;
+                  };
+                };
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                  recentLossLimit: number;
+                };
+                generatedAt: number;
+                latestFacility?: {
+                  creditLimit: {
+                    currency: string;
+                    units: number;
+                  };
+                  disposition: string;
+                  expiresAt: number;
+                  facilityId: string;
+                  issuedAt: number;
+                  lifecycleState: string;
+                  signerKey: string;
+                };
+                recentLossHistory: {
+                  entries: {}[];
+                  summary: {
+                    failedSettlementEvents: number;
+                    matchingLossEvents: number;
+                    provisionalLossEvents: number;
+                    recoveredEvents: number;
+                    returnedLossEvents: number;
+                  };
+                };
+                runtimeAssurance?: {
+                  governedReceipts: number;
+                  highestTier: string;
+                  latestEvidenceSha256: string;
+                  latestSchema: string;
+                  latestVerifier: string;
+                  latestVerifierFamily: string;
+                  observedVerifierFamilies: string[];
+                  runtimeAssuranceReceipts: number;
+                  stale: boolean;
+                };
+                schema: string;
+                scorecard: {
+                  body: {
+                    dimensions: {}[];
+                    filters: {
+                      agentSubject: string;
+                      decisionLimit: number;
+                      receiptLimit: number;
+                    };
+                    generatedAt: number;
+                    positions: {
+                      activeQuotedPremiumUnits: number;
+                      currency: string;
+                      failedUnits: number;
+                      governedMaxExposureUnits: number;
+                      pendingUnits: number;
+                      provisionalLossUnits: number;
+                      quotedPremiumUnits: number;
+                      recoveredUnits: number;
+                      reservedUnits: number;
+                      settledUnits: number;
+                    }[];
+                    probation: {
+                      probationary: boolean;
+                      receiptCount: number;
+                      spanDays: number;
+                      targetReceiptCount: number;
+                      targetSpanDays: number;
+                    };
+                    reputation: {
+                      acceptedImportedSignalCount: number;
+                      effectiveScore: number;
+                      importedSignalCount: number;
+                      probationary: boolean;
+                    };
+                    schema: string;
+                    summary: {
+                      anomalyCount: number;
+                      band: string;
+                      confidence: string;
+                      currencies: string[];
+                      matchingDecisions: number;
+                      matchingReceipts: number;
+                      mixedCurrencyBook: boolean;
+                      overallScore: number;
+                      probationary: boolean;
+                      returnedDecisions: number;
+                      returnedReceipts: number;
+                    };
+                    supportBoundary: {
+                      capitalAllocationSupported: boolean;
+                      crossCurrencyNettingSupported: boolean;
+                      facilityPolicySupported: boolean;
+                      subjectScopedOnly: boolean;
+                    };
+                  };
+                  signature: string;
+                  signerKey: string;
+                };
+                subjectKey: string;
+                supportBoundary: {
+                  autonomousPricingSupported: boolean;
+                  complianceScoreReferenceSupported: boolean;
+                  externalCapitalReviewSupported: boolean;
+                  facilityPolicyAuthoritative: boolean;
+                  liabilityMarketSupported: boolean;
+                  signedExposureAuthoritative: boolean;
+                  signedScorecardAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        quoteResponseId: string;
+        quotedTerms: {
+          expiresAt: number;
+          quotedCoverageAmount: {
+            currency: string;
+            units: number;
+          };
+          quotedDeductibleAmount?: {
+            currency: string;
+            units: number;
+          };
+          quotedPremiumAmount: {
+            currency: string;
+            units: number;
+          };
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    schema: "chio.market.placement.v1";
+    selectedCoverageAmount: {
+      currency: string;
+      units: number;
+    };
+    selectedPremiumAmount: {
+      currency: string;
+      units: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/pricing-authority.schema.json
+export namespace Market_PricingAuthority {
+  export interface ChioMarketPricingAuthoritySignedBody {
+    authorityId: string;
+    autoBindEnabled: boolean;
+    capitalBook: {
+      body: {
+        events: {}[];
+        generatedAt: number;
+        query: {
+          agentSubject: string;
+          bondLimit: number;
+          facilityLimit: number;
+          lossEventLimit: number;
+          receiptLimit: number;
+        };
+        schema: string;
+        sources: {
+          capitalSource: string;
+          committedAmount: {
+            currency: string;
+            units: number;
+          };
+          counterpartyId: string;
+          counterpartyRole: string;
+          currency: string;
+          description: string;
+          disbursedAmount: {
+            currency: string;
+            units: number;
+          };
+          facilityId: string;
+          impairedAmount: {
+            currency: string;
+            units: number;
+          };
+          jurisdiction: string;
+          kind: string;
+          ownerRole: string;
+          sourceId: string;
+        }[];
+        subjectKey: string;
+        summary: {
+          currencies: string[];
+          fundingSources: number;
+          ledgerEvents: number;
+          matchingBonds: number;
+          matchingFacilities: number;
+          matchingLossEvents: number;
+          matchingReceipts: number;
+          mixedCurrencyBook: boolean;
+          returnedBonds: number;
+          returnedFacilities: number;
+          returnedLossEvents: number;
+          returnedReceipts: number;
+          truncatedBonds: boolean;
+          truncatedFacilities: boolean;
+          truncatedLossEvents: boolean;
+          truncatedReceipts: boolean;
+        };
+        supportBoundary: {
+          automaticCapitalExecutionSupported: boolean;
+          custodyExecutionSupported: boolean;
+          mixedCurrencyNettingSupported: boolean;
+          sourceOfFundsAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    envelope: {
+      authorityChainRef: string;
+      delegateId: string;
+      kind: string;
+    };
+    expiresAt: number;
+    facility: {
+      body: {
+        expiresAt: number;
+        facilityId: string;
+        issuedAt: number;
+        lifecycleState: string;
+        report: {
+          disposition: string;
+          filters: {
+            agentSubject: string;
+            decisionLimit: number;
+            receiptLimit: number;
+          };
+          generatedAt: number;
+          prerequisites: {
+            certificationMet: boolean;
+            certificationRequired: boolean;
+            manualReviewRequired: boolean;
+            minimumRuntimeAssuranceTier: string;
+            runtimeAssuranceMet: boolean;
+          };
+          schema: string;
+          scorecard: {
+            anomalyCount: number;
+            band: string;
+            confidence: string;
+            currencies: string[];
+            matchingDecisions: number;
+            matchingReceipts: number;
+            mixedCurrencyBook: boolean;
+            overallScore: number;
+            probationary: boolean;
+            returnedDecisions: number;
+            returnedReceipts: number;
+          };
+          supportBoundary: {
+            bondExecutionSupported: boolean;
+            crossCurrencyAllocationSupported: boolean;
+            providerNeutralPolicy: boolean;
+          };
+          terms: {
+            capitalSource: string;
+            concentrationCapBps: number;
+            creditLimit: {
+              currency: string;
+              units: number;
+            };
+            reserveRatioBps: number;
+            ttlSeconds: number;
+            utilizationCeilingBps: number;
+          };
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    issuedAt: number;
+    maxCoverageAmount: {
+      currency: string;
+      units: number;
+    };
+    maxPremiumAmount: {
+      currency: string;
+      units: number;
+    };
+    notes: string;
+    providerPolicy: {
+      boundCoverageSupported: boolean;
+      claimsSupported: boolean;
+      coverageClass: string;
+      currency: string;
+      displayName: string;
+      jurisdiction: string;
+      maxCoverageAmount: {
+        currency: string;
+        units: number;
+      };
+      providerId: string;
+      providerRecordId: string;
+      quoteTtlSeconds: number;
+      requiredEvidence: string[];
+    };
+    quoteRequest: {
+      body: {
+        issuedAt: number;
+        notes: string;
+        providerPolicy: {
+          boundCoverageSupported: boolean;
+          claimsSupported: boolean;
+          coverageClass: string;
+          currency: string;
+          displayName: string;
+          jurisdiction: string;
+          maxCoverageAmount: {
+            currency: string;
+            units: number;
+          };
+          providerId: string;
+          providerRecordId: string;
+          quoteTtlSeconds: number;
+          requiredEvidence: string[];
+        };
+        quoteRequestId: string;
+        requestedCoverageAmount: {
+          currency: string;
+          units: number;
+        };
+        requestedEffectiveFrom: number;
+        requestedEffectiveUntil: number;
+        riskPackage: {
+          body: {
+            certification: {
+              required: boolean;
+            };
+            exposure: {
+              body: {
+                decisions: {}[];
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                positions: {
+                  activeQuotedPremiumUnits: number;
+                  currency: string;
+                  failedUnits: number;
+                  governedMaxExposureUnits: number;
+                  pendingUnits: number;
+                  provisionalLossUnits: number;
+                  quotedPremiumUnits: number;
+                  recoveredUnits: number;
+                  reservedUnits: number;
+                  settledUnits: number;
+                }[];
+                receipts: {}[];
+                schema: string;
+                summary: {
+                  actionableReceipts: number;
+                  activeDecisions: number;
+                  currencies: string[];
+                  failedSettlementReceipts: number;
+                  matchingDecisions: number;
+                  matchingReceipts: number;
+                  mixedCurrencyBook: boolean;
+                  pendingSettlementReceipts: number;
+                  returnedDecisions: number;
+                  returnedReceipts: number;
+                  supersededDecisions: number;
+                  truncatedDecisions: boolean;
+                  truncatedReceipts: boolean;
+                };
+                supportBoundary: {
+                  claimAdjudicationSupported: boolean;
+                  crossCurrencyNettingSupported: boolean;
+                  governedReceiptsAuthoritative: boolean;
+                  recoveryLifecycleSupported: boolean;
+                  settlementReconciliationAuthoritative: boolean;
+                  underwritingDecisionsAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            facilityReport: {
+              disposition: string;
+              filters: {
+                agentSubject: string;
+                decisionLimit: number;
+                receiptLimit: number;
+              };
+              generatedAt: number;
+              prerequisites: {
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                manualReviewRequired: boolean;
+                minimumRuntimeAssuranceTier: string;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                bondExecutionSupported: boolean;
+                crossCurrencyAllocationSupported: boolean;
+                providerNeutralPolicy: boolean;
+              };
+              terms: {
+                capitalSource: string;
+                concentrationCapBps: number;
+                creditLimit: {
+                  currency: string;
+                  units: number;
+                };
+                reserveRatioBps: number;
+                ttlSeconds: number;
+                utilizationCeilingBps: number;
+              };
+            };
+            filters: {
+              agentSubject: string;
+              decisionLimit: number;
+              receiptLimit: number;
+              recentLossLimit: number;
+            };
+            generatedAt: number;
+            latestFacility: {
+              creditLimit: {
+                currency: string;
+                units: number;
+              };
+              disposition: string;
+              expiresAt: number;
+              facilityId: string;
+              issuedAt: number;
+              lifecycleState: string;
+              signerKey: string;
+            };
+            recentLossHistory: {
+              entries: {}[];
+              summary: {
+                failedSettlementEvents: number;
+                matchingLossEvents: number;
+                provisionalLossEvents: number;
+                recoveredEvents: number;
+                returnedLossEvents: number;
+              };
+            };
+            runtimeAssurance: {
+              governedReceipts: number;
+              highestTier: string;
+              latestEvidenceSha256: string;
+              latestSchema: string;
+              latestVerifier: string;
+              latestVerifierFamily: string;
+              observedVerifierFamilies: string[];
+              runtimeAssuranceReceipts: number;
+              stale: boolean;
+            };
+            schema: string;
+            scorecard: {
+              body: {
+                dimensions: {}[];
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                positions: {
+                  activeQuotedPremiumUnits: number;
+                  currency: string;
+                  failedUnits: number;
+                  governedMaxExposureUnits: number;
+                  pendingUnits: number;
+                  provisionalLossUnits: number;
+                  quotedPremiumUnits: number;
+                  recoveredUnits: number;
+                  reservedUnits: number;
+                  settledUnits: number;
+                }[];
+                probation: {
+                  probationary: boolean;
+                  receiptCount: number;
+                  spanDays: number;
+                  targetReceiptCount: number;
+                  targetSpanDays: number;
+                };
+                reputation: {
+                  acceptedImportedSignalCount: number;
+                  effectiveScore: number;
+                  importedSignalCount: number;
+                  probationary: boolean;
+                };
+                schema: string;
+                summary: {
+                  anomalyCount: number;
+                  band: string;
+                  confidence: string;
+                  currencies: string[];
+                  matchingDecisions: number;
+                  matchingReceipts: number;
+                  mixedCurrencyBook: boolean;
+                  overallScore: number;
+                  probationary: boolean;
+                  returnedDecisions: number;
+                  returnedReceipts: number;
+                };
+                supportBoundary: {
+                  capitalAllocationSupported: boolean;
+                  crossCurrencyNettingSupported: boolean;
+                  facilityPolicySupported: boolean;
+                  subjectScopedOnly: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            subjectKey: string;
+            supportBoundary: {
+              autonomousPricingSupported: boolean;
+              complianceScoreReferenceSupported: boolean;
+              externalCapitalReviewSupported: boolean;
+              facilityPolicyAuthoritative: boolean;
+              liabilityMarketSupported: boolean;
+              signedExposureAuthoritative: boolean;
+              signedScorecardAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    schema: "chio.market.pricing-authority.v1";
+    underwritingDecision: {
+      body: {
+        budget: {
+          action: string;
+          ceilingFactor: number;
+          rationale: string;
+        };
+        decisionId: string;
+        evaluation: {
+          generatedAt: number;
+          input: {
+            certification: {
+              artifactId: string;
+              checkedAt: number;
+              publishedAt: number;
+              state: string;
+              toolServerId: string;
+              verdict: string;
+            };
+            filters: {
+              agentSubject: string;
+              receiptLimit: number;
+            };
+            generatedAt: number;
+            receipts: {
+              actionableMeteredReceipts: number;
+              actionableSettlementReceipts: number;
+              allowCount: number;
+              approvalReceipts: number;
+              approvedReceipts: number;
+              callChainReceipts: number;
+              cancelledCount: number;
+              denyCount: number;
+              failedSettlementReceipts: number;
+              governedReceipts: number;
+              incompleteCount: number;
+              matchingReceipts: number;
+              meteredReceipts: number;
+              pendingSettlementReceipts: number;
+              returnedReceipts: number;
+              runtimeAssuranceReceipts: number;
+              sharedEvidenceProofRequiredCount: number;
+              sharedEvidenceReferenceCount: number;
+            };
+            reputation: {
+              acceptedImportedSignalCount: number;
+              effectiveScore: number;
+              importedSignalCount: number;
+              probationary: boolean;
+              resolvedTier: string;
+              subjectKey: string;
+            };
+            runtimeAssurance: {
+              governedReceipts: number;
+              highestTier: string;
+              latestEvidenceSha256: string;
+              latestSchema: string;
+              latestVerifier: string;
+              latestVerifierFamily: string;
+              observedVerifierFamilies: string[];
+              runtimeAssuranceReceipts: number;
+            };
+            schema: string;
+            taxonomy: {
+              supportedClasses: string[];
+              supportedReasons: string[];
+              version: string;
+            };
+          };
+          outcome: string;
+          policy: {
+            denyReputationScoreBelow: number;
+            maximumReceiptAgeSeconds: number;
+            minimumApproveReputationScore: number;
+            minimumApproveRuntimeAssuranceTier: string;
+            minimumReceiptHistory: number;
+            minimumStepUpRuntimeAssuranceTier: string;
+            reduceCeilingFactor: number;
+            requireActiveToolCertification: boolean;
+            requireComplianceScoreReference: boolean;
+            schema: string;
+            version: string;
+          };
+          riskClass: string;
+          schema: string;
+          suggestedCeilingFactor: number;
+        };
+        issuedAt: number;
+        lifecycleState: string;
+        premium: {
+          basisPoints: number;
+          quotedAmount: {
+            currency: string;
+            units: number;
+          };
+          rationale: string;
+          state: string;
+        };
+        reviewState: string;
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/provider.schema.json
+export namespace Market_Provider {
+  export interface ChioMarketProviderSignedBody {
+    issuedAt: number;
+    lifecycleState: string;
+    providerRecordId: string;
+    report: {
+      displayName: string;
+      lifecycleState: string;
+      policies: {
+        claimsSupported: boolean;
+        coverageClasses: string[];
+        jurisdiction: string;
+        maxCoverageAmount: {
+          currency: string;
+          units: number;
+        };
+        quoteTtlSeconds: number;
+        requiredEvidence: string[];
+        supportedCurrencies: string[];
+      }[];
+      provenance: {
+        changeReason: string;
+        configuredAt: number;
+        configuredBy: string;
+        sourceRef: string;
+      };
+      providerId: string;
+      providerType: string;
+      providerUrl: string;
+      schema: string;
+      supportBoundary: {
+        automaticTrustAdmission: boolean;
+        boundCoverageSupported: boolean;
+        curatedRegistryOnly: boolean;
+        permissionlessFederationSupported: boolean;
+      };
+    };
+    schema: "chio.market.provider.v1";
+    supersedesProviderRecordId?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/quote-request.schema.json
+export namespace Market_QuoteRequest {
+  export interface ChioMarketQuoteRequestSignedBody {
+    issuedAt: number;
+    notes?: string;
+    providerPolicy: {
+      boundCoverageSupported: boolean;
+      claimsSupported: boolean;
+      coverageClass: string;
+      currency: string;
+      displayName: string;
+      jurisdiction: string;
+      maxCoverageAmount: {
+        currency: string;
+        units: number;
+      };
+      providerId: string;
+      providerRecordId: string;
+      quoteTtlSeconds: number;
+      requiredEvidence: string[];
+    };
+    quoteRequestId: string;
+    requestedCoverageAmount: {
+      currency: string;
+      units: number;
+    };
+    requestedEffectiveFrom: number;
+    requestedEffectiveUntil: number;
+    riskPackage: {
+      body: {
+        certification: {
+          required: boolean;
+        };
+        exposure: {
+          body: {
+            decisions: {}[];
+            filters: {
+              agentSubject: string;
+              decisionLimit: number;
+              receiptLimit: number;
+            };
+            generatedAt: number;
+            positions: {
+              activeQuotedPremiumUnits: number;
+              currency: string;
+              failedUnits: number;
+              governedMaxExposureUnits: number;
+              pendingUnits: number;
+              provisionalLossUnits: number;
+              quotedPremiumUnits: number;
+              recoveredUnits: number;
+              reservedUnits: number;
+              settledUnits: number;
+            }[];
+            receipts: {}[];
+            schema: string;
+            summary: {
+              actionableReceipts: number;
+              activeDecisions: number;
+              currencies: string[];
+              failedSettlementReceipts: number;
+              matchingDecisions: number;
+              matchingReceipts: number;
+              mixedCurrencyBook: boolean;
+              pendingSettlementReceipts: number;
+              returnedDecisions: number;
+              returnedReceipts: number;
+              supersededDecisions: number;
+              truncatedDecisions: boolean;
+              truncatedReceipts: boolean;
+            };
+            supportBoundary: {
+              claimAdjudicationSupported: boolean;
+              crossCurrencyNettingSupported: boolean;
+              governedReceiptsAuthoritative: boolean;
+              recoveryLifecycleSupported: boolean;
+              settlementReconciliationAuthoritative: boolean;
+              underwritingDecisionsAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        facilityReport: {
+          disposition: string;
+          filters: {
+            agentSubject: string;
+            decisionLimit: number;
+            receiptLimit: number;
+          };
+          generatedAt: number;
+          prerequisites: {
+            certificationMet: boolean;
+            certificationRequired: boolean;
+            manualReviewRequired: boolean;
+            minimumRuntimeAssuranceTier: string;
+            runtimeAssuranceMet: boolean;
+          };
+          schema: string;
+          scorecard: {
+            anomalyCount: number;
+            band: string;
+            confidence: string;
+            currencies: string[];
+            matchingDecisions: number;
+            matchingReceipts: number;
+            mixedCurrencyBook: boolean;
+            overallScore: number;
+            probationary: boolean;
+            returnedDecisions: number;
+            returnedReceipts: number;
+          };
+          supportBoundary: {
+            bondExecutionSupported: boolean;
+            crossCurrencyAllocationSupported: boolean;
+            providerNeutralPolicy: boolean;
+          };
+          terms?: {
+            capitalSource: string;
+            concentrationCapBps: number;
+            creditLimit: {
+              currency: string;
+              units: number;
+            };
+            reserveRatioBps: number;
+            ttlSeconds: number;
+            utilizationCeilingBps: number;
+          };
+        };
+        filters: {
+          agentSubject: string;
+          decisionLimit: number;
+          receiptLimit: number;
+          recentLossLimit: number;
+        };
+        generatedAt: number;
+        latestFacility?: {
+          creditLimit: {
+            currency: string;
+            units: number;
+          };
+          disposition: string;
+          expiresAt: number;
+          facilityId: string;
+          issuedAt: number;
+          lifecycleState: string;
+          signerKey: string;
+        };
+        recentLossHistory: {
+          entries: {}[];
+          summary: {
+            failedSettlementEvents: number;
+            matchingLossEvents: number;
+            provisionalLossEvents: number;
+            recoveredEvents: number;
+            returnedLossEvents: number;
+          };
+        };
+        runtimeAssurance?: {
+          governedReceipts: number;
+          highestTier: string;
+          latestEvidenceSha256: string;
+          latestSchema: string;
+          latestVerifier: string;
+          latestVerifierFamily: string;
+          observedVerifierFamilies: string[];
+          runtimeAssuranceReceipts: number;
+          stale: boolean;
+        };
+        schema: string;
+        scorecard: {
+          body: {
+            dimensions: {}[];
+            filters: {
+              agentSubject: string;
+              decisionLimit: number;
+              receiptLimit: number;
+            };
+            generatedAt: number;
+            positions: {
+              activeQuotedPremiumUnits: number;
+              currency: string;
+              failedUnits: number;
+              governedMaxExposureUnits: number;
+              pendingUnits: number;
+              provisionalLossUnits: number;
+              quotedPremiumUnits: number;
+              recoveredUnits: number;
+              reservedUnits: number;
+              settledUnits: number;
+            }[];
+            probation: {
+              probationary: boolean;
+              receiptCount: number;
+              spanDays: number;
+              targetReceiptCount: number;
+              targetSpanDays: number;
+            };
+            reputation: {
+              acceptedImportedSignalCount: number;
+              effectiveScore: number;
+              importedSignalCount: number;
+              probationary: boolean;
+            };
+            schema: string;
+            summary: {
+              anomalyCount: number;
+              band: string;
+              confidence: string;
+              currencies: string[];
+              matchingDecisions: number;
+              matchingReceipts: number;
+              mixedCurrencyBook: boolean;
+              overallScore: number;
+              probationary: boolean;
+              returnedDecisions: number;
+              returnedReceipts: number;
+            };
+            supportBoundary: {
+              capitalAllocationSupported: boolean;
+              crossCurrencyNettingSupported: boolean;
+              facilityPolicySupported: boolean;
+              subjectScopedOnly: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        subjectKey: string;
+        supportBoundary: {
+          autonomousPricingSupported: boolean;
+          complianceScoreReferenceSupported: boolean;
+          externalCapitalReviewSupported: boolean;
+          facilityPolicyAuthoritative: boolean;
+          liabilityMarketSupported: boolean;
+          signedExposureAuthoritative: boolean;
+          signedScorecardAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    schema: "chio.market.quote-request.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/market/quote-response.schema.json
+export namespace Market_QuoteResponse {
+  export interface ChioMarketQuoteResponseSignedBody {
+    disposition: string;
+    issuedAt: number;
+    providerQuoteRef: string;
+    quoteRequest: {
+      body: {
+        issuedAt: number;
+        notes?: string;
+        providerPolicy: {
+          boundCoverageSupported: boolean;
+          claimsSupported: boolean;
+          coverageClass: string;
+          currency: string;
+          displayName: string;
+          jurisdiction: string;
+          maxCoverageAmount: {
+            currency: string;
+            units: number;
+          };
+          providerId: string;
+          providerRecordId: string;
+          quoteTtlSeconds: number;
+          requiredEvidence: string[];
+        };
+        quoteRequestId: string;
+        requestedCoverageAmount: {
+          currency: string;
+          units: number;
+        };
+        requestedEffectiveFrom: number;
+        requestedEffectiveUntil: number;
+        riskPackage: {
+          body: {
+            certification: {
+              required: boolean;
+            };
+            exposure: {
+              body: {
+                decisions: {}[];
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                positions: {
+                  activeQuotedPremiumUnits: number;
+                  currency: string;
+                  failedUnits: number;
+                  governedMaxExposureUnits: number;
+                  pendingUnits: number;
+                  provisionalLossUnits: number;
+                  quotedPremiumUnits: number;
+                  recoveredUnits: number;
+                  reservedUnits: number;
+                  settledUnits: number;
+                }[];
+                receipts: {}[];
+                schema: string;
+                summary: {
+                  actionableReceipts: number;
+                  activeDecisions: number;
+                  currencies: string[];
+                  failedSettlementReceipts: number;
+                  matchingDecisions: number;
+                  matchingReceipts: number;
+                  mixedCurrencyBook: boolean;
+                  pendingSettlementReceipts: number;
+                  returnedDecisions: number;
+                  returnedReceipts: number;
+                  supersededDecisions: number;
+                  truncatedDecisions: boolean;
+                  truncatedReceipts: boolean;
+                };
+                supportBoundary: {
+                  claimAdjudicationSupported: boolean;
+                  crossCurrencyNettingSupported: boolean;
+                  governedReceiptsAuthoritative: boolean;
+                  recoveryLifecycleSupported: boolean;
+                  settlementReconciliationAuthoritative: boolean;
+                  underwritingDecisionsAuthoritative: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            facilityReport: {
+              disposition: string;
+              filters: {
+                agentSubject: string;
+                decisionLimit: number;
+                receiptLimit: number;
+              };
+              generatedAt: number;
+              prerequisites: {
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                manualReviewRequired: boolean;
+                minimumRuntimeAssuranceTier: string;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                bondExecutionSupported: boolean;
+                crossCurrencyAllocationSupported: boolean;
+                providerNeutralPolicy: boolean;
+              };
+              terms?: {
+                capitalSource: string;
+                concentrationCapBps: number;
+                creditLimit: {
+                  currency: string;
+                  units: number;
+                };
+                reserveRatioBps: number;
+                ttlSeconds: number;
+                utilizationCeilingBps: number;
+              };
+            };
+            filters: {
+              agentSubject: string;
+              decisionLimit: number;
+              receiptLimit: number;
+              recentLossLimit: number;
+            };
+            generatedAt: number;
+            latestFacility?: {
+              creditLimit: {
+                currency: string;
+                units: number;
+              };
+              disposition: string;
+              expiresAt: number;
+              facilityId: string;
+              issuedAt: number;
+              lifecycleState: string;
+              signerKey: string;
+            };
+            recentLossHistory: {
+              entries: {}[];
+              summary: {
+                failedSettlementEvents: number;
+                matchingLossEvents: number;
+                provisionalLossEvents: number;
+                recoveredEvents: number;
+                returnedLossEvents: number;
+              };
+            };
+            runtimeAssurance?: {
+              governedReceipts: number;
+              highestTier: string;
+              latestEvidenceSha256: string;
+              latestSchema: string;
+              latestVerifier: string;
+              latestVerifierFamily: string;
+              observedVerifierFamilies: string[];
+              runtimeAssuranceReceipts: number;
+              stale: boolean;
+            };
+            schema: string;
+            scorecard: {
+              body: {
+                dimensions: {}[];
+                filters: {
+                  agentSubject: string;
+                  decisionLimit: number;
+                  receiptLimit: number;
+                };
+                generatedAt: number;
+                positions: {
+                  activeQuotedPremiumUnits: number;
+                  currency: string;
+                  failedUnits: number;
+                  governedMaxExposureUnits: number;
+                  pendingUnits: number;
+                  provisionalLossUnits: number;
+                  quotedPremiumUnits: number;
+                  recoveredUnits: number;
+                  reservedUnits: number;
+                  settledUnits: number;
+                }[];
+                probation: {
+                  probationary: boolean;
+                  receiptCount: number;
+                  spanDays: number;
+                  targetReceiptCount: number;
+                  targetSpanDays: number;
+                };
+                reputation: {
+                  acceptedImportedSignalCount: number;
+                  effectiveScore: number;
+                  importedSignalCount: number;
+                  probationary: boolean;
+                };
+                schema: string;
+                summary: {
+                  anomalyCount: number;
+                  band: string;
+                  confidence: string;
+                  currencies: string[];
+                  matchingDecisions: number;
+                  matchingReceipts: number;
+                  mixedCurrencyBook: boolean;
+                  overallScore: number;
+                  probationary: boolean;
+                  returnedDecisions: number;
+                  returnedReceipts: number;
+                };
+                supportBoundary: {
+                  capitalAllocationSupported: boolean;
+                  crossCurrencyNettingSupported: boolean;
+                  facilityPolicySupported: boolean;
+                  subjectScopedOnly: boolean;
+                };
+              };
+              signature: string;
+              signerKey: string;
+            };
+            subjectKey: string;
+            supportBoundary: {
+              autonomousPricingSupported: boolean;
+              complianceScoreReferenceSupported: boolean;
+              externalCapitalReviewSupported: boolean;
+              facilityPolicyAuthoritative: boolean;
+              liabilityMarketSupported: boolean;
+              signedExposureAuthoritative: boolean;
+              signedScorecardAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        schema: string;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    quoteResponseId: string;
+    quotedTerms: {
+      expiresAt: number;
+      quotedCoverageAmount: {
+        currency: string;
+        units: number;
+      };
+      quotedDeductibleAmount?: {
+        currency: string;
+        units: number;
+      };
+      quotedPremiumAmount: {
+        currency: string;
+        units: number;
+      };
+    };
+    schema: "chio.market.quote-response.v1";
+    supersedesQuoteResponseId?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/marketplace/accepted-bid.schema.json
+export namespace Marketplace_AcceptedBid {
+  export interface ChioMarketplaceAcceptedBidSignedBody {
+    acceptedAt: number;
+    agentId: string;
+    askDigest: string;
+    bidDigest: string;
+    bidReceiptId: string;
+    listingId: string;
+    quotedPrice: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.marketplace.accepted-bid.v1";
+    tokenExpiresAt: number;
+    tokenId: string;
+    tokenSubject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/marketplace/ask-response.schema.json
+export namespace Marketplace_AskResponse {
+  export interface ChioMarketplaceAskResponseSignedBody {
+    agentId: string;
+    bidDigest: string;
+    expiresAt: number;
+    issuedAt: number;
+    listingId: string;
+    quotedPrice: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.marketplace.ask-response.v1";
+    tokenOffer: {
+      expires_at: number;
+      id: string;
+      issued_at: number;
+      issuer: string;
+      schema: string;
+      scope: {
+        grants: {
+          constraints?: {
+            type: string;
+            value:
+              | string
+              | {
+                  finding_id: string;
+                  listing_id: string;
+                  settlement: {
+                    mode: string;
+                  };
+                };
+          }[];
+          dpop_required?: boolean;
+          max_cost_per_invocation: {
+            currency: string;
+            units: number;
+          };
+          max_invocations: number;
+          max_total_cost: {
+            currency: string;
+            units: number;
+          };
+          operations: string[];
+          server_id: string;
+          tool_name: string;
+        }[];
+        prompt_grants?: {
+          operations: string[];
+          prompt_name: string;
+        }[];
+        resource_grants?: {
+          operations: string[];
+          uri_pattern: string;
+        }[];
+      };
+      signature: string;
+      subject: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/marketplace/bid-request.schema.json
+export namespace Marketplace_BidRequest {
+  export interface ChioMarketplaceBidRequestSignedBody {
+    agentId: string;
+    issuedAt: number;
+    listingId: string;
+    maxPricePerCall: {
+      currency: string;
+      units: number;
+    };
+    payoutDestination?: string;
+    requestedScope: {
+      capabilityScopePrefix: string;
+      maxInvocations: number;
+      serverId: string;
+      toolName: string;
+    };
+    schema: "chio.marketplace.bid-request.v1";
+    windowSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/marketplace/listing-pricing-hint.schema.json
+export namespace Marketplace_ListingPricingHint {
+  export interface ChioMarketplaceListingPricingHintSignedBody {
+    capabilityScope: string;
+    expiresAt: number;
+    issuedAt: number;
+    listingId: string;
+    namespace: string;
+    pricePerCall: {
+      currency: string;
+      units: number;
+    };
+    providerOperatorId: string;
+    recentReceiptsVolume: number;
+    revocationRateBps: number;
+    schema: "chio.marketplace.listing-pricing-hint.v1";
+    sla: {
+      availabilityBps: number;
+      maxLatencyMs: number;
+      throughputRps: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/marketplace/reservation-receipt.schema.json
+export namespace Marketplace_ReservationReceipt {
+  export interface ChioMarketplaceReservationReceiptSignedBody {
+    agentId: string;
+    askDigest: string;
+    listingId: string;
+    receiptId: string;
+    reservedAmount: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.marketplace.reservation-receipt.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/mcp/operator-approval.schema.json
+export namespace Mcp_OperatorApproval {
+  export interface ChioMcpOperatorApprovalSignedBody {
+    arguments: {
+      message: string;
+    };
+    capability_id: string;
+    created_at: number;
+    decision?: {
+      approver: string;
+      decision: string;
+      expires_at: number;
+      governed_intent_hash: string;
+      id: string;
+      issued_at: number;
+      request_id: string;
+      signature: string;
+      subject: string;
+    };
+    expires_at: number;
+    id: string;
+    intent: {
+      body: {
+        kind: string;
+        value: {
+          capability_id: string;
+          parameters_hash: string;
+        };
+      };
+      context: {
+        chio_tool_approval: {
+          arguments: {
+            message: string;
+          };
+          capability_hash: string;
+          policy_hash: string;
+          request_id: string;
+          schema: string;
+          tenant_id: string;
+        };
+        mcpSessionId: string;
+      };
+      id: string;
+      purpose: string;
+      server_id: string;
+      tool_name: string;
+    };
+    policy_fingerprint: string;
+    request_id: string;
+    runtime_contract_fingerprint: string;
+    schema: "chio.mcp.operator-approval.v1";
+    session_id: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/mcp/session-credential-call.schema.json
+export namespace Mcp_SessionCredentialCall {
+  export interface ChioMcpSessionCredentialCallSignedBody {
+    capabilityIds: string[];
+    deliveryAck?: {
+      acknowledgement: string;
+      receiptId: string;
+      requestHash: string;
+      requestId: string;
+      resultHash: string;
+      schema: string;
+    };
+    parameterHash: string;
+    requestHash: string;
+    requestId: string;
+    reservationId: string;
+    response: null | {
+      error?: {
+        code: number;
+        message: string;
+      };
+      id: number;
+      jsonrpc: string;
+      result?: {
+        _meta?: {
+          chio: {
+            decision: string;
+            receipt: {
+              action: {
+                parameter_hash: string;
+                parameters: unknown;
+              };
+              boundary_class: string;
+              capability_id: string;
+              content_hash: string;
+              decision: {
+                verdict: string;
+              };
+              id: string;
+              kernel_key: string;
+              metadata: {
+                admission_operation: {
+                  compensation_status?: string;
+                  coordinator_lease_epoch?: number;
+                  coordinator_lease_id?: string;
+                  operation_id?: string;
+                  projected_dispatch_state: string;
+                  projected_operation_version?: number;
+                  projected_state: string;
+                  request_binding_hash?: string;
+                  request_id: string;
+                  request_namespace_digest?: string;
+                  retained_dispatch_commit?: {
+                    committed_version: number;
+                    coordinator_lease_epoch: number;
+                    coordinator_lease_id: string;
+                    dispatch_launch: {
+                      native_launch: null;
+                      worker_profile: null;
+                    };
+                    provider_attempt: {
+                      attempt_id: string;
+                      operation_id: string;
+                      transport_id: string;
+                      transport_key_epoch: number;
+                    };
+                    store_fence: {
+                      lease_id: string;
+                      owner_epoch: number;
+                      store_uuid: string;
+                    };
+                  };
+                  schema: string;
+                  store_fence?: {
+                    lease_id: string;
+                    owner_epoch: number;
+                    store_uuid: string;
+                  };
+                  tool_outcome_id: string;
+                  tool_outcome_version?: number;
+                  trusted_time_unix_ms?: number;
+                };
+                attribution: {
+                  delegation_depth?: number;
+                  grant_index?: number;
+                  issuer_key?: string;
+                  subject_key: string;
+                };
+                chio_receipt_signing_nonce: string;
+                chio_runtime?: {
+                  identity_disposition: string;
+                };
+                receipt_context: {
+                  request_id: string;
+                  request_namespace_digest?: string;
+                };
+              };
+              policy_hash: string;
+              receipt_kind: string;
+              redaction_mode: string;
+              signature: string;
+              timestamp: number;
+              tool_name: string;
+              tool_origin: string;
+              tool_server: string;
+              trust_level: string;
+            };
+            receiptId: string;
+            terminalState: {
+              state: string;
+            };
+          };
+          chioDelivery: {
+            acknowledgement: string;
+            receiptId: string;
+            requestHash: string;
+            requestId: string;
+            resultHash: string;
+            schema: string;
+          };
+          chioEvidence: {
+            output: {
+              content: {
+                text: string;
+                type: string;
+              }[];
+              isError: boolean;
+              numbers?: number[];
+              structuredContent?: unknown;
+            };
+            outputKind: string;
+            receipt: {
+              action: {
+                parameter_hash: string;
+                parameters: unknown;
+              };
+              boundary_class: string;
+              capability_id: string;
+              content_hash: string;
+              decision: {
+                verdict: string;
+              };
+              id: string;
+              kernel_key: string;
+              metadata: {
+                admission_operation: {
+                  compensation_status?: string;
+                  coordinator_lease_epoch?: number;
+                  coordinator_lease_id?: string;
+                  operation_id?: string;
+                  projected_dispatch_state: string;
+                  projected_operation_version?: number;
+                  projected_state: string;
+                  request_binding_hash?: string;
+                  request_id: string;
+                  request_namespace_digest?: string;
+                  retained_dispatch_commit?: {
+                    committed_version: number;
+                    coordinator_lease_epoch: number;
+                    coordinator_lease_id: string;
+                    dispatch_launch: {
+                      native_launch: null;
+                      worker_profile: null;
+                    };
+                    provider_attempt: {
+                      attempt_id: string;
+                      operation_id: string;
+                      transport_id: string;
+                      transport_key_epoch: number;
+                    };
+                    store_fence: {
+                      lease_id: string;
+                      owner_epoch: number;
+                      store_uuid: string;
+                    };
+                  };
+                  schema: string;
+                  store_fence?: {
+                    lease_id: string;
+                    owner_epoch: number;
+                    store_uuid: string;
+                  };
+                  tool_outcome_id: string;
+                  tool_outcome_version?: number;
+                  trusted_time_unix_ms?: number;
+                };
+                attribution: {
+                  delegation_depth?: number;
+                  grant_index?: number;
+                  issuer_key?: string;
+                  subject_key: string;
+                };
+                chio_receipt_signing_nonce: string;
+                chio_runtime?: {
+                  identity_disposition: string;
+                };
+                receipt_context: {
+                  request_id: string;
+                  request_namespace_digest?: string;
+                };
+              };
+              policy_hash: string;
+              receipt_kind: string;
+              redaction_mode: string;
+              signature: string;
+              timestamp: number;
+              tool_name: string;
+              tool_origin: string;
+              tool_server: string;
+              trust_level: string;
+            };
+            requestId: string;
+            schema: string;
+            terminalState: string;
+          };
+          chioExecutionNonce?: {
+            nonce: {
+              bound_to: {
+                capability_id: string;
+                parameter_hash: string;
+                request_id: string;
+                subject_id: string;
+                tool_name: string;
+                tool_server: string;
+              };
+              expires_at: number;
+              issued_at: number;
+              nonce_id: string;
+              schema: string;
+            };
+            signature: string;
+          };
+        };
+        content?: {
+          text: string;
+          type: string;
+        }[];
+        isError?: boolean;
+        numbers?: number[];
+        ownerResult?: boolean;
+        structuredContent?: unknown;
+      };
+    };
+    schema: "chio.mcp.session-credential-call.v1";
+    serverId: string;
+    sessionId: string;
+    startedAt: number;
+    state: string;
+    subjectKey: string;
+    toolName: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/mcp/session-credential.schema.json
+export namespace Mcp_SessionCredential {
+  export interface ChioMcpSessionCredentialSignedBody {
+    allowedTools: string[];
+    authModeFingerprint: string;
+    capabilityIds: string[];
+    endpointPath: string;
+    expiresAt: number;
+    issuedAt: number;
+    policyFingerprint: string;
+    schema: "chio.mcp.session-credential.v1";
+    serverId: string;
+    sessionId: string;
+    subjectKey: string;
+    tokenHash: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-contractual-zero-body.schema.json
+export namespace Outcome_OutcomeContractualZeroBody {
+  export interface ChioOutcomeContractualZeroV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    contractualZeroId: string;
+    eligibilityDigest: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    noDeliverySlotProofDigest: string;
+    postGuardEvidenceDigest: string;
+    postGuardPolicyDigest: string;
+    providerAcceptanceDigest: string;
+    reason: string;
+    requestId: string;
+    schema: "chio.outcome.contractual-zero.v1";
+    terminalToolOutcomeDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-acknowledgement-body.schema.json
+export namespace Outcome_OutcomeDeliveryAcknowledgementBody {
+  export interface ChioOutcomeDeliveryAcknowledgementV1SignedBody {
+    acknowledgementId: string;
+    deliveryAcceptedAtUnixMs: number;
+    deliveryCheckpointDigest: string;
+    deliveryCheckpointSequence: number;
+    deliveryId: string;
+    durableBlobDigest: string;
+    durableBlobReference: string;
+    eligibilityDigest: string;
+    finalOutputDigest: string;
+    idempotencyKey: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverKeyEpoch: number;
+    receiverKeyId: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-acknowledgement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-checkpoint-body.schema.json
+export namespace Outcome_OutcomeDeliveryCheckpointBody {
+  export interface ChioOutcomeDeliveryCheckpointV1SignedBody {
+    anchorId: string;
+    anchorKeyEpoch: number;
+    blobAbsenceProofDigest?: string;
+    blobDigest?: string;
+    blobReference?: string;
+    cancellationFenceDigest?: string;
+    deliveryId: string;
+    eligibilityDigest: string;
+    idempotencyKey: string;
+    outputDigest: string;
+    predecessorDigest?: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverId: string;
+    receiverKeyEpoch: number;
+    receiverNamespace: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-checkpoint.v1";
+    sequence: number;
+    state: string;
+    trustedClockHighWaterUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-delivery-nonacceptance-body.schema.json
+export namespace Outcome_OutcomeDeliveryNonacceptanceBody {
+  export interface ChioOutcomeDeliveryNonacceptanceV1SignedBody {
+    blobAbsenceProofDigest: string;
+    cancellationFenceDigest: string;
+    cancelledAtUnixMs: number;
+    deliveryCheckpointDigest: string;
+    deliveryCheckpointSequence: number;
+    deliveryId: string;
+    eligibilityDigest: string;
+    idempotencyKey: string;
+    nonacceptanceId: string;
+    outputDigest: string;
+    providerAcceptanceDigest: string;
+    receiverBindingDigest: string;
+    receiverKeyEpoch: number;
+    receiverKeyId: string;
+    receiverQueueId: string;
+    requestId: string;
+    schema: "chio.outcome.delivery-nonacceptance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-eligibility-body.schema.json
+export namespace Outcome_OutcomeEligibilityBody {
+  export interface ChioOutcomeEligibilityV1SignedBody {
+    capabilityId: string;
+    deliveryAckDeadlineUnixMs: number;
+    eligibilityId: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    kernelAuthorityId: string;
+    kernelKeyEpoch: number;
+    listingDigest: string;
+    listingId: string;
+    outcomePrice: {
+      currency: string;
+      units: number;
+    };
+    postGuardPolicyDigest: string;
+    preActionAuthorityDigest: string;
+    predicateDigest: string;
+    predicateId: string;
+    pricingDigest: string;
+    pricingId: string;
+    providerBindingDigest: string;
+    providerId: string;
+    qualifiedRailCapabilityDigest: string;
+    qualifiedRailId: string;
+    quoteDigest: string;
+    railCaptureDeadlineUnixMs: number;
+    receiverBindingDigest: string;
+    requestExtensionDigest: string;
+    requestId: string;
+    schema: "chio.outcome.eligibility.v1";
+    settlementMode: string;
+    slaDigest: string;
+    toolName: string;
+    toolServer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-output-provenance-body.schema.json
+export namespace Outcome_OutcomeOutputProvenanceBody {
+  export interface ChioOutcomeOutputProvenanceV1SignedBody {
+    authorityId: string;
+    authorityKeyEpoch: number;
+    eligibilityDigest: string;
+    expiresAtUnixMs: number;
+    finalOutputDigest: string;
+    issuedAtUnixMs: number;
+    postGuardEvidenceDigest: string;
+    postGuardPolicyDigest: string;
+    provenanceClass: string;
+    provenanceId: string;
+    providerAcceptanceDigest: string;
+    providerOutputDigest: string;
+    redactionProofDigest?: string;
+    requestId: string;
+    schema: "chio.outcome.output-provenance.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-predicate-body.schema.json
+export namespace Outcome_OutcomePredicateBody {
+  export interface ChioOutcomePredicateV1SignedBody {
+    assertions: {
+      comparator: {
+        kind: string;
+        value?:
+          | number
+          | {
+              x: number;
+              y: number;
+            };
+      };
+      pointer: string;
+    }[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    predicateId: string;
+    providerId: string;
+    schema: "chio.outcome.predicate.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-pricing-body.schema.json
+export namespace Outcome_OutcomePricingBody {
+  export interface ChioOutcomePricingV1SignedBody {
+    expiresAtUnixMs: number;
+    failureMode: string;
+    issuedAtUnixMs: number;
+    outcomePrice: {
+      currency: string;
+      units: number;
+    };
+    predicateDigest: string;
+    predicateId: string;
+    pricingId: string;
+    providerId: string;
+    schema: "chio.outcome.pricing.v1";
+    slaDigest: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/outcome/outcome-sla-body.schema.json
+export namespace Outcome_OutcomeSlaBody {
+  export interface ChioOutcomeSlaV1SignedBody {
+    effectiveAtUnixMs: number;
+    expiresAtUnixMs: number;
+    listingDigest: string;
+    maxFailureBps: number;
+    minimumSampleCount: number;
+    providerId: string;
+    schema: "chio.outcome.sla.v1";
+    slaId: string;
+    windowAnchorUnixMs: number;
+    windowSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/parametric/contest.schema.json
+export namespace Parametric_Contest {
+  export interface ChioParametricContestSignedBody {
+    claimId: string;
+    contestId: string;
+    contestantId: string;
+    evidenceDigests: string[];
+    expectedClaimVersion: number;
+    expectedLifecycleFence: number;
+    expiresAt: number;
+    issuedAt: number;
+    parametricPolicyBodyDigest: string;
+    reasonCode: string;
+    schema: "chio.parametric.contest.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/parametric/evidence-source-checkpoint.schema.json
+export namespace Parametric_EvidenceSourceCheckpoint {
+  export interface ChioParametricEvidenceSourceCheckpointSignedBody {
+    anchorEpoch: number;
+    checkpointAt: number;
+    checkpointId: string;
+    indexNamespace: string;
+    queryIndexRoot: string;
+    queryTreeSize: number;
+    schema: "chio.parametric.evidence-source-checkpoint.v1";
+    signatureDomain: string;
+    signerKeyEpoch: number;
+    sourceId: string;
+    sourceKind: string;
+    sourcePrefixCutoff: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/parametric/parametric-policy-body.schema.json
+export namespace Parametric_ParametricPolicyBody {
+  export interface ChioParametricPolicyV1SignedBody {
+    beneficiaryId: string;
+    boundCoverageBodyDigest: string;
+    boundCoverageEnvelopeDigest: string;
+    coverageAmount: {
+      currency: string;
+      units: number;
+    };
+    coverageAuthorityId: string;
+    effectiveFrom: number;
+    effectiveUntil: number;
+    evaluatorAuthority: {
+      authorityId: string;
+      keyEpoch: number;
+      keyId: string;
+    };
+    fundingFacilityId: string;
+    issuedAt: number;
+    maxCheckpointLagSeconds: number;
+    payerId: string;
+    payoutMode: {
+      kind: string;
+      windowSeconds?: number;
+    };
+    payoutRail: {
+      destinationAccountDigest: string;
+      kind: string;
+      railId: string;
+    };
+    payoutSchedule: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      kind: string;
+    };
+    preActionAuthorityDigest: string;
+    predicate: {
+      kind: string;
+      minEvents: number;
+      thresholdBps: number;
+    };
+    schema: "chio.parametric.policy.v1";
+    subjectKey: string;
+    windowAnchor: number;
+    windowSeconds: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/parametric/payout-intent.schema.json
+export namespace Parametric_PayoutIntent {
+  export interface ChioParametricPayoutIntentSignedBody {
+    binding: {
+      amount: {
+        currency: string;
+        units: number;
+      };
+      beneficiaryId: string;
+      boundCoverageBodyDigest: string;
+      capitalInstructionBodyDigest: string;
+      capitalInstructionEnvelopeDigest: string;
+      capitalInstructionId: string;
+      capitalInstructionTemplateDigest: string;
+      claimId: string;
+      completionFlowRowId: string;
+      coverageHeadDigest: string;
+      coverageReservationId: string;
+      coverageReservationLifecycleFence: number;
+      coverageReservationVersion: number;
+      custodianAuthorityKeyEpoch: number;
+      effectIdempotencyKey: string;
+      effectSlot: {
+        actionDigest: string;
+        admissionHandoff: {
+          lifecycleFence: number;
+          operationVersion: number;
+          state: string;
+          storeFence: {
+            lease_id: string;
+            owner_epoch: number;
+            store_uuid: string;
+          };
+        };
+        anchorId: string;
+        effectKind: string;
+        idempotencyKey: string;
+        namespace: string;
+        operationId: string;
+        parametersDigest: string;
+        request: {
+          requestBindingDigest: string;
+          requestId: string;
+          requestNamespaceDigest: string;
+        };
+        resourceHeadDigest: string;
+        resourceKey: {
+          resourceFamily: string;
+          resourceId: string;
+          scopeId: string;
+        };
+        schema: string;
+        slotId: string;
+        state: string;
+        target: {
+          qualificationDigest: string;
+          targetId: string;
+          targetKeyEpoch: number;
+        };
+      };
+      effectSlotId: string;
+      expectedClaimVersion: number;
+      expectedLifecycleFence: number;
+      facilityAuthorityKeyEpoch: number;
+      fundingFacilityId: string;
+      governedReceiptId: string;
+      instructionSignerKeyEpoch: number;
+      operationId: string;
+      parametricPolicyBodyDigest: string;
+      payerId: string;
+      payoutRail: {
+        destinationAccountDigest: string;
+        kind: string;
+        railId: string;
+      };
+      request: {
+        requestBindingDigest: string;
+        requestId: string;
+        requestNamespaceDigest: string;
+      };
+      schema: string;
+      sourceAccountDigest: string;
+      triggerInstanceId: string;
+    };
+    capitalInstruction: {
+      body: {
+        action: string;
+        amount: {
+          currency: string;
+          units: number;
+        };
+        authorityChain: {
+          approvedAt: number;
+          authorityProof: {
+            body: {
+              approvedAt: number;
+              expiresAt: number;
+              principalId: string;
+              role: string;
+              schema: string;
+            };
+            signature: string;
+            signerKey: string;
+          };
+          expiresAt: number;
+          principalId: string;
+          role: string;
+        }[];
+        completionFlowRowId: string;
+        counterpartyId: string;
+        counterpartyRole: string;
+        description: string;
+        executionWindow: {
+          notAfter: number;
+          notBefore: number;
+        };
+        governedReceiptId: string;
+        instructionId: string;
+        intendedState: string;
+        issuedAt: number;
+        ownerRole: string;
+        query: {
+          agentSubject: string;
+          bondLimit: number;
+          facilityLimit: number;
+          lossEventLimit: number;
+          receiptLimit: number;
+        };
+        rail: {
+          custodyProviderId: string;
+          destinationAccountRef: string;
+          jurisdiction: string;
+          kind: string;
+          railId: string;
+          sourceAccountRef: string;
+        };
+        reconciledState: string;
+        schema: string;
+        sourceId: string;
+        sourceKind: string;
+        subjectKey: string;
+        supportBoundary: {
+          automaticDispatchSupported: boolean;
+          capitalBookAuthoritative: boolean;
+          custodyNeutralInstructionSupported: boolean;
+          externalExecutionAuthoritative: boolean;
+        };
+      };
+      signature: string;
+      signerKey: string;
+    };
+    payoutIntentId: string;
+    schema: "chio.parametric.payout-intent.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-deposit-body.schema.json
+export namespace Pheromone_PheromoneDepositBody {
+  export interface ChioPheromoneDepositV1SignedBody {
+    agent_passport_jwk_thumbprint: string;
+    agent_passport_key_hash: string;
+    confidence: number;
+    decay_half_life_secs: number;
+    evaporation_floor?: number;
+    indicator: {
+      admission_envelope_sha256?: string;
+      blob?: string;
+      capability_scope?: string;
+      digest?: string;
+      finding_id?: string;
+      indicatorDigest?: string;
+      kind?: string;
+      listing_envelope_sha256?: string;
+      listing_id?: string;
+      schema?: string;
+      workflowId?: string;
+    };
+    kernel_id: string;
+    nonce: string;
+    schema: "chio.pheromone-deposit.v1";
+    severity: string;
+    subject_class: string;
+    subject_class_namespace: string;
+    timestamp_unix_ms: number;
+    treaty_scope: string[];
+    workflow_context?: {
+      bilateral_dsse_sha256: string;
+      consistency_anchor: string;
+      schema: string;
+      step_index: number;
+      tool_receipt_id: string;
+      workflow_id: string;
+      workflow_intersection_id: string;
+      workflow_intersection_sha256: string;
+      workflow_receipt_id: string;
+      workflow_receipt_sha256: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-observation-cost-verifier-root-body.schema.json
+export namespace Pheromone_PheromoneObservationCostVerifierRootBody {
+  export interface ChioPheromoneObservationCostVerifierRootV1SignedBody {
+    allowedSubjectClassNamespaces: string[];
+    allowedSubjectClasses: string[];
+    allowedTreaties: string[];
+    issuerKernelId: string;
+    publicKey: string;
+    runtimePolicySha256: string;
+    schema: "chio.pheromone-observation-cost-verifier-root.v1";
+    validFromUnixMs: number;
+    validUntilUnixMs: number;
+    verifierId: string;
+    verifierKeyId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-peer-directory-bundle-body.schema.json
+export namespace Pheromone_PheromonePeerDirectoryBundleBody {
+  export interface ChioPheromonePeerDirectoryBundleV1SignedBody {
+    directorySha256: string;
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    issuer: string;
+    keyId: string;
+    previousVersionSha256: null | string;
+    schema: "chio.pheromone.peer-directory-bundle.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-query-report-body.schema.json
+export namespace Pheromone_PheromoneQueryReportBody {
+  export interface ChioPheromoneQueryReportV1SignedBody {
+    accepted: boolean;
+    concentration: {
+      distinctOriginPairs: number;
+      evaluatedAtUnixMs: number;
+      reputationEpoch: number;
+      subjectClass: string;
+      subjectClassNamespace: string;
+      totalStrength: number;
+    };
+    schema: "chio.pheromone.query-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-archive-package-manifest-body.schema.json
+export namespace Pheromone_PheromoneRelayAlertAssuranceArchivePackageManifestBody {
+  export interface ChioPheromoneRelayAlertAssuranceArchivePackageManifestV1SignedBody {
+    bundleCount: number;
+    bundles: {
+      artifactCount: number;
+      bundleId: string;
+      bundlePath: string;
+      exportManifestSha256: string;
+      exportReportSha256: string;
+      sourcePackageSha256: string;
+    }[];
+    compressionFormat: string;
+    createdAtUnixMs: number;
+    localKernelId: string;
+    memberCount: number;
+    members: {
+      artifactRole: string;
+      bundleId: string;
+      byteCount: number;
+      kind: string;
+      path: string;
+      retentionClass: string;
+      schema: string;
+      sha256: string;
+    }[];
+    packageGeneration: number;
+    packageId: string;
+    packagerId: string;
+    packagerKeyId: string;
+    safetyClaims: string[];
+    schema: "chio.pheromone.relay-alert-assurance-archive-package-manifest.v1";
+    sourceArchiveReportSha256: string;
+    sourceCloseoutReportSha256: string;
+    totalByteCount: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-export-manifest-body.schema.json
+export namespace Pheromone_PheromoneRelayAlertAssuranceExportManifestBody {
+  export interface ChioPheromoneRelayAlertAssuranceExportManifestV1SignedBody {
+    artifacts: {
+      byteCount: number;
+      path: string;
+      retentionClass: string;
+      role: string;
+      schema: string;
+      sha256: string;
+    }[];
+    bundleId: string;
+    exportedAtUnixMs: number;
+    exporterId: string;
+    exporterKeyId: string;
+    localKernelId: string;
+    safetyClaims: string[];
+    schema: "chio.pheromone.relay-alert-assurance-export-manifest.v1";
+    sourcePackageSha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-relay-http-request-body.schema.json
+export namespace Pheromone_PheromoneRelayHttpRequestBody {
+  export interface ChioPheromoneRelayHttpRequestV1SignedBody {
+    bodySha256: string;
+    method: string;
+    nonce: string;
+    path: string;
+    recipientKernelId: string;
+    schema: "chio.pheromone.relay-http-request.v1";
+    senderKernelId: string;
+    sentAtUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/pheromone/pheromone-transit-policy-body.schema.json
+export namespace Pheromone_PheromoneTransitPolicyBody {
+  export interface ChioPheromoneTransitPolicyV1SignedBody {
+    accepted_hubs: string[];
+    admission: {
+      activePeersInTreaty: number;
+      activeReputationEpoch?: number;
+      authenticatedSenderKernelId: string;
+      implicitCompatibilityDefault?: boolean;
+      kernelPublicKeys: string[];
+      knownReputationEpochs: number[];
+      maxDepositsPerPair: number;
+      observationCostVerifierRoots: {
+        allowedSubjectClassNamespaces: string[];
+        allowedSubjectClasses: string[];
+        allowedTreaties: string[];
+        issuerKernelId: string;
+        issuerSignature: string;
+        publicKey: string;
+        runtimePolicySha256: string;
+        schema: string;
+        validFromUnixMs: number;
+        validUntilUnixMs: number;
+        verifierId: string;
+        verifierKeyId: string;
+      }[];
+      passports: {
+        firstSeenEpoch: number;
+        kernelId: string;
+        publicKey: string;
+        revoked: boolean;
+        validFromUnixMs: number;
+        validUntilUnixMs: number;
+      }[];
+      recipientKernelId: string;
+      replayWindowMs: number;
+      runtimePolicyIssuerPublicKeys: string[];
+      runtimeTrustFloorState: {
+        entries: {
+          highestVersion?: number;
+          keyId: string;
+          latestBundleSha256?: string;
+          latestRevocationCheckpointSha256?: string;
+          revoked?: boolean;
+          verifierId: string;
+        }[];
+        schema: string;
+      };
+      scarcityPolicies?: {
+        activePeersEpoch: number;
+        newcomerHorizonEpochs?: number;
+        observationCostVerification: string;
+        policyId: string;
+        policySha256?: string;
+        reputationEpoch: number;
+        runtimePolicySha256: string;
+        schema: string;
+        subjectClass: string;
+        subjectClassNamespace: string;
+        tokenCapacity: number;
+        treatyScope: string[];
+        verifierId: string;
+        windowEndUnixMs: number;
+        windowId: string;
+        windowStartUnixMs: number;
+      }[];
+      subjectClasses: {
+        allowedTreaties: string[];
+        costCommitment: string;
+        destructive: boolean;
+        subjectClass: string;
+        subjectClassNamespace: string;
+      }[];
+    };
+    allowed_egress_treaties: string[];
+    allowed_ingress_treaties: string[];
+    allowed_subject_class_namespaces: string[];
+    max_hops: number;
+    pinned_ladder_refs: {
+      ladder_intersection_id: string;
+      ladder_intersection_sha256: string;
+      ladder_manifest_expires_at_unix_ms: number;
+      ladder_manifest_id: string;
+      ladder_manifest_sha256: string;
+    }[];
+    required_action_class_id: string;
+    schema: "chio.pheromone-transit-policy.v1";
+    valid_from_unix_ms: number;
+    valid_until_unix_ms: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/policy/activation-receipt-signature.schema.json
+export namespace Policy_ActivationReceiptSignature {
+  export interface ChioPolicyActivationReceiptSignatureSignedBody {
+    activatedAt: string;
+    activationEpoch: string;
+    activationMode: string;
+    issuer: string;
+    migrationRule: string;
+    narrowingOrWidening: string;
+    policyDigest: string;
+    previousPolicyDigest: string;
+    schema: "chio.policy.activation-receipt-signature.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/process/container-launch.schema.json
+export namespace Process_ContainerLaunch {
+  export interface ChioProcessContainerLaunchSignedBody {
+    attempt: number;
+    container_id: string;
+    engine_identity: string;
+    failed_at_unix_ms?: number;
+    failure_class?: string;
+    image_id: string;
+    inspected_config_digest?: string;
+    process_id: string;
+    profile_digest: string;
+    schema: "chio.process.container-launch.v1";
+    started_at?: string;
+    state: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/process/swarm-profile.schema.json
+export namespace Process_SwarmProfile {
+  export interface ChioProcessSwarmProfileSignedBody {
+    admission: {
+      expiresAtUnixMs: number;
+      issuedAtUnixMs: number;
+      localKernelId: string;
+      profileId: string;
+      schema: string;
+      verifierId: string;
+    };
+    binding: {
+      expectation_id: string;
+      runtime_authority_id: string;
+    };
+    record_sha256: string;
+    routes: {
+      alice: {
+        bridge: string;
+        manifest_sha256: string;
+        protocol_target: string;
+        selected_route: string;
+      };
+    };
+    runtime_id: string;
+    schema: "chio.process.swarm-profile.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/proof-room/proof-first-run-trust-roots-body.schema.json
+export namespace ProofRoom_ProofFirstRunTrustRootsBody {
+  export interface ChioProofFirstRunTrustRootsV1SignedBody {
+    authority?: string;
+    id: string;
+    root_id?: string;
+    roots: {
+      key_digest?: string;
+      key_id?: string;
+      subject: string;
+    }[];
+    schema: string;
+    trust_domain?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/proof-room/proof-room-receipt-evidence-body.schema.json
+export namespace ProofRoom_ProofRoomReceiptEvidenceBody {
+  export interface ChioProofRoomReceiptEvidenceV1SignedBody {
+    ambient_authority?: boolean;
+    capability_id?: string;
+    execution_lease_ref?: string;
+    guard_decision_id?: string;
+    kernel_key: string;
+    policy_digest: string;
+    receipt_id: string;
+    request_digest?: string;
+    response_digest?: string;
+    schema: string;
+    terminal_status: string;
   }
 }
 
@@ -3165,6 +19281,26 @@ export namespace Provenance_Context {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/provenance/provenance-stamp.schema.json
+export namespace Provenance_ProvenanceStamp {
+  export interface ChioProvenanceStampSignedBody {
+    api_version: string;
+    principal: {
+      account_id: string;
+      assumed_role_session_arn: null;
+      caller_arn: string;
+      kind: string;
+    };
+    provider: string;
+    received_at: {
+      nanos_since_epoch: number;
+      secs_since_epoch: number;
+    };
+    request_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/provenance/stamp.schema.json
 export namespace Provenance_Stamp {
   /**
@@ -3191,6 +19327,78 @@ export namespace Provenance_Stamp {
      * Unix timestamp (seconds) at which Chio observed the provider response. Monotonic with respect to receipts emitted from the same kernel; Chio fails closed if the value is in the future relative to the kernel clock.
      */
     received_at: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/provenance/trace-observation.schema.json
+export namespace Provenance_TraceObservation {
+  export interface ChioTraceObservationSignedBody {
+    authorityKey: string;
+    delegationDepthLimit: number;
+    event: {
+      admission_sequence?: number;
+      capability_id?: string;
+      delegation_depth?: number;
+      epoch?: number;
+      kind: string;
+      receipt?: {
+        action: {
+          parameter_hash: string;
+          parameters: {
+            nonce: number;
+          };
+        };
+        boundary_class: string;
+        capability_id: string;
+        content_hash: string;
+        decision: {
+          guard?: string;
+          reason?: string;
+          verdict: string;
+        };
+        id: string;
+        kernel_key: string;
+        metadata: {
+          attribution?: {
+            delegation_depth: number;
+            grant_index?: number;
+            issuer_key: string;
+            subject_key: string;
+          };
+          chio_receipt_signing_nonce: string;
+          chio_runtime?: {
+            identity_disposition: string;
+          };
+          receipt_context: {
+            evaluation_id?: string;
+            request_id: string;
+            request_namespace_digest?: string;
+          };
+        };
+        policy_hash: string;
+        receipt_kind: string;
+        redaction_mode: string;
+        signature: string;
+        timestamp: number;
+        tool_name: string;
+        tool_origin: string;
+        tool_server: string;
+        trust_level: string;
+      };
+      receipt_time?: number;
+      request_id?: string;
+      revocation_admitted?: boolean;
+      revocation_source_id?: null | string;
+      revocation_subject_ids?: string[];
+      seen_epoch?: number;
+    };
+    runtimeEventCount: number;
+    schema: "chio.trace-observation.v1";
+    sequence: number;
+    sourceSequence: number;
+    traceId: string;
+    traceLength: number;
   }
 }
 
@@ -3346,6 +19554,60 @@ export namespace Receipt_AdmissionMetadata {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/ag-ui-receipt.schema.json
+export namespace Receipt_AgUiReceipt {
+  export interface ChioAgUiReceiptSignedBody {
+    agent_id: string;
+    allowed: boolean;
+    capability_id: string;
+    classification: string;
+    denial_reason?: string;
+    event_id: string;
+    event_type: string;
+    id: string;
+    kernel_key: string;
+    payload_hash: string;
+    session_id?: string;
+    target?: {
+      component_id?: string;
+      component_type: string;
+    };
+    timestamp: number;
+    transport: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/child-request-receipt.schema.json
+export namespace Receipt_ChildRequestReceipt {
+  export interface ChioChildRequestReceiptSignedBody {
+    id: string;
+    kernel_key: string;
+    metadata?: {
+      message?: string;
+      message_sha256?: string;
+      message_truncated?: boolean;
+      outcome?: string;
+      source?: string;
+      surface?: {
+        lane: string;
+      };
+    };
+    operation_kind: string;
+    outcome_hash: string;
+    parent_request_id: string;
+    policy_hash: string;
+    request_id: string;
+    session_id: string;
+    terminal_state: {
+      reason?: string;
+      state: string;
+    };
+    timestamp: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json
 export namespace Receipt_DecisionModelWitness {
   export type ChioDecisionModelWitnessReceiptMetadata = {
@@ -3446,6 +19708,84 @@ export namespace Receipt_FindingDelivery {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/http-receipt.schema.json
+export namespace Receipt_HttpReceipt {
+  export interface ChioHttpReceiptSignedBody {
+    boundary_class: string;
+    caller_identity_hash: string;
+    capability_id?: string;
+    content_hash: string;
+    evidence?: {
+      details?: string;
+      guard_name: string;
+      verdict: boolean;
+    }[];
+    id: string;
+    kernel_key: string;
+    metadata?:
+      | null
+      | string
+      | {
+          chio_decision_receipt_id?: string;
+          chio_http_receipt_v1?: {
+            source: string;
+          };
+          chio_http_status_scope?: string;
+          chio_kernel_receipt_id?: string;
+          chio_receipt_signing_nonce?: string;
+          completed_at?: string;
+          job_name?: string;
+          job_uid?: string;
+          namespace?: string;
+          outcome?: string;
+          route_selection?: {
+            candidates: {
+              available: boolean;
+              routeId: string;
+              selectedProtocols: string[];
+              targetProtocol: string;
+            }[];
+            decision: string;
+            requestedTargetProtocol: string;
+            routeSelectionId: string;
+            selectedProtocols: string[];
+            selectedRouteId: string;
+            selectedTargetProtocol: string;
+            sourceProtocol: string;
+          };
+          started_at?: string;
+          steps?: {
+            observed_at: string;
+            payload: string;
+            phase: string;
+            pod_name: string;
+          }[];
+          submission_kind?: string;
+          tags?: string[];
+          trace_id?: string;
+        };
+    method: string;
+    observation_outcome?: string;
+    policy_hash: string;
+    receipt_kind: string;
+    redaction_mode: string;
+    request_id: string;
+    response_status: number;
+    route_pattern: string;
+    session_id?: string;
+    timestamp: number;
+    tool_origin: string;
+    trust_level: string;
+    verdict: {
+      guard?: string;
+      http_status?: number;
+      reason?: string;
+      verdict: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/receipt/inclusion-proof.schema.json
 export namespace Receipt_InclusionProof {
   /**
@@ -3492,6 +19832,1211 @@ export namespace Receipt_LineageStatement {
   export interface SessionAnchorReference {
     sessionAnchorId: string;
     sessionAnchorHash: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/receipt-body.schema.json
+export namespace Receipt_ReceiptBody {
+  export interface ChioReceiptV1SignedBody {
+    body: {
+      action: {
+        parameter_hash: string;
+        parameters: {
+          bootstrap?: {
+            action: {
+              parameter_hash: string;
+              parameters: {
+                capabilities: {
+                  alice: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  bob: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  carol: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  dave: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    attenuation_proof: {
+                      childScopeHash: string;
+                      normalizedSubsetProof: {
+                        aggregateBudget: {
+                          max_invocations: number;
+                          root_binding_digest: string;
+                        };
+                        normalizedChildScope: string;
+                        normalizedParentScope: string;
+                        subsetRelations: {
+                          childIndex: number;
+                          grantKind: string;
+                          parentIndex: number;
+                          subset: boolean;
+                        }[];
+                      };
+                      parentScopeHash: string;
+                    };
+                    budget_share_bps: number;
+                    delegation_chain: {
+                      aggregate_budget: {
+                        max_invocations: number;
+                        root_binding_digest: string;
+                      };
+                      capability_id: string;
+                      delegatee: string;
+                      delegator: string;
+                      scope_hash: string;
+                      signature: string;
+                      timestamp: number;
+                    }[];
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                  root: {
+                    aggregate_invocation_budget: {
+                      max_invocations: number;
+                      root_binding: {
+                        body: {
+                          max_invocations: number;
+                          root_capability_hash: string;
+                          root_capability_id: string;
+                          root_expires_at: number;
+                          root_issuer: string;
+                          root_scope_hash: string;
+                          root_subject: string;
+                          schema: string;
+                        };
+                        signature: string;
+                      };
+                      scope: string;
+                    };
+                    expires_at: number;
+                    id: string;
+                    issued_at: number;
+                    issuer: string;
+                    schema: string;
+                    scope: {
+                      grants: {
+                        operations: string[];
+                        server_id: string;
+                        tool_name: string;
+                      }[];
+                    };
+                    signature: string;
+                    subject: string;
+                  };
+                };
+                record_sha256: string;
+                runtime_id: string;
+              };
+            };
+            boundary_class: string;
+            capability_id: string;
+            content_hash: string;
+            id: string;
+            kernel_key: string;
+            observation_outcome: string;
+            policy_hash: string;
+            receipt_kind: string;
+            redaction_mode: string;
+            signature: string;
+            timestamp: number;
+            tool_name: string;
+            tool_origin: string;
+            tool_server: string;
+            trust_level: string;
+          };
+          context?: {
+            capability_id: string;
+            process_id: string;
+            runtime_id: string;
+          };
+          evidence_id?: string;
+          finding_id?: string;
+          kind?: string;
+          nonce?: {
+            operation: {
+              attachments: {
+                BrokerAttempt?: {
+                  attempt_id: string;
+                  operation_id: string;
+                  transport_id: string;
+                  transport_key_epoch: number;
+                };
+                BudgetHoldId?: string;
+                ExecutionNonceId?: string;
+                ExecutionNonceIssuanceDigest?: string;
+                ExecutionNoncePreflightDigest?: string;
+                RuntimeParticipantLedgerDigest?: string;
+                ToolOutcomeId?: string;
+              }[];
+              binding: {
+                authenticated_tenant_id: string;
+                authorization_capability_hash: string;
+                capability_id: string;
+                coordinator_authority_id: string;
+                effect_class: string;
+                kind: string;
+                operation_id: string;
+                policy_hash: string;
+                request_binding: {
+                  action_parameter_hash: string;
+                  immutable_request_hash: string;
+                  participant_requirements: {
+                    approval: boolean;
+                    authorization_consumption: boolean;
+                    broker_attempt: boolean;
+                    budget_capture: boolean;
+                    execution_nonce: boolean;
+                    obligation: boolean;
+                    observation_attempt_zero: boolean;
+                    outcome_eligibility: boolean;
+                    payment: boolean;
+                  };
+                  request_binding_hash: string;
+                };
+                request_id: string;
+                request_namespace_digest: string;
+              };
+              coordinator_lease_epoch: number;
+              dispatch_commit: {
+                committed_version: number;
+                coordinator_lease_epoch: number;
+                coordinator_lease_id: string;
+                dispatch_launch: {
+                  native_launch: null;
+                  worker_profile: null;
+                };
+                provider_attempt: {
+                  attempt_id: string;
+                  operation_id: string;
+                  transport_id: string;
+                  transport_key_epoch: number;
+                };
+                store_fence: {
+                  lease_id: string;
+                  owner_epoch: number;
+                  store_uuid: string;
+                };
+              };
+              dispatch_state: string;
+              last_error: null;
+              schema: string;
+              state: string;
+              terminal_replay: {
+                receipt: {
+                  projection_digest: string;
+                  receipt_id: string;
+                };
+              };
+              version: number;
+            };
+            reserved_at_unix_ms: number;
+            signed_nonce: {
+              nonce: {
+                bound_to: {
+                  capability_id: string;
+                  parameter_hash: string;
+                  request_id: string;
+                  subject_id: string;
+                  tool_name: string;
+                  tool_server: string;
+                };
+                expires_at: number;
+                issued_at: number;
+                nonce_id: string;
+                schema: string;
+              };
+              signature: string;
+            };
+            verified_at_unix_ms: number;
+          };
+          observed_at_unix_ms?: number;
+          operation?: {
+            binding: {
+              authenticated_tenant_id: string;
+              authorization_capability_hash: string;
+              capability_id: string;
+              coordinator_authority_id: string;
+              effect_class: string;
+              kind: string;
+              operation_id: string;
+              policy_hash: string;
+              request_binding: {
+                action_parameter_hash: string;
+                immutable_request_hash: string;
+                participant_requirements: {
+                  approval: boolean;
+                  authorization_consumption: boolean;
+                  broker_attempt: boolean;
+                  budget_capture: boolean;
+                  execution_nonce: boolean;
+                  obligation: boolean;
+                  observation_attempt_zero: boolean;
+                  outcome_eligibility: boolean;
+                  payment: boolean;
+                };
+                request_binding_hash: string;
+              };
+              request_id: string;
+              request_namespace_digest: string;
+            };
+            dispatch_commit: {
+              committed_version: number;
+              coordinator_lease_epoch: number;
+              coordinator_lease_id: string;
+              dispatch_launch: {
+                native_launch: null;
+                worker_profile: null;
+              };
+              provider_attempt: {
+                attempt_id: string;
+                operation_id: string;
+                transport_id: string;
+                transport_key_epoch: number;
+              };
+              store_fence: {
+                lease_id: string;
+                owner_epoch: number;
+                store_uuid: string;
+              };
+            };
+            dispatch_state: string;
+            execution_nonce_issuance_digest: string;
+            history: {
+              claim: {
+                intent: {
+                  episodeId: string;
+                  expectationId: string;
+                  grantIndex: number;
+                  phase: string;
+                  planDigest: string;
+                  requestBindingHash: string;
+                  resources: {
+                    artifactDigest: string;
+                    kind: string;
+                    resourceId: string;
+                  }[];
+                  runtimeAuthorityId: string;
+                };
+                ledgerDigest: string;
+                operationId: string;
+                recordedAtUnixMs: number;
+                schema: string;
+              };
+              history: {
+                disposition: string;
+                intent: {
+                  episodeId: string;
+                  expectationId: string;
+                  grantIndex: number;
+                  phase: string;
+                  planDigest: string;
+                  requestBindingHash: string;
+                  resources: {
+                    artifactDigest: string;
+                    kind: string;
+                    resourceId: string;
+                  }[];
+                  runtimeAuthorityId: string;
+                };
+                reference: {
+                  claimDigest: string;
+                  episodeId: string;
+                  operationId: string;
+                };
+              };
+              operation: {
+                attachments: {
+                  BrokerAttempt?: {
+                    attempt_id: string;
+                    operation_id: string;
+                    transport_id: string;
+                    transport_key_epoch: number;
+                  };
+                  ExecutionNonceIssuanceDigest?: string;
+                  ExecutionNoncePreflightDigest?: string;
+                  RuntimeParticipantLedgerDigest?: string;
+                }[];
+                binding: {
+                  authenticated_tenant_id: string;
+                  authorization_capability_hash: string;
+                  capability_id: string;
+                  coordinator_authority_id: string;
+                  effect_class: string;
+                  kind: string;
+                  operation_id: string;
+                  policy_hash: string;
+                  request_binding: {
+                    action_parameter_hash: string;
+                    immutable_request_hash: string;
+                    participant_requirements: {
+                      approval: boolean;
+                      authorization_consumption: boolean;
+                      broker_attempt: boolean;
+                      budget_capture: boolean;
+                      execution_nonce: boolean;
+                      obligation: boolean;
+                      observation_attempt_zero: boolean;
+                      outcome_eligibility: boolean;
+                      payment: boolean;
+                    };
+                    request_binding_hash: string;
+                  };
+                  request_id: string;
+                  request_namespace_digest: string;
+                };
+                coordinator_lease_epoch: number;
+                dispatch_commit: null;
+                dispatch_state: string;
+                last_error: null;
+                schema: string;
+                state: string;
+                terminal_replay: null;
+                version: number;
+              };
+            }[];
+            state: string;
+            terminal_replay: {
+              receipt: {
+                projection_digest: string;
+                receipt_id: string;
+              };
+            };
+            version: number;
+          };
+          path?: string;
+          receipt_log?: {
+            checkpoint: {
+              body: {
+                batch_end_seq: number;
+                batch_start_seq: number;
+                chain_root: string;
+                checkpoint_seq: number;
+                issued_at: number;
+                kernel_key: string;
+                merkle_root: string;
+                schema: string;
+                tree_size: number;
+              };
+              signature: string;
+            };
+            inclusion: {
+              checkpoint_seq: number;
+              leaf_index: number;
+              merkle_root: string;
+              proof: {
+                audit_path: string[];
+                leaf_index: number;
+                tree_size: number;
+              };
+              receipt_seq: number;
+            };
+          };
+          record?: string;
+          request?: {
+            arguments: {
+              message_key: string;
+              payload: {
+                from: string;
+              };
+            };
+            known_outcome_only: boolean;
+            operation_key: string;
+            server_id: string;
+            tool_name: string;
+          };
+          response?: {
+            execution_nonce_json: null;
+            output: {
+              kind: string;
+              value: {
+                sequence: string;
+                status: string;
+              };
+            };
+            reason: null;
+            receipt_json: string;
+            request_id: string;
+            terminal_state: {
+              state: string;
+            };
+            verdict: string;
+          };
+          runtime_id?: string;
+          schema?: string;
+          transition_id?: string;
+          value?: string;
+        };
+      };
+      boundary_class: string;
+      capability_id: string;
+      content_hash: string;
+      decision?: {
+        reason?: string;
+        verdict: string;
+      };
+      evidence?: {
+        details?: string;
+        guard_name: string;
+        verdict: boolean;
+      }[];
+      kernel_key: string;
+      metadata?: {
+        active_defense_body?: {
+          body: {
+            dispatch_authorization_hash: number[];
+            effects: {
+              effect: {
+                contribution_hash: number[];
+                effect_id: string;
+                kind: string;
+                observed_base_version_hash: number[];
+                ordinal: number;
+                target: {
+                  session_id: string;
+                  target_type: string;
+                };
+              };
+              outcome: {
+                resulting_version_hash: number[];
+                state: string;
+              };
+            }[];
+            error_code: null;
+            execution_dispatch: {
+              action_id: string;
+              admission_artifact_fingerprint: number[];
+              approval: {
+                admission_operation_id: string;
+                admission_operation_version: number;
+                approval_mode: string;
+                approval_set_hash: number[];
+              };
+              authorization_capability_hash: number[];
+              authorized_at_unix_ms: number;
+              dispatch_id: string;
+              executor_authority_generation: number;
+              executor_authority_id: string;
+              governed_intent_hash: number[];
+              plan_hash: number[];
+              policy_decision_hash: number[];
+              schema_version: number;
+              tenant_id: string;
+            };
+            final_state: string;
+            header: {
+              occurred_at_unix_ms: number;
+              prior_receipt_ids: string[];
+              schema_version: number;
+              tenant_id: string;
+              transition_id: string;
+            };
+            response: {
+              action_id: string;
+              affected_set_hash: number[];
+              plan_expires_at_unix_ms: number;
+              plan_hash: number[];
+              policy: {
+                policy_hash: number[];
+                policy_version: string;
+              };
+              trigger_finding_hash: number[];
+              trigger_finding_id: string;
+              trigger_finding_receipt_id: string;
+            };
+            response_body_hash: number[];
+            response_generation: number;
+          };
+          kind: string;
+        };
+        active_defense_evidence_id?: string;
+        admission_operation?: {
+          compensation_status: string;
+          coordinator_lease_epoch: number;
+          coordinator_lease_id: string;
+          operation_id: string;
+          projected_dispatch_state: string;
+          projected_operation_version: number;
+          projected_state: string;
+          request_binding_hash: string;
+          request_id: string;
+          request_namespace_digest: string;
+          retained_dispatch_commit: {
+            committed_version: number;
+            coordinator_lease_epoch: number;
+            coordinator_lease_id: string;
+            dispatch_launch: {
+              native_launch: null;
+              worker_profile: null;
+            };
+            provider_attempt: {
+              attempt_id: string;
+              operation_id: string;
+              transport_id: string;
+              transport_key_epoch: number;
+            };
+            store_fence: {
+              lease_id: string;
+              owner_epoch: number;
+              store_uuid: string;
+            };
+          };
+          schema: string;
+          store_fence: {
+            lease_id: string;
+            owner_epoch: number;
+            store_uuid: string;
+          };
+          tool_outcome_id: string;
+          tool_outcome_version: number;
+          trusted_time_unix_ms: number;
+        };
+        attribution?: {
+          delegation_depth: number;
+          grant_index: number;
+          issuer_key: string;
+          subject_key: string;
+        };
+        budget_authority?: {
+          authority: {
+            authority_id: string;
+            lease_epoch: number;
+            lease_id: string;
+          };
+          authority_profile: string;
+          authorize: {
+            budget_commit_index: number;
+            committed_cost_units_after: number;
+            event_id: string;
+            exposure_units: number;
+          };
+          budget_term: string;
+          cleanup_custody: string;
+          guarantee_level: string;
+          hold_id: string;
+          metering_profile: string;
+          terminal: {
+            budget_commit_index: number;
+            committed_cost_units_after: number;
+            disposition: string;
+            event_id: string;
+            exposure_units: number;
+            realized_spend_units: number;
+          };
+        };
+        chio_receipt_signing_nonce?: string;
+        chio_runtime?: {
+          accepted?: boolean;
+          admission_id?: string;
+          destructive?: boolean;
+          failure_code?: null;
+          federation_treaty_dsse?: {
+            capability_lease_ref: {
+              expires_at_unix_ms: number;
+              issuer: string;
+              lease_id: string;
+            };
+            consistency_anchor: string;
+            consistency_model: string;
+            cross_org_visibility: string;
+            governance_receipt_ref: {
+              digest: {
+                alg: string;
+                value: string;
+              };
+              kernel_id: string;
+              receipt_id: string;
+            };
+            policy_evaluation_summary: {
+              joint_disposition: string;
+              server_a_verdict: {
+                policy_id: string;
+                policy_version: string;
+                verdict: string;
+              };
+              server_b_verdict: {
+                policy_id: string;
+                policy_version: string;
+                verdict: string;
+              };
+            };
+            treaty_binding_ref: {
+              action_class_id: string;
+              admission_report_sha256: string;
+              consistency_model: string;
+              continuation_sha256: string;
+              governance_refs: string[];
+              ladder_intersection_sha256: string;
+              lease_refs: string[];
+              lineage_bundle_sha256: string;
+              local_receipt_sha256: string;
+              outcome_sha256: string;
+              remote_receipt_sha256: string;
+              request_sha256: string;
+              signer_kernel_ids: string[];
+              treaty_id: string;
+              treaty_scope_sha256: string;
+            };
+          };
+          governance_receipt_id?: string;
+          identity_disposition?: string;
+          lease_id?: string;
+          operation_owned_replay?: {
+            bundle_sha256: string;
+            plan_sha256: string;
+            reference: {
+              claimDigest: string;
+              episodeId: string;
+              operationId: string;
+            };
+            resources_sha256: string;
+            swarm_evidence_sha256: string;
+            treaty_evidence_sha256: string;
+          };
+          pheromone_advisory?: {
+            accepted: boolean;
+            distinctOriginPairs: number;
+            evaluatedAtUnixMs: number;
+            observeOnly: boolean;
+            reputationEpoch: number;
+            sourceReportSha256: string;
+            subjectClass: string;
+            subjectClassNamespace: string;
+            totalStrength: number;
+          };
+          pheromone_policy_decision?: {
+            decision: string;
+            enforced: boolean;
+            peerWeightsSha256: string;
+            policyId: string;
+            policySha256: string;
+            queryReportSha256: string;
+            reasonCode: string;
+            reputationEpoch: number;
+            schema: string;
+          };
+          step_index?: number;
+          trust_bundle_sha256?: string;
+          verification_context_sha256?: string;
+          verified_swarm_request_binding?: {
+            capability_sha256: string;
+            evidence_refs_sha256: string;
+            graph_id: string;
+            scope_sha256: string;
+            task_id: string;
+          };
+          verified_swarm_route_metadata?: {
+            route: {
+              bridge: string;
+              protocolTarget: string;
+              selectedRoute: string;
+            };
+          };
+          workflow_grant_id?: string;
+          workflow_id?: string;
+        };
+        delivery_contract?: {
+          expected_digest: string;
+          observed_digest: string;
+          result: string;
+          schema: string;
+        };
+        execution_nonce?: {
+          stage: string;
+          tool_dispatched: boolean;
+        };
+        financial?: {
+          budget_remaining: number;
+          budget_total: number;
+          cost_breakdown: {
+            payment: {
+              authorization_id: string;
+              budget_exposure_units: number;
+              preauthorized_units: number;
+              pricing_failure: null;
+              rail: string;
+              rail_mode: string;
+              recorded_units: number;
+              reported_cost: {
+                currency: string;
+                units: number;
+              };
+              transaction_id: string;
+            };
+          };
+          cost_charged: number;
+          currency: string;
+          delegation_depth: number;
+          grant_index: number;
+          payment_reference: string;
+          root_budget_holder: string;
+          settlement_status: string;
+        };
+        finding_delivery?: {
+          accepted_bid_envelope_sha256: string;
+          authoritative_payment_operation_id: string;
+          digest_check: string;
+          finding_id: string;
+          listing_id: string;
+          media_type_check: string;
+          purchase_intent_id: string;
+          reservation_id: string;
+          schema: string;
+          settlement_mode: string;
+          status_proof: {
+            feed_id: string;
+            key_domain_nonce: number;
+            map_epoch: number;
+            non_inclusion_checked_at: number;
+            proof_sha256: string;
+            root_hash: string;
+            status_epoch_artifact_sha256: string;
+          };
+          transform_profile: string;
+          venue_admission_envelope_sha256: string;
+        };
+        finding_purchase_replay_snapshot?: {
+          purchase: {
+            accepted_bid_envelope_sha256: string;
+            accepted_price: {
+              currency: string;
+              units: number;
+            };
+            authoritative_payment_operation_id: string;
+            expected_status_feed_id: string;
+            finding_id: string;
+            listing_id: string;
+            payer_key_hex: string;
+            payload_media_type: string;
+            payload_sha256: string;
+            purchase_intent_id: string;
+            reservation_id: string;
+            status_proof: {
+              feed_id: string;
+              key_domain_nonce: number;
+              map_epoch: number;
+              non_inclusion_checked_at: number;
+              operator_authorization_sha256: string;
+              proof_sha256: string;
+              root_hash: string;
+              service_bond_evidence_sha256: string;
+              status_epoch_artifact_sha256: string;
+              status_epoch_id: string;
+            };
+            venue_admission_envelope_sha256: string;
+          };
+          schema: string;
+        };
+        governed_transaction?: {
+          approval?: {
+            approval_artifact_digest: string;
+            approved: boolean;
+            approver_key: string;
+            token_id: string;
+          };
+          autonomy?: {
+            delegationBondId: string;
+            tier: string;
+          };
+          call_chain?: {
+            chainId: string;
+            delegatorSubject: string;
+            evidenceClass: string;
+            evidenceSources: string[];
+            originSubject: string;
+            parentReceiptId: string;
+            parentRequestId: string;
+            upstreamProof: {
+              chainId: string;
+              delegatorSubject: string;
+              expiresAt: number;
+              issuedAt: number;
+              originSubject: string;
+              parentReceiptId: string;
+              parentRequestId: string;
+              signature: string;
+              signer: string;
+              subject: string;
+            };
+          };
+          commerce?: {
+            seller: string;
+            settlement_destination_ref: string;
+            shared_payment_token_id: string;
+          };
+          economic_authorization?: {
+            amount_bounds: {
+              approved_max: {
+                currency: string;
+                units: number;
+              };
+              hold_amount: {
+                currency: string;
+                units: number;
+              };
+              settlement_cap: {
+                currency: string;
+                units: number;
+              };
+            };
+            budget: {
+              budget_remaining: number;
+              budget_total: number;
+              cost_charged: number;
+              currency: string;
+              delegation_depth: number;
+              grant_index: number;
+              root_budget_holder: string;
+            };
+            credit_authority_digest: string;
+            economic_intent_digest: string;
+            economic_mode: string;
+            liability_refs: {
+              bond_id: string;
+              dispute_policy_ref: string;
+              policy_id: string;
+            };
+            merchant: {
+              merchant_id: string;
+              merchant_of_record: string;
+              order_ref: string;
+            };
+            metering: {
+              billing_unit: string;
+              max_billable_units: number;
+              meter_profile_hash: string;
+              provider: string;
+            };
+            payee: {
+              beneficiary_id: string;
+              settlement_destination_ref: string;
+            };
+            payee_binding_digest: string;
+            payer: {
+              custody_provider: string;
+              funding_source_ref: string;
+              obligor_ref: string;
+              party_id: string;
+            };
+            pre_action_authority_digest: string;
+            pricing_basis: {
+              quote_expiry: number;
+              quote_hash: string;
+              tariff_hash: string;
+            };
+            rail: {
+              asset: string;
+              contract_or_account_ref: string;
+              facilitator: string;
+              kind: string;
+              network: string;
+            };
+            settlement: {
+              settlement_status: string;
+            };
+            version: string;
+          };
+          intent_hash: string;
+          intent_id: string;
+          max_amount?: {
+            currency: string;
+            units: number;
+          };
+          metered_billing?: {
+            maxBilledUnits: number;
+            quote: {
+              billingUnit: string;
+              expiresAt: number;
+              issuedAt: number;
+              provider: string;
+              quoteId: string;
+              quotedCost: {
+                currency: string;
+                units: number;
+              };
+              quotedUnits: number;
+            };
+            settlementMode: string;
+            usageEvidence: {
+              evidenceId: string;
+              evidenceKind: string;
+              evidenceSha256: string;
+              observedUnits: number;
+            };
+          };
+          purpose: string;
+          runtime_assurance?: {
+            evidenceSha256: string;
+            schema: string;
+            tier: string;
+            verifier: string;
+            verifierFamily: string;
+          };
+          server_id: string;
+          tool_name: string;
+        };
+        occurred_at_unix_ms?: number;
+        receipt_context?: {
+          request_id: string;
+          request_namespace_digest?: string;
+        };
+        route?: {
+          bridge: string;
+          protocolTarget: string;
+          selectedRoute: string;
+        };
+      };
+      observation_outcome?: string;
+      policy_hash: string;
+      receipt_kind: string;
+      redaction_mode: string;
+      tenant_id?: string;
+      timestamp: number;
+      tool_name: string;
+      tool_origin: string;
+      tool_server: string;
+      trust_level: string;
+    };
+    id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/receipt-lineage-statement-body.schema.json
+export namespace Receipt_ReceiptLineageStatementBody {
+  export interface ChioReceiptLineageStatementV1SignedBody {
+    childReceiptId: string;
+    childRequestId: string;
+    childSessionAnchor: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    continuationTokenId?: string;
+    evidenceClass: string;
+    id: string;
+    issuedAt: number;
+    kernelKey: string;
+    parentReceiptId: string;
+    parentRequestId: string;
+    parentSessionAnchor: {
+      sessionAnchorHash: string;
+      sessionAnchorId: string;
+    };
+    relationKind: string;
+    schema: "chio.receipt_lineage_statement.v1";
   }
 }
 
@@ -3585,10 +21130,6 @@ export namespace Receipt_Record {
      */
     kernel_key: string;
     bbs_signature?: BbsReceiptSignature;
-    /**
-     * Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
-     */
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Supports Ed25519, byte-aligned DER P-256/P-384, and algorithm-coupled classical plus ML-DSA-65 hybrid envelopes; cryptographic DER validity is checked by the verifier.
      */
@@ -3684,6 +21225,15 @@ export namespace Receipt_SessionAnchorMetadata {
   export interface ChioReceiptSessionAnchorMetadata {
     schema: "chio.receipt-session-anchor.v1";
     session_anchor_commitment: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/settlement-closure-body.schema.json
+export namespace Receipt_SettlementClosureBody {
+  export interface ChioSettlementClosureV1SignedBody {
+    fixture: string;
+    n: number;
   }
 }
 
@@ -4419,7 +21969,6 @@ export namespace Recovery_ApprovalSubmission {
   export interface SignedRecoveryAuthorityCoverageV1 {
     body: RecoveryAuthorityCoverageBodyV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryAuthorityCoverageBodyV1 {
@@ -6502,10 +24051,6 @@ export namespace Recovery_CommandResult {
      */
     kernel_key: string;
     bbs_signature?: BbsReceiptSignature;
-    /**
-     * Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
-     */
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     /**
      * Hex-encoded signature over canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Supports Ed25519, byte-aligned DER P-256/P-384, and algorithm-coupled classical plus ML-DSA-65 hybrid envelopes; cryptographic DER validity is checked by the verifier.
      */
@@ -17573,7 +35118,6 @@ export namespace Recovery_DisclosureGrant {
   export interface SignedDeclassificationGrant {
     body: Body;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface Body {
@@ -17604,7 +35148,6 @@ export namespace Recovery_DisclosureGrant {
       recovery: RecoveryMandatoryGrantBindingV1;
     };
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryMandatoryGrantBindingV1 {
@@ -24110,6 +41653,63 @@ export namespace Recovery_ProviderFinality {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-grant-body.schema.json
+export namespace Recovery_RecoveryGrantBody {
+  export interface ChioRecoveryGrantV1SignedBody {
+    claims: {
+      agent_id: string;
+      authority_key_id: string;
+      capability_id: string;
+      destination_id: string;
+      domain_version: number;
+      expires_at_unix_seconds: number;
+      grant_id: string;
+      issued_at_unix_seconds: number;
+      purpose: string;
+      request_hash: number[];
+      session_id: string;
+      source_label_hash: number[];
+      subject_id: string;
+      target_label: {
+        compartments: string[];
+        kind: string;
+        owners: {
+          bob?: string[];
+        };
+      };
+      tenant_id: string;
+      tool_name: string;
+    };
+    recovery: {
+      action_intent: number[];
+      approval_intent: string;
+      approved_plan: number[];
+      authority_domain: string;
+      authority_scope: number[];
+      authorization_requirements: number[];
+      challenge: string;
+      continuation_id: string;
+      contract_digest: number[];
+      coverage_digest: number[];
+      isolation_epoch: number;
+      isolation_lineage: string;
+      output_disposition: number[];
+      policy_digest: number[];
+      process_id: string;
+      request_id: string;
+      request_namespace: number[];
+      schema: string;
+      selected_offer: number[];
+      step_id: string;
+      version: number;
+      workflow_id: string;
+    };
+    schema: "chio.recovery.grant.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/recovery/recovery-setup-probe.schema.json
 export namespace Recovery_RecoverySetupProbe {
   export type OpaqueId = string;
@@ -24285,6 +41885,194 @@ export namespace Recovery_RecoverySetupReport {
     authority_domain: string;
     tenant_id: string;
     process_id: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-confined-disclosure-body.schema.json
+export namespace Recovery_RecoverySignedConfinedDisclosureBody {
+  export interface ChioRecoverySignedConfinedDisclosureV1SignedBody {
+    artifact: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    boundary: number[];
+    content: number[];
+    contract: number[];
+    domain_version: number;
+    evidence: string;
+    expires_at_unix_ms: number;
+    implementation: number[];
+    influence: {
+      commitment: number[];
+      externally_influenced: boolean;
+      unknown: boolean;
+    };
+    issued_at_unix_ms: number;
+    launch: number[];
+    observation: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    parent: {
+      clearance: {
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+        kind: string;
+        owners: {};
+      };
+      context_generation: number;
+      isolation_epoch: string;
+      lineage: string;
+      principal: string;
+      recipient: string;
+      runtime: string;
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      sink: {
+        kind: string;
+      };
+    };
+    policy: number[];
+    size_bytes: number;
+    source: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+    target: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-confined-endorsement-body.schema.json
+export namespace Recovery_RecoverySignedConfinedEndorsementBody {
+  export interface ChioRecoverySignedConfinedEndorsementV1SignedBody {
+    artifact: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    boundary: number[];
+    content: number[];
+    contract: number[];
+    domain_version: number;
+    evidence: string;
+    expires_at_unix_ms: number;
+    implementation: number[];
+    influence: {
+      commitment: number[];
+      externally_influenced: boolean;
+      unknown: boolean;
+    };
+    issued_at_unix_ms: number;
+    launch: number[];
+    observation: {
+      artifact: string;
+      provenance: number[];
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      version: string;
+    };
+    parent: {
+      clearance: {
+        /**
+         * @maxItems 64
+         */
+        compartments: string[];
+        kind: string;
+        owners: {};
+      };
+      context_generation: number;
+      isolation_epoch: string;
+      lineage: string;
+      principal: string;
+      recipient: string;
+      runtime: string;
+      scope: {
+        authority_domain: string;
+        process_id: string;
+        tenant_id: string;
+      };
+      sink: {
+        kind: string;
+      };
+    };
+    policy: number[];
+    size_bytes: number;
+    source: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+    target: {
+      /**
+       * @maxItems 64
+       */
+      compartments: string[];
+      kind: string;
+      owners: {};
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/recovery-signed-policy-deployment-change-body.schema.json
+export namespace Recovery_RecoverySignedPolicyDeploymentChangeBody {
+  export interface ChioRecoverySignedPolicyDeploymentChangeV1SignedBody {
+    base_deployment: number[];
+    base_generation: number;
+    base_policy: number[];
+    domain_version: number;
+    proposal_digest: number[];
+    proposal_id: string;
+    scope: {
+      authority_domain: string;
+      process_id: string;
+      tenant_id: string;
+    };
+    target_deployment: number[];
+    target_generation: number;
+    target_policy: number[];
+    writer_fence: number[];
   }
 }
 
@@ -31491,7 +49279,6 @@ export namespace Recovery_SemanticInvocation {
   export interface SignedSemanticAudienceV1 {
     body: SemanticAudienceV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticAudienceV1 {
@@ -31521,7 +49308,6 @@ export namespace Recovery_SemanticInvocation {
   export interface SignedScopedEndorsementV1 {
     body: ScopedEndorsementV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ScopedEndorsementV1 {
@@ -31564,7 +49350,6 @@ export namespace Recovery_SemanticInvocation {
   export interface SignedSemanticAnnotationV1 {
     body: SemanticAnnotationV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticAnnotationV1 {
@@ -31604,7 +49389,6 @@ export namespace Recovery_SemanticInvocation {
   export interface SignedSemanticTransformationV1 {
     body: SemanticTransformationV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticTransformationV1 {
@@ -31796,7 +49580,6 @@ export namespace Recovery_SemanticInvocation {
   export interface SignedSemanticPrerequisiteV1 {
     body: SemanticPrerequisiteV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticPrerequisiteV1 {
@@ -33859,7 +51642,6 @@ export namespace Recovery_SignedArtifactArchiveManifest {
   export interface SignedArtifactArchiveManifestV1 {
     body: ArtifactArchiveManifestV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ArtifactArchiveManifestV1 {
@@ -34317,7 +52099,6 @@ export namespace Recovery_SignedArtifactCertificate {
   export interface SignedArtifactCertificateV1 {
     body: ArtifactCertificateV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ArtifactCertificateV1 {
@@ -34570,7 +52351,6 @@ export namespace Recovery_SignedAuthorityCoverage {
   export interface SignedRecoveryAuthorityCoverageV1 {
     body: RecoveryAuthorityCoverageBodyV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryAuthorityCoverageBodyV1 {
@@ -34702,7 +52482,6 @@ export namespace Recovery_SignedConfinedDisclosure {
   export interface SignedConfinedDisclosureV1 {
     body: ConfinedReturnEvidenceV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ConfinedReturnEvidenceV1 {
@@ -34868,7 +52647,6 @@ export namespace Recovery_SignedConfinedEndorsement {
   export interface SignedConfinedEndorsementV1 {
     body: ConfinedReturnEvidenceV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ConfinedReturnEvidenceV1 {
@@ -35014,7 +52792,6 @@ export namespace Recovery_SignedExplanationReport {
   export interface RecoverySignedExplanationReportV1 {
     body: RecoveryExplanationReportV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryExplanationReportV1 {
@@ -35054,7 +52831,6 @@ export namespace Recovery_SignedExplanationView {
   export interface RecoverySignedExplanationViewV1 {
     body: RecoveryExplanationViewV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryExplanationViewV1 {
@@ -36928,7 +54704,6 @@ export namespace Recovery_SignedPolicyDeploymentChange {
   export interface SignedPolicyDeploymentChangeV1 {
     body: PolicyDeploymentChangeV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface PolicyDeploymentChangeV1 {
@@ -36997,7 +54772,6 @@ export namespace Recovery_SignedProviderFinality {
   export interface SignedRecoveryProviderFinalityV1 {
     body: RecoveryProviderPositiveFinalityV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryProviderPositiveFinalityV1 {
@@ -37134,7 +54908,6 @@ export namespace Recovery_SignedRecoveryGrant {
       recovery: RecoveryMandatoryGrantBindingV1;
     };
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface Body {
@@ -37229,7 +55002,6 @@ export namespace Recovery_SignedRecoverySetupProbe {
   export interface SignedRecoverySetupProbeV1 {
     body: RecoverySetupProbeV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoverySetupProbeV1 {
@@ -37337,7 +55109,6 @@ export namespace Recovery_SignedRecoverySetupReport {
   export interface SignedRecoverySetupReportV1 {
     body: RecoverySetupReportV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoverySetupReportV1 {
@@ -37416,7 +55187,6 @@ export namespace Recovery_SignedScopedEndorsement {
   export interface SignedScopedEndorsementV1 {
     body: ScopedEndorsementV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ScopedEndorsementV1 {
@@ -37524,7 +55294,6 @@ export namespace Recovery_SignedSemanticAnnotation {
   export interface SignedSemanticAnnotationV1 {
     body: SemanticAnnotationV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticAnnotationV1 {
@@ -37629,7 +55398,6 @@ export namespace Recovery_SignedSemanticAudience {
   export interface SignedSemanticAudienceV1 {
     body: SemanticAudienceV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticAudienceV1 {
@@ -37724,7 +55492,6 @@ export namespace Recovery_SignedSemanticDeployment {
   export interface SignedSemanticDeploymentV1 {
     body: SemanticDeploymentV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticDeploymentV1 {
@@ -42460,7 +60227,6 @@ export namespace Recovery_SignedSemanticPackage {
   export interface SignedSemanticPackageV1 {
     body: SemanticPackageV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticPackageV1 {
@@ -46914,7 +64680,6 @@ export namespace Recovery_SignedSemanticPrerequisite {
   export interface SignedSemanticPrerequisiteV1 {
     body: SemanticPrerequisiteV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticPrerequisiteV1 {
@@ -47006,7 +64771,6 @@ export namespace Recovery_SignedSemanticTransformation {
   export interface SignedSemanticTransformationV1 {
     body: SemanticTransformationV1;
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface SemanticTransformationV1 {
@@ -47411,6 +65175,269 @@ export namespace Recovery_TransportRequest {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/governance-case.schema.json
+export namespace Registry_GovernanceCase {
+  export interface ChioRegistryGovernanceCaseSignedBody {
+    activationId?: string;
+    appealOfCaseId?: string;
+    caseId: string;
+    charterId: string;
+    evidenceRefs: {
+      kind: string;
+      referenceId: string;
+    }[];
+    expiresAt: number;
+    governingOperatorId: string;
+    issuedBy: string;
+    kind: string;
+    listingId: string;
+    namespace: string;
+    note?: string;
+    openedAt: number;
+    schema: "chio.registry.governance-case.v1";
+    state: string;
+    subjectOperatorId: string;
+    supersedesCaseId?: string;
+    updatedAt: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/governance-charter.schema.json
+export namespace Registry_GovernanceCharter {
+  export interface ChioRegistryGovernanceCharterSignedBody {
+    allowedCaseKinds: string[];
+    authorityScope: {
+      allowedActorKinds: string[];
+      allowedListingOperatorIds: string[];
+      namespace: string;
+      policyReference: string;
+    };
+    charterId: string;
+    escalationOperatorIds?: string[];
+    expiresAt: number;
+    governingOperatorId: string;
+    governingOperatorName?: string;
+    issuedAt: number;
+    issuedBy: string;
+    note?: string;
+    schema: "chio.registry.governance-charter.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/listing.schema.json
+export namespace Registry_Listing {
+  export interface ChioRegistryListingSignedBody {
+    boundary: {
+      automaticTrustAdmission: boolean;
+      explicitTrustActivationRequired: boolean;
+      visibilityOnly: boolean;
+    };
+    compatibility: {
+      sourceArtifactId: string;
+      sourceArtifactSha256: string;
+      sourceSchema: string;
+    };
+    expiresAt: number;
+    listingId: string;
+    namespace: string;
+    namespaceOwnership: {
+      namespace: string;
+      ownerId: string;
+      ownerName?: string;
+      registeredAt: number;
+      registryUrl: string;
+      signerPublicKey: string;
+    };
+    publishedAt: number;
+    schema: "chio.registry.listing.v1";
+    status: string;
+    subject: {
+      actorId: string;
+      actorKind: string;
+      displayName?: string;
+      homepageUrl?: string;
+      metadataUrl?: string;
+      resolutionUrl?: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/market-fee-schedule.schema.json
+export namespace Registry_MarketFeeSchedule {
+  export interface ChioRegistryMarketFeeScheduleSignedBody {
+    bondRequirements: {
+      bondClass: string;
+      collateralReferenceKind: string;
+      requiredAmount: {
+        currency: string;
+        units: number;
+      };
+      slashable: boolean;
+    }[];
+    disputeFee: {
+      currency: string;
+      units: number;
+    };
+    expiresAt?: number;
+    feeScheduleId: string;
+    governingOperatorId: string;
+    governingOperatorName?: string;
+    issuedAt: number;
+    issuedBy: string;
+    marketParticipationFee: {
+      currency: string;
+      units: number;
+    };
+    namespace: string;
+    note?: string;
+    publicationFee: {
+      currency: string;
+      units: number;
+    };
+    schema: "chio.registry.market-fee-schedule.v1";
+    scope: {
+      allowedActorKinds?: string[];
+      allowedAdmissionClasses?: string[];
+      allowedListingOperatorIds?: string[];
+      namespace: string;
+      policyReference?: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/namespace.schema.json
+export namespace Registry_Namespace {
+  export interface ChioRegistryNamespaceSignedBody {
+    boundary: {
+      automaticTrustAdmission: boolean;
+      explicitTrustActivationRequired: boolean;
+      visibilityOnly: boolean;
+    };
+    lifecycleState: string;
+    namespaceId: string;
+    ownership: {
+      namespace: string;
+      ownerId: string;
+      registeredAt: number;
+      registryUrl: string;
+      signerPublicKey: string;
+    };
+    schema: "chio.registry.namespace.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/registry/trust-activation.schema.json
+export namespace Registry_TrustActivation {
+  export interface ChioRegistryTrustActivationSignedBody {
+    activationId: string;
+    admissionClass: string;
+    disposition: string;
+    eligibility: {
+      allowedActorKinds: string[];
+      allowedPublisherRoles: string[];
+      allowedStatuses: string[];
+      policyReference: string;
+      requireBondBacking: boolean;
+      requireFreshListing: boolean;
+      requiredListingOperatorIds?: string[];
+    };
+    expiresAt: number;
+    listingId: string;
+    listingPublishedAt: number;
+    listingSha256: string;
+    localOperatorId: string;
+    localOperatorName?: string;
+    namespace: string;
+    note?: string;
+    requestedAt: number;
+    requestedBy: string;
+    reviewContext: {
+      freshness: {
+        ageSecs: number;
+        generatedAt: number;
+        maxAgeSecs: number;
+        state: string;
+        validUntil: number;
+      };
+      publisher: {
+        operatorId: string;
+        operatorName?: string;
+        registryUrl: string;
+        role: string;
+      };
+    };
+    reviewedAt?: number;
+    reviewedBy?: string;
+    schema: "chio.registry.trust-activation.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/regulatory/receipt-export.schema.json
+export namespace Regulatory_ReceiptExport {
+  export interface ChioRegulatoryReceiptExportSignedBody {
+    after?: number;
+    agentId?: string;
+    before?: number;
+    generatedAt: number;
+    matchingReceipts: number;
+    receipts: {
+      action: {
+        parameter_hash: string;
+        parameters: {};
+      };
+      boundary_class: string;
+      capability_id: string;
+      content_hash: string;
+      decision: {
+        verdict: string;
+      };
+      id: string;
+      kernel_key: string;
+      metadata: {
+        chio_receipt_signing_nonce: string;
+      };
+      policy_hash: string;
+      receipt_kind: string;
+      redaction_mode: string;
+      signature: string;
+      timestamp: number;
+      tool_name: string;
+      tool_origin: string;
+      tool_server: string;
+      trust_level: string;
+    }[];
+    schema: "chio.regulatory.receipt-export.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/release/release-qualification-manifest.schema.json
+export namespace Release_ReleaseQualificationManifest {
+  export interface ChioReleaseQualificationManifestSignedBody {
+    artifacts: {
+      bytes: number;
+      path: string;
+      sha256: string;
+    }[];
+    candidateGitCommit: string;
+    candidateGitTree: string;
+    cargoLockSha256: string;
+    generatedAtUnixSecs: number;
+    qualificationScope: string;
+    schema: "chio.release-qualification-manifest.v1";
+    source: string;
+    workflowRunAttempt: null;
+    workflowRunId: null;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/result/cancelled.schema.json
 export namespace Result_Cancelled {
   export interface ChioToolCallResultCancelled {
@@ -47493,7 +65520,6 @@ export namespace Result_PendingApproval {
     proposal_created_at: number;
     proposal_deadline: number;
     policy_authority: string;
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -47504,6 +65530,83 @@ export namespace Result_StreamComplete {
   export interface ChioToolCallResultStreamComplete {
     status: "stream_complete";
     total_chunks: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-adjudication-jurisdiction-receipt-body.schema.json
+export namespace Risk_RiskAdjudicationJurisdictionReceiptBody {
+  export interface ChioRiskAdjudicationJurisdictionReceiptV1SignedBody {
+    adjudicator_subjects: string[];
+    appeal_authority_refs: string[];
+    covered_dispute_types: string[];
+    effective_window: {
+      end: string;
+      start: string;
+    };
+    evidence_rules_ref: string;
+    id: string;
+    issued_at: string;
+    jurisdiction_id: string;
+    order_id: string;
+    policy_ref: string;
+    remedy_limits: {
+      currency: string;
+      maximum_remedy: number;
+    }[];
+    schema: "chio.risk.adjudication-jurisdiction-receipt.v1";
+    slash_authority_refs: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-collateral-position-report-body.schema.json
+export namespace Risk_RiskCollateralPositionReportBody {
+  export interface ChioRiskCollateralPositionReportV1SignedBody {
+    amount: number;
+    available_amount: number;
+    claim_priority: string;
+    collateral_id: string;
+    consumed_amount_refs: {}[];
+    currency_or_asset: string;
+    id: string;
+    issued_at: string;
+    lock_expiry: string;
+    lock_start: string;
+    order_id: string;
+    release_policy_ref: string;
+    schema: "chio.risk.collateral-position-report.v1";
+    slash_authority_ref: string;
+    source_ref: string;
+    source_type: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/risk/risk-guarantee-decision-body.schema.json
+export namespace Risk_RiskGuaranteeDecisionBody {
+  export interface ChioRiskGuaranteeDecisionV1SignedBody {
+    adjudication_jurisdiction_ref: string;
+    backing_refs: string[];
+    beneficiary_subject: string;
+    claim_window: {
+      end: string;
+      start: string;
+    };
+    coverage_decision_ref: string;
+    currency: string;
+    exclusions_ref: string;
+    guarantee_id: string;
+    guarantee_type: string;
+    id: string;
+    issued_at: string;
+    maximum_remedy: number;
+    order_id: string;
+    provider_subject: string;
+    schema: "chio.risk.guarantee-decision.v1";
+    sla_commitment_ref: string;
+    verdict: string;
   }
 }
 
@@ -47818,6 +65921,31 @@ export namespace RootAuthority_EnterpriseProviderIdentity {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot-body.schema.json
+export namespace RootAuthority_IdpKeySnapshotBody {
+  export interface ChioIdpKeySnapshotV1SignedBody {
+    exchange_key?: string;
+    fixture?: string;
+    issuer?: string;
+    keys?: {
+      alg?: string;
+      crv?: string;
+      e?: string;
+      kid: string;
+      kty: string;
+      n?: string;
+      use?: string;
+      x?: string;
+      y?: string;
+    }[];
+    n?: number;
+    observed_at?: number;
+    schema?: "chio.idp-key-snapshot.v1";
+    source?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json
 export namespace RootAuthority_IdpKeySnapshot {
   /**
@@ -47896,6 +66024,15 @@ export namespace RootAuthority_IdpKeySnapshot {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/revocation-request-body.schema.json
+export namespace RootAuthority_RevocationRequestBody {
+  export interface ChioRevocationRequestV1SignedBody {
+    fixture: string;
+    n: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/root_authority/revocation-request.schema.json
 export namespace RootAuthority_RevocationRequest {
   /**
@@ -47961,6 +66098,76 @@ export namespace RootAuthority_RootAnchor {
      * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
      */
     assertion_exp: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/root-policy-body.schema.json
+export namespace RootAuthority_RootPolicyBody {
+  export interface ChioRootPolicyV1SignedBody {
+    disclosure?: {
+      default: string;
+      tools?: {
+        "crm/search": {
+          parameters: {
+            inline_fields: string[];
+          };
+          result: {
+            inline_fields: {}[];
+          };
+        };
+      };
+    };
+    exchange_keys?: string[];
+    fixture?: string;
+    n?: number;
+    policy_id?: string;
+    policy_key?: string;
+    rules?: {
+      capability_ttl_secs?: number;
+      ceiling_scope: {
+        grants: {
+          dpop_required?: boolean;
+          operations: string[];
+          server_id: string;
+          tool_name: string;
+        }[];
+        resource_grants?: {
+          operations: string[];
+          uri_pattern: string;
+        }[];
+      };
+      ceiling_scope_hash: string;
+      holder_classes: string[];
+      idp_scope_projection?: {
+        "crm.admin"?: string[];
+        "crm.read": string[];
+        "crm.write"?: string[];
+      };
+      match: {
+        allowed_algs?: string[];
+        anchor_kind: string;
+        claims?: {
+          client_id?: string[];
+          scope?: string[];
+        };
+        provider_identity_digest?: string;
+        provider_record_id?: string;
+      };
+      max_assertion_lifetime_secs?: number;
+      max_clock_skew_secs?: number;
+      principal?: string;
+      recorded_claims: {
+        client_id?: string;
+        scope?: string;
+      };
+      retain_idp_artifact?: boolean;
+      rule_id: string;
+      tenant_value?: string;
+    }[];
+    schema?: "chio.root-policy.v1";
+    valid_from?: number;
+    valid_until?: number;
   }
 }
 
@@ -48390,7 +66597,6 @@ export namespace RootAuthority_RootPolicy {
       threshold: CumulativeRootMonetaryAmount;
       root_expires_at: number;
     };
-    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface CumulativeRootMonetaryAmount {
@@ -48605,6 +66811,599 @@ export namespace RootAuthority_VerifierTrust {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/attack-simulation-report-signature.schema.json
+export namespace Runtime_AttackSimulationReportSignature {
+  export interface ChioRuntimeAttackSimulationReportSignatureSignedBody {
+    actualVerifierReportDigest: string;
+    attackClass: string;
+    chaosKnobs: string[];
+    expectedDenialClaim: string;
+    fixturePath: string;
+    issuer: string;
+    runtimeReceiptRefs: string[];
+    scenarioId: string;
+    schema: "chio.runtime.attack-simulation-report-signature.v1";
+    simulatorVersionDigest: string;
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/chaos-run-report-signature.schema.json
+export namespace Runtime_ChaosRunReportSignature {
+  export interface ChioRuntimeChaosRunReportSignatureSignedBody {
+    actualVerifierReportDigest: string;
+    caseId: string;
+    deterministicSeedDigest: string;
+    expectedResult: string;
+    failureInjected: string;
+    issuer: string;
+    runnerVersionDigest: string;
+    runtimeReceiptRefs: string[];
+    schema: "chio.runtime.chaos-run-report-signature.v1";
+    status: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/execution-lease-signature.schema.json
+export namespace Runtime_ExecutionLeaseSignature {
+  export interface ChioRuntimeExecutionLeaseSignatureSignedBody {
+    ancestorCapabilityDigest: string;
+    budgetAllocationRef: string;
+    budgetPoolRef: string;
+    capabilityDigest: string;
+    childTaskId: string;
+    expiresAt: string;
+    issuedAt: string;
+    issuer: string;
+    joinReceiptRef: string;
+    leaseId: string;
+    nonce: string;
+    parentReceiptRef: string;
+    policyDigest: string;
+    requestDigest: string;
+    responsePolicyDigest: string;
+    revocationEpochRef?: string;
+    revocationFreshnessRef: string;
+    routePlanReceiptRef?: string;
+    sandboxAttestationRef: string;
+    schema: "chio.runtime.execution-lease-signature.v1";
+    sideEffectClass: string;
+    subjectAgent: string;
+    subjectCapabilityDigest: string;
+    taskGraphDigest: string;
+    toolInstanceId: string;
+    toolManifestDigest: string;
+    toolServerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/revocation-freshness-proof-signature.schema.json
+export namespace Runtime_RevocationFreshnessProofSignature {
+  export interface ChioRuntimeRevocationFreshnessProofSignatureSignedBody {
+    ancestorCapabilityDigest?: string;
+    epochId: string;
+    epochRoot: string;
+    fetchedAt: string;
+    maxStalenessMs: number;
+    oracleId: string;
+    proofId: string;
+    revokedAncestorResult?: boolean;
+    revokedLeafResult: boolean;
+    schema: "chio.runtime.revocation-freshness-proof-signature.v1";
+    sequence: number;
+    subjectCapabilityDigest?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-peer-weights-body.schema.json
+export namespace Runtime_RuntimePeerWeightsBody {
+  export interface ChioRuntimePeerWeightsV1SignedBody {
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    reputationEpoch: number;
+    schema: "chio.runtime.peer-weights.v1";
+    verifierId: string;
+    weights: {
+      peerKernelId: string;
+      weight: number;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-pheromone-policy-body.schema.json
+export namespace Runtime_RuntimePheromonePolicyBody {
+  export interface ChioRuntimePheromonePolicyV1SignedBody {
+    allowedReputationEpochs: number[];
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    maxQueryReportAgeMs: number;
+    minDistinctOriginPairs: number;
+    mode: string;
+    peerWeightsSha256: string;
+    policyId: string;
+    policyVersion: number;
+    rules: {
+      actionClassId: string;
+      direction: string;
+      effect: string;
+      ruleId: string;
+      subjectClass: string;
+      subjectClassNamespace: string;
+      thresholdTotalStrength: number;
+    }[];
+    runtimeTrustBundleSha256: string;
+    schema: "chio.runtime.pheromone-policy.v1";
+    verifierId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/runtime-verifier-trust-bundle-body.schema.json
+export namespace Runtime_RuntimeVerifierTrustBundleBody {
+  export interface ChioRuntimeVerifierTrustBundleV1SignedBody {
+    expiresAtUnixMs: number;
+    issuedAtUnixMs: number;
+    keyId: string;
+    previousHashSha256?: string;
+    revocationAuthorityRoots: string[];
+    revocationCheckpointSha256: string;
+    schema: "chio.runtime.verifier-trust-bundle.v1";
+    trustBundleSha256: string;
+    verificationContextSha256: string;
+    verifierId: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/sandbox-attestation-signature.schema.json
+export namespace Runtime_SandboxAttestationSignature {
+  export interface ChioRuntimeSandboxAttestationSignatureSignedBody {
+    attestationId: string;
+    attester: string;
+    egressPolicyDigest: string;
+    expiresAt: string;
+    sandboxProfileDigest: string;
+    schema: "chio.runtime.sandbox-attestation-signature.v1";
+    startedAt: string;
+    toolInstanceId: string;
+    toolManifestDigest: string;
+    toolServerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/tee-bless-audit.schema.json
+export namespace Runtime_TeeBlessAudit {
+  export interface ChioTeeBlessAuditSignedBody {
+    capture: {
+      frames_after_dedupe: number;
+      frames_after_redact: number;
+      frames_in: number;
+      path: string;
+    };
+    control_plane_capability: string;
+    event: string;
+    fixture: {
+      family: string;
+      name: string;
+      path: string;
+      receipts_root: string;
+    };
+    operator: {
+      git_user: string;
+      id: string;
+    };
+    redaction_pass_id: string;
+    ts: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/tee-capture-frame.schema.json
+export namespace Runtime_TeeCaptureFrame {
+  export interface ChioTeeCaptureFrameSignedBody {
+    deny_reason?: string;
+    event_id: string;
+    invocation: {
+      cmd?: string;
+      q?: string;
+      to?: string;
+      tool?: string;
+    };
+    provenance: {
+      otel: {
+        span_id: string;
+        trace_id: string;
+      };
+    };
+    redaction_pass_id: string;
+    request_blob_sha256: string;
+    response_blob_sha256: string;
+    schema_version: string;
+    tee_id: string;
+    ts: string;
+    upstream: {
+      api_version: string;
+      operation: string;
+      system: string;
+    };
+    verdict: string;
+    would_have_blocked: boolean;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/terminal-receipt-signature.schema.json
+export namespace Runtime_TerminalReceiptSignature {
+  export interface ChioRuntimeTerminalReceiptSignatureSignedBody {
+    executionLeaseRef?: string;
+    incidentRef?: string;
+    kernelKey: string;
+    policyDigest: string;
+    receiptId: string;
+    schema: "chio.runtime.terminal-receipt-signature.v1";
+    terminalStatus: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/tool-server-ack-signature.schema.json
+export namespace Runtime_ToolServerAckSignature {
+  export interface ChioRuntimeToolServerAckSignatureSignedBody {
+    ackId: string;
+    issuedAt: string;
+    leaseId: string;
+    nonce: string;
+    sandboxAttestationRef: string;
+    schema: "chio.runtime.tool-server-ack-signature.v1";
+    terminalStatus: string;
+    toolInstanceId: string;
+    toolServerId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/trusted-time-proof-signature.schema.json
+export namespace Runtime_TrustedTimeProofSignature {
+  export interface ChioRuntimeTrustedTimeProofSignatureSignedBody {
+    ackId: string;
+    issuer: string;
+    leaseId: string;
+    maxClockSkewMs: number;
+    observedAt: string;
+    proofId: string;
+    schema: "chio.runtime.trusted-time-proof-signature.v1";
+    timeSourceId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime/wasm-module.schema.json
+export namespace Runtime_WasmModule {
+  export interface ChioWasmModuleSignedBody {
+    module_hash: string;
+    module_name: string;
+    signer_public_key: string;
+    version: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/appraisal-report.schema.json
+export namespace RuntimeAttestation_AppraisalReport {
+  export interface ChioRuntimeAttestationAppraisalReportSignedBody {
+    appraisal: {
+      adapter: string;
+      artifact: {
+        claims: {
+          normalizedAssertions: {
+            attestationType: string;
+            runtimeIdentity?: string;
+          };
+          normalizedClaims: {
+            category: string;
+            code: string;
+            confidence: string;
+            freshness: string;
+            provenance: string;
+            value: string;
+          }[];
+          vendorClaims: {
+            attestationType: string;
+          };
+        };
+        evidence: {
+          evidenceSha256: string;
+          expiresAt: number;
+          issuedAt: number;
+          schema: string;
+          verifier: string;
+        };
+        policy: {
+          effectiveTier: string;
+          reasonCodes: string[];
+          reasons: {
+            code: string;
+            description: string;
+            disposition: string;
+            group: string;
+          }[];
+          verdict: string;
+        };
+        schema: string;
+        verifier: {
+          adapter: string;
+          verifierFamily: string;
+        };
+      };
+      effectiveTier: string;
+      evidence: {
+        evidenceSha256: string;
+        expiresAt: number;
+        issuedAt: number;
+        schema: string;
+        verifier: string;
+      };
+      normalizedAssertions: {
+        attestationType: string;
+        runtimeIdentity?: string;
+      };
+      normalizedClaims: {
+        category: string;
+        code: string;
+        confidence: string;
+        freshness: string;
+        provenance: string;
+        value: string;
+      }[];
+      reasonCodes: string[];
+      reasons: {
+        code: string;
+        description: string;
+        disposition: string;
+        group: string;
+      }[];
+      schema: string;
+      vendorClaims: {
+        attestationType: string;
+      };
+      verdict: string;
+      verifierFamily: string;
+    };
+    generatedAt: number;
+    policyOutcome: {
+      accepted: boolean;
+      effectiveTier: string;
+      reason: string;
+      trustPolicyConfigured: boolean;
+    };
+    schema: "chio.runtime-attestation.appraisal-report.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/appraisal-result.schema.json
+export namespace RuntimeAttestation_AppraisalResult {
+  export interface ChioRuntimeAttestationAppraisalResultSignedBody {
+    appraisal: {
+      claims: {
+        normalizedAssertions: {
+          attestationType: string;
+          hardwareModel?: string;
+          runtimeIdentity: string;
+          secureBoot?: string;
+          workloadIdentityScheme?: string;
+          workloadIdentityUri?: string;
+        };
+        normalizedClaims: {
+          category: string;
+          code: string;
+          confidence: string;
+          freshness: string;
+          provenance: string;
+          value: string;
+        }[];
+        vendorClaims: {
+          attestationType: string;
+          audiences?: string[];
+          hardwareModel?: string;
+          secureBoot?: string;
+        };
+      };
+      evidence: {
+        evidenceSha256: string;
+        expiresAt: number;
+        issuedAt: number;
+        schema: string;
+        verifier: string;
+      };
+      policy: {
+        effectiveTier: string;
+        reasonCodes: string[];
+        reasons: {
+          code: string;
+          description: string;
+          disposition: string;
+          group: string;
+        }[];
+        verdict: string;
+      };
+      schema: string;
+      verifier: {
+        adapter: string;
+        verifierFamily: string;
+      };
+      workloadIdentity?: {
+        credentialKind: string;
+        path: string;
+        scheme: string;
+        trustDomain: string;
+        uri: string;
+      };
+    };
+    exportedAt: number;
+    exporterPolicyOutcome: {
+      accepted: boolean;
+      effectiveTier: string;
+      reason?: string;
+      trustPolicyConfigured: boolean;
+    };
+    issuer: string;
+    resultId: string;
+    schema: "chio.runtime-attestation.appraisal-result.v1";
+    subject: {
+      runtimeIdentity: string;
+      workloadIdentity?: {
+        credentialKind: string;
+        path: string;
+        scheme: string;
+        trustDomain: string;
+        uri: string;
+      };
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/evidence.schema.json
+export namespace RuntimeAttestation_Evidence {
+  export interface ChioRuntimeAttestationEvidenceSignedBody {
+    claims: {
+      awsNitro?: {
+        digest: string;
+        moduleId: string;
+        pcrs: {
+          "0": string;
+        };
+      };
+      azureMaa?: {
+        attestationType: string;
+      };
+      enterpriseVerifier?: {
+        attestationType: string;
+        digest?: string;
+        hardwareModel?: string;
+        pcrs?: {
+          "0": string;
+        };
+        secureBoot?: string;
+      };
+    };
+    evidence_sha256: string;
+    expires_at: number;
+    issued_at: number;
+    runtime_identity?: string;
+    schema: string;
+    tier: string;
+    verifier: string;
+    workload_identity?: {
+      credentialKind: string;
+      path: string;
+      scheme: string;
+      trustDomain: string;
+      uri: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/reference-values.schema.json
+export namespace RuntimeAttestation_ReferenceValues {
+  export interface ChioRuntimeAttestationReferenceValuesSignedBody {
+    attestationSchema: string;
+    descriptorId: string;
+    expiresAt: number;
+    issuedAt: number;
+    measurements: {
+      hwModel?: string;
+      mrEnclave?: string;
+    };
+    referenceValueId: string;
+    schema: "chio.runtime-attestation.reference-values.v1";
+    sourceUri?: string;
+    state: string;
+    supersededBy?: string;
+    verifierFamily: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/trust-bundle.schema.json
+export namespace RuntimeAttestation_TrustBundle {
+  export interface ChioRuntimeAttestationTrustBundleSignedBody {
+    bundleId: string;
+    descriptors: {
+      body: {
+        adapter: string;
+        appraisalArtifactSchema: string;
+        appraisalResultSchema: string;
+        attestationSchemas: string[];
+        descriptorId: string;
+        expiresAt: number;
+        issuedAt: number;
+        referenceValuesUri?: string;
+        schema: string;
+        signingKeyFingerprints: string[];
+        verifier: string;
+        verifierFamily: string;
+      };
+      signature: string;
+      signerKey: string;
+    }[];
+    expiresAt: number;
+    issuedAt: number;
+    publisher: string;
+    referenceValues?: {
+      body: {
+        attestationSchema: string;
+        descriptorId: string;
+        expiresAt: number;
+        issuedAt: number;
+        measurements: {
+          mrEnclave: string;
+        };
+        referenceValueId: string;
+        schema: string;
+        sourceUri: string;
+        state: string;
+        verifierFamily: string;
+      };
+      signature: string;
+      signerKey: string;
+    }[];
+    schema: "chio.runtime-attestation.trust-bundle.v1";
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/runtime-attestation/verifier-descriptor.schema.json
+export namespace RuntimeAttestation_VerifierDescriptor {
+  export interface ChioRuntimeAttestationVerifierDescriptorSignedBody {
+    adapter: string;
+    appraisalArtifactSchema: string;
+    appraisalResultSchema: string;
+    attestationSchemas: string[];
+    descriptorId: string;
+    expiresAt: number;
+    issuedAt: number;
+    referenceValuesUri?: string;
+    schema: "chio.runtime-attestation.verifier-descriptor.v1";
+    signingKeyFingerprints: string[];
+    verifier: string;
+    verifierFamily: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/broker-admin-control-receipt-body-v1.schema.json
 export namespace Security_BrokerAdminControlReceiptBodyV1 {
   export type Digest = string;
@@ -48633,7 +67432,6 @@ export namespace Security_BrokerAdminControlReceiptEnvelopeV1 {
   export interface ChioSignedBrokerAdminControlReceiptV1 {
     body: ChioBrokerAdminControlReceiptBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerAdminControlReceiptBodyV1 {
@@ -48684,7 +67482,6 @@ export namespace Security_BrokerAdminMutationReceiptEnvelopeV1 {
   export interface ChioSignedBrokerAdminMutationReceiptV1 {
     body: ChioBrokerAdminMutationReceiptBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerAdminMutationReceiptBodyV1 {
@@ -48788,7 +67585,6 @@ export namespace Security_BrokerAuditComparisonEnvelopeV1 {
   export interface ChioSignedBrokerAuditComparisonV1 {
     body: ChioBrokerAuditComparisonBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerAuditComparisonBodyV1 {
@@ -48848,7 +67644,6 @@ export namespace Security_BrokerAuditRunnerAuthorizationEnvelopeV1 {
   export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
     body: ChioBrokerAuditRunnerAuthorizationBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
@@ -48909,7 +67704,7 @@ export namespace Security_BrokerAuthorityRequestBodyV1 {
   export type AuthorityRpcDigest = string;
 
   export interface ChioBrokerAuthorityRPCRequestBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-request.v1";
     requestId: AuthorityRpcIdentifier;
     issuedAtUnixSeconds: PositiveU64;
     broker: PublicKey;
@@ -48931,7 +67726,6 @@ export namespace Security_BrokerAuthorityRequestBodyV1 {
   }
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -48985,7 +67779,6 @@ export namespace Security_BrokerAuthorityRequestBodyV1 {
   }
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -49134,16 +67927,14 @@ export namespace Security_BrokerAuthorityRequestEnvelopeV1 {
    * @maxItems 64
    */
   export type HeaderNames = string[];
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedBrokerAuthorityRPCRequestV1 {
     body: ChioBrokerAuthorityRPCRequestBodyV1;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioBrokerAuthorityRPCRequestBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-request.v1";
     requestId: string;
     issuedAtUnixSeconds: number;
     broker: string;
@@ -49188,7 +67979,6 @@ export namespace Security_BrokerAuthorityRequestEnvelopeV1 {
   }
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -49242,7 +68032,6 @@ export namespace Security_BrokerAuthorityRequestEnvelopeV1 {
   }
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -49407,7 +68196,7 @@ export namespace Security_BrokerAuthorityResponseBodyV1 {
       };
 
   export interface ChioBrokerAuthorityRPCResponseBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-response.v1";
     requestId: AuthorityRpcResponseIdentifier;
     requestDigest: Digest;
     issuedAtUnixSeconds: PositiveU64;
@@ -49541,16 +68330,14 @@ export namespace Security_BrokerAuthorityResponseBodyV1 {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/broker-authority-response-envelope-v1.schema.json
 export namespace Security_BrokerAuthorityResponseEnvelopeV1 {
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedBrokerAuthorityRPCResponseV1 {
     body: ChioBrokerAuthorityRPCResponseBodyV1;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioBrokerAuthorityRPCResponseBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-response.v1";
     requestId: string;
     requestDigest: string;
     issuedAtUnixSeconds: number;
@@ -49765,7 +68552,6 @@ export namespace Security_BrokerCapabilityEnvelopeV1 {
 
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -49830,7 +68616,6 @@ export namespace Security_BrokerExecuteFailureV1 {
   export interface ChioSignedBrokerExecutionFailureReceiptV1 {
     body: ChioBrokerExecutionFailureReceiptBodyV1;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerExecutionFailureReceiptBodyV1 {
@@ -49871,7 +68656,6 @@ export namespace Security_BrokerExecuteRequestV1 {
   }
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -49925,7 +68709,6 @@ export namespace Security_BrokerExecuteRequestV1 {
   }
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -50012,7 +68795,6 @@ export namespace Security_BrokerExecuteResponseV1 {
   export interface ChioSignedBrokerExecutionReceiptV1 {
     body: ChioBrokerExecutionReceiptBodyV1;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerExecutionReceiptBodyV1 {
@@ -50129,7 +68911,6 @@ export namespace Security_BrokerExecutionFailureReceiptEnvelopeV1 {
   export interface ChioSignedBrokerExecutionFailureReceiptV1 {
     body: ChioBrokerExecutionFailureReceiptBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerExecutionFailureReceiptBodyV1 {
@@ -50237,7 +69018,6 @@ export namespace Security_BrokerExecutionReceiptEnvelopeV1 {
   export interface ChioSignedBrokerExecutionReceiptV1 {
     body: ChioBrokerExecutionReceiptBodyV1;
     signer: PublicKey;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerExecutionReceiptBodyV1 {
@@ -50326,12 +69106,42 @@ export namespace Security_BrokerPrepareDispatchAcknowledgementV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-body.schema.json
+export namespace Security_BrokerPrivilegedAuditChallengeBody {
+  export interface ChioBrokerPrivilegedAuditChallengeV1SignedBody {
+    expiresAtUnixSeconds: number;
+    issuedAtUnixSeconds: number;
+    runnerAuthorizationBody: {
+      auditId: string;
+      brokerInstanceId: string;
+      canonicalRequestSha256: string;
+      capabilitySha256: string;
+      credentialProvider: string;
+      deploymentId: string;
+      expiresAtUnixSeconds: number;
+      issuedAtUnixSeconds: number;
+      proofSha256: string;
+      providerAdapterId: string;
+      providerAdapterVersion: number;
+      referenceCommitmentSha256: string;
+      referenceSource: string;
+      revocationAuthorityDomain: string;
+      runnerId: string;
+      schema: string;
+      tenantScope: string;
+    };
+    schema: "chio.broker-privileged-audit-challenge.v1";
+    sessionCommitmentSha256: string;
+    sessionNonce: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/broker-privileged-audit-challenge-v1.schema.json
 export namespace Security_BrokerPrivilegedAuditChallengeV1 {
   export type Digest = string;
   export type PositiveU64 = number;
   export type PublicKey = string;
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   /**
@@ -50340,7 +69150,6 @@ export namespace Security_BrokerPrivilegedAuditChallengeV1 {
   export interface ChioSignedBrokerPrivilegedAuditChallengeV1 {
     body: ChallengeBody;
     signer: PublicKey;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChallengeBody {
@@ -50394,7 +69203,6 @@ export namespace Security_BrokerPrivilegedAuditCommitV1 {
   export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
     body: ChioBrokerAuditRunnerAuthorizationBodyV1;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerAuditRunnerAuthorizationBodyV1 {
@@ -50451,7 +69259,6 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   export interface ChioSignedBrokerPrivilegedAuditChallengeV1 {
     body: ChallengeBody;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChallengeBody {
@@ -50484,7 +69291,6 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   export interface ChioSignedBrokerAuditRunnerAuthorizationV1 {
     body: ChioBrokerAuditRunnerAuthorizationBodyV1;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface AuthorityExchange {
@@ -50498,11 +69304,10 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   }
   export interface ChioSignedBrokerAuthorityRPCRequestV1 {
     body: ChioBrokerAuthorityRPCRequestBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerAuthorityRPCRequestBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-request.v1";
     requestId: string;
     issuedAtUnixSeconds: number;
     broker: string;
@@ -50547,7 +69352,6 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   }
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -50601,7 +69405,6 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   }
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -50743,11 +69546,10 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   }
   export interface ChioSignedBrokerAuthorityRPCResponseV1 {
     body: ChioBrokerAuthorityRPCResponseBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerAuthorityRPCResponseBodyV1 {
-    schema: "chio.broker-authority-rpc.v1";
+    schema: "chio.broker-authority-response.v1";
     requestId: string;
     requestDigest: string;
     issuedAtUnixSeconds: number;
@@ -50890,7 +69692,6 @@ export namespace Security_BrokerPrivilegedAuditEvidenceV1 {
   export interface ChioSignedBrokerAuditComparisonV1 {
     body: ChioBrokerAuditComparisonBodyV1;
     signer: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerAuditComparisonBodyV1 {
@@ -50958,7 +69759,6 @@ export namespace Security_BrokerPrivilegedAuditOpenV1 {
   }
   export interface ChioSignedBrokerCapabilityV1 {
     body: ChioBrokerCapabilityBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerCapabilityBodyV1 {
@@ -51012,7 +69812,6 @@ export namespace Security_BrokerPrivilegedAuditOpenV1 {
   }
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -51094,7 +69893,6 @@ export namespace Security_BrokerRegisterAttemptAuthorizationEnvelopeV1 {
 
   export interface ChioSignedBrokerRegisterAttemptAuthorizationV1 {
     body: ChioBrokerRegisterAttemptAuthorizationBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: Signature;
   }
   export interface ChioBrokerRegisterAttemptAuthorizationBodyV1 {
@@ -51160,7 +69958,6 @@ export namespace Security_BrokerRequestProofBodyV1 {
 export namespace Security_BrokerRequestProofEnvelopeV1 {
   export interface ChioSignedBrokerRequestProofV1 {
     body: ChioBrokerRequestProofBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioBrokerRequestProofBodyV1 {
@@ -53385,6 +72182,35 @@ export namespace Security_DeclassificationConsumptionReceiptBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/declassification-grant-body.schema.json
+export namespace Security_DeclassificationGrantBody {
+  export interface ChioDeclassificationGrantV1SignedBody {
+    agent_id: string;
+    authority_key_id: string;
+    capability_id: string;
+    destination_id: string;
+    domain_version: number;
+    expires_at_unix_seconds: number;
+    grant_id: string;
+    issued_at_unix_seconds: number;
+    purpose: string;
+    request_hash: number[];
+    session_id: string;
+    source_label_hash: number[];
+    subject_id: string;
+    target_label: {
+      compartments: string[];
+      kind: string;
+      owners: {
+        "owner-a": string[];
+      };
+    };
+    tenant_id: string;
+    tool_name: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/declassification-grant.schema.json
 export namespace Security_DeclassificationGrant {
   export type FlowIdentifier = string;
@@ -53472,7 +72298,6 @@ export namespace Security_DeclassificationGrant {
       authority_key_id: FlowIdentifier;
     };
     authority_key: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -53906,7 +72731,6 @@ export namespace Security_KeyLogActivationCommitBodyV1 {
   }
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -53917,7 +72741,6 @@ export namespace Security_KeyLogActivationCommitEnvelopeV1 {
   export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
     body: ChioKeyLogActivationCommitBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogActivationCommitBodyV1 {
@@ -53941,7 +72764,6 @@ export namespace Security_KeyLogActivationCommitEnvelopeV1 {
   }
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -53976,13 +72798,11 @@ export namespace Security_KeyLogArtifactTimeAnchorBodyV1 {
 // Source: spec/schemas/chio-wire/v1/security/key-log-artifact-time-anchor-envelope-v1.schema.json
 export namespace Security_KeyLogArtifactTimeAnchorEnvelopeV1 {
   export type Hash = string;
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedKeyLogArtifactTimeAnchorV1 {
     body: ChioKeyLogArtifactTimeAnchorBodyV1;
     anchor_key_id: Hash;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioKeyLogArtifactTimeAnchorBodyV1 {
@@ -54046,7 +72866,6 @@ export namespace Security_KeyLogAuditReadinessBodyV1 {
   }
   export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
     body: ChioKeyLogWitnessServiceReadinessBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
@@ -54073,12 +72892,10 @@ export namespace Security_KeyLogAuditReadinessBodyV1 {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/key-log-audit-readiness-proof-v1.schema.json
 export namespace Security_KeyLogAuditReadinessProofV1 {
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedKeyLogAuditServiceReadinessProofV1 {
     body: ChioKeyLogAuditServiceReadinessBodyV1;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioKeyLogAuditServiceReadinessBodyV1 {
@@ -54115,7 +72932,6 @@ export namespace Security_KeyLogAuditReadinessProofV1 {
   }
   export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
     body: ChioKeyLogWitnessServiceReadinessBodyV1;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
@@ -54156,6 +72972,20 @@ export namespace Security_KeyLogCheckpointBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-body.schema.json
+export namespace Security_KeyLogCheckpointBody {
+  export interface ChioKeyLogCheckpointV1SignedBody {
+    checkpoint_sequence: number;
+    issued_at: number;
+    log_id: string;
+    previous_checkpoint_hash: string;
+    root_hash: string;
+    schema: "chio.key-log.checkpoint.v1";
+    tree_size: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/key-log-checkpoint-envelope-v1.schema.json
 export namespace Security_KeyLogCheckpointEnvelopeV1 {
   export type Signature = string;
@@ -54163,7 +72993,6 @@ export namespace Security_KeyLogCheckpointEnvelopeV1 {
   export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
     body: ChioKeyLogCheckpointBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: Signature;
     /**
      * @maxItems 64
@@ -54181,7 +73010,6 @@ export namespace Security_KeyLogCheckpointEnvelopeV1 {
   }
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -54266,7 +73094,6 @@ export namespace Security_KeyLogEnterpriseReceiptBodyV1 {
 
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -54370,12 +73197,10 @@ export namespace Security_KeyLogEnterpriseReceiptEnvelopeV1 {
   export interface ChioSignedKeyLogEnterpriseReceiptEnvelopeV1 {
     body: ChioKeyLogEnterpriseReceiptBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
 }
@@ -54440,7 +73265,6 @@ export namespace Security_KeyLogEventBodyV1 {
 // Source: spec/schemas/chio-wire/v1/security/key-log-event-envelope-v1.schema.json
 export namespace Security_KeyLogEventEnvelopeV1 {
   export type Hash = string;
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
   export type KeyLogIdentifier = string;
 
@@ -54503,12 +73327,10 @@ export namespace Security_KeyLogEventEnvelopeV1 {
   }
   export interface KeyAuthorization {
     key_id: Hash;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface RecoveryAuthorization {
     authorizer_id: KeyLogIdentifier;
-    algorithm: Algorithm;
     signature: Signature;
   }
 }
@@ -54538,7 +73360,6 @@ export namespace Security_KeyLogSyncResponseV1 {
   export interface ChioSignedKeyLogCheckpointEnvelopeV1 {
     body: ChioKeyLogCheckpointBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
     /**
      * @maxItems 64
@@ -54556,7 +73377,6 @@ export namespace Security_KeyLogSyncResponseV1 {
   }
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioSignedKeyLogEventEnvelopeV1 {
@@ -54618,18 +73438,15 @@ export namespace Security_KeyLogSyncResponseV1 {
   }
   export interface KeyAuthorization {
     key_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface RecoveryAuthorization {
     authorizer_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
   }
   export interface ChioSignedKeyLogActivationCommitEnvelopeV1 {
     body: ChioKeyLogActivationCommitBodyV1;
     operator_key_id: string;
-    operator_algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     operator_signature: string;
   }
   export interface ChioKeyLogActivationCommitBodyV1 {
@@ -54694,12 +73511,10 @@ export namespace Security_KeyLogWitnessReadinessBodyV1 {
 // -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/security/key-log-witness-readiness-proof-v1.schema.json
 export namespace Security_KeyLogWitnessReadinessProofV1 {
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedKeyLogWitnessServiceReadinessProofV1 {
     body: ChioKeyLogWitnessServiceReadinessBodyV1;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioKeyLogWitnessServiceReadinessBodyV1 {
@@ -54728,8 +73543,19 @@ export namespace Security_KeyLogWitnessReadinessProofV1 {
 export namespace Security_KeyLogWitnessSignatureV1 {
   export interface ChioKeyLogWitnessSignatureV1 {
     witness_id: string;
-    algorithm: "ed25519" | "p256" | "p384" | "hybrid";
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/keyring-artifact-signature-body.schema.json
+export namespace Security_KeyringArtifactSignatureBody {
+  export interface ChioKeyringArtifactSignatureV1SignedBody {
+    artifact_hash: string;
+    artifact_signature: string;
+    key_id: string;
+    schema: "chio.keyring.artifact-signature.v1";
+    signing_epoch: number;
   }
 }
 
@@ -54738,7 +73564,6 @@ export namespace Security_KeyLogWitnessSignatureV1 {
 export namespace Security_KeyringArtifactSignatureV1 {
   export type Hash = string;
   export type U64 = number;
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioKeyringArtifactSignatureEvidenceV1 {
@@ -54746,7 +73571,6 @@ export namespace Security_KeyringArtifactSignatureV1 {
     artifact_hash: Hash;
     key_id: Hash;
     signing_epoch: U64;
-    algorithm: Algorithm;
     artifact_signature: Signature;
     fence_signature: Signature;
   }
@@ -54918,6 +73742,101 @@ export namespace Security_LiftRollbackCompletionReceiptBodyV1 {
         };
     contribution_hash: Digest;
     observed_base_version_hash: Digest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-body.schema.json
+export namespace Security_McpCageLaunchPolicyBody {
+  export interface ChioMcpCageLaunchPolicyV1SignedBody {
+    enterprise_migration: {
+      deployment_id: string;
+      head: {
+        key: {
+          control: string;
+          deployment_id: string;
+          scope_id: string;
+          scope_kind: string;
+        };
+        transition_digest: number[];
+      };
+      state_database_path: string;
+      trusted_transition_signers: string[];
+    };
+    limits: {
+      launch_timeout_ms: number;
+      max_artifact_bytes: number;
+      nofile_hard: number;
+      nofile_soft: number;
+    };
+    operator_ceilings: {
+      environment_variables: string[];
+      forbidden_paths: string[];
+      native_syscall_profiles: string[];
+      network_destinations: {
+        host: string;
+        port: number;
+      }[];
+      read_paths: string[];
+      write_paths: string[];
+    };
+    receipt: {
+      capability_id: string;
+      database_path: string;
+      signer_seed_path: string;
+      tenant_id: string;
+      trusted_signer_public_key: string;
+    };
+    registered_public_key: string;
+    runtime: {
+      cage_init_binding_digest: string;
+      cage_init_path: string;
+      execution_identity: {
+        gid: number;
+        /**
+         * @maxItems 64
+         */
+        supplementary_gids: number[];
+        uid: number;
+      };
+      /**
+       * @maxItems 48
+       */
+      runtime_files: string[];
+      target_argv: string[];
+      target_binding_digest: string;
+      target_path: string;
+      working_directory: string;
+    };
+    schema: "chio.mcp.cage-launch-policy.v1";
+    signed_manifest: {
+      manifest: {
+        name: string;
+        public_key: string;
+        required_permissions: {
+          native_syscall_profile: string;
+        };
+        schema: string;
+        server_id: string;
+        tools: {
+          annotations: {
+            destructive: boolean;
+            idempotent: boolean;
+            read_only: boolean;
+            requires_approval: boolean;
+          };
+          description: string;
+          input_schema: {
+            type: string;
+          };
+          latency_hint: string;
+          name: string;
+        }[];
+        version: string;
+      };
+      signature: string;
+      signer_key: string;
+    };
   }
 }
 
@@ -56040,13 +74959,11 @@ export namespace Security_SecurityEventBodyV1 {
 // Source: spec/schemas/chio-wire/v1/security/signed-security-event-envelope-v1.schema.json
 export namespace Security_SignedSecurityEventEnvelopeV1 {
   export type PublicKey = string;
-  export type Algorithm = "ed25519" | "p256" | "p384" | "hybrid";
   export type Signature = string;
 
   export interface ChioSignedSecurityEventProvenanceEnvelopeV1 {
     body: ChioSecurityEventBodyV1;
     producer_key: PublicKey;
-    algorithm: Algorithm;
     signature: Signature;
   }
   export interface ChioSecurityEventBodyV1 {
@@ -56190,6 +75107,24 @@ export namespace Security_SignedToolManifestV1 {
   export interface NetworkDestination {
     host: string;
     port: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/signed-watermark-envelope.schema.json
+export namespace Security_SignedWatermarkEnvelope {
+  export interface ChioSignedWatermarkEnvelopeSignedBody {
+    application_id: string;
+    encoding: string;
+    expires_at_unix_ms: number;
+    issued_at_unix_ms: number;
+    key_id: string;
+    marker_ref: string;
+    sequence: number;
+    session_id: string;
+    source_receipt_id: string;
+    tenant_id: string;
+    tool_id: string;
   }
 }
 
@@ -56402,6 +75337,1589 @@ export namespace Security_TripwireObservationReceiptBodyV1 {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/security/witness-statement.schema.json
+export namespace Security_WitnessStatement {
+  export interface ChioKeyLogWitnessStatementSignedBody {
+    checkpoint_hash: string;
+    schema: "chio.key-log.witness-statement.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/delegation-witness-hop-signature.schema.json
+export namespace Swarm_DelegationWitnessHopSignature {
+  export interface ChioSwarmDelegationWitnessHopSignatureSignedBody {
+    attenuationRuleId: string;
+    chainId: string;
+    childCapabilityDigest: string;
+    childScopeHash: string;
+    childTaskId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    parentCapabilityDigest: string;
+    parentScopeHash: string;
+    parentTaskId: string;
+    policyDigest: string;
+    schema: "chio.swarm.delegation-witness-hop-signature.v1";
+    scopeSubsetProof: {
+      normalizedChildScope: string;
+      normalizedParentScope: string;
+      subsetRelations: {
+        childIndex: number;
+        grantKind: string;
+        parentIndex: number;
+        subset: boolean;
+      }[];
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/route-plan-receipt-signature.schema.json
+export namespace Swarm_RoutePlanReceiptSignature {
+  export interface ChioSwarmRoutePlanReceiptSignatureSignedBody {
+    attenuationDecision: string;
+    bridgeId: string;
+    candidateSetDigest: string;
+    egressConstraints: string[];
+    egressContractId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    policyDigest: string;
+    protocolTarget: string;
+    registrySnapshotHash: string;
+    routePlanId: string;
+    schema: "chio.swarm.route-plan-receipt-signature.v1";
+    selectedRoute: string;
+    taskId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-continuation-token-body.schema.json
+export namespace Swarm_SwarmContinuationTokenBody {
+  export interface ChioSwarmContinuationTokenV1SignedBody {
+    budgetAllocationId: string;
+    childTaskId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    graphSha256: string;
+    issuedAtUnixMs: number;
+    issuer: string;
+    joinReceiptId?: string;
+    mode: string;
+    nonce: string;
+    parentReceiptIds: string[];
+    parentTaskId?: string;
+    revocationEpochRef: string;
+    revocationEpochRootHash: string;
+    routePlanReceiptId: string;
+    schema: "chio.swarm.continuation-token.v1";
+    sessionAnchorRef: string;
+    tokenId: string;
+    witnessChainRef?: string;
+    witnessChainSha256?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-join-receipt-body.schema.json
+export namespace Swarm_SwarmJoinReceiptBody {
+  export interface ChioSwarmJoinReceiptV1SignedBody {
+    actualParentReceiptIds: string[];
+    chainId: string;
+    dagOrdinal: number;
+    expectedParentReceiptIds: string[];
+    graphId: string;
+    hlcUnixMs: number;
+    issuer: string;
+    joinId: string;
+    joinPredicate: string;
+    nextTaskId: string;
+    parentSetHash: string;
+    parentTaskReceipts: {
+      receiptId: string;
+      taskId: string;
+    }[];
+    resultDigest: string;
+    schema: "chio.swarm.join-receipt.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-revocation-epoch-body.schema.json
+export namespace Swarm_SwarmRevocationEpochBody {
+  export interface ChioSwarmRevocationEpochV1SignedBody {
+    epochId: string;
+    issuedAtUnixMs: number;
+    issuer: string;
+    revokedSubjects: string[];
+    revokedTaskIds: string[];
+    rootHash: string;
+    schema: "chio.swarm.revocation-epoch.v1";
+    validUntilUnixMs: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-route-plan-receipt-body.schema.json
+export namespace Swarm_SwarmRoutePlanReceiptBody {
+  export interface ChioSwarmRoutePlanReceiptV1SignedBody {
+    attenuationDecision: string;
+    bridgeId: string;
+    candidateSetDigest: string;
+    egressConstraints: string[];
+    egressContractId: string;
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    policyDigest: string;
+    protocolTarget: string;
+    registrySnapshotHash: string;
+    routePlanId: string;
+    schema: "chio.swarm.route-plan-receipt.v1";
+    selectedRoute: string;
+    taskId: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-task-graph-body.schema.json
+export namespace Swarm_SwarmTaskGraphBody {
+  export interface ChioSwarmTaskGraphV1SignedBody {
+    budgetPoolRef: string;
+    createdAtUnixMs: number;
+    edges: {
+      edgeType: string;
+      fromTaskId: string;
+      toTaskId: string;
+    }[];
+    expiresAtUnixMs: number;
+    graphId: string;
+    issuer: string;
+    joins: {
+      joinId: string;
+      nextTaskId: string;
+      parentTaskIds: string[];
+    }[];
+    maxDepth: number;
+    maxFanout: number;
+    multiHopWitnessChains?: boolean;
+    nodes: {
+      budgetAllocationRef?: string;
+      continuationTokenRef?: string;
+      depth: number;
+      parentTaskId?: string;
+      routePlanRef?: string;
+      scopeHash: string;
+      taskId: string;
+    }[];
+    plannerSubject: string;
+    revocationEpochRef: string;
+    rootTransactionRef: string;
+    routePlanRefs: string[];
+    schema: "chio.swarm.task-graph.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/swarm/swarm-terminal-graph-receipt-body.schema.json
+export namespace Swarm_SwarmTerminalGraphReceiptBody {
+  export interface ChioSwarmTerminalGraphReceiptV1SignedBody {
+    budgetPoolId: string;
+    budgetRollups: {
+      activeUnits: number;
+      consumedUnits: number;
+      dimensionId: string;
+      releasedUnits: number;
+      reservedUnits: number;
+      reversedUnits: number;
+      totalUnits: number;
+    }[];
+    chainId: string;
+    completedAtUnixMs: number;
+    completedTaskIds: string[];
+    graphId: string;
+    issuer: string;
+    joinReceiptIds: string[];
+    receiptId: string;
+    resultDigest: string;
+    revocationEpochRef: string;
+    routePlanReceiptIds: string[];
+    schema: "chio.swarm.terminal-graph-receipt.v1";
+    terminalTaskIds: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/capability-proof-body.schema.json
+export namespace Transaction_CapabilityProofBody {
+  export interface ChioCapabilityProofV1SignedBody {
+    capability_id: string;
+    expires_at: string;
+    id: string;
+    issuer: string;
+    schema: "chio.capability.proof.v1";
+    scope: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/guard-decision-body.schema.json
+export namespace Transaction_GuardDecisionBody {
+  export interface ChioGuardDecisionV1SignedBody {
+    capability_id: string;
+    decision: string;
+    guard_key: string;
+    id: string;
+    policy_sha256: string;
+    request_sha256: string;
+    response_sha256: string;
+    schema: "chio.guard.decision.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/transaction/transaction-passport-body.schema.json
+export namespace Transaction_TransactionPassportBody {
+  export interface ChioTransactionPassportV1SignedBody {
+    claim_set_path: string;
+    claim_set_sha256: string;
+    evidence_graph_path: string;
+    evidence_graph_sha256: string;
+    id: string;
+    issued_at: string;
+    issuer: string;
+    omission_policy?: {
+      claim_id: string;
+      reason: string;
+      status: string;
+    }[];
+    schema: "chio.transaction-passport.v1";
+    verifier_policy_path: string;
+    verifier_policy_sha256: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/agent-passport-presentation-response.schema.json
+export namespace Trust_AgentPassportPresentationResponse {
+  export interface ChioAgentPassportPresentationResponseSignedBody {
+    challenge: {
+      challengeId?: string;
+      expiresAt: string;
+      issuedAt: string;
+      issuerAllowlist?: string[];
+      maxCredentials?: number;
+      nonce: string;
+      policy?: {
+        issuerAllowlist?: string[];
+        minCompositeScore?: number;
+        minReceiptCount?: number;
+        minReliability?: number;
+        requireActiveLifecycle: boolean;
+        requireCheckpointCoverage: boolean;
+        requireEnterpriseIdentityProvenance: boolean;
+        requireReceiptLogUrls: boolean;
+      };
+      policyRef?: {
+        policyId: string;
+      };
+      schema: string;
+      verifier: string;
+    };
+    passport: {
+      credentials: {
+        "@context": string[];
+        credentialSubject: {
+          id: string;
+          metrics: {
+            boundary_pressure: {
+              deny_ratio: {
+                state: string;
+                value?: number;
+              };
+              policies_observed: number;
+              receipts_observed: number;
+            };
+            composite_score: {
+              state: string;
+              value?: number;
+            };
+            computed_at: number;
+            delegation_hygiene: {
+              budget_reduction_rate: {
+                state: string;
+                value?: number;
+              };
+              delegations_observed: number;
+              scope_reduction_rate: {
+                state: string;
+                value?: number;
+              };
+              score: {
+                state: string;
+                value?: number;
+              };
+              ttl_reduction_rate: {
+                state: string;
+                value?: number;
+              };
+            };
+            effective_weight_sum: number;
+            history_depth: {
+              active_days: number;
+              activity_ratio: {
+                state: string;
+                value?: number;
+              };
+              first_seen: number | null;
+              last_seen: number | null;
+              receipt_count: number;
+              score: {
+                state: string;
+                value?: number;
+              };
+              span_days: number;
+            };
+            incident_correlation: {
+              incidents_observed: null;
+              score: {
+                state: string;
+              };
+            };
+            least_privilege: {
+              capabilities_observed: number;
+              score: {
+                state: string;
+                value?: number;
+              };
+            };
+            reliability: {
+              cancellation_rate: {
+                state: string;
+                value?: number;
+              };
+              completion_rate: {
+                state: string;
+                value?: number;
+              };
+              incompletion_rate: {
+                state: string;
+                value?: number;
+              };
+              receipts_observed: number;
+              score: {
+                state: string;
+                value?: number;
+              };
+            };
+            resource_stewardship: {
+              average_utilization: {
+                state: string;
+                value?: number;
+              };
+              capped_grants_observed: number;
+              fit_score: {
+                state: string;
+                value?: number;
+              };
+            };
+            specialization: {
+              distinct_tools: number;
+              score: {
+                state: string;
+                value?: number;
+              };
+            };
+            subject_key: string;
+          };
+        };
+        evidence: {
+          checkpointRoots: string[];
+          lineageRecords: number;
+          query: {
+            since?: number;
+            until: number;
+          };
+          receiptCount: number;
+          receiptIds: string[];
+          receiptLogUrls?: string[];
+          uncheckpointedReceipts: number;
+        };
+        expirationDate: string;
+        issuanceDate: string;
+        issuer: string;
+        proof: {
+          created: string;
+          proofPurpose: string;
+          proofValue: string;
+          type: string;
+          verificationMethod: string;
+        };
+        type: string[];
+      }[];
+      issuedAt: string;
+      merkleRoots: string[];
+      schema: string;
+      subject: string;
+      validUntil: string;
+    };
+    schema: "chio.agent-passport-presentation-response.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-challenge-body.schema.json
+export namespace Trust_FinancialAgentPassportPresentationChallengeBody {
+  export interface ChioFinancialAgentPassportPresentationChallengeV1SignedBody {
+    challengeDigest: string;
+    challengeId: string;
+    expiresAt: string;
+    issuedAt: string;
+    nonce: string;
+    schema: "chio.financial-agent-passport-presentation-challenge.v1";
+    selectors: {
+      credentialRefDigest: string;
+      family: string;
+    }[];
+    sourcePassportId: string;
+    verifier: string;
+    verifierKeyEpoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-response.schema.json
+export namespace Trust_FinancialAgentPassportPresentationResponse {
+  export interface ChioFinancialAgentPassportPresentationResponseSignedBody {
+    challenge: {
+      body: {
+        challengeDigest: string;
+        challengeId: string;
+        expiresAt: string;
+        issuedAt: string;
+        nonce: string;
+        schema: string;
+        selectors: {
+          credentialRefDigest: string;
+          family: string;
+        }[];
+        sourcePassportId: string;
+        verifier: string;
+        verifierKeyEpoch: number;
+      };
+      signature: string;
+      signerKey: string;
+    };
+    presentation: {
+      challengeDigest: string;
+      credentials: {
+        credential: {
+          "@context": string[];
+          credentialSubject: {
+            id: string;
+            metrics: {
+              boundary_pressure: {
+                deny_ratio: {
+                  state: string;
+                  value: number;
+                };
+                policies_observed: number;
+                receipts_observed: number;
+              };
+              composite_score: {
+                state: string;
+                value: number;
+              };
+              computed_at: number;
+              delegation_hygiene: {
+                budget_reduction_rate: {
+                  state: string;
+                  value: number;
+                };
+                delegations_observed: number;
+                scope_reduction_rate: {
+                  state: string;
+                  value: number;
+                };
+                score: {
+                  state: string;
+                  value: number;
+                };
+                ttl_reduction_rate: {
+                  state: string;
+                  value: number;
+                };
+              };
+              effective_weight_sum: number;
+              history_depth: {
+                active_days: number;
+                activity_ratio: {
+                  state: string;
+                  value: number;
+                };
+                first_seen: number;
+                last_seen: number;
+                receipt_count: number;
+                score: {
+                  state: string;
+                  value: number;
+                };
+                span_days: number;
+              };
+              incident_correlation: {
+                incidents_observed: null;
+                score: {
+                  state: string;
+                };
+              };
+              least_privilege: {
+                capabilities_observed: number;
+                score: {
+                  state: string;
+                  value: number;
+                };
+              };
+              reliability: {
+                cancellation_rate: {
+                  state: string;
+                  value: number;
+                };
+                completion_rate: {
+                  state: string;
+                  value: number;
+                };
+                incompletion_rate: {
+                  state: string;
+                  value: number;
+                };
+                receipts_observed: number;
+                score: {
+                  state: string;
+                  value: number;
+                };
+              };
+              resource_stewardship: {
+                average_utilization: {
+                  state: string;
+                  value: number;
+                };
+                capped_grants_observed: number;
+                fit_score: {
+                  state: string;
+                  value: number;
+                };
+              };
+              specialization: {
+                distinct_tools: number;
+                score: {
+                  state: string;
+                  value: number;
+                };
+              };
+              subject_key: string;
+            };
+          };
+          evidence: {
+            checkpointRoots: string[];
+            lineageRecords: number;
+            query: {
+              since: number;
+              until: number;
+            };
+            receiptCount: number;
+            receiptIds: string[];
+            uncheckpointedReceipts: number;
+          };
+          expirationDate: string;
+          issuanceDate: string;
+          issuer: string;
+          proof: {
+            created: string;
+            proofPurpose: string;
+            proofValue: string;
+            type: string;
+            verificationMethod: string;
+          };
+          type: string[];
+        };
+        kind: string;
+      }[];
+      membershipProofs: {
+        leaf: {
+          credentialId: string;
+          credentialRefDigest: string;
+          family: string;
+        };
+        proof: {
+          audit_path: string[];
+          leaf_index: number;
+          tree_size: number;
+        };
+      }[];
+      presentationDigest: string;
+      schema: string;
+      sourceManifest: {
+        body: {
+          credentialCount: number;
+          credentialRoot: string;
+          expiresAt: number;
+          issuedAt: number;
+          issuer: string;
+          merkleRoots: string[];
+          schema: string;
+          sourcePassportId: string;
+          subject: string;
+        };
+        signature: string;
+        signerKey: string;
+      };
+    };
+    schema: "chio.financial-agent-passport-presentation-response.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/financial-agent-passport-source-manifest-body.schema.json
+export namespace Trust_FinancialAgentPassportSourceManifestBody {
+  export interface ChioFinancialAgentPassportSourceManifestV1SignedBody {
+    credentialCount: number;
+    credentialRoot: string;
+    expiresAt: number;
+    issuedAt: number;
+    issuer: string;
+    merkleRoots: string[];
+    schema: "chio.financial-agent-passport.source-manifest.v1";
+    sourcePassportId: string;
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-premium-history-body.schema.json
+export namespace Trust_FincredPremiumHistoryBody {
+  export interface ChioFincredPremiumHistoryV1SignedBody {
+    "@context": string[];
+    credentialId: string;
+    credentialSubject: {
+      claims: {
+        id: string;
+        quotedAmounts: {
+          currency: string;
+          units: number;
+        }[];
+        quotedCount: number;
+      };
+      family: string;
+    };
+    evidence: {
+      sourceCompletenessAttestations: {
+        body: {
+          attestationReference: string;
+          checkpointAuthorityEpoch: number;
+          checkpointAuthorityKey: string;
+          checkpointDigest: string;
+          checkpointSequence: number;
+          committedLeaves: {
+            indexProof: {
+              /**
+               * @maxItems 64
+               */
+              auditPath: string[];
+              leafIndex: number;
+              treeSize: number;
+            };
+            leaf: {
+              index: number;
+              queryKey: {
+                artifactId: string;
+                occurredAt: number;
+                sourceFamily: string;
+                subject: string;
+              };
+              sourceArtifactDigest: string;
+            };
+          }[];
+          cutoff: number;
+          disclosureDigest: string;
+          expiresAt: number;
+          indexRoot: string;
+          issuedAt: number;
+          lowerBoundary: {
+            kind: string;
+          };
+          rangeRoot: string;
+          schema: string;
+          sourceArtifactDigests: string[];
+          sourceEvidenceClass: string;
+          sourceFamily: string;
+          sourceId: string;
+          sourceSignerKey: string;
+          storeGeneration: number;
+          subject: string;
+          upperBoundary: {
+            kind: string;
+          };
+          window: {
+            endsAt: number;
+            startsAt: number;
+          };
+        };
+        signature: string;
+        signerKey: string;
+      }[];
+      sourceDisclosure: {
+        artifacts: {
+          artifactDigest: string;
+          artifactSchema: string;
+          canonicalArtifact: string;
+          role: string;
+        }[];
+        kind: string;
+      };
+      window: {
+        endsAt: number;
+        startsAt: number;
+      };
+    };
+    expirationDate: string;
+    family: string;
+    issuanceDate: string;
+    issuer: string;
+    issuerKeyEpoch: number;
+    presentationEvidenceClass: string;
+    schema: "chio.fincred.premium-history.v1";
+    sourceEvidenceClass: string;
+    type: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-settlement-reliability-body.schema.json
+export namespace Trust_FincredSettlementReliabilityBody {
+  export interface ChioFincredSettlementReliabilityV1SignedBody {
+    "@context": string[];
+    credentialId: string;
+    credentialSubject: {
+      claims: {
+        id: string;
+        obligationCount: number;
+        onTimeCount: number;
+        onTimeRatioBps: number;
+      };
+      family: string;
+    };
+    evidence: {
+      /**
+       * @maxItems 32
+       */
+      sourceCompletenessAttestations: {
+        body: {
+          schema: "chio.fincred.source-completeness-attestation.v1";
+          sourceId: string;
+          sourceFamily:
+            | "credit_scorecard"
+            | "exposure_history"
+            | "settlement_reliability"
+            | "premium_history"
+            | "loss_history";
+          subject: string;
+          sourceSignerKey: string;
+          checkpointAuthorityEpoch: number;
+          checkpointAuthorityKey: string;
+          storeGeneration: number;
+          checkpointSequence: number;
+          checkpointDigest: string;
+          cutoff: number;
+          window: {
+            startsAt: number;
+            endsAt: number;
+          };
+          /**
+           * @minItems 1
+           * @maxItems 256
+           */
+          committedLeaves: [
+            {
+              leaf: {
+                index: number;
+                queryKey: {
+                  sourceFamily:
+                    | "credit_scorecard"
+                    | "exposure_history"
+                    | "settlement_reliability"
+                    | "premium_history"
+                    | "loss_history";
+                  subject: string;
+                  occurredAt: number;
+                  artifactId: string;
+                };
+                sourceArtifactDigest: string;
+              };
+              indexProof: {
+                treeSize: number;
+                leafIndex: number;
+                /**
+                 * @maxItems 64
+                 */
+                auditPath: string[];
+              };
+            },
+            ...{
+              leaf: {
+                index: number;
+                queryKey: {
+                  sourceFamily:
+                    | "credit_scorecard"
+                    | "exposure_history"
+                    | "settlement_reliability"
+                    | "premium_history"
+                    | "loss_history";
+                  subject: string;
+                  occurredAt: number;
+                  artifactId: string;
+                };
+                sourceArtifactDigest: string;
+              };
+              indexProof: {
+                treeSize: number;
+                leafIndex: number;
+                /**
+                 * @maxItems 64
+                 */
+                auditPath: string[];
+              };
+            }[]
+          ];
+          rangeRoot: string;
+          indexRoot: string;
+          lowerBoundary:
+            | {
+                kind: "source_edge";
+              }
+            | {
+                kind: "adjacent";
+                leafProof: {
+                  leaf: {
+                    index: number;
+                    queryKey: {
+                      sourceFamily:
+                        | "credit_scorecard"
+                        | "exposure_history"
+                        | "settlement_reliability"
+                        | "premium_history"
+                        | "loss_history";
+                      subject: string;
+                      occurredAt: number;
+                      artifactId: string;
+                    };
+                    sourceArtifactDigest: string;
+                  };
+                  indexProof: {
+                    treeSize: number;
+                    leafIndex: number;
+                    /**
+                     * @maxItems 64
+                     */
+                    auditPath: string[];
+                  };
+                };
+              };
+          upperBoundary:
+            | {
+                kind: "source_edge";
+              }
+            | {
+                kind: "adjacent";
+                leafProof: {
+                  leaf: {
+                    index: number;
+                    queryKey: {
+                      sourceFamily:
+                        | "credit_scorecard"
+                        | "exposure_history"
+                        | "settlement_reliability"
+                        | "premium_history"
+                        | "loss_history";
+                      subject: string;
+                      occurredAt: number;
+                      artifactId: string;
+                    };
+                    sourceArtifactDigest: string;
+                  };
+                  indexProof: {
+                    treeSize: number;
+                    leafIndex: number;
+                    /**
+                     * @maxItems 64
+                     */
+                    auditPath: string[];
+                  };
+                };
+              };
+          /**
+           * @minItems 1
+           * @maxItems 256
+           */
+          sourceArtifactDigests: [string, ...string[]];
+          disclosureDigest: string;
+          attestationReference: string;
+          issuedAt: number;
+          expiresAt: number;
+          sourceEvidenceClass: "asserted" | "observed" | "verified";
+        };
+        signerKey: string;
+        signature: string;
+      }[];
+      sourceDisclosure: {
+        /**
+         * @maxItems 256
+         */
+        artifacts: {
+          role: "claim" | "member";
+          artifactSchema: string;
+          artifactDigest: string;
+          canonicalArtifact: string;
+        }[];
+        kind: string;
+      };
+      window: {
+        endsAt: number;
+        startsAt: number;
+      };
+    };
+    expirationDate: string;
+    family: string;
+    issuanceDate: string;
+    issuer: string;
+    issuerKeyEpoch: number;
+    presentationEvidenceClass: string;
+    schema: "chio.fincred.settlement-reliability.v1";
+    sourceEvidenceClass: string;
+    type: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-checkpoint-body.schema.json
+export namespace Trust_FincredSourceCheckpointBody {
+  export interface ChioFincredSourceCheckpointV1SignedBody {
+    checkpointAuthorityEpoch: number;
+    checkpointAuthorityKey: string;
+    checkpointSequence: number;
+    cutoff: number;
+    expiresAt: number;
+    indexRoot: string;
+    indexSize: number;
+    issuedAt: number;
+    lowerBoundary: {
+      kind: string;
+    };
+    rangeRoot: string;
+    schema: "chio.fincred.source-checkpoint.v1";
+    sourceId: string;
+    storeGeneration: number;
+    upperBoundary: {
+      kind: string;
+    };
+    window: {
+      endsAt: number;
+      startsAt: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-completeness-attestation-body.schema.json
+export namespace Trust_FincredSourceCompletenessAttestationBody {
+  export interface ChioFincredSourceCompletenessAttestationV1SignedBody {
+    attestationReference: string;
+    checkpointAuthorityEpoch: number;
+    checkpointAuthorityKey: string;
+    checkpointDigest: string;
+    checkpointSequence: number;
+    committedLeaves: {
+      indexProof: {
+        /**
+         * @maxItems 64
+         */
+        auditPath: string[];
+        leafIndex: number;
+        treeSize: number;
+      };
+      leaf: {
+        index: number;
+        queryKey: {
+          artifactId: string;
+          occurredAt: number;
+          sourceFamily: string;
+          subject: string;
+        };
+        sourceArtifactDigest: string;
+      };
+    }[];
+    cutoff: number;
+    disclosureDigest: string;
+    expiresAt: number;
+    indexRoot: string;
+    issuedAt: number;
+    lowerBoundary: {
+      kind: string;
+    };
+    rangeRoot: string;
+    schema: "chio.fincred.source-completeness-attestation.v1";
+    sourceArtifactDigests: string[];
+    sourceEvidenceClass: string;
+    sourceFamily: string;
+    sourceId: string;
+    sourceSignerKey: string;
+    storeGeneration: number;
+    subject: string;
+    upperBoundary: {
+      kind: string;
+    };
+    window: {
+      endsAt: number;
+      startsAt: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/fincred-source-member-body.schema.json
+export namespace Trust_FincredSourceMemberBody {
+  export interface ChioFincredSourceMemberV1SignedBody {
+    artifactSchema: string;
+    canonicalArtifact: string;
+    queryKey: {
+      artifactId: string;
+      occurredAt: number;
+      sourceFamily: string;
+      subject: string;
+    };
+    schema: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/key-binding-certificate.schema.json
+export namespace Trust_KeyBindingCertificate {
+  export interface ChioKeyBindingCertificateSignedBody {
+    chain_scope: string[];
+    chio_identity: string;
+    chio_public_key: string;
+    expires_at: number;
+    issued_at: number;
+    nonce: string;
+    purpose: string[];
+    schema: "chio.key-binding-certificate.v1";
+    settlement_address: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/passkey-capability.schema.json
+export namespace Trust_PasskeyCapability {
+  export interface ChioPasskeyCapabilitySignedBody {
+    audience: string;
+    challenge_nonce: string;
+    credential_id: string;
+    exp: string;
+    iat: string;
+    scope_set: string[];
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/passport-verifier-policy.schema.json
+export namespace Trust_PassportVerifierPolicy {
+  export interface ChioPassportVerifierPolicySignedBody {
+    createdAt: number;
+    expiresAt: number;
+    policy: {
+      minCompositeScore?: number;
+      minReceiptCount?: number;
+      requireActiveLifecycle: boolean;
+      requireCheckpointCoverage: boolean;
+      requireEnterpriseIdentityProvenance: boolean;
+      requireReceiptLogUrls: boolean;
+    };
+    policyId: string;
+    schema: "chio.passport-verifier-policy.v1";
+    signerPublicKey: string;
+    verifier: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/portable-agent-passport.schema.json
+export namespace Trust_PortableAgentPassport {
+  export interface ChioPortableAgentPassportSignedBody {
+    expiresAt: number;
+    issuedAt: number;
+    issuer: string;
+    payloadCanonicalBytes: string;
+    schema: "chio.portable-agent-passport.v1";
+    subject: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/portable-negative-event.schema.json
+export namespace Trust_PortableNegativeEvent {
+  export interface ChioPortableNegativeEventSignedBody {
+    eventId: string;
+    evidenceRefs: {
+      kind: string;
+      referenceId: string;
+      uri: string;
+    }[];
+    expiresAt: number;
+    issuerOperatorId: string;
+    kind: string;
+    observedAt: number;
+    publishedAt: number;
+    schema: "chio.portable-negative-event.v1";
+    severity: number;
+    subjectKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/portable-reputation-summary.schema.json
+export namespace Trust_PortableReputationSummary {
+  export interface ChioPortableReputationSummarySignedBody {
+    acceptedImportedSignalCount: number;
+    effectiveScore: number;
+    expiresAt: number;
+    importedSignalCount: number;
+    issuedAt: number;
+    issuerOperatorId: string;
+    probationary: boolean;
+    schema: "chio.portable-reputation-summary.v1";
+    scorecard: {
+      boundary_pressure: {
+        deny_ratio: {
+          state: string;
+          value: number;
+        };
+        policies_observed: number;
+        receipts_observed: number;
+      };
+      composite_score: {
+        state: string;
+        value: number;
+      };
+      computed_at: number;
+      delegation_hygiene: {
+        budget_reduction_rate: {
+          state: string;
+          value: number;
+        };
+        delegations_observed: number;
+        scope_reduction_rate: {
+          state: string;
+          value: number;
+        };
+        score: {
+          state: string;
+          value: number;
+        };
+        ttl_reduction_rate: {
+          state: string;
+          value: number;
+        };
+      };
+      effective_weight_sum: number;
+      history_depth: {
+        active_days: number;
+        activity_ratio: {
+          state: string;
+          value: number;
+        };
+        first_seen: number;
+        last_seen: number;
+        receipt_count: number;
+        score: {
+          state: string;
+          value: number;
+        };
+        span_days: number;
+      };
+      incident_correlation: {
+        incidents_observed: number;
+        score: {
+          state: string;
+          value: number;
+        };
+      };
+      least_privilege: {
+        capabilities_observed: number;
+        score: {
+          state: string;
+          value: number;
+        };
+      };
+      reliability: {
+        cancellation_rate: {
+          state: string;
+          value: number;
+        };
+        completion_rate: {
+          state: string;
+          value: number;
+        };
+        incompletion_rate: {
+          state: string;
+          value: number;
+        };
+        receipts_observed: number;
+        score: {
+          state: string;
+          value: number;
+        };
+      };
+      resource_stewardship: {
+        average_utilization: {
+          state: string;
+          value: number;
+        };
+        capped_grants_observed: number;
+        fit_score: {
+          state: string;
+          value: number;
+        };
+      };
+      specialization: {
+        distinct_tools: number;
+        score: {
+          state: string;
+          value: number;
+        };
+      };
+      subject_key: string;
+    };
+    subjectKey: string;
+    summaryId: string;
+    window: {
+      since?: number;
+      until: number;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/public-discovery-transparency.schema.json
+export namespace Trust_PublicDiscoveryTransparency {
+  export interface ChioPublicDiscoveryTransparencySignedBody {
+    entries: {
+      discoveryId: string;
+      documentSha256: string;
+      expiresAt: number;
+      kind: string;
+      metadataUrl: string;
+      publishedAt: number;
+    }[];
+    expiresAt: number;
+    importGuardrails: {
+      informationalOnly: boolean;
+      requiresExplicitPolicyImport: boolean;
+      requiresManualReview: boolean;
+    };
+    publishedAt: number;
+    publisher: string;
+    schema: "chio.public-discovery-transparency.v1";
+    signerPublicKey: string;
+    transparencyId: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/public-issuer-discovery.schema.json
+export namespace Trust_PublicIssuerDiscovery {
+  export interface ChioPublicIssuerDiscoverySignedBody {
+    credentialConfigurationIds: string[];
+    discoveryId: string;
+    expiresAt: number;
+    importGuardrails: {
+      informationalOnly: boolean;
+      requiresExplicitPolicyImport: boolean;
+      requiresManualReview: boolean;
+    };
+    issuer: string;
+    jwksUri: string;
+    metadataSha256: string;
+    metadataUrl: string;
+    passportStatusDistribution?: {
+      cacheTtlSecs: number;
+      resolveUrls: string[];
+    };
+    publishedAt: number;
+    schema: "chio.public-issuer-discovery.v1";
+    signerPublicKey: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/public-verifier-discovery.schema.json
+export namespace Trust_PublicVerifierDiscovery {
+  export interface ChioPublicVerifierDiscoverySignedBody {
+    discoveryId: string;
+    expiresAt: number;
+    importGuardrails: {
+      informationalOnly: boolean;
+      requiresExplicitPolicyImport: boolean;
+      requiresManualReview: boolean;
+    };
+    jwksUri: string;
+    metadataSha256: string;
+    metadataUrl: string;
+    publishedAt: number;
+    requestUriPrefix: string;
+    schema: "chio.public-verifier-discovery.v1";
+    signerPublicKey: string;
+    verifier: string;
+    version: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/reputation-credential.schema.json
+export namespace Trust_ReputationCredential {
+  export interface ChioReputationCredentialSignedBody {
+    "@context": string[];
+    credentialSubject: {
+      id: string;
+      metrics: {
+        boundary_pressure: {
+          deny_ratio: {
+            state: string;
+            value?: number;
+          };
+          policies_observed: number;
+          receipts_observed: number;
+        };
+        composite_score: {
+          state: string;
+          value?: number;
+        };
+        computed_at: number;
+        delegation_hygiene: {
+          budget_reduction_rate: {
+            state: string;
+            value?: number;
+          };
+          delegations_observed: number;
+          scope_reduction_rate: {
+            state: string;
+            value?: number;
+          };
+          score: {
+            state: string;
+            value?: number;
+          };
+          ttl_reduction_rate: {
+            state: string;
+            value?: number;
+          };
+        };
+        effective_weight_sum: number;
+        history_depth: {
+          active_days: number;
+          activity_ratio: {
+            state: string;
+            value?: number;
+          };
+          first_seen: number | null;
+          last_seen: number | null;
+          receipt_count: number;
+          score: {
+            state: string;
+            value?: number;
+          };
+          span_days: number;
+        };
+        incident_correlation: {
+          incidents_observed: null;
+          score: {
+            state: string;
+          };
+        };
+        least_privilege: {
+          capabilities_observed: number;
+          score: {
+            state: string;
+            value?: number;
+          };
+        };
+        reliability: {
+          cancellation_rate: {
+            state: string;
+            value?: number;
+          };
+          completion_rate: {
+            state: string;
+            value?: number;
+          };
+          incompletion_rate: {
+            state: string;
+            value?: number;
+          };
+          receipts_observed: number;
+          score: {
+            state: string;
+            value?: number;
+          };
+        };
+        resource_stewardship: {
+          average_utilization: {
+            state: string;
+            value?: number;
+          };
+          capped_grants_observed: number;
+          fit_score: {
+            state: string;
+            value?: number;
+          };
+        };
+        specialization: {
+          distinct_tools: number;
+          score: {
+            state: string;
+            value?: number;
+          };
+        };
+        subject_key: string;
+      };
+    };
+    enterpriseIdentityProvenance?: {
+      attributeSources: {
+        groups: string;
+        principal: string;
+        roles: string;
+      };
+      clientId: string;
+      federationMethod: string;
+      groups: string[];
+      objectId: string;
+      organizationId: string;
+      principal: string;
+      providerId: string;
+      providerKind: string;
+      providerRecordId: string;
+      roles: string[];
+      sourceSubject: string;
+      subjectKey: string;
+      tenantId: string;
+      trustMaterialRef: string;
+    };
+    evidence: {
+      checkpointRoots: string[];
+      lineageRecords: number;
+      query: {
+        since?: number;
+        until: number;
+      };
+      receiptCount: number;
+      receiptIds: string[];
+      receiptLogUrls?: string[];
+      uncheckpointedReceipts: number;
+    };
+    expirationDate: string;
+    issuanceDate: string;
+    issuer: string;
+    type: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-passport-revocation-root-body.schema.json
+export namespace Trust_TrustPassportRevocationRootBody {
+  export interface ChioTrustPassportRevocationRootV1SignedBody {
+    epoch: number;
+    issued_at_unix_ms: number;
+    leaf_count: number;
+    root_hash: number[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-reputation-import-report-body.schema.json
+export namespace Trust_TrustReputationImportReportBody {
+  export interface ChioTrustReputationImportReportV1SignedBody {
+    decay_policy_ref: string;
+    id: string;
+    import_verdict: string;
+    issued_at: string;
+    issuer: string;
+    issuer_trust_ref: string;
+    local_weight: number;
+    negative_event_refs: {}[];
+    privacy_profile_ref: string;
+    schema: "chio.trust.reputation-import-report.v1";
+    source_network: string;
+    source_reputation_ref: string;
+    subject: string;
+    subject_binding_ref: string;
+    usage: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-root-body.schema.json
+export namespace Trust_TrustRootBody {
+  export interface ChioTrustRootV1SignedBody {
+    authority: string;
+    id: string;
+    root_id?: string;
+    roots: {
+      subject: string;
+    }[];
+    schema: "chio.trust.root.v1";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust/trust-scorecard-snapshot-body.schema.json
+export namespace Trust_TrustScorecardSnapshotBody {
+  export interface ChioTrustScorecardSnapshotV1SignedBody {
+    component_scores: {
+      component: string;
+      evidence_ref: string;
+      score: number;
+      stale: boolean;
+      weight: number;
+    }[];
+    computed_score: number;
+    downgrade_reasons: {}[];
+    freshness_window: {
+      valid_from: string;
+      valid_until: string;
+    };
+    id: string;
+    issued_at: string;
+    issuer_trust_roots: string[];
+    negative_event_refs: {}[];
+    portable_reputation_import_refs: string[];
+    reputation_snapshot_refs: string[];
+    schema: "chio.trust.scorecard-snapshot.v1";
+    scope: string;
+    score_ceiling: number;
+    score_floor: number;
+    sla_performance_refs: string[];
+    subject: string;
+    verifier_policy_ref: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/trust-control/attestation.schema.json
 export namespace TrustControl_Attestation {
   /**
@@ -56500,6 +77018,45 @@ export namespace TrustControl_BudgetSnapshotAnchorProvenance {
     electionTerm: number;
     committedAt: number;
     signerPublicKey: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/cluster-budget-anchor-body.schema.json
+export namespace TrustControl_ClusterBudgetAnchorBody {
+  export interface ChioClusterBudgetAnchorSignedBody {
+    chain: {
+      body: {
+        anchorSetDigest: string;
+        chainDigest: string;
+        commitSequence: number;
+        committedAt: number;
+        electionTerm: number;
+        leaderUrl: string;
+        previousChainDigest: string;
+        schema: string;
+        signerPublicKey: string;
+      };
+      signature: string;
+    }[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/trust-control/cluster-peer-request-body.schema.json
+export namespace TrustControl_ClusterPeerRequestBody {
+  export interface ChioClusterPeerRequestSignedBody {
+    bodySha256: string;
+    deployment: string;
+    issuedAt: number;
+    method: string;
+    nodeId: string;
+    nonce: string;
+    path: string;
+    query: string;
+    recipient: string;
+    scheme: string;
+    term: number | null;
   }
 }
 
@@ -56610,6 +77167,705 @@ export namespace TrustControl_Terminate {
      * Optional normalized URL of the successor leader, when termination is part of a planned handoff.
      */
     successorLeaderUrl?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/underwriting/decision.schema.json
+export namespace Underwriting_Decision {
+  export interface ChioUnderwritingDecisionSignedBody {
+    budget: {
+      action: string;
+      ceilingFactor?: number;
+      rationale: string;
+    };
+    decisionId: string;
+    evaluation: {
+      generatedAt: number;
+      input: {
+        certification?: {
+          artifactId: string;
+          checkedAt: number;
+          publishedAt: number;
+          state: string;
+          toolServerId: string;
+          verdict: string;
+        };
+        filters: {
+          agentSubject: string;
+          receiptLimit: number;
+        };
+        generatedAt: number;
+        receipts: {
+          actionableMeteredReceipts: number;
+          actionableSettlementReceipts: number;
+          allowCount: number;
+          approvalReceipts: number;
+          approvedReceipts: number;
+          callChainReceipts: number;
+          cancelledCount: number;
+          denyCount: number;
+          failedSettlementReceipts: number;
+          governedReceipts: number;
+          incompleteCount: number;
+          matchingReceipts: number;
+          meteredReceipts: number;
+          pendingSettlementReceipts: number;
+          receiptRefs?: {
+            kind: string;
+            locator: string;
+            observedAt: number;
+            referenceId: string;
+          }[];
+          returnedReceipts: number;
+          runtimeAssuranceReceipts: number;
+          sharedEvidenceProofRequiredCount: number;
+          sharedEvidenceReferenceCount: number;
+        };
+        reputation?: {
+          acceptedImportedSignalCount: number;
+          effectiveScore: number;
+          importedSignalCount: number;
+          probationary: boolean;
+          resolvedTier: string;
+          subjectKey: string;
+        };
+        runtimeAssurance?: {
+          governedReceipts: number;
+          highestTier: string;
+          latestEvidenceSha256: string;
+          latestSchema: string;
+          latestVerifier: string;
+          latestVerifierFamily: string;
+          observedVerifierFamilies: string[];
+          runtimeAssuranceReceipts: number;
+        };
+        schema: string;
+        taxonomy: {
+          supportedClasses: string[];
+          supportedReasons: string[];
+          version: string;
+        };
+      };
+      outcome: string;
+      policy: {
+        denyReputationScoreBelow: number;
+        maximumReceiptAgeSeconds: number;
+        minimumApproveReputationScore: number;
+        minimumApproveRuntimeAssuranceTier: string;
+        minimumReceiptHistory: number;
+        minimumStepUpRuntimeAssuranceTier: string;
+        reduceCeilingFactor: number;
+        requireActiveToolCertification: boolean;
+        requireComplianceScoreReference: boolean;
+        schema: string;
+        version: string;
+      };
+      riskClass: string;
+      schema: string;
+      suggestedCeilingFactor?: number;
+    };
+    issuedAt: number;
+    lifecycleState: string;
+    premium: {
+      basisPoints?: number;
+      quotedAmount?: {
+        currency: string;
+        units: number;
+      };
+      rationale: string;
+      state: string;
+    };
+    reviewState: string;
+    schema: "chio.underwriting.decision.v1";
+    supersedesDecisionId?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/underwriting/policy-input.schema.json
+export namespace Underwriting_PolicyInput {
+  export interface ChioUnderwritingPolicyInputSignedBody {
+    filters: {
+      agentSubject: string;
+      receiptLimit: number;
+    };
+    generatedAt: number;
+    receipts: {
+      actionableMeteredReceipts: number;
+      actionableSettlementReceipts: number;
+      allowCount: number;
+      approvalReceipts: number;
+      approvedReceipts: number;
+      callChainReceipts: number;
+      cancelledCount: number;
+      denyCount: number;
+      failedSettlementReceipts: number;
+      governedReceipts: number;
+      incompleteCount: number;
+      matchingReceipts: number;
+      meteredReceipts: number;
+      pendingSettlementReceipts: number;
+      receiptRefs: {
+        kind: string;
+        locator: string;
+        observedAt: number;
+        referenceId: string;
+      }[];
+      returnedReceipts: number;
+      runtimeAssuranceReceipts: number;
+      sharedEvidenceProofRequiredCount: number;
+      sharedEvidenceReferenceCount: number;
+    };
+    reputation: {
+      acceptedImportedSignalCount: number;
+      effectiveScore: number;
+      importedSignalCount: number;
+      probationary: boolean;
+      resolvedTier: string;
+      subjectKey: string;
+    };
+    runtimeAssurance: {
+      governedReceipts: number;
+      highestTier: string;
+      latestEvidenceSha256: string;
+      latestSchema: string;
+      latestVerifier: string;
+      latestVerifierFamily: string;
+      observedVerifierFamilies: string[];
+      runtimeAssuranceReceipts: number;
+    };
+    schema: "chio.underwriting.policy-input.v1";
+    taxonomy: {
+      supportedClasses: string[];
+      supportedReasons: string[];
+      version: string;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/web3/web3-settlement-proof-bundle-body.schema.json
+export namespace Web3_Web3SettlementProofBundleBody {
+  export interface ChioWeb3SettlementProofBundleV1SignedBody {
+    bundle_id: string;
+    chain_id: string;
+    chain_snapshot: {
+      beneficiary_identity_binding: {
+        certificate: {
+          chain_scope: string[];
+          chio_identity: string;
+          chio_public_key: string;
+          expires_at: number;
+          issued_at: number;
+          nonce: string;
+          purpose: string[];
+          schema: string;
+          settlement_address: string;
+        };
+        signature: string;
+      };
+      block: {
+        block_hash: string;
+        block_number: number;
+        transaction_hashes: string[];
+      };
+      bond: {
+        bond_vault_contract: string;
+        bond_vault_runtime_codehash: string;
+        minimum_required_amount: {
+          currency: string;
+          units: number;
+        };
+        posted_amount: {
+          currency: string;
+          units: number;
+        };
+      };
+      chain_id: string;
+      escrow: {
+        beneficiary_address: string;
+        escrow_contract: string;
+        escrow_id: string;
+        escrow_runtime_codehash: string;
+        locked_amount: {
+          currency: string;
+          units: number;
+        };
+        refund_event?: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          block: {
+            block_hash: string;
+            block_number: number;
+            transaction_hashes: string[];
+          };
+          escrow_id: string;
+          refund_tx_hash: string;
+        };
+        refunded: boolean;
+        release_event?: {
+          amount: {
+            currency: string;
+            units: number;
+          };
+          block: {
+            block_hash: string;
+            block_number: number;
+            transaction_hashes: string[];
+          };
+          escrow_id: string;
+          partial: boolean;
+          receipt_hash: string;
+          release_tx_hash: string;
+          remaining_amount: {
+            currency: string;
+            units: number;
+          };
+        };
+        released_amount: {
+          currency: string;
+          units: number;
+        };
+        settlement_token_address: string;
+      };
+      identity_registry_address: string;
+      identity_registry_operator?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        identity_registry_contract: string;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        settlement_key: string;
+      };
+      identity_registry_runtime_codehash: string;
+      latest_block_number: number;
+      max_block_lag: number;
+      observed_block_number: number;
+      registry_root: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+    };
+    collateral_position_ref?: string;
+    commerce_order_id: string;
+    deployment_provenance: {
+      approval_hash: string;
+      bond_vault_contract: string;
+      bond_vault_runtime_codehash: string;
+      chain_id: string;
+      contract_package_id: string;
+      create2_factory: string;
+      escrow_contract: string;
+      escrow_runtime_codehash: string;
+      identity_registry_address: string;
+      identity_registry_runtime_codehash: string;
+      provenance_id: string;
+      reviewed_manifest_hash: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+      salt_namespace: string;
+      settlement_token_address: string;
+    };
+    dispute_posture: string;
+    dispute_snapshot: {
+      chain_event_blocks?: {
+        block_hash: string;
+        block_number: number;
+        transaction_hashes: string[];
+      }[];
+      chain_event_tx_hashes: string[];
+      challenge_window_secs: number;
+      dispute_id: string;
+      linked_receipt_ids: string[];
+      observed_at: number;
+      open_dispute_count: number;
+      posture: string;
+      schema: string;
+      window_closed_at: number;
+    };
+    guarantee_decision_ref?: string;
+    observed_confirmations: number;
+    order_binding: {
+      beneficiary_address: string;
+      chain_id: string;
+      commerce_order_id: string;
+      custody_provider_id: string;
+      escrow_id: string;
+      settlement_amount: {
+        currency: string;
+        units: number;
+      };
+      settlement_rail_id: string;
+      settlement_reference: string;
+      settlement_tx_hash: string;
+      transaction_passport_id: string;
+    };
+    public_witness?: {
+      anchor_tx_hash: string;
+      anchored_checkpoint_seq: number;
+      anchored_merkle_root: string;
+      body_hash: string;
+      bond_vault_contract: string;
+      bond_vault_runtime_codehash: string;
+      chain_id: string;
+      escrow_contract: string;
+      escrow_runtime_codehash: string;
+      identity_registry_address: string;
+      identity_registry_operator?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        identity_registry_contract: string;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        settlement_key: string;
+      };
+      identity_registry_runtime_codehash: string;
+      mode: string;
+      observed_at: number;
+      registry_root: string;
+      root_registry_address: string;
+      root_registry_runtime_codehash: string;
+      settlement_token_address: string;
+      witness_id: string;
+    };
+    required_confirmations: number;
+    schema: "chio.web3-settlement-proof-bundle.v1";
+    settlement_receipt: {
+      dispatch: {
+        beneficiary_address: string;
+        bond?: {
+          body: {
+            bondId: string;
+            expiresAt: number;
+            issuedAt: number;
+            lifecycleState: string;
+            report: {
+              disposition: string;
+              exposure: {
+                actionableReceipts: number;
+                activeDecisions: number;
+                currencies: string[];
+                failedSettlementReceipts: number;
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                pendingSettlementReceipts: number;
+                returnedDecisions: number;
+                returnedReceipts: number;
+                supersededDecisions: number;
+                truncatedDecisions: boolean;
+                truncatedReceipts: boolean;
+              };
+              filters: {
+                agentSubject: string;
+                decisionLimit: number;
+                receiptLimit: number;
+              };
+              generatedAt: number;
+              latestFacilityId: string;
+              prerequisites: {
+                activeFacilityMet: boolean;
+                activeFacilityRequired: boolean;
+                certificationMet: boolean;
+                certificationRequired: boolean;
+                currencyCoherent: boolean;
+                runtimeAssuranceMet: boolean;
+              };
+              schema: string;
+              scorecard: {
+                anomalyCount: number;
+                band: string;
+                confidence: string;
+                currencies: string[];
+                matchingDecisions: number;
+                matchingReceipts: number;
+                mixedCurrencyBook: boolean;
+                overallScore: number;
+                probationary: boolean;
+                returnedDecisions: number;
+                returnedReceipts: number;
+              };
+              supportBoundary: {
+                autonomyGatingSupported: boolean;
+                externalEscrowExecutionSupported: boolean;
+                reserveAccountingAuthoritative: boolean;
+              };
+            };
+            schema: string;
+          };
+          signature: string;
+          signerKey: string;
+        };
+        bond_vault_contract: string;
+        capital_instruction: {
+          body: {
+            action: string;
+            amount: {
+              currency: string;
+              units: number;
+            };
+            authorityChain: {
+              approvedAt: number;
+              authorityProof: {
+                body: {
+                  approvedAt: number;
+                  expiresAt: number;
+                  principalId: string;
+                  role: string;
+                  schema: string;
+                };
+                signature: string;
+                signerKey: string;
+              };
+              expiresAt: number;
+              note: string;
+              principalId: string;
+              role: string;
+            }[];
+            completionFlowRowId: string;
+            counterpartyId: string;
+            counterpartyRole: string;
+            description: string;
+            evidenceRefs: {
+              kind: string;
+              locator: string;
+              observedAt: number;
+              referenceId: string;
+            }[];
+            executionWindow: {
+              notAfter: number;
+              notBefore: number;
+            };
+            governedReceiptId: string;
+            instructionId: string;
+            intendedState: string;
+            issuedAt: number;
+            ownerRole: string;
+            query: {
+              agentSubject: string;
+              bondLimit: number;
+              facilityLimit: number;
+              lossEventLimit: number;
+              receiptLimit: number;
+            };
+            rail: {
+              custodyProviderId: string;
+              destinationAccountRef: string;
+              jurisdiction: string;
+              kind: string;
+              railId: string;
+              sourceAccountRef: string;
+            };
+            reconciledState: string;
+            schema: string;
+            sourceId: string;
+            sourceKind: string;
+            subjectKey: string;
+            supportBoundary: {
+              automaticDispatchSupported: boolean;
+              capitalBookAuthoritative: boolean;
+              custodyNeutralInstructionSupported: boolean;
+              externalExecutionAuthoritative: boolean;
+            };
+          };
+          signature: string;
+          signerKey: string;
+        };
+        chain_id: string;
+        contract_package_id: string;
+        dispatch_id: string;
+        escrow_contract: string;
+        escrow_id: string;
+        issued_at: number;
+        note: string;
+        operator_key_hash: string;
+        schema: string;
+        settlement_amount: {
+          currency: string;
+          units: number;
+        };
+        settlement_path: string;
+        settlement_token_address: string;
+        support_boundary: {
+          anchor_proof_required: boolean;
+          custody_boundary_explicit: boolean;
+          oracle_evidence_required_for_fx: boolean;
+          real_dispatch_supported: boolean;
+          reversal_supported: boolean;
+        };
+        trust_profile_id: string;
+      };
+      execution_receipt_id: string;
+      failure_reason?: string;
+      identity_registry_evidence?: {
+        active: boolean;
+        block_hash: string;
+        block_number: number;
+        chain_id: string;
+        identity_registry_contract: string;
+        observed_at: number;
+        operator_address: string;
+        operator_epoch: number;
+        operator_key_hash: string;
+        registered_at: number;
+        settlement_key: string;
+      };
+      issued_at: number;
+      lifecycle_state: string;
+      note: string;
+      observed_execution: {
+        amount: {
+          currency: string;
+          units: number;
+        };
+        externalReferenceId: string;
+        observedAt: number;
+      };
+      oracle_evidence?: {
+        authority: string;
+        base: string;
+        cache_age_seconds: number;
+        converted_cost_units: number;
+        feed_address: string;
+        grant_currency: string;
+        max_age_seconds: number;
+        oracle_public_key: string;
+        original_cost_units: number;
+        original_currency: string;
+        quote: string;
+        rate_denominator: number;
+        rate_numerator: number;
+        schema: string;
+        signature: string;
+        source: string;
+        updated_at: number;
+      };
+      reconciled_anchor_proof?: {
+        chain_anchor: {
+          anchored_checkpoint_seq: number;
+          anchored_merkle_root: string;
+          block_hash: string;
+          block_number: number;
+          chain_id: string;
+          contract_address: string;
+          operator_address: string;
+          operator_epoch: number;
+          operator_key_hash: string;
+          tx_hash: string;
+        };
+        checkpoint_statement: {
+          batch_end_seq: number;
+          batch_start_seq: number;
+          checkpoint_seq: number;
+          issued_at: number;
+          kernel_key: string;
+          merkle_root: string;
+          schema: string;
+          signature: string;
+          tree_size: number;
+        };
+        key_binding_certificate: {
+          certificate: {
+            chain_scope: string[];
+            chio_identity: string;
+            chio_public_key: string;
+            expires_at: number;
+            issued_at: number;
+            nonce: string;
+            purpose: string[];
+            schema: string;
+            settlement_address: string;
+          };
+          signature: string;
+        };
+        receipt: {
+          action: {
+            parameter_hash: string;
+            parameters: {
+              amount: number;
+              currency: string;
+              to: string;
+            };
+          };
+          boundary_class: string;
+          capability_id: string;
+          content_hash: string;
+          decision: {
+            verdict: string;
+          };
+          id: string;
+          kernel_key: string;
+          metadata: {
+            chio_receipt_signing_nonce: string;
+            financial: {
+              budget_remaining: number;
+              budget_total: number;
+              cost_charged: number;
+              currency: string;
+              delegation_depth: number;
+              grant_index: number;
+              oracle_evidence: {
+                authority: string;
+                base: string;
+                cache_age_seconds: number;
+                converted_cost_units: number;
+                feed_address: string;
+                grant_currency: string;
+                max_age_seconds: number;
+                oracle_public_key?: string;
+                original_cost_units: number;
+                original_currency: string;
+                quote: string;
+                rate_denominator: number;
+                rate_numerator: number;
+                schema: string;
+                signature?: string;
+                source: string;
+                updated_at: number;
+              };
+              payment_reference: string;
+              root_budget_holder: string;
+              settlement_status: string;
+            };
+          };
+          policy_hash: string;
+          receipt_kind: string;
+          redaction_mode: string;
+          signature: string;
+          timestamp: number;
+          tool_name: string;
+          tool_origin: string;
+          tool_server: string;
+          trust_level: string;
+        };
+        receipt_inclusion: {
+          checkpoint_seq: number;
+          merkle_root: string;
+          proof: {
+            audit_path: {}[];
+            leaf_index: number;
+            tree_size: number;
+          };
+        };
+        schema: string;
+      };
+      reversal_of?: string;
+      schema: string;
+      settled_amount: {
+        currency: string;
+        units: number;
+      };
+      settlement_reference: string;
+    };
+    sla_remedy_ref?: string;
+    slash_authority_ref?: string;
+    transaction_passport_id: string;
   }
 }
 
@@ -59360,5 +80616,205 @@ export namespace Work_Response {
       statement_digest: WorkDigest;
     }[];
     funding_profile_id?: WorkId;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/work-dispatch-permit.schema.json
+export namespace Work_WorkDispatchPermit {
+  export interface ChioWorkDispatchPermitSignedBody {
+    body: {
+      allocation_hash: string;
+      issued_at: number;
+      root_id: string;
+      selection: {
+        body: {
+          capability_hash: string;
+          expected_revision: number;
+          offer: {
+            body: {
+              allocation_hash: string;
+              arguments_hash: string;
+              contract_hash: string;
+              effect: {
+                server: string;
+                tool: string;
+              };
+              expires_at: number;
+              price_units: number;
+              receiver: string;
+              slot_id: string;
+            };
+            signature: string;
+            signer: string;
+          };
+          request_id: string;
+        };
+        signature: string;
+        signer: string;
+      };
+      slot: {
+        contract: {
+          acceptance: {
+            clauses: {
+              kind: string;
+              max: number;
+              min: number;
+              pointer: string;
+            }[];
+          };
+          currency: string;
+          depth: number;
+          effects: {
+            server: string;
+            tool: string;
+          }[];
+          expires_at: number;
+          max_units: number;
+          readers: string[];
+        };
+        holder: string;
+        id: string;
+      };
+    };
+    signer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/work-offer.schema.json
+export namespace Work_WorkOffer {
+  export interface ChioWorkOfferSignedBody {
+    body: {
+      allocation_hash: string;
+      arguments_hash: string;
+      contract_hash: string;
+      effect: {
+        server: string;
+        tool: string;
+      };
+      expires_at: number;
+      price_units: number;
+      receiver: string;
+      slot_id: string;
+    };
+    signer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/work-selection.schema.json
+export namespace Work_WorkSelection {
+  export interface ChioWorkSelectionSignedBody {
+    body: {
+      capability_hash: string;
+      expected_revision: number;
+      offer: {
+        body: {
+          allocation_hash: string;
+          arguments_hash: string;
+          contract_hash: string;
+          effect: {
+            server: string;
+            tool: string;
+          };
+          expires_at: number;
+          price_units: number;
+          receiver: string;
+          slot_id: string;
+        };
+        signature: string;
+        signer: string;
+      };
+      request_id: string;
+    };
+    signer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/work-subdivision.schema.json
+export namespace Work_WorkSubdivision {
+  export interface ChioWorkSubdivisionSignedBody {
+    body: {
+      child: {
+        contract: {
+          acceptance: {
+            clauses: {
+              kind: string;
+              max?: number;
+              min?: number;
+              pointer: string;
+              value?: string;
+            }[];
+          };
+          currency: string;
+          depth: number;
+          effects: {
+            server: string;
+            tool: string;
+          }[];
+          expires_at: number;
+          max_units: number;
+          readers: string[];
+        };
+        holder: string;
+        id: string;
+      };
+      parent_allocation_hash: string;
+      parent_id: string;
+    };
+    signer: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/workflow/workflow-receipt.schema.json
+export namespace Workflow_WorkflowReceipt {
+  export interface ChioWorkflowReceiptSignedBody {
+    agent_id: string;
+    capability_id: string;
+    completed_at: number;
+    duration_ms: number;
+    id: string;
+    kernel_key: string;
+    outcome: {
+      currency?: string;
+      elapsed_secs?: number;
+      limit_secs?: number;
+      limit_units?: number;
+      reason?: string;
+      spent_units?: number;
+      status: string;
+      step_index?: number;
+    };
+    schema: "chio.workflow-receipt.v1";
+    session_id?: string;
+    skill_id: string;
+    skill_version: string;
+    started_at: number;
+    steps: {
+      allowed: boolean;
+      bilateral_dsse_sha256?: string;
+      consistency_anchor?: string;
+      cost?: {
+        currency: string;
+        units: number;
+      };
+      destructive?: boolean;
+      duration_ms: number;
+      governance_receipt_id?: string;
+      outcome: string;
+      output_hash?: string;
+      parent_receipt_sha256?: string;
+      server_id: string;
+      step_index: number;
+      tool_name: string;
+      tool_receipt_id?: string;
+    }[];
+    total_cost?: {
+      currency: string;
+      units: number;
+    };
   }
 }

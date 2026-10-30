@@ -1,0 +1,59 @@
+{
+  "authorityEpoch": 1,
+  "entries": [
+    {
+      "entry_kind": "domain",
+      "event": {
+        "body": {
+          "aggregateId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifactSignerKey": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+          "authorityEpoch": 1,
+          "committedAt": 1700000000,
+          "eventId": "import-1",
+          "eventKind": "finding_published",
+          "expectedEventSha256": null,
+          "expectedRevision": 0,
+          "payload": {
+            "invalid": true
+          },
+          "schema": "chio.finding.hosted-replication-event.v1",
+          "sequence": 1,
+          "sourceAuthority": "sqlite",
+          "tenantId": "tenant:import"
+        },
+        "signature": "0343c050ca0d81dffe9bb796e5c7e829e1c7f2a8dbd2018664b5a883725c9ba50aff71014b6d0d01914946713c7fbbdb21897305f7db1c013058ecfee080940a",
+        "signerKey": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b"
+      }
+    },
+    {
+      "entry_kind": "domain",
+      "event": {
+        "body": {
+          "aggregateId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "artifactSignerKey": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b",
+          "authorityEpoch": 1,
+          "committedAt": 1700000000,
+          "eventId": "import-2",
+          "eventKind": "finding_published",
+          "expectedEventSha256": null,
+          "expectedRevision": 0,
+          "payload": {
+            "invalid": true
+          },
+          "schema": "chio.finding.hosted-replication-event.v1",
+          "sequence": 2,
+          "sourceAuthority": "sqlite",
+          "tenantId": "tenant:import"
+        },
+        "signature": "33718f8c6dbc734c40ac42aed4362bbec13c3e88d3058b86ee776863e59214f50a1cf220fbea701d274eb0c500304579d6b683cd918794d3ed856cbfda31d004",
+        "signerKey": "884b8857f4eaa1613c61504db34d4beaf346517a0e31de3cddd4d9b4201d9d0b"
+      }
+    }
+  ],
+  "exportedAt": 1700000001,
+  "firstSequence": 1,
+  "lastSequence": 2,
+  "schema": "chio.finding.hosted-sqlite-import-batch.v1",
+  "sourceProjectionSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tenantId": "tenant:import"
+}

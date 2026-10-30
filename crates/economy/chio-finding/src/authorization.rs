@@ -130,3 +130,7 @@ pub fn verify_signed_seller_authorization(
     signed.body.validate()?;
     crate::envelope::verify_pinned_envelope(signed, &signed.body.issuer, "seller_authorization")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingSellerAuthorization {
+    const SCHEMA_ID: &'static str = FINDING_SELLER_AUTHORIZATION_SCHEMA_V1;
+}

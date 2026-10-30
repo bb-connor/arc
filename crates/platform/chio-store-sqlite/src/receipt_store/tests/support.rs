@@ -409,7 +409,7 @@ pub(super) fn sample_child_receipt_with_keypair_seq_and_timestamp(
 
 pub(super) fn sign_export<T>(body: T) -> SignedExportEnvelope<T>
 where
-    T: serde::Serialize + Clone,
+    T: chio_core::receipt::lineage::SignedExportPayload + Clone,
 {
     let keypair = Keypair::generate();
     SignedExportEnvelope::sign(body, &keypair).test_unwrap()

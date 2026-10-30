@@ -255,7 +255,7 @@ impl NativeFlowResolver {
                 return Err(FlowDenial::DeclassificationUntrustedAuthority.into());
             }
             if !grant
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|_| FlowDenial::DeclassificationBindingMismatch)?
             {
                 return Err(FlowDenial::DeclassificationBindingMismatch.into());

@@ -373,7 +373,7 @@ pub fn sign_cage_receipt(
 pub fn verify_signed_cage_receipt(
     receipt: &ChioReceipt,
 ) -> Result<CageReceiptBody, CageReceiptError> {
-    if !receipt.verify_signature()? || !receipt.action.verify_hash()? {
+    if !receipt.verify_integrity_embedded_key()? || !receipt.action.verify_hash()? {
         return Err(CageReceiptError::InvalidSignature);
     }
     validate_identifier(&receipt.capability_id)?;

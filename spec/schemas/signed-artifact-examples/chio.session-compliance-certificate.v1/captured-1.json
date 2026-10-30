@@ -1,0 +1,8 @@
+{
+  "all_signatures_valid": true,
+  "crypto_floor": "allow_classical",
+  "issued_at": 1792234800,
+  "policy_hash": "policy-hash",
+  "receipt_count": 3,
+  "session_id": "sess-wrapper-refusal"
+}

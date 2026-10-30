@@ -62,7 +62,7 @@ fn bound_token(issuer: &Keypair) -> Result<CapabilityToken> {
         workload_signer_public_key: issuer.public_key().to_hex(),
     };
     let token = CapabilityToken::sign_with_security_binding(body(issuer), binding.clone(), issuer)?;
-    assert!(token.verify_signature()?);
+    assert!(token.verify_integrity_embedded_key()?);
     assert_eq!(token.security_binding()?, Some(binding));
     token.validate_time(100)?;
     Ok(token)
@@ -177,7 +177,7 @@ fn security_binding_projection_denies_all_portable_evaluators_before_guards() ->
 fn security_binding_projection_preserves_unbound_portable_evaluation() -> Result {
     let issuer = Keypair::from_seed(&[43; 32]);
     let token = CapabilityToken::sign(body(&issuer), &issuer)?;
-    assert!(token.verify_signature()?);
+    assert!(token.verify_integrity_embedded_key()?);
     assert!(token.security_binding()?.is_none());
     let guard = CountingGuard::default();
     for (entry, result) in evaluate_public_entries(&issuer, &token, &guard)? {

@@ -1,0 +1,57 @@
+{
+  "authorityKey": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+  "delegationDepthLimit": 4,
+  "event": {
+    "admission_sequence": 4,
+    "delegation_depth": 1,
+    "kind": "evaluate",
+    "receipt": {
+      "action": {
+        "parameter_hash": "e1d8b691c6220e5151c86cd6c0ec8f8113031d0d3cab343312240770625ef394",
+        "parameters": {
+          "nonce": 3
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "cap-trace-child",
+      "content_hash": "d28a61bfe0680e4a71cd2e78d7bdb7b48edfd3a34946bdfe79b5e4637f149d6c",
+      "decision": {
+        "guard": "revocation_store",
+        "reason": "capability revoked",
+        "verdict": "deny"
+      },
+      "id": "d700ae03efc6b055c28ecdc64ec6ff7db263e6f454486b8b4e65fd6779a0cf5f",
+      "kernel_key": "4508a07aa941707f3eb2db94c8897a80b2c1197476b6de213ac273df7d86c4ff",
+      "metadata": {
+        "chio_receipt_signing_nonce": "trace-receipt-3",
+        "receipt_context": {
+          "request_id": "trace-request-3"
+        }
+      },
+      "policy_hash": "0150fc694e0fc8af62b7f7d219f2beef53350bf69424ef205e18b2a4bc87bd5d",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "b0b0ce9f740db2aa1f7601f77b443816f65f93d09a31ace10edb0bcc30b25b8ac33a5567cb2add14e9dc1e15e5aa8b4cb646425c06b4fad245552610ba6d5009",
+      "timestamp": 1700000003,
+      "tool_name": "echo",
+      "tool_origin": "caller_executed",
+      "tool_server": "conformance",
+      "trust_level": "mediated"
+    },
+    "receipt_time": 3,
+    "request_id": "trace-request-3",
+    "revocation_admitted": false,
+    "revocation_source_id": "cap-trace-parent",
+    "revocation_subject_ids": [
+      "cap-trace-child",
+      "cap-trace-parent"
+    ],
+    "seen_epoch": 2
+  },
+  "runtimeEventCount": 5,
+  "schema": "chio.trace-observation.v1",
+  "sequence": 3,
+  "sourceSequence": 5,
+  "traceId": "revocation-good-fixture",
+  "traceLength": 3
+}

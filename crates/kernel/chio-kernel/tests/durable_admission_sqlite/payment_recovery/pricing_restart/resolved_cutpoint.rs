@@ -318,7 +318,7 @@ fn crash_at_resolved_then_recover(
             serde_json::json!({"original_paid_output": true}),
         ))
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(response.receipt.kernel_key, keypair.public_key());
     assert_eq!(response.receipt.capability_id, request.capability.id);
     let financial = response

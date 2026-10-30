@@ -312,7 +312,7 @@ pub fn search(
             });
             continue;
         }
-        match hint.verify_signature() {
+        match hint.verify_signature(&hint.signer_key) {
             Ok(true) => {}
             Ok(false) => {
                 errors.push(GenericListingSearchError {
@@ -622,6 +622,10 @@ fn validate_currency_code(value: &str, field: &str) -> Result<(), String> {
             "{field} must be a 3-letter uppercase currency code"
         ))
     }
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ListingPricingHint {
+    const SCHEMA_ID: &'static str = LISTING_PRICING_HINT_SCHEMA;
 }
 
 #[cfg(test)]

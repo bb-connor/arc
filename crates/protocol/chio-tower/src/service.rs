@@ -871,7 +871,7 @@ mod tests {
         );
         assert!(
             receipt
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .unwrap_or_else(|e| panic!("verify failed: {e}")),
             "413 receipt signature must verify under embedded kernel key"
         );
@@ -910,7 +910,7 @@ mod tests {
         assert_eq!(parsed.response_status, 413);
         assert!(
             parsed
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .unwrap_or_else(|e| panic!("verify failed: {e}")),
             "deserialised receipt body must verify under the embedded kernel key"
         );

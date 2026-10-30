@@ -1,0 +1,45 @@
+{
+  "all_signatures_valid": true,
+  "anomalies": [],
+  "budget_compliant": true,
+  "chain_continuous": true,
+  "checks": {
+    "allowed_mediated_receipt_limit": "passed",
+    "required_guards": "passed",
+    "tenant": "not_evaluated",
+    "tool_targets": "passed"
+  },
+  "compliance_profile_digest": "9921d9ae9bee1d0d2b24cfa2461a66939f7cac09d3535f78952261364df1598f",
+  "coverage": {
+    "archived_through_entry_seq": 0,
+    "checkpoint": {
+      "body": {
+        "batch_end_seq": 1,
+        "batch_start_seq": 1,
+        "chain_root": "0xa67901a1b9493c9139126655f789deaa45130cd42b2dd9553505b67a8dd534c3",
+        "checkpoint_seq": 1,
+        "issued_at": 1793202718,
+        "kernel_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+        "merkle_root": "0xcbef8c63114bda1fab2f82c5937f884993f4d404b4686cdf73db0e07dd9f9fa2",
+        "schema": "chio.checkpoint_statement.v1",
+        "tree_size": 1
+      },
+      "signature": "a16706c4b57e88f0f6ae3c1457b5ed888dc73cc859c05b35c28b77a6888259a8ce0ab86a5525d99fe3fb84ff580027c7111356c346324f401f44de015a8cf604"
+    },
+    "kind": "retained_snapshot_reference",
+    "session_id": "target_%",
+    "snapshot_end_entry_seq": 1,
+    "tenant_id": null
+  },
+  "first_receipt_at": 1,
+  "guards_compliant": true,
+  "invocation_count": 1,
+  "issued_at": 1793202718,
+  "kernel_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "last_receipt_at": 1,
+  "receipt_count": 1,
+  "receipt_set_digest": "64828a4633b6a3e47043efca15718886596e4d464991dcb89ae12b17bbd9dc4d",
+  "schema": "chio.compliance.certificate.v1",
+  "scope_compliant": true,
+  "session_id": "target_%"
+}

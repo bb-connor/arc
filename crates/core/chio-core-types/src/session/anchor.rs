@@ -2,7 +2,11 @@ use alloc::string::{String, ToString};
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
+use crate::canonical::CanonicalBytes;
+use crate::crypto::{
+    canonical_json_bytes, sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey,
+    Signature,
+};
 use crate::error::Result;
 use crate::schema_binding::ensure_schema_matches;
 use crate::signer_binding::ensure_keypair_matches_embedded_key;
@@ -166,7 +170,10 @@ impl SessionAnchor {
             "session anchor",
             "kernel_key",
         )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_SESSION_ANCHOR_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             schema: body.schema,
             id: body.id,
@@ -200,10 +207,17 @@ impl SessionAnchor {
         }
     }
 
-    pub fn verify_signature(&self) -> Result<bool> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         ensure_schema_matches(&self.schema, CHIO_SESSION_ANCHOR_SCHEMA, "session anchor")?;
         let body = self.body();
-        self.kernel_key.verify_canonical(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.kernel_key,
+            CHIO_SESSION_ANCHOR_SCHEMA,
+            &body,
+            &self.signature,
+        ))
     }
 
     pub fn anchor_hash(&self) -> Result<String> {

@@ -250,7 +250,7 @@ pub(crate) fn commit_prepared_channel_terminal_projection(
     )
     .map_err(|_| ChannelTerminalAuthorityError::BindingMismatch)?;
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .map_err(|_| ChannelTerminalAuthorityError::BindingMismatch)?;
     if verified.channel_terminal() != Some(prepared.channel()) {
         return Err(ChannelTerminalAuthorityError::BindingMismatch);

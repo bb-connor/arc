@@ -1,0 +1,36 @@
+{
+  "bondRequirements": [
+    {
+      "bondClass": "listing",
+      "collateralReferenceKind": "credit_bond",
+      "requiredAmount": {
+        "currency": "USD",
+        "units": 500
+      },
+      "slashable": true
+    }
+  ],
+  "disputeFee": {
+    "currency": "USD",
+    "units": 1
+  },
+  "expiresAt": 1900000000,
+  "feeScheduleId": "finding-verifier-schedule",
+  "governingOperatorId": "venue-operator",
+  "issuedAt": 1699000000,
+  "issuedBy": "venue-operator",
+  "marketParticipationFee": {
+    "currency": "USD",
+    "units": 1
+  },
+  "namespace": "dev.chio.cognition-market",
+  "note": "different signed schedule",
+  "publicationFee": {
+    "currency": "USD",
+    "units": 1
+  },
+  "schema": "chio.registry.market-fee-schedule.v1",
+  "scope": {
+    "namespace": "dev.chio.cognition-market"
+  }
+}

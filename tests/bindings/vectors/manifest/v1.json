@@ -83,7 +83,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
+        "signature": "7dc7c74216e1021c6e9e9ba3744e86a5aba52abb1e6459ec4954593e88a542a200fb23c66e774530de348de6889822dbb9c798d7e69c2c444b90b2faadd3540b",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -169,7 +169,7 @@
           ],
           "version": "1.0.1"
         },
-        "signature": "84b5319ffe8f60734691f61e77322f8aee88220430e4d3fd26b975d07f8ac7e60e9e4738180fdff0c01311c3f305743752c6620ce5eec77d58d351146db8fa0e",
+        "signature": "7dc7c74216e1021c6e9e9ba3744e86a5aba52abb1e6459ec4954593e88a542a200fb23c66e774530de348de6889822dbb9c798d7e69c2c444b90b2faadd3540b",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -255,7 +255,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "63def20573cfc3378dabcd8d0a4fdcc497906e2bca369fd4be2a50285bd505bd6fdf6a5771e979d98450288ad64906d9cd4174085754696a90f05892175dbc0c",
+        "signature": "f772e441bb5ff25f9944608681f25cefa1df0a54c14b14f9e87c8f29dbdccd894b871ecad2ab2fdd5c988e2912c1d043ae0a93140d0b60b670715db4002ca304",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -384,7 +384,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "42e093a8b940203b73a46b2481b2c012e2bf2ceda435e4d64f493ac339f6ed66f2baa7ab911919ef27975467d2379d2b0ec49037308d2b273eb3c5ce989a3b03",
+        "signature": "7a6fe2e3b72d0a8baadb3a438098361a1c3993b7f15b0d110dc9e0e059e9688ed651d2b2b8ff50bf637cc579cc02f9b69518e636b757e932e5e5bd7699a9ab04",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -513,7 +513,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "1c258a6d47e262b430d4c1c1053137340ae6c1cd9c9f01308122446e47ba3e4d91739180cb2abda4d4a39c0073224cff076b8d42e28c1a61403353d7617bd40a",
+        "signature": "fc7c9c776f76579447be729b75be14764421b636fd147bcb312a583a983bda5dcea367bf62d488a22470807094a78f9f9502c66e29df60b80235a818724ac90b",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     }

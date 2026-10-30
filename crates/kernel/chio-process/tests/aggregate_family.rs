@@ -95,7 +95,7 @@ async fn authenticated_siblings_share_issued_budget_across_contention_and_restar
                 .as_str()
                 .ok_or("receipt")?,
         )?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
     }
     assert_eq!((allowed, denied), (1, 1));
     assert_eq!(effects.load(Ordering::SeqCst), 1);

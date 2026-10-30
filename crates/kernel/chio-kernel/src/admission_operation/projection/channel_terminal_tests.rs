@@ -1595,6 +1595,26 @@ fn kernel_terminal_outcome_adapter_derives_exact_private_evidence() -> TestResul
         &fixture.base.reservation,
         fixture.base.receipt.receipt(),
     )?;
+    for (label, kernel_signature) in
+        crate::wrapper_refusals::refused_signatures(&kernel, &signed.body)
+    {
+        let refused = SignedChannelTerminalOutcomeCommitmentV1 {
+            kernel_signature,
+            ..signed.clone()
+        };
+        assert!(
+            matches!(
+                verify_channel_terminal_outcome_commitment(
+                    &refused,
+                    &kernel.public_key(),
+                    &fixture.base.reservation,
+                    fixture.base.receipt.receipt(),
+                ),
+                Err(ChannelError::AuthorityVerification)
+            ),
+            "{label}"
+        );
+    }
 
     let alternate = build_fixture(7, "kernel-outcome-adapter-alternate")?;
     assert!(sign_channel_terminal_outcome_commitment(
@@ -1618,105 +1638,8 @@ fn kernel_terminal_outcome_adapter_derives_exact_private_evidence() -> TestResul
     Ok(())
 }
 
-#[test]
-fn channel_terminal_projection_rebases_immutable_evidence_over_a_later_checkpoint() -> TestResult<()>
-{
-    let fixture = build_fixture(7, "terminal-later-rebase")?;
-    let kernel = Keypair::from_seed(&[36; 32]);
-    let signed_outcome = sign_channel_terminal_outcome_commitment(
-        &fixture.base.operation,
-        &fixture.base.reservation,
-        &fixture.base.receipt,
-        &fixture.base.tool_outcome,
-        &fixture.base.context,
-        &kernel,
-    )?;
-    let outcome = verify_channel_terminal_outcome_commitment(
-        &signed_outcome,
-        &kernel.public_key(),
-        &fixture.base.reservation,
-        fixture.base.receipt.receipt(),
-    )?;
-    let mut later_view = fixture.base.advance.current_view().view().clone();
-    later_view.checkpoint_sequence = later_view
-        .checkpoint_sequence
-        .checked_add(1)
-        .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
-    later_view.checkpoint_digest = channel_digest("terminal-later-rebase-checkpoint");
-    later_view.observed_at = 1_700;
-    later_view.seal(&Keypair::from_seed(&[61; 32]))?;
-    let later_view = verify_economic_state_view(later_view, &anchor_pins())?;
-    let issued_at = 1_701;
-    let transition = compose_channel_terminal_transition(
-        fixture.base.advance.open(),
-        &fixture.base.reservation,
-        fixture.base.advance.next_state(),
-        fixture.base.advance.receipt(),
-        &outcome,
-        &later_view,
-        issued_at,
-    )?;
-    let anchored_advance = verified_terminal_batch(
-        &later_view,
-        fixture.base.operation.binding().operation_id().as_str(),
-        transition.transitions().to_vec(),
-        issued_at,
-    )?;
-    let advance = verify_channel_terminal_advance(
-        fixture.base.advance.open(),
-        &fixture.base.reservation,
-        fixture.base.advance.prior_state(),
-        fixture.base.advance.next_state(),
-        fixture.base.advance.receipt(),
-        &outcome,
-        &anchored_advance,
-    )?;
-    assert_eq!(
-        advance.obligation_atom(),
-        fixture.base.advance.obligation_atom()
-    );
-    assert_eq!(advance.next_state(), fixture.base.advance.next_state());
-    assert!(fixture.base.context.trusted_time_unix_ms < advance.batch_issued_at());
-
-    let (channel, obligation) = VerifiedChannelTerminalProjectionV1::from_verified(
-        &fixture.base.operation,
-        &fixture.base.context,
-        &fixture.base.receipt,
-        &fixture.base.tool_outcome,
-        &advance,
-    )?;
-    assert_eq!(
-        obligation.as_ref().map(ObligationProjection::atom),
-        fixture.base.atom.as_ref()
-    );
-    let projection =
-        AdmissionTerminalProjection::Completed(Box::new(AdmissionCompletedProjection {
-            context: fixture.base.context.clone(),
-            receipt: fixture.base.receipt.clone(),
-            tool_outcome: Some(fixture.base.tool_outcome.clone()),
-            payment_evidence: None,
-            authorization: None,
-            eligibility: None,
-            observer_work: None,
-            obligation,
-            channel_terminal: Some(channel),
-        }));
-    let envelope = SignedAdmissionTerminalProjectionV1::from_verified(
-        &fixture.base.operation,
-        &projection,
-        &capabilities(),
-        &kernel,
-    )?;
-    let verified = envelope.verify()?;
-    assert_eq!(
-        verified
-            .channel_terminal()
-            .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?
-            .batch_issued_at(),
-        issued_at
-    );
-    Ok(())
-}
+#[path = "channel_terminal_tests/checkpoint_rebase.rs"]
+mod checkpoint_rebase;
 
 #[test]
 fn channel_terminal_rejects_non_atomic_projection_time_and_substituted_advance() -> TestResult<()> {
@@ -1764,7 +1687,7 @@ fn signed_channel_terminal_preserves_typed_anchor_contract() -> TestResult<()> {
         &capabilities(),
         &Keypair::from_seed(&[36; 32]),
     )?;
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     assert!(verified.requires_anchored_economic_commit());
     let channel = verified
         .channel_terminal()
@@ -1867,13 +1790,13 @@ fn resigned_terminal_envelope_rejects_substituted_obligation_record() -> TestRes
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     *replay_digest = serde_json::Value::String(projection_digest);
 
-    let canonical_body = canonical_json_bytes(&encoded["body"])?;
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend_from_slice(&canonical_body);
-    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    encoded["signature"] = serde_json::to_value(kernel.sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::canonical::CanonicalBytes::from_serializable(&encoded["body"])?,
+    )?)?;
     let substituted: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        substituted.verify(),
+        substituted.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())

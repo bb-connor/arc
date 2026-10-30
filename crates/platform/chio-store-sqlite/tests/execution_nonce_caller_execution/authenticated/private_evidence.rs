@@ -61,7 +61,10 @@ fn private_delivery_evidence_rejects_tampering_and_schema_confusion() -> TestRes
                     .as_mut()
                     .ok_or("evidence")?
                     .report
-                    .signature = Keypair::generate().sign(b"different")
+                    .signature = Keypair::generate().sign_exempt(
+                    chio_core::crypto::ExemptFormat::JwsSigningInput,
+                    b"different",
+                )
             }
             "output" => {
                 altered.output = InvocationOutputV1::Value {

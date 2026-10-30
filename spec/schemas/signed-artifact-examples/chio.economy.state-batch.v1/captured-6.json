@@ -1,0 +1,56 @@
+{
+  "anchorId": "anchor-1",
+  "batchId": "42a8f6f82b1a5330810a092c431208c200537b71f1aaf00e1effcab93d981d08",
+  "checkpointSequence": 2,
+  "effectSlots": [],
+  "expectedHeadsRoot": "b27b6d6a8bee22fd91ce7bccee7807c0bd4352fb1e80e880310a27191e7beef1",
+  "issuedAt": 110,
+  "namespace": "economy-prod",
+  "nextHeadsRoot": "eef6defa7ae5f49ed697e8d1770c3622974eba90427d61a301940adc67db3ad7",
+  "previousCheckpointDigest": "a024398b9672844d656025705196d8b8fd3067c8edcc87c5362a7a15e90b8b35",
+  "requestReplays": [],
+  "schema": "chio.economy.state-batch.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1",
+  "transitions": [
+    {
+      "expectedHeadDigest": "612caf2e40fd2868bef68513a33eacf96bf7033bb4089d4905a8df61c2427afb",
+      "nextHead": {
+        "anchorId": "anchor-1",
+        "frost": {
+          "actionDigest": "bd938c688f49b77c7fc537c6b9222e2c97ebddd63076b87f2feaec66fb9c05d0",
+          "authorizationId": "cbb82ebec6051b780ad26655ee48b5b42658c4ac49438888aac829e82195584f",
+          "authorizationSlotId": "44fd499fdc683fda952073ed393cdf2ed6d447b8b11be84ab1d1dc44418ecb7c",
+          "signedEnvelopeDigest": "58acc1aa4021d73a9b910d318557028a814a82dd2b8aa71ee8edbea48fbd7fc4"
+        },
+        "headVersion": 2,
+        "lifecycleFence": 2,
+        "lifecycleState": "open",
+        "namespace": "economy-prod",
+        "predecessorDigest": "612caf2e40fd2868bef68513a33eacf96bf7033bb4089d4905a8df61c2427afb",
+        "resourceKey": {
+          "resourceFamily": "clearing_round",
+          "resourceId": "round-1",
+          "scopeId": "tenant-1"
+        },
+        "resourceVersion": 2,
+        "schema": "chio.economy.resource-head.v1",
+        "state": {
+          "storage": "inline",
+          "value": {
+            "resourceId": "round-1",
+            "resourceVersion": 2
+          }
+        },
+        "stateDigest": "5bc01da3ce36d616382b6d1f9c15e9439c2c06fbb9730f3aa0934d7c7f844f76",
+        "trustedClockHighWater": 102
+      },
+      "resourceKey": {
+        "resourceFamily": "clearing_round",
+        "resourceId": "round-1",
+        "scopeId": "tenant-1"
+      },
+      "transitionProofDigest": "bfb1f6e0629e4a8998aaf920fcc04d4bdd0b9268b6585ea01afb4539f57a8fbb"
+    }
+  ]
+}

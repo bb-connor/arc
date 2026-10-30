@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-verified-fix-submission-body.schema.json",
+  "title": "chio.finding.verified-fix-submission.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activation_sha256",
+    "finding_id",
+    "proof_bundle_sha256",
+    "schema",
+    "seller",
+    "submission_id",
+    "submitted_at"
+  ],
+  "properties": {
+    "activation_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "proof_bundle_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.verified-fix-submission.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "submission_id": {
+      "type": "string"
+    },
+    "submitted_at": {
+      "type": "integer"
+    }
+  }
+}

@@ -755,7 +755,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
     assert_eq!(feed.status(), reqwest::StatusCode::OK);
     let feed: SignedBehavioralFeed = feed.json().expect("parse signed behavioral feed");
     assert!(feed
-        .verify_signature()
+        .verify_signature(&feed.signer_key)
         .expect("verify metered behavioral feed signature"));
     assert_eq!(feed.body.metered_billing.metered_receipts, 2);
     assert_eq!(feed.body.metered_billing.evidence_attached_receipts, 1);

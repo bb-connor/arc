@@ -6,8 +6,9 @@ use chio_core::capability::governance::{
 };
 use chio_core::capability::scope::Operation;
 use chio_core::capability::token::CapabilityToken;
+use chio_core::crypto::verify_wrapped_bytes;
 use chio_core::receipt::security::{ActiveDefenseReceiptBody, CorrelatedFindingReceiptBody};
-use chio_core::{canonical_json_bytes, Hash, PublicKey, Signature, SigningBackend};
+use chio_core::{canonical_json_bytes, CanonicalBytes, Hash, PublicKey, Signature, SigningBackend};
 use chio_security_types::ports::{
     ActionId, Digest32, OpaqueReceiptRef, RecordId, RESPONSE_AFFECTED_SET_DOMAIN,
 };
@@ -19,7 +20,6 @@ use serde::{Deserialize, Serialize};
 use super::{ChioKernel, KernelCryptoFloor, KernelError};
 
 pub const ACTIVE_RESPONSE_SUBMISSION_SCHEMA: &str = "chio.active-response-submission.v1";
-const ACTIVE_RESPONSE_SUBMISSION_SIGNATURE_DOMAIN: &[u8] = b"chio.active-response-submission.v1\0";
 
 /// Canonical statement signed by the authenticated response-plan submitter.
 ///
@@ -95,15 +95,23 @@ impl ActiveResponseSubmissionProof {
     ) -> Result<Self, ActiveResponseSubmissionProofError> {
         body.validate()?;
         let expected_submitter = body.submitter.clone();
-        let signing_bytes = active_response_submission_signing_bytes(&body)?;
+        let signing_body = active_response_submission_signing_body(&body)?;
         let outcome = backend
-            .sign_bytes_for_identity(&expected_submitter, &signing_bytes)
+            .sign_wrapped_for_identity(
+                &expected_submitter,
+                ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+                &signing_body,
+            )
             .map_err(|error| ActiveResponseSubmissionProofError::Signing(error.to_string()))?;
-        let expected_algorithm = expected_submitter.algorithm();
         if outcome.public_key != expected_submitter
-            || outcome.algorithm != expected_algorithm
-            || outcome.signature.algorithm() != expected_algorithm
-            || !expected_submitter.verify(&signing_bytes, &outcome.signature)
+            || outcome.algorithm != expected_submitter.algorithm()
+            || verify_wrapped_bytes(
+                &expected_submitter,
+                ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+                &signing_body,
+                &outcome.signature,
+            )
+            .is_err()
         {
             return Err(ActiveResponseSubmissionProofError::Signing(
                 "backend returned an invalid submitter identity or signature".to_string(),
@@ -115,28 +123,27 @@ impl ActiveResponseSubmissionProof {
         })
     }
 
-    pub fn verify_signature(&self) -> Result<bool, ActiveResponseSubmissionProofError> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(
+        &self,
+    ) -> Result<bool, ActiveResponseSubmissionProofError> {
         self.body.validate()?;
-        if self.signature.algorithm() != self.body.submitter.algorithm() {
-            return Ok(false);
-        }
-        Ok(self.body.submitter.verify(
-            &active_response_submission_signing_bytes(&self.body)?,
+        Ok(verify_wrapped_bytes(
+            &self.body.submitter,
+            ACTIVE_RESPONSE_SUBMISSION_SCHEMA,
+            &active_response_submission_signing_body(&self.body)?,
             &self.signature,
-        ))
+        )
+        .is_ok())
     }
 }
 
-fn active_response_submission_signing_bytes(
+fn active_response_submission_signing_body(
     body: &ActiveResponseSubmissionProofBody,
-) -> Result<Vec<u8>, ActiveResponseSubmissionProofError> {
-    let canonical = canonical_json_bytes(body)
-        .map_err(|error| ActiveResponseSubmissionProofError::Invalid(error.to_string()))?;
-    let mut signing_bytes =
-        Vec::with_capacity(ACTIVE_RESPONSE_SUBMISSION_SIGNATURE_DOMAIN.len() + canonical.len());
-    signing_bytes.extend_from_slice(ACTIVE_RESPONSE_SUBMISSION_SIGNATURE_DOMAIN);
-    signing_bytes.extend_from_slice(&canonical);
-    Ok(signing_bytes)
+) -> Result<CanonicalBytes, ActiveResponseSubmissionProofError> {
+    CanonicalBytes::from_serializable(body)
+        .map_err(|error| ActiveResponseSubmissionProofError::Invalid(error.to_string()))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
@@ -260,7 +267,7 @@ impl ActiveResponseAuthorizationRequest {
             ));
         }
         if !submission_proof
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|error| denied(&error.to_string()))?
         {
             return Err(denied(
@@ -713,7 +720,7 @@ fn validate_active_response_submission(
         ));
     }
     if !proof
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| denied(&error.to_string()))?
     {
         return Err(denied(
@@ -1032,3 +1039,7 @@ fn denied(reason: &str) -> KernelError {
         "active-response authorization denied: {reason}"
     ))
 }
+
+#[cfg(test)]
+#[path = "active_response_admission/wrapper_refusal_tests.rs"]
+mod wrapper_refusal_tests;

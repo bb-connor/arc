@@ -1,0 +1,23 @@
+{
+  "authorityEpoch": 1,
+  "committedAt": 1700000000,
+  "lifecycleEvent": {
+    "body": {
+      "capabilityPublicKeyHex": "dac31ebca159d283f8341fd90d7fa1cd95bf5eccab657f7952662e67e56afbe3",
+      "createdAt": 1700000000,
+      "operation": "provision",
+      "overlapExpiresAt": null,
+      "previousEventSha256": null,
+      "principalId": "buyer-a",
+      "role": "buyer",
+      "schema": "chio.finding.hosted-principal-lifecycle.v1",
+      "tenantId": "integration-a-1793209486471803644"
+    },
+    "signature": "3704ecfab0407040a42d3efce929912cef37a34fb8eca5b29b694e01956b2969c4ae09e842dbb4f1f5291a05e21d24196eab5ff8c0a9c3119f6ae209ff21f206",
+    "signerKey": "ab7260f20edab8208990343f0b9954b20b42b0bd81c8256bebab0c70d41750cc"
+  },
+  "schema": "chio.finding.hosted-principal-replication-event.v1",
+  "sequence": 1,
+  "sourceAuthority": "sqlite",
+  "tenantId": "integration-a-1793209486471803644"
+}

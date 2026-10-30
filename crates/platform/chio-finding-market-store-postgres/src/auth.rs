@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::crypto::PublicKey;
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 
 use super::*;
 
@@ -76,6 +76,10 @@ pub struct HostedPrincipalLifecycleBody {
 }
 
 pub type SignedHostedPrincipalLifecycleEvent = SignedExportEnvelope<HostedPrincipalLifecycleBody>;
+
+impl SignedExportPayload for HostedPrincipalLifecycleBody {
+    const SCHEMA_ID: &'static str = HOSTED_PRINCIPAL_LIFECYCLE_SCHEMA;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostedSecurityEventOutcome {
@@ -671,7 +675,7 @@ pub(crate) fn validate_principal_lifecycle_event(
         || body.tenant_id != tenant.as_str()
         || event.signer_key != *expected_signer
         || expected_signer.is_weak_ed25519()
-        || !matches!(event.verify_signature(), Ok(true))
+        || !matches!(event.verify_signature(expected_signer), Ok(true))
         || body.created_at == 0
     {
         return Err(HostedMarketStoreError::Invalid("principal lifecycle"));

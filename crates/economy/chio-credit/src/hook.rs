@@ -16,7 +16,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::crypto::{PublicKey, Signature, SigningAlgorithm};
+use crate::crypto::{verify_wrapped, PublicKey, Signature};
 use crate::receipt::body::ChioReceipt;
 
 /// Schema string emitted on the wire for IOU envelope bodies.
@@ -55,6 +55,7 @@ pub enum CreditEvaluatorError {
 /// the receipt's content/policy hashes so a downstream auditor can
 /// confirm the IOU references the same bytes the kernel signed.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct IouEnvelopeBody {
     /// Schema tag (`chio.credit.iou-envelope.v1`).
     pub schema: String,
@@ -92,25 +93,32 @@ pub struct IouEnvelopeBody {
 /// after a finalized receipt is observed, and persisted by the
 /// store binding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct IouEnvelope {
     /// Body that was signed.
-    #[serde(flatten)]
     pub body: IouEnvelopeBody,
-    /// Signing algorithm used for `signature`; absent defaults to Ed25519.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub algorithm: Option<SigningAlgorithm>,
-    /// Detached signature over canonical JSON of `body`.
+    /// Signature over the signing wrapper of the canonical `body` under
+    /// `chio.credit.iou-envelope.v1`.
     pub signature: Signature,
 }
 
 impl IouEnvelope {
     /// Verify the IOU envelope signature against the embedded issuer
     /// key. Returns `Ok(true)` when the signature is valid.
-    pub fn verify_signature(&self) -> Result<bool, CreditEvaluatorError> {
-        self.body
-            .issuer_key
-            .verify_canonical(&self.body, &self.signature)
-            .map_err(|err| CreditEvaluatorError::Canonical(err.to_string()))
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, CreditEvaluatorError> {
+        match verify_wrapped(
+            &self.body.issuer_key,
+            IOU_ENVELOPE_SCHEMA,
+            &self.body,
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core_types::Error::SignatureRejected) => Ok(false),
+            Err(err) => Err(CreditEvaluatorError::Canonical(err.to_string())),
+        }
     }
 }
 

@@ -1018,11 +1018,13 @@ fn verify_status_projection(
         || epoch.body.root_hash != response.root_hash
         || epoch.body.valid_until != response.valid_until
         || epoch.signer_key != epoch.body.operator_key
-        || !epoch.verify_signature().map_err(|error| {
-            CliError::cli_other_error(format!(
-                "finding status epoch signature check failed: {error}"
-            ))
-        })?
+        || !epoch
+            .verify_signature(&epoch.body.operator_key)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "finding status epoch signature check failed: {error}"
+                ))
+            })?
     {
         return Err(CliError::cli_other_error(
             "finding status epoch signature or response binding is invalid".to_string(),

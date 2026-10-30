@@ -16,7 +16,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{ExemptFormat, Keypair};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
@@ -1536,7 +1536,11 @@ fn sign_jwt(keypair: &Keypair, claims: &Value) -> String {
     );
     let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).expect("serialize JWT claims"));
     let signing_input = format!("{header}.{payload}");
-    let signature = URL_SAFE_NO_PAD.encode(keypair.sign(signing_input.as_bytes()).to_bytes());
+    let signature = URL_SAFE_NO_PAD.encode(
+        keypair
+            .sign_exempt(ExemptFormat::JwsSigningInput, signing_input.as_bytes())
+            .to_bytes(),
+    );
     format!("{signing_input}.{signature}")
 }
 

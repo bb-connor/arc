@@ -1,0 +1,15 @@
+{
+  "attestationSchema": "chio.runtime-attestation.azure-maa.jwt.v1",
+  "descriptorId": "azure-prod",
+  "expiresAt": 300,
+  "issuedAt": 100,
+  "measurements": {
+    "mrEnclave": "abc123"
+  },
+  "referenceValueId": "azure-rv-old",
+  "schema": "chio.runtime-attestation.reference-values.v1",
+  "sourceUri": "https://maa.contoso.test/reference-values/1",
+  "state": "superseded",
+  "supersededBy": "azure-rv-next",
+  "verifierFamily": "azure_maa"
+}

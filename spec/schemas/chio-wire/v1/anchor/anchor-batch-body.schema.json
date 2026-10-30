@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/anchor/anchor-batch-body.schema.json",
+  "title": "chio.anchor_batch.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointIds",
+    "inclusions",
+    "issuedAt",
+    "schema",
+    "signerKey",
+    "treeRoot",
+    "witness",
+    "witnessState"
+  ],
+  "properties": {
+    "checkpointIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inclusions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "checkpointId",
+          "leafHash",
+          "proof"
+        ],
+        "properties": {
+          "checkpointId": {
+            "type": "string"
+          },
+          "leafHash": {
+            "type": "string"
+          },
+          "proof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "audit_path",
+              "leaf_index",
+              "tree_size"
+            ],
+            "properties": {
+              "audit_path": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "leaf_index": {
+                "type": "integer"
+              },
+              "tree_size": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.anchor_batch.v1"
+    },
+    "signerKey": {
+      "type": "string"
+    },
+    "treeRoot": {
+      "type": "string"
+    },
+    "witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "observedAt",
+        "root",
+        "witnessId"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "observedAt": {
+          "type": "integer"
+        },
+        "root": {
+          "type": "string"
+        },
+        "witnessId": {
+          "type": "string"
+        }
+      }
+    },
+    "witnessState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "error": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "last_verified": {
+          "type": "integer"
+        },
+        "observed_at": {
+          "type": "integer"
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bodyHash",
+            "externalUuid",
+            "inclusionProof",
+            "kind",
+            "publishedAt",
+            "witnessRoot"
+          ],
+          "properties": {
+            "bodyHash": {
+              "type": "string"
+            },
+            "externalUuid": {
+              "type": "string"
+            },
+            "inclusionProof": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "publishedAt": {
+              "type": "integer"
+            },
+            "witnessRoot": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

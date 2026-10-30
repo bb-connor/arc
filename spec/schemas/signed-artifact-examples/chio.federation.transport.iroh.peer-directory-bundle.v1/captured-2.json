@@ -1,0 +1,10 @@
+{
+  "directorySha256": "b8ab207f2de6751417589a63ee4194ab451bcec6d5b79b6c4d92f295f2bcdff1",
+  "expiresAtUnixMs": 1001000,
+  "issuedAtUnixMs": 999000,
+  "issuer": "did:chio:issuer",
+  "keyId": "issuer-key-1",
+  "previousVersionSha256": null,
+  "schema": "chio.federation.transport.iroh.peer-directory-bundle.v1",
+  "version": 5
+}

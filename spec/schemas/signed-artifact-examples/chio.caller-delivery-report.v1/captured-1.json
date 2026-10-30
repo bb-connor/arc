@@ -1,0 +1,16 @@
+{
+  "authorization_digest": "5a8e5cb75191022f5c7749f9bcd8c3f98eed034ec4fc6a735352615bbe374688",
+  "claim_id": "runtime-custody-test",
+  "completed_at_unix_ms": 1800000001000,
+  "execution_started_at_unix_ms": 1800000001000,
+  "executor": {
+    "executor_id": "runtime-executor",
+    "key_epoch": 13,
+    "public_key": "851293e95e8fdea02f5d00dec3f842da8aa5087ab3bd990cc25498eb05d4f950"
+  },
+  "output": {
+    "historical": true
+  },
+  "realized_cost": null,
+  "schema": "chio.caller-delivery-report.v1"
+}

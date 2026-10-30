@@ -1,0 +1,73 @@
+{
+  "proposalId": "2b4a886d64d1f11e2fb7442d30a6861927f340569d97cb1df72afd52b3ff27b0",
+  "proposedAt": 50,
+  "proposedBy": "34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e",
+  "rationaleDigest": "45196e36c4755fc5533a5f6bfbcf17330dc1a2daad9c0c899bfda6aca12a06e8",
+  "schema": "chio.fiscal.proposal.v1",
+  "target": {
+    "candidate": {
+      "body": {
+        "charterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
+        "charterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
+        "domain": "open_market_fee_and_bond_schedule",
+        "issuedAt": 70,
+        "issuedBy": "operator.example",
+        "params": {
+          "feeSchedule": {
+            "bondRequirements": [
+              {
+                "bondClass": "listing",
+                "collateralReferenceKind": "credit_bond",
+                "requiredAmount": {
+                  "currency": "USD",
+                  "units": 10
+                },
+                "slashable": true
+              }
+            ],
+            "disputeFee": {
+              "currency": "USD",
+              "units": 2
+            },
+            "expiresAt": 900,
+            "feeScheduleId": "market-fee-schedule-4aae9a8b33043b6376d64f14937c3a759b3ae4bb86db279824e773005a1d4058",
+            "governingOperatorId": "operator.example",
+            "issuedAt": 70,
+            "issuedBy": "operator.example",
+            "marketParticipationFee": {
+              "currency": "USD",
+              "units": 3
+            },
+            "namespace": "https://registry.operator.example",
+            "publicationFee": {
+              "currency": "USD",
+              "units": 1
+            },
+            "schema": "chio.registry.market-fee-schedule.v1",
+            "scope": {
+              "allowedActorKinds": [
+                "tool_server"
+              ],
+              "allowedAdmissionClasses": [
+                "bond_backed"
+              ],
+              "allowedListingOperatorIds": [
+                "operator.example"
+              ],
+              "namespace": "https://registry.operator.example"
+            }
+          },
+          "kind": "open_market_fee_and_bond_schedule"
+        },
+        "scheduleId": "ccba251edb2519abbbc945b0a578e188ffc1050dc2ec7341f51a0e3e60bcab4c",
+        "schema": "chio.fiscal.schedule.v1",
+        "sequence": 1,
+        "validFrom": 70,
+        "validUntil": 900
+      },
+      "signature": "057c0baa557fe9770e2aa645608e1e0528a1c0268dbb68abf4ed856e266a69a0c705dff87a652c75231c83e548b212a61ce76d0cb6385ecf0cd14baf29c1bd0c",
+      "signerKey": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618"
+    },
+    "kind": "schedule"
+  }
+}

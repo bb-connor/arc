@@ -23,7 +23,7 @@ fn protocol_refusal_is_a_bounded_nonauthorizing_observation() -> TestResult {
     let (context, _) = super::session_reports::report_operation(&kernel)?;
     let summary = summary();
     let receipt = kernel.record_session_protocol_refusal(&context, &summary)?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert!(receipt.action.verify_hash()?);
     assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
     assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
@@ -142,7 +142,7 @@ fn protocol_refusal_survives_durable_store_reopen() -> TestResult {
         .load_chio_receipt(&receipt.id)?
         .ok_or("refusal not retained")?;
     assert_eq!(canonical_json_bytes(&retained)?, signed_bytes);
-    assert!(retained.verify_signature()?);
+    assert!(retained.verify_integrity_embedded_key()?);
     assert_eq!(retained.tenant_id.as_deref(), Some("tenant-A"));
     assert!(!retained.is_allowed());
     Ok(())

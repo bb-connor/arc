@@ -1,0 +1,14 @@
+{
+  "actualVerifierReportDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "caseId": "policy-reload-during-dispatch",
+  "deterministicSeedDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "expectedResult": "reject unless reminted or activation receipt proves narrowing",
+  "failureInjected": "policy digest changes after lease mint and before tool ack",
+  "issuer": "did:chio:5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca",
+  "runnerVersionDigest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "runtimeReceiptRefs": [
+    "receipt-runtime-valid"
+  ],
+  "schema": "chio.runtime.chaos-run-report-signature.v1",
+  "status": "failed"
+}

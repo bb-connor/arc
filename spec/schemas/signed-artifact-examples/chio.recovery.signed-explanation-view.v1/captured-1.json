@@ -1,0 +1,20 @@
+{
+  "expires_at_unix_ms": 20000,
+  "issued_at_unix_ms": 1000,
+  "issuer": "advisory-issuer",
+  "planner_version": "chio.recovery.planner.v1",
+  "projection": {
+    "candidates": [
+      {
+        "assessment": "feasible_under_snapshot",
+        "template_id": "public-remedy"
+      }
+    ],
+    "summary": "alternatives_under_snapshot"
+  },
+  "recipient": "viewer",
+  "report_ref": "advice:synthetic",
+  "schema": "chio.recovery.explanation-view.v1",
+  "trust_domain": "advisory-domain",
+  "version": 1
+}

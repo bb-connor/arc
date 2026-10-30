@@ -1,0 +1,24 @@
+{
+  "checkpointAuthorityEpoch": 1,
+  "checkpointAuthorityKey": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+  "checkpointSequence": 8,
+  "cutoff": 200,
+  "expiresAt": 300,
+  "indexRoot": "3333333333333333333333333333333333333333333333333333333333333333",
+  "indexSize": 1,
+  "issuedAt": 200,
+  "lowerBoundary": {
+    "kind": "source_edge"
+  },
+  "rangeRoot": "2222222222222222222222222222222222222222222222222222222222222222",
+  "schema": "chio.fincred.source-checkpoint.v1",
+  "sourceId": "source",
+  "storeGeneration": 1,
+  "upperBoundary": {
+    "kind": "source_edge"
+  },
+  "window": {
+    "endsAt": 200,
+    "startsAt": 100
+  }
+}

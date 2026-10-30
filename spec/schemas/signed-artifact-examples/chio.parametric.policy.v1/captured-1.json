@@ -1,0 +1,47 @@
+{
+  "beneficiaryId": "subject-1",
+  "boundCoverageBodyDigest": "31e41aacafafde0d3ce2df71f1f9d786c12b0bb7312ca5f963382ef3594a2cdb",
+  "boundCoverageEnvelopeDigest": "f4cdd64f9219776d1d964f67ea3f562c1b1ecc4309366a3f1b00eb9ae0aabd31",
+  "coverageAmount": {
+    "currency": "USD",
+    "units": 10000
+  },
+  "coverageAuthorityId": "carrier-alpha",
+  "effectiveFrom": 1700010000,
+  "effectiveUntil": 1700020000,
+  "evaluatorAuthority": {
+    "authorityId": "evaluator-1",
+    "keyEpoch": 3,
+    "keyId": "evaluator-key-1"
+  },
+  "fundingFacilityId": "cfd-1",
+  "issuedAt": 1700000172,
+  "maxCheckpointLagSeconds": 120,
+  "payerId": "operator-treasury-1",
+  "payoutMode": {
+    "kind": "contestable",
+    "windowSeconds": 60
+  },
+  "payoutRail": {
+    "destinationAccountDigest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "kind": "web3",
+    "railId": "web3-primary"
+  },
+  "payoutSchedule": {
+    "amount": {
+      "currency": "USD",
+      "units": 1000
+    },
+    "kind": "fixed"
+  },
+  "preActionAuthorityDigest": "3333333333333333333333333333333333333333333333333333333333333333",
+  "predicate": {
+    "kind": "guard_denial_rate",
+    "minEvents": 2,
+    "thresholdBps": 5000
+  },
+  "schema": "chio.parametric.policy.v1",
+  "subjectKey": "subject-1",
+  "windowAnchor": 1700010000,
+  "windowSeconds": 1000
+}

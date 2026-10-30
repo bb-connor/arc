@@ -2,18 +2,16 @@ pub const EVENT_EVIDENCE_HASH_DOMAIN: &[u8] = b"chio.verified-security-event-evi
 pub const EVENT_RECEIPT_EVIDENCE_HASH_DOMAIN: &[u8] =
     b"chio.verified-security-event-receipt-evidence.v1\0";
 use alloc::string::ToString;
-use alloc::vec::Vec;
 
 use chio_security_types::ports::{ProducerId, RecordId};
 use chio_security_types::SecurityEventBody;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    canonical_json_bytes, Error, PublicKey, Result, Signature, SigningAlgorithm, SigningBackend,
-};
+use crate::crypto::{verify_wrapped, wrapped_verdict};
+use crate::{CanonicalBytes, Error, PublicKey, Result, Signature, SigningBackend};
 
-/// Domain separator for independently signed detector provenance.
-pub const SECURITY_EVENT_SIGNATURE_DOMAIN: &str = "chio:security-event:v1";
+/// Signing-wrapper schema id of detector-signed security event provenance.
+pub const CHIO_SIGNED_SECURITY_EVENT_SCHEMA: &str = "chio.signed-security-event.v1";
 
 /// Detector-signed security event provenance envelope.
 ///
@@ -25,7 +23,6 @@ pub const SECURITY_EVENT_SIGNATURE_DOMAIN: &str = "chio:security-event:v1";
 pub struct SignedSecurityEvent {
     body: SecurityEventBody,
     producer_key: PublicKey,
-    algorithm: SigningAlgorithm,
     signature: Signature,
 }
 
@@ -36,21 +33,14 @@ impl SignedSecurityEvent {
     ) -> Result<Self> {
         body.validate()
             .map_err(|error| Error::InvalidSignature(error.to_string()))?;
-        let signing_bytes = signing_bytes(&body)?;
-        let outcome = backend.sign_bytes_with_identity(&signing_bytes)?;
-        let producer_key = outcome.public_key;
-        let algorithm = outcome.algorithm;
-        let signature = outcome.signature;
-        if signature.algorithm() != algorithm {
-            return Err(Error::InvalidSignature(
-                "security event signature algorithm mismatch".into(),
-            ));
-        }
+        let outcome = backend.sign_wrapped(
+            CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             body,
-            producer_key,
-            algorithm,
-            signature,
+            producer_key: outcome.public_key,
+            signature: outcome.signature,
         })
     }
 
@@ -66,14 +56,15 @@ impl SignedSecurityEvent {
         if &self.body.producer_id != expected_producer_id
             || &self.body.producer_key_id != expected_producer_key_id
             || &self.producer_key != trusted_producer_key
-            || self.producer_key.algorithm() != self.algorithm
-            || self.signature.algorithm() != self.algorithm
         {
             return Ok(false);
         }
-        Ok(self
-            .producer_key
-            .verify(&signing_bytes(&self.body)?, &self.signature))
+        wrapped_verdict(verify_wrapped(
+            trusted_producer_key,
+            CHIO_SIGNED_SECURITY_EVENT_SCHEMA,
+            &self.body,
+            &self.signature,
+        ))
     }
 
     #[must_use]
@@ -87,27 +78,9 @@ impl SignedSecurityEvent {
     }
 
     #[must_use]
-    pub const fn algorithm(&self) -> SigningAlgorithm {
-        self.algorithm
-    }
-
-    #[must_use]
     pub const fn signature(&self) -> &Signature {
         &self.signature
     }
-
-    pub fn signing_bytes(&self) -> Result<Vec<u8>> {
-        signing_bytes(&self.body)
-    }
-}
-
-fn signing_bytes(body: &SecurityEventBody) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(body)?;
-    let mut bytes = Vec::with_capacity(SECURITY_EVENT_SIGNATURE_DOMAIN.len() + 1 + canonical.len());
-    bytes.extend_from_slice(SECURITY_EVENT_SIGNATURE_DOMAIN.as_bytes());
-    bytes.push(0);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
 }
 
 #[cfg(feature = "tenant-index")]

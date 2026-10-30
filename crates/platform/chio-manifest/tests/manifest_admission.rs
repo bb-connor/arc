@@ -1098,7 +1098,7 @@ fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
             assert_eq!(source, encoded);
             assert_eq!(
                 chio_core::sha256_hex(&encoded),
-                "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed"
+                "b3387974261d22131bee3b2d2113e761db60bf610921e96955a76b349ac60bc2"
             );
         }
     }
@@ -1160,4 +1160,281 @@ fn manifest_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
         decode_error::<ToolManifest>(unknown).contains("unknown field `estimated_duration_ms`"),
         "the runtime must reject the same second latency authority as its schema",
     );
+}
+
+/// JSON value whose object members keep insertion order, so a fixture can append
+/// an unknown member after the sorted ones exactly as a hostile peer would.
+#[derive(Clone)]
+enum Ordered {
+    Object(Vec<(String, Ordered)>),
+    Array(Vec<Ordered>),
+    Leaf(serde_json::Value),
+}
+
+impl Ordered {
+    fn from_value(value: &serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Object(members) => Ordered::Object(
+                members
+                    .iter()
+                    .map(|(key, member)| (key.clone(), Ordered::from_value(member)))
+                    .collect(),
+            ),
+            serde_json::Value::Array(items) => {
+                Ordered::Array(items.iter().map(Ordered::from_value).collect())
+            }
+            leaf => Ordered::Leaf(leaf.clone()),
+        }
+    }
+
+    fn at(&mut self, key: &str) -> &mut Ordered {
+        match self {
+            Ordered::Object(members) => members
+                .iter_mut()
+                .find(|(name, _)| name == key)
+                .map(|(_, member)| member)
+                .unwrap_or_else(|| panic!("missing member {key}")),
+            _ => panic!("not an object: {key}"),
+        }
+    }
+
+    fn item(&mut self, index: usize) -> &mut Ordered {
+        match self {
+            Ordered::Array(items) => &mut items[index],
+            _ => panic!("not an array: {index}"),
+        }
+    }
+
+    fn set(&mut self, key: &str, value: serde_json::Value) {
+        match self {
+            Ordered::Object(members) => match members.iter_mut().find(|(name, _)| name == key) {
+                Some((_, member)) => *member = Ordered::Leaf(value),
+                None => members.push((key.to_string(), Ordered::Leaf(value))),
+            },
+            _ => panic!("not an object: {key}"),
+        }
+    }
+
+    fn remove(&mut self, key: &str) {
+        match self {
+            Ordered::Object(members) => {
+                let before = members.len();
+                members.retain(|(name, _)| name != key);
+                assert_eq!(members.len() + 1, before, "missing member {key}");
+            }
+            _ => panic!("not an object: {key}"),
+        }
+    }
+}
+
+impl serde::Serialize for Ordered {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::{SerializeMap, SerializeSeq};
+        match self {
+            Ordered::Object(members) => {
+                let mut map = serializer.serialize_map(Some(members.len()))?;
+                for (key, member) in members {
+                    map.serialize_entry(key, member)?;
+                }
+                map.end()
+            }
+            Ordered::Array(items) => {
+                let mut seq = serializer.serialize_seq(Some(items.len()))?;
+                for item in items {
+                    seq.serialize_element(item)?;
+                }
+                seq.end()
+            }
+            Ordered::Leaf(value) => value.serialize(serializer),
+        }
+    }
+}
+
+#[derive(serde::Serialize)]
+struct ConsumerCase {
+    name: &'static str,
+    schema_file: &'static str,
+    valid: bool,
+    instance: Ordered,
+}
+
+#[derive(serde::Serialize)]
+struct ConsumerCorpus {
+    cases: Vec<ConsumerCase>,
+}
+
+fn consumer_signed_manifest() -> chio_manifest::SignedManifest {
+    let server = Keypair::from_seed(&[21u8; 32]);
+    let manifest = ToolManifest {
+        schema: TOOL_MANIFEST_SCHEMA.to_string(),
+        server_id: "srv-bindings-demo".to_string(),
+        name: "Bindings Demo".to_string(),
+        description: Some("Manifest vector for bindings-core SDK fixtures".to_string()),
+        version: "1.0.0".to_string(),
+        tools: vec![ToolDefinition {
+            name: "file_read".to_string(),
+            description: "Tool definition for file_read".to_string(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": { "path": { "type": "string" } },
+                "required": ["path"]
+            }),
+            output_schema: Some(serde_json::json!({
+                "type": "object",
+                "properties": { "ok": { "type": "boolean" } }
+            })),
+            pricing: None,
+            annotations: ToolAnnotations {
+                read_only: true,
+                destructive: false,
+                idempotent: false,
+                requires_approval: false,
+            },
+            latency_hint: Some(LatencyHint::Fast),
+            flow: Some(chio_manifest::ToolFlowDeclaration::public_egress()),
+        }],
+        server_tools: Vec::new(),
+        required_permissions: Some(RequiredPermissions {
+            read_paths: Some(vec!["/workspace".to_string()]),
+            write_paths: Some(vec!["/workspace/output".to_string()]),
+            network_destinations: Some(vec![NetworkDestination::new("api.example.com", 443)
+                .unwrap_or_else(|error| panic!("destination: {error}"))]),
+            environment_variables: Some(vec![EnvironmentVariableName::new("CHIO_ENV")
+                .unwrap_or_else(|error| panic!("environment name: {error}"))]),
+            native_syscall_profile: NativeSyscallProfile::NativeStandardV1,
+        }),
+        public_key: server.public_key().to_hex(),
+    };
+    sign_manifest(&manifest, &server)
+        .unwrap_or_else(|error| panic!("sign consumer manifest: {error}"))
+}
+
+fn consumer_corpus_text() -> String {
+    let base = Ordered::from_value(
+        &serde_json::to_value(consumer_signed_manifest())
+            .unwrap_or_else(|error| panic!("serialize consumer manifest: {error}")),
+    );
+    let case = |name: &'static str, valid: bool, mutate: &dyn Fn(&mut Ordered)| {
+        let mut instance = base.clone();
+        mutate(&mut instance);
+        ConsumerCase {
+            name,
+            schema_file: "security/signed-tool-manifest-v1.schema.json",
+            valid,
+            instance,
+        }
+    };
+    let corpus = ConsumerCorpus {
+        cases: vec![
+            case("signed-manifest", true, &|_| {}),
+            case("unknown-envelope-field", false, &|v| {
+                v.set("authorized", serde_json::json!(true));
+            }),
+            case("unknown-manifest-field", false, &|v| {
+                v.at("manifest")
+                    .set("allow_unconfined", serde_json::json!(true));
+            }),
+            case("second-latency-authority", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .set("estimated_duration_ms", serde_json::json!(50));
+            }),
+            case("null-flow-alias", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .set("flow", serde_json::Value::Null);
+            }),
+            case("null-latency-alias", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .set("latency_hint", serde_json::Value::Null);
+            }),
+            case("missing-annotation", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .remove("destructive");
+            }),
+            case("numeric-boolean", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("annotations")
+                    .set("destructive", serde_json::json!(0));
+            }),
+            case("missing-egress", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("flow")
+                    .remove("egress");
+            }),
+            case("unknown-flow-field", false, &|v| {
+                v.at("manifest")
+                    .at("tools")
+                    .item(0)
+                    .at("flow")
+                    .set("allow_declassification", serde_json::json!(true));
+            }),
+            case("unknown-native-profile", false, &|v| {
+                v.at("manifest")
+                    .at("required_permissions")
+                    .set("native_syscall_profile", serde_json::json!("unconfined"));
+            }),
+            case("old-shape-network-hosts", false, &|v| {
+                v.at("manifest")
+                    .at("required_permissions")
+                    .set("network_hosts", serde_json::json!(["api.example.com"]));
+            }),
+            case("missing-network-port", false, &|v| {
+                v.at("manifest")
+                    .at("required_permissions")
+                    .at("network_destinations")
+                    .item(0)
+                    .remove("port");
+            }),
+            case("zero-network-port", false, &|v| {
+                v.at("manifest")
+                    .at("required_permissions")
+                    .at("network_destinations")
+                    .item(0)
+                    .set("port", serde_json::json!(0));
+            }),
+        ],
+    };
+    let mut rendered = serde_json::to_string_pretty(&corpus)
+        .unwrap_or_else(|error| panic!("render consumer corpus: {error}"));
+    rendered.push('\n');
+    rendered
+}
+
+fn consumer_corpus_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../tests/bindings/fixtures/manifest-consumers.json")
+}
+
+#[test]
+fn manifest_consumer_corpus_is_current() {
+    let path = consumer_corpus_path();
+    let committed = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    assert_eq!(
+        committed,
+        consumer_corpus_text(),
+        "fixture {} is out of date",
+        path.display()
+    );
+}
+
+#[test]
+#[ignore = "regenerator: rewrite tests/bindings/fixtures/manifest-consumers.json from the manifest builder; run with --ignored"]
+fn regenerate_manifest_consumer_corpus() {
+    let path = consumer_corpus_path();
+    std::fs::write(&path, consumer_corpus_text())
+        .unwrap_or_else(|error| panic!("write {}: {error}", path.display()));
 }

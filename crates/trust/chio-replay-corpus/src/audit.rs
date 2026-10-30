@@ -14,6 +14,8 @@ pub const TEE_BLESS_EVENT: &str = "tee.bless";
 pub const TEE_BLESS_CAPABILITY: &str = "chio:tee/bless@1";
 
 const ED25519_SIGNATURE_PREFIX: &str = "ed25519:";
+/// Signing-wrapper schema id of a signed `tee.bless` audit entry.
+pub const TEE_BLESS_AUDIT_SCHEMA: &str = "chio.tee-bless-audit.v1";
 const RECEIPTS_ROOT_HEX_LEN: usize = 64;
 
 /// Operator identity recorded for a bless event.
@@ -139,7 +141,8 @@ pub struct TeeBlessAuditEntry {
     /// Body fields are top-level in the wire JSON.
     #[serde(flatten)]
     pub body: TeeBlessAuditBody,
-    /// Ed25519 signature over the canonical JSON body.
+    /// Ed25519 signature over the signing wrapper of the canonical body under
+    /// `chio.tee-bless-audit.v1`.
     pub signature: String,
 }
 
@@ -147,7 +150,10 @@ impl TeeBlessAuditEntry {
     /// Sign a `tee.bless` body with an Ed25519 operator key.
     pub fn sign(body: TeeBlessAuditBody, keypair: &Keypair) -> Result<Self, BlessAuditError> {
         body.validate()?;
-        let (signature, _) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            TEE_BLESS_AUDIT_SCHEMA,
+            &chio_core::CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             body,
             signature: format!("{ED25519_SIGNATURE_PREFIX}{}", signature.to_hex()),
@@ -162,7 +168,16 @@ impl TeeBlessAuditEntry {
             ));
         };
         let signature = Signature::from_hex(signature_hex)?;
-        Ok(public_key.verify_canonical(&self.body, &signature)?)
+        match chio_core::crypto::verify_wrapped(
+            public_key,
+            TEE_BLESS_AUDIT_SCHEMA,
+            &self.body,
+            &signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(chio_core::Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Canonical JSON bytes for receipt-store persistence.

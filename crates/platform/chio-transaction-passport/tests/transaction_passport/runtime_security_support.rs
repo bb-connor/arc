@@ -284,11 +284,7 @@ pub(super) fn sign_runtime_execution_lease(value: &Value, signing_key: &Keypair)
     if value.get("max_invocations").is_some() {
         body["maxInvocations"] = value["max_invocations"].clone();
     }
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("execution lease signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "execution lease signs")
 }
 
 pub(super) fn sign_runtime_route_plan_with_fixture_authority(value: &mut Value) {
@@ -315,11 +311,7 @@ fn sign_runtime_route_plan(value: &Value, signing_key: &Keypair) -> String {
         "expiresAtUnixMs": value["expiresAtUnixMs"],
         "issuer": value["issuer"],
     });
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("runtime route plan signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "runtime route plan signs")
 }
 
 pub(super) fn sign_runtime_join_receipt_with_fixture_authority(value: &mut Value) {
@@ -333,11 +325,7 @@ pub(super) fn sign_runtime_join_receipt(value: &Value, signing_key: &Keypair) ->
     body.as_object_mut()
         .test_expect("runtime join receipt is object")
         .remove("signature");
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("runtime join receipt signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "runtime join receipt signs")
 }
 
 pub(super) fn sign_runtime_trusted_time_with_fixture_authority(value: &mut Value) {
@@ -357,11 +345,7 @@ pub(super) fn sign_runtime_trusted_time(value: &Value, signing_key: &Keypair) ->
         "timeSourceId": value["time_source_id"],
         "issuer": value["issuer"],
     });
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("runtime trusted time proof signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "runtime trusted time proof signs")
 }
 
 pub(super) fn sign_runtime_revocation_freshness_with_fixture_oracle(value: &mut Value) {
@@ -385,11 +369,7 @@ fn sign_runtime_revocation_freshness(value: &Value, signing_key: &Keypair) -> St
         "revokedLeafResult": value["revoked_leaf_result"],
         "revokedAncestorResult": value["revoked_ancestor_result"],
     });
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("revocation freshness proof signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "revocation freshness proof signs")
 }
 
 pub(super) fn sign_runtime_terminal_receipt_with_fixture_kernel(value: &mut Value) {
@@ -412,11 +392,7 @@ fn sign_runtime_terminal_receipt(value: &Value, signing_key: &Keypair) -> String
     if value.get("incident_ref").is_some() {
         body["incidentRef"] = value["incident_ref"].clone();
     }
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("terminal receipt signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "terminal receipt signs")
 }
 
 pub(super) fn sign_runtime_trust_root(value: &Value, signing_key: &Keypair) -> String {
@@ -424,11 +400,7 @@ pub(super) fn sign_runtime_trust_root(value: &Value, signing_key: &Keypair) -> S
     body.as_object_mut()
         .test_expect("runtime trust root is an object")
         .remove("signature");
-    signing_key
-        .sign_canonical(&body)
-        .test_expect("runtime trust root signs")
-        .0
-        .to_hex()
+    sign_wrapped_hex(signing_key, &body, "runtime trust root signs")
 }
 
 pub(super) fn runtime_trusted_root_keys() -> Vec<chio_core_types::PublicKey> {
@@ -470,4 +442,16 @@ pub(super) fn add_unavailable_runtime_receipt_node(
             "role": "receipt"
         }));
     rebind_runtime_graph(bundle, graph);
+}
+
+/// Signs a test body under the wrapper id its `schema` member names.
+fn sign_wrapped_hex(signing_key: &Keypair, body: &Value, label: &str) -> String {
+    let schema_id = body["schema"].as_str().test_expect(label).to_string();
+    signing_key
+        .sign_wrapped(
+            &schema_id,
+            &chio_core_types::CanonicalBytes::from_serializable(body).test_expect(label),
+        )
+        .test_expect(label)
+        .to_hex()
 }

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-kernel-handshake.schema.json",
+  "title": "Chio federation kernel handshake signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilities",
+    "conformanceTier",
+    "localKernelId",
+    "nonce",
+    "remoteKernelId",
+    "schema",
+    "timestamp"
+  ],
+  "properties": {
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema"
+      ],
+      "properties": {
+        "features": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "accepts_anchor_batch_v1": {
+              "type": "boolean"
+            },
+            "aggregate_invocation_budget": {
+              "type": "boolean"
+            },
+            "cumulative_approval_budget": {
+              "type": "boolean"
+            },
+            "delegation_chain_binding": {
+              "type": "boolean"
+            },
+            "governed_active_response_plan": {
+              "type": "boolean"
+            },
+            "threshold_governed_approvals": {
+              "type": "boolean"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "conformanceTier": {
+      "type": "string"
+    },
+    "ladderManifestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expiresAtUnixMs",
+        "issuedAtUnixMs",
+        "manifestId",
+        "sha256"
+      ],
+      "properties": {
+        "expiresAtUnixMs": {
+          "type": "integer"
+        },
+        "issuedAtUnixMs": {
+          "type": "integer"
+        },
+        "manifestId": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      }
+    },
+    "localKernelId": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "remoteKernelId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federation-kernel-handshake.v1"
+    },
+    "timestamp": {
+      "type": "integer"
+    }
+  }
+}

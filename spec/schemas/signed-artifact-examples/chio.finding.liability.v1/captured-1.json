@@ -1,0 +1,16 @@
+{
+  "backing_allocation_id": "backing-a",
+  "chain_id": "chain-a",
+  "defect_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "finding_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "liability_key": "9999999999999999999999999999999999999999999999999999999999999999",
+  "listing_id": "listing-a",
+  "opened_at": 25,
+  "schema": "chio.finding.liability.v1",
+  "seller": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "state": "open",
+  "updated_at": 25,
+  "vault_contract": "vault-contract-a",
+  "vault_id": "vault-a",
+  "venue_id": "venue-a"
+}

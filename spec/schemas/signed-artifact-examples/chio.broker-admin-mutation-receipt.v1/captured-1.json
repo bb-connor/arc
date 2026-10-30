@@ -1,0 +1,16 @@
+{
+  "authorizationDigest": "84c47c6f32e2715f93e31f3a4b89e26f49095bcfc5c55e5a5c066502c2ccf4dd",
+  "completedAtUnixSeconds": 100,
+  "credential": {
+    "credentialId": "f011-credential",
+    "provider": "generic-https",
+    "version": 1
+  },
+  "intentDigest": "c066978bca1d8ab3360ad5b6fafee4821bf6f3e69ba28b32b283effd54b2f51d",
+  "operation": "disable",
+  "operationId": "042f7520eb9cbc8ee1ad1959712332184d6a70bec1ab6f604c4ffc0feb9c36ec",
+  "outcome": "applied",
+  "requestId": "f011-admin-disable",
+  "schema": "chio.broker-admin-mutation-receipt.v1",
+  "tenantScope": "tenant-production"
+}

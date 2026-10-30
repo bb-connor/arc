@@ -1,0 +1,14 @@
+{
+  "anchorId": "anchor-1",
+  "casNonceDigest": "5055da83721c3f66e47a844d45cdf6f90baa3f614bbd4981458c21f8855610f8",
+  "commitId": "1927651c1a901e4a6ffb5fddf8404499444a6306041b7e1d3999eccbc7933404",
+  "committedAt": 103,
+  "committedCheckpointDigest": "4086b471e617e96f196bd5e2795b95abcc87e34aec501ad8e400615dbeafd1bb",
+  "effectHeadDigest": "b747e8783fe65e27cacda54e87f48ff904afa3ee29d1636bf14870d4f50ad1a0",
+  "effectSlotId": "1bcb333e307ef972af068b1ca32a2072e7a6b3df7dcc5ea0c08c09a229d4dc90",
+  "namespace": "economy-prod",
+  "previousCheckpointDigest": "a024398b9672844d656025705196d8b8fd3067c8edcc87c5362a7a15e90b8b35",
+  "schema": "chio.economy.effect-dispatch-commit.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "anchor-key-1"
+}

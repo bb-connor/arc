@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::SigningWrapper;
 use chio_core_types::{sha256_hex, Keypair};
 use chio_federation::frost::{
     frost_action_registration, frost_authorization_session_id, frost_authorization_slot_id,
@@ -240,11 +242,13 @@ fn sign_roster(roster: &mut FrostRosterV1) {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("fixture roster id must compute: {error}"));
     roster.roster_authority_signature = roster_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("fixture roster must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()
@@ -275,11 +279,13 @@ fn epoch_checkpoint(roster: &FrostRosterV1) -> FrostEpochCheckpointV1 {
 
 fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
     checkpoint.anchor_signature = epoch_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_EPOCH_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("epoch checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -288,11 +294,13 @@ fn sign_epoch_checkpoint(checkpoint: &mut FrostEpochCheckpointV1) {
 
 fn sign_slot_checkpoint(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) {
     checkpoint.anchor_signature = slot_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -325,6 +333,19 @@ fn historical_slot_pair(
 }
 
 fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
+    fixture_signed_over(roster_key, signing_key, |body| {
+        body.signing_bytes()
+            .unwrap_or_else(|error| panic!("fixture body must produce signing bytes: {error}"))
+    })
+}
+
+/// A fixture whose group signature covers `message(body)`; the anchored
+/// checkpoints still commit the body's real signing message.
+fn fixture_signed_over(
+    roster_key: &str,
+    signing_key: &str,
+    message: impl Fn(&FrostAuthorizationBodyV1) -> Vec<u8>,
+) -> Fixture {
     let roster = roster(roster_key, 4);
     let registration = frost_action_registration(FrostAuthorizationDomain::SettleCommitment)
         .unwrap_or_else(|| panic!("settlement authorization domain must be registered"));
@@ -357,7 +378,7 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
         .unwrap_or_else(|error| panic!("fixture body must produce signing bytes: {error}"));
     let secret = SigningKey::deserialize(&decode_hex(signing_key))
         .unwrap_or_else(|error| panic!("official group secret must decode: {error}"));
-    let signature = secret.sign(ChaCha20Rng::from_seed([7; 32]), &signing_bytes);
+    let signature = secret.sign(ChaCha20Rng::from_seed([7; 32]), &message(&body));
     let signature_bytes = signature
         .serialize()
         .unwrap_or_else(|error| panic!("fixture signature must serialize: {error}"));
@@ -403,11 +424,13 @@ fn fixture_with_keys(roster_key: &str, signing_key: &str) -> Fixture {
     };
     let mut checkpoint = checkpoint;
     checkpoint.anchor_signature = slot_anchor_authority()
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
             &checkpoint
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("slot checkpoint must canonicalize: {error}")),
         )
+        .unwrap_or_else(|error| panic!("wrapped signature: {error}"))
         .to_hex();
     checkpoint.checkpoint_digest = checkpoint
         .recompute_checkpoint_digest()
@@ -884,6 +907,54 @@ fn refused_slot_error(
     )
     .err()
     .unwrap_or_else(|| panic!("slot must refuse"))
+}
+
+#[test]
+fn group_signature_covers_only_the_authorization_signing_wrapper() {
+    let canonical = |body: &FrostAuthorizationBodyV1| {
+        CanonicalBytes::from_serializable(body)
+            .unwrap_or_else(|error| panic!("body must canonicalize: {error}"))
+    };
+    let body = fixture().proof.body;
+    assert_eq!(
+        body.signing_bytes()
+            .unwrap_or_else(|error| panic!("signing bytes: {error}")),
+        SigningWrapper::new(CHIO_FROST_AUTHORIZATION_SCHEMA, &canonical(&body))
+            .unwrap_or_else(|error| panic!("wrapper: {error}"))
+            .as_bytes()
+            .to_vec()
+    );
+
+    let wrapped = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        SigningWrapper::new(CHIO_FROST_AUTHORIZATION_SCHEMA, &canonical(body))
+            .unwrap_or_else(|error| panic!("wrapper: {error}"))
+            .as_bytes()
+            .to_vec()
+    });
+    verify_fixture_at(&wrapped, 250)
+        .unwrap_or_else(|error| panic!("wrapper signature must verify: {error}"));
+
+    let raw_prefix = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        let mut message = b"CHIO-FROST-AUTHORIZATION-V1\0".to_vec();
+        message.extend_from_slice(canonical(body).as_bytes());
+        message
+    });
+    let cross_id = fixture_signed_over(OFFICIAL_VERIFYING_KEY, OFFICIAL_SECRET_KEY, |body| {
+        SigningWrapper::new(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+            &canonical(body),
+        )
+        .unwrap_or_else(|error| panic!("wrapper: {error}"))
+        .as_bytes()
+        .to_vec()
+    });
+    for (label, refused) in [("raw prefix", raw_prefix), ("foreign schema id", cross_id)] {
+        assert_eq!(
+            verify_fixture_at(&refused, 250).err(),
+            Some(FrostVerificationError::InvalidGroupSignature),
+            "{label}"
+        );
+    }
 }
 
 #[test]
@@ -1641,4 +1712,109 @@ fn historical_completion_requires_the_exact_bound_slot_and_live_completion_windo
         .unwrap_or_else(|| panic!("expired completion")),
         FrostVerificationError::NotCurrent("historical authorization completion window")
     );
+}
+
+fn published_fixture_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../spec/schemas/chio-frost/v1/fixtures")
+}
+
+fn render_published<T: serde::Serialize>(value: &T) -> String {
+    let canonical = chio_core_types::canonical_json_bytes(value)
+        .unwrap_or_else(|error| panic!("published fixture must canonicalize: {error}"));
+    let value: serde_json::Value = serde_json::from_slice(&canonical)
+        .unwrap_or_else(|error| panic!("canonical fixture must parse: {error}"));
+    let mut text = serde_json::to_string_pretty(&value)
+        .unwrap_or_else(|error| panic!("published fixture must render: {error}"));
+    text.push('\n');
+    text
+}
+
+fn tampered_published_roster(roster: &FrostRosterV1) -> FrostRosterV1 {
+    let mut tampered = roster.clone();
+    let first = if tampered.roster_authority_signature.starts_with('0') {
+        "1"
+    } else {
+        "0"
+    };
+    tampered
+        .roster_authority_signature
+        .replace_range(..1, first);
+    tampered.roster_digest = tampered
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("tampered roster digest must compute: {error}"));
+    tampered
+}
+
+fn published_fixture_files() -> Vec<(&'static str, String)> {
+    let fixture = fixture();
+    vec![
+        ("roster.positive.json", render_published(&fixture.roster)),
+        (
+            "roster.tampered-signature.json",
+            render_published(&tampered_published_roster(&fixture.roster)),
+        ),
+        (
+            "epoch-checkpoint.positive.json",
+            render_published(&fixture.epoch_checkpoint),
+        ),
+        (
+            "authorization-slot-checkpoint.positive.json",
+            render_published(&fixture.slot.checkpoint),
+        ),
+        (
+            "authorization.positive.json",
+            render_published(&fixture.proof),
+        ),
+    ]
+}
+
+#[test]
+#[ignore = "regenerator: rewrites spec/schemas/chio-frost/v1/fixtures from the pinned builders"]
+fn regenerate_published_frost_fixtures() {
+    let dir = published_fixture_dir();
+    for (name, text) in published_fixture_files() {
+        std::fs::write(dir.join(name), text)
+            .unwrap_or_else(|error| panic!("write {name}: {error}"));
+    }
+}
+
+#[test]
+fn published_frost_fixtures_are_current_and_verify() {
+    let dir = published_fixture_dir();
+    for (name, expected) in published_fixture_files() {
+        let committed = std::fs::read_to_string(dir.join(name))
+            .unwrap_or_else(|error| panic!("read {name}: {error}"));
+        assert_eq!(
+            committed, expected,
+            "fixture spec/schemas/chio-frost/v1/fixtures/{name} is out of date"
+        );
+    }
+
+    let read = |name: &str| {
+        std::fs::read_to_string(dir.join(name))
+            .unwrap_or_else(|error| panic!("read {name}: {error}"))
+    };
+    let trust = artifact_trust();
+    let roster: FrostRosterV1 = serde_json::from_str(&read("roster.positive.json"))
+        .unwrap_or_else(|error| panic!("roster fixture must decode: {error}"));
+    trust
+        .verify_roster(&roster)
+        .unwrap_or_else(|error| panic!("roster fixture must verify: {error}"));
+    let tampered: FrostRosterV1 = serde_json::from_str(&read("roster.tampered-signature.json"))
+        .unwrap_or_else(|error| panic!("tampered roster fixture must decode: {error}"));
+    assert!(trust.verify_roster(&tampered).is_err());
+    let epoch: FrostEpochCheckpointV1 =
+        serde_json::from_str(&read("epoch-checkpoint.positive.json"))
+            .unwrap_or_else(|error| panic!("epoch fixture must decode: {error}"));
+    trust
+        .verify_epoch_checkpoint(&epoch)
+        .unwrap_or_else(|error| panic!("epoch fixture must verify: {error}"));
+    let slot: FrostAuthorizationSlotCheckpointV1 =
+        serde_json::from_str(&read("authorization-slot-checkpoint.positive.json"))
+            .unwrap_or_else(|error| panic!("slot fixture must decode: {error}"));
+    trust
+        .verify_authorization_slot_checkpoint(&slot)
+        .unwrap_or_else(|error| panic!("slot fixture must verify: {error}"));
+    let _: FrostAuthorizationV1 = serde_json::from_str(&read("authorization.positive.json"))
+        .unwrap_or_else(|error| panic!("authorization fixture must decode: {error}"));
 }

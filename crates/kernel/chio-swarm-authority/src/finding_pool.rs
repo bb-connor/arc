@@ -8,7 +8,7 @@
 use chio_core_types::crypto::{
     canonical_json_bytes, sha256_hex, Keypair, PublicKey, SigningAlgorithm,
 };
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use serde::{Deserialize, Serialize};
 
 use crate::{SwarmAuthorityError, SwarmBudgetPool, CHIO_SWARM_BUDGET_POOL_SCHEMA};
@@ -53,6 +53,10 @@ pub struct FindingPoolAllocation {
 }
 
 pub type SignedFindingPoolAllocation = SignedExportEnvelope<FindingPoolAllocation>;
+
+impl SignedExportPayload for FindingPoolAllocation {
+    const SCHEMA_ID: &'static str = FINDING_POOL_ALLOCATION_SCHEMA_V1;
+}
 
 /// Verified allocation values passed across the kernel ledger boundary.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -255,7 +259,7 @@ pub fn verify_finding_pool_allocation(
             "finding pool allocation validity window is invalid",
         ));
     }
-    match pinned_authority.verify_canonical_strict(body, &signed.signature) {
+    match signed.verify_signature(pinned_authority) {
         Ok(true) => {}
         Ok(false) => return Err(rejected("finding pool allocation signature is invalid")),
         Err(error) => {

@@ -248,11 +248,11 @@ pub fn sign_receipt_body_hybrid_canonical(
     backend: &dyn chio_core::crypto::SigningBackend,
     canonical_content: &[u8],
 ) -> Result<SignedHybridReceipt, KernelError> {
-    use chio_core::crypto::{
-        canonical_json_shared_bytes, sign_shared_canonical_with_backend, PublicKey,
-    };
+    use chio_core::crypto::{canonical_json_shared_bytes, sign_shared_wrapped, PublicKey};
     use chio_core::receipt::{
-        body::chio_receipt_id, signing::bind_receipt_signing_nonce, signing::ChioReceiptSigningBody,
+        body::{chio_receipt_id, CHIO_RECEIPT_SCHEMA},
+        signing::bind_receipt_signing_nonce,
+        signing::ChioReceiptSigningBody,
     };
 
     // WYSIWYS recompute-and-refuse FIRST, inside the trust boundary, before any
@@ -316,9 +316,8 @@ pub fn sign_receipt_body_hybrid_canonical(
     })?;
     let signing_body = ChioReceiptSigningBody::from(&body);
 
-    // Build the SharedCanonicalBytes once over the authoritative
-    // signing wrapper. This is the byte buffer the classical half
-    // hashes and the ML-DSA-65 half signs.
+    // Build the SharedCanonicalBytes once over the authoritative signing
+    // body. The signing wrapper over these bytes is what both halves sign.
     let canonical = canonical_json_shared_bytes(&signing_body).map_err(|error| {
         KernelError::ReceiptSigningFailed(format!(
             "canonical JSON encoding of receipt signing body failed: {error}"
@@ -329,13 +328,13 @@ pub fn sign_receipt_body_hybrid_canonical(
     // buffer downstream consumers will consume. `Arc::clone` keeps the
     // allocation; no second canonicalization happens.
     let signed =
-        sign_shared_canonical_with_backend(backend, canonical.clone()).map_err(|error| {
+        sign_shared_wrapped(backend, CHIO_RECEIPT_SCHEMA, canonical.clone()).map_err(|error| {
             KernelError::ReceiptSigningFailed(format!("hybrid signing failed: {error}"))
         })?;
     let (signature, signed_canonical) = signed.into_parts();
 
     // Defence-in-depth: the buffer the backend signed MUST be the same
-    // allocation we built above. `sign_shared_canonical_with_backend`
+    // allocation we built above. `sign_shared_wrapped`
     // does not reserialize, but assert byte-equality so a future change
     // that reserializes silently fails this contract first.
     debug_assert_eq!(
@@ -367,7 +366,6 @@ pub fn sign_receipt_body_hybrid_canonical(
         bbs_projection_version: None,
         kernel_key: body.kernel_key,
         bbs_signature: None,
-        algorithm: Some(backend_pk.algorithm()),
         signature,
     };
 
@@ -539,13 +537,13 @@ mod borrowed_preimage_tests {
 
         let signed = sign_receipt_body_hybrid_canonical(body, &backend, PREIMAGE)
             .expect("matching body must sign through the borrowed-slice recompute path");
-        assert!(
-            signed
-                .receipt
-                .kernel_key
-                .verify(signed.canonical.as_bytes(), &signed.receipt.signature),
-            "produced signature must verify over the exact signed bytes"
-        );
+        chio_core::crypto::verify_wrapped_bytes(
+            &signed.receipt.kernel_key,
+            chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+            signed.canonical.as_ref(),
+            &signed.receipt.signature,
+        )
+        .expect("produced signature must verify over the exact signed bytes");
     }
 
     #[test]

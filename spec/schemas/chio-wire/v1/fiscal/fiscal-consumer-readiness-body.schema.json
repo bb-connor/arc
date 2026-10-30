@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-consumer-readiness-body.schema.json",
+  "title": "chio.fiscal.consumer-readiness.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attestedAt",
+    "genesisPolicyDigest",
+    "genesisPolicyId",
+    "governingOperatorId",
+    "readinessId",
+    "readinessSequence",
+    "readyDomains",
+    "runtimeRegistryDigest",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId"
+  ],
+  "properties": {
+    "attestedAt": {
+      "type": "integer"
+    },
+    "genesisPolicyDigest": {
+      "type": "string"
+    },
+    "genesisPolicyId": {
+      "type": "string"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "readinessId": {
+      "type": "string"
+    },
+    "readinessSequence": {
+      "type": "integer"
+    },
+    "readyDomains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "runtimeRegistryDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.consumer-readiness.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    }
+  }
+}

@@ -26,8 +26,8 @@
       "tool_name": "tool",
       "tool_server": "server"
     },
-    "signature": "2e8071171200f3c0229f5195dc0c645fed41f092b59d5d9e44ed54b49a1bf22c23c24c56ae9eecf715ac76cd889cb184588dba85627f1831344a285a0d851e0a"
+    "signature": "0cdf3b662882440058a86814a2072bb1383f580b805c4261bce73d960abf61bc83a95827601e5e4e72ac42b25e203f889da41846953a431317dabe7ca13e1505"
   },
   "canonical_body": "{\"action_hash\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"agent_key\":\"e734ea6c2b6257de72355e472aa05a4c487e6b463c029ed306df2f01b5636b58\",\"capability_id\":\"capability\",\"issued_at\":1800000000,\"nonce\":\"nonce\",\"replay_authority\":{\"destination_store_uuid\":\"018f9878-7047-7abc-8c98-120dc65700ea\",\"dpop_authority_id\":\"configured-dpop\",\"expectation_id\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"max_clock_skew_secs\":30,\"proof_ttl_secs\":300},\"schema\":\"chio.dpop_proof.v1\",\"tool_name\":\"tool\",\"tool_server\":\"server\"}",
-  "proof_sha256": "5c5dc8fe6d236c66a02b933ed2e2978b60bb9c8aec9bd1ce398cb29e28264f2b"
+  "proof_sha256": "6e9f9462ec7fdedbf97b180808591932f11cfd8d05511bc159ae08aac111cd4f"
 }

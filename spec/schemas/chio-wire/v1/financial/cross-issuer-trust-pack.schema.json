@@ -1,0 +1,184 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-trust-pack.schema.json",
+  "title": "Chio financial cross issuer trust pack signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "createdAt",
+    "decisions",
+    "expiresAt",
+    "packId",
+    "policy",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "verifierId"
+  ],
+  "properties": {
+    "createdAt": {
+      "type": "integer"
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "signature",
+          "signerKey"
+        ],
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "certificationRefs",
+              "credentialBindings",
+              "decidedAt",
+              "decision",
+              "decisionDigest",
+              "entryId",
+              "issuer",
+              "lifecycleEvidenceDigest",
+              "lifecyclePinDigest",
+              "migrationEnvelopeDigests",
+              "packId",
+              "presentationDigest",
+              "profileFamily",
+              "reason",
+              "schema",
+              "signerKeyEpoch",
+              "signerKeyId",
+              "sourceKind",
+              "sourceManifestDigest",
+              "sourcePassportId",
+              "verifierId"
+            ],
+            "properties": {
+              "certificationRefs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "credentialBindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "credentialId",
+                    "envelopeDigest",
+                    "family"
+                  ],
+                  "properties": {
+                    "credentialId": {
+                      "type": "string"
+                    },
+                    "envelopeDigest": {
+                      "type": "string"
+                    },
+                    "family": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "decidedAt": {
+                "type": "integer"
+              },
+              "decision": {
+                "type": "string"
+              },
+              "decisionDigest": {
+                "type": "string"
+              },
+              "entryId": {
+                "type": "string"
+              },
+              "issuer": {
+                "type": "string"
+              },
+              "lifecycleEvidenceDigest": {
+                "type": "string"
+              },
+              "lifecyclePinDigest": {
+                "type": "string"
+              },
+              "migrationEnvelopeDigests": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "packId": {
+                "type": "string"
+              },
+              "presentationDigest": {
+                "type": "string"
+              },
+              "profileFamily": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "signerKeyEpoch": {
+                "type": "integer"
+              },
+              "signerKeyId": {
+                "type": "string"
+              },
+              "sourceKind": {
+                "type": "string"
+              },
+              "sourceManifestDigest": {
+                "type": "string"
+              },
+              "sourcePassportId": {
+                "type": "string"
+              },
+              "verifierId": {
+                "type": "string"
+              }
+            }
+          },
+          "signature": {
+            "type": "string"
+          },
+          "signerKey": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "packId": {
+      "type": "string"
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer-trust-pack.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "verifierId": {
+      "type": "string"
+    }
+  }
+}

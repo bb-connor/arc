@@ -43,7 +43,14 @@ fn portable_sd_jwt_passport_projection_roundtrip_verifies() {
         ),
     ] {
         let signing_input = format!("{}.{}", URL_SAFE_NO_PAD.encode(header), parts[1]);
-        let signature = URL_SAFE_NO_PAD.encode(issuer.sign(signing_input.as_bytes()).to_bytes());
+        let signature = URL_SAFE_NO_PAD.encode(
+            issuer
+                .sign_exempt(
+                    chio_core::crypto::ExemptFormat::JwsSigningInput,
+                    signing_input.as_bytes(),
+                )
+                .to_bytes(),
+        );
         let malformed = format!("{signing_input}.{signature}~{disclosures}");
         let error = verify_chio_passport_sd_jwt_vc(&malformed, &issuer.public_key(), 1_710_000_200)
             .expect_err("valid signature cannot bypass the header contract");

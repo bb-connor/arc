@@ -1,28 +1,29 @@
 //! Persistent knowledge signatures use roles distinct from one-shot crossings.
 use super::authority::{invalid, signed_authority};
 use super::RecoveryDigestDomain;
-use crate::crypto::Ed25519Backend;
-use crate::{
-    canonical_json_bytes, Keypair, PublicKey, Result, Signature, SigningAlgorithm, SigningBackend,
-};
+use crate::{canonical_json_bytes, Keypair, PublicKey, Result, Signature, SigningBackend};
 use alloc::vec::Vec;
 use chio_security_types::{knowledge::*, recovery::*};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const ARTIFACT_CERTIFICATE_SIGNATURE_DOMAIN: &str = "chio:artifact-certificate:v1";
-pub const ARTIFACT_ARCHIVE_SIGNATURE_DOMAIN: &str = "chio:artifact-archive:v1";
+/// Signing-wrapper schema id of an artifact certificate.
+pub const CHIO_RECOVERY_ARTIFACT_CERTIFICATE_SCHEMA: &str =
+    "chio.recovery.signed-artifact-certificate.v1";
+/// Signing-wrapper schema id of an artifact archive manifest.
+pub const CHIO_RECOVERY_ARTIFACT_ARCHIVE_MANIFEST_SCHEMA: &str =
+    "chio.recovery.signed-archive-manifest.v1";
 
 signed_authority!(
     SignedArtifactCertificateV1,
     ArtifactCertificateV1,
-    ARTIFACT_CERTIFICATE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_ARTIFACT_CERTIFICATE_SCHEMA,
     |body: &ArtifactCertificateV1| body.validate().map_err(|_| invalid())
 );
 signed_authority!(
     SignedArtifactArchiveManifestV1,
     ArtifactArchiveManifestV1,
-    ARTIFACT_ARCHIVE_SIGNATURE_DOMAIN,
+    CHIO_RECOVERY_ARTIFACT_ARCHIVE_MANIFEST_SCHEMA,
     |body: &ArtifactArchiveManifestV1| body.validate().map_err(|_| invalid())
 );
 
@@ -79,7 +80,7 @@ pub fn verify_artifact_certificate(
     let body = signed.body();
     body.validate().map_err(|_| invalid())?;
     if signed.authority_key() != root
-        || !signed.verify_signature()?
+        || !signed.verify_integrity_embedded_key()?
         || body.scope != metadata.scope
         || body.artifact != metadata.artifact
         || body.version != metadata.version
@@ -106,7 +107,10 @@ pub fn verify_artifact_archive(
 ) -> Result<()> {
     let body = signed.body();
     body.validate().map_err(|_| invalid())?;
-    if signed.authority_key() != root || !signed.verify_signature()? || &body.scope != scope {
+    if signed.authority_key() != root
+        || !signed.verify_integrity_embedded_key()?
+        || &body.scope != scope
+    {
         return Err(invalid());
     }
     let references = body

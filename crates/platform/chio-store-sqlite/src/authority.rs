@@ -293,10 +293,11 @@ impl SqliteCapabilityAuthority {
             };
             body.chain_digest = budget_snapshot_anchor_chain_digest(&body)
                 .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?;
-            let signature = keypair
-                .sign_canonical(&body)
-                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?
-                .0;
+            let signature = chio_core::CanonicalBytes::from_serializable(&body)
+                .and_then(|canonical| {
+                    keypair.sign_wrapped("chio.budget-snapshot-anchor-commitment.v1", &canonical)
+                })
+                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?;
             let commit_sequence_sqlite = i64::try_from(commit_sequence).map_err(|_| {
                 AuthorityStoreError::Fence(
                     "budget snapshot anchor commitment sequence exceeds SQLite range".to_string(),
@@ -796,7 +797,7 @@ mod tests {
         assert_eq!(capability.subject, subject);
         assert_eq!(capability.issuer, authority.authority_public_key().unwrap());
         assert!(capability.id.starts_with("cap-"));
-        assert!(capability.verify_signature().unwrap());
+        assert!(capability.verify_integrity_embedded_key().unwrap());
     }
 
     #[test]
@@ -869,7 +870,7 @@ mod tests {
 
         assert_ne!(first.issuer, second.issuer);
         assert_eq!(second.issuer, rotated.public_key);
-        assert!(second.verify_signature().unwrap());
+        assert!(second.verify_integrity_embedded_key().unwrap());
 
         let _ = fs::remove_file(path);
     }

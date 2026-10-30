@@ -1,4 +1,4 @@
-use chio_core_types::{canonical_json_bytes, recovery::*, PublicKey};
+use chio_core_types::{canonical_json_bytes, recovery::*};
 use chio_security_types::{knowledge::*, recovery::*};
 #[path = "../../../../fixtures/recovery-knowledge-profile.rs"]
 mod profile;
@@ -18,13 +18,19 @@ fn typed(schema: &str, bytes: &[u8]) -> bool {
         "artifact-recipient.schema.json" => read!(ArtifactRecipientV1),
         "artifact-certificate.schema.json" => read!(ArtifactCertificateV1),
         "signed-artifact-certificate.schema.json" => {
-            decode_contract::<SignedArtifactCertificateV1>(bytes)
-                .is_ok_and(|proof| proof.verify_signature().is_ok_and(|valid| valid))
+            decode_contract::<SignedArtifactCertificateV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
         }
         "artifact-archive-manifest.schema.json" => read!(ArtifactArchiveManifestV1),
         "signed-artifact-archive-manifest.schema.json" => {
-            decode_contract::<SignedArtifactArchiveManifestV1>(bytes)
-                .is_ok_and(|proof| proof.verify_signature().is_ok_and(|valid| valid))
+            decode_contract::<SignedArtifactArchiveManifestV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
         }
         "model-context.schema.json" => read!(ModelContextV1),
         "labeled-checkpoint.schema.json" => read!(LabeledCheckpointV1),
@@ -90,22 +96,23 @@ fn signatures_content_and_role_domains_cannot_substitute() -> TestResult {
         .find(|(name, _)| *name == "signed-artifact-certificate.schema.json")
         .ok_or("certificate")?;
     let proof: SignedArtifactCertificateV1 = decode_contract(&canonical_json_bytes(&signed.1)?)?;
-    assert!(proof.verify_signature()?);
+    assert!(proof.verify_integrity_embedded_key()?);
     let mut changed = signed.1.clone();
     changed["body"]["output_label"] = serde_json::json!({"kind":"top"});
     assert!(
         decode_contract::<SignedArtifactCertificateV1>(&canonical_json_bytes(&changed)?)
-            .map(|proof| proof.verify_signature().unwrap_or(false))
+            .map(|proof| proof.verify_integrity_embedded_key().unwrap_or(false))
             .is_ok_and(|valid| !valid)
     );
-    assert!(proof
-        .signing_bytes()?
-        .starts_with(b"chio:artifact-certificate:v1\0"));
-    let mut wrong = b"chio:scoped-endorsement:v1\0".to_vec();
-    wrong.extend(canonical_json_bytes(proof.body())?);
-    assert!(!proof.authority_key().verify(&wrong, proof.signature()));
-    let key: PublicKey = proof.authority_key().clone();
-    assert_eq!(key.algorithm(), proof.algorithm());
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            proof.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_SCOPED_ENDORSEMENT_SCHEMA,
+            proof.body(),
+            proof.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     Ok(())
 }
 #[test]

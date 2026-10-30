@@ -1,18 +1,1 @@
-{
-  "actual_verifier_report_digest": "de56aa279a1495acd2f3e6b7854d3651bbee160c16a5811d81f245189a07f518",
-  "attack_class": "policy-hot-reload-widening",
-  "chaos_knobs": [
-    "policy_reload"
-  ],
-  "expected_denial_claim": "claim.runtime.policy_activation_no_widening",
-  "fixture_path": "runtime-security/policy-hot-reload-widening",
-  "issuer": "did:chio:5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca",
-  "runtime_receipt_refs": [
-    "receipt-runtime-valid"
-  ],
-  "scenario_id": "attack-policy-hot-reload-widening",
-  "schema": "chio.runtime.attack-simulation-report.v1",
-  "signature": "adad3c1cfa89cd115f5686ba0e5ff6f55dcc89ccbf226f8cd79d4f796b6861aa272972353b2ae87e17b993ef2dd509285b1b205ba9d60a709f16331709867f0b",
-  "simulator_version_digest": "7b507c9dd41316c67a49d7eb5c33730b7e01843ea2c0d1d495cae1f8a08679d3",
-  "status": "passed"
-}
+{"actual_verifier_report_digest":"de56aa279a1495acd2f3e6b7854d3651bbee160c16a5811d81f245189a07f518","attack_class":"policy-hot-reload-widening","chaos_knobs":["policy_reload"],"expected_denial_claim":"claim.runtime.policy_activation_no_widening","fixture_path":"runtime-security/policy-hot-reload-widening","issuer":"did:chio:5b8649c0cfcdbe78a5ff962edfa48914dfd45af22afe358de1f4dd7e4567d5ca","runtime_receipt_refs":["receipt-runtime-valid"],"scenario_id":"attack-policy-hot-reload-widening","schema":"chio.runtime.attack-simulation-report.v1","signature":"4be8c688a1ca3638e2bc8e77b23877bb01d9a3d5be27d5764ec2013d6f0bde6c6dc521b161359059e67aadc7006907cbd1010e5692ac46b161909a0a577e300d","simulator_version_digest":"7b507c9dd41316c67a49d7eb5c33730b7e01843ea2c0d1d495cae1f8a08679d3","status":"passed"}

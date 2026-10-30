@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-open-body.schema.json",
+  "title": "chio.channel.open.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channelId",
+        "fundingAcknowledgementDigest",
+        "initialStateDigest",
+        "openIntentDigest",
+        "openedAtUnixMs",
+        "schema"
+      ],
+      "properties": {
+        "channelId": {
+          "type": "string"
+        },
+        "fundingAcknowledgementDigest": {
+          "type": "string"
+        },
+        "initialStateDigest": {
+          "type": "string"
+        },
+        "openIntentDigest": {
+          "type": "string"
+        },
+        "openedAtUnixMs": {
+          "type": "integer"
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

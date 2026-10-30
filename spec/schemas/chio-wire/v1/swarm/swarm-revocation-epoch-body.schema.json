@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-revocation-epoch-body.schema.json",
+  "title": "chio.swarm.revocation-epoch.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "epochId",
+    "issuedAtUnixMs",
+    "issuer",
+    "revokedSubjects",
+    "revokedTaskIds",
+    "rootHash",
+    "schema",
+    "validUntilUnixMs"
+  ],
+  "properties": {
+    "epochId": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "revokedSubjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "revokedTaskIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rootHash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.swarm.revocation-epoch.v1"
+    },
+    "validUntilUnixMs": {
+      "type": "integer"
+    }
+  }
+}

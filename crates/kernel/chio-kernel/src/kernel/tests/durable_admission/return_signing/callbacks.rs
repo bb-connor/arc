@@ -28,14 +28,17 @@ impl SigningBackend for SigningProbe {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.inner.public_key()
     }
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<Signature, chio_core::Error> {
         self.inner.sign_bytes(message)
     }
 
     fn sign_bytes_for_identity(
         &self,
         key: &PublicKey,
-        message: &[u8],
+        message: chio_core::crypto::SigningMessage<'_>,
     ) -> Result<SigningOutcome, chio_core::Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         let sequencer = self.sequencer.clone();
@@ -126,7 +129,7 @@ fn signing_callback(mode: Mode) -> TestResult {
         Mode::Reenter => {
             let response = result?;
             assert_eq!(response.verdict, Verdict::Allow);
-            assert!(response.receipt.verify_signature()?);
+            assert!(response.receipt.verify_integrity_embedded_key()?);
             assert_eq!(
                 store.operation().state(),
                 AdmissionOperationState::Completed

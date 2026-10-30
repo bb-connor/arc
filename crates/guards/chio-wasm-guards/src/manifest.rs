@@ -44,7 +44,8 @@ pub const SIGNATURE_SUFFIX: &str = ".sig";
 
 /// Domain separator prepended to every signed module envelope. Bumping this
 /// string invalidates all previously issued signatures, so keep it stable.
-const SIGNED_MODULE_DOMAIN: &str = "chio-wasm-guard-v1";
+/// Signing-wrapper schema id of a signed WASM guard module.
+pub const WASM_MODULE_SCHEMA: &str = "chio.wasm-module.v1";
 
 // GuardManifest
 
@@ -187,30 +188,26 @@ pub fn verify_wit_world(wit_world: Option<&str>) -> Result<(), WasmGuardError> {
 
 // Signing helpers
 
-/// Produce the canonical byte sequence that a signer signs when attesting a
-/// WASM guard module.
-///
-/// The envelope binds together:
-///
-/// 1. a fixed domain separator ([`SIGNED_MODULE_DOMAIN`]);
-/// 2. the hex-encoded SHA-256 hash of the module bytes;
-/// 3. the module name;
-/// 4. the module version;
-/// 5. the signer's public key (hex-encoded).
-///
-/// All fields are separated by newlines. Signatures produced over this
-/// envelope cannot be replayed across different modules, versions, or
-/// signers without invalidating the binding.
+/// Produce the 88 signing-wrapper bytes a signer signs when attesting a WASM
+/// guard module: the wrapper under `chio.wasm-module.v1` over the canonical
+/// `{"module_hash","module_name","signer_public_key","version"}` statement.
 pub fn signed_module_message(
     module_hash_hex: &str,
     module_name: &str,
     version: &str,
     signer_public_key_hex: &str,
-) -> Vec<u8> {
-    format!(
-        "{SIGNED_MODULE_DOMAIN}\n{module_hash_hex}\n{module_name}\n{version}\n{signer_public_key_hex}"
-    )
-    .into_bytes()
+) -> Result<Vec<u8>, WasmGuardError> {
+    let statement = serde_json::json!({
+        "module_hash": module_hash_hex,
+        "module_name": module_name,
+        "signer_public_key": signer_public_key_hex,
+        "version": version,
+    });
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&statement)
+        .map_err(|e| WasmGuardError::SignatureVerification(format!("module statement: {e}")))?;
+    let wrapper = chio_core::crypto::SigningWrapper::new(WASM_MODULE_SCHEMA, &canonical)
+        .map_err(|e| WasmGuardError::SignatureVerification(format!("module statement: {e}")))?;
+    Ok(wrapper.as_bytes().to_vec())
 }
 
 /// Compute the path at which the signature sidecar for `wasm_path` lives.
@@ -330,7 +327,7 @@ pub fn verify_signed_module(
         &signed.module_name,
         &signed.version,
         &signed.signer_public_key,
-    );
+    )?;
 
     verifying_key
         .verify_strict(&message, &signature)
@@ -672,7 +669,8 @@ config:
     fn make_signed(sk: &SigningKey, bytes: &[u8], name: &str, version: &str) -> SignedWasmModule {
         let module_hash = hex::encode(Sha256::digest(bytes));
         let signer_public_key = hex::encode(sk.verifying_key().to_bytes());
-        let message = signed_module_message(&module_hash, name, version, &signer_public_key);
+        let message =
+            signed_module_message(&module_hash, name, version, &signer_public_key).unwrap();
         let signature = sk.sign(&message);
         SignedWasmModule {
             module_hash,
@@ -684,10 +682,22 @@ config:
     }
 
     #[test]
-    fn signed_module_message_is_canonical_newline_separated() {
-        let msg = signed_module_message("deadbeef", "g", "1.0.0", "aa11");
-        let s = std::str::from_utf8(&msg).unwrap();
-        assert_eq!(s, "chio-wasm-guard-v1\ndeadbeef\ng\n1.0.0\naa11");
+    fn signed_module_message_is_the_wrapper_over_the_module_statement() {
+        let msg = signed_module_message("deadbeef", "g", "1.0.0", "aa11").unwrap();
+        let canonical = chio_core::canonical::CanonicalBytes::from_value(&serde_json::json!({
+            "module_hash": "deadbeef",
+            "module_name": "g",
+            "signer_public_key": "aa11",
+            "version": "1.0.0",
+        }))
+        .unwrap();
+        let expected =
+            chio_core::crypto::SigningWrapper::new(WASM_MODULE_SCHEMA, &canonical).unwrap();
+        assert_eq!(msg.as_slice(), expected.as_bytes());
+        assert_ne!(
+            msg,
+            signed_module_message("deadbeef", "g", "1.0.1", "aa11").unwrap()
+        );
     }
 
     #[test]
@@ -948,5 +958,30 @@ wasm_sha256: deadbeef
         let m: GuardManifest = yaml_serde::from_str(yaml).unwrap();
         assert!(m.signer_public_key.is_none());
         assert!(!m.allow_unsigned, "allow_unsigned should default to false");
+    }
+
+    #[test]
+    fn signed_artifact_capture_wasm_module() {
+        let keypair = chio_core::crypto::Keypair::from_seed(&[7; 32]);
+        let module_hash = hex::encode(Sha256::digest(SIGN_TEST_WASM));
+        let signer_public_key = keypair.public_key().to_hex();
+        let statement = chio_core::canonical::CanonicalBytes::from_value(&serde_json::json!({
+            "module_hash": module_hash,
+            "module_name": "g",
+            "signer_public_key": signer_public_key,
+            "version": "0.1.0",
+        }))
+        .unwrap();
+        let signature = keypair
+            .sign_wrapped(WASM_MODULE_SCHEMA, &statement)
+            .unwrap();
+        let signed = SignedWasmModule {
+            module_hash,
+            module_name: "g".to_string(),
+            version: "0.1.0".to_string(),
+            signer_public_key: signer_public_key.clone(),
+            signature: signature.to_hex(),
+        };
+        verify_signed_module(SIGN_TEST_WASM, &signed, &signer_public_key).unwrap();
     }
 }

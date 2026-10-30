@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/pool-debit-authorization.schema.json",
+  "title": "Chio finding pool debit authorization signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocation_envelope_sha256",
+    "arguments_sha256",
+    "capability_id",
+    "expected_output_digest",
+    "expires_at_unix_ms",
+    "purchase_context_sha256",
+    "purchase_id",
+    "purchaser_id",
+    "schema",
+    "server_id",
+    "tool_name"
+  ],
+  "properties": {
+    "allocation_envelope_sha256": {
+      "type": "string"
+    },
+    "arguments_sha256": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "expected_output_digest": {
+      "type": "string"
+    },
+    "expires_at_unix_ms": {
+      "type": "string"
+    },
+    "purchase_context_sha256": {
+      "type": "string"
+    },
+    "purchase_id": {
+      "type": "string"
+    },
+    "purchaser_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.pool-debit-authorization.v1"
+    },
+    "server_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    }
+  }
+}

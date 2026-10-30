@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core_types::crypto::verify_wrapped;
 use chio_core_types::{Keypair, PublicKey, Signature};
 use serde::Serialize;
 
@@ -140,8 +141,17 @@ pub fn sign_lineage_subgraph(
     lineage: &SignedLineageSubgraph,
     signer: &Keypair,
 ) -> Result<String, DisclosureLineageError> {
-    let digest = compute_signed_lineage_subgraph_digest(lineage)?;
-    let signature = signer.sign(digest.as_bytes());
+    let material = chio_core_types::CanonicalBytes::from_serializable(
+        &lineage_subgraph_digest_material(lineage),
+    )
+    .map_err(|error| {
+        invalid(format!(
+            "lineage signing body canonicalization failed: {error}"
+        ))
+    })?;
+    let signature = signer
+        .sign_wrapped(LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1, &material)
+        .map_err(|error| invalid(format!("lineage subgraph signature failed: {error}")))?;
     Ok(format!(
         "{LINEAGE_SIGNATURE_PREFIX}{}:{}",
         signer.public_key().to_hex(),
@@ -155,8 +165,10 @@ pub fn sign_crypto_context_report(
 ) -> Result<String, DisclosureLineageError> {
     let mut material = report.clone();
     material.signature = None;
-    let (signature, _) = signer
-        .sign_canonical(&material)
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&material)
+        .and_then(|canonical| {
+            signer.sign_wrapped(DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1, &canonical)
+        })
         .map_err(|error| invalid(format!("crypto context report signature failed: {error}")))?;
     Ok(format!(
         "{LINEAGE_SIGNATURE_PREFIX}{}:{}",
@@ -432,13 +444,12 @@ fn validate_lineage(
     if actual_digest != lineage.subgraph_sha256 {
         return Err(digest_mismatch("lineage subgraph digest mismatch"));
     }
-    verify_lineage_signature(lineage, &actual_digest, trust.trusted_lineage_signer_keys())?;
+    verify_lineage_signature(lineage, trust.trusted_lineage_signer_keys())?;
     Ok(())
 }
 
 fn verify_lineage_signature(
     lineage: &SignedLineageSubgraph,
-    digest: &str,
     trusted_signer_keys: &[PublicKey],
 ) -> Result<(), DisclosureLineageError> {
     let signature = lineage
@@ -456,8 +467,14 @@ fn verify_lineage_signature(
     let signature = Signature::from_hex(signature).map_err(|error| {
         signature_invalid(format!("lineage subgraph signature invalid: {error}"))
     })?;
-    let verified = public_key.verify(digest.as_bytes(), &signature);
-    if !verified {
+    if verify_wrapped(
+        &public_key,
+        LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1,
+        &lineage_subgraph_digest_material(lineage),
+        &signature,
+    )
+    .is_err()
+    {
         return Err(signature_invalid(
             "lineage subgraph signature verification failed",
         ));
@@ -493,12 +510,14 @@ pub fn verify_crypto_context_report_signature_with_trust(
     })?;
     let mut material = report.clone();
     material.signature = None;
-    let verified = public_key
-        .verify_canonical(&material, &signature)
-        .map_err(|error| {
-            signature_invalid(format!("crypto context report signature invalid: {error}"))
-        })?;
-    if !verified {
+    if verify_wrapped(
+        &public_key,
+        DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1,
+        &material,
+        &signature,
+    )
+    .is_err()
+    {
         return Err(signature_invalid(
             "crypto context report signature verification failed",
         ));

@@ -66,7 +66,7 @@ func signedTokenWith(
 		t.Fatalf("failed to canonicalize token: %v", err)
 	}
 
-	body["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, canonical))
+	body["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, signingWrapper(capabilitySchema, canonical)))
 
 	encoded, err := json.Marshal(body)
 	if err != nil {
@@ -305,7 +305,7 @@ func signedRawToken(t *testing.T, signer kernelSigner, signed, emitted map[strin
 	for key, value := range emitted {
 		out[key] = value
 	}
-	out["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, canonical))
+	out["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, signingWrapper(capabilitySchema, canonical)))
 	encoded, err := json.Marshal(out)
 	if err != nil {
 		t.Fatalf("failed to marshal token: %v", err)
@@ -633,5 +633,36 @@ func TestParseRequiredScopeRejectsAliasesAndShorthand(t *testing.T) {
 		if _, err := parseRequiredScope(raw); err != nil {
 			t.Fatalf("expected %q to parse: %v", raw, err)
 		}
+	}
+}
+
+func TestVerifyCapabilityRefusesAlgorithmMember(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["algorithm"] = "ed25519"
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: unknown member "algorithm"` {
+		t.Fatalf("expected algorithm member refusal, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesRawBodySignature(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	canonical, err := canonicalJSON(body)
+	if err != nil {
+		t.Fatalf("failed to canonicalize token: %v", err)
+	}
+	body["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, canonical))
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("failed to marshal token: %v", err)
+	}
+
+	err = VerifyCapability(string(encoded), AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != "webhook denies admission: capability signature verification failed" {
+		t.Fatalf("expected raw body signature refusal, got %v", err)
 	}
 }

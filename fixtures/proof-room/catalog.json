@@ -326,6 +326,12 @@
       "description": "Generated Proof Room bundle for recursive swarm authority and runtime parity evidence"
     },
     {
+      "id": "recursive-runtime-swarm-valid-recursive-delegation",
+      "kind": "transaction-passport",
+      "path": "fixtures/proof-room/swarm-authority/valid-recursive-delegation",
+      "description": "Recursive swarm authority fixture with the static proof package baseline the runtime loopback reproduces"
+    },
+    {
       "id": "recursive-runtime-swarm-stale-continuation",
       "kind": "negative-transaction-passport",
       "path": "fixtures/proof-room/swarm-authority/stale-continuation",

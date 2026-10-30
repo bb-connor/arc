@@ -39,7 +39,7 @@ fn http_receipt(verdict: Verdict) -> HttpReceipt {
 
 fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
     assert!(receipt
-        .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+        .verify_signature_with_floor(&receipt.kernel_key, ReceiptCryptoFloor::AllowHybrid)
         .test_unwrap());
     assert!(receipt.action.verify_hash().test_unwrap());
     let directory = chio_test_support::private_tempdir().test_unwrap();
@@ -62,6 +62,7 @@ fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
         None,
         None,
         &package_keypair(),
+        PACKAGE_EXPORTED_AT,
     )
     .test_unwrap();
     directory
@@ -107,7 +108,7 @@ fn package_rejects_tampered_embedded_http_receipt() {
         .to_chio_receipt_with_keypair(&package_keypair())
         .test_unwrap();
     http.response_status = 503;
-    assert!(!http.verify_signature().test_unwrap());
+    assert!(!http.verify_integrity_embedded_key().test_unwrap());
     let receipt = resign_embedded_http(projected.body(), http);
     let expected = format!(
         "HTTP receipt projection verification failed: {}",
@@ -142,7 +143,7 @@ fn package_rejects_forged_embedded_http_signature_with_valid_id() {
         .test_unwrap();
     http.signature = http_receipt(Verdict::deny("outside capability scope", "scope")).signature;
     assert!(http.receipt_id_valid().test_unwrap());
-    assert!(!http.verify_signature().test_unwrap());
+    assert!(!http.verify_integrity_embedded_key().test_unwrap());
     let receipt = resign_embedded_http(projected.body(), http);
     let expected = format!(
         "HTTP receipt projection verification failed: {}",
@@ -254,7 +255,7 @@ fn package_rejects_distinct_trusted_http_and_outer_signers() {
     let mut body = http_receipt(Verdict::Allow).body();
     body.kernel_key = foreign.public_key();
     let http = HttpReceipt::sign(body, &foreign).test_unwrap();
-    assert!(http.verify_signature().test_unwrap());
+    assert!(http.verify_integrity_embedded_key().test_unwrap());
     let mut body = http
         .to_chio_receipt_with_keypair(&foreign)
         .test_unwrap()

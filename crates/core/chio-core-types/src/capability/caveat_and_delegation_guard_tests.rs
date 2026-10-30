@@ -49,7 +49,7 @@ fn security_binding_is_canonical_signed_and_strict() {
     )
     .unwrap();
 
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
     assert_eq!(token.security_binding().unwrap(), Some(binding));
     assert_eq!(token.caveats.len(), 1);
     assert_eq!(token.caveats[0].kind, CaveatKind::BindSecurityContext);
@@ -105,10 +105,10 @@ fn security_binding_mutation_invalidates_capability_signature() {
     let mut binding = mutated.security_binding().unwrap().unwrap();
     binding.context_generation += 1;
     mutated.caveats = vec![Caveat::bind_security_context(&binding).unwrap()];
-    assert!(!mutated.verify_signature().unwrap());
+    assert!(!mutated.verify_integrity_embedded_key().unwrap());
 
     let plain = CapabilityToken::sign(direct_body(&issuer, &subject), &issuer).unwrap();
-    assert!(plain.verify_signature().unwrap());
+    assert!(plain.verify_integrity_embedded_key().unwrap());
     assert_eq!(plain.security_binding().unwrap(), None);
 }
 
@@ -189,7 +189,7 @@ fn capability_caveats_reject_fail_closed_until_admission_enforces_them() {
     )
     .unwrap();
     token.caveats = vec![caveat];
-    assert!(token.verify_signature().is_err());
+    assert!(token.verify_integrity_embedded_key().is_err());
 }
 
 #[cfg(feature = "delegation")]

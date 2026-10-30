@@ -33,9 +33,12 @@ impl SqliteFiscalStore {
             .body
             .validate()
             .map_err(|error| invariant(format!("fee schedule envelope is invalid: {error}")))?;
-        if !envelope.verify_signature().map_err(|error| {
-            invariant(format!("fee schedule envelope signature failed: {error}"))
-        })? {
+        if !envelope
+            .verify_signature(&envelope.signer_key)
+            .map_err(|error| {
+                invariant(format!("fee schedule envelope signature failed: {error}"))
+            })?
+        {
             return Err(invariant("fee schedule envelope signature is invalid"));
         }
         let FiscalParams::OpenMarketFeeAndBondSchedule { fee_schedule } = &schedule.body().params

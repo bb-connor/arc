@@ -34,10 +34,10 @@
             "commitmentId": "cost-commitment-llamaworks-001",
             "verifierId": "did:chio:dataco-cost-verifier",
             "verifierKeyId": "cost-root-key-1",
-            "runtimePolicySha256": "b0cfe65c6f966a7e7b3abbc3490bcc9a2c2546e46df757aa15ab6473096f6955",
-            "scarcityPolicySha256": "69073f134018c3cc27f53726aa2a98a63bdfedf6bd68bfde7bb2b3777f3050d4",
-            "depositBodySha256": "f192ddb95332af0bb28e367257eda9803cb98d928135f62c26047f87f11d9676",
-            "depositSignatureSha256": "529e49664bcefbdebcaf1fd04194d8d123dc02130728d48acb070d81edf0efa8",
+            "runtimePolicySha256": "0b749d4d2b2cf2c5beb23ef804397c017c821b3c88f523218904db6bab268f8f",
+            "scarcityPolicySha256": "dab554ff6d64ba4278e435fd76a351f663c117b69c416810e89dab51db7705dd",
+            "depositBodySha256": "fd2865a87bbd7265fa9f8bc8c254ee6e7cd43267eadbc325a51a7f18d673c005",
+            "depositSignatureSha256": "9eff797c23da9350b7fb900310c50eff1c830265ef5011f8f47b5915e9a16ab6",
             "kernelId": "did:chio:llamaworks",
             "agentPassportKeyHash": "1f5fe64ec2f8c901be3aad94a41d70c12d2f3a8f43755f902e665c96f41c87e3",
             "treatyId": "treaty:buyer-dataco:support-ops",
@@ -54,7 +54,7 @@
             "telemetry": {
               "schema": "chio.pheromone-observation-cost-telemetry-root.v1",
               "algorithm": "rfc6962-sha256-v1",
-              "rootHash": "0xa162849edda18a5725ebf6bd44d4cdef1789f76a9ed1cb01d46735453d014dbc",
+              "rootHash": "0x0708647ebcca040a2ab10bf36585c6cf1d283edddf21dccfb50982acd85b4d42",
               "treeSize": 1,
               "verifierId": "did:chio:dataco-cost-verifier",
               "verifierKeyId": "cost-root-key-1",
@@ -65,23 +65,23 @@
               "leaf_index": 0,
               "audit_path": []
             },
-            "leafPreimageSha256": "8d2f47f2f231d870be2db0c52c0a3aed711cb1da877f59baafddc8cf551a26b1"
+            "leafPreimageSha256": "4104a1648cc46edd11ca991f0f92abf2abff53e2969150e1dc8c60df4444fd51"
           },
-          "signature": "9e5b27f9ff54329beac26c2a3f6e8a43031050ab40e90043a36a177248f314cb2ea3b752ed5459752fae004c7301fd852e4af7b7d52c1654e3a8863b86460a0b"
+          "signature": "b42490169e517b42135f659631336f470b17592b3ece19c4e795bb584cf0c5fc423d283da99c0c615ee1fd5f7ed4005ed6095f60ccd011efa65a5918c5d73103"
         },
         "workflow_context": {
           "schema": "chio.pheromone-workflow-context.v1",
           "workflow_id": "wf-chio-refund-001",
           "workflow_receipt_id": "wf-chio-refund-001",
-          "workflow_receipt_sha256": "9d0e87515b0c30136d17285d738dbbb4d9756227a8f6b55251241178c9fb932f",
+          "workflow_receipt_sha256": "339eaeeae6f8b15b39a126482ab3fda24bc0d4bde564846d4ed0ee22112a755a",
           "workflow_intersection_id": "workflow-intersection:buyer-refund:001",
-          "workflow_intersection_sha256": "16213a813a9f547399521241d398d76af3f7f1db616700485b1747b0ee90e1e1",
+          "workflow_intersection_sha256": "294d056842082dc46a6937ba76c604b280f50e1717f5c4ba943676f55e5e78ee",
           "step_index": 0,
-          "tool_receipt_id": "6eb100fd981448fc3efd61777defcf6aa5873ff874745dae5484fce8c993b372",
-          "bilateral_dsse_sha256": "129ae7601e55e5acda1855ffe8bf82793cc85b4fc0404c6ad91af20d48039b86",
+          "tool_receipt_id": "14b79693334d566639bdb36299b1b1e7efa4e5695135811dbc281e0474eeabf1",
+          "bilateral_dsse_sha256": "c2e3db14cda40df288fe59dc6106b9dfdd39778ed7078fc0eca652840c95504f",
           "consistency_anchor": "chio:consistency:wf-chio-refund-001:0"
         },
-        "signature": "848d7cc2e40f54a752a5c5ed040e19ef043a6228cffe1f4b8f82176bcc6dab73cbf063a2df90c37c8abc383edad394c0886c07eee04478322e3543eccac19505"
+        "signature": "a3d48321b73dc786923eb73019464b2958945e449ea1ffb2434940f5d583746b51e0f5ffd2e41cde4cc856b9139efc61066bc88c0e4ad872336a5b7c9ba00007"
       },
       "origin_kernel_id": "did:chio:llamaworks",
       "gossiping_peer_kernel_id": "did:chio:buyer-kernel",

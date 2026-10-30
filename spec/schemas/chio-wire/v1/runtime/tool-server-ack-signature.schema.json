@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/tool-server-ack-signature.schema.json",
+  "title": "Chio runtime tool server ack signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ackId",
+    "issuedAt",
+    "leaseId",
+    "nonce",
+    "sandboxAttestationRef",
+    "schema",
+    "terminalStatus",
+    "toolInstanceId",
+    "toolServerId"
+  ],
+  "properties": {
+    "ackId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "string"
+    },
+    "leaseId": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "sandboxAttestationRef": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.tool-server-ack-signature.v1"
+    },
+    "terminalStatus": {
+      "type": "string"
+    },
+    "toolInstanceId": {
+      "type": "string"
+    },
+    "toolServerId": {
+      "type": "string"
+    }
+  }
+}

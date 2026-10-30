@@ -1,0 +1,102 @@
+{
+  "attenuation_proof": {
+    "childScopeHash": "708a540dc4634ca686adc88dd962dbf1235e82d1bf98e896dc55793c72aad21a",
+    "normalizedSubsetProof": {
+      "cumulativeApproval": {
+        "bindings": [
+          {
+            "approval_budget_epoch": 7,
+            "approval_budget_id": "budget-1",
+            "currency": "USD",
+            "root_binding_digest": "7a0935fb7fe6cc68743d06891bd66268050d02e94b6c12e5a6d31ead11d7963c"
+          }
+        ]
+      },
+      "normalizedChildScope": "{\"grants\":[{\"constraints\":[{\"type\":\"require_cumulative_approval_above\",\"value\":{\"approval_budget_epoch\":7,\"approval_budget_id\":\"budget-1\",\"cumulative_approval_root_binding\":{\"body\":{\"approval_budget_epoch\":7,\"approval_budget_id\":\"budget-1\",\"root_capability_hash\":\"c8cb4ca99b8a150ea4bb126a0b414b68c594118260529a6cbf4d9c8e46003a74\",\"root_capability_id\":\"cap-root\",\"root_expires_at\":1000,\"root_grant_hash\":\"ceb49b370810ae2179e552d8b7a071db1820c565182d1a5f119b2ce08ce035d5\",\"root_issuer\":\"492eb92685202e9a3cbea322534ee401133135563b0037bf41f715468efdb055\",\"root_scope_hash\":\"debb851617e2fdac8dc3f557efef08e861bab1ecbaddb6a0a991496ae1b2168c\",\"root_subject\":\"7d59ee415497b42b598e58b3faa76ccb05578603fb4f3fc852ce0467eea9aa4d\",\"schema\":\"chio.cumulative-approval-root.v1\",\"signer_key_epoch\":0,\"threshold\":{\"currency\":\"USD\",\"units\":100}},\"signature\":\"2ff452f9933337d2c8e52c43cd0817c46e2c75a927630b3bdfabd5c3c678837db5a9d191e1f4306f8d88213c0a68ab223e6df04238f52ac58634585705c08f0e\"},\"threshold\":{\"currency\":\"USD\",\"units\":80}}}],\"operations\":[\"invoke\"],\"server_id\":\"server\",\"tool_name\":\"tool\"}]}",
+      "normalizedParentScope": "{\"grants\":[{\"constraints\":[{\"type\":\"require_cumulative_approval_above\",\"value\":{\"approval_budget_epoch\":7,\"approval_budget_id\":\"budget-1\",\"cumulative_approval_root_binding\":{\"body\":{\"approval_budget_epoch\":7,\"approval_budget_id\":\"budget-1\",\"root_capability_hash\":\"c8cb4ca99b8a150ea4bb126a0b414b68c594118260529a6cbf4d9c8e46003a74\",\"root_capability_id\":\"cap-root\",\"root_expires_at\":1000,\"root_grant_hash\":\"ceb49b370810ae2179e552d8b7a071db1820c565182d1a5f119b2ce08ce035d5\",\"root_issuer\":\"492eb92685202e9a3cbea322534ee401133135563b0037bf41f715468efdb055\",\"root_scope_hash\":\"debb851617e2fdac8dc3f557efef08e861bab1ecbaddb6a0a991496ae1b2168c\",\"root_subject\":\"7d59ee415497b42b598e58b3faa76ccb05578603fb4f3fc852ce0467eea9aa4d\",\"schema\":\"chio.cumulative-approval-root.v1\",\"signer_key_epoch\":0,\"threshold\":{\"currency\":\"USD\",\"units\":100}},\"signature\":\"2ff452f9933337d2c8e52c43cd0817c46e2c75a927630b3bdfabd5c3c678837db5a9d191e1f4306f8d88213c0a68ab223e6df04238f52ac58634585705c08f0e\"},\"threshold\":{\"currency\":\"USD\",\"units\":100}}}],\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"server\",\"tool_name\":\"tool\"}]}",
+      "restrictedPredicates": [
+        "tool:server:tool:constraint:RequireCumulativeApprovalAbove { threshold: MonetaryAmount { units: 80, currency: \"USD\" }, approval_budget_id: \"budget-1\", approval_budget_epoch: 7, cumulative_approval_root_binding: Some(CumulativeApprovalRootBinding { body: CumulativeApprovalRootBindingBody { schema: \"chio.cumulative-approval-root.v1\", signer_key_epoch: 0, root_capability_id: \"cap-root\", root_capability_hash: \"c8cb4ca99b8a150ea4bb126a0b414b68c594118260529a6cbf4d9c8e46003a74\", root_issuer: PublicKey { material: Ed25519 { verifying_key: VerifyingKey(CompressedEdwardsY: [73, 46, 185, 38, 133, 32, 46, 154, 60, 190, 163, 34, 83, 78, 228, 1, 19, 49, 53, 86, 59, 0, 55, 191, 65, 247, 21, 70, 142, 253, 176, 85]), EdwardsPoint{\n\tX: FieldElement51([21385587565812, 2237434027605535, 326414353439880, 1344153637914221, 1252480169209837]),\n\tY: FieldElement51([1399275678470703, 986165418753396, 918005953186102, 125669364260836, 402046057361318]),\n\tZ: FieldElement51([890128551687402, 520363077817792, 1721482640791109, 28387635208400, 1524323076674834]),\n\tT: FieldElement51([7193520521028, 511778259422919, 1214535280066889, 20799238188600, 755698137411914])\n}) } }, root_subject: PublicKey { material: Ed25519 { verifying_key: VerifyingKey(CompressedEdwardsY: [125, 89, 238, 65, 84, 151, 180, 43, 89, 142, 88, 179, 250, 167, 108, 203, 5, 87, 134, 3, 251, 79, 63, 200, 82, 206, 4, 103, 238, 169, 170, 77]), EdwardsPoint{\n\tX: FieldElement51([1546928098465605, 817421652484396, 1494668126529067, 1472190990303805, 546059903745729]),\n\tY: FieldElement51([1674926170062953, 1711412494976653, 48422757063975, 324925459977537, 1090552687879175]),\n\tZ: FieldElement51([1289091901420191, 40801172939843, 1722667384377638, 1252437843663927, 76579169637459]),\n\tT: FieldElement51([1185570905689195, 1853582716052906, 168404232201809, 1475752852038830, 2162632608908353])\n}) } }, root_scope_hash: \"debb851617e2fdac8dc3f557efef08e861bab1ecbaddb6a0a991496ae1b2168c\", root_grant_hash: \"ceb49b370810ae2179e552d8b7a071db1820c565182d1a5f119b2ce08ce035d5\", approval_budget_id: \"budget-1\", approval_budget_epoch: 7, threshold: MonetaryAmount { units: 100, currency: \"USD\" }, root_expires_at: 1000 }, signature: Signature { material: Ed25519 { inner: ed25519::Signature { R: 0x2ff452f9933337d2c8e52c43cd0817c46e2c75a927630b3bdfabd5c3c678837d, s: 0xb5a9d191e1f4306f8d88213c0a68ab223e6df04238f52ac58634585705c08f0e } } } }) }",
+        "tool:server:tool:removed_operation:Delegate"
+      ],
+      "subsetRelations": [
+        {
+          "childIndex": 0,
+          "grantKind": "tool",
+          "parentIndex": 0,
+          "subset": true
+        }
+      ]
+    },
+    "parentScopeHash": "a92a80a68a013806ea065b91c73591534279fa00793cc1adb7944111b3f64e54"
+  },
+  "delegation_chain": [
+    {
+      "capability_id": "cap-root",
+      "cumulative_approval": {
+        "bindings": [
+          {
+            "approval_budget_epoch": 7,
+            "approval_budget_id": "budget-1",
+            "currency": "USD",
+            "root_binding_digest": "7a0935fb7fe6cc68743d06891bd66268050d02e94b6c12e5a6d31ead11d7963c"
+          }
+        ]
+      },
+      "delegatee": "8ac58431656b887a101d677486b69e230e2d6a98fd57a47e2a352b1f91f2c5e3",
+      "delegator": "7d59ee415497b42b598e58b3faa76ccb05578603fb4f3fc852ce0467eea9aa4d",
+      "scope_hash": "a92a80a68a013806ea065b91c73591534279fa00793cc1adb7944111b3f64e54",
+      "signature": "273a8c488d85ffd691599337d6ecfb183744aa941cd6fb24cbd3b1f1a107d924c4b21ae90fa52f137f7bc987a4eb4aed1718403a4c82a987452f9e43f4a33705",
+      "timestamp": 200
+    }
+  ],
+  "expires_at": 1000,
+  "id": "cap-witness",
+  "issued_at": 100,
+  "issuer": "492eb92685202e9a3cbea322534ee401133135563b0037bf41f715468efdb055",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "require_cumulative_approval_above",
+            "value": {
+              "approval_budget_epoch": 7,
+              "approval_budget_id": "budget-1",
+              "cumulative_approval_root_binding": {
+                "body": {
+                  "approval_budget_epoch": 7,
+                  "approval_budget_id": "budget-1",
+                  "root_capability_hash": "c8cb4ca99b8a150ea4bb126a0b414b68c594118260529a6cbf4d9c8e46003a74",
+                  "root_capability_id": "cap-root",
+                  "root_expires_at": 1000,
+                  "root_grant_hash": "ceb49b370810ae2179e552d8b7a071db1820c565182d1a5f119b2ce08ce035d5",
+                  "root_issuer": "492eb92685202e9a3cbea322534ee401133135563b0037bf41f715468efdb055",
+                  "root_scope_hash": "debb851617e2fdac8dc3f557efef08e861bab1ecbaddb6a0a991496ae1b2168c",
+                  "root_subject": "7d59ee415497b42b598e58b3faa76ccb05578603fb4f3fc852ce0467eea9aa4d",
+                  "schema": "chio.cumulative-approval-root.v1",
+                  "signer_key_epoch": 0,
+                  "threshold": {
+                    "currency": "USD",
+                    "units": 100
+                  }
+                },
+                "signature": "2ff452f9933337d2c8e52c43cd0817c46e2c75a927630b3bdfabd5c3c678837db5a9d191e1f4306f8d88213c0a68ab223e6df04238f52ac58634585705c08f0e"
+              },
+              "threshold": {
+                "currency": "USD",
+                "units": 80
+              }
+            }
+          }
+        ],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "server",
+        "tool_name": "tool"
+      }
+    ]
+  },
+  "subject": "8ac58431656b887a101d677486b69e230e2d6a98fd57a47e2a352b1f91f2c5e3"
+}

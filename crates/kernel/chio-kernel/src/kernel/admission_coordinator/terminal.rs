@@ -695,7 +695,10 @@ impl ChioKernel {
             .then_some(binding.authenticated_tenant_id.as_str());
         let signing_identity = tool_return.raw.receipt_signing_identity().clone();
         let signature_valid = receipt
-            .verify_signature_with_floor(signing_identity.crypto_floor())
+            .verify_signature_with_floor(
+                signing_identity.public_key(),
+                signing_identity.crypto_floor(),
+            )
             .map_err(|error| {
                 KernelError::DurableAdmission(format!(
                     "replay original receipt verification failed: {error}"
@@ -703,7 +706,10 @@ impl ChioKernel {
             })?
             && (signing_identity.crypto_floor() == self.receipt_signing_crypto_floor()
                 || receipt
-                    .verify_signature_with_floor(self.receipt_signing_crypto_floor())
+                    .verify_signature_with_floor(
+                        signing_identity.public_key(),
+                        self.receipt_signing_crypto_floor(),
+                    )
                     .map_err(|error| {
                         KernelError::DurableAdmission(format!(
                             "replay receipt verification failed: {error}"

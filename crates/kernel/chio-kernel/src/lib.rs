@@ -171,6 +171,8 @@ pub mod tool_outcome;
 pub mod transport;
 #[cfg(not(loom))]
 pub mod weights_binding;
+#[cfg(all(test, not(loom)))]
+pub(crate) mod wrapper_refusals;
 
 #[cfg(not(loom))]
 pub(crate) use std::collections::HashMap;
@@ -283,18 +285,19 @@ pub use chio_core::credit::{
     validate_capital_execution_envelope, CapitalAllocationDecisionArtifact,
     CapitalAllocationDecisionFinding, CapitalAllocationDecisionOutcome,
     CapitalAllocationDecisionReasonCode, CapitalAllocationDecisionSupportBoundary,
-    CapitalAllocationInstructionDraft, CapitalBookEvent, CapitalBookEventKind,
-    CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookReport,
-    CapitalBookRole, CapitalBookSource, CapitalBookSourceKind, CapitalBookSummary,
-    CapitalBookSupportBoundary, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
-    CapitalExecutionInstructionArtifact, CapitalExecutionInstructionSupportBoundary,
-    CapitalExecutionIntendedState, CapitalExecutionObservation, CapitalExecutionRail,
-    CapitalExecutionRailKind, CapitalExecutionReconciledState, CapitalExecutionRole,
-    CapitalExecutionWindow, CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport,
-    CreditBacktestSummary, CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition,
-    CreditBondFinding, CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport,
-    CreditBondListSummary, CreditBondPrerequisites, CreditBondReasonCode, CreditBondReport,
-    CreditBondRow, CreditBondSupportBoundary, CreditBondTerms, CreditBondedExecutionControlPolicy,
+    CapitalAllocationInstructionDraft, CapitalAuthorityTrustError, CapitalBookEvent,
+    CapitalBookEventKind, CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
+    CapitalBookReport, CapitalBookRole, CapitalBookSource, CapitalBookSourceKind,
+    CapitalBookSummary, CapitalBookSupportBoundary, CapitalExecutionAuthorityStep,
+    CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
+    CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
+    CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionRailKind,
+    CapitalExecutionReconciledState, CapitalExecutionRole, CapitalExecutionWindow,
+    CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
+    CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition, CreditBondFinding,
+    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondListSummary,
+    CreditBondPrerequisites, CreditBondReasonCode, CreditBondReport, CreditBondRow,
+    CreditBondSupportBoundary, CreditBondTerms, CreditBondedExecutionControlPolicy,
     CreditBondedExecutionDecision, CreditBondedExecutionEvaluation, CreditBondedExecutionFinding,
     CreditBondedExecutionFindingCode, CreditBondedExecutionSimulationDelta,
     CreditBondedExecutionSimulationQuery, CreditBondedExecutionSimulationReport,
@@ -322,15 +325,15 @@ pub use chio_core::credit::{
     SignedCapitalAllocationDecision, SignedCapitalBookReport, SignedCapitalExecutionInstruction,
     SignedCreditBond, SignedCreditFacility, SignedCreditLossLifecycle,
     SignedCreditProviderRiskPackage, SignedCreditScorecardReport, SignedExposureLedgerReport,
-    CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA, CAPITAL_BOOK_REPORT_SCHEMA,
-    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CREDIT_BACKTEST_REPORT_SCHEMA,
-    CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA, CREDIT_BOND_ARTIFACT_SCHEMA,
-    CREDIT_BOND_LIST_REPORT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA,
-    CREDIT_FACILITY_LIST_REPORT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
-    CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA, CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA,
-    CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA, CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA,
-    CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA, MAX_CREDIT_BACKTEST_WINDOW_LIMIT,
-    MAX_CREDIT_BOND_LIST_LIMIT, MAX_CREDIT_FACILITY_LIST_LIMIT,
+    TrustedCapitalAuthority, CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA,
+    CAPITAL_BOOK_REPORT_SCHEMA, CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
+    CREDIT_BACKTEST_REPORT_SCHEMA, CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_LIST_REPORT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
+    CREDIT_FACILITY_ARTIFACT_SCHEMA, CREDIT_FACILITY_LIST_REPORT_SCHEMA,
+    CREDIT_FACILITY_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
+    CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
+    CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA, CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA,
+    MAX_CREDIT_BACKTEST_WINDOW_LIMIT, MAX_CREDIT_BOND_LIST_LIMIT, MAX_CREDIT_FACILITY_LIST_LIMIT,
     MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, MAX_CREDIT_PROVIDER_LOSS_LIMIT,
     MAX_EXPOSURE_LEDGER_DECISION_LIMIT, MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT,
 };
@@ -660,7 +663,7 @@ pub use chio_core::receipt::metadata::{
 #[cfg(not(loom))]
 pub use kernel::{
     active_response_admission_artifact_payload_digest,
-    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
     derive_active_response_dispatch_id, prepare_response_dispatch, AcquiredNativeSecurityEgress,
     ActiveResponseAdmissionRequest, ActiveResponseArtifactAuthorityAttestation,
     ActiveResponseArtifactAuthorityAttestationBody,

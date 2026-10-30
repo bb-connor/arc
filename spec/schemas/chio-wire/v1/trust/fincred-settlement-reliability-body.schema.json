@@ -1,0 +1,692 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/fincred-settlement-reliability-body.schema.json",
+  "title": "chio.fincred.settlement-reliability.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "@context",
+    "credentialId",
+    "credentialSubject",
+    "evidence",
+    "expirationDate",
+    "family",
+    "issuanceDate",
+    "issuer",
+    "issuerKeyEpoch",
+    "presentationEvidenceClass",
+    "schema",
+    "sourceEvidenceClass",
+    "type"
+  ],
+  "properties": {
+    "@context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "credentialId": {
+      "type": "string"
+    },
+    "credentialSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claims",
+        "family"
+      ],
+      "properties": {
+        "claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "obligationCount",
+            "onTimeCount",
+            "onTimeRatioBps"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "obligationCount": {
+              "type": "integer"
+            },
+            "onTimeCount": {
+              "type": "integer"
+            },
+            "onTimeRatioBps": {
+              "type": "integer"
+            }
+          }
+        },
+        "family": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceCompletenessAttestations",
+        "sourceDisclosure",
+        "window"
+      ],
+      "properties": {
+        "sourceCompletenessAttestations": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signerKey",
+              "signature"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "schema",
+                  "sourceId",
+                  "sourceFamily",
+                  "subject",
+                  "sourceSignerKey",
+                  "checkpointAuthorityEpoch",
+                  "checkpointAuthorityKey",
+                  "storeGeneration",
+                  "checkpointSequence",
+                  "checkpointDigest",
+                  "cutoff",
+                  "window",
+                  "committedLeaves",
+                  "rangeRoot",
+                  "indexRoot",
+                  "lowerBoundary",
+                  "upperBoundary",
+                  "sourceArtifactDigests",
+                  "disclosureDigest",
+                  "attestationReference",
+                  "issuedAt",
+                  "expiresAt",
+                  "sourceEvidenceClass"
+                ],
+                "properties": {
+                  "schema": {
+                    "const": "chio.fincred.source-completeness-attestation.v1"
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "sourceFamily": {
+                    "enum": [
+                      "credit_scorecard",
+                      "exposure_history",
+                      "settlement_reliability",
+                      "premium_history",
+                      "loss_history"
+                    ]
+                  },
+                  "subject": {
+                    "type": "string",
+                    "pattern": "^did:chio:[0-9a-f]{64}$"
+                  },
+                  "sourceSignerKey": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "checkpointAuthorityEpoch": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "checkpointAuthorityKey": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "storeGeneration": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "checkpointSequence": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "checkpointDigest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "cutoff": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "window": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "startsAt",
+                      "endsAt"
+                    ],
+                    "properties": {
+                      "startsAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "endsAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    }
+                  },
+                  "committedLeaves": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "leaf",
+                        "indexProof"
+                      ],
+                      "properties": {
+                        "leaf": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "index",
+                            "queryKey",
+                            "sourceArtifactDigest"
+                          ],
+                          "properties": {
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "queryKey": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "sourceFamily",
+                                "subject",
+                                "occurredAt",
+                                "artifactId"
+                              ],
+                              "properties": {
+                                "sourceFamily": {
+                                  "enum": [
+                                    "credit_scorecard",
+                                    "exposure_history",
+                                    "settlement_reliability",
+                                    "premium_history",
+                                    "loss_history"
+                                  ]
+                                },
+                                "subject": {
+                                  "type": "string",
+                                  "pattern": "^did:chio:[0-9a-f]{64}$"
+                                },
+                                "occurredAt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "artifactId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 512
+                                }
+                              }
+                            },
+                            "sourceArtifactDigest": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{64}$"
+                            }
+                          }
+                        },
+                        "indexProof": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "treeSize",
+                            "leafIndex",
+                            "auditPath"
+                          ],
+                          "properties": {
+                            "treeSize": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "leafIndex": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "auditPath": {
+                              "type": "array",
+                              "maxItems": 64,
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "rangeRoot": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "indexRoot": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "lowerBoundary": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "source_edge"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "leafProof"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "adjacent"
+                          },
+                          "leafProof": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "leaf",
+                              "indexProof"
+                            ],
+                            "properties": {
+                              "leaf": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "index",
+                                  "queryKey",
+                                  "sourceArtifactDigest"
+                                ],
+                                "properties": {
+                                  "index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "queryKey": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "sourceFamily",
+                                      "subject",
+                                      "occurredAt",
+                                      "artifactId"
+                                    ],
+                                    "properties": {
+                                      "sourceFamily": {
+                                        "enum": [
+                                          "credit_scorecard",
+                                          "exposure_history",
+                                          "settlement_reliability",
+                                          "premium_history",
+                                          "loss_history"
+                                        ]
+                                      },
+                                      "subject": {
+                                        "type": "string",
+                                        "pattern": "^did:chio:[0-9a-f]{64}$"
+                                      },
+                                      "occurredAt": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "artifactId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      }
+                                    }
+                                  },
+                                  "sourceArtifactDigest": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-f]{64}$"
+                                  }
+                                }
+                              },
+                              "indexProof": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "treeSize",
+                                  "leafIndex",
+                                  "auditPath"
+                                ],
+                                "properties": {
+                                  "treeSize": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "leafIndex": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "auditPath": {
+                                    "type": "array",
+                                    "maxItems": 64,
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "upperBoundary": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "source_edge"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "leafProof"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "adjacent"
+                          },
+                          "leafProof": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "leaf",
+                              "indexProof"
+                            ],
+                            "properties": {
+                              "leaf": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "index",
+                                  "queryKey",
+                                  "sourceArtifactDigest"
+                                ],
+                                "properties": {
+                                  "index": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "queryKey": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "sourceFamily",
+                                      "subject",
+                                      "occurredAt",
+                                      "artifactId"
+                                    ],
+                                    "properties": {
+                                      "sourceFamily": {
+                                        "enum": [
+                                          "credit_scorecard",
+                                          "exposure_history",
+                                          "settlement_reliability",
+                                          "premium_history",
+                                          "loss_history"
+                                        ]
+                                      },
+                                      "subject": {
+                                        "type": "string",
+                                        "pattern": "^did:chio:[0-9a-f]{64}$"
+                                      },
+                                      "occurredAt": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "artifactId": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 512
+                                      }
+                                    }
+                                  },
+                                  "sourceArtifactDigest": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-f]{64}$"
+                                  }
+                                }
+                              },
+                              "indexProof": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "treeSize",
+                                  "leafIndex",
+                                  "auditPath"
+                                ],
+                                "properties": {
+                                  "treeSize": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "leafIndex": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "auditPath": {
+                                    "type": "array",
+                                    "maxItems": 64,
+                                    "items": {
+                                      "type": "string",
+                                      "pattern": "^[0-9a-f]{64}$"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "sourceArtifactDigests": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    }
+                  },
+                  "disclosureDigest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "attestationReference": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "issuedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "sourceEvidenceClass": {
+                    "enum": [
+                      "asserted",
+                      "observed",
+                      "verified"
+                    ]
+                  }
+                }
+              },
+              "signerKey": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "signature": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{128}$"
+              }
+            }
+          }
+        },
+        "sourceDisclosure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifacts",
+            "kind"
+          ],
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "maxItems": 256,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "role",
+                  "artifactSchema",
+                  "artifactDigest",
+                  "canonicalArtifact"
+                ],
+                "properties": {
+                  "role": {
+                    "enum": [
+                      "claim",
+                      "member"
+                    ]
+                  },
+                  "artifactSchema": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 512
+                  },
+                  "artifactDigest": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "canonicalArtifact": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 524288
+                  }
+                }
+              }
+            },
+            "kind": {
+              "type": "string"
+            }
+          }
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endsAt",
+            "startsAt"
+          ],
+          "properties": {
+            "endsAt": {
+              "type": "integer"
+            },
+            "startsAt": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "expirationDate": {
+      "type": "string"
+    },
+    "family": {
+      "type": "string"
+    },
+    "issuanceDate": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "issuerKeyEpoch": {
+      "type": "integer"
+    },
+    "presentationEvidenceClass": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fincred.settlement-reliability.v1"
+    },
+    "sourceEvidenceClass": {
+      "type": "string"
+    },
+    "type": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

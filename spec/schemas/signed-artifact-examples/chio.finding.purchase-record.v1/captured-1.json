@@ -1,0 +1,26 @@
+{
+  "accepted_bid_envelope_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "accepted_price": {
+    "currency": "USD",
+    "units": 450
+  },
+  "authoritative_payment_operation_id": "payment-operation-42",
+  "buyer": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+  "delivery_receipt_id": "delivery-receipt-42",
+  "encumbrance_id": "encumbrance-42",
+  "finding_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "listing_id": "finding-listing-01",
+  "payer": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+  "payment_reference": "rail:venue-ledger:payment-42",
+  "payout_destination": "0x1111111111111111111111111111111111111111",
+  "purchase_intent_id": "purchase-intent-42",
+  "purchase_key": "1a043f0a81cb19d2ba3fffc88f7a2dd7587c58910beaefee7ff4c1e34c7863e4",
+  "realized_spend": {
+    "currency": "USD",
+    "units": 450
+  },
+  "recorded_at": 1750000000,
+  "schema": "chio.finding.purchase-record.v1",
+  "seller_backing_envelope_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "venue_admission_envelope_sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+}

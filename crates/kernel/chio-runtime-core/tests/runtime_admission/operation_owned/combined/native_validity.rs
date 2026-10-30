@@ -187,7 +187,10 @@ fn native_runtime_deadline_includes_the_verified_bilateral_capability_lease() ->
             .into_iter()
             .map(|key| DsseSignature {
                 keyid: chio_federation::bilateral_dsse::Keyid::from_public_key(&key.public_key()).0,
-                sig: encoding.encode(key.sign(&preimage).to_bytes()),
+                sig: encoding.encode(
+                    key.sign_exempt(chio_core_types::crypto::ExemptFormat::DssePae, &preimage)
+                        .to_bytes(),
+                ),
             })
             .collect();
         chio_federation::bilateral_dsse::verify_chio_bilateral_dsse_envelope(
@@ -228,7 +231,7 @@ fn native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_p
         Some(swarm_route_metadata()),
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let (source, intent) = physical_input(&fixture.inner)?;
     assert_eq!(intent.resources().len(), 3);
     let context = revalidation_input(&fixture.inner, &response);

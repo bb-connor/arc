@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/key-log-checkpoint-body.schema.json",
+  "title": "chio.key-log.checkpoint.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpoint_sequence",
+    "issued_at",
+    "log_id",
+    "previous_checkpoint_hash",
+    "root_hash",
+    "schema",
+    "tree_size"
+  ],
+  "properties": {
+    "checkpoint_sequence": {
+      "type": "integer"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "log_id": {
+      "type": "string"
+    },
+    "previous_checkpoint_hash": {
+      "type": "string"
+    },
+    "root_hash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.key-log.checkpoint.v1"
+    },
+    "tree_size": {
+      "type": "integer"
+    }
+  }
+}

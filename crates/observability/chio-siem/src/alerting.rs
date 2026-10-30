@@ -132,7 +132,7 @@ pub fn derive_severity(receipt: &ChioReceipt) -> AlertSeverity {
         .map(|id| id == receipt.id)
         .unwrap_or(false);
     let authoritative = receipt_id_valid
-        && receipt.verify_signature().unwrap_or(false)
+        && receipt.verify_integrity_embedded_key().unwrap_or(false)
         && receipt.action.verify_hash().unwrap_or(false);
     let authorized = authoritative
         && receipt
@@ -743,7 +743,7 @@ impl AlertingExporter {
             || !chio_receipt_id(&receipt.body())
                 .map(|expected| expected == receipt.id)
                 .unwrap_or(false)
-            || !receipt.verify_signature().unwrap_or(false)
+            || !receipt.verify_integrity_embedded_key().unwrap_or(false)
             || !receipt.action.verify_hash().unwrap_or(false)
         {
             return false;

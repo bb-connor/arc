@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-input-manifest-body.schema.json",
+  "title": "chio.clearing.input-manifest.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityId",
+    "endCheckpointDigest",
+    "entries",
+    "epoch",
+    "expiresAtUnixMs",
+    "hasMore",
+    "issuedAtUnixMs",
+    "keyEpoch",
+    "rangeEndSequence",
+    "rangeStartSequence",
+    "schema",
+    "sourceId",
+    "startCheckpointDigest"
+  ],
+  "properties": {
+    "authorityId": {
+      "type": "string"
+    },
+    "endCheckpointDigest": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "atomDigest",
+          "dispositionDigest",
+          "dispositionVersion",
+          "lifecycleFence",
+          "obligationId",
+          "roundId",
+          "sourceSequence"
+        ],
+        "properties": {
+          "atomDigest": {
+            "type": "string"
+          },
+          "dispositionDigest": {
+            "type": "string"
+          },
+          "dispositionVersion": {
+            "type": "integer"
+          },
+          "lifecycleFence": {
+            "type": "integer"
+          },
+          "obligationId": {
+            "type": "string"
+          },
+          "roundId": {
+            "type": "string"
+          },
+          "sourceSequence": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "epoch": {
+      "type": "integer"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "rangeEndSequence": {
+      "type": "integer"
+    },
+    "rangeStartSequence": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.clearing.input-manifest.v1"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "startCheckpointDigest": {
+      "type": "string"
+    }
+  }
+}

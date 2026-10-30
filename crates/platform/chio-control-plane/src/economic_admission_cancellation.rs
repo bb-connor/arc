@@ -148,7 +148,7 @@ impl EconomicAdmissionCancellationCoordinator {
             &self.operations.admission_projection_capabilities(),
             &self.signer,
         )?;
-        let expected_terminal = envelope.verify()?.terminal()?;
+        let expected_terminal = envelope.verify_integrity_embedded_key()?.terminal()?;
         let batch_id = advance.batch().batch_id.clone();
         self.operations.stage_anchored_terminal_projection(
             advance.state_advance(),

@@ -48,12 +48,10 @@ The current public export surface is:
 - `is_valid_public_key_hex`
 - `is_valid_signature_hex`
 - `public_key_hex_matches`
-- `sign_utf8_message_ed25519`
-- `verify_utf8_message_ed25519`
-- `sign_json_str_ed25519`
-- `verify_json_str_signature_ed25519`
-- `Utf8MessageSignature`
-- `CanonicalJsonSignature`
+- `public_key_from_seed_ed25519`
+- `sign_wrapped_json_ed25519` (takes a registered schema id)
+- `verify_wrapped_json`
+- `WrappedJsonSignature`
 
 ### Receipts
 

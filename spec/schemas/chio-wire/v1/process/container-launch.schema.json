@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/process/container-launch.schema.json",
+  "title": "Chio process container launch signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attempt",
+    "container_id",
+    "engine_identity",
+    "image_id",
+    "process_id",
+    "profile_digest",
+    "schema",
+    "state"
+  ],
+  "properties": {
+    "attempt": {
+      "type": "integer"
+    },
+    "container_id": {
+      "type": "string"
+    },
+    "engine_identity": {
+      "type": "string"
+    },
+    "failed_at_unix_ms": {
+      "type": "integer"
+    },
+    "failure_class": {
+      "type": "string"
+    },
+    "image_id": {
+      "type": "string"
+    },
+    "inspected_config_digest": {
+      "type": "string"
+    },
+    "process_id": {
+      "type": "string"
+    },
+    "profile_digest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.process.container-launch.v1"
+    },
+    "started_at": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    }
+  }
+}

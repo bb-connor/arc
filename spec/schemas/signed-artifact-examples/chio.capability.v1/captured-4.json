@@ -1,0 +1,33 @@
+{
+  "expires_at": 18446744073709551615,
+  "id": "cap-request-matching",
+  "issued_at": 1,
+  "issuer": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "require_finding_recovery",
+            "value": {
+              "finding_id": "finding-a",
+              "listing_id": "listing-1",
+              "max_recoveries": 2,
+              "original_capability_id": "capability-original",
+              "original_delivery_receipt_id": "receipt-original",
+              "purchase_key": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "recovery_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        ],
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "srv",
+        "tool_name": "tool"
+      }
+    ]
+  },
+  "subject": "a41b084bb32ba2bb97b8859a216b822aa8b8afef77e791915b2c2e59aaca3d39"
+}

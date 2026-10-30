@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/parametric/parametric-policy-body.schema.json",
+  "title": "chio.parametric.policy.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "beneficiaryId",
+    "boundCoverageBodyDigest",
+    "boundCoverageEnvelopeDigest",
+    "coverageAmount",
+    "coverageAuthorityId",
+    "effectiveFrom",
+    "effectiveUntil",
+    "evaluatorAuthority",
+    "fundingFacilityId",
+    "issuedAt",
+    "maxCheckpointLagSeconds",
+    "payerId",
+    "payoutMode",
+    "payoutRail",
+    "payoutSchedule",
+    "preActionAuthorityDigest",
+    "predicate",
+    "schema",
+    "subjectKey",
+    "windowAnchor",
+    "windowSeconds"
+  ],
+  "properties": {
+    "beneficiaryId": {
+      "type": "string"
+    },
+    "boundCoverageBodyDigest": {
+      "type": "string"
+    },
+    "boundCoverageEnvelopeDigest": {
+      "type": "string"
+    },
+    "coverageAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "coverageAuthorityId": {
+      "type": "string"
+    },
+    "effectiveFrom": {
+      "type": "integer"
+    },
+    "effectiveUntil": {
+      "type": "integer"
+    },
+    "evaluatorAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorityId",
+        "keyEpoch",
+        "keyId"
+      ],
+      "properties": {
+        "authorityId": {
+          "type": "string"
+        },
+        "keyEpoch": {
+          "type": "integer"
+        },
+        "keyId": {
+          "type": "string"
+        }
+      }
+    },
+    "fundingFacilityId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "maxCheckpointLagSeconds": {
+      "type": "integer"
+    },
+    "payerId": {
+      "type": "string"
+    },
+    "payoutMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "windowSeconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "payoutRail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "destinationAccountDigest",
+        "kind",
+        "railId"
+      ],
+      "properties": {
+        "destinationAccountDigest": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "railId": {
+          "type": "string"
+        }
+      }
+    },
+    "payoutSchedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "kind"
+      ],
+      "properties": {
+        "amount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "preActionAuthorityDigest": {
+      "type": "string"
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "minEvents",
+        "thresholdBps"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "minEvents": {
+          "type": "integer"
+        },
+        "thresholdBps": {
+          "type": "integer"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.parametric.policy.v1"
+    },
+    "subjectKey": {
+      "type": "string"
+    },
+    "windowAnchor": {
+      "type": "integer"
+    },
+    "windowSeconds": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/iou-envelope.schema.json",
+  "title": "Chio credit iou envelope signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount_units",
+    "capability_id",
+    "currency",
+    "iou_id",
+    "issuer_key",
+    "receipt_id",
+    "receipt_timestamp",
+    "schema",
+    "tool_name",
+    "tool_server"
+  ],
+  "properties": {
+    "amount_units": {
+      "type": "integer"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "iou_id": {
+      "type": "string"
+    },
+    "issuer_key": {
+      "type": "string"
+    },
+    "receipt_id": {
+      "type": "string"
+    },
+    "receipt_timestamp": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.credit.iou-envelope.v1"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    },
+    "tool_server": {
+      "type": "string"
+    }
+  }
+}

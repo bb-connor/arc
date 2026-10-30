@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-challenge-outcome-body.schema.json",
+  "title": "chio.finding.challenge-outcome.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorization",
+    "backing_allocation_id",
+    "challenge_envelope_sha256",
+    "evaluated_at",
+    "evaluator_authority_id",
+    "evaluator_key",
+    "evaluator_key_epoch",
+    "evaluator_revocation_status_ref",
+    "evaluator_valid_from",
+    "evaluator_valid_until",
+    "evidence_bundle_digest",
+    "evidence_kind",
+    "facet",
+    "finding_id",
+    "listing_id",
+    "outcome_id",
+    "reason",
+    "schema",
+    "trigger_digest",
+    "verdict",
+    "verifier_profile_envelope_sha256"
+  ],
+  "properties": {
+    "audit_epoch_envelope_sha256": {
+      "type": "string"
+    },
+    "authorization": {
+      "type": "string"
+    },
+    "backing_allocation_id": {
+      "type": "string"
+    },
+    "challenge_envelope_sha256": {
+      "type": "string"
+    },
+    "evaluated_at": {
+      "type": "integer"
+    },
+    "evaluator_authority_id": {
+      "type": "string"
+    },
+    "evaluator_key": {
+      "type": "string"
+    },
+    "evaluator_key_epoch": {
+      "type": "integer"
+    },
+    "evaluator_revocation_status_ref": {
+      "type": "string"
+    },
+    "evaluator_valid_from": {
+      "type": "integer"
+    },
+    "evaluator_valid_until": {
+      "type": "integer"
+    },
+    "evidence_bundle_digest": {
+      "type": "string"
+    },
+    "evidence_kind": {
+      "type": "string"
+    },
+    "facet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "digest_mismatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "committed_payload_sha256",
+            "delivered_output_sha256",
+            "realized_spend_units",
+            "transform_profile"
+          ],
+          "properties": {
+            "committed_payload_sha256": {
+              "type": "string"
+            },
+            "delivered_output_sha256": {
+              "type": "string"
+            },
+            "realized_spend_units": {
+              "type": "integer"
+            },
+            "transform_profile": {
+              "type": "string"
+            }
+          }
+        },
+        "evidence_invalid": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "challenged_receipt_ids",
+            "invalidity"
+          ],
+          "properties": {
+            "challenged_receipt_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "invalidity": {
+              "type": "string"
+            }
+          }
+        },
+        "replay_contradiction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observation_digests",
+            "predicate",
+            "predicate_result",
+            "recipe_sha256",
+            "replay_run_id"
+          ],
+          "properties": {
+            "observation_digests": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "predicate": {
+              "type": "string"
+            },
+            "predicate_result": {
+              "type": "string"
+            },
+            "recipe_sha256": {
+              "type": "string"
+            },
+            "replay_run_id": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "outcome_id": {
+      "type": "string"
+    },
+    "penalty_calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_finding_stake_units",
+        "computed_exposure_units",
+        "listing_required_amount_units",
+        "live_allocated_collateral_units",
+        "open_per_sale_encumbrance_units",
+        "penalty_amount"
+      ],
+      "properties": {
+        "base_finding_stake_units": {
+          "type": "integer"
+        },
+        "computed_exposure_units": {
+          "type": "integer"
+        },
+        "listing_required_amount_units": {
+          "type": "integer"
+        },
+        "live_allocated_collateral_units": {
+          "type": "integer"
+        },
+        "open_per_sale_encumbrance_units": {
+          "type": "integer"
+        },
+        "penalty_amount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "reason": {
+      "type": "string"
+    },
+    "retry_deadline": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.challenge-outcome.v1"
+    },
+    "trigger_digest": {
+      "type": "string"
+    },
+    "verdict": {
+      "type": "string"
+    },
+    "verifier_profile_envelope_sha256": {
+      "type": "string"
+    }
+  }
+}

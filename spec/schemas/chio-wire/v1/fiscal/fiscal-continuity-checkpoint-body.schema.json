@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-continuity-checkpoint-body.schema.json",
+  "title": "chio.fiscal.continuity-checkpoint.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorId",
+    "anchorNamespace",
+    "checkpointId",
+    "continuitySequence",
+    "domains",
+    "genesisPolicyDigest",
+    "genesisPolicyId",
+    "governingOperatorId",
+    "pinnedCharterDigest",
+    "pinnedCharterId",
+    "pinnedCharterSequence",
+    "runtimeReadinessDigest",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "trustedClockHighWater"
+  ],
+  "properties": {
+    "anchorId": {
+      "type": "string"
+    },
+    "anchorNamespace": {
+      "type": "string"
+    },
+    "checkpointId": {
+      "type": "string"
+    },
+    "continuitySequence": {
+      "type": "integer"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "domain",
+          "everActivated"
+        ],
+        "properties": {
+          "active": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scheduleDigest",
+              "scheduleId",
+              "sequence"
+            ],
+            "properties": {
+              "scheduleDigest": {
+                "type": "string"
+              },
+              "scheduleId": {
+                "type": "string"
+              },
+              "sequence": {
+                "type": "integer"
+              }
+            }
+          },
+          "domain": {
+            "type": "string"
+          },
+          "everActivated": {
+            "type": "boolean"
+          },
+          "lastKnownGood": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scheduleDigest",
+              "scheduleId",
+              "sequence"
+            ],
+            "properties": {
+              "scheduleDigest": {
+                "type": "string"
+              },
+              "scheduleId": {
+                "type": "string"
+              },
+              "sequence": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "genesisPolicyDigest": {
+      "type": "string"
+    },
+    "genesisPolicyId": {
+      "type": "string"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "pinnedCharterDigest": {
+      "type": "string"
+    },
+    "pinnedCharterId": {
+      "type": "string"
+    },
+    "pinnedCharterSequence": {
+      "type": "integer"
+    },
+    "previousCheckpointDigest": {
+      "type": "string"
+    },
+    "runtimeReadinessDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.continuity-checkpoint.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "stagedTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transitionDigest",
+        "transitionId"
+      ],
+      "properties": {
+        "transitionDigest": {
+          "type": "string"
+        },
+        "transitionId": {
+          "type": "string"
+        }
+      }
+    },
+    "trustedClockHighWater": {
+      "type": "integer"
+    }
+  }
+}

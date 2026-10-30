@@ -214,7 +214,7 @@ fn protocol_refusal_original_ingress_is_durable_without_logging_or_dispatch() ->
             "refusal lacked retained evidence: {response}"
         );
         let receipt: ChioReceipt = serde_json::from_value(evidence["receipt"].clone())?;
-        assert!(receipt.verify_signature()?);
+        assert!(receipt.verify_integrity_embedded_key()?);
         assert!(receipt.action.verify_hash()?);
         assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
         assert_eq!(receipt.boundary_class, BoundaryClass::DetectOnly);
@@ -249,7 +249,7 @@ fn protocol_refusal_original_ingress_is_durable_without_logging_or_dispatch() ->
             canonical_json_bytes(&retained)?,
             canonical_json_bytes(&receipt)?
         );
-        assert!(retained.verify_signature()?);
+        assert!(retained.verify_integrity_embedded_key()?);
         let conn = rusqlite::Connection::open_with_flags(
             &path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,

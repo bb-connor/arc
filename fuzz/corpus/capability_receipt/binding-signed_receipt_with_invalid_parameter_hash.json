@@ -1,9 +1,18 @@
 {
   "description": "Receipt is signed correctly but carries a bad action parameter hash.",
   "expected": {
+    "authorized": false,
+    "boundary_class": "prevent",
     "decision": "allow",
+    "ok": false,
     "parameter_hash_valid": false,
-    "signature_valid": true
+    "receipt_id_valid": true,
+    "receipt_kind": "mediated_decision",
+    "result": "Authorized",
+    "signature_valid": true,
+    "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "signer_trusted": false,
+    "trust_level": "mediated"
   },
   "id": "signed_receipt_with_invalid_parameter_hash",
   "receipt": {
@@ -14,6 +23,7 @@
         "path": "/workspace/docs/private.md"
       }
     },
+    "boundary_class": "prevent",
     "capability_id": "cap-bindings-001",
     "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
     "decision": {
@@ -31,17 +41,21 @@
         "verdict": true
       }
     ],
-    "id": "rcpt-bindings-invalid-hash",
+    "id": "462d00b0dcb5b8b858dd986f52542967908b0d0f3cd6201fd9c0b0be83873136",
     "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
     "metadata": {
       "surface": "bindings-vectors",
       "version": 1
     },
     "policy_hash": "policy-bindings-v1",
-    "signature": "c043ad36f6cc2965a61f692691ac551067d3d0e8da7ff3280379e6eb1e84dcdc709358462b59d3b8801a5e78904286b2321f68dd195a8d00b6d926b2bc1b8903",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "signature": "381177a41b406fda26032a39749f2b047c956aeffa6b508b6f0c71de56cb0a622f5f0f617e85bfd8d2e50e532d884ac509fe9411d7f1abbdcef8f944d9504d00",
     "timestamp": 1710000200,
     "tool_name": "file_read",
-    "tool_server": "srv-files"
+    "tool_origin": "caller_executed",
+    "tool_server": "srv-files",
+    "trust_level": "mediated"
   },
-  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/private.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-invalid-hash\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+  "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/private.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"462d00b0dcb5b8b858dd986f52542967908b0d0f3cd6201fd9c0b0be83873136\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"mediated\"}"
 }

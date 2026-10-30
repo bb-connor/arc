@@ -27,7 +27,10 @@ fn evidence_export_marks_unanchored_publication_as_transparency_preview() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &[checkpoint_chain_leaf_hash(&first.body).expect("first chain leaf")],
     )
     .expect("second checkpoint");
@@ -45,8 +48,11 @@ fn evidence_export_marks_unanchored_publication_as_transparency_preview() {
             oldest_live_receipt_timestamp: None,
         },
     };
-    let transparency =
-        build_checkpoint_transparency(&[first, second]).expect("transparency summary");
+    let transparency = build_checkpoint_transparency(
+        &[first.clone(), second],
+        core::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("transparency summary");
 
     let claims = build_evidence_transparency_claims(&bundle, &transparency, None);
     assert_eq!(
@@ -84,7 +90,10 @@ fn evidence_export_marks_bound_publication_as_trust_anchored() {
         4,
         &[b"three".to_vec(), b"four".to_vec()],
         &keypair,
-        Some(&validate_checkpoint(&first).expect("verified predecessor")),
+        Some(
+            &validate_checkpoint(&first, core::slice::from_ref(&first.body.kernel_key))
+                .expect("verified predecessor"),
+        ),
         &[checkpoint_chain_leaf_hash(&first.body).expect("first chain leaf")],
     )
     .expect("second checkpoint");
@@ -102,8 +111,11 @@ fn evidence_export_marks_bound_publication_as_trust_anchored() {
             oldest_live_receipt_timestamp: None,
         },
     };
-    let mut transparency =
-        build_checkpoint_transparency(&[first.clone(), second.clone()]).expect("summary");
+    let mut transparency = build_checkpoint_transparency(
+        &[first.clone(), second.clone()],
+        core::slice::from_ref(&first.body.kernel_key),
+    )
+    .expect("summary");
     let binding = chio_core_types::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
         publication_identity: chio_core_types::receipt::checkpoint::CheckpointPublicationIdentity::new(
             chio_core_types::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
@@ -118,10 +130,18 @@ fn evidence_export_marks_bound_publication_as_trust_anchored() {
         publication_profile_version: "phase4-pilot".to_string(),
     };
     transparency.publications = vec![
-        build_trust_anchored_checkpoint_publication(&first, binding.clone())
-            .expect("first anchored publication"),
-        build_trust_anchored_checkpoint_publication(&second, binding)
-            .expect("second anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &first,
+            binding.clone(),
+            core::slice::from_ref(&first.body.kernel_key),
+        )
+        .expect("first anchored publication"),
+        build_trust_anchored_checkpoint_publication(
+            &second,
+            binding,
+            core::slice::from_ref(&second.body.kernel_key),
+        )
+        .expect("second anchored publication"),
     ];
 
     let unpinned = build_evidence_transparency_claims(&bundle, &transparency, None);

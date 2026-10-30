@@ -857,6 +857,7 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
     roster_policy_file: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    capital_authority_keys: &[String],
 ) -> Result<(), CliError> {
     let request = load_liability_claim_settlement_instruction_issue_request(input_file)?;
     let settlement_instruction = if let Some(url) = control_url {
@@ -880,6 +881,7 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
                 )
             })
             .and_then(load_roster_policy)?;
+        let capital_authority = require_local_capital_authority(capital_authority_keys)?;
         let receipt_store = chio_store_sqlite::SqliteReceiptStore::open(receipt_db_path)?;
         crate::trust_commands_cli::provision_local_issuance_authority(
             authority_seed_path,
@@ -891,6 +893,7 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
             authority_db_path,
             &request,
             &policy,
+            &capital_authority,
         )?
     };
 

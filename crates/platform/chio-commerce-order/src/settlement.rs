@@ -167,7 +167,7 @@ fn validate_settlement_dispatch_receipt(
             settlement.dispatch_receipt_ref
         )));
     }
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         CommerceOrderError::SettlementSignatureInvalid(format!(
             "settlement dispatch receipt signature invalid: {}: {error}",
             settlement.dispatch_receipt_ref

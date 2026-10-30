@@ -21,6 +21,9 @@ pub enum ErrorCode {
     MerkleProofFailed,
     EmptyTree,
     InvalidProofIndex,
+    UnregisteredSchemaId,
+    SignatureAlgorithmMismatch,
+    SignatureRejected,
     EmptyManifest,
     DuplicateToolName,
     InvalidToolName,
@@ -104,6 +107,11 @@ fn core_error_code(error: &chio_core::Error) -> ErrorCode {
         chio_core::Error::MerkleProofFailed => ErrorCode::MerkleProofFailed,
         chio_core::Error::EmptyTree => ErrorCode::EmptyTree,
         chio_core::Error::InvalidProofIndex { .. } => ErrorCode::InvalidProofIndex,
+        chio_core::Error::UnregisteredSchemaId(_) => ErrorCode::UnregisteredSchemaId,
+        chio_core::Error::SignatureAlgorithmMismatch { .. } => {
+            ErrorCode::SignatureAlgorithmMismatch
+        }
+        chio_core::Error::SignatureRejected => ErrorCode::SignatureRejected,
     }
 }
 

@@ -69,7 +69,7 @@ pub(super) fn validate_runtime_receipt_for_vendor(
         )));
     }
     let verified = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|error| ChioPackageError::Inconsistent(error.to_string()))?;
     if !verified {
         return Err(ChioPackageError::Inconsistent(format!(

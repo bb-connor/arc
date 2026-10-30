@@ -1,0 +1,42 @@
+{
+  "allowedAdmissionClasses": [
+    "reviewable",
+    "bond_backed"
+  ],
+  "explicitLocalReviewRequired": true,
+  "feeScheduleRef": {
+    "artifactId": "fee-schedule-1",
+    "kind": "open_market_fee_schedule",
+    "operatorId": "operator-alpha",
+    "schema": "chio.example.v1",
+    "sha256": "abababababababababababababababababababababababababababababababab",
+    "uri": "https://operator.example/fee-schedule-1"
+  },
+  "governingCharterRef": {
+    "artifactId": "charter-1",
+    "kind": "governance_charter",
+    "operatorId": "operator-alpha",
+    "schema": "chio.example.v1",
+    "sha256": "abababababababababababababababababababababababababababababababab",
+    "uri": "https://operator.example/charter-1"
+  },
+  "governingOperatorId": "operator-alpha",
+  "issuedAt": 1700000000,
+  "namespace": "chio://federation/open",
+  "note": "permissionless federation policy",
+  "policyId": "policy-anti-sybil",
+  "schema": "chio.federation-open-admission-policy.v1",
+  "stakeRequirements": [
+    {
+      "admissionClass": "bond_backed",
+      "governanceCaseRequired": true,
+      "minimumBondAmount": {
+        "currency": "USD",
+        "units": 5000
+      },
+      "requiredBondClass": "listing",
+      "slashable": true
+    }
+  ],
+  "visibilityOnlyWithoutActivation": true
+}

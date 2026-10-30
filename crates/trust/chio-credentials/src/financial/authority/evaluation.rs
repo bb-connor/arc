@@ -88,7 +88,7 @@ pub fn evaluate_financial_credentials(
     let mut credentials = Vec::new();
     let manifest_authority =
         trust.manifest_issuer_key(&manifest.body.issuer, &manifest.signer_key)?;
-    if manifest_authority.public_key != manifest.signer_key || !manifest.verify_signature()? {
+    if manifest_authority.public_key != manifest.signer_key || !manifest.verify_signature(&manifest.signer_key)? {
         return Err(authority_error(
             "source manifest signer does not match local issuer trust",
         ));
@@ -128,10 +128,14 @@ pub fn evaluate_financial_credentials(
                     credential.issuer_key_epoch,
                 )?;
                 let signature = Signature::from_hex(&credential.proof.proof_value)?;
-                if !issuer_key.public_key.verify(
-                    &canonical_json_bytes(&credential.signing_body())?,
+                if chio_core::crypto::verify_wrapped(
+                    &issuer_key.public_key,
+                    credential.family().schema(),
+                    &credential.signing_body(),
                     &signature,
-                ) {
+                )
+                .is_err()
+                {
                     return Err(authority_error(
                         "financial credential signature does not match local issuer trust",
                     ));

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -78,17 +78,6 @@ class TrustLevel(Enum):
     advisory = "advisory"
 
 
-class Algorithm(Enum):
-    """
-    Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.
-    """
-
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
-
-
 class BbsReceiptSignature(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -120,7 +109,7 @@ class ToolCallAction(BaseModel):
     )
 
 
-class Decision3(BaseModel):
+class Decision7(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -131,7 +120,7 @@ class Decision3(BaseModel):
     verdict: Literal["allow"]
 
 
-class Decision4(BaseModel):
+class Decision8(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -146,7 +135,7 @@ class Decision4(BaseModel):
     )
 
 
-class Decision5(BaseModel):
+class Decision9(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -158,7 +147,7 @@ class Decision5(BaseModel):
     reason: str = Field(..., description="Human-readable reason for the cancellation.")
 
 
-class Decision6(BaseModel):
+class Decision10(BaseModel):
     """
     The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).
     """
@@ -172,8 +161,8 @@ class Decision6(BaseModel):
     )
 
 
-class Decision(RootModel[Decision3 | Decision4 | Decision5 | Decision6]):
-    root: Decision3 | Decision4 | Decision5 | Decision6 = Field(
+class Decision(RootModel[Decision7 | Decision8 | Decision9 | Decision10]):
+    root: Decision7 | Decision8 | Decision9 | Decision10 = Field(
         ...,
         description='The Kernel\'s verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = "verdict", rename_all = "snake_case")]`).',
     )
@@ -300,11 +289,6 @@ class ChioReceiptRecord(BaseModel):
                 "bbs_projection_version and bbs_signature must be present together"
             )
         return self
-
-    algorithm: Algorithm | None = Field(
-        None,
-        description="Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field.",
-    )
     signature: constr(
         pattern=r"^([0-9a-f]{128}|p256:([0-9a-f]{2})+|p384:([0-9a-f]{2})+|hybrid:[0-9a-f]{128}:[0-9a-f]{6618}:ed25519\+mldsa65|hybrid:p256:([0-9a-f]{2})+:[0-9a-f]{6618}:p256\+mldsa65|hybrid:p384:([0-9a-f]{2})+:[0-9a-f]{6618}:p384\+mldsa65)$"
     ) = Field(

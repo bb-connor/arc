@@ -1,0 +1,25 @@
+{
+  "agent_passport_jwk_thumbprint": "hlqNnvnuw_g7uAgV8Sy2kR0hH3orMop9alO-BBtaWo4",
+  "agent_passport_key_hash": "4b735ac174e40636507716ed5c9a8a75fbf6f462357fabb71ac42b7bd502c64a",
+  "confidence": 0.75,
+  "decay_half_life_secs": 3600,
+  "evaporation_floor": 0.01,
+  "indicator": {
+    "admission_envelope_sha256": "19db3f6c49dda17dedab6d3767bde9a837dc5ac8432d939a759f773f7bee1650",
+    "capability_scope": "finding:24f849bb212aa95f22a5b6eef99fd973abd7f96ac1a24167cfda4def935923b1",
+    "finding_id": "24f849bb212aa95f22a5b6eef99fd973abd7f96ac1a24167cfda4def935923b1",
+    "listing_envelope_sha256": "f6a624abbf4784da94cef38402cfbc2234e3387af6252165f66cf2ac708dff6c",
+    "listing_id": "listing-finding-admitted-0001",
+    "schema": "chio.finding.pheromone-indicator.v1"
+  },
+  "kernel_id": "did:chio:buyer-kernel",
+  "nonce": "hint-scope",
+  "schema": "chio.pheromone-deposit.v1",
+  "severity": "medium",
+  "subject_class": "finding_listing_hint",
+  "subject_class_namespace": "dev.chio.cognition-market",
+  "timestamp_unix_ms": 1749999999000,
+  "treaty_scope": [
+    "treaty:other"
+  ]
+}

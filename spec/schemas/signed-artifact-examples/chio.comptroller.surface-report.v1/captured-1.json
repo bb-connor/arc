@@ -1,0 +1,57 @@
+{
+  "budgetUtilization": {
+    "distinctCapabilities": 0,
+    "distinctSubjects": 0,
+    "exhaustedCount": 0,
+    "matchingGrants": 0,
+    "nearLimitCount": 0,
+    "returnedGrants": 0,
+    "rowsMissingLineage": 0,
+    "rowsMissingScope": 0,
+    "totalCostCharged": 0,
+    "totalInvocations": 0,
+    "truncated": false
+  },
+  "decisionSummary": {
+    "allowCount": 1,
+    "cancelledCount": 0,
+    "denyCount": 1,
+    "incompleteCount": 0
+  },
+  "exposurePositions": [
+    {
+      "activeQuotedPremiumUnits": 0,
+      "currency": "USD",
+      "failedUnits": 0,
+      "governedMaxExposureUnits": 4200,
+      "pendingUnits": 0,
+      "provisionalLossUnits": 0,
+      "quotedPremiumUnits": 0,
+      "recoveredUnits": 0,
+      "reservedUnits": 1000,
+      "settledUnits": 0
+    }
+  ],
+  "filters": {
+    "attributionLimit": 100,
+    "authorizationLimit": 50,
+    "budgetLimit": 50,
+    "economicLimit": 50,
+    "groupLimit": 50,
+    "meteredLimit": 50,
+    "settlementLimit": 50,
+    "timeBucket": "day"
+  },
+  "generatedAt": 1700000000,
+  "schema": "chio.comptroller.surface-report.v1",
+  "settlementReconciliation": {
+    "actionableReceipts": 0,
+    "failedReceipts": 0,
+    "matchingReceipts": 0,
+    "pendingReceipts": 0,
+    "reconciledReceipts": 0,
+    "returnedReceipts": 0,
+    "truncated": false
+  },
+  "sourceRefs": {}
+}

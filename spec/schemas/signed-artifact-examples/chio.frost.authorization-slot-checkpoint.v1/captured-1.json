@@ -1,0 +1,21 @@
+{
+  "actionDigest": "0dc00973d1afb441372c4eaf494c6eef48e15c7e95426b131b57a3712b59527b",
+  "anchorId": "slot-anchor.primary",
+  "anchorKeyId": "slot-authority.v1",
+  "authorizationId": "f9764899573174e5f826fe3103103b2e7a2695118f91fe3a876a12fdf5d48852",
+  "clockHighWater": 4001,
+  "domain": "chio.frost.settle-commitment.v1",
+  "keyEpoch": 1,
+  "ladderActionClass": "settle.commitment",
+  "resourceFence": 7,
+  "resourceId": "failed-ceremony",
+  "resourceVersion": 1,
+  "rosterDigest": "ff3166883e7b40ccc51b0b72a1e12f7fac9ee2ead5858e4c0b53e09f400faad8",
+  "schema": "chio.frost.authorization-slot-checkpoint.v1",
+  "scopeId": "settlement.atlantic.v1",
+  "sessionId": "af290677d0faaf44fc7387f927d62596a512ab52ee4a2c9338af212eb6b39441",
+  "signingMessageDigest": "09b2953cc0f6fd06f433241600a61946bf5dfa9c81778e958c9e094e16effd83",
+  "slotId": "292e372e756ec7a309a4e4ac618d7f2f5d79bd6454891022951906e1ed51b06b",
+  "slotVersion": 1,
+  "state": "bound"
+}

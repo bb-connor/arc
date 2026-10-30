@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/tee-bless-audit.schema.json",
+  "title": "Chio tee bless audit signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capture",
+    "control_plane_capability",
+    "event",
+    "fixture",
+    "operator",
+    "redaction_pass_id",
+    "ts"
+  ],
+  "properties": {
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frames_after_dedupe",
+        "frames_after_redact",
+        "frames_in",
+        "path"
+      ],
+      "properties": {
+        "frames_after_dedupe": {
+          "type": "integer"
+        },
+        "frames_after_redact": {
+          "type": "integer"
+        },
+        "frames_in": {
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "control_plane_capability": {
+      "type": "string"
+    },
+    "event": {
+      "type": "string"
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "name",
+        "path",
+        "receipts_root"
+      ],
+      "properties": {
+        "family": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "receipts_root": {
+          "type": "string"
+        }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_user",
+        "id"
+      ],
+      "properties": {
+        "git_user": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "redaction_pass_id": {
+      "type": "string"
+    },
+    "ts": {
+      "type": "string"
+    }
+  }
+}

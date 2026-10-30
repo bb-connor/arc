@@ -1,0 +1,25 @@
+{
+  "event_id": "01H7ZZZZZZZZZZZZZZZZZZZZZZ",
+  "invocation": {
+    "tool": "x"
+  },
+  "provenance": {
+    "otel": {
+      "span_id": "0000000000000000",
+      "trace_id": "00000000000000000000000000000000"
+    }
+  },
+  "redaction_pass_id": "test-redactors@1.0.0",
+  "request_blob_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "response_blob_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema_version": "1",
+  "tee_id": "tee-prod-1",
+  "ts": "2026-05-08T00:00:00.000Z",
+  "upstream": {
+    "api_version": "2026-05-01",
+    "operation": "responses.create",
+    "system": "openai"
+  },
+  "verdict": "allow",
+  "would_have_blocked": false
+}

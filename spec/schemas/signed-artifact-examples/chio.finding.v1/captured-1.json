@@ -1,0 +1,30 @@
+{
+  "bond_ref": "bond:pending-allocation",
+  "descriptor": {
+    "context_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "outcome_class": "verified_fix",
+    "topic": "repo:backbay/chio#m2-exit-hinted"
+  },
+  "evidence_checkpoint_ref": "local-log-e37abcd79efd08db94518a903952ffe9f8af7e8b4684b63591631cef8e8871c8#1",
+  "evidence_class": "verified",
+  "evidence_cost": {
+    "currency": "USD",
+    "units": 10
+  },
+  "evidence_receipt_ids": [
+    "415a9f0c56da33388450823370c7f05a340f408c97c900f6a63c593d8d1e7393",
+    "e18aab850f2596b1cc733bb9eb6278282797632158f985e11e51d878eb595773"
+  ],
+  "expires_at": 1900000000,
+  "finding_id": "13d104f7779b1957828ba63c746a5128993b0d493f875aaa487767d65add3bbd",
+  "guarantee_class": "deterministic_replay",
+  "issued_at": 1700000000,
+  "issuer": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+  "payload_media_type": "application/json",
+  "payload_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "price_hint_ref": "pricing-hint/finding",
+  "replay_recipe_sha256": "9fa8ec361bf47a8afbccda5bc18ef1b42074587296349bb95a7afd3bceb31483",
+  "schema": "chio.finding.v1",
+  "signature": "",
+  "status_feed_ref": "status-feed/venue-wedge"
+}

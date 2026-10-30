@@ -31,14 +31,14 @@ fn kernel_receipt_signer_uses_store_owned_checkpoint_creation() {
         .sign_acp_receipt(&request_a)
         .expect("first receipt should sign");
     assert!(receipt_a
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("signature should verify"));
 
     let receipt_b = signer
         .sign_acp_receipt(&request_b)
         .expect("second receipt should sign");
     assert!(receipt_b
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("signature should verify"));
 
     let state = shared.lock().expect("shared state should lock");

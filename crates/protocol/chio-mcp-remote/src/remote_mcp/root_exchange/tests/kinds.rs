@@ -258,7 +258,12 @@ fn local_token(claims: &Value) -> String {
     compact(
         &json!({ "alg": "EdDSA", "kid": "chio-local", "typ": "JWT" }),
         claims,
-        |input| local_keypair().sign(input).to_bytes().to_vec(),
+        |input| {
+            local_keypair()
+                .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, input)
+                .to_bytes()
+                .to_vec()
+        },
     )
 }
 
@@ -660,7 +665,7 @@ async fn oidc_jwt_refusals() {
     }
     let unsigned = compact(&idp_header(), &oidc_claims(), |input| {
         Keypair::from_seed(&[99; 32])
-            .sign(input)
+            .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, input)
             .to_bytes()
             .to_vec()
     });
@@ -886,7 +891,12 @@ fn local_token_confirmation_is_read_strictly() {
     let input = format!("{header}.{}", b64(repeated.as_bytes()));
     let token = format!(
         "{input}.{}",
-        b64(&local_keypair().sign(input.as_bytes()).to_bytes())
+        b64(&local_keypair()
+            .sign_exempt(
+                chio_core::crypto::ExemptFormat::JwsSigningInput,
+                input.as_bytes(),
+            )
+            .to_bytes())
     );
     let verify = |token: &str| {
         reexchange_from(&local_server(&key), token, SenderRequest::from(&headers)).unwrap_err()

@@ -3095,6 +3095,7 @@ dependencies = [
  "chio-test-support",
  "chio-tool-call-fabric",
  "chio-trace-validate",
+ "chio-transaction-passport",
  "chio-underwriting",
  "chio-wasm-guards",
  "chio-web3",
@@ -5377,6 +5378,7 @@ dependencies = [
 name = "chio-spec-codegen"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "jsonschema",
  "prettyplease",
  "schemars 0.8.22",
@@ -5534,6 +5536,7 @@ dependencies = [
  "chio-core-types",
  "chio-federation",
  "chio-pheromone",
+ "chio-pheromone-relay",
  "chio-pheromone-runtime",
  "serde",
  "serde_json",

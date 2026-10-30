@@ -1277,7 +1277,9 @@ fn write_bundle_signature_to_path(
         "signatures": [
             {
                 "keyid": keypair.public_key().to_hex(),
-                "sig": keypair.sign(&signed_payload).to_hex()
+                "sig": keypair
+                    .sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload)
+                    .to_hex()
             }
         ]
     });
@@ -1342,9 +1344,16 @@ fn sign_collected_json_artifact(
         CliError::cli_other_error("collected proof artifact must be a JSON object")
     })?;
     object.remove("signature");
-    let (signature, _) = keypair.sign_canonical(value).map_err(|error| {
-        CliError::cli_other_error(format!("failed to sign collected proof artifact: {error}"))
-    })?;
+    let schema_id = object
+        .get("schema")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| CliError::cli_other_error("collected proof artifact must carry a schema"))?
+        .to_owned();
+    let signature = chio_core::canonical::CanonicalBytes::from_serializable(value)
+        .and_then(|canonical| keypair.sign_wrapped(&schema_id, &canonical))
+        .map_err(|error| {
+            CliError::cli_other_error(format!("failed to sign collected proof artifact: {error}"))
+        })?;
     value["signature"] = serde_json::Value::String(signature.to_hex());
     Ok(())
 }

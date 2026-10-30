@@ -9,7 +9,6 @@
     "verifierId",
     "verifierKeyId",
     "publicKey",
-    "signatureAlgorithm",
     "validFromUnixMs",
     "validUntilUnixMs",
     "allowedTreaties",
@@ -28,7 +27,6 @@
       "pattern": "^[0-9a-f]+$",
       "minLength": 64
     },
-    "signatureAlgorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "validFromUnixMs": { "type": "integer", "minimum": 0 },
     "validUntilUnixMs": { "type": "integer", "minimum": 0 },
     "allowedTreaties": {

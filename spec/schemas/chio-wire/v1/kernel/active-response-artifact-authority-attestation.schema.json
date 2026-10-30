@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/active-response-artifact-authority-attestation.schema.json",
+  "title": "Chio active response artifact authority attestation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actionId",
+    "artifactPayloadDigest",
+    "artifactRef",
+    "authority",
+    "expiresAtUnixMs",
+    "governedIntentHash",
+    "issuedAtUnixMs",
+    "planBodyHash",
+    "schema",
+    "submissionProofDigest",
+    "submitter",
+    "tenantId"
+  ],
+  "properties": {
+    "actionId": {
+      "type": "string"
+    },
+    "artifactPayloadDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "artifactRef": {
+      "type": "string"
+    },
+    "authority": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "governedIntentHash": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "planBodyHash": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "schema": {
+      "const": "chio.active-response-artifact-authority-attestation.v1"
+    },
+    "submissionProofDigest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "submitter": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

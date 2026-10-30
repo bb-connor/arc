@@ -163,7 +163,7 @@ pub fn is_authoritative_spend_receipt(
     // signed nonce could forge receipt fields (invented reconciled-budget
     // metadata) under an admitted key. Fail-closed on a verification error or a
     // false result.
-    if !matches!(receipt.verify_signature(), Ok(true)) {
+    if !matches!(receipt.verify_integrity_embedded_key(), Ok(true)) {
         return Err(NotAuthoritativeReason::ReceiptSignatureInvalid);
     }
     // (e) signer must be an admitted kernel key.

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-entry-activation-decision.schema.json",
+  "title": "Chio financial cross issuer entry activation decision signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "certificationRefs",
+    "credentialBindings",
+    "decidedAt",
+    "decision",
+    "decisionDigest",
+    "entryId",
+    "issuer",
+    "lifecycleEvidenceDigest",
+    "lifecyclePinDigest",
+    "migrationEnvelopeDigests",
+    "packId",
+    "presentationDigest",
+    "profileFamily",
+    "reason",
+    "schema",
+    "signerKeyEpoch",
+    "signerKeyId",
+    "sourceKind",
+    "sourceManifestDigest",
+    "sourcePassportId",
+    "verifierId"
+  ],
+  "properties": {
+    "certificationRefs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "credentialBindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credentialId",
+          "envelopeDigest",
+          "family"
+        ],
+        "properties": {
+          "credentialId": {
+            "type": "string"
+          },
+          "envelopeDigest": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decidedAt": {
+      "type": "integer"
+    },
+    "decision": {
+      "type": "string"
+    },
+    "decisionDigest": {
+      "type": "string"
+    },
+    "entryId": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "lifecycleEvidenceDigest": {
+      "type": "string"
+    },
+    "lifecyclePinDigest": {
+      "type": "string"
+    },
+    "migrationEnvelopeDigests": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "packId": {
+      "type": "string"
+    },
+    "presentationDigest": {
+      "type": "string"
+    },
+    "profileFamily": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer-entry-activation-decision.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "signerKeyId": {
+      "type": "string"
+    },
+    "sourceKind": {
+      "type": "string"
+    },
+    "sourceManifestDigest": {
+      "type": "string"
+    },
+    "sourcePassportId": {
+      "type": "string"
+    },
+    "verifierId": {
+      "type": "string"
+    }
+  }
+}

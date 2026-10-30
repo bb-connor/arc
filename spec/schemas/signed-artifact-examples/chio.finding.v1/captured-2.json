@@ -1,0 +1,30 @@
+{
+  "bond_ref": "bond:pending-allocation",
+  "descriptor": {
+    "context_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "outcome_class": "verified_fix",
+    "topic": "rust/workspace/test-failure"
+  },
+  "evidence_checkpoint_ref": "local-log-e37abcd79efd08db94518a903952ffe9f8af7e8b4684b63591631cef8e8871c8#1",
+  "evidence_class": "verified",
+  "evidence_cost": {
+    "currency": "USD",
+    "units": 2
+  },
+  "evidence_receipt_ids": [
+    "48c4ec7cc7ded9e3812a1c0d7ce7e98a1db6cb6e6b32d4748e359de9bd2fd994",
+    "df3d4cad9a2cdf154de5536aacececdebdebecae15dfce3d466d5e2145bc26f0"
+  ],
+  "expires_at": 1900000000,
+  "finding_id": "4822202d302825075ae5b141d58d13aed1340873a36c38bf044bfb859debe341",
+  "guarantee_class": "deterministic_replay",
+  "issued_at": 1750000002,
+  "issuer": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+  "payload_media_type": "application/json",
+  "payload_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "replay_recipe_sha256": "d745cb38bbeeb0331c297981c65d4edef87240ad51f20ec0ddbeda2286014304",
+  "runtime_assurance_tier": "basic",
+  "schema": "chio.finding.v1",
+  "signature": "",
+  "status_feed_ref": "status-feed/venue-wedge"
+}

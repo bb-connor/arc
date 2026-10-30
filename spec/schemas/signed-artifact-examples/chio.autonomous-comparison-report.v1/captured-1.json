@@ -1,0 +1,17 @@
+{
+  "comparison_id": "acr-1",
+  "deltas": [
+    {
+      "automated_value": "4800",
+      "description": "Automation priced inside the manual ceiling.",
+      "field": "premium_units",
+      "manual_value": "5100"
+    }
+  ],
+  "disposition": "narrower_than_manual",
+  "generated_at": 1743379500,
+  "manual_decision_ref": "uwd-manual-1",
+  "note": "Shows automation staying narrower than the comparable manual decision.",
+  "pricing_decision_ref": "apd-1",
+  "schema": "chio.autonomous-comparison-report.v1"
+}

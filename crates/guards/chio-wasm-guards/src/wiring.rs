@@ -406,7 +406,8 @@ mod tests {
             "test-guard",
             "1.0.0",
             &signer_public_key,
-        );
+        )
+        .unwrap();
         let signature = sk.sign(&message);
         let signed = crate::manifest::SignedWasmModule {
             module_hash,

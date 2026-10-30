@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-aggregate-checkpoint.schema.json",
+  "title": "Chio finding hosted aggregate checkpoint signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aggregateId",
+    "aggregateKind",
+    "createdAt",
+    "eventSha256",
+    "previousCheckpointSha256",
+    "revision",
+    "schema",
+    "tenantId"
+  ],
+  "properties": {
+    "aggregateId": {
+      "type": "string"
+    },
+    "aggregateKind": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "integer"
+    },
+    "eventSha256": {
+      "type": "string"
+    },
+    "previousCheckpointSha256": {
+      "type": "null"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.hosted.aggregate-checkpoint.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

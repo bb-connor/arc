@@ -86,7 +86,7 @@ fn bound_projection_denies(session: Option<&str>, policy: HttpAuthorityPolicy) {
     let token =
         CapabilityToken::sign_with_security_binding(body(&issuer), binding.clone(), &issuer)
             .test_expect("the trusted issuer signs the complete binding");
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
     assert_eq!(token.security_binding().test_unwrap(), Some(binding));
     token.validate_time(100).test_unwrap();
     let raw = serde_json::to_string(&token).test_unwrap();
@@ -112,7 +112,7 @@ fn bound_projection_denies(session: Option<&str>, policy: HttpAuthorityPolicy) {
     );
     assert!(prepared.capability_id.is_none());
     let receipt = authority.sign_decision_receipt(&prepared).test_unwrap();
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     assert!(receipt.capability_id.is_none());
 }
 
@@ -140,7 +140,7 @@ fn security_binding_projection_denies_session_allow_fallback() {
 fn security_binding_projection_preserves_unbound_capability() {
     let issuer = Keypair::from_seed(&[42; 32]);
     let token = CapabilityToken::sign(body(&issuer), &issuer).test_unwrap();
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
     assert!(token.security_binding().test_unwrap().is_none());
     let raw = serde_json::to_string(&token).test_unwrap();
     let query = HashMap::new();
@@ -152,7 +152,7 @@ fn security_binding_projection_preserves_unbound_capability() {
         result.receipt.capability_id.as_deref(),
         Some(token.id.as_str())
     );
-    assert!(result.receipt.verify_signature().test_unwrap());
+    assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
 }
 
 #[test]
@@ -163,7 +163,7 @@ fn security_binding_projection_preserves_dpop_refusal() {
     grant.dpop_required = Some(true);
     token_body.scope.grants = vec![grant];
     let token = CapabilityToken::sign(token_body, &issuer).test_unwrap();
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
     assert!(token.security_binding().test_unwrap().is_none());
     let raw = serde_json::to_string(&token).test_unwrap();
     let query = HashMap::new();
@@ -172,5 +172,5 @@ fn security_binding_projection_preserves_dpop_refusal() {
         .test_unwrap();
     assert!(matches!(&result.verdict, Verdict::Deny { reason, .. }
         if reason.contains("proof-required capabilities require kernel-mediated dispatch")));
-    assert!(result.receipt.verify_signature().test_unwrap());
+    assert!(result.receipt.verify_integrity_embedded_key().test_unwrap());
 }

@@ -965,7 +965,7 @@ fn validate_agent_web_receipt(
 ) -> Result<(), TransactionPassportError> {
     let receipt: ChioReceipt = chio_transaction_passport::decode_evidence_json(receipt_bytes)?;
     let signature_valid = receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .map_err(|_| signature_invalid("Agent Web receipt signature invalid"))?;
     if !signature_valid {
         return Err(signature_invalid("Agent Web receipt signature invalid"));

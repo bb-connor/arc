@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-claim-allocation-body.schema.json",
+  "title": "chio.finding.claim-allocation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocation_id",
+    "buyer_pool_units",
+    "community_fund_units",
+    "cutoff_slot",
+    "deterministic_allocation_sha256",
+    "entries",
+    "liability_key",
+    "purchase_snapshot_sha256",
+    "recorded_at",
+    "schema",
+    "slash",
+    "total_realized_spend_units"
+  ],
+  "properties": {
+    "allocation_id": {
+      "type": "string"
+    },
+    "buyer_pool_units": {
+      "type": "integer"
+    },
+    "community_fund_units": {
+      "type": "integer"
+    },
+    "cutoff_slot": {
+      "type": "integer"
+    },
+    "deterministic_allocation_sha256": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "amount_units",
+          "beneficiary_kind",
+          "destination"
+        ],
+        "properties": {
+          "amount_units": {
+            "type": "integer"
+          },
+          "beneficiary_kind": {
+            "type": "string"
+          },
+          "destination": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "liability_key": {
+      "type": "string"
+    },
+    "purchase_snapshot_sha256": {
+      "type": "string"
+    },
+    "recorded_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.finding.claim-allocation.v1"
+    },
+    "slash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "total_realized_spend_units": {
+      "type": "integer"
+    }
+  }
+}

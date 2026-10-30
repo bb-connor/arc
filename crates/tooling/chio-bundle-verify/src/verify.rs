@@ -308,8 +308,11 @@ pub fn verify_decoded_package(
     let tool_receipts_by_seq = verify_tool_receipts(&package.bundle.tool_receipts, embedded_http)?;
     verify_child_receipts(&package.bundle.child_receipts)?;
     let checkpoints_by_seq = verify_checkpoints(&package.bundle.checkpoints, trust)?;
-    let transparency =
-        verify_transparency(&package.bundle.checkpoints, package.transparency.as_ref())?;
+    let transparency = verify_transparency(
+        &package.bundle.checkpoints,
+        package.transparency.as_ref(),
+        &trusted_checkpoint_keys(trust),
+    )?;
     let claims = transparency_claims(trust, &package.bundle, &transparency)?;
     verify_transparency_claim_boundary(
         package.manifest.claim_boundary.as_ref(),
@@ -369,11 +372,13 @@ fn verify_envelope(
     trust: &VerifierTrust,
 ) -> Result<(), BundleVerifyError> {
     require_kernel_signer(trust, &envelope.signer_key)?;
-    let signed = envelope.verify_signature().map_err(|error| {
-        BundleVerifyError::envelope(format!(
-            "evidence export envelope signature or schema is invalid: {error}"
-        ))
-    })?;
+    let signed = envelope
+        .verify_signature(&envelope.signer_key)
+        .map_err(|error| {
+            BundleVerifyError::envelope(format!(
+                "evidence export envelope signature or schema is invalid: {error}"
+            ))
+        })?;
     if envelope.body.schema != EVIDENCE_EXPORT_COMMITMENT_SCHEMA || !signed {
         return Err(BundleVerifyError::envelope(
             "evidence export envelope signature or schema is invalid",
@@ -407,15 +412,30 @@ fn verify_bundle_signers(
     Ok(())
 }
 
+/// Every key the trust file lets sign a checkpoint statement.
+#[must_use]
+pub fn trusted_checkpoint_keys(trust: &VerifierTrust) -> Vec<PublicKey> {
+    let mut keys = trust.kernel_keys.clone();
+    for key in &trust.checkpoint_keys {
+        if !keys.contains(key) {
+            keys.push(key.clone());
+        }
+    }
+    keys
+}
+
 /// Check supplied transparency records against the signed checkpoints, or
 /// derive them when none are supplied.
 pub fn verify_transparency(
     checkpoints: &[KernelCheckpoint],
     supplied: Option<&CheckpointTransparencySummary>,
+    trusted_checkpoint_keys: &[PublicKey],
 ) -> Result<CheckpointTransparencySummary, BundleVerifyError> {
     match supplied {
-        Some(summary) => verify_checkpoint_transparency_records(checkpoints, summary),
-        None => validate_checkpoint_transparency(checkpoints),
+        Some(summary) => {
+            verify_checkpoint_transparency_records(checkpoints, summary, trusted_checkpoint_keys)
+        }
+        None => validate_checkpoint_transparency(checkpoints, trusted_checkpoint_keys),
     }
     .map_err(|error| {
         BundleVerifyError::inconsistent(format!(
@@ -494,7 +514,10 @@ pub fn verify_tool_receipts<'a>(
         // Offline evidence accepts classical and hybrid receipt signatures.
         let signed = record
             .receipt
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(
+                &record.receipt.kernel_key,
+                ReceiptCryptoFloor::AllowHybrid,
+            )
             .map_err(|error| {
                 BundleVerifyError::signature(format!(
                     "tool receipt signature verification failed: {}: {error}",
@@ -581,7 +604,10 @@ pub fn verify_child_receipts(
         // signatures both verify.
         let signed = record
             .receipt
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(
+                &record.receipt.kernel_key,
+                ReceiptCryptoFloor::AllowHybrid,
+            )
             .map_err(|error| {
                 BundleVerifyError::signature(format!(
                     "child receipt signature verification failed: {}: {error}",
@@ -617,7 +643,11 @@ pub fn verify_checkpoints<'a>(
                 "evidence signer is outside the trusted kernel key set",
             ));
         }
-        let checkpoint = verify_checkpoint_signature(checkpoint).map_err(|error| match error {
+        let checkpoint = verify_checkpoint_signature(
+            checkpoint,
+            core::slice::from_ref(&checkpoint.body.kernel_key),
+        )
+        .map_err(|error| match error {
             CheckpointError::InvalidSignature => BundleVerifyError::signature(format!(
                 "checkpoint signature verification failed: {}",
                 checkpoint.body.checkpoint_seq
@@ -786,7 +816,10 @@ pub fn receipt_semantic_summary(
             && record.receipt.is_allowed()
             && record
                 .receipt
-                .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+                .verify_signature_with_floor(
+                    &record.receipt.kernel_key,
+                    ReceiptCryptoFloor::AllowHybrid,
+                )
                 .unwrap_or(false)
             && record.receipt.action.verify_hash().unwrap_or(false)
         {

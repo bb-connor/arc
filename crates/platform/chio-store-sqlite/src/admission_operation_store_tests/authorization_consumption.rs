@@ -269,7 +269,7 @@ fn candidate(
         &fixture.store.admission_projection_capabilities(),
         &kernel,
     )?;
-    envelope.verify()?;
+    envelope.verify_integrity_embedded_key()?;
     Ok(Candidate {
         operation,
         envelope,
@@ -350,9 +350,11 @@ fn substituted(
         .ok_or("receipt replay digest")? = sha256_hex(&manifest_bytes).into();
     body["projection_json"] = STANDARD.encode(projection_bytes).into();
     body["manifest_json"] = STANDARD.encode(manifest_bytes).into();
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend(canonical_json_bytes(body)?);
-    wire["signature"] = serde_json::to_value(signer().sign(&preimage))?;
+    let signature = signer().sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::CanonicalBytes::from_serializable(body)?,
+    )?;
+    wire["signature"] = serde_json::to_value(signature)?;
     Ok(serde_json::from_value(wire)?)
 }
 
@@ -364,7 +366,7 @@ fn signed_authorization_consumption_rejects_substitutions_and_reopens_exactly() 
     let before = terminal_counts(&fixture)?;
     for variant in 0..8 {
         let altered = substituted(&candidate, variant)?;
-        assert!(matches!(altered.verify(), Err(chio_kernel::admission_operation::AdmissionOperationError::TerminalProjectionBindingMismatch)), "variant {variant}");
+        assert!(matches!(altered.verify_integrity_embedded_key(), Err(chio_kernel::admission_operation::AdmissionOperationError::TerminalProjectionBindingMismatch)), "variant {variant}");
         assert!(
             matches!(
                 fixture.store.commit_signed_terminal_projection(&altered),
@@ -382,7 +384,7 @@ fn signed_authorization_consumption_rejects_substitutions_and_reopens_exactly() 
             Some(candidate.operation.clone())
         );
     }
-    let verified = candidate.envelope.verify()?;
+    let verified = candidate.envelope.verify_integrity_embedded_key()?;
     let first = fixture
         .store
         .commit_signed_terminal_projection(&candidate.envelope)?;
@@ -460,13 +462,13 @@ fn authorization_consumption_refuses_other_claimants_and_double_consumption_atom
     assert_eq!(
         first
             .envelope
-            .verify()?
+            .verify_integrity_embedded_key()?
             .authorization_consumption()
             .ok_or("first")?
             .authorization_receipt_id,
         second
             .envelope
-            .verify()?
+            .verify_integrity_embedded_key()?
             .authorization_consumption()
             .ok_or("second")?
             .authorization_receipt_id

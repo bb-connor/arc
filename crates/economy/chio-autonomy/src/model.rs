@@ -549,3 +549,43 @@ pub struct AutonomousQualificationMatrix {
     pub profile_id: String,
     pub cases: Vec<AutonomousQualificationCase>,
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousComparisonReport {
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_COMPARISON_REPORT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousDriftReport {
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_DRIFT_REPORT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for AutonomousExecutionDecisionArtifact
+{
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_EXECUTION_DECISION_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload
+    for AutonomousPricingAuthorityEnvelopeArtifact
+{
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_PRICING_AUTHORITY_ENVELOPE_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousPricingDecisionArtifact {
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_PRICING_DECISION_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousPricingInputArtifact {
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_PRICING_INPUT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AutonomousRollbackPlanArtifact {
+    const SCHEMA_ID: &'static str = CHIO_AUTONOMOUS_ROLLBACK_PLAN_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalPoolOptimizationArtifact {
+    const SCHEMA_ID: &'static str = CHIO_CAPITAL_POOL_OPTIMIZATION_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for CapitalPoolSimulationReport {
+    const SCHEMA_ID: &'static str = CHIO_CAPITAL_POOL_SIMULATION_REPORT_SCHEMA;
+}

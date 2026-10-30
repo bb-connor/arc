@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-activation-exchange.schema.json",
+  "title": "Chio federation activation exchange signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activationRef",
+    "delegationControl",
+    "exchangeId",
+    "expiresAt",
+    "governingCharterRef",
+    "importControl",
+    "issuedAt",
+    "listingId",
+    "listingRef",
+    "note",
+    "schema",
+    "scope",
+    "sourceOperatorId",
+    "targetOperatorId"
+  ],
+  "properties": {
+    "activationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "kind",
+        "operatorId",
+        "schema",
+        "sha256",
+        "uri"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operatorId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "delegationControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attenuationRequired",
+        "delegateOperatorId",
+        "delegatorOperatorId",
+        "maxHops",
+        "visibilityOnlyUntilLocalActivation"
+      ],
+      "properties": {
+        "attenuationRequired": {
+          "type": "boolean"
+        },
+        "delegateOperatorId": {
+          "type": "string"
+        },
+        "delegatorOperatorId": {
+          "type": "string"
+        },
+        "maxHops": {
+          "type": "integer"
+        },
+        "visibilityOnlyUntilLocalActivation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "exchangeId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "governingCharterRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "kind",
+        "operatorId",
+        "schema",
+        "sha256",
+        "uri"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operatorId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "importControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowVisibilityWithoutRuntimeTrust",
+        "explicitLocalActivationRequired",
+        "manualReviewRequired",
+        "prohibitAmbientRuntimeAdmission",
+        "rejectStaleInputs"
+      ],
+      "properties": {
+        "allowVisibilityWithoutRuntimeTrust": {
+          "type": "boolean"
+        },
+        "explicitLocalActivationRequired": {
+          "type": "boolean"
+        },
+        "manualReviewRequired": {
+          "type": "boolean"
+        },
+        "prohibitAmbientRuntimeAdmission": {
+          "type": "boolean"
+        },
+        "rejectStaleInputs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "listingRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "kind",
+        "operatorId",
+        "schema",
+        "sha256",
+        "uri"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operatorId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      }
+    },
+    "note": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.federation-activation-exchange.v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowedActorKinds",
+        "allowedAdmissionClasses",
+        "namespace",
+        "policyReference",
+        "subjectOperatorId"
+      ],
+      "properties": {
+        "allowedActorKinds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedAdmissionClasses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "policyReference": {
+          "type": "string"
+        },
+        "subjectOperatorId": {
+          "type": "string"
+        }
+      }
+    },
+    "sourceOperatorId": {
+      "type": "string"
+    },
+    "targetOperatorId": {
+      "type": "string"
+    }
+  }
+}

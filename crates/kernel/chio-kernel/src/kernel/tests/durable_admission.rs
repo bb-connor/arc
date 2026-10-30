@@ -15,6 +15,8 @@ mod output_finalization;
 mod pre_dispatch;
 #[path = "durable_admission/recovery.rs"]
 mod recovery;
+#[path = "durable_admission/signer_pins.rs"]
+mod signer_pins;
 #[path = "durable_admission/terminal_refusal.rs"]
 mod terminal_refusal;
 use terminal_refusal::compensation_response;

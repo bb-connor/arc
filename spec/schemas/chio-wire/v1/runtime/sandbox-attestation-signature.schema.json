@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/sandbox-attestation-signature.schema.json",
+  "title": "Chio runtime sandbox attestation signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attestationId",
+    "attester",
+    "egressPolicyDigest",
+    "expiresAt",
+    "sandboxProfileDigest",
+    "schema",
+    "startedAt",
+    "toolInstanceId",
+    "toolManifestDigest",
+    "toolServerId"
+  ],
+  "properties": {
+    "attestationId": {
+      "type": "string"
+    },
+    "attester": {
+      "type": "string"
+    },
+    "egressPolicyDigest": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "string"
+    },
+    "sandboxProfileDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.sandbox-attestation-signature.v1"
+    },
+    "startedAt": {
+      "type": "string"
+    },
+    "toolInstanceId": {
+      "type": "string"
+    },
+    "toolManifestDigest": {
+      "type": "string"
+    },
+    "toolServerId": {
+      "type": "string"
+    }
+  }
+}

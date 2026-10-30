@@ -9,6 +9,8 @@ use crate::{
     VerifiedFiscalSchedule,
 };
 
+use crate::fiscal::verify_schedule_issuer;
+
 use super::continuity::{FiscalStagedTransition, VerifiedFiscalActivationAuthority};
 use super::proposal::{
     FiscalAdmissionTrustRegistry, FiscalProposalAdmissionState, FiscalProposalAdmissionStatus,
@@ -760,6 +762,7 @@ fn verify_rotation_replacement(
     predecessor: &VerifiedFiscalSchedule,
 ) -> Result<(), FiscalError> {
     signed.body.validate_against(successor_charter)?;
+    verify_schedule_issuer(signed, successor_charter)?;
     verify_envelope(signed)?;
     let expected_sequence = predecessor
         .body()
@@ -831,4 +834,12 @@ fn approval_set_digest(approvals: &[SignedFiscalApproval]) -> Result<String, Fis
         previous = Some(approval.body.signer_key_id.as_str());
     }
     lifecycle_digest(FISCAL_APPROVAL_SET_DIGEST_DOMAIN, &entries)
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalActivation {
+    const SCHEMA_ID: &'static str = FISCAL_ACTIVATION_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalApproval {
+    const SCHEMA_ID: &'static str = FISCAL_APPROVAL_SCHEMA;
 }

@@ -121,7 +121,10 @@ The shipped settlement lanes are:
   vault state
 - integrated FX-backed dual-sign execution plus recovery qualification over the
   generated `target/web3-e2e-qualification/` artifact family
-- Solana-native Ed25519 settlement preparation and commitment-parity checks
+- Solana-native Ed25519 settlement preparation and commitment-parity checks,
+  for receipts signed by a kernel key in the Solana config
+  `kernel_authority.trusted_keys` set, with a binding certificate naming that
+  same key
 
 ## Failure Posture
 

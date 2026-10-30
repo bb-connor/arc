@@ -1753,8 +1753,8 @@ const GOLDEN_PEER_PAYLOAD: &str = concat!(
 );
 
 const GOLDEN_PEER_SIGNATURE: &str = concat!(
-    "e24d4130f03d791599b7c606f3463f3f8584e39893f4236498b505f428d4ca95",
-    "1b129b801a08d47850af1ea4d9dc0d58d5c7e752e12b97a42d2f4bf98012060b"
+    "717af1da49c0ac2917b8de22a4698468ddca0eece498c400e1af3ffdf35cb083",
+    "1e8bc67793ee62419c9a0b1af274c326cf235a0da4ac8f208b8281171d29ab0e"
 );
 
 #[test]
@@ -1793,7 +1793,7 @@ fn peer_signature_golden_vector() {
     )
     .test_unwrap();
     assert_eq!(
-        String::from_utf8(payload).test_unwrap(),
+        String::from_utf8(payload.as_bytes().to_vec()).test_unwrap(),
         GOLDEN_PEER_PAYLOAD
     );
     assert_eq!(signed.signature, GOLDEN_PEER_SIGNATURE);
@@ -1909,4 +1909,60 @@ fn single_client_secret_must_be_clean() {
         );
     }
     TrustAccess::single_client(DEPLOYMENT, "finding-operator", "operator-secret").test_unwrap();
+}
+
+#[test]
+fn peer_signature_over_the_bare_payload_refused() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, REPLICA_SCOPES);
+    let target = status_target();
+    let mut headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    let header = |name: &str| {
+        headers
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .test_unwrap()
+            .to_string()
+    };
+    let node_id = normalize_cluster_url(NODE_B).test_unwrap();
+    let recipient = normalize_cluster_url(SELF_NODE).test_unwrap();
+    let nonce = header(CLUSTER_AUTH_NONCE_HEADER);
+    let body_sha256 = header(CLUSTER_AUTH_BODY_SHA256_HEADER);
+    let signature = header(CLUSTER_AUTH_SIGNATURE_HEADER);
+    let payload = peer_signature_payload(
+        &target,
+        &SignedPeerFields {
+            deployment: DEPLOYMENT,
+            recipient: &recipient,
+            node_id: &node_id,
+            body_sha256: &body_sha256,
+            nonce: &nonce,
+            issued_at: ISSUED_AT,
+            term: None,
+        },
+    )
+    .test_unwrap();
+    let wrapped = keypair
+        .sign_wrapped(CLUSTER_PEER_SIGNATURE_SCHEME, &payload)
+        .test_unwrap();
+    assert_eq!(signature, wrapped.to_hex());
+    let bare = keypair.sign_exempt(
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        payload.as_bytes(),
+    );
+    headers.insert(
+        CLUSTER_AUTH_SIGNATURE_HEADER,
+        HeaderValue::from_str(&bare.to_hex()).test_unwrap(),
+    );
+    let refused = access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &nonce_cache(),
+        )
+        .test_unwrap_err();
+    assert_eq!(refused, PeerAuthError::BadSignature);
 }

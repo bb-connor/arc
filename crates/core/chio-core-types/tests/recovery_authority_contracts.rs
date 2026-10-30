@@ -35,12 +35,24 @@ fn accepts(kind: &str, bytes: &[u8]) -> bool {
         "command" => typed::<RecoveryCommandV1>(bytes),
         "support_issue_input" => typed::<RecoverySupportIssueInputV1>(bytes),
         "provider_body" => typed::<RecoveryProviderFinalityV1>(bytes),
-        "grant" => decode_contract::<SignedRecoveryGrant>(bytes)
-            .is_ok_and(|grant| grant.verify_signature().is_ok_and(|valid| valid)),
-        "coverage" => decode_contract::<SignedAuthorityCoverageAttestationV1>(bytes)
-            .is_ok_and(|proof| proof.verify_signature().is_ok_and(|valid| valid)),
+        "grant" => decode_contract::<SignedRecoveryGrant>(bytes).is_ok_and(|grant| {
+            grant
+                .verify_integrity_embedded_key()
+                .is_ok_and(|valid| valid)
+        }),
+        "coverage" => {
+            decode_contract::<SignedAuthorityCoverageAttestationV1>(bytes).is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            })
+        }
         "provider_finality" => decode_contract::<SignedRecoveryProviderFinalityV1>(bytes)
-            .is_ok_and(|proof| proof.verify_signature().is_ok_and(|valid| valid)),
+            .is_ok_and(|proof| {
+                proof
+                    .verify_integrity_embedded_key()
+                    .is_ok_and(|valid| valid)
+            }),
         _ => typed::<Value>(bytes),
     }
 }
@@ -131,7 +143,7 @@ fn disclosure_grants_select_their_shape_by_kind() -> Result {
         serde_json::to_value(&action.origin)?
     );
     let signed: SignedRecoveryGrant = serde_json::from_value(positive["grant"].clone())?;
-    assert!(signed.verify_signature()?);
+    assert!(signed.verify_integrity_embedded_key()?);
     let key = chio_core_types::Keypair::from_seed(&[143; 32]);
     let declassification =
         chio_core_types::SignedDeclassificationGrant::sign(signed.body().claims.clone(), &key)?;
@@ -166,16 +178,19 @@ fn disclosure_grants_select_their_shape_by_kind() -> Result {
     let mut swapped = serde_json::to_value(&signed)?;
     swapped["signature"] = serde_json::to_value(declassification.signature())?;
     let swapped: SignedRecoveryGrant = serde_json::from_value(swapped)?;
-    assert!(!swapped.verify_signature()?);
+    assert!(!swapped.verify_integrity_embedded_key()?);
     let proof: SignedAuthorityCoverageAttestationV1 =
         serde_json::from_value(positive["coverage"][0].clone())?;
-    assert!(proof.verify_signature()?);
-    assert!(signed
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-grant:v1\0"));
-    assert!(proof
-        .signing_bytes()?
-        .starts_with(b"chio:recovery-authority-coverage:v1\0"));
+    assert!(proof.verify_integrity_embedded_key()?);
+    assert!(matches!(
+        chio_core_types::crypto::verify_wrapped(
+            proof.authority_key(),
+            chio_core_types::recovery::CHIO_RECOVERY_GRANT_SCHEMA,
+            proof.body(),
+            proof.signature(),
+        ),
+        Err(chio_core_types::Error::SignatureRejected)
+    ));
     assert!(!format!("{signed:?}").contains("private-canary"));
     Ok(())
 }

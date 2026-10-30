@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use chio_core_types::crypto::{ExemptFormat, SigningMessage};
 use chio_core_types::{Ed25519Backend, Keypair, SigningBackend};
 use chio_keyring::{
     derive_key_id, read_canonical_frame, read_single_canonical_frame,
@@ -1385,7 +1386,8 @@ fn authority_current_selector_refuses_after_router_poison() {
                 if message == chio_keyring::KeyringError::Synchronization.to_string()
         )
     };
-    let message = b"poisoned selector artifact";
+    let message =
+        SigningMessage::exempt(ExemptFormat::JwsSigningInput, b"poisoned selector artifact");
     assert!(refused(authority.sign_bytes(message).map(drop)));
     assert!(refused(
         authority.sign_bytes_with_identity(message).map(drop)
@@ -1397,6 +1399,8 @@ fn authority_current_selector_refuses_after_router_poison() {
     ));
     let canonical = chio_core_types::CanonicalBytes::from_serializable(&"poisoned").test_unwrap();
     assert!(refused(
-        authority.sign_canonical_bytes(&canonical).map(drop)
+        authority
+            .sign_wrapped("chio.receipt.v1", &canonical)
+            .map(drop)
     ));
 }

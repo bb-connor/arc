@@ -379,10 +379,14 @@ pub struct VerifiedFiscalCharter {
 }
 
 impl VerifiedFiscalCharter {
+    /// Verifies the charter under its own signer key. Trust in that key comes
+    /// from the caller: a charter is current only when its digest is pinned by
+    /// the local genesis policy or by a rotation proposal whose digest, which
+    /// covers the successor `signer_key`, reached the current charter quorum.
     pub fn verify(signed: SignedFiscalCharter) -> Result<Self, FiscalError> {
         signed.body.validate()?;
         if !signed
-            .verify_signature()
+            .verify_signature(&signed.signer_key)
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
         {
             return Err(FiscalError::InvalidSignature);
@@ -636,7 +640,7 @@ impl VerifiedFiscalSchedule {
     ) -> Result<Self, FiscalError> {
         signed.body.validate_against(charter)?;
         verify_schedule_lineage(&signed.body, charter, predecessor, false)?;
-        Self::finish_verification(signed)
+        Self::finish_verification(signed, charter)
     }
 
     pub fn verify_rotation_replacement(
@@ -646,16 +650,14 @@ impl VerifiedFiscalSchedule {
     ) -> Result<Self, FiscalError> {
         signed.body.validate_against(successor_charter)?;
         verify_schedule_lineage(&signed.body, successor_charter, Some(predecessor), true)?;
-        Self::finish_verification(signed)
+        Self::finish_verification(signed, successor_charter)
     }
 
-    fn finish_verification(signed: SignedFiscalSchedule) -> Result<Self, FiscalError> {
-        if !signed
-            .verify_signature()
-            .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
-        {
-            return Err(FiscalError::InvalidSignature);
-        }
+    fn finish_verification(
+        signed: SignedFiscalSchedule,
+        charter: &VerifiedFiscalCharter,
+    ) -> Result<Self, FiscalError> {
+        verify_schedule_issuer(&signed, charter)?;
         let bytes = canonical_json_bytes(&signed)
             .map_err(|error| FiscalError::Canonicalization(error.to_string()))?;
         if bytes.len() > MAX_SIGNED_FISCAL_SCHEDULE_BYTES {
@@ -688,6 +690,28 @@ impl VerifiedFiscalSchedule {
     pub const fn signed(&self) -> &SignedFiscalSchedule {
         &self.signed
     }
+}
+
+/// A schedule is issued by the issuer of the charter it is verified under: the
+/// same `issued_by` and the charter's signing key.
+pub(crate) fn verify_schedule_issuer(
+    signed: &SignedFiscalSchedule,
+    charter: &VerifiedFiscalCharter,
+) -> Result<(), FiscalError> {
+    if signed.body.issued_by != charter.body().issued_by {
+        return Err(FiscalError::InvalidField("schedule.issued_by"));
+    }
+    let issuer_key = &charter.signed().signer_key;
+    if &signed.signer_key != issuer_key {
+        return Err(FiscalError::InvalidField("schedule.issuer_key"));
+    }
+    if !signed
+        .verify_signature(issuer_key)
+        .map_err(|error| FiscalError::Canonicalization(error.to_string()))?
+    {
+        return Err(FiscalError::InvalidSignature);
+    }
+    Ok(())
 }
 
 fn verify_schedule_lineage(
@@ -791,4 +815,12 @@ fn decode_prefixed_key(public_key: &PublicKey, prefix: &str) -> Result<Vec<u8>, 
         .and_then(|encoded| {
             hex::decode(encoded).map_err(|error| FiscalError::Canonicalization(error.to_string()))
         })
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalCharter {
+    const SCHEMA_ID: &'static str = FISCAL_CHARTER_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FiscalSchedule {
+    const SCHEMA_ID: &'static str = FISCAL_SCHEDULE_SCHEMA;
 }

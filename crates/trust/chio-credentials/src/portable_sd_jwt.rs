@@ -375,7 +375,11 @@ pub fn issue_chio_passport_sd_jwt_vc(
     );
     let signing_input = format!("{header_b64}.{payload_b64}");
     let signature_b64 =
-        URL_SAFE_NO_PAD.encode(issuer_keypair.sign(signing_input.as_bytes()).to_bytes());
+        URL_SAFE_NO_PAD.encode(
+            issuer_keypair
+                .sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes())
+                .to_bytes(),
+        );
     let compact_jwt = format!("{signing_input}.{signature_b64}");
     let compact = format!(
         "{}~{}~{}~{}~",
@@ -419,7 +423,14 @@ pub fn verify_chio_passport_sd_jwt_vc(
             "portable credential JWT header must declare EdDSA and dc+sd-jwt".to_string(),
         ));
     }
-    if !issuer_public_key.verify(signing_input.as_bytes(), &signature) {
+    if chio_core::crypto::verify_exempt(
+        issuer_public_key,
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        signing_input.as_bytes(),
+        &signature,
+    )
+    .is_err()
+    {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable credential signature verification failed".to_string(),
         ));

@@ -26,11 +26,11 @@ fn typed(schema: &str, bytes: &[u8]) -> bool {
         "return-admission.schema.json" => read!(ReturnAdmissionV1),
         "signed-confined-disclosure.schema.json" => {
             decode_contract::<SignedConfinedDisclosureV1>(bytes)
-                .is_ok_and(|b| b.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|b| b.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         "signed-confined-endorsement.schema.json" => {
             decode_contract::<SignedConfinedEndorsementV1>(bytes)
-                .is_ok_and(|b| b.verify_signature().is_ok_and(|v| v))
+                .is_ok_and(|b| b.verify_integrity_embedded_key().is_ok_and(|v| v))
         }
         _ => false,
     }
@@ -120,9 +120,9 @@ fn disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail()
         .ok_or("proof")?
         .1;
     let original: SignedConfinedDisclosureV1 = serde_json::from_value(contract.clone())?;
-    assert!(original.verify_signature()?);
+    assert!(original.verify_integrity_embedded_key()?);
     let wrong: SignedConfinedEndorsementV1 = serde_json::from_value(contract.clone())?;
-    assert!(!wrong.verify_signature()?);
+    assert!(!wrong.verify_integrity_embedded_key()?);
     for field in [
         "boundary",
         "launch",
@@ -134,7 +134,8 @@ fn disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail()
         let mut changed = contract.clone();
         changed["body"][field] = serde_json::to_value([171u8; 32])?;
         assert!(
-            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?.verify_signature()?,
+            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?
+                .verify_integrity_embedded_key()?,
             "{field}"
         );
     }
@@ -142,7 +143,8 @@ fn disclosure_cannot_substitute_for_integrity_and_exact_binding_mutations_fail()
         let mut changed = contract.clone();
         changed["body"]["parent"][field] = "substitute".into();
         assert!(
-            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?.verify_signature()?,
+            !serde_json::from_value::<SignedConfinedDisclosureV1>(changed)?
+                .verify_integrity_embedded_key()?,
             "parent {field}"
         );
     }

@@ -1,0 +1,5 @@
+{
+  "manifestSha256": "fdcd9c4898513ce3e015be21edfbcea730ed9f63ed37b1ce2edf0c17d8de6b4b",
+  "payloadSha256": "ba6604336fe2fb50f40f530b798a1c617b0986f1a6e92ba4ca84c3c6e9ab55e0",
+  "schema": "chio.other_commitment.v1"
+}

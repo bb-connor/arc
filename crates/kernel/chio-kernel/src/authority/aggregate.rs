@@ -128,7 +128,10 @@ mod tests {
             .ok_or("root binding")?
             .body
             .max_invocations = 3;
-        changed.signature = key.sign_canonical(&changed.signing_body())?.0;
+        changed.signature = key.sign_wrapped(
+            chio_core::capability::token::CHIO_CAPABILITY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&changed.signing_body())?,
+        )?;
         assert!(validate(&changed, 2).is_err());
         assert!(matches!(validate_issued_aggregate_family_root_response(
             &root,
@@ -198,14 +201,14 @@ mod tests {
             chio_core::canonical_json_bytes(&requested_scope)?
         );
         assert_eq!(issued.expires_at - issued.issued_at, 300);
-        assert!(issued.verify_signature()?);
+        assert!(issued.verify_integrity_embedded_key()?);
         let mut changed = issued;
         changed
             .aggregate_invocation_budget
             .as_mut()
             .ok_or("budget")?
             .max_invocations = 3;
-        assert!(!changed.verify_signature()?);
+        assert!(!changed.verify_integrity_embedded_key()?);
         Ok(())
     }
 }

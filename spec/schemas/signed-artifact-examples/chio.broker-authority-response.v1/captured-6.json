@@ -1,0 +1,13 @@
+{
+  "authority": "34b4d9043156cb6dcf0beb0a2949b7559c940d2bcb6dbe8c53a9b30278e3a746",
+  "issuedAtUnixSeconds": 1700000001,
+  "requestDigest": "07b1e7c8547210829a5c1f681394be25cf1214195375319be36e0cc61d21c6e2",
+  "requestId": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "result": {
+    "kind": "rejected",
+    "response": {
+      "code": "vector_denied"
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

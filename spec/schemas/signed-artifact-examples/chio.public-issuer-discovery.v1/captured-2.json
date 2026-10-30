@@ -1,0 +1,22 @@
+{
+  "credentialConfigurationIds": [
+    "chio_agent_passport",
+    "chio_agent_passport_jwt_vc_json",
+    "chio_agent_passport_sd_jwt_vc"
+  ],
+  "discoveryId": "issuer-discovery:https://trust.example.com",
+  "expiresAt": 1793192511,
+  "importGuardrails": {
+    "informationalOnly": true,
+    "requiresExplicitPolicyImport": true,
+    "requiresManualReview": true
+  },
+  "issuer": "https://trust.example.com",
+  "jwksUri": "https://trust.example.com/.well-known/jwks.json",
+  "metadataSha256": "5b64195dc9c11d14e0def9a5e570b0bd03682cfd672bf427b3c2827a2f52791e",
+  "metadataUrl": "https://trust.example.com/.well-known/openid-credential-issuer",
+  "publishedAt": 1793192211,
+  "schema": "chio.public-issuer-discovery.v1",
+  "signerPublicKey": "e6f777d2c6fbbe6e36d2ee22e849df7b6b6bd778379b965b50c4a18891840bac",
+  "version": 3
+}

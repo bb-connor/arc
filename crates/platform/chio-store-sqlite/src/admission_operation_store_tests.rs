@@ -833,7 +833,7 @@ fn signed_terminal_projection_is_bound_to_the_durable_kernel_claimant() -> Resul
     )
     .expect("projection envelope");
     let signed_bytes = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .expect("verified envelope")
         .projection_json()
         .to_vec();

@@ -33,9 +33,16 @@ pub fn verify_signed_manifest(signed_manifest: &SignedManifest) -> Result<Manife
 
     Ok(ManifestVerification {
         structure_valid,
-        signature_valid: signed_manifest
-            .signer_key
-            .verify_canonical(&signed_manifest.manifest, &signed_manifest.signature)?,
+        signature_valid: match chio_core::crypto::verify_wrapped(
+            &signed_manifest.signer_key,
+            chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA,
+            &signed_manifest.manifest,
+            &signed_manifest.signature,
+        ) {
+            Ok(()) => true,
+            Err(chio_core::Error::SignatureRejected) => false,
+            Err(error) => return Err(error.into()),
+        },
         embedded_public_key_valid: embedded_public_key.is_some(),
         embedded_public_key_matches_signer: embedded_public_key
             .as_ref()

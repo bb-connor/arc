@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-settlement-intent-body.schema.json",
+  "title": "chio.clearing.settlement-intent.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "contributingReservationRoot",
+    "creditorParticipantId",
+    "creditorSettlementDestination",
+    "debtorParticipantId",
+    "dispatchIdempotencyKey",
+    "intentId",
+    "ordinal",
+    "roundCoreDigest",
+    "schema"
+  ],
+  "properties": {
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "contributingReservationRoot": {
+      "type": "string"
+    },
+    "creditorParticipantId": {
+      "type": "string"
+    },
+    "creditorSettlementDestination": {
+      "type": "string"
+    },
+    "debtorParticipantId": {
+      "type": "string"
+    },
+    "dispatchIdempotencyKey": {
+      "type": "string"
+    },
+    "intentId": {
+      "type": "string"
+    },
+    "ordinal": {
+      "type": "integer"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.settlement-intent.v1"
+    }
+  }
+}

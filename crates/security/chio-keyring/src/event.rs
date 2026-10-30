@@ -3,18 +3,18 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use chio_core_types::{
-    canonical_json_bytes, leaf_hash, sha256, Hash, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    canonical_json_bytes, leaf_hash, sha256, CanonicalBytes, Hash, PublicKey, Signature,
+    SigningAlgorithm, SigningBackend,
 };
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 
+use crate::signing::{sign_wrapped_canonical, verify_wrapped_canonical};
 use crate::{KeyringError, Result};
 
 pub const KEY_LOG_EVENT_SCHEMA: &str = "chio.key-log.event.v1";
 const KEY_ID_SCHEMA: &str = "chio.key-log.key-id.v1";
 const KEY_ID_DOMAIN: &[u8] = b"chio.key-log.key-id.v1\0";
-const EVENT_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.event-signature.v1\0";
 const EVENT_ENVELOPE_HASH_DOMAIN: &[u8] = b"chio.key-log.event-envelope.v1\0";
 const MAX_IDENTIFIER_LENGTH: usize = 128;
 const MAX_REASON_LENGTH: usize = 512;
@@ -275,8 +275,10 @@ pub struct KeyLogEventBody {
 }
 
 impl KeyLogEventBody {
-    pub fn signing_bytes(&self) -> Result<Vec<u8>> {
-        domain_canonical_bytes(EVENT_SIGNATURE_DOMAIN, self)
+    /// Canonical body every authorization role signs under
+    /// `chio.key-log.event.v1`.
+    pub fn signing_body(&self) -> Result<CanonicalBytes> {
+        Ok(CanonicalBytes::from_serializable(self)?)
     }
 }
 
@@ -286,20 +288,16 @@ macro_rules! key_authorization {
         #[serde(deny_unknown_fields)]
         pub struct $name {
             pub key_id: KeyId,
-            pub algorithm: SigningAlgorithm,
             pub signature: Signature,
         }
 
         impl $name {
             pub fn sign(body: &KeyLogEventBody, backend: &dyn SigningBackend) -> Result<Self> {
-                let outcome = backend.sign_bytes_with_identity(&body.signing_bytes()?)?;
-                let key_id = derive_key_id(outcome.algorithm, &outcome.public_key)?;
-                if outcome.signature.algorithm() != outcome.algorithm {
-                    return Err(KeyringError::AlgorithmMismatch);
-                }
+                let outcome =
+                    sign_wrapped_canonical(backend, KEY_LOG_EVENT_SCHEMA, &body.signing_body()?)?;
+                let key_id = derive_key_id(outcome.public_key.algorithm(), &outcome.public_key)?;
                 Ok(Self {
                     key_id,
-                    algorithm: outcome.algorithm,
                     signature: outcome.signature,
                 })
             }
@@ -315,7 +313,6 @@ key_authorization!(NewKeyProofOfPossession);
 #[serde(deny_unknown_fields)]
 pub struct RecoveryAuthorization {
     pub authorizer_id: RecoveryAuthorizerId,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -325,16 +322,10 @@ impl RecoveryAuthorization {
         authorizer_id: RecoveryAuthorizerId,
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
-        let outcome = backend.sign_bytes_with_identity(&body.signing_bytes()?)?;
-        let algorithm = outcome.algorithm;
-        let signature = outcome.signature;
-        if signature.algorithm() != algorithm {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
+        let outcome = sign_wrapped_canonical(backend, KEY_LOG_EVENT_SCHEMA, &body.signing_body()?)?;
         Ok(Self {
             authorizer_id,
-            algorithm,
-            signature,
+            signature: outcome.signature,
         })
     }
 }
@@ -578,9 +569,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             bootstrap_key,
             authorization.key_id,
-            authorization.algorithm,
             &authorization.signature,
-            &self.body.signing_bytes()?,
+            &self.body.signing_body()?,
         )
     }
 
@@ -596,7 +586,7 @@ impl SignedKeyLogEvent {
         {
             return Err(KeyringError::InvalidAuthorizationSet);
         }
-        let bytes = self.body.signing_bytes()?;
+        let body = self.body.signing_body()?;
         let old_authorization = self
             .authorizations
             .old_key
@@ -605,9 +595,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             old_key,
             old_authorization.key_id,
-            old_authorization.algorithm,
             &old_authorization.signature,
-            &bytes,
+            &body,
         )?;
         let new_authorization = self
             .authorizations
@@ -617,9 +606,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             &self.body.public_key,
             new_authorization.key_id,
-            new_authorization.algorithm,
             &new_authorization.signature,
-            &bytes,
+            &body,
         )
     }
 
@@ -635,9 +623,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             active_key,
             authorization.key_id,
-            authorization.algorithm,
             &authorization.signature,
-            &self.body.signing_bytes()?,
+            &self.body.signing_body()?,
         )
     }
 
@@ -649,7 +636,7 @@ impl SignedKeyLogEvent {
         if !self.authorizations.is_rotation_only() {
             return Err(KeyringError::InvalidAuthorizationSet);
         }
-        let bytes = self.body.signing_bytes()?;
+        let body = self.body.signing_body()?;
         let old_authorization = self
             .authorizations
             .old_key
@@ -658,9 +645,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             old_key,
             old_authorization.key_id,
-            old_authorization.algorithm,
             &old_authorization.signature,
-            &bytes,
+            &body,
         )?;
         let new_authorization = self
             .authorizations
@@ -670,9 +656,8 @@ impl SignedKeyLogEvent {
         verify_key_authorization(
             new_key,
             new_authorization.key_id,
-            new_authorization.algorithm,
             &new_authorization.signature,
-            &bytes,
+            &body,
         )
     }
 
@@ -698,7 +683,7 @@ impl SignedKeyLogEvent {
         {
             return Err(KeyringError::InvalidAuthorizationSet);
         }
-        let bytes = self.body.signing_bytes()?;
+        let body = self.body.signing_body()?;
         let mut verified = BTreeSet::new();
         for authorization in &self.authorizations.recovery {
             if !verified.insert(authorization.authorizer_id.clone()) {
@@ -707,12 +692,7 @@ impl SignedKeyLogEvent {
             let key = recovery_keys
                 .get(&authorization.authorizer_id)
                 .ok_or(KeyringError::InvalidSignature)?;
-            verify_signature(
-                key,
-                authorization.algorithm,
-                &authorization.signature,
-                &bytes,
-            )?;
+            verify_signature(key, &authorization.signature, &body)?;
         }
         if verified.len() < threshold {
             return Err(KeyringError::InvalidSignature);
@@ -723,13 +703,7 @@ impl SignedKeyLogEvent {
                 .new_key
                 .as_ref()
                 .ok_or(KeyringError::InvalidAuthorizationSet)?;
-            verify_key_authorization(
-                &self.body.public_key,
-                proof.key_id,
-                proof.algorithm,
-                &proof.signature,
-                &bytes,
-            )?;
+            verify_key_authorization(&self.body.public_key, proof.key_id, &proof.signature, &body)?;
         }
         Ok(())
     }
@@ -738,41 +712,17 @@ impl SignedKeyLogEvent {
 fn verify_key_authorization(
     key: &PublicKey,
     claimed_key_id: KeyId,
-    algorithm: SigningAlgorithm,
     signature: &Signature,
-    bytes: &[u8],
+    body: &CanonicalBytes,
 ) -> Result<()> {
     if derive_key_id(key.algorithm(), key)? != claimed_key_id {
         return Err(KeyringError::InvalidSignature);
     }
-    verify_signature(key, algorithm, signature, bytes)
+    verify_signature(key, signature, body)
 }
 
-fn verify_signature(
-    key: &PublicKey,
-    algorithm: SigningAlgorithm,
-    signature: &Signature,
-    bytes: &[u8],
-) -> Result<()> {
-    if key.algorithm() != algorithm || signature.algorithm() != algorithm {
-        return Err(KeyringError::AlgorithmMismatch);
-    }
-    if !key.verify_strict(bytes, signature) {
-        return Err(KeyringError::InvalidSignature);
-    }
-    Ok(())
-}
-
-fn domain_canonical_bytes<T: Serialize>(domain: &[u8], value: &T) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(value)?;
-    let capacity = domain
-        .len()
-        .checked_add(canonical.len())
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(domain);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
+fn verify_signature(key: &PublicKey, signature: &Signature, body: &CanonicalBytes) -> Result<()> {
+    verify_wrapped_canonical(key, KEY_LOG_EVENT_SCHEMA, body, signature)
 }
 
 fn domain_hash(domain: &[u8], bytes: &[u8]) -> Result<Hash> {

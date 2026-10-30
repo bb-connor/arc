@@ -1,0 +1,26 @@
+{
+  "body": {
+    "channelId": "6d7a90402ca4f1d6853631bd7c9eb33cde4ca6ac778f089aea9f99f2eec910e0",
+    "channelStateExpectedVersion": 2,
+    "dispositionExpectedVersion": 1,
+    "expiresAtUnixMs": 1750,
+    "lifecycleFence": 2,
+    "maximumCharge": {
+      "currency": "USD",
+      "units": 50
+    },
+    "maximumTokenBaseUnits": "500000",
+    "nextSequence": 1,
+    "openDigest": "8ddbb8b7a9b851e75bce8481e126afbb9bc5ded9f5c3ada282bc01648da0f487",
+    "operationId": "187f0349dd12b6dc73d76d86f421cd454facccc36ef9a2ba6956b37abbb31102",
+    "priorStateDigest": "e39a11888394a502f8c5a2741d41c8aaa1f267ce45eabf89d7d25532cc23d941",
+    "receiptAuthorityDigest": "6919ccd1a68336ec0befcd68d8fd4cf93c46b01b530c4bacd53c9c1295087fbe",
+    "requestId": "request-1",
+    "reservationId": "9efa077f044e7a779c655f8d8e8760cacd16ce2347b6aa10e45b18fb5325fdd6",
+    "schema": "chio.channel.reservation.v1",
+    "serviceBindingDigest": "e0c54ec1caea269b249569f9252f8438c4bf14fcb0c37c2c14be27ee2197aec1"
+  },
+  "keyEpoch": 2,
+  "signerId": "payer",
+  "signerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+}

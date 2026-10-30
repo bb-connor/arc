@@ -110,8 +110,12 @@ pub(super) fn signed_policy(
     policy: McpCageLaunchPolicy,
     signer: &chio_core::Keypair,
 ) -> SignedMcpCageLaunchPolicy {
-    let (signature, _) = signer
-        .sign_canonical(&policy)
+    let signature = signer
+        .sign_wrapped(
+            MCP_CAGE_LAUNCH_POLICY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&policy)
+                .test_expect("canonical cage launch policy"),
+        )
         .test_expect("sign cage launch policy");
     SignedMcpCageLaunchPolicy {
         body: policy,

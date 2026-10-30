@@ -1,0 +1,27 @@
+{
+  "body": {
+    "actualCharge": {
+      "currency": "USD",
+      "units": 0
+    },
+    "assetBindingDigest": "47905618986166ecd3eb0a127e7c8fda9d210b2e5984b67826b0eb2b876760b3",
+    "channelId": "782e5abb69dcd9b073fd53b10f9e29b4d3a7d79cb2bb108df54ac135afe99e39",
+    "cumulativeOwed": {
+      "currency": "USD",
+      "units": 0
+    },
+    "cumulativeTokenBaseUnits": "0",
+    "prevStateDigest": "4da6bcf63a3d350ee34c18f446e786b13e841098c0a933e4ec1790cfbe4afce1",
+    "receiptAuthorityDigest": "79904a049fa597b399a6c9fd22b58803126ad8aeb8e9e7c30c7d123eee06a491",
+    "receiptCount": 1,
+    "receiptDigest": "d12c2e233ab7acd5d990e50b366d9e35c2073601aa92013fb3b73cde535bfc34",
+    "receiptId": "c0a9563c88de8c6acfa46d56265aaedef5156eaa8ff72826754af4fe0a2af68f",
+    "receiptIdRoot": "0fa7ca81d09a96ceeb4434914e30d91e6f50dea921d644c122b698a1fb977826",
+    "reservationDigest": "16ff6fd7b4b6f246ac4f78e960bee71a16e60b0ebc209f865a9fc4c3adcef0c5",
+    "schema": "chio.channel.state.v1",
+    "seq": 1
+  },
+  "keyEpoch": 3,
+  "signerId": "payee",
+  "signerKey": "4ed32f63bf35f0eeefcb25f28a2e1fbdc873ae2835671b0c9460f5f12e4556a8"
+}

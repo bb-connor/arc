@@ -654,7 +654,7 @@ fn session_anchor_signing_binds_auth_context_and_reference() {
     let anchor = SessionAnchor::sign(body, &kp).unwrap();
     let reference = anchor.reference().unwrap();
 
-    assert!(anchor.verify_signature().unwrap());
+    assert!(anchor.verify_integrity_embedded_key().unwrap());
     assert!(anchor.matches_context(&auth, Some(&proof_binding)).unwrap());
     assert_eq!(reference.session_anchor_id, "anchor-1");
     assert!(!reference.session_anchor_hash.is_empty());
@@ -910,4 +910,31 @@ fn chio_identity_assertion_rejects_remaining_invalid_fields() {
     assertion.session_hint = Some("resume".to_string());
     assertion.bound_request_id = Some(" ".to_string());
     assert!(assertion.validate().unwrap_err().contains("boundRequestId"));
+}
+
+#[test]
+fn signed_artifact_capture_request_lineage_record() {
+    let record = RequestLineageRecord::new(
+        RequestId::new("req-child-1"),
+        SessionAnchorReference::new("anchor-1", "anchor-hash-1"),
+        OperationKind::ToolCall,
+        RequestLineageMode::Continued,
+        1_710_000_020,
+    )
+    .with_parent_request_id(RequestId::new("req-parent-1"))
+    .with_capability_attribution("cap-1", "subject-key-1", "issuer-key-1")
+    .with_intent_hash("intent-hash-1")
+    .with_continuation_token_id("continuation-1");
+    let keypair = Keypair::from_seed(&[7; 32]);
+    let canonical = crate::CanonicalBytes::from_serializable(&record).unwrap();
+    let signature = keypair
+        .sign_wrapped(CHIO_REQUEST_LINEAGE_RECORD_SCHEMA, &canonical)
+        .unwrap();
+    crate::crypto::verify_wrapped(
+        &keypair.public_key(),
+        CHIO_REQUEST_LINEAGE_RECORD_SCHEMA,
+        &record,
+        &signature,
+    )
+    .unwrap();
 }

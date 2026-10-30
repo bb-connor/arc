@@ -376,7 +376,7 @@ fn assert_capture_replay(
             Some(KernelError::DurableAdmission(reason.into()).to_string())
         );
         assert!(response.output.is_none());
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response
                 .receipt
@@ -430,7 +430,7 @@ fn single_use_capture(site: Site, entry: Entry, boundary: Boundary) -> CaptureRe
         "{label}"
     );
     assert!(denied.output.is_none());
-    assert!(denied.receipt.verify_signature()?);
+    assert!(denied.receipt.verify_integrity_embedded_key()?);
     assert!(denied.receipt.is_denied());
     assert_eq!(case.invocations.load(Ordering::SeqCst), 0, "{label}");
 

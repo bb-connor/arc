@@ -1,0 +1,18 @@
+{
+  "body": {
+    "channelId": "6d7a90402ca4f1d6853631bd7c9eb33cde4ca6ac778f089aea9f99f2eec910e0",
+    "closeDigest": "ddd1cc1bec91a75dd0ca8e544502b07aecd59946885f018fd68ff7af51b1df9f",
+    "closeStateDigest": "6f8bbea50d794c251f273930ae3b1c15694e5f0519e5086b586d6298c01fc9bc",
+    "closeStateSequence": 1,
+    "competingStateDigest": "917cba05f546ea74aaf19a77ecdd7b74849ea6ed114bd85981df1df36ea316a9",
+    "competingStateSequence": 2,
+    "disputeId": "caea47fa084a8512bbe159b69e526cb8e4ebc90da2b3298846608921c768cad6",
+    "reason": "newer signed state",
+    "schema": "chio.channel.dispute.v1",
+    "stateChainProofDigest": "46cacfde08f29047f04d3f346eacc2f454938bca46e18a05037199fca09676fd",
+    "submittedAtUnixMs": 1750
+  },
+  "keyEpoch": 2,
+  "signerId": "payer",
+  "signerKey": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+}

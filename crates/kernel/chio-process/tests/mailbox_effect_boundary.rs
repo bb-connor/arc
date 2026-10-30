@@ -210,7 +210,7 @@ async fn call(
 
 fn allowed(response: &ToolCallResponse) -> Result<Value> {
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     match &response.output {
         Some(ToolCallOutput::Value(value)) => Ok(value.clone()),
         _ => Err("missing tool value".into()),
@@ -284,7 +284,7 @@ async fn mailbox_claims_do_not_fence_independent_resource_mutations() -> Result 
     )
     .await?;
     assert_eq!(superseded.verdict, Verdict::Deny);
-    assert!(superseded.receipt.verify_signature()?);
+    assert!(superseded.receipt.verify_integrity_embedded_key()?);
 
     let update = json!({"expected_version": 0, "value": "replacement result"});
     let committed = call(

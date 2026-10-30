@@ -1,0 +1,170 @@
+{
+  "authority_envelope": {
+    "authority_chain_refs": [
+      "underwriting-committee-approval",
+      "operator-treasury-approval"
+    ],
+    "automation_mode": "active",
+    "currency": "USD",
+    "delegated_authority_reference": "lpa-1",
+    "envelope_id": "ape-1",
+    "issued_at": 1743379200,
+    "kind": "delegated_market_authority",
+    "max_coverage_amount": {
+      "currency": "USD",
+      "units": 150000
+    },
+    "max_daily_decisions": 20,
+    "max_premium_amount": {
+      "currency": "USD",
+      "units": 6000
+    },
+    "max_rate_change_bps": 750,
+    "not_after": 1743465600,
+    "not_before": 1743379200,
+    "note": "Binds automation to one delegated pricing authority envelope.",
+    "permitted_actions": [
+      "reprice",
+      "renew",
+      "decline",
+      "bind"
+    ],
+    "provider_id": "carrier-1",
+    "requires_human_review_above_premium": {
+      "currency": "USD",
+      "units": 5000
+    },
+    "requires_human_review_for_bind": false,
+    "schema": "chio.autonomous-pricing-authority-envelope.v1",
+    "subject_key": "subject-1",
+    "support_boundary": {
+      "delegated_authority_required": true,
+      "live_bind_supported": true,
+      "operator_override_supported": true,
+      "reserve_optimization_required": true
+    }
+  },
+  "comparison_baseline_ref": "uwd-1",
+  "confidence_bps": 8700,
+  "decision_id": "apd-1",
+  "disposition": "bind_within_envelope",
+  "explanation_factors": [
+    {
+      "code": "strong-runtime-assurance",
+      "description": "Verified runtime assurance supports automated bind posture.",
+      "direction": "decrease",
+      "evidence_refs": [
+        {
+          "kind": "runtime_assurance_appraisal",
+          "locator": "appraisal:raa-1",
+          "observed_at": 1743379000,
+          "reference_id": "raa-1"
+        }
+      ],
+      "weight_bps": 2500
+    },
+    {
+      "code": "settled-web3-history",
+      "description": "Recent settled web3 history reduces uncertainty for automated renewal and bind.",
+      "direction": "decrease",
+      "evidence_refs": [
+        {
+          "kind": "web3_settlement_receipt",
+          "locator": "web3-settlement:receipt-web3-1",
+          "observed_at": 1743379000,
+          "reference_id": "receipt-web3-1"
+        }
+      ],
+      "weight_bps": 2000
+    }
+  ],
+  "issued_at": 1743379260,
+  "model": {
+    "engine_family": "gradient_boosted_policy",
+    "explanation_version": "counterfactual-v1",
+    "input_hash": "4e4efc0ad4f8c80ad4c76f2f3ae2122e9b6cf407cdb2d43516c8f8e4dfd2c1df",
+    "model_id": "pricing-model-chio-1",
+    "model_version": "2026.03.31",
+    "published_at": 1743379000,
+    "supports_counterfactuals": true,
+    "supports_shadow_evaluation": true,
+    "training_cutoff": 1743292800
+  },
+  "note": "Auto-approves one renewal/bind decision inside the active envelope.",
+  "pricing_input": {
+    "available_capital_units": 600000,
+    "coverage_class": "professional_liability",
+    "currency": "USD",
+    "evidence_refs": [
+      {
+        "kind": "underwriting_decision",
+        "locator": "underwriting:uwd-1",
+        "observed_at": 1743379100,
+        "reference_id": "uwd-1"
+      },
+      {
+        "kind": "exposure_ledger",
+        "locator": "ledger:eld-1",
+        "observed_at": 1743379100,
+        "reference_id": "eld-1"
+      },
+      {
+        "kind": "credit_scorecard",
+        "locator": "scorecard:score-1",
+        "observed_at": 1743379050,
+        "reference_id": "score-1"
+      },
+      {
+        "kind": "capital_book",
+        "locator": "capital-book:cb-1",
+        "observed_at": 1743379150,
+        "reference_id": "cb-1"
+      },
+      {
+        "kind": "credit_loss_lifecycle",
+        "locator": "loss:loss-1",
+        "observed_at": 1743378900,
+        "reference_id": "loss-1"
+      },
+      {
+        "kind": "web3_settlement_receipt",
+        "locator": "web3-settlement:receipt-web3-1",
+        "observed_at": 1743379000,
+        "reference_id": "receipt-web3-1"
+      }
+    ],
+    "generated_at": 1743379200,
+    "input_id": "api-1",
+    "latest_web3_settlement_state": "settled",
+    "note": "Feeds one bounded autonomous pricing decision over Chio truth.",
+    "pending_loss_units": 0,
+    "provider_id": "carrier-1",
+    "receipt_history_window_secs": 2592000,
+    "reputation_score_bps": 8200,
+    "requested_coverage_amount": {
+      "currency": "USD",
+      "units": 120000
+    },
+    "runtime_assurance_tier": "verified",
+    "schema": "chio.autonomous-pricing-input.v1",
+    "settled_loss_units": 2500,
+    "subject_key": "subject-1",
+    "support_boundary": {
+      "delegated_authority_required": true,
+      "live_bind_supported": true,
+      "operator_override_supported": true,
+      "reserve_optimization_required": true
+    }
+  },
+  "review_state": "auto_approved",
+  "schema": "chio.autonomous-pricing-decision.v1",
+  "suggested_ceiling_factor_bps": 9000,
+  "suggested_coverage_amount": {
+    "currency": "USD",
+    "units": 110000
+  },
+  "suggested_premium_amount": {
+    "currency": "USD",
+    "units": 4800
+  }
+}

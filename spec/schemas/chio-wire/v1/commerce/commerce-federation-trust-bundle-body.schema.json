@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/commerce/commerce-federation-trust-bundle-body.schema.json",
+  "title": "chio.commerce.federation-trust-bundle.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "issued_at",
+    "provider_subject",
+    "schema",
+    "status",
+    "trust_domain",
+    "trust_root_ref"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "string"
+    },
+    "provider_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.commerce.federation-trust-bundle.v1"
+    },
+    "status": {
+      "type": "string"
+    },
+    "trust_domain": {
+      "type": "string"
+    },
+    "trust_root_ref": {
+      "type": "string"
+    }
+  }
+}

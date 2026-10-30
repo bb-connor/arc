@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/registry/governance-case.schema.json",
+  "title": "Chio registry governance case signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "caseId",
+    "charterId",
+    "evidenceRefs",
+    "expiresAt",
+    "governingOperatorId",
+    "issuedBy",
+    "kind",
+    "listingId",
+    "namespace",
+    "openedAt",
+    "schema",
+    "state",
+    "subjectOperatorId",
+    "updatedAt"
+  ],
+  "properties": {
+    "activationId": {
+      "type": "string"
+    },
+    "appealOfCaseId": {
+      "type": "string"
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "charterId": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "referenceId"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "governingOperatorId": {
+      "type": "string"
+    },
+    "issuedBy": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "openedAt": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.registry.governance-case.v1"
+    },
+    "state": {
+      "type": "string"
+    },
+    "subjectOperatorId": {
+      "type": "string"
+    },
+    "supersedesCaseId": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "integer"
+    }
+  }
+}

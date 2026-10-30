@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-verifier-report-body.schema.json",
+  "title": "chio.finding.verifier-report.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evaluation_time",
+    "facets",
+    "finding_artifact_sha256",
+    "finding_id",
+    "report_id",
+    "resolved_evidence_bundle_sha256",
+    "resolver_policy_sha256",
+    "schema",
+    "trust_root_snapshot_sha256",
+    "trusted_time_input_sha256",
+    "verifier_authority",
+    "verifier_implementation_id",
+    "verifier_key_epoch",
+    "verifier_profile_envelope_sha256",
+    "verifier_profile_id"
+  ],
+  "properties": {
+    "backing_allocation_id": {
+      "type": "string"
+    },
+    "evaluation_time": {
+      "type": "integer"
+    },
+    "facets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "facet",
+          "outcome",
+          "reason"
+        ],
+        "properties": {
+          "facet": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "finding_artifact_sha256": {
+      "type": "string"
+    },
+    "finding_delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_bid_envelope_sha256",
+        "authoritative_payment_operation_id",
+        "digest_check",
+        "finding_id",
+        "listing_id",
+        "media_type_check",
+        "purchase_intent_id",
+        "reservation_id",
+        "schema",
+        "settlement_mode",
+        "transform_profile",
+        "venue_admission_envelope_sha256"
+      ],
+      "properties": {
+        "accepted_bid_envelope_sha256": {
+          "type": "string"
+        },
+        "authoritative_payment_operation_id": {
+          "type": "string"
+        },
+        "digest_check": {
+          "type": "string"
+        },
+        "finding_id": {
+          "type": "string"
+        },
+        "listing_id": {
+          "type": "string"
+        },
+        "media_type_check": {
+          "type": "string"
+        },
+        "purchase_intent_id": {
+          "type": "string"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "settlement_mode": {
+          "type": "string"
+        },
+        "transform_profile": {
+          "type": "string"
+        },
+        "venue_admission_envelope_sha256": {
+          "type": "string"
+        }
+      }
+    },
+    "finding_delivery_receipt_id": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "replay_recipe_input_sha256": {
+      "type": "string"
+    },
+    "report_id": {
+      "type": "string"
+    },
+    "resolved_evidence_bundle_sha256": {
+      "type": "string"
+    },
+    "resolver_policy_sha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.verifier-report.v1"
+    },
+    "status_proof_input_sha256": {
+      "type": "string"
+    },
+    "trust_root_snapshot_sha256": {
+      "type": "string"
+    },
+    "trusted_time_input_sha256": {
+      "type": "string"
+    },
+    "verifier_authority": {
+      "type": "string"
+    },
+    "verifier_implementation_id": {
+      "type": "string"
+    },
+    "verifier_key_epoch": {
+      "type": "integer"
+    },
+    "verifier_profile_envelope_sha256": {
+      "type": "string"
+    },
+    "verifier_profile_id": {
+      "type": "string"
+    }
+  }
+}

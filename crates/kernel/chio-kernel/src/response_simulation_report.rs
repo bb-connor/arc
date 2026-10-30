@@ -161,7 +161,7 @@ pub fn verify_response_simulation_receipt(
 ) -> PortResult<ResponseSimulationReport> {
     if &receipt.kernel_key != trusted_signer
         || !receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| PortError::integrity_failure())?
     {
         return Err(PortError::integrity_failure());

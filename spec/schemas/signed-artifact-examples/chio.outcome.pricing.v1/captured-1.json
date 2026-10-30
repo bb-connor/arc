@@ -1,0 +1,15 @@
+{
+  "expiresAtUnixMs": 2000,
+  "failureMode": "zero_charge",
+  "issuedAtUnixMs": 1000,
+  "outcomePrice": {
+    "currency": "USD",
+    "units": 250
+  },
+  "predicateDigest": "94008abb1899e2e29516c237caa5ee94725483d1e2b19dad435aff79229a702b",
+  "predicateId": "4a44610deead73fd4a8bcaa5c6e75b2478393812e1f34f71015d843ab203a0ad",
+  "pricingId": "571b6c6d0e116e126b726b9f52271dab10eea46c6f5428491a82e87a459252cc",
+  "providerId": "provider-1",
+  "schema": "chio.outcome.pricing.v1",
+  "slaDigest": "a841c3426b1aab3d0bbc2cfc09131c0f63d7cf38eb2556ecc5ab9aa55c4581f7"
+}

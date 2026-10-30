@@ -1,0 +1,17 @@
+{
+  "decay_policy_ref": "decay-policy-market-valid",
+  "id": "reputation-import-trust-market-valid",
+  "import_verdict": "accepted",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "issuer": "did:chio:federation-root",
+  "issuer_trust_ref": "did:chio:federation-root",
+  "local_weight": 30,
+  "negative_event_refs": [],
+  "privacy_profile_ref": "privacy-profile-market-valid",
+  "schema": "chio.trust.reputation-import-report.v1",
+  "source_network": "federated-commerce-network",
+  "source_reputation_ref": "external-reputation-alpha",
+  "subject": "did:chio:provider-alpha",
+  "subject_binding_ref": "subject-binding-alpha",
+  "usage": "scoring_input"
+}

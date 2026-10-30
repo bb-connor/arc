@@ -1,0 +1,17 @@
+{
+  "boundary": {
+    "automaticTrustAdmission": false,
+    "explicitTrustActivationRequired": true,
+    "visibilityOnly": true
+  },
+  "lifecycleState": "active",
+  "namespaceId": "ns-93167af95865221975bbabeb8887885e9e0c4bcab408050416ecba79076048d4",
+  "ownership": {
+    "namespace": "https://trust.example.com",
+    "ownerId": "https://trust.example.com",
+    "registeredAt": 1793192210,
+    "registryUrl": "https://trust.example.com",
+    "signerPublicKey": "3309c51c0008f8d033139a5b08769ce044d68691a26dcf930a0da8b5380c3b0e"
+  },
+  "schema": "chio.registry.namespace.v1"
+}

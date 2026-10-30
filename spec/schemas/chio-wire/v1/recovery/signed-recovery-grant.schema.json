@@ -7,7 +7,6 @@
   "required": [
     "body",
     "authority_key",
-    "algorithm",
     "signature"
   ],
   "properties": {
@@ -38,15 +37,6 @@
     "authority_key": {
       "type": "string",
       "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
-    },
-    "algorithm": {
-      "type": "string",
-      "enum": [
-        "ed25519",
-        "p256",
-        "p384",
-        "hybrid"
-      ]
     },
     "signature": {
       "type": "string",

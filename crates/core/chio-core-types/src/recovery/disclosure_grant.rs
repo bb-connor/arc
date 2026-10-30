@@ -2,7 +2,7 @@
 //! A declassification grant serializes exactly as `SignedDeclassificationGrant`;
 //! a recovery grant is wrapped as `{"kind":"recovery","grant":...}`.
 use super::SignedRecoveryGrant;
-use crate::{PublicKey, Signature, SignedDeclassificationGrant, SigningAlgorithm};
+use crate::{PublicKey, Signature, SignedDeclassificationGrant};
 use alloc::boxed::Box;
 use chio_security_types::DeclassificationGrantBody;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -23,10 +23,12 @@ impl From<SignedRecoveryGrant> for SignedDisclosureGrant {
     }
 }
 impl SignedDisclosureGrant {
-    pub fn verify_signature(&self) -> crate::Result<bool> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> crate::Result<bool> {
         match self {
-            Self::Declassification(grant) => grant.verify_signature(),
-            Self::Recovery(grant) => grant.verify_signature(),
+            Self::Declassification(grant) => grant.verify_integrity_embedded_key(),
+            Self::Recovery(grant) => grant.verify_integrity_embedded_key(),
         }
     }
     pub fn authority_key(&self) -> &PublicKey {
@@ -103,8 +105,6 @@ impl<'de> Deserialize<'de> for SignedDisclosureGrant {
             #[serde(default, deserialize_with = "present")]
             authority_key: Option<PublicKey>,
             #[serde(default, deserialize_with = "present")]
-            algorithm: Option<SigningAlgorithm>,
-            #[serde(default, deserialize_with = "present")]
             signature: Option<Signature>,
         }
         let wire = Wire::deserialize(d)?;
@@ -113,18 +113,16 @@ impl<'de> Deserialize<'de> for SignedDisclosureGrant {
             wire.grant,
             wire.body,
             wire.authority_key,
-            wire.algorithm,
             wire.signature,
         ) {
-            (Some(Kind::Recovery), Some(grant), None, None, None, None) => {
+            (Some(Kind::Recovery), Some(grant), None, None, None) => {
                 Ok(Self::Recovery(Box::new(grant)))
             }
-            (None, None, Some(body), Some(authority_key), Some(algorithm), Some(signature)) => {
+            (None, None, Some(body), Some(authority_key), Some(signature)) => {
                 Ok(Self::Declassification(Box::new(
                     SignedDeclassificationGrant::from_untrusted_parts(
                         body,
                         authority_key,
-                        algorithm,
                         signature,
                     ),
                 )))

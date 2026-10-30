@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/credit-receivable-iou-envelope-body.schema.json",
+  "title": "chio.credit.receivable-iou-envelope.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "capabilityId",
+    "creditAuthorityDigest",
+    "creditFacilityBind",
+    "currentDispositionDigest",
+    "debtorId",
+    "dueAtUnixMs",
+    "facilityId",
+    "iouId",
+    "issuedAtUnixMs",
+    "issuerId",
+    "issuerKeyEpoch",
+    "obligationAtomDigest",
+    "obligationId",
+    "operationId",
+    "originalCreditorId",
+    "originalSettlementDestinationRef",
+    "payeeBindingDigest",
+    "receiptContentHash",
+    "receiptDigest",
+    "receiptId",
+    "receiptPolicyHash",
+    "receiptTimestampUnixSeconds",
+    "schema",
+    "toolName",
+    "toolServer"
+  ],
+  "properties": {
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "capabilityId": {
+      "type": "string"
+    },
+    "creditAuthorityDigest": {
+      "type": "string"
+    },
+    "creditFacilityBind": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authoritySignature",
+        "body",
+        "creditorSignature",
+        "debtorSignature"
+      ],
+      "properties": {
+        "authoritySignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "partyId",
+            "partyKeyEpoch",
+            "signature",
+            "signerKey"
+          ],
+          "properties": {
+            "partyId": {
+              "type": "string"
+            },
+            "partyKeyEpoch": {
+              "type": "integer"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signerKey": {
+              "type": "string"
+            }
+          }
+        },
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "actionNonce",
+            "amount",
+            "authorityId",
+            "authorityKeyEpoch",
+            "authoritySetDigest",
+            "bindId",
+            "capabilityId",
+            "creditorKeyEpoch",
+            "debtorId",
+            "debtorKeyEpoch",
+            "dueAtUnixMs",
+            "economicIntentDigest",
+            "effectiveCeiling",
+            "expectedExposureFence",
+            "expectedExposureVersion",
+            "expiresAtUnixMs",
+            "facilityArtifactDigest",
+            "facilityId",
+            "issuedAtUnixMs",
+            "operationId",
+            "originalCreditorId",
+            "originalSettlementDestinationRef",
+            "payeeBindingDigest",
+            "requestId",
+            "schema",
+            "scopeDigest",
+            "toolName",
+            "toolServer"
+          ],
+          "properties": {
+            "actionNonce": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "authorityId": {
+              "type": "string"
+            },
+            "authorityKeyEpoch": {
+              "type": "integer"
+            },
+            "authoritySetDigest": {
+              "type": "string"
+            },
+            "bindId": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "creditorKeyEpoch": {
+              "type": "integer"
+            },
+            "debtorId": {
+              "type": "string"
+            },
+            "debtorKeyEpoch": {
+              "type": "integer"
+            },
+            "dueAtUnixMs": {
+              "type": "integer"
+            },
+            "economicIntentDigest": {
+              "type": "string"
+            },
+            "effectiveCeiling": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "expectedExposureFence": {
+              "type": "integer"
+            },
+            "expectedExposureVersion": {
+              "type": "integer"
+            },
+            "expiresAtUnixMs": {
+              "type": "integer"
+            },
+            "facilityArtifactDigest": {
+              "type": "string"
+            },
+            "facilityId": {
+              "type": "string"
+            },
+            "issuedAtUnixMs": {
+              "type": "integer"
+            },
+            "operationId": {
+              "type": "string"
+            },
+            "originalCreditorId": {
+              "type": "string"
+            },
+            "originalSettlementDestinationRef": {
+              "type": "string"
+            },
+            "payeeBindingDigest": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "scopeDigest": {
+              "type": "string"
+            },
+            "toolName": {
+              "type": "string"
+            },
+            "toolServer": {
+              "type": "string"
+            }
+          }
+        },
+        "creditorSignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "partyId",
+            "partyKeyEpoch",
+            "signature",
+            "signerKey"
+          ],
+          "properties": {
+            "partyId": {
+              "type": "string"
+            },
+            "partyKeyEpoch": {
+              "type": "integer"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signerKey": {
+              "type": "string"
+            }
+          }
+        },
+        "debtorSignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "partyId",
+            "partyKeyEpoch",
+            "signature",
+            "signerKey"
+          ],
+          "properties": {
+            "partyId": {
+              "type": "string"
+            },
+            "partyKeyEpoch": {
+              "type": "integer"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signerKey": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "currentDispositionDigest": {
+      "type": "string"
+    },
+    "debtorId": {
+      "type": "string"
+    },
+    "dueAtUnixMs": {
+      "type": "integer"
+    },
+    "facilityId": {
+      "type": "string"
+    },
+    "iouId": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "issuerId": {
+      "type": "string"
+    },
+    "issuerKeyEpoch": {
+      "type": "integer"
+    },
+    "obligationAtomDigest": {
+      "type": "string"
+    },
+    "obligationId": {
+      "type": "string"
+    },
+    "operationId": {
+      "type": "string"
+    },
+    "originalCreditorId": {
+      "type": "string"
+    },
+    "originalSettlementDestinationRef": {
+      "type": "string"
+    },
+    "payeeBindingDigest": {
+      "type": "string"
+    },
+    "receiptContentHash": {
+      "type": "string"
+    },
+    "receiptDigest": {
+      "type": "string"
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "receiptPolicyHash": {
+      "type": "string"
+    },
+    "receiptTimestampUnixSeconds": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.credit.receivable-iou-envelope.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "toolName": {
+      "type": "string"
+    },
+    "toolServer": {
+      "type": "string"
+    }
+  }
+}

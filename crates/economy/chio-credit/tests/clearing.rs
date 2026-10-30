@@ -198,13 +198,20 @@ fn frost_verifying_share(share: &str) -> Result<String, Box<dyn std::error::Erro
 
 fn sign_frost_roster(roster: &mut FrostRosterV1) -> TestResult {
     roster.roster_id = roster.recompute_roster_id()?;
-    roster.roster_authority_signature = roster_authority().sign(&roster.signing_bytes()?).to_hex();
+    roster.roster_authority_signature = roster_authority()
+        .sign_wrapped(CHIO_FROST_ROSTER_SCHEMA, &roster.signing_body()?)?
+        .to_hex();
     roster.roster_digest = roster.recompute_roster_digest()?;
     Ok(())
 }
 
 fn sign_frost_slot(checkpoint: &mut FrostAuthorizationSlotCheckpointV1) -> TestResult {
-    checkpoint.anchor_signature = slot_authority().sign(&checkpoint.signing_bytes()?).to_hex();
+    checkpoint.anchor_signature = slot_authority()
+        .sign_wrapped(
+            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SCHEMA,
+            &checkpoint.signing_body()?,
+        )?
+        .to_hex();
     checkpoint.checkpoint_digest = checkpoint.recompute_checkpoint_digest()?;
     Ok(())
 }

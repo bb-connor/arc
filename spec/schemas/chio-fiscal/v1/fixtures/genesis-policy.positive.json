@@ -13,9 +13,9 @@
       400
     ]
   },
-  "genesisCharterDigest": "a79930cdbd1c5d68208e437f8b8851dcd0f66114b5d34c25cb48a670bf2a22fa",
+  "genesisCharterDigest": "ab49db4861722b5fdc0c8cbd1bbd340cf3f8563e3301941ad239b1c79c3ec48a",
   "genesisCharterId": "8e486b91278e696d27603e62e2192af0667d5417891379a354b4113be30bb375",
   "governingOperatorId": "operator.example",
-  "policyId": "4b98f64e78f6ec56310ad17a180d36d5a9f3d8a8c621d1a9cc45449c173cd9b7",
+  "policyId": "b567fc99500509c4f9e611958122520ee82212de4335a185bad0624e7316b41b",
   "schema": "chio.fiscal.genesis-policy.v1"
 }

@@ -1,0 +1,36 @@
+{
+  "actionNonce": "credit-admission-nonce-1",
+  "amount": {
+    "currency": "USD",
+    "units": 1250
+  },
+  "authorityId": "credit-admission-authority",
+  "authorityKeyEpoch": 3,
+  "authoritySetDigest": "e8a43c351ea8b42cd10fe13a53577f502758bedf589b4a4cb19f75520640c66c",
+  "bindId": "e9810e5a686cd4f7ecf22c085f62ede2666de7510d667d7b838ef5af2b226465",
+  "capabilityId": "capability:metered-tool",
+  "creditorKeyEpoch": 7,
+  "debtorId": "did:chio:debtor",
+  "debtorKeyEpoch": 5,
+  "dueAtUnixMs": 5000,
+  "economicIntentDigest": "87e295c0353e9ff217e58d25dfebc906ce260ecad2857109488378374258789f",
+  "effectiveCeiling": {
+    "currency": "USD",
+    "units": 5000
+  },
+  "expectedExposureFence": 11,
+  "expectedExposureVersion": 9,
+  "expiresAtUnixMs": 1100,
+  "facilityArtifactDigest": "a858e0c758e76e607d094bba15efbac27ba0417bd19ba036252588a4dba16bef",
+  "facilityId": "facility:working-capital",
+  "issuedAtUnixMs": 1000,
+  "operationId": "9bf5a24e4aa779981ac41f1a0f8713ec758e12df95fa51866869849c06e51175",
+  "originalCreditorId": "did:chio:creditor",
+  "originalSettlementDestinationRef": "acct:creditor",
+  "payeeBindingDigest": "744afa178e1f4d393bbc788d9f7ba1647a09aaeb3268ffbdaa75473e4d46495c",
+  "requestId": "request-1",
+  "schema": "chio.credit.facility-bind.v1",
+  "scopeDigest": "6cf13c011cf00afe20036a603e95e901206703d5c280299b65e731991603541f",
+  "toolName": "search",
+  "toolServer": "research-server"
+}

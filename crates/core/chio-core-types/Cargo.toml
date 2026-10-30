@@ -90,6 +90,11 @@ std = [
 # `aws-lc-rs` itself is std-only.
 fips = ["dep:aws-lc-rs", "std"]
 pq = ["dep:fips204"]
+# Deterministic ML-DSA-65 KAT signer; only the chio-core pq_kats test target enables it.
+pq-kat = ["pq"]
+# Records wrapped bodies under $CHIO_WRAPPER_CAPTURE_DIR during test runs for schema example
+# generation. Never enabled by a default or production build.
+wrapper-capture = ["std"]
 # The recursive-delegation wire primitive is always compiled in, including
 # no-default builds, so this feature is a no-op kept for downstream manifests
 # that enable it by name.

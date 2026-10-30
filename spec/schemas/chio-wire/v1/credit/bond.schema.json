@@ -1,0 +1,370 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/bond.schema.json",
+  "title": "Chio credit bond signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bondId",
+    "expiresAt",
+    "issuedAt",
+    "lifecycleState",
+    "report",
+    "schema"
+  ],
+  "properties": {
+    "bondId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lifecycleState": {
+      "type": "string"
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "exposure",
+        "filters",
+        "generatedAt",
+        "prerequisites",
+        "schema",
+        "scorecard",
+        "supportBoundary"
+      ],
+      "properties": {
+        "disposition": {
+          "type": "string"
+        },
+        "exposure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "actionableReceipts",
+            "activeDecisions",
+            "currencies",
+            "failedSettlementReceipts",
+            "matchingDecisions",
+            "matchingReceipts",
+            "mixedCurrencyBook",
+            "pendingSettlementReceipts",
+            "returnedDecisions",
+            "returnedReceipts",
+            "supersededDecisions",
+            "truncatedDecisions",
+            "truncatedReceipts"
+          ],
+          "properties": {
+            "actionableReceipts": {
+              "type": "integer"
+            },
+            "activeDecisions": {
+              "type": "integer"
+            },
+            "currencies": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "failedSettlementReceipts": {
+              "type": "integer"
+            },
+            "matchingDecisions": {
+              "type": "integer"
+            },
+            "matchingReceipts": {
+              "type": "integer"
+            },
+            "mixedCurrencyBook": {
+              "type": "boolean"
+            },
+            "pendingSettlementReceipts": {
+              "type": "integer"
+            },
+            "returnedDecisions": {
+              "type": "integer"
+            },
+            "returnedReceipts": {
+              "type": "integer"
+            },
+            "supersededDecisions": {
+              "type": "integer"
+            },
+            "truncatedDecisions": {
+              "type": "boolean"
+            },
+            "truncatedReceipts": {
+              "type": "boolean"
+            }
+          }
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentSubject",
+            "decisionLimit",
+            "receiptLimit"
+          ],
+          "properties": {
+            "agentSubject": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "decisionLimit": {
+              "type": "integer"
+            },
+            "receiptLimit": {
+              "type": "integer"
+            },
+            "toolName": {
+              "type": "string"
+            },
+            "toolServer": {
+              "type": "string"
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "description"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "generatedAt": {
+          "type": "integer"
+        },
+        "latestFacilityId": {
+          "type": "string"
+        },
+        "prerequisites": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "activeFacilityMet",
+            "activeFacilityRequired",
+            "certificationMet",
+            "certificationRequired",
+            "currencyCoherent",
+            "runtimeAssuranceMet"
+          ],
+          "properties": {
+            "activeFacilityMet": {
+              "type": "boolean"
+            },
+            "activeFacilityRequired": {
+              "type": "boolean"
+            },
+            "certificationMet": {
+              "type": "boolean"
+            },
+            "certificationRequired": {
+              "type": "boolean"
+            },
+            "currencyCoherent": {
+              "type": "boolean"
+            },
+            "runtimeAssuranceMet": {
+              "type": "boolean"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "scorecard": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "anomalyCount",
+            "band",
+            "confidence",
+            "currencies",
+            "matchingDecisions",
+            "matchingReceipts",
+            "mixedCurrencyBook",
+            "overallScore",
+            "probationary",
+            "returnedDecisions",
+            "returnedReceipts"
+          ],
+          "properties": {
+            "anomalyCount": {
+              "type": "integer"
+            },
+            "band": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "currencies": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "matchingDecisions": {
+              "type": "integer"
+            },
+            "matchingReceipts": {
+              "type": "integer"
+            },
+            "mixedCurrencyBook": {
+              "type": "boolean"
+            },
+            "overallScore": {
+              "type": "number"
+            },
+            "probationary": {
+              "type": "boolean"
+            },
+            "returnedDecisions": {
+              "type": "integer"
+            },
+            "returnedReceipts": {
+              "type": "integer"
+            }
+          }
+        },
+        "supportBoundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "autonomyGatingSupported",
+            "externalEscrowExecutionSupported",
+            "reserveAccountingAuthoritative"
+          ],
+          "properties": {
+            "autonomyGatingSupported": {
+              "type": "boolean"
+            },
+            "externalEscrowExecutionSupported": {
+              "type": "boolean"
+            },
+            "reserveAccountingAuthoritative": {
+              "type": "boolean"
+            }
+          }
+        },
+        "terms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capitalSource",
+            "collateralAmount",
+            "coverageRatioBps",
+            "creditLimit",
+            "facilityId",
+            "outstandingExposureAmount",
+            "reserveRatioBps",
+            "reserveRequirementAmount"
+          ],
+          "properties": {
+            "capitalSource": {
+              "type": "string"
+            },
+            "collateralAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "coverageRatioBps": {
+              "type": "integer"
+            },
+            "creditLimit": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "facilityId": {
+              "type": "string"
+            },
+            "outstandingExposureAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "reserveRatioBps": {
+              "type": "integer"
+            },
+            "reserveRequirementAmount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.credit.bond.v1"
+    }
+  }
+}

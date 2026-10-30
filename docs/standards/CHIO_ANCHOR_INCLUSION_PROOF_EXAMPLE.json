@@ -1,7 +1,7 @@
 {
   "schema": "chio.anchor-inclusion-proof.v1",
   "receipt": {
-    "id": "3ab6f57e6829f529c584173af9c6484afbffaf3be10dfce6fe5e7f3434ff9d11",
+    "id": "9efc43ad289d55120be289a3b2509f68094afb618cddbaa7419797a08dda7504",
     "timestamp": 1743292800,
     "capability_id": "cap-web3-1",
     "tool_server": "chio-settle",
@@ -40,12 +40,14 @@
           "feed_address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612",
           "grant_currency": "USD",
           "max_age_seconds": 3600,
-          "original_cost_units": 100000000000000,
+          "oracle_public_key": "d9bf2148748a85c89da5aad8ee0b0fc2d105fd39d41a4c796536354f0ae2900c",
+          "original_cost_units": 1000000000000000,
           "original_currency": "ETH",
           "quote": "USD",
           "rate_denominator": 100,
           "rate_numerator": 300000,
           "schema": "chio.oracle-conversion-evidence.v1",
+          "signature": "8a7b0cc235e29ef48c84219ba098bea8c1a7c572939f77c54b034819246e1decb5d0fa31349811c09890e3f9a52381b3e214a5ffe7224c4971ddc6442bc2df0d",
           "source": "chainlink",
           "updated_at": 1743292740
         },
@@ -56,11 +58,11 @@
     },
     "trust_level": "mediated",
     "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-    "signature": "49bbe98f1cb8c45ae1d4be4526d2d0ca3b7ae229718580063ce5ede62012450bb1685832026fe08a53c6d3bb084aacb7f172c0ef469d50157cc864d2cc261804"
+    "signature": "17ea8549ecaf4f689f4d083fcaf35a8675068dd08156fb59c0fa111eb0c12ded32cbc4c21a62ac17278d3400d196e303c90c6120860d313cd18c7954acfab003"
   },
   "receipt_inclusion": {
     "checkpoint_seq": 1042,
-    "merkle_root": "0xfba90da7db4859cf33cd97a64b2ce07f244c8fcafe51c19ddd67b03c8490c3eb",
+    "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
     "proof": {
       "tree_size": 1,
       "leaf_index": 0,
@@ -73,10 +75,10 @@
     "batch_start_seq": 104101,
     "batch_end_seq": 104101,
     "tree_size": 1,
-    "merkle_root": "0xfba90da7db4859cf33cd97a64b2ce07f244c8fcafe51c19ddd67b03c8490c3eb",
+    "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
     "issued_at": 1743292800,
     "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-    "signature": "ca94a77f269911405b2dc699acfd4da07535be277de23c7aceb7d286a778e0871e33b941cb72a3383131afaa19eafe81d581966bf2fb7704f335f91f3ddba608"
+    "signature": "d1e9ef54183509d3d73f0ac079c8055cc42394f6ba38b6884e7fb4ba0be68da4f71d1e387cfe91853052c137581f0d2f2f1e04e22a04f0d21d4c9d5c22fe0603"
   },
   "chain_anchor": {
     "chain_id": "eip155:8453",
@@ -87,7 +89,7 @@
     "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "operator_key_hash": "0x0791868d8f29ea735f26a17a9aea038cd4255baac26eac5a74e58a07ed2f1975",
     "operator_epoch": 1,
-    "anchored_merkle_root": "0xfba90da7db4859cf33cd97a64b2ce07f244c8fcafe51c19ddd67b03c8490c3eb",
+    "anchored_merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
     "anchored_checkpoint_seq": 1042
   },
   "key_binding_certificate": {
@@ -108,6 +110,6 @@
       "expires_at": 1774828800,
       "nonce": "0123456789abcdef0123456789abcdef"
     },
-    "signature": "66c566b5ed17f4b1b23a18ef073d3ed331f43d9e420bafc7edbd676c71e45e26285b5d35ad8fce99488968a368bb231fa8a83a6664f8979c725e4481143acd03"
+    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
   }
 }

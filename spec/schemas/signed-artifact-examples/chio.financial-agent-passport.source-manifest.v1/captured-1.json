@@ -1,0 +1,13 @@
+{
+  "credentialCount": 2,
+  "credentialRoot": "60cdf7d3e1d1d91fcb73213b35e2b5861ad8f1051d3e7657e08a888bfde59e10",
+  "expiresAt": 1710086400,
+  "issuedAt": 1710000000,
+  "issuer": "did:chio:66cd608b928b88e50e0efeaa33faf1c43cefe07294b0b87e9fe0aba6a3cf7633",
+  "merkleRoots": [
+    "root"
+  ],
+  "schema": "chio.financial-agent-passport.source-manifest.v1",
+  "sourcePassportId": "a685c0226776c3f5603cf73deefa7d8c1459067a013cd4d1961cf37321f1aca2",
+  "subject": "did:chio:20828bf5c5bdcacb684863336c202fb5599da48be5596615742170705beca9f7"
+}

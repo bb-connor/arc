@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/store-identity-proof.schema.json",
+  "title": "Chio finding pool store identity proof signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "challenge",
+    "schema"
+  ],
+  "properties": {
+    "challenge": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding-pool.store-identity-proof.v1"
+    }
+  }
+}

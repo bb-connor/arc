@@ -65,7 +65,9 @@ fn assert_unknown_receipt(
     };
     assert_eq!(receipt.id, receipt_id.as_str());
     assert_eq!(projection_digest.as_str().len(), 64);
-    assert!(receipt.verify_signature().expect("valid receipt signature"));
+    assert!(receipt
+        .verify_integrity_embedded_key()
+        .expect("valid receipt signature"));
     assert_eq!(
         receipt.capability_id,
         operation.binding().capability_id().as_str()

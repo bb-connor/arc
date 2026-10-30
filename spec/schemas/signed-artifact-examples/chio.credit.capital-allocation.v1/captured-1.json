@@ -1,0 +1,128 @@
+{
+  "allocationId": "cad-1",
+  "approvalTokenId": "approval-1",
+  "authorityChain": [
+    {
+      "approvedAt": 9,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 9,
+          "expiresAt": 20,
+          "principalId": "9f4ecf4154e11f3cb5dd5ba5d7a0660d80b264b8a2fa261282820e38271b3acd",
+          "role": "operator_treasury",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "03b625a870e755cc84d380e5dc91e7dca2276a86fe306895dbe22a43d0415f0af8ef39da5acf1c4eb93f69ce2829ae39c8d4fad9929b11144e9d7b3668910a0d",
+        "signerKey": "9f4ecf4154e11f3cb5dd5ba5d7a0660d80b264b8a2fa261282820e38271b3acd"
+      },
+      "expiresAt": 20,
+      "principalId": "9f4ecf4154e11f3cb5dd5ba5d7a0660d80b264b8a2fa261282820e38271b3acd",
+      "role": "operator_treasury"
+    },
+    {
+      "approvedAt": 9,
+      "authorityProof": {
+        "body": {
+          "approvedAt": 9,
+          "expiresAt": 20,
+          "principalId": "9a1fd72939bcaeb4c3480843b2e37da37ab6450ab33753c31694b2ab5a853932",
+          "role": "custodian",
+          "schema": "chio.credit.capital-authority-step-proof.v1"
+        },
+        "signature": "21e7b4a43e38aef699c5784f068cffb648709fcebef5b463c6612e7434dd3b4b9c19f8463f39fb521fa9394b1dff3f3e37f3494cf06e2e658d890eb64a019609",
+        "signerKey": "9a1fd72939bcaeb4c3480843b2e37da37ab6450ab33753c31694b2ab5a853932"
+      },
+      "expiresAt": 20,
+      "principalId": "9a1fd72939bcaeb4c3480843b2e37da37ab6450ab33753c31694b2ab5a853932",
+      "role": "custodian"
+    }
+  ],
+  "bondId": "cbd-1",
+  "capabilityId": "cap-1",
+  "concentrationCapAmount": {
+    "currency": "USD",
+    "units": 350
+  },
+  "currentOutstandingAmount": {
+    "currency": "USD",
+    "units": 300
+  },
+  "currentReserveAmount": {
+    "currency": "USD",
+    "units": 50
+  },
+  "description": "allocate governed action",
+  "evidenceRefs": [
+    {
+      "kind": "receipt",
+      "locator": "receipt:rc-1",
+      "observedAt": 10,
+      "referenceId": "rc-1"
+    }
+  ],
+  "executionWindow": {
+    "notAfter": 20,
+    "notBefore": 10
+  },
+  "facilityId": "cfd-1",
+  "governedReceiptId": "rc-1",
+  "instructionDrafts": [
+    {
+      "action": "transfer_funds",
+      "amount": {
+        "currency": "USD",
+        "units": 300
+      },
+      "description": "transfer approved funds",
+      "sourceId": "capital-source:facility:cfd-1",
+      "sourceKind": "facility_commitment"
+    }
+  ],
+  "intentId": "intent-1",
+  "issuedAt": 10,
+  "outcome": "allocate",
+  "projectedOutstandingAmount": {
+    "currency": "USD",
+    "units": 300
+  },
+  "query": {
+    "agentSubject": "subject-1",
+    "bondLimit": 10,
+    "facilityLimit": 10,
+    "lossEventLimit": 25,
+    "receiptLimit": 100
+  },
+  "rail": {
+    "custodyProviderId": "9a1fd72939bcaeb4c3480843b2e37da37ab6450ab33753c31694b2ab5a853932",
+    "destinationAccountRef": "merchant-1",
+    "jurisdiction": "US-NY",
+    "kind": "manual",
+    "railId": "rail-1",
+    "sourceAccountRef": "facility-main"
+  },
+  "requestedAmount": {
+    "currency": "USD",
+    "units": 300
+  },
+  "requiredReserveAmount": {
+    "currency": "USD",
+    "units": 50
+  },
+  "reserveSourceId": "capital-source:bond:cbd-1",
+  "schema": "chio.credit.capital-allocation.v1",
+  "sourceId": "capital-source:facility:cfd-1",
+  "sourceKind": "facility_commitment",
+  "subjectKey": "subject-1",
+  "supportBoundary": {
+    "automaticDispatchSupported": false,
+    "capitalBookAuthoritative": true,
+    "externalExecutionAuthoritative": false,
+    "simulationFirstOnly": true
+  },
+  "toolName": "transfer",
+  "toolServer": "ledger",
+  "utilizationCeilingAmount": {
+    "currency": "USD",
+    "units": 900
+  }
+}

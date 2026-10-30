@@ -1,0 +1,29 @@
+{
+  "authorityId": "other-authority",
+  "authorityKeyEpoch": 3,
+  "currentCreditorId": "did:chio:seller",
+  "currentSettlementDestinationRef": "acct:seller",
+  "debtorId": "did:chio:debtor",
+  "disposition": {
+    "kind": "per_call"
+  },
+  "dispositionDigest": "fa555bdc06519e2070f3a21436ba65d4215153d92e1cc3fbe4432195626eaecb",
+  "dispositionLifecycleFence": 1,
+  "dispositionVersion": 1,
+  "dueAtUnixMs": 10000,
+  "expiresAtUnixMs": 1100,
+  "issuedAtUnixMs": 1000,
+  "obligationAtomDigest": "20c38ecce28d1552f4eb9e009823ad5c41dc1c0c035ed361423bb44155480f3b",
+  "obligationId": "b844cab488732d9bb9486d73dd0ff1632826b6bb406dfa3a9f00a44b87020fe7",
+  "originalCreditorId": "did:chio:seller",
+  "proofId": "ab10e0b2e8f88a4c60b113071796b2ec3146644f900adb41e29b0212e1d3526c",
+  "resourceFence": 11,
+  "schema": "chio.obligation.status-proof.v1",
+  "settlementLifecycleDigest": "9a7c2aa00401277760251e23af9ae1755aaac1109f38052cb5343873949a7b52",
+  "settlementLifecycleFence": 1,
+  "settlementLifecycleVersion": 1,
+  "settlementState": {
+    "kind": "pending"
+  },
+  "snapshotVersion": 7
+}

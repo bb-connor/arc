@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/transaction/capability-proof-body.schema.json",
+  "title": "chio.capability.proof.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capability_id",
+    "expires_at",
+    "id",
+    "issuer",
+    "schema",
+    "scope",
+    "subject"
+  ],
+  "properties": {
+    "capability_id": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.capability.proof.v1"
+    },
+    "scope": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

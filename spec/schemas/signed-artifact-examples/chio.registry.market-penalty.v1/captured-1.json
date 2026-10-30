@@ -1,0 +1,32 @@
+{
+  "abuseClass": "fraudulent_listing",
+  "action": "slash_bond",
+  "activationId": "activation-57acaf13f280975cb4775e0592acdb4a72bca31f5862c79d261ad8ba32a7e5c7",
+  "bondClass": "listing",
+  "caseId": "case-504e7939f6808b5162f71a805c3883678960171900319b8fa8dd3840b57e6943",
+  "charterId": "charter-906bfcc62f17b945d0edf8bf7dec86fc3bbc55622d06576d83ead8e07578b3da",
+  "evidenceRefs": [
+    {
+      "kind": "external",
+      "referenceId": "cfe925b74d0a5a3ef18d3f64fcfc04c17eeaf514114ce38d0da1b1ed3f313169",
+      "sha256": "1f942f3499b92d6aa0e1d632315031003ea331ed954aeb10d625ed982cd49dcc"
+    }
+  ],
+  "expiresAt": 1750900000,
+  "feeScheduleId": "market-fee-schedule-8197c9598c991c8b4cc84aa59c07d9f9bd8925bbf5c80458efa0d9af9e86e918",
+  "governingOperatorId": "https://registry.chio.example",
+  "issuedBy": "market@chio.example",
+  "listingId": "listing-42",
+  "namespace": "https://registry.chio.example",
+  "openedAt": 1750259206,
+  "penaltyAmount": {
+    "currency": "USD",
+    "units": 500
+  },
+  "penaltyId": "market-penalty-fc4f87c0fc294e0ab04b1b7450405b852a40cce20b331b6a252b478b2b98aeb6",
+  "schema": "chio.registry.market-penalty.v1",
+  "state": "enforced",
+  "subjectOperatorId": "https://registry.chio.example",
+  "supersedesPenaltyId": "market-penalty-a095ad1ece57fff67ef7be6dafda3bd07248693715e6cdb5352dcd594579ec82",
+  "updatedAt": 1750259206
+}

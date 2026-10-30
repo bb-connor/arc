@@ -419,7 +419,7 @@ pub(super) fn verify(
         assert!(
             matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &witness.request.arguments)
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let second = kernel.evaluate_tool_call_blocking_with_security_context(
             &witness.request,
             &witness.context,
@@ -440,7 +440,7 @@ pub(super) fn verify(
         assert_eq!(response.verdict, Verdict::Deny);
         assert!(response.output.is_none());
         assert_eq!(response.reason.as_deref(), Some(reason));
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let persisted = store
             .load_chio_receipt(&response.receipt.id)?
             .ok_or("recovery terminal receipt is not persisted")?;

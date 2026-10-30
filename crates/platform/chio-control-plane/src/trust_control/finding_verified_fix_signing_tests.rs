@@ -1,4 +1,5 @@
-use chio_core::crypto::{Ed25519Backend, SigningAlgorithm, SigningBackend};
+use chio_core::crypto::{Ed25519Backend, ExemptFormat, Keypair, SigningAlgorithm, SigningBackend};
+use chio_core::receipt::authoritative_spend::PresentedNonceView;
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::{canonical_json_bytes, message::SignedExecutionNonce};
 
@@ -42,10 +43,11 @@ fn assert_signed_by(
     for (receipt, nonce) in receipts.iter().zip(&nonces) {
         assert_eq!(receipt.kernel_key, key);
         assert_eq!(receipt.signature.algorithm(), algorithm);
-        assert!(receipt.verify_signature().map_err(|e| e.to_string())?);
-        let nonce_bytes = canonical_json_bytes(&nonce.nonce).map_err(|e| e.to_string())?;
+        assert!(receipt
+            .verify_integrity_embedded_key()
+            .map_err(|e| e.to_string())?);
         assert_eq!(nonce.signature.algorithm(), algorithm);
-        assert!(key.verify(&nonce_bytes, &nonce.signature));
+        assert!(nonce.verify_signed_by(&key));
     }
     Ok(())
 }
@@ -80,4 +82,17 @@ fn hybrid_production_backend_signs_hybrid_receipts_and_nonces() -> Result<(), St
     )
     .map_err(|error| error.to_string())?;
     assert_signed_by(&backend, SigningAlgorithm::Hybrid)
+}
+
+#[test]
+fn nonce_signed_over_bare_canonical_bytes_is_refused() -> Result<(), String> {
+    let seed = [7_u8; 32];
+    let (_, nonces) = sign_evidence(&Ed25519Backend::new(Keypair::from_seed(&seed)))?;
+    let signer = Keypair::from_seed(&seed);
+    let mut bare = nonces[0].clone();
+    assert!(bare.verify_signed_by(&signer.public_key()));
+    let nonce_bytes = canonical_json_bytes(&bare.nonce).map_err(|e| e.to_string())?;
+    bare.signature = signer.sign_exempt(ExemptFormat::JwsSigningInput, &nonce_bytes);
+    assert!(!bare.verify_signed_by(&signer.public_key()));
+    Ok(())
 }

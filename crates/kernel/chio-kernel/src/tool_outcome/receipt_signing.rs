@@ -94,7 +94,10 @@ impl RawInvocationOutcomeV1 {
                 .as_ref()
                 .is_none_or(compactable_receipt_metadata)
             && receipt
-                .verify_signature_with_floor(ReceiptCryptoFloor::AllowClassical)
+                .verify_signature_with_floor(
+                    &self.receipt_signing_identity.public_key,
+                    ReceiptCryptoFloor::AllowClassical,
+                )
                 .is_ok_and(|valid| valid)
     }
 

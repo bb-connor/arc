@@ -71,7 +71,7 @@ fn test_underwriting_policy_input_export_surfaces() {
     let input: SignedUnderwritingPolicyInput =
         response.json().expect("parse signed underwriting input");
     assert!(input
-        .verify_signature()
+        .verify_signature(&input.signer_key)
         .expect("verify underwriting input signature"));
     assert_eq!(input.body.schema, "chio.underwriting.policy-input.v1");
     assert_eq!(input.body.filters.receipt_limit, Some(10));
@@ -150,7 +150,7 @@ fn test_underwriting_policy_input_export_surfaces() {
     let cli_input: SignedUnderwritingPolicyInput =
         serde_json::from_slice(&cli_output.stdout).expect("parse underwriting input CLI json");
     assert!(cli_input
-        .verify_signature()
+        .verify_signature(&cli_input.signer_key)
         .expect("verify underwriting input CLI signature"));
     assert_eq!(cli_input.body.schema, "chio.underwriting.policy-input.v1");
     assert_eq!(cli_input.body.receipts.matching_receipts, 1);
@@ -692,7 +692,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
         .json()
         .expect("parse signed underwriting decision");
     assert!(remote_decision
-        .verify_signature()
+        .verify_signature(&remote_decision.signer_key)
         .expect("verify signed underwriting decision"));
     assert_eq!(remote_decision.body.schema, "chio.underwriting.decision.v1");
     assert_eq!(
@@ -777,7 +777,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
     let cli_decision: SignedUnderwritingDecision =
         serde_json::from_slice(&cli_issue.stdout).expect("parse underwriting decision issue CLI");
     assert!(cli_decision
-        .verify_signature()
+        .verify_signature(&cli_decision.signer_key)
         .expect("verify underwriting decision issue CLI signature"));
 
     let cli_list = Command::new(env!("CARGO_BIN_EXE_chio"))

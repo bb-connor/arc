@@ -22,7 +22,7 @@
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::capability::token::CapabilityToken;
 use chio_core_types::crypto::{Keypair, PublicKey};
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_credit::{
     CapitalExecutionInstructionAction, CapitalExecutionReconciledState,
     SignedCapitalExecutionInstruction,
@@ -268,6 +268,10 @@ pub struct CommerceReservationReceipt {
     pub reserved_amount: MonetaryAmount,
 }
 
+impl SignedExportPayload for CommerceReservationReceipt {
+    const SCHEMA_ID: &'static str = COMMERCE_RESERVATION_RECEIPT_SCHEMA_ID;
+}
+
 pub type SignedCommerceReservationReceipt = SignedExportEnvelope<CommerceReservationReceipt>;
 
 /// The offer token subject's signed acceptance of one order quote.
@@ -287,6 +291,14 @@ pub struct CommerceEscrowAcceptance {
     pub token_offer_sha256: String,
     /// Unix seconds; the offer token must be valid at this time.
     pub accepted_at: u64,
+}
+
+impl SignedExportPayload for CommerceEscrowAcceptance {
+    const SCHEMA_ID: &'static str = COMMERCE_ESCROW_ACCEPTANCE_SCHEMA_ID;
+}
+
+impl SignedExportPayload for CommerceSettlementPacket {
+    const SCHEMA_ID: &'static str = COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID;
 }
 
 pub type SignedCommerceEscrowAcceptance = SignedExportEnvelope<CommerceEscrowAcceptance>;
@@ -614,7 +626,7 @@ fn authenticate_offer(
     token: &CapabilityToken,
     context: &CommerceOrderContext,
 ) -> Result<(), CommerceEscrowError> {
-    if !matches!(token.verify_signature(), Ok(true)) {
+    if !matches!(token.verify_integrity_embedded_key(), Ok(true)) {
         return Err(CommerceEscrowError::OfferSignatureInvalid);
     }
     if token.issuer == token.subject {
@@ -646,7 +658,7 @@ fn authenticate_acceptance(
     if acceptance.signer_key != token.subject {
         return Err(CommerceEscrowError::AcceptorNotSubject);
     }
-    if !matches!(acceptance.verify_signature(), Ok(true)) {
+    if !matches!(acceptance.verify_signature(&token.subject), Ok(true)) {
         return Err(CommerceEscrowError::AcceptanceSignatureInvalid);
     }
     if body.order_id != context.order_id {
@@ -861,7 +873,7 @@ fn verify_execution(
 
 /// Requires a nonempty pinned signer set, signer membership, and a valid
 /// signature, in that order.
-fn require_pinned_signature<T: Serialize + Clone>(
+fn require_pinned_signature<T: SignedExportPayload + Clone>(
     envelope: &SignedExportEnvelope<T>,
     trusted: &[PublicKey],
     unpinned: CommerceEscrowError,
@@ -874,7 +886,7 @@ fn require_pinned_signature<T: Serialize + Clone>(
     if !trusted.contains(&envelope.signer_key) {
         return Err(untrusted);
     }
-    if !matches!(envelope.verify_signature(), Ok(true)) {
+    if !matches!(envelope.verify_signature(&envelope.signer_key), Ok(true)) {
         return Err(invalid);
     }
     Ok(())

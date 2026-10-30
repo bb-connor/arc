@@ -181,11 +181,15 @@ impl LiabilityQuoteRequestArtifact {
                 "quote request effective window must have end after start",
             ));
         }
-        if !self.risk_package.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "quote request risk package signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .risk_package
+            .verify_signature(&self.risk_package.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "quote request risk package signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "quote request risk package signature verification failed",
             ));
@@ -338,11 +342,15 @@ impl LiabilityQuoteResponseArtifact {
                 "quote response quote_response_id must not include control characters",
             ));
         }
-        if !self.quote_request.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "quote response quote_request signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .quote_request
+            .verify_signature(&self.quote_request.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "quote response quote_request signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "quote response quote_request signature verification failed",
             ));
@@ -416,27 +424,35 @@ impl LiabilityPricingAuthorityArtifact {
     /// delegation envelope, positive bounds, and a validity window that
     /// has not inverted.
     pub fn validate(&self) -> Result<(), MarketError> {
-        if !self.quote_request.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "pricing authority quote_request signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .quote_request
+            .verify_signature(&self.quote_request.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "pricing authority quote_request signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "pricing authority quote_request signature verification failed",
             ));
         }
-        if !self.facility.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "pricing authority facility signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .facility
+            .verify_signature(&self.facility.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "pricing authority facility signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "pricing authority facility signature verification failed",
             ));
         }
         if !self
             .underwriting_decision
-            .verify_signature()
+            .verify_signature(&self.underwriting_decision.signer_key)
             .map_err(|error| {
  MarketError::signature_invalid(format!("pricing authority underwriting decision signature verification failed: {error}"))
  })?
@@ -445,11 +461,15 @@ impl LiabilityPricingAuthorityArtifact {
 "pricing authority underwriting decision signature verification failed",
 ));
         }
-        if !self.capital_book.verify_signature().map_err(|error| {
-            MarketError::signature_invalid(format!(
-                "pricing authority capital book signature verification failed: {error}"
-            ))
-        })? {
+        if !self
+            .capital_book
+            .verify_signature(&self.capital_book.signer_key)
+            .map_err(|error| {
+                MarketError::signature_invalid(format!(
+                    "pricing authority capital book signature verification failed: {error}"
+                ))
+            })?
+        {
             return Err(MarketError::signature_invalid(
                 "pricing authority capital book signature verification failed",
             ));
@@ -648,3 +668,15 @@ impl LiabilityPricingAuthorityArtifact {
 
 /// Signed pricing authority envelope.
 pub type SignedLiabilityPricingAuthority = SignedExportEnvelope<LiabilityPricingAuthorityArtifact>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityPricingAuthorityArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityQuoteRequestArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityQuoteResponseArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA;
+}

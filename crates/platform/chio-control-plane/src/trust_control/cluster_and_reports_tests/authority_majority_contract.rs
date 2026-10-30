@@ -117,7 +117,10 @@ async fn assert_admitted_read_and_issue(state: &TrustServiceState) {
             .and_then(Value::as_str)
             .map(str::to_string)
     );
-    assert!(issued.capability.verify_signature().test_unwrap());
+    assert!(issued
+        .capability
+        .verify_integrity_embedded_key()
+        .test_unwrap());
 }
 
 fn retire_old_issuer(

@@ -122,7 +122,14 @@ pub fn verify_chio_passport_jwt_vc_json(
             "portable jwt vc header typ must be `{JWT_VC_TYP}`"
         )));
     }
-    if !issuer_public_key.verify(signing_input.as_bytes(), &signature) {
+    if chio_core::crypto::verify_exempt(
+        issuer_public_key,
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        signing_input.as_bytes(),
+        &signature,
+    )
+    .is_err()
+    {
         return Err(CredentialError::InvalidOid4vciCredentialResponse(
             "portable jwt vc signature verification failed".to_string(),
         ));

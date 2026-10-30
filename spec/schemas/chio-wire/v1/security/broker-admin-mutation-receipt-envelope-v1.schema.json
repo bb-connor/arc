@@ -4,11 +4,10 @@
   "title": "Chio signed broker admin mutation receipt v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["body", "signer", "algorithm", "signature"],
+  "required": ["body", "signer", "signature"],
   "properties": {
     "body": { "$ref": "broker-admin-mutation-receipt-body-v1.schema.json" },
     "signer": { "$ref": "#/$defs/publicKey" },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": { "$ref": "#/$defs/signature" }
   },
   "$defs": {

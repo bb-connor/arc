@@ -168,7 +168,8 @@ pub fn issue_reputation_credential_with_enterprise_identity(
         enterprise_identity_provenance,
     };
 
-    let (signature, _) = issuer_keypair.sign_canonical(&unsigned)?;
+    let signature =
+        issuer_keypair.sign_wrapped(REPUTATION_CREDENTIAL_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned)?)?;
     Ok(ReputationCredential {
         unsigned,
         proof: CredentialProof {
@@ -216,9 +217,13 @@ pub fn verify_reputation_credential(
     }
 
     let signature = Signature::from_hex(&credential.proof.proof_value)?;
-    let signed = issuer
-        .public_key()
-        .verify(&canonical_json_bytes(&credential.unsigned)?, &signature);
+    let signed = chio_core::crypto::verify_wrapped(
+        issuer.public_key(),
+        REPUTATION_CREDENTIAL_SCHEMA,
+        &credential.unsigned,
+        &signature,
+    )
+    .is_ok();
     if !signed {
         return Err(CredentialError::InvalidCredentialSignature);
     }

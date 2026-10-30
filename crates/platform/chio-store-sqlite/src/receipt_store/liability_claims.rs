@@ -32,7 +32,7 @@ impl SqliteReceiptStore {
         claim: &SignedLiabilityClaimPackage,
     ) -> Result<(), ReceiptStoreError> {
         if !claim
-            .verify_signature()
+            .verify_signature(&claim.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -209,7 +209,7 @@ impl SqliteReceiptStore {
         response: &SignedLiabilityClaimResponse,
     ) -> Result<(), ReceiptStoreError> {
         if !response
-            .verify_signature()
+            .verify_signature(&response.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -307,7 +307,7 @@ impl SqliteReceiptStore {
         dispute: &SignedLiabilityClaimDispute,
     ) -> Result<(), ReceiptStoreError> {
         if !dispute
-            .verify_signature()
+            .verify_signature(&dispute.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -405,7 +405,7 @@ impl SqliteReceiptStore {
         adjudication: &SignedLiabilityClaimAdjudication,
     ) -> Result<(), ReceiptStoreError> {
         if !adjudication
-            .verify_signature()
+            .verify_signature(&adjudication.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -498,7 +498,7 @@ impl SqliteReceiptStore {
         payout_instruction: &SignedLiabilityClaimPayoutInstruction,
     ) -> Result<(), ReceiptStoreError> {
         if !payout_instruction
-            .verify_signature()
+            .verify_signature(&payout_instruction.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -598,7 +598,7 @@ impl SqliteReceiptStore {
         payout_receipt: &SignedLiabilityClaimPayoutReceipt,
     ) -> Result<(), ReceiptStoreError> {
         if !payout_receipt
-            .verify_signature()
+            .verify_signature(&payout_receipt.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -698,7 +698,7 @@ impl SqliteReceiptStore {
         settlement_instruction: &SignedLiabilityClaimSettlementInstruction,
     ) -> Result<(), ReceiptStoreError> {
         if !settlement_instruction
-            .verify_signature()
+            .verify_signature(&settlement_instruction.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(
@@ -808,7 +808,7 @@ impl SqliteReceiptStore {
         settlement_receipt: &SignedLiabilityClaimSettlementReceipt,
     ) -> Result<(), ReceiptStoreError> {
         if !settlement_receipt
-            .verify_signature()
+            .verify_signature(&settlement_receipt.signer_key)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
         {
             return Err(ReceiptStoreError::Conflict(

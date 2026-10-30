@@ -36,7 +36,7 @@ fn signed_readback_underwriting_rejects_precision_alias_before_verification() {
     let aliased = raw.replacen("0.8", "0.80000000000000004", 1);
     // The old typed reader silently erased the extra precision and verified it.
     let decoded: SignedUnderwritingDecision = serde_json::from_str(&aliased).test_unwrap();
-    assert!(decoded.verify_signature().test_unwrap());
+    assert!(decoded.verify_signature(&decoded.signer_key).test_unwrap());
     replace_raw(&store, "underwriting_decisions", &aliased);
     assert!(matches!(
         store.query_underwriting_decisions(&UnderwritingDecisionQuery::default()),
@@ -290,16 +290,16 @@ fn signed_readback_lineage_verifies_signature_and_binds_requested_child() {
 #[test]
 fn signed_readback_rejects_nested_duplicate_map_keys() {
     let keypair = Keypair::from_seed(&[73; 32]);
-    let signed =
-        SignedExportEnvelope::sign(serde_json::json!({"USD": 500}), &keypair).test_unwrap();
+    let mut body = underwriting_fixture().body;
+    body.premium.quoted_amount = Some(usd(500));
+    let signed = SignedExportEnvelope::sign(body, &keypair).test_unwrap();
     let raw = serde_json::to_string(&signed).test_unwrap();
-    let aliased = raw.replace(r#""USD":500"#, r#""USD":0,"USD":500"#);
+    let aliased = raw.replacen(r#""units":500"#, r#""units":0,"units":500"#, 1);
     assert_ne!(raw, aliased);
-    let erased: SignedExportEnvelope<serde_json::Value> =
-        serde_json::from_str(&aliased).test_unwrap();
-    assert!(erased.verify_signature().test_unwrap());
+    let erased: serde_json::Value = serde_json::from_str(&aliased).test_unwrap();
+    assert_eq!(erased, serde_json::to_value(&signed).test_unwrap());
     assert!(matches!(
-        decode_verified_signed_export::<serde_json::Value>(&aliased),
+        decode_verified_signed_export::<chio_kernel::UnderwritingDecisionArtifact>(&aliased),
         Err(ReceiptStoreError::UntrustedInput(error)) if matches!(error.as_ref(), chio_core::canonical::UntrustedJsonError::SignedInput(chio_core::Error::CanonicalJson(reason)) if reason.contains("duplicate object key"))
     ));
 }

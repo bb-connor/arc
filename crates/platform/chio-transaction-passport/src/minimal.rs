@@ -161,8 +161,8 @@ pub fn sign_transaction_passport(
         ));
     }
     let body = transaction_passport_signature_body(passport)?;
-    let (signature, _canonical) = keypair
-        .sign_canonical(&body)
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| keypair.sign_wrapped(TRANSACTION_PASSPORT_SCHEMA_ID, &canonical))
         .map_err(|error| TransactionPassportError::InvalidPassportSignature(error.to_string()))?;
     Ok(signature.to_hex())
 }
@@ -185,9 +185,20 @@ pub fn verify_transaction_passport_signature(
     let signature = Signature::from_hex(&passport.signature)
         .map_err(|error| TransactionPassportError::InvalidPassportSignature(error.to_string()))?;
     let body = transaction_passport_signature_body(passport)?;
-    let verified = signer_key
-        .verify_canonical(&body, &signature)
-        .map_err(|error| TransactionPassportError::InvalidPassportSignature(error.to_string()))?;
+    let verified = match chio_core_types::crypto::verify_wrapped(
+        &signer_key,
+        TRANSACTION_PASSPORT_SCHEMA_ID,
+        &body,
+        &signature,
+    ) {
+        Ok(()) => true,
+        Err(chio_core_types::Error::SignatureRejected) => false,
+        Err(error) => {
+            return Err(TransactionPassportError::InvalidPassportSignature(
+                error.to_string(),
+            ))
+        }
+    };
     if verified {
         Ok(())
     } else {
@@ -1118,10 +1129,17 @@ fn transparency_anchor_state(
     if statement.signature != signature.to_hex() {
         return invalid("checkpoint statement signature uses a noncanonical encoding");
     }
-    let Ok(body_bytes) = canonical_json_bytes(&statement.body) else {
+    let Ok(body_bytes) = chio_core_types::CanonicalBytes::from_serializable(&statement.body) else {
         return invalid("checkpoint statement body is not canonicalizable");
     };
-    if !kernel_key.verify(&body_bytes, &signature) {
+    if chio_core_types::crypto::verify_wrapped_bytes(
+        &kernel_key,
+        "chio.checkpoint_statement.v1",
+        &body_bytes,
+        &signature,
+    )
+    .is_err()
+    {
         return invalid("checkpoint statement signature does not verify");
     }
     // The claimed log must be the one this signer's checkpoints define.
@@ -1141,7 +1159,7 @@ fn transparency_anchor_state(
     let Ok(typed_body_bytes) = canonical_json_bytes(&checkpoint_body) else {
         return invalid("parsed checkpoint statement body is not canonicalizable");
     };
-    if typed_body_bytes != body_bytes {
+    if typed_body_bytes.as_slice() != body_bytes.as_bytes() {
         return invalid("checkpoint statement body uses noncanonical field encodings");
     }
     if checkpoint_body.kernel_key != kernel_key {

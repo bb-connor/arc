@@ -46,6 +46,10 @@ pub struct ChannelReservationBodyV1 {
     pub lifecycle_fence: u64,
 }
 
+impl super::signed::ChannelSignedBody for ChannelReservationBodyV1 {
+    const SIGNATURE_SCHEMA: &'static str = CHANNEL_RESERVATION_SCHEMA;
+}
+
 impl ChannelReservationBodyV1 {
     pub fn validate(&self) -> Result<(), ChannelError> {
         if self.schema != CHANNEL_RESERVATION_SCHEMA {

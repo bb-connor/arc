@@ -57,7 +57,7 @@ fn signed_response(
     result: ActiveResponseAuthorityResult,
 ) -> SignedActiveResponseAuthorityResponse {
     let body = ActiveResponseAuthorityResponseBody {
-        schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        schema: ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA.to_string(),
         deployment_digest: deployment_digest(),
         store_digest: store_digest(),
         request_id: RequestId::new(request_id).test_expect("bounded authority request id"),
@@ -66,14 +66,12 @@ fn signed_response(
         authority: declared_authority,
         result,
     };
-    let canonical = active_response_authority_response_signing_bytes(&body)
-        .test_expect("canonical active-response authority response signing input");
-    let signature = signer.sign(&canonical);
-    SignedActiveResponseAuthorityResponse {
-        body,
-        algorithm: signature.algorithm(),
-        signature,
-    }
+    let canonical = active_response_authority_response_signing_body(&body)
+        .test_expect("canonical active-response authority response signing body");
+    let signature = signer
+        .sign_wrapped(ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA, &canonical)
+        .test_expect("sign active-response authority response");
+    SignedActiveResponseAuthorityResponse { body, signature }
 }
 
 fn signed_health_response(
@@ -90,7 +88,7 @@ fn signed_health_response(
         declared_authority,
         signer,
         ActiveResponseAuthorityResult::Ready {
-            protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
             deployment_digest: deployment_digest(),
             store_digest: store_digest(),
         },
@@ -195,9 +193,11 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
         &authority,
     );
     wrong_store.body.store_digest = Digest32::new([99; 32]);
-    let signing_bytes = active_response_authority_response_signing_bytes(&wrong_store.body)
-        .test_expect("mismatched store response signing bytes");
-    wrong_store.signature = authority.sign(&signing_bytes);
+    let signing_body = active_response_authority_response_signing_body(&wrong_store.body)
+        .test_expect("mismatched store response signing body");
+    wrong_store.signature = authority
+        .sign_wrapped(ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA, &signing_body)
+        .test_expect("sign mismatched store response");
     assert_eq!(
         client.verify_response(&wrong_store, "request-1", &"a".repeat(64), now),
         Err(PortError::integrity_failure())
@@ -219,12 +219,16 @@ impl SigningBackend for SwitchingBackend {
         })
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
-        Ok(if self.rotated.load(Ordering::SeqCst) {
-            self.replacement.sign(message)
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> chio_core_types::Result<Signature> {
+        let signer = if self.rotated.load(Ordering::SeqCst) {
+            &self.replacement
         } else {
-            self.initial.sign(message)
-        })
+            &self.initial
+        };
+        Ed25519Backend::new(signer.clone()).sign_bytes(message)
     }
 }
 
@@ -292,7 +296,7 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
     let unknown_ready_field = serde_json::json!({
         "result": "ready",
         "output": {
-            "protocol": ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+            "protocol": ACTIVE_RESPONSE_AUTHORITY_PROTOCOL,
             "deploymentDigest": deployment_digest(),
             "storeDigest": store_digest(),
             "unexpected": true
@@ -323,7 +327,7 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
     );
 
     let digestless_request = serde_json::json!({
-        "schema": ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+        "schema": ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
         "requestId": "digestless",
         "issuedAtUnixSeconds": 1_700_000_000_u64,
         "client": Keypair::from_seed(&[42; 32]).public_key(),
@@ -342,7 +346,7 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
 #[test]
 fn authority_results_are_bound_to_the_requested_operation() {
     let ready = ActiveResponseAuthorityResult::Ready {
-        protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
         deployment_digest: deployment_digest(),
         store_digest: store_digest(),
     };
@@ -368,7 +372,7 @@ fn authority_results_are_bound_to_the_requested_operation() {
 fn request_and_response_wire_golden_vectors_are_exact() {
     let client = Keypair::from_seed(&[42_u8; 32]);
     let request_body = ActiveResponseAuthorityRequestBody {
-        schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        schema: ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA.to_string(),
         deployment_digest: deployment_digest(),
         store_digest: store_digest(),
         request_id: RequestId::new("golden-request-v1").test_expect("golden request id"),
@@ -376,39 +380,47 @@ fn request_and_response_wire_golden_vectors_are_exact() {
         client: client.public_key(),
         operation: ActiveResponseAuthorityOperation::Health,
     };
-    let request_input = active_response_authority_request_signing_bytes(&request_body)
-        .test_expect("golden request signing input");
+    let request_input = active_response_authority_request_signing_body(&request_body)
+        .test_expect("golden request signing body");
     assert_eq!(
-        request_input,
-        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.request.v1\u0000"}"#
+        request_input.as_bytes(),
+        br#"{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority-request.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]}"#
     );
     assert_eq!(
-        sha256_hex(&request_input),
-        "16bd6d08e999ae270a20e294db8b48a00f2ec9e94bb965eb1659d6e80134e6be"
+        sha256_hex(
+            chio_core::crypto::SigningWrapper::new(
+                ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+                &request_input
+            )
+            .test_expect("golden request wrapper")
+            .as_bytes()
+        ),
+        "e88481fee4cc09c519cf4fafeef06a14baea4d1172b698885b0b2396c3cb723c"
     );
-    let request_signature = client.sign(&request_input);
+    let request_signature = client
+        .sign_wrapped(ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA, &request_input)
+        .test_expect("golden request signature");
     assert_eq!(
         request_signature.to_hex(),
-        "ba04ee2d0b42ba52e7bdd967668bf167058cbca1c588269d4d19bf0567be851c707c7aff212ace615b696f5e3ea5c36299362b9a53cc3fb0aac3d51a4daf2009"
+        "83c02e29b3b237377bbf654ca2a438cfd1052df672a06af143f4ec920c7302cf5fef4a1ed1be588e990b1ee2f0d831f5f7a7407886f0a9ad59a9945e2a1cb700"
     );
     let request = SignedActiveResponseAuthorityRequest {
         body: request_body,
-        algorithm: request_signature.algorithm(),
         signature: request_signature,
     };
     let request_wire = canonical_json_bytes(&request).test_expect("golden request wire");
     assert_eq!(
         request_wire,
-        br#"{"algorithm":"ed25519","body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"ba04ee2d0b42ba52e7bdd967668bf167058cbca1c588269d4d19bf0567be851c707c7aff212ace615b696f5e3ea5c36299362b9a53cc3fb0aac3d51a4daf2009"}"#
+        br#"{"body":{"client":"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000000,"operation":{"operation":"health"},"requestId":"golden-request-v1","schema":"chio.active-response-policy-authority-request.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"83c02e29b3b237377bbf654ca2a438cfd1052df672a06af143f4ec920c7302cf5fef4a1ed1be588e990b1ee2f0d831f5f7a7407886f0a9ad59a9945e2a1cb700"}"#
     );
     assert_eq!(
         sha256_hex(&request_wire),
-        "1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3"
+        "ad97c083ed257a11e8cc8864a574d1d42312eed39d0aa3504cc877bb98e1978e"
     );
 
     let authority = Keypair::from_seed(&[45_u8; 32]);
     let response_body = ActiveResponseAuthorityResponseBody {
-        schema: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+        schema: ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA.to_string(),
         deployment_digest: deployment_digest(),
         store_digest: store_digest(),
         request_id: RequestId::new("golden-request-v1").test_expect("golden response request id"),
@@ -416,39 +428,47 @@ fn request_and_response_wire_golden_vectors_are_exact() {
         issued_at_unix_seconds: 1_700_000_001,
         authority: authority.public_key(),
         result: ActiveResponseAuthorityResult::Ready {
-            protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+            protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
             deployment_digest: deployment_digest(),
             store_digest: store_digest(),
         },
     };
-    let response_input = active_response_authority_response_signing_bytes(&response_body)
-        .test_expect("golden response signing input");
+    let response_input = active_response_authority_response_signing_body(&response_body)
+        .test_expect("golden response signing body");
     assert_eq!(
-        response_input,
-        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"domain":"chio.active-response-policy-authority.response.v1\u0000"}"#
+        response_input.as_bytes(),
+        br#"{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"ad97c083ed257a11e8cc8864a574d1d42312eed39d0aa3504cc877bb98e1978e","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority-response.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]}"#
     );
     assert_eq!(
-        sha256_hex(&response_input),
-        "c73f7b01b48e8765b0e47203c471f822190cae86770c5cd491e2c10e3b65dbea"
+        sha256_hex(
+            chio_core::crypto::SigningWrapper::new(
+                ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
+                &response_input
+            )
+            .test_expect("golden response wrapper")
+            .as_bytes()
+        ),
+        "a254c9c68c3d17672740acf3829d2a011bc7b9e651232721c6420a1ea74a9406"
     );
-    let response_signature = authority.sign(&response_input);
+    let response_signature = authority
+        .sign_wrapped(ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA, &response_input)
+        .test_expect("golden response signature");
     assert_eq!(
         response_signature.to_hex(),
-        "bd8313dbed5f053678871fc41c8d455f88a830501be2e817b77d218e0784a9548f5a55748fd6e1dbf44bdfd031bc4f20e1ad187708e3e00bbd059758a8dd0301"
+        "50aaa79a82b90fa168f9a2c9e3fec00c895d262b331e7cd5ca0952285c4671213f453d39a34cc903c6796fb38a831a09ca9745f3ff4385d0fe1d821fab95f003"
     );
     let response = SignedActiveResponseAuthorityResponse {
         body: response_body,
-        algorithm: response_signature.algorithm(),
         signature: response_signature,
     };
     let response_wire = canonical_json_bytes(&response).test_expect("golden response wire bytes");
     assert_eq!(
         response_wire,
-        br#"{"algorithm":"ed25519","body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"1f01d82e7f8a828ae4e600af91cd6f5c622a2788b3110fc9c900464b7d3d29a3","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"bd8313dbed5f053678871fc41c8d455f88a830501be2e817b77d218e0784a9548f5a55748fd6e1dbf44bdfd031bc4f20e1ad187708e3e00bbd059758a8dd0301"}"#
+        br#"{"body":{"authority":"a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f","deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"issuedAtUnixSeconds":1700000001,"requestDigest":"ad97c083ed257a11e8cc8864a574d1d42312eed39d0aa3504cc877bb98e1978e","requestId":"golden-request-v1","result":{"output":{"deploymentDigest":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65],"protocol":"chio.active-response-policy-authority.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"result":"ready"},"schema":"chio.active-response-policy-authority-response.v1","storeDigest":[82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82,82]},"signature":"50aaa79a82b90fa168f9a2c9e3fec00c895d262b331e7cd5ca0952285c4671213f453d39a34cc903c6796fb38a831a09ca9745f3ff4385d0fe1d821fab95f003"}"#
     );
     assert_eq!(
         sha256_hex(&response_wire),
-        "47b355e030609545faa0ee13a5460761ecd4138c3f9ba7f923a7bf4934d195f1"
+        "b147b66ccec887986de5ce333ae4cea7ddff8d94558a018dafd9f0822f0759ff"
     );
 }
 

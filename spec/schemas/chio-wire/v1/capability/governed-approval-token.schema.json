@@ -25,7 +25,6 @@
     "issued_at": { "type": "integer", "minimum": 0 },
     "expires_at": { "type": "integer", "minimum": 0 },
     "decision": { "enum": ["approved", "denied"] },
-    "algorithm": { "enum": ["ed25519", "p256", "p384", "hybrid"] },
     "signature": { "$ref": "#/$defs/governedApprovalSignature" }
   },
   "$defs": {

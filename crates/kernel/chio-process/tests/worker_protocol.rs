@@ -110,7 +110,7 @@ async fn governed_worker_context_reaches_required_swarm_kernel_without_granting_
             .as_str()
             .ok_or("missing signed denial")?,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.capability_id, cap.id);
     assert_eq!(
         receipt.metadata.as_ref().ok_or("missing denial metadata")?["chio_runtime"]["failure_code"],
@@ -130,7 +130,7 @@ async fn governed_worker_context_reaches_required_swarm_kernel_without_granting_
             .as_str()
             .ok_or("missing replay denial")?,
     )?;
-    assert!(replay_receipt.verify_signature()?);
+    assert!(replay_receipt.verify_integrity_embedded_key()?);
     assert_eq!(replay_receipt.capability_id, cap.id);
     assert_eq!(
         replay_receipt
@@ -191,7 +191,7 @@ async fn governed_worker_completed_outcome_reopens_with_identical_intent_and_rec
             .as_str()
             .ok_or("missing retained receipt")?,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.capability_id, cap.id);
     for changed in [
         invoke("task-read"),
@@ -337,7 +337,7 @@ async fn guest_identity_is_fixed_and_admin_operations_are_absent() -> Result {
             .as_str()
             .ok_or("missing receipt")?,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     let checkpoint = request(
         &service,

@@ -28,7 +28,9 @@ use std::sync::Mutex;
 use base64::Engine;
 use chio_core::crypto::Keypair;
 
-use crate::frame::{canonicalize, signing_payload, Frame, FrameError, FrameInputs};
+use crate::frame::{
+    canonicalize, signing_body, Frame, FrameError, FrameInputs, TEE_CAPTURE_FRAME_SCHEMA,
+};
 
 /// Crockford base32 uppercase alphabet (ULID encoding). Excludes I, L, O, U.
 const CROCKFORD_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -177,9 +179,10 @@ pub fn sign_frame(mut inputs: FrameInputs, keypair: &Keypair) -> Result<Frame, C
         base64::engine::general_purpose::STANDARD.encode([0u8; 64])
     );
     let mut frame = Frame::build(inputs)?;
-    let payload =
-        signing_payload(&frame).map_err(|e| CaptureError::SigningPayload(e.to_string()))?;
-    let signature = keypair.sign(&payload);
+    let body = signing_body(&frame).map_err(|e| CaptureError::SigningPayload(e.to_string()))?;
+    let signature = keypair
+        .sign_wrapped(TEE_CAPTURE_FRAME_SCHEMA, &body)
+        .map_err(|e| CaptureError::SigningPayload(e.to_string()))?;
     frame.tenant_sig = format!(
         "ed25519:{}",
         base64::engine::general_purpose::STANDARD.encode(signature.to_bytes())

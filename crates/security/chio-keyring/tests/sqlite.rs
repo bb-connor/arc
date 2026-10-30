@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 
+use chio_core_types::crypto::SigningMessage;
 use chio_core_types::{
     Ed25519Backend, Keypair, PublicKey, Result as CoreResult, Signature, SigningBackend,
 };
@@ -704,7 +705,7 @@ impl SigningBackend for FailingBackend {
         Ok(self.public.clone())
     }
 
-    fn sign_bytes(&self, _message: &[u8]) -> CoreResult<Signature> {
+    fn sign_bytes(&self, _message: SigningMessage<'_>) -> CoreResult<Signature> {
         Err(chio_core_types::Error::InvalidSignature(
             "injected signing failure".to_string(),
         ))

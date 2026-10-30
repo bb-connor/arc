@@ -1,14 +1,17 @@
-pub use chio_security_types::ports::ACTIVE_RESPONSE_AUTHORITY_SCHEMA;
+pub use chio_security_types::ports::{
+    ACTIVE_RESPONSE_AUTHORITY_PROTOCOL, ACTIVE_RESPONSE_AUTHORITY_REQUEST_SCHEMA,
+    ACTIVE_RESPONSE_AUTHORITY_RESPONSE_SCHEMA,
+};
 use std::path::PathBuf;
 
 use chio_core::capability::governance::{GovernedApprovalToken, GovernedTransactionIntent};
 use chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS;
 use chio_core::capability::token::CapabilityToken;
-use chio_core::{canonical_json_bytes, PublicKey, Signature, SigningAlgorithm};
+use chio_core::{CanonicalBytes, PublicKey, Signature};
 use chio_kernel::threshold_approval::ThresholdApprovalProposal;
 use chio_kernel::{
     active_response_admission_artifact_payload_digest,
-    active_response_artifact_authority_signing_bytes, active_response_submission_proof_digest,
+    active_response_artifact_authority_signing_body, active_response_submission_proof_digest,
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,
     ActiveResponseAuthorizationRequest, ActiveResponseSubmissionProof,
 };
@@ -44,10 +47,6 @@ pub use protocol::{
     ActiveResponseAuthorityProtocolServerConfig, ActiveResponseAuthorityServeOutcome,
 };
 
-pub const ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN: &str =
-    "chio.active-response-policy-authority.request.v1\0";
-pub const ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN: &str =
-    "chio.active-response-policy-authority.response.v1\0";
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_CLOCK_SKEW_SECONDS: u64 = 30;
 pub const MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_ACTIVE_RESPONSE_AFFECTED_IDS: usize = 4_096;
@@ -133,7 +132,6 @@ pub struct ActiveResponseAuthorityRequestBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedActiveResponseAuthorityRequest {
     pub body: ActiveResponseAuthorityRequestBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
@@ -251,35 +249,23 @@ pub struct ActiveResponseAuthorityResponseBody {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SignedActiveResponseAuthorityResponse {
     pub body: ActiveResponseAuthorityResponseBody,
-    pub algorithm: SigningAlgorithm,
     pub signature: Signature,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ActiveResponseAuthoritySigningInput<'a, T> {
-    domain: &'static str,
-    body: &'a T,
-}
-
-pub fn active_response_authority_request_signing_bytes(
+/// Canonical request body the wrapper binds to
+/// `chio.active-response-policy-authority-request.v1`.
+pub fn active_response_authority_request_signing_body(
     body: &ActiveResponseAuthorityRequestBody,
-) -> PortResult<Vec<u8>> {
-    canonical_json_bytes(&ActiveResponseAuthoritySigningInput {
-        domain: ACTIVE_RESPONSE_AUTHORITY_REQUEST_DOMAIN,
-        body,
-    })
-    .map_err(|_| PortError::invalid_data())
+) -> PortResult<CanonicalBytes> {
+    CanonicalBytes::from_serializable(body).map_err(|_| PortError::invalid_data())
 }
 
-pub fn active_response_authority_response_signing_bytes(
+/// Canonical response body the wrapper binds to
+/// `chio.active-response-policy-authority-response.v1`.
+pub fn active_response_authority_response_signing_body(
     body: &ActiveResponseAuthorityResponseBody,
-) -> PortResult<Vec<u8>> {
-    canonical_json_bytes(&ActiveResponseAuthoritySigningInput {
-        domain: ACTIVE_RESPONSE_AUTHORITY_RESPONSE_DOMAIN,
-        body,
-    })
-    .map_err(|_| PortError::invalid_data())
+) -> PortResult<CanonicalBytes> {
+    CanonicalBytes::from_serializable(body).map_err(|_| PortError::invalid_data())
 }
 
 pub fn validate_active_response_policy_selection(
@@ -328,7 +314,7 @@ pub fn validate_active_response_artifacts_draft(
         proof.clone(),
     )
     .map_err(|_| PortError::integrity_failure())?;
-    active_response_artifact_authority_signing_bytes(body)
+    active_response_artifact_authority_signing_body(body)
         .map_err(|_| PortError::integrity_failure())?;
     if draft.action_id != response_plan.action_id
         || draft.plan_hash != response_plan.plan_hash

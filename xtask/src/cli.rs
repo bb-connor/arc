@@ -175,6 +175,16 @@ pub enum GenCommand {
         #[arg(long)]
         check: bool,
     },
+    /// Regenerate every signed fixture set through its owning generator.
+    #[command(name = "signed-fixtures")]
+    SignedFixtures {
+        /// Run each generator's check mode once and fail on any drift.
+        #[arg(long)]
+        check: bool,
+        /// Fail when a signed fixture set has no owning generator.
+        #[arg(long = "require-complete")]
+        require_complete: bool,
+    },
     /// Compile a decision-model rules and thresholds file into a canonical artifact.
     #[command(name = "decision-model")]
     DecisionModel {
@@ -462,6 +472,34 @@ mod tests {
             parse(&["xtask", "gen", "proof-coverage"]),
             Command::Gen {
                 command: GenCommand::ProofCoverage { check: false }
+            }
+        ));
+    }
+
+    #[test]
+    fn gen_signed_fixtures_parses_check_and_require_complete() {
+        assert!(matches!(
+            parse(&["xtask", "gen", "signed-fixtures"]),
+            Command::Gen {
+                command: GenCommand::SignedFixtures {
+                    check: false,
+                    require_complete: false
+                }
+            }
+        ));
+        assert!(matches!(
+            parse(&[
+                "xtask",
+                "gen",
+                "signed-fixtures",
+                "--check",
+                "--require-complete"
+            ]),
+            Command::Gen {
+                command: GenCommand::SignedFixtures {
+                    check: true,
+                    require_complete: true
+                }
             }
         ));
     }

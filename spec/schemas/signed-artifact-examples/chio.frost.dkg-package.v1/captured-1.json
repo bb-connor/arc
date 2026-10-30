@@ -1,0 +1,10 @@
+{
+  "ceremonyId": "7e82bc2e2738b7e382fc0f5b129143a3f051d8238c0e9d8c33186d4465a74385",
+  "keyEpoch": 1,
+  "packageDigest": "0b890cd183582d810c0238def822b4598f31b4071b8f7dae7f3a324fe8bd584a",
+  "participantSetDigest": "d13abdd17a17df99d633189f2f06131081259048fc644c138ae39a9a338ab494",
+  "round": "round1",
+  "schema": "chio.frost.dkg-package.v1",
+  "senderParticipantId": "peer-1",
+  "transportKeyId": "sign-1"
+}

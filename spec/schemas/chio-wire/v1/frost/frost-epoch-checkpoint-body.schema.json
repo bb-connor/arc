@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/frost/frost-epoch-checkpoint-body.schema.json",
+  "title": "chio.frost.epoch-checkpoint.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "activationFence",
+    "activeRosterDigest",
+    "activeRosterId",
+    "anchorId",
+    "anchorKeyId",
+    "checkpointSequence",
+    "clockHighWater",
+    "groupPublicKeyDigest",
+    "keyEpoch",
+    "schema",
+    "scopeId"
+  ],
+  "properties": {
+    "activationFence": {
+      "type": "integer"
+    },
+    "activeRosterDigest": {
+      "type": "string"
+    },
+    "activeRosterId": {
+      "type": "string"
+    },
+    "anchorId": {
+      "type": "string"
+    },
+    "anchorKeyId": {
+      "type": "string"
+    },
+    "checkpointSequence": {
+      "type": "integer"
+    },
+    "clockHighWater": {
+      "type": "integer"
+    },
+    "groupPublicKeyDigest": {
+      "type": "string"
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "predecessorDigest": {
+      "type": "string"
+    },
+    "rotationAuthorizationDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.frost.epoch-checkpoint.v1"
+    },
+    "scopeId": {
+      "type": "string"
+    }
+  }
+}

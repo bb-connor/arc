@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/stop-operator-config-approval.schema.json",
+  "title": "Chio stop operator config approval signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_digest",
+    "principal",
+    "schema"
+  ],
+  "properties": {
+    "config_digest": {
+      "type": "string"
+    },
+    "principal": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.stop-operator-config-approval.v1"
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "acceptedImportedSignalCount": 0,
+  "effectiveScore": 0.7,
+  "expiresAt": 1700000500,
+  "importedSignalCount": 0,
+  "issuedAt": 1700000100,
+  "issuerOperatorId": "https://issuer.example",
+  "probationary": true,
+  "schema": "chio.portable-reputation-summary.v1",
+  "scorecard": {
+    "boundary_pressure": {
+      "deny_ratio": {
+        "state": "known",
+        "value": 0.1
+      },
+      "policies_observed": 4,
+      "receipts_observed": 8
+    },
+    "composite_score": {
+      "state": "known",
+      "value": 0.7
+    },
+    "computed_at": 1700000100,
+    "delegation_hygiene": {
+      "budget_reduction_rate": {
+        "state": "known",
+        "value": 0.8
+      },
+      "delegations_observed": 2,
+      "scope_reduction_rate": {
+        "state": "known",
+        "value": 0.8
+      },
+      "score": {
+        "state": "known",
+        "value": 0.8
+      },
+      "ttl_reduction_rate": {
+        "state": "known",
+        "value": 0.8
+      }
+    },
+    "effective_weight_sum": 1,
+    "history_depth": {
+      "active_days": 4,
+      "activity_ratio": {
+        "state": "known",
+        "value": 0.75
+      },
+      "first_seen": 1700000000,
+      "last_seen": 1700000100,
+      "receipt_count": 8,
+      "score": {
+        "state": "known",
+        "value": 0.8
+      },
+      "span_days": 4
+    },
+    "incident_correlation": {
+      "incidents_observed": 0,
+      "score": {
+        "state": "known",
+        "value": 0.9
+      }
+    },
+    "least_privilege": {
+      "capabilities_observed": 6,
+      "score": {
+        "state": "known",
+        "value": 0.9
+      }
+    },
+    "reliability": {
+      "cancellation_rate": {
+        "state": "known",
+        "value": 0.02
+      },
+      "completion_rate": {
+        "state": "known",
+        "value": 0.95
+      },
+      "incompletion_rate": {
+        "state": "known",
+        "value": 0.03
+      },
+      "receipts_observed": 8,
+      "score": {
+        "state": "known",
+        "value": 0.9
+      }
+    },
+    "resource_stewardship": {
+      "average_utilization": {
+        "state": "known",
+        "value": 0.8
+      },
+      "capped_grants_observed": 3,
+      "fit_score": {
+        "state": "known",
+        "value": 0.9
+      }
+    },
+    "specialization": {
+      "distinct_tools": 2,
+      "score": {
+        "state": "known",
+        "value": 0.7
+      }
+    },
+    "subject_key": "2930d0021da92fb80b76f1f28e3e53d30cb80f2e551f9321acce443a5cb8b68c"
+  },
+  "subjectKey": "2930d0021da92fb80b76f1f28e3e53d30cb80f2e551f9321acce443a5cb8b68c",
+  "summaryId": "portable-reputation-67f4db0d7f25e119b2d2f0103013118605117a09fa96631a30b8a9051977b03e",
+  "window": {
+    "until": 1700000100
+  }
+}

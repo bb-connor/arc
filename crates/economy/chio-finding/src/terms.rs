@@ -234,3 +234,7 @@ pub fn verify_signed_market_terms(signed: &SignedFindingMarketTerms) -> Result<(
     signed.body.validate()?;
     crate::envelope::verify_pinned_envelope(signed, &signed.body.seller, "market_terms")
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingMarketTerms {
+    const SCHEMA_ID: &'static str = FINDING_MARKET_TERMS_SCHEMA_V1;
+}

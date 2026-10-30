@@ -121,6 +121,7 @@ pub type RuntimeWorkflowRunReport = chio_runtime_core::RuntimeWorkflowRunReport;
 pub type SignedRuntimeAdmissionReport = chio_runtime_core::SignedRuntimeAdmissionReport;
 pub type SignedRuntimePeerWeights = chio_runtime_core::SignedRuntimePeerWeights;
 pub type SignedRuntimePheromonePolicy = chio_runtime_core::SignedRuntimePheromonePolicy;
+pub use chio_runtime_core::RuntimePheromoneQueryReport;
 pub type SignedRuntimePheromoneQueryReport = chio_runtime_core::SignedRuntimePheromoneQueryReport;
 pub type SignedRuntimeVerifierTrustBundle = chio_runtime_core::SignedRuntimeVerifierTrustBundle;
 pub type SwarmAuthorityBundle = chio_swarm_authority::SwarmAuthorityBundle;
@@ -258,9 +259,11 @@ pub fn signed_runtime_admission_report_json(
 
 pub fn verify_signed_runtime_admission_report(
     report: &SignedRuntimeAdmissionReport,
+    expected_signer: &chio_core_types::crypto::PublicKey,
 ) -> Result<bool, ChioRuntimeError> {
     wrap_runtime(chio_runtime_core::verify_signed_runtime_admission_report(
         report,
+        expected_signer,
     ))
 }
 

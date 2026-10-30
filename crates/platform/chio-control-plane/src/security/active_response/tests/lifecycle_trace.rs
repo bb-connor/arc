@@ -490,7 +490,7 @@ fn durable_lifecycle_trace_links_commits_effects_and_signed_receipts() {
             )
             .unwrap_or_else(|| panic!("missing signed receipt"));
             assert!(require_success(
-                receipt.verify_signature(),
+                receipt.verify_integrity_embedded_key(),
                 "verify receipt"
             ));
             let signing = ChioReceiptSigningBody::from(&receipt.body());

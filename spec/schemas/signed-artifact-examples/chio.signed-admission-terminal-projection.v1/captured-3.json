@@ -1,0 +1,129 @@
+{
+  "authorization_consumption": null,
+  "context": {
+    "coordinator_lease_epoch": 3,
+    "coordinator_lease_id": "factor-coordinator-lease",
+    "expected_operation_version": 4,
+    "operation_id": "c6775e03104c7e86d80aff9f251bc8f47d00d41c2e336f3f07a56dff4a4b31d9",
+    "request_id": "factor-request",
+    "store_fence": {
+      "lease_id": "factor-owner-lease",
+      "owner_epoch": 3,
+      "store_uuid": "factor-store"
+    },
+    "trusted_time_unix_ms": 1200
+  },
+  "manifest_json": "eyJwcm9qZWN0aW9uX2JvZHlfZGlnZXN0IjoiNzMxNTEzYzg2ZWEwZjc3MWNiNDdlMWNhNDUxMTRiOWYxZDUwMTdjNGRjZTBjMDIwNWNkNTE5Y2ZmZjI3NzcxZSIsInJlY29yZHMiOlt7ImtpbmQiOiJlY29ub21pY19tdXRhdGlvbl9yZXN1bHQiLCJyZWNvcmRfZGlnZXN0IjoiODhhMzVmYTNmMWU2NTQ0Y2Y3ZTJkMjA0MDY3MWQ2M2FmNDU4MzdlZTcxODdjMzc1MjM0NDM4N2ZjYmQ2ZmMwZSIsInJlY29yZF9pZCI6ImMyMzA4NDExZWU4NGMwNTdmM2JmYmNiMmE1ODkyNDBmZTlhM2ZkMTNiNDA2OTZjZmY1YmM1NGRiNjQxZDkxZGUifSx7ImtpbmQiOiJtdXRhdGlvbl9hdWRpdCIsInJlY29yZF9kaWdlc3QiOiJlOGNiNGVhMzNiNTllYzI2NWM5NTI0YjY3YTc0NzIzZTUyY2ZiODVhMmZhNDMzMmY2ZDFmODYxN2M3M2E4YjE0IiwicmVjb3JkX2lkIjoiYzIzMDg0MTFlZTg0YzA1N2YzYmZiY2IyYTU4OTI0MGZlOWEzZmQxM2I0MDY5NmNmZjViYzU0ZGI2NDFkOTFkZTphdWRpdCJ9XSwic2NoZW1hIjoiY2hpby5hZG1pc3Npb24tcHJvamVjdGlvbi1tYW5pZmVzdC52MSJ9",
+  "observer": null,
+  "projection_json": "eyJhdWRpdF9ldmVudCI6eyJiaW5kaW5nIjp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjozLCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImZhY3Rvci1jb29yZGluYXRvci1sZWFzZSIsIm9wZXJhdGlvbl9pZCI6ImM2Nzc1ZTAzMTA0YzdlODZkODBhZmY5ZjI1MWJjOGY0N2QwMGQ0MWMyZTMzNmYzZjA3YTU2ZGZmNGE0YjMxZDkiLCJwcm9qZWN0ZWRfb3BlcmF0aW9uX3ZlcnNpb24iOjUsInByb2plY3RlZF9zdGF0ZSI6ImVjb25vbWljX211dGF0aW9uX2FwcGxpZWQiLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6IjljYzRhOTQzNjA4ODEwZmY5ZjIxM2M5ZTUyNmNiN2QzM2Y0ZjJjZmMxMmEwMDUxOWM1Zjk2OTY1YTE1MWVkN2QiLCJyZXF1ZXN0X2lkIjoiZmFjdG9yLXJlcXVlc3QiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOm51bGwsInNvdXJjZV9vcGVyYXRpb25fdmVyc2lvbiI6NCwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJmYWN0b3Itb3duZXItbGVhc2UiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6ImZhY3Rvci1zdG9yZSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTIwMH0sInJlY29yZF9kaWdlc3QiOiI3NjVjNTBkNjVmMDlmZmQzODQ3Nzg0Y2ZjOGQwZGNlYzlmNmU2NDVjMjQ4ODMzOWUzMWQyNGIwNjZjYTlkYjZjIiwicmVjb3JkX2lkIjoiYzIzMDg0MTFlZTg0YzA1N2YzYmZiY2IyYTU4OTI0MGZlOWEzZmQxM2I0MDY5NmNmZjViYzU0ZGI2NDFkOTFkZTphdWRpdCJ9LCJjb250ZXh0Ijp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjozLCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImZhY3Rvci1jb29yZGluYXRvci1sZWFzZSIsImV4cGVjdGVkX29wZXJhdGlvbl92ZXJzaW9uIjo0LCJvcGVyYXRpb25faWQiOiJjNjc3NWUwMzEwNGM3ZTg2ZDgwYWZmOWYyNTFiYzhmNDdkMDBkNDFjMmUzMzZmM2YwN2E1NmRmZjRhNGIzMWQ5IiwicmVxdWVzdF9pZCI6ImZhY3Rvci1yZXF1ZXN0Iiwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJmYWN0b3Itb3duZXItbGVhc2UiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6ImZhY3Rvci1zdG9yZSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTIwMH0sInJlc3VsdCI6eyJhbmNob3JlZF9lZmZlY3QiOmZhbHNlLCJiaW5kaW5nIjp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjozLCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImZhY3Rvci1jb29yZGluYXRvci1sZWFzZSIsIm9wZXJhdGlvbl9pZCI6ImM2Nzc1ZTAzMTA0YzdlODZkODBhZmY5ZjI1MWJjOGY0N2QwMGQ0MWMyZTMzNmYzZjA3YTU2ZGZmNGE0YjMxZDkiLCJwcm9qZWN0ZWRfb3BlcmF0aW9uX3ZlcnNpb24iOjUsInByb2plY3RlZF9zdGF0ZSI6ImVjb25vbWljX211dGF0aW9uX2FwcGxpZWQiLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6IjljYzRhOTQzNjA4ODEwZmY5ZjIxM2M5ZTUyNmNiN2QzM2Y0ZjJjZmMxMmEwMDUxOWM1Zjk2OTY1YTE1MWVkN2QiLCJyZXF1ZXN0X2lkIjoiZmFjdG9yLXJlcXVlc3QiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOm51bGwsInNvdXJjZV9vcGVyYXRpb25fdmVyc2lvbiI6NCwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJmYWN0b3Itb3duZXItbGVhc2UiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6ImZhY3Rvci1zdG9yZSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTIwMH0sImV4cGVjdGVkX3Jlc291cmNlX2ZlbmNlIjoiZmFjdG9yLWFzc2lnbm1lbnQtcmVzb3VyY2UtZmVuY2U6MTEiLCJleHBlY3RlZF9yZXNvdXJjZV92ZXJzaW9uIjo3LCJpbW11dGFibGVfcmVxdWVzdF9kaWdlc3QiOiI5Y2M0YTk0MzYwODgxMGZmOWYyMTNjOWU1MjZjYjdkMzNmNGYyY2ZjMTJhMDA1MTljNWY5Njk2NWExNTFlZDdkIiwicGFydGljaXBhbnRfaWQiOiJvYmxpZ29yLWRpc3Bvc2l0aW9uLWF1dGhvcml0eSIsInBhcnRpY2lwYW50X2tleV9lcG9jaCI6MywicmVjb3JkX2RpZ2VzdCI6Ijc2NWM1MGQ2NWYwOWZmZDM4NDc3ODRjZmM4ZDBkY2VjOWY2ZTY0NWMyNDg4MzM5ZTMxZDI0YjA2NmNhOWRiNmMiLCJyZWNvcmRfaWQiOiJjMjMwODQxMWVlODRjMDU3ZjNiZmJjYjJhNTg5MjQwZmU5YTNmZDEzYjQwNjk2Y2ZmNWJjNTRkYjY0MWQ5MWRlIiwicmVzb3VyY2VfaWQiOiI3M2NiZjU2NGU5MDJhM2I5YmEzN2I5ZTU5NGYzODVjODkyOWQ1ZjIzM2EzZGRmYWQ0ZDcwMjdiMDIwNTllZTlmIiwicmVzdWx0aW5nX3Jlc291cmNlX2ZlbmNlIjoiZmFjdG9yLWFzc2lnbm1lbnQtcmVzb3VyY2UtZmVuY2U6MTIiLCJyZXN1bHRpbmdfcmVzb3VyY2VfdmVyc2lvbiI6OCwic2lnbmF0dXJlX2RpZ2VzdCI6IjJlZWZkMTFmZDc0OTc2MTc3ZjM3NzljZTc4MmIwMDcyOGJkZTIwNTM1ZDVmNjMxNjljNTc1YWQ0YjY1ODQ0YWMiLCJzdGF0dXMiOiJhcHBsaWVkIn0sInRlcm1pbmFsIjoiZWNvbm9taWNfbXV0YXRpb25fYXBwbGllZCJ9",
+  "records": [
+    {
+      "canonical_json": "eyJhbmNob3JlZF9lZmZlY3QiOmZhbHNlLCJiaW5kaW5nIjp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjozLCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImZhY3Rvci1jb29yZGluYXRvci1sZWFzZSIsIm9wZXJhdGlvbl9pZCI6ImM2Nzc1ZTAzMTA0YzdlODZkODBhZmY5ZjI1MWJjOGY0N2QwMGQ0MWMyZTMzNmYzZjA3YTU2ZGZmNGE0YjMxZDkiLCJwcm9qZWN0ZWRfb3BlcmF0aW9uX3ZlcnNpb24iOjUsInByb2plY3RlZF9zdGF0ZSI6ImVjb25vbWljX211dGF0aW9uX2FwcGxpZWQiLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6IjljYzRhOTQzNjA4ODEwZmY5ZjIxM2M5ZTUyNmNiN2QzM2Y0ZjJjZmMxMmEwMDUxOWM1Zjk2OTY1YTE1MWVkN2QiLCJyZXF1ZXN0X2lkIjoiZmFjdG9yLXJlcXVlc3QiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOm51bGwsInNvdXJjZV9vcGVyYXRpb25fdmVyc2lvbiI6NCwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJmYWN0b3Itb3duZXItbGVhc2UiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6ImZhY3Rvci1zdG9yZSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTIwMH0sImV4cGVjdGVkX3Jlc291cmNlX2ZlbmNlIjoiZmFjdG9yLWFzc2lnbm1lbnQtcmVzb3VyY2UtZmVuY2U6MTEiLCJleHBlY3RlZF9yZXNvdXJjZV92ZXJzaW9uIjo3LCJpbW11dGFibGVfcmVxdWVzdF9kaWdlc3QiOiI5Y2M0YTk0MzYwODgxMGZmOWYyMTNjOWU1MjZjYjdkMzNmNGYyY2ZjMTJhMDA1MTljNWY5Njk2NWExNTFlZDdkIiwicGFydGljaXBhbnRfaWQiOiJvYmxpZ29yLWRpc3Bvc2l0aW9uLWF1dGhvcml0eSIsInBhcnRpY2lwYW50X2tleV9lcG9jaCI6MywicmVjb3JkX2RpZ2VzdCI6Ijc2NWM1MGQ2NWYwOWZmZDM4NDc3ODRjZmM4ZDBkY2VjOWY2ZTY0NWMyNDg4MzM5ZTMxZDI0YjA2NmNhOWRiNmMiLCJyZWNvcmRfaWQiOiJjMjMwODQxMWVlODRjMDU3ZjNiZmJjYjJhNTg5MjQwZmU5YTNmZDEzYjQwNjk2Y2ZmNWJjNTRkYjY0MWQ5MWRlIiwicmVzb3VyY2VfaWQiOiI3M2NiZjU2NGU5MDJhM2I5YmEzN2I5ZTU5NGYzODVjODkyOWQ1ZjIzM2EzZGRmYWQ0ZDcwMjdiMDIwNTllZTlmIiwicmVzdWx0aW5nX3Jlc291cmNlX2ZlbmNlIjoiZmFjdG9yLWFzc2lnbm1lbnQtcmVzb3VyY2UtZmVuY2U6MTIiLCJyZXN1bHRpbmdfcmVzb3VyY2VfdmVyc2lvbiI6OCwic2lnbmF0dXJlX2RpZ2VzdCI6IjJlZWZkMTFmZDc0OTc2MTc3ZjM3NzljZTc4MmIwMDcyOGJkZTIwNTM1ZDVmNjMxNjljNTc1YWQ0YjY1ODQ0YWMiLCJzdGF0dXMiOiJhcHBsaWVkIn0=",
+      "kind": "economic_mutation_result",
+      "record_digest": "88a35fa3f1e6544cf7e2d2040671d63af45837ee7187c3752344387fcbd6fc0e",
+      "record_id": "c2308411ee84c057f3bfbcb2a589240fe9a3fd13b40696cff5bc54db641d91de"
+    },
+    {
+      "canonical_json": "eyJiaW5kaW5nIjp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjozLCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImZhY3Rvci1jb29yZGluYXRvci1sZWFzZSIsIm9wZXJhdGlvbl9pZCI6ImM2Nzc1ZTAzMTA0YzdlODZkODBhZmY5ZjI1MWJjOGY0N2QwMGQ0MWMyZTMzNmYzZjA3YTU2ZGZmNGE0YjMxZDkiLCJwcm9qZWN0ZWRfb3BlcmF0aW9uX3ZlcnNpb24iOjUsInByb2plY3RlZF9zdGF0ZSI6ImVjb25vbWljX211dGF0aW9uX2FwcGxpZWQiLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6IjljYzRhOTQzNjA4ODEwZmY5ZjIxM2M5ZTUyNmNiN2QzM2Y0ZjJjZmMxMmEwMDUxOWM1Zjk2OTY1YTE1MWVkN2QiLCJyZXF1ZXN0X2lkIjoiZmFjdG9yLXJlcXVlc3QiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOm51bGwsInNvdXJjZV9vcGVyYXRpb25fdmVyc2lvbiI6NCwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJmYWN0b3Itb3duZXItbGVhc2UiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6ImZhY3Rvci1zdG9yZSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTIwMH0sInJlY29yZF9kaWdlc3QiOiI3NjVjNTBkNjVmMDlmZmQzODQ3Nzg0Y2ZjOGQwZGNlYzlmNmU2NDVjMjQ4ODMzOWUzMWQyNGIwNjZjYTlkYjZjIiwicmVjb3JkX2lkIjoiYzIzMDg0MTFlZTg0YzA1N2YzYmZiY2IyYTU4OTI0MGZlOWEzZmQxM2I0MDY5NmNmZjViYzU0ZGI2NDFkOTFkZTphdWRpdCJ9",
+      "kind": "mutation_audit",
+      "record_digest": "e8cb4ea33b59ec265c9524b67a74723e52cfb85a2fa4332f6d1f8617c73a8b14",
+      "record_id": "c2308411ee84c057f3bfbcb2a589240fe9a3fd13b40696cff5bc54db641d91de:audit"
+    }
+  ],
+  "schema": "chio.signed-admission-terminal-projection.v1",
+  "signer_key": "5e449ad6fa4b2d65746e8cd4f968e38c5a9679f8495db114ee06317f72f717db",
+  "source_operation": {
+    "attachments": [
+      {
+        "SupplementalAuthorizationDigest": "afdd92f94c5428cf56679d03633ea40f762add55d2ebe7a79e0c01721443899d"
+      }
+    ],
+    "binding": {
+      "authenticated_tenant_id": "tenant-factor",
+      "authorization_capability_hash": "b8e237194cb80d21182cb9d3ca5503f8058bc940654904da9786eabd4520c2e7",
+      "capability_id": "factor-capability",
+      "coordinator_authority_id": "https://coordinator.example",
+      "effect_class": "monetary",
+      "kind": "governed_economic_mutation",
+      "operation_id": "c6775e03104c7e86d80aff9f251bc8f47d00d41c2e336f3f07a56dff4a4b31d9",
+      "policy_hash": "3ac2c28440efab1181aa682b53b4391f1b138bcd8b41cf2df3d52fadd0767db5",
+      "request_binding": {
+        "action_parameter_hash": "0d51b690c34041a564e19208c8bc1f4fb34e29362d70391108da6b77a0c1dd5a",
+        "immutable_request_hash": "0d51b690c34041a564e19208c8bc1f4fb34e29362d70391108da6b77a0c1dd5a",
+        "participant_requirements": {
+          "approval": false,
+          "authorization_consumption": false,
+          "broker_attempt": false,
+          "budget_capture": false,
+          "execution_nonce": false,
+          "obligation": false,
+          "observation_attempt_zero": false,
+          "outcome_eligibility": false,
+          "payment": false,
+          "supplemental_authorization": true
+        },
+        "request_binding_hash": "9cc4a943608810ff9f213c9e526cb7d33f4f2cfc12a00519c5f96965a151ed7d"
+      },
+      "request_id": "factor-request",
+      "request_namespace_digest": "73b417c3ea0ea77036d616362f6e91acfbe808ec71a71ea75260a3374c414e9b"
+    },
+    "coordinator_lease_epoch": 3,
+    "dispatch_commit": null,
+    "dispatch_state": "not_applicable",
+    "last_error": null,
+    "schema": "chio.admission-operation.v1",
+    "state": "mutation_submitted",
+    "terminal_replay": null,
+    "version": 4
+  },
+  "terminal_operation": {
+    "attachments": [
+      {
+        "SupplementalAuthorizationDigest": "afdd92f94c5428cf56679d03633ea40f762add55d2ebe7a79e0c01721443899d"
+      }
+    ],
+    "binding": {
+      "authenticated_tenant_id": "tenant-factor",
+      "authorization_capability_hash": "b8e237194cb80d21182cb9d3ca5503f8058bc940654904da9786eabd4520c2e7",
+      "capability_id": "factor-capability",
+      "coordinator_authority_id": "https://coordinator.example",
+      "effect_class": "monetary",
+      "kind": "governed_economic_mutation",
+      "operation_id": "c6775e03104c7e86d80aff9f251bc8f47d00d41c2e336f3f07a56dff4a4b31d9",
+      "policy_hash": "3ac2c28440efab1181aa682b53b4391f1b138bcd8b41cf2df3d52fadd0767db5",
+      "request_binding": {
+        "action_parameter_hash": "0d51b690c34041a564e19208c8bc1f4fb34e29362d70391108da6b77a0c1dd5a",
+        "immutable_request_hash": "0d51b690c34041a564e19208c8bc1f4fb34e29362d70391108da6b77a0c1dd5a",
+        "participant_requirements": {
+          "approval": false,
+          "authorization_consumption": false,
+          "broker_attempt": false,
+          "budget_capture": false,
+          "execution_nonce": false,
+          "obligation": false,
+          "observation_attempt_zero": false,
+          "outcome_eligibility": false,
+          "payment": false,
+          "supplemental_authorization": true
+        },
+        "request_binding_hash": "9cc4a943608810ff9f213c9e526cb7d33f4f2cfc12a00519c5f96965a151ed7d"
+      },
+      "request_id": "factor-request",
+      "request_namespace_digest": "73b417c3ea0ea77036d616362f6e91acfbe808ec71a71ea75260a3374c414e9b"
+    },
+    "coordinator_lease_epoch": 3,
+    "dispatch_commit": null,
+    "dispatch_state": "not_applicable",
+    "last_error": null,
+    "schema": "chio.admission-operation.v1",
+    "state": "economic_mutation_applied",
+    "terminal_replay": {
+      "economic_mutation": {
+        "projection_digest": "fbe468e573c9e845a941b9434c07e24b872da95289849e7db3729a2b012ff695",
+        "result_digest": "765c50d65f09ffd3847784cfc8d0dcec9f6e645c2488339e31d24b066ca9db6c",
+        "result_id": "c2308411ee84c057f3bfbcb2a589240fe9a3fd13b40696cff5bc54db641d91de"
+      }
+    },
+    "version": 5
+  }
+}

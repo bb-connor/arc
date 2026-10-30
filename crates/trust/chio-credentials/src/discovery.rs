@@ -184,7 +184,7 @@ pub fn create_signed_public_issuer_discovery(
         import_guardrails,
     };
     verify_signed_public_issuer_discovery_body(&body)?;
-    let (signature, _) = signer_keypair.sign_canonical(&body)?;
+    let signature = signer_keypair.sign_wrapped(CHIO_PUBLIC_ISSUER_DISCOVERY_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body)?)?;
     let document = SignedPublicIssuerDiscovery { body, signature };
     verify_signed_public_issuer_discovery(&document)?;
     Ok(document)
@@ -194,10 +194,13 @@ pub fn verify_signed_public_issuer_discovery(
     document: &SignedPublicIssuerDiscovery,
 ) -> Result<(), CredentialError> {
     verify_signed_public_issuer_discovery_body(&document.body)?;
-    if !document
-        .body
-        .signer_public_key
-        .verify_canonical(&document.body, &document.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &document.body.signer_public_key,
+        CHIO_PUBLIC_ISSUER_DISCOVERY_SCHEMA,
+        &document.body,
+        &document.signature,
+    )
+    .is_err()
     {
         return Err(CredentialError::InvalidPublicDiscoverySignature);
     }
@@ -256,7 +259,7 @@ pub fn create_signed_public_verifier_discovery(
         import_guardrails,
     };
     verify_signed_public_verifier_discovery_body(&body)?;
-    let (signature, _) = signer_keypair.sign_canonical(&body)?;
+    let signature = signer_keypair.sign_wrapped(CHIO_PUBLIC_VERIFIER_DISCOVERY_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body)?)?;
     let document = SignedPublicVerifierDiscovery { body, signature };
     verify_signed_public_verifier_discovery(&document)?;
     Ok(document)
@@ -266,10 +269,13 @@ pub fn verify_signed_public_verifier_discovery(
     document: &SignedPublicVerifierDiscovery,
 ) -> Result<(), CredentialError> {
     verify_signed_public_verifier_discovery_body(&document.body)?;
-    if !document
-        .body
-        .signer_public_key
-        .verify_canonical(&document.body, &document.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &document.body.signer_public_key,
+        CHIO_PUBLIC_VERIFIER_DISCOVERY_SCHEMA,
+        &document.body,
+        &document.signature,
+    )
+    .is_err()
     {
         return Err(CredentialError::InvalidPublicDiscoverySignature);
     }
@@ -319,7 +325,7 @@ pub fn create_signed_public_discovery_transparency(
         import_guardrails,
     };
     verify_signed_public_discovery_transparency_body(&body)?;
-    let (signature, _) = signer_keypair.sign_canonical(&body)?;
+    let signature = signer_keypair.sign_wrapped(CHIO_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body)?)?;
     let document = SignedPublicDiscoveryTransparency { body, signature };
     verify_signed_public_discovery_transparency(&document)?;
     Ok(document)
@@ -329,10 +335,13 @@ pub fn verify_signed_public_discovery_transparency(
     document: &SignedPublicDiscoveryTransparency,
 ) -> Result<(), CredentialError> {
     verify_signed_public_discovery_transparency_body(&document.body)?;
-    if !document
-        .body
-        .signer_public_key
-        .verify_canonical(&document.body, &document.signature)?
+    if chio_core::crypto::verify_wrapped(
+        &document.body.signer_public_key,
+        CHIO_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA,
+        &document.body,
+        &document.signature,
+    )
+    .is_err()
     {
         return Err(CredentialError::InvalidPublicDiscoverySignature);
     }

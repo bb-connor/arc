@@ -1,0 +1,10 @@
+{
+  "accepted_at": 1749000000,
+  "allocation_id": "881484e75d92dc40521c049750070aa97ad327d2a52ba7b8330e7c48d1fb11ad",
+  "backing_envelope_sha256": "df211802430b5dfcc771dd84d4234dd029cc0085b31f4f340c541cb0c31f70df",
+  "bond_ref": "bond:pending-allocation",
+  "finding_id": "a5c8a5154fb925cb65f0ca7d6a40d5cc8ad313197a9f4f9d463d09c6b30a8ef6",
+  "live": true,
+  "observed_at": 1750000010,
+  "schema": "chio.finding.bond-store-snapshot.v1"
+}

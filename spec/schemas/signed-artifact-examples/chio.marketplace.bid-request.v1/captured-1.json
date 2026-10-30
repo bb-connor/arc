@@ -1,0 +1,17 @@
+{
+  "agentId": "agent-alpha",
+  "issuedAt": 120,
+  "listingId": "listing-1",
+  "maxPricePerCall": {
+    "currency": "USD",
+    "units": 50
+  },
+  "requestedScope": {
+    "capabilityScopePrefix": "tools:search",
+    "maxInvocations": 10,
+    "serverId": "demo-server",
+    "toolName": "search"
+  },
+  "schema": "chio.marketplace.bid-request.v1",
+  "windowSeconds": 300
+}

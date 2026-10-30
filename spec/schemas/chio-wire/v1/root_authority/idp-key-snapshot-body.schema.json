@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/idp-key-snapshot-body.schema.json",
+  "title": "chio.idp-key-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "exchange_key": {
+      "type": "string"
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kid",
+          "kty"
+        ],
+        "properties": {
+          "alg": {
+            "type": "string"
+          },
+          "crv": {
+            "type": "string"
+          },
+          "e": {
+            "type": "string"
+          },
+          "kid": {
+            "type": "string"
+          },
+          "kty": {
+            "type": "string"
+          },
+          "n": {
+            "type": "string"
+          },
+          "use": {
+            "type": "string"
+          },
+          "x": {
+            "type": "string"
+          },
+          "y": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "n": {
+      "type": "integer"
+    },
+    "observed_at": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.idp-key-snapshot.v1"
+    },
+    "source": {
+      "type": "string"
+    }
+  }
+}

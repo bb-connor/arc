@@ -719,7 +719,7 @@ pub(crate) async fn sidecar_validate_capability_handler(
             .into_response();
     }
 
-    let signature_valid = token.verify_signature().unwrap_or(false);
+    let signature_valid = token.verify_integrity_embedded_key().unwrap_or(false);
     if !signature_valid {
         return (
             StatusCode::OK,
@@ -853,7 +853,7 @@ fn sidecar_chio_receipt_report(
     receipt: &ChioReceipt,
     signer_trusted: bool,
 ) -> VerifyReceiptResponse {
-    let signature_valid = receipt.verify_signature().unwrap_or(false);
+    let signature_valid = receipt.verify_integrity_embedded_key().unwrap_or(false);
     let receipt_id_valid = chio_core_types::receipt::body::chio_receipt_id(&receipt.body())
         .map(|expected_id| expected_id == receipt.id)
         .unwrap_or(false);

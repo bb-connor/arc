@@ -3,10 +3,11 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::CanonicalBytes;
 use crate::capability::governance::ProvenanceEvidenceClass;
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature,
-    SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, sha256_hex, verify_wrapped, wrapped_verdict, Keypair, PublicKey,
+    Signature, SigningBackend,
 };
 use crate::error::Result;
 use crate::schema_binding::ensure_schema_matches;
@@ -15,12 +16,15 @@ use crate::session::{
 };
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-    sign_bytes_for_embedded_key,
+    sign_wrapped_for_embedded_key,
 };
 
 use super::crypto_floor::{
     ensure_receipt_signature_algorithm_allowed, ReceiptCryptoFloor, ReceiptFloorVerifyError,
 };
+
+/// Signing-wrapper schema id of a child-request receipt.
+pub const CHIO_CHILD_REQUEST_RECEIPT_SCHEMA: &str = "chio.child-request-receipt.v1";
 
 /// Signed audit record for a nested child request handled under a parent tool call.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,9 +42,6 @@ pub struct ChildRequestReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     pub kernel_key: PublicKey,
-    /// Signing algorithm. Absent means Ed25519 (the default).
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -128,7 +129,10 @@ impl ChildRequestReceipt {
             "child request receipt",
             "kernel_key",
         )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_CHILD_REQUEST_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             timestamp: body.timestamp,
@@ -141,7 +145,6 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
-            algorithm: None,
             signature,
         })
     }
@@ -157,8 +160,12 @@ impl ChildRequestReceipt {
             "child request receipt",
             "kernel_key",
         )?;
-        let outcome =
-            sign_bytes_for_embedded_key(&body.kernel_key, backend, &canonical_json_bytes(&body)?)?;
+        let outcome = sign_wrapped_for_embedded_key(
+            &body.kernel_key,
+            backend,
+            CHIO_CHILD_REQUEST_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             timestamp: body.timestamp,
@@ -171,7 +178,6 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
-            algorithm: Some(outcome.algorithm),
             signature: outcome.signature,
         })
     }
@@ -193,21 +199,34 @@ impl ChildRequestReceipt {
         }
     }
 
-    pub fn verify_signature(&self) -> Result<bool> {
-        let body = self.body();
-        self.kernel_key
-            .verify_canonical_strict(&body, &self.signature)
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature_against(&self.kernel_key)
     }
 
-    /// Verify the child-request receipt signature and enforce the configured
-    /// crypto floor.
+    fn verify_signature_against(&self, key: &PublicKey) -> Result<bool> {
+        wrapped_verdict(verify_wrapped(
+            key,
+            CHIO_CHILD_REQUEST_RECEIPT_SCHEMA,
+            &self.body(),
+            &self.signature,
+        ))
+    }
+
+    /// Verify the child-request receipt signature against `pinned` and
+    /// enforce the configured crypto floor over the pinned key's algorithm.
     pub fn verify_signature_with_floor(
         &self,
+        pinned: &PublicKey,
         floor: ReceiptCryptoFloor,
     ) -> core::result::Result<bool, ReceiptFloorVerifyError> {
-        let signature_algorithm = self.signature.algorithm();
-        ensure_receipt_signature_algorithm_allowed(self.algorithm, signature_algorithm, floor)?;
-        self.verify_signature()
+        ensure_receipt_signature_algorithm_allowed(
+            pinned.algorithm(),
+            self.signature.algorithm(),
+            floor,
+        )?;
+        self.verify_signature_against(pinned)
             .map_err(ReceiptFloorVerifyError::Crypto)
     }
 }
@@ -355,7 +374,10 @@ impl ReceiptLineageStatement {
             "receipt lineage statement",
             "kernel_key",
         )?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             schema: body.schema,
             id: body.id,
@@ -393,21 +415,33 @@ impl ReceiptLineageStatement {
         }
     }
 
-    pub fn verify_signature(&self) -> Result<bool> {
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         ensure_schema_matches(
             &self.schema,
             CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
             "receipt lineage statement",
         )?;
-        let body = self.body();
-        self.kernel_key
-            .verify_canonical_strict(&body, &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.kernel_key,
+            CHIO_RECEIPT_LINEAGE_STATEMENT_SCHEMA,
+            &self.body(),
+            &self.signature,
+        ))
     }
 
     #[must_use]
     pub fn is_verified(&self) -> bool {
         self.evidence_class == ProvenanceEvidenceClass::Verified
     }
+}
+
+/// A payload a [`SignedExportEnvelope`] signs, with its signing-wrapper
+/// schema id.
+pub trait SignedExportPayload: Serialize {
+    /// Registered schema id the wrapper binds this payload to.
+    const SCHEMA_ID: &'static str;
 }
 
 /// Signed envelope for stable export/report artifacts.
@@ -418,17 +452,19 @@ pub struct SignedExportEnvelope<T> {
     pub body: T,
     /// Public key that signed the export.
     pub signer_key: PublicKey,
-    /// Signature over the canonical JSON of `body`.
+    /// Signature over the signing wrapper of the canonical `body` under
+    /// `T::SCHEMA_ID`.
     pub signature: Signature,
 }
 
 impl<T> SignedExportEnvelope<T>
 where
-    T: Serialize + Clone,
+    T: SignedExportPayload + Clone,
 {
     /// Sign an export payload with the provided keypair.
     pub fn sign(body: T, keypair: &Keypair) -> Result<Self> {
-        let (signature, _) = keypair.sign_canonical(&body)?;
+        let signature =
+            keypair.sign_wrapped(T::SCHEMA_ID, &CanonicalBytes::from_serializable(&body)?)?;
         Ok(Self {
             body,
             signer_key: keypair.public_key(),
@@ -438,7 +474,8 @@ where
 
     /// Sign an export payload through an external or platform signing backend.
     pub fn sign_with_backend(body: T, backend: &dyn SigningBackend) -> Result<Self> {
-        let outcome = backend.sign_bytes_with_identity(&canonical_json_bytes(&body)?)?;
+        let outcome =
+            backend.sign_wrapped(T::SCHEMA_ID, &CanonicalBytes::from_serializable(&body)?)?;
         Ok(Self {
             body,
             signer_key: outcome.public_key,
@@ -446,9 +483,14 @@ where
         })
     }
 
-    /// Verify the envelope signature against the embedded signer key.
-    pub fn verify_signature(&self) -> Result<bool> {
-        self.signer_key
-            .verify_canonical_strict(&self.body, &self.signature)
+    /// Verify the envelope signature against `pinned`, the key the caller
+    /// trusts for this export.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        wrapped_verdict(verify_wrapped(
+            pinned,
+            T::SCHEMA_ID,
+            &self.body,
+            &self.signature,
+        ))
     }
 }

@@ -1,4 +1,7 @@
-use chio_core_types::{crypto::PublicKey, receipt::lineage::SignedExportEnvelope};
+use chio_core_types::{
+    crypto::PublicKey,
+    receipt::lineage::{SignedExportEnvelope, SignedExportPayload},
+};
 use chio_kernel::admission_operation::{AdmissionDigest, AdmissionIdentifier};
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +21,10 @@ pub const MAX_TREATY_EPOCH_AUTHORIZATIONS: usize = 65536;
 pub const MAX_TREATY_EPOCH_INTEGER: u64 = (1_u64 << 53) - 1;
 
 pub type SignedTreatyEpochV1 = SignedExportEnvelope<TreatyEpochRecordV1>;
+
+impl SignedExportPayload for TreatyEpochRecordV1 {
+    const SCHEMA_ID: &'static str = CHIO_TREATY_EPOCH_SCHEMA;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

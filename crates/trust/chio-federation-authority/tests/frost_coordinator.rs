@@ -105,11 +105,13 @@ fn fixture() -> Fixture {
         .recompute_roster_id()
         .unwrap_or_else(|error| panic!("roster id: {error}"));
     roster.roster_authority_signature = roster_authority
-        .sign(
+        .sign_wrapped(
+            chio_federation::frost::CHIO_FROST_ROSTER_SCHEMA,
             &roster
-                .signing_bytes()
+                .signing_body()
                 .unwrap_or_else(|error| panic!("roster bytes: {error}")),
         )
+        .unwrap_or_else(|error| panic!("roster signature: {error}"))
         .to_hex();
     roster.roster_digest = roster
         .recompute_roster_digest()

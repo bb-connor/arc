@@ -445,7 +445,7 @@ fn test_behavioral_feed_export_surfaces() {
     let feed: SignedBehavioralFeed =
         serde_json::from_str(&response_text).expect("parse behavioral feed");
     assert!(feed
-        .verify_signature()
+        .verify_signature(&feed.signer_key)
         .expect("verify behavioral feed signature"));
     assert_eq!(feed.body.schema, "chio.behavioral-feed.v1");
     assert_eq!(feed.body.filters.receipt_limit, Some(200));
@@ -525,7 +525,7 @@ fn test_behavioral_feed_export_surfaces() {
     let cli_feed: SignedBehavioralFeed =
         serde_json::from_slice(&cli_output.stdout).expect("parse behavioral feed CLI json");
     assert!(cli_feed
-        .verify_signature()
+        .verify_signature(&cli_feed.signer_key)
         .expect("verify behavioral feed CLI signature"));
     assert_eq!(cli_feed.body.schema, "chio.behavioral-feed.v1");
     assert_eq!(cli_feed.body.filters.receipt_limit, Some(200));
@@ -633,7 +633,7 @@ extensions:
     let report: SignedRuntimeAttestationAppraisalReport =
         response.json().expect("parse signed appraisal report");
     assert!(report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .expect("verify signed runtime appraisal"));
     assert_eq!(report.signer_key, test_kernel_keypair().public_key());
     assert_eq!(
@@ -745,7 +745,7 @@ extensions:
     let cli_report: SignedRuntimeAttestationAppraisalReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse runtime appraisal CLI json");
     assert!(cli_report
-        .verify_signature()
+        .verify_signature(&cli_report.signer_key)
         .expect("verify runtime appraisal CLI signature"));
     assert!(cli_report.body.policy_outcome.trust_policy_configured);
     assert!(!cli_report.body.policy_outcome.accepted);
@@ -866,7 +866,7 @@ extensions:
     let exported: SignedRuntimeAttestationAppraisalResult =
         response.json().expect("parse signed appraisal result");
     assert!(exported
-        .verify_signature()
+        .verify_signature(&exported.signer_key)
         .expect("verify signed appraisal result"));
     assert_eq!(
         exported.body.schema,
@@ -980,7 +980,7 @@ extensions:
         serde_json::from_slice(&cli_export_output.stdout)
             .expect("parse appraisal result export CLI json");
     assert!(cli_result
-        .verify_signature()
+        .verify_signature(&cli_result.signer_key)
         .expect("verify appraisal result export CLI signature"));
     assert!(
         cli_result
@@ -1170,7 +1170,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         let exported: SignedRuntimeAttestationAppraisalResult =
             response.json().expect("parse signed appraisal result");
         assert!(exported
-            .verify_signature()
+            .verify_signature(&exported.signer_key)
             .expect("verify signed appraisal result"));
         assert_eq!(exported.body.issuer, issuer);
         assert_eq!(
@@ -1429,7 +1429,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         SignedRuntimeAttestationAppraisalResult::sign(fresh_result, &replay_signer)
             .expect("sign fresh trusted-exporter result");
     assert!(signed_fresh_result
-        .verify_signature()
+        .verify_signature(&signed_fresh_result.signer_key)
         .expect("verify trusted exporter fixture"));
     let replay_policy = RuntimeAttestationImportedAppraisalPolicy {
         trusted_issuers: vec!["did:chio:test:stale-replay-exporter".to_string()],

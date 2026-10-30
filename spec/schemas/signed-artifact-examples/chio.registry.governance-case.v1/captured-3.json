@@ -1,0 +1,24 @@
+{
+  "activationId": "activation-2b2f19d15b66a8c42415e9c1fdca9cc232912c189fa800cb49a91c816f41663e",
+  "caseId": "case-bf02747fc0194115d5e9812e3a4bed1e8dcf74d74c16e0c9135e737f90b92107",
+  "charterId": "charter-b771ccbb4aebab61e343e01ecfecf76a557bdcb82cd970cde56e660ab47f7c6c",
+  "evidenceRefs": [
+    {
+      "kind": "external",
+      "referenceId": "incident-1"
+    }
+  ],
+  "expiresAt": 500,
+  "governingOperatorId": "origin-a",
+  "issuedBy": "governance@chio.example",
+  "kind": "sanction",
+  "listingId": "listing-artifact-1",
+  "namespace": "https://registry.chio.example",
+  "note": "freeze",
+  "openedAt": 140,
+  "schema": "chio.registry.governance-case.v1",
+  "state": "enforced",
+  "subjectOperatorId": "origin-a",
+  "supersedesCaseId": "prior-case-1",
+  "updatedAt": 140
+}

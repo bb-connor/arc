@@ -49,6 +49,9 @@ pub const CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD: i32 = 26;
 pub const CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION: i32 = 27;
 pub const CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION: i32 = 28;
 pub const CHIO_FFI_ERROR_UNTRUSTED_INPUT: i32 = 29;
+pub const CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID: i32 = 30;
+pub const CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH: i32 = 31;
+pub const CHIO_FFI_ERROR_SIGNATURE_REJECTED: i32 = 32;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -141,6 +144,9 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::MerkleProofFailed => CHIO_FFI_ERROR_MERKLE_PROOF_FAILED,
         ErrorCode::EmptyTree => CHIO_FFI_ERROR_EMPTY_TREE,
         ErrorCode::InvalidProofIndex => CHIO_FFI_ERROR_INVALID_PROOF_INDEX,
+        ErrorCode::UnregisteredSchemaId => CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID,
+        ErrorCode::SignatureAlgorithmMismatch => CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH,
+        ErrorCode::SignatureRejected => CHIO_FFI_ERROR_SIGNATURE_REJECTED,
         ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
         ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
         ErrorCode::InvalidToolName => CHIO_FFI_ERROR_INVALID_TOOL_NAME,
@@ -266,11 +272,25 @@ pub extern "C" fn chio_sha256_hex_bytes(input: *const u8, input_len: usize) -> C
 }
 
 #[no_mangle]
-pub extern "C" fn chio_sign_utf8_message_ed25519(
-    input_utf8: *const c_char,
+pub extern "C" fn chio_public_key_from_seed_ed25519(seed_hex: *const c_char) -> ChioFfiResult {
+    let seed = match read_c_str(seed_hex, "seed_hex") {
+        Ok(value) => value,
+        Err(result) => return result,
+    };
+    run_ffi(|| chio_binding_helpers::public_key_from_seed_ed25519(seed))
+}
+
+#[no_mangle]
+pub extern "C" fn chio_sign_wrapped_json_ed25519(
+    schema_id: *const c_char,
+    input_json: *const c_char,
     seed_hex: *const c_char,
 ) -> ChioFfiResult {
-    let input = match read_c_str(input_utf8, "input_utf8") {
+    let schema_id = match read_c_str(schema_id, "schema_id") {
+        Ok(value) => value,
+        Err(result) => return result,
+    };
+    let input = match read_c_str(input_json, "input_json") {
         Ok(value) => value,
         Err(result) => return result,
     };
@@ -279,60 +299,25 @@ pub extern "C" fn chio_sign_utf8_message_ed25519(
         Err(result) => return result,
     };
     run_ffi(|| {
-        json(&chio_binding_helpers::sign_utf8_message_ed25519(
-            input, seed,
+        json(&chio_binding_helpers::sign_wrapped_json_ed25519(
+            schema_id, input, seed,
         )?)
     })
 }
 
+/// Succeeds with `true` only when the signature verifies; every refusal is an
+/// error result.
 #[no_mangle]
-pub extern "C" fn chio_verify_utf8_message_ed25519(
-    input_utf8: *const c_char,
-    public_key_hex: *const c_char,
-    signature_hex: *const c_char,
-) -> ChioFfiResult {
-    let input = match read_c_str(input_utf8, "input_utf8") {
-        Ok(value) => value,
-        Err(result) => return result,
-    };
-    let public_key = match read_c_str(public_key_hex, "public_key_hex") {
-        Ok(value) => value,
-        Err(result) => return result,
-    };
-    let signature = match read_c_str(signature_hex, "signature_hex") {
-        Ok(value) => value,
-        Err(result) => return result,
-    };
-    run_ffi(|| {
-        Ok(
-            chio_binding_helpers::verify_utf8_message_ed25519(input, public_key, signature)?
-                .to_string(),
-        )
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn chio_sign_json_ed25519(
-    input_json: *const c_char,
-    seed_hex: *const c_char,
-) -> ChioFfiResult {
-    let input = match read_c_str(input_json, "input_json") {
-        Ok(value) => value,
-        Err(result) => return result,
-    };
-    let seed = match read_c_str(seed_hex, "seed_hex") {
-        Ok(value) => value,
-        Err(result) => return result,
-    };
-    run_ffi(|| json(&chio_binding_helpers::sign_json_str_ed25519(input, seed)?))
-}
-
-#[no_mangle]
-pub extern "C" fn chio_verify_json_signature_ed25519(
+pub extern "C" fn chio_verify_wrapped_json(
+    schema_id: *const c_char,
     input_json: *const c_char,
     public_key_hex: *const c_char,
     signature_hex: *const c_char,
 ) -> ChioFfiResult {
+    let schema_id = match read_c_str(schema_id, "schema_id") {
+        Ok(value) => value,
+        Err(result) => return result,
+    };
     let input = match read_c_str(input_json, "input_json") {
         Ok(value) => value,
         Err(result) => return result,
@@ -346,10 +331,8 @@ pub extern "C" fn chio_verify_json_signature_ed25519(
         Err(result) => return result,
     };
     run_ffi(|| {
-        Ok(
-            chio_binding_helpers::verify_json_str_signature_ed25519(input, public_key, signature)?
-                .to_string(),
-        )
+        chio_binding_helpers::verify_wrapped_json(schema_id, input, public_key, signature)?;
+        Ok(true.to_string())
     })
 }
 
@@ -421,14 +404,15 @@ pub extern "C" fn chio_verify_manifest_json(input_json: *const c_char) -> ChioFf
 mod tests {
     use super::{
         chio_buffer_free, chio_canonicalize_json, chio_ffi_abi_version, chio_ffi_build_info,
-        chio_sha256_hex_bytes, chio_sha256_hex_utf8, chio_sign_utf8_message_ed25519,
-        chio_verify_receipt_json_with_trusted_signers, chio_verify_utf8_message_ed25519,
-        ffi_error_code_from_helper_code, ChioFfiBuffer,
+        chio_public_key_from_seed_ed25519, chio_sha256_hex_bytes, chio_sha256_hex_utf8,
+        chio_sign_wrapped_json_ed25519, chio_verify_receipt_json_with_trusted_signers,
+        chio_verify_wrapped_json, ffi_error_code_from_helper_code, ChioFfiBuffer,
         CHIO_FFI_ERROR_DUPLICATE_REQUIRED_PERMISSION, CHIO_FFI_ERROR_INVALID_HEX,
         CHIO_FFI_ERROR_INVALID_INPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_MANIFEST_FIELD,
         CHIO_FFI_ERROR_INVALID_OUTPUT_SCHEMA, CHIO_FFI_ERROR_INVALID_REQUIRED_PERMISSION,
-        CHIO_FFI_ERROR_INVALID_TOOL_NAME, CHIO_FFI_STATUS_ERROR, CHIO_FFI_STATUS_NULL_ARGUMENT,
-        CHIO_FFI_STATUS_OK,
+        CHIO_FFI_ERROR_INVALID_TOOL_NAME, CHIO_FFI_ERROR_SIGNATURE_REJECTED,
+        CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID, CHIO_FFI_STATUS_ERROR,
+        CHIO_FFI_STATUS_NULL_ARGUMENT, CHIO_FFI_STATUS_OK,
     };
     use std::ffi::CString;
     use std::os::raw::c_char;
@@ -483,13 +467,57 @@ mod tests {
 
     #[test]
     fn signing_roundtrips_over_c_abi() {
-        let input = c_string("hello chio");
+        let schema_id = c_string("chio.receipt.v1");
+        let input = c_string(r#"{"z":1,"a":2}"#);
         let seed = c_string(&"09".repeat(32));
-        let result = chio_sign_utf8_message_ed25519(input.as_ptr(), seed.as_ptr());
+        let result =
+            chio_sign_wrapped_json_ed25519(schema_id.as_ptr(), input.as_ptr(), seed.as_ptr());
         assert_eq!(result.status, CHIO_FFI_STATUS_OK);
-        let output = result_to_string(result.data);
-        assert!(output.contains("public_key_hex"));
-        assert!(output.contains("signature_hex"));
+        let signed: serde_json::Value = match serde_json::from_str(&result_to_string(result.data)) {
+            Ok(value) => value,
+            Err(error) => panic!("signed json: {error}"),
+        };
+        let public_key = c_string(signed["public_key_hex"].as_str().unwrap_or_default());
+        let signature = c_string(signed["signature_hex"].as_str().unwrap_or_default());
+
+        let key_result = chio_public_key_from_seed_ed25519(seed.as_ptr());
+        assert_eq!(key_result.status, CHIO_FFI_STATUS_OK);
+        assert_eq!(
+            result_to_string(key_result.data),
+            signed["public_key_hex"].as_str().unwrap_or_default()
+        );
+
+        let verified = chio_verify_wrapped_json(
+            schema_id.as_ptr(),
+            input.as_ptr(),
+            public_key.as_ptr(),
+            signature.as_ptr(),
+        );
+        assert_eq!(verified.status, CHIO_FFI_STATUS_OK);
+        assert_eq!(result_to_string(verified.data), "true");
+
+        let other_schema = c_string("chio.capability.v1");
+        let substituted = chio_verify_wrapped_json(
+            other_schema.as_ptr(),
+            input.as_ptr(),
+            public_key.as_ptr(),
+            signature.as_ptr(),
+        );
+        assert_eq!(substituted.status, CHIO_FFI_STATUS_ERROR);
+        assert_eq!(substituted.error_code, CHIO_FFI_ERROR_SIGNATURE_REJECTED);
+        let _ = result_to_string(substituted.data);
+    }
+
+    #[test]
+    fn unregistered_schema_id_refuses_over_c_abi() {
+        let schema_id = c_string("chio.unregistered-fixture.v1");
+        let input = c_string("{}");
+        let seed = c_string(&"09".repeat(32));
+        let result =
+            chio_sign_wrapped_json_ed25519(schema_id.as_ptr(), input.as_ptr(), seed.as_ptr());
+        assert_eq!(result.status, CHIO_FFI_STATUS_ERROR);
+        assert_eq!(result.error_code, CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID);
+        let _ = result_to_string(result.data);
     }
 
     #[test]
@@ -559,10 +587,12 @@ mod tests {
 
     #[test]
     fn malformed_hex_returns_error_status() {
-        let input = c_string("hello");
+        let schema_id = c_string("chio.receipt.v1");
+        let input = c_string("{}");
         let public_key = c_string("not-hex");
         let signature = c_string("also-not-hex");
-        let result = chio_verify_utf8_message_ed25519(
+        let result = chio_verify_wrapped_json(
+            schema_id.as_ptr(),
             input.as_ptr(),
             public_key.as_ptr(),
             signature.as_ptr(),
@@ -687,16 +717,15 @@ mod tests {
             "chio_canonicalize_json",
             "chio_ffi_abi_version",
             "chio_ffi_build_info",
+            "chio_public_key_from_seed_ed25519",
             "chio_sha256_hex_bytes",
             "chio_sha256_hex_utf8",
-            "chio_sign_json_ed25519",
-            "chio_sign_utf8_message_ed25519",
+            "chio_sign_wrapped_json_ed25519",
             "chio_verify_capability_json",
-            "chio_verify_json_signature_ed25519",
             "chio_verify_manifest_json",
             "chio_verify_receipt_json",
             "chio_verify_receipt_json_with_trusted_signers",
-            "chio_verify_utf8_message_ed25519",
+            "chio_verify_wrapped_json",
         ];
 
         let actual: Vec<&str> = snapshot

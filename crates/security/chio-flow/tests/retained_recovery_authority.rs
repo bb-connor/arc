@@ -104,7 +104,7 @@ fn retained(owners: usize) -> Result<Retained, Box<dyn std::error::Error>> {
             },
         );
         let proof = SignedAuthorityCoverageAttestationV1::sign(body, &key)?;
-        assert!(proof.verify_signature()?);
+        assert!(proof.verify_integrity_embedded_key()?);
         proofs.push(proof);
         keys.push(key);
     }
@@ -213,7 +213,7 @@ fn retained_coverage_verifies_at_preparation_time_and_returns_only_a_digest() ->
     };
     grant.validate()?;
     let signed = SignedRecoveryGrant::sign(grant, &Keypair::from_seed(&[91; 32]))?;
-    assert!(signed.verify_signature()?);
+    assert!(signed.verify_integrity_embedded_key()?);
     assert_eq!(
         serde_json::to_value(serde_json::from_slice::<SignedRecoveryGrant>(
             &canonical_json_bytes(&signed)?,

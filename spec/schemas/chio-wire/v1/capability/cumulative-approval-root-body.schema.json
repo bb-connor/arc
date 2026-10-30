@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/cumulative-approval-root-body.schema.json",
+  "title": "chio.cumulative-approval-root.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "approval_budget_epoch",
+    "approval_budget_id",
+    "root_capability_hash",
+    "root_capability_id",
+    "root_expires_at",
+    "root_grant_hash",
+    "root_issuer",
+    "root_scope_hash",
+    "root_subject",
+    "schema",
+    "signer_key_epoch",
+    "threshold"
+  ],
+  "properties": {
+    "approval_budget_epoch": {
+      "type": "integer"
+    },
+    "approval_budget_id": {
+      "type": "string"
+    },
+    "root_capability_hash": {
+      "type": "string"
+    },
+    "root_capability_id": {
+      "type": "string"
+    },
+    "root_expires_at": {
+      "type": "integer"
+    },
+    "root_grant_hash": {
+      "type": "string"
+    },
+    "root_issuer": {
+      "type": "string"
+    },
+    "root_scope_hash": {
+      "type": "string"
+    },
+    "root_subject": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.cumulative-approval-root.v1"
+    },
+    "signer_key_epoch": {
+      "type": "integer"
+    },
+    "threshold": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

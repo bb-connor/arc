@@ -7,8 +7,10 @@ from .hashing import sha256_hex_utf8
 from .json import canonicalize_json
 from .signing import (
     public_key_hex_matches,
-    verify_chio_signature,
+    wrapped_signature_valid,
 )
+
+RECEIPT_SCHEMA = "chio.receipt.v1"
 
 
 def _safe_verify_receipt_signature(
@@ -16,15 +18,10 @@ def _safe_verify_receipt_signature(
     signature: str,
     public_key: str,
 ) -> bool:
-    """Dispatch through ``verify_chio_signature``, swallowing algorithm errors.
-
-    Receipts signed with algorithms this SDK build does not yet support fail
-    closed by reporting ``signature_valid: False`` rather than propagating an
-    exception, mirroring the TS behaviour.
-    """
+    """Receipts whose signature this SDK cannot check report ``False``."""
 
     try:
-        return verify_chio_signature(signed_text, signature, public_key)
+        return wrapped_signature_valid(RECEIPT_SCHEMA, signed_text, public_key, signature)
     except ChioInvariantError:
         return False
 
@@ -32,7 +29,6 @@ def _safe_verify_receipt_signature(
 _RECEIPT_MEMBERS = frozenset({
     "action",
     "actor_chain",
-    "algorithm",
     "bbs_projection_version",
     "bbs_signature",
     "boundary_class",
@@ -110,7 +106,7 @@ def _receipt_body(receipt: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in receipt.items()
-        if key not in {"algorithm", "signature"} and value is not None
+        if key != "signature" and value is not None
     }
 
 

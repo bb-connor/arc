@@ -89,9 +89,11 @@ fn sign_frame(frame: &mut Frame, key: &SigningKey) {
         .as_object_mut()
         .expect("frame is json object")
         .remove("tenant_sig");
-    let payload =
-        chio_core::canonical::canonical_json_bytes(&value).expect("canonical signing payload");
-    let signature = key.sign(&payload);
+    let canonical = chio_core::canonical::CanonicalBytes::from_value(&value)
+        .expect("canonical signing payload");
+    let wrapper = chio_core::crypto::SigningWrapper::new("chio.tee-capture-frame.v1", &canonical)
+        .expect("frame signing wrapper");
+    let signature = key.sign(wrapper.as_bytes());
     let encoded = base64::engine::general_purpose::STANDARD.encode(signature.to_bytes());
     frame.tenant_sig = format!("ed25519:{encoded}");
 }
@@ -157,6 +159,20 @@ fn replay_from_tee_accepts_signed_capture_with_pubkey() {
     let report: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("json replay report");
     assert_eq!(report["exit_code"], 0);
+}
+
+#[test]
+fn replay_from_tee_rejects_the_committed_placeholder_tenant_sig() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let pubkey_path = write_tenant_pubkey(dir.path(), &tenant_signing_key());
+    let extra = vec![
+        "--tenant-pubkey".to_string(),
+        pubkey_path.display().to_string(),
+    ];
+
+    let output = run_from_tee(&fixture_path("clean_match.ndjson"), &extra);
+
+    assert_exit(&output, 20);
 }
 
 #[test]

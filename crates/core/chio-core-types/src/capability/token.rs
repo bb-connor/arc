@@ -5,15 +5,16 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::canonical::canonical_json_bytes;
+use crate::canonical::CanonicalBytes;
 use crate::crypto::{
-    is_default_optional_algorithm, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    verify_wrapped, wrapped_verdict, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::schema_binding::ensure_schema_matches;
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
-    sign_bytes_for_embedded_key,
+    sign_wrapped_for_embedded_key,
 };
 
 use super::aggregate_invocation::{
@@ -108,11 +109,9 @@ fn validate_cumulative_approval_projections(
 
 /// A Chio capability token. Scoped, time-bounded, cryptographically signed.
 ///
-/// The `signature` field covers the canonical JSON of all other fields.
-/// Verification re-serializes the token (excluding the signature), computes
-/// the canonical form, and checks the signature against `issuer` using the
-/// algorithm declared by the `algorithm` field (defaulting to Ed25519 when
-/// absent).
+/// The `signature` covers the signing wrapper over the canonical
+/// [`CapabilityTokenSigningBody`] under `chio.capability.v1`. Verification
+/// checks it against `issuer`, whose encoding alone selects the algorithm.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CapabilityToken {
@@ -136,9 +135,6 @@ pub struct CapabilityToken {
     /// Optional invocation ceiling shared by this capability or its delegation family.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate_invocation_budget: Option<AggregateInvocationBudget>,
-    /// Signing algorithm. Absent means Ed25519 (the default).
-    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
-    pub algorithm: Option<SigningAlgorithm>,
     /// Typed caveats. Empty tokens omit this on the wire.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub caveats: Vec<Caveat>,
@@ -271,7 +267,7 @@ impl CapabilityToken {
                             .to_string(),
                     });
                 }
-                if !binding.verify_signature()? {
+                if !binding.verify_integrity_embedded_key()? {
                     return Err(Error::SignatureVerificationFailed);
                 }
                 let marker = binding.delegation_marker()?;
@@ -476,10 +472,6 @@ impl CapabilityToken {
 
     /// Sign a capability token body with the given Ed25519 keypair.
     ///
-    /// This is the bare Ed25519 signing entry point: the `algorithm` envelope
-    /// field is omitted from the serialized output, so the artifact is
-    /// byte-identical to one signed through the `SigningBackend` path with the
-    /// default Ed25519 algorithm.
     pub fn sign(body: CapabilityTokenBody, keypair: &Keypair) -> Result<Self> {
         ensure_keypair_matches_embedded_key(&body.issuer, keypair, "capability token", "issuer")?;
         validate_aggregate_budget_shape(&body.scope, body.aggregate_invocation_budget.as_ref())?;
@@ -492,7 +484,10 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_CAPABILITY_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -503,7 +498,6 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
-            algorithm: None,
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
@@ -533,7 +527,10 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_CAPABILITY_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -544,7 +541,6 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
-            algorithm: None,
             caveats,
             scope_attenuations: None,
             attenuation_proof: None,
@@ -698,7 +694,10 @@ impl CapabilityToken {
             attenuation_proof: Some(body.attenuation_proof.clone()),
             budget_share_bps: body.budget_share_bps,
         };
-        let (signature, _bytes) = keypair.sign_canonical(&signing_body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_CAPABILITY_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
+        )?;
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.body.id,
@@ -709,7 +708,6 @@ impl CapabilityToken {
             expires_at: body.body.expires_at,
             delegation_chain: body.body.delegation_chain,
             aggregate_invocation_budget: body.body.aggregate_invocation_budget,
-            algorithm: None,
             caveats: body.caveats,
             scope_attenuations: Some(body.scope_attenuations),
             attenuation_proof: Some(body.attenuation_proof),
@@ -726,10 +724,6 @@ impl CapabilityToken {
     /// when operating under the `fips` feature. The `body.issuer` field must
     /// equal the backend's atomic signing identity. Rotation away from that
     /// identity refuses issuance before a token can be returned.
-    ///
-    /// The resulting token's `algorithm` envelope field is populated with the
-    /// backend's algorithm. It is informational only -- verification
-    /// dispatches off the `signature` hex prefix, not this field.
     pub fn sign_with_backend(
         body: CapabilityTokenBody,
         backend: &dyn SigningBackend,
@@ -745,13 +739,13 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let signature = sign_bytes_for_embedded_key(
+        let signature = sign_wrapped_for_embedded_key(
             &body.issuer,
             backend,
-            &canonical_json_bytes(&signing_body)?,
+            CHIO_CAPABILITY_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
         )?
         .signature;
-        let algorithm = body.issuer.algorithm();
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,
@@ -762,7 +756,6 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
-            algorithm: Some(algorithm),
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
@@ -781,7 +774,6 @@ impl CapabilityToken {
         backend: &dyn SigningBackend,
     ) -> Result<Self> {
         let expected_issuer = body.issuer.clone();
-        let expected_algorithm = expected_issuer.algorithm();
         ensure_backend_matches_embedded_key(
             &expected_issuer,
             backend,
@@ -799,10 +791,11 @@ impl CapabilityToken {
             attenuation_proof: None,
             budget_share_bps: None,
         };
-        let signature = sign_bytes_for_embedded_key(
+        let signature = sign_wrapped_for_embedded_key(
             &expected_issuer,
             backend,
-            &canonical_json_bytes(&signing_body)?,
+            CHIO_CAPABILITY_SCHEMA,
+            &CanonicalBytes::from_serializable(&signing_body)?,
         )?
         .signature;
         let token = Self {
@@ -815,7 +808,6 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
-            algorithm: Some(expected_algorithm),
             caveats,
             scope_attenuations: None,
             attenuation_proof: None,
@@ -868,19 +860,26 @@ impl CapabilityToken {
 
     /// Verify the token's signature against its issuer key.
     ///
-    /// Dispatches off the algorithm carried by `signature` and `issuer`.
-    /// For FIPS algorithms, the `fips` feature must be enabled at the crate
-    /// level or verification returns `Ok(false)`.
-    pub fn verify_signature(&self) -> Result<bool> {
+    /// The issuer key alone selects the algorithm. For FIPS algorithms, the
+    /// `fips` feature must be enabled at the crate level or verification
+    /// returns `Ok(false)`.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
         self.validate_schema()?;
-        self.issuer
-            .verify_canonical(&self.signing_body(), &self.signature)
+        wrapped_verdict(verify_wrapped(
+            &self.issuer,
+            CHIO_CAPABILITY_SCHEMA,
+            &self.signing_body(),
+            &self.signature,
+        ))
     }
 
     /// Verify the token's signature and enforce the kernel-side
     /// `crypto_floor` posture in one pass.
     ///
-    /// Verification dispatches off `Signature::algorithm()`:
+    /// The floor reads the issuer key's algorithm:
     ///
     /// - [`SigningAlgorithm::Hybrid`] tokens are accepted under
     ///   [`CapabilityCryptoFloor::AllowHybrid`] and
@@ -893,45 +892,26 @@ impl CapabilityToken {
     ///
     /// The floor check fires BEFORE the cryptographic verification step
     /// so a forged classical signature on a hybrid-only deployment cannot
-    /// burn CPU cycles on a doomed verify call (and so the rejection
-    /// path is explicit in the audit trail).
-    ///
-    /// `algorithm` envelope-field consistency is also checked here: when
-    /// the optional `CapabilityToken::algorithm` field is present, it MUST
-    /// agree with `Signature::algorithm()`. A mismatch is a downgrade
-    /// signal and is rejected fail-closed.
+    /// burn CPU cycles on a doomed verify call.
     ///
     /// # Errors
     ///
     /// Returns
     /// [`CapabilityFloorVerifyError::RejectedByCryptoFloor`] when the
     /// signature algorithm violates the floor.
-    /// [`CapabilityFloorVerifyError::AlgorithmMismatch`] when the envelope
-    /// field disagrees with the signature material.
     /// [`CapabilityFloorVerifyError::Crypto`] when canonical
-    /// re-serialization fails.
-    pub fn verify_signature_with_floor(
+    /// re-serialization fails or the signature algorithm differs from the
+    /// issuer key's.
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_with_floor(
         &self,
         floor: CapabilityCryptoFloor,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
-        let signature_algorithm = self.signature.algorithm();
+        let signature_algorithm = self.issuer.algorithm();
 
-        // Step 1: envelope vs. signature consistency. If the envelope
-        // declares an algorithm, it MUST match the signature's
-        // self-describing prefix. Treat a mismatch as a downgrade
-        // signal: an attacker who flips the envelope bit but cannot
-        // reforge the signature should not be able to coerce a
-        // different verification path.
-        if let Some(declared) = self.algorithm {
-            if declared != signature_algorithm {
-                return Err(CapabilityFloorVerifyError::AlgorithmMismatch {
-                    declared,
-                    actual: signature_algorithm,
-                });
-            }
-        }
-
-        // Step 2: floor enforcement. Reject any combination that the
+        // Floor enforcement. Reject any combination that the
         // configured floor disallows BEFORE doing the cryptographic
         // check. Threat model row `pq_signature_downgrade` is the
         // surface this guards.
@@ -948,19 +928,26 @@ impl CapabilityToken {
             });
         }
 
-        // Step 3: schema and cryptographic verification.
+        // Schema and cryptographic verification.
         self.validate_schema()
             .map_err(CapabilityFloorVerifyError::Crypto)?;
-        self.issuer
-            .verify_canonical(&self.signing_body(), &self.signature)
-            .map_err(CapabilityFloorVerifyError::Crypto)
+        match verify_wrapped(
+            &self.issuer,
+            CHIO_CAPABILITY_SCHEMA,
+            &self.signing_body(),
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(CapabilityFloorVerifyError::Crypto(error)),
+        }
     }
 
     /// Verify the signature AND enforce the validity window in one pass.
     ///
     /// This is the sanctioned entry point when a verifier also needs
     /// freshness: it fails closed on expiry / not-yet-valid tokens, which
-    /// the bare [`CapabilityToken::verify_signature`] does not check. A clock
+    /// the bare [`CapabilityToken::verify_integrity_embedded_key`] does not check. A clock
     /// is threaded explicitly via `now` (unix seconds) so there is no hidden
     /// wall-clock read in this pure check.
     ///
@@ -974,8 +961,11 @@ impl CapabilityToken {
     /// not verify. Returns [`Error::CapabilityNotYetValid`] /
     /// [`Error::CapabilityExpired`] when the signature is valid but the token
     /// is outside its validity window.
-    pub fn verify_signature_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_signature()? {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
+        if !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         self.validate_time(now)?;
@@ -985,7 +975,7 @@ impl CapabilityToken {
     /// Verify the signature, enforce the `crypto_floor` posture, AND enforce
     /// the validity window in one pass.
     ///
-    /// Equivalent to [`CapabilityToken::verify_signature_with_floor`] followed
+    /// Equivalent to [`CapabilityToken::verify_integrity_embedded_key_with_floor`] followed
     /// by [`CapabilityToken::validate_time`], with the same fail-closed
     /// ordering: floor + signature are checked before the time window, so a
     /// floor violation or invalid signature is reported ahead of expiry. A
@@ -994,16 +984,19 @@ impl CapabilityToken {
     /// # Errors
     ///
     /// Propagates every error of
-    /// [`CapabilityToken::verify_signature_with_floor`]. When the signature
+    /// [`CapabilityToken::verify_integrity_embedded_key_with_floor`]. When the signature
     /// and floor pass but the token is outside its validity window, the time
     /// error is surfaced as [`CapabilityFloorVerifyError::Crypto`] wrapping
     /// [`Error::CapabilityNotYetValid`] / [`Error::CapabilityExpired`].
-    pub fn verify_signature_with_floor_at(
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key_with_floor_at(
         &self,
         floor: CapabilityCryptoFloor,
         now: u64,
     ) -> core::result::Result<bool, CapabilityFloorVerifyError> {
-        if !self.verify_signature_with_floor(floor)? {
+        if !self.verify_integrity_embedded_key_with_floor(floor)? {
             return Ok(false);
         }
         self.validate_time(now)

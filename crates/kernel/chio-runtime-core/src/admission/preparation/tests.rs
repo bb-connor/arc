@@ -71,7 +71,7 @@ fn signed_preparation_policy(
     Ok((
         SignedExportEnvelope::sign(policy, signer)?,
         SignedExportEnvelope::sign(weights, signer)?,
-        SignedExportEnvelope::sign(query_report, signer)?,
+        SignedExportEnvelope::sign(crate::RuntimePheromoneQueryReport(query_report), signer)?,
     ))
 }
 

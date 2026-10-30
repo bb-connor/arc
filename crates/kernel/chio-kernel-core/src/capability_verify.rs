@@ -223,15 +223,15 @@ fn verify_capability_base(
     }
 
     // Signature check.
-    match token.verify_signature_with_floor(crypto_floor) {
+    match token.verify_integrity_embedded_key_with_floor(crypto_floor) {
         Ok(true) => {}
         Ok(false) => return Err(CapabilityError::InvalidSignature),
         Err(error @ CapabilityFloorVerifyError::RejectedByCryptoFloor { .. }) => {
             return Err(CapabilityError::CryptoFloorRejected(error.to_string()));
         }
-        Err(error @ CapabilityFloorVerifyError::AlgorithmMismatch { .. }) => {
-            return Err(CapabilityError::CryptoFloorRejected(error.to_string()));
-        }
+        Err(CapabilityFloorVerifyError::Crypto(CoreError::SignatureAlgorithmMismatch {
+            ..
+        })) => return Err(CapabilityError::InvalidSignature),
         Err(CapabilityFloorVerifyError::Crypto(error)) => {
             return Err(CapabilityError::Internal(error.to_string()));
         }

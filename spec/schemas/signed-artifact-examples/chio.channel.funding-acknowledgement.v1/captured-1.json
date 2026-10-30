@@ -1,0 +1,22 @@
+{
+  "body": {
+    "anchoredHeadDigest": "f886c5cec0f5f15f47a969147f78ae4823243fc7a0d154edf13bbe7fae939708",
+    "escrowReference": {
+      "chainId": "eip155:31337",
+      "escrowContract": "0x5555555555555555555555555555555555555555",
+      "escrowId": "0xea3ff6c9815e6587cce8fe1652f779c12426bb751e2268cd87db72ebc56fda1b"
+    },
+    "expiresAtUnixMs": 1700,
+    "newState": "opening",
+    "newVersion": 2,
+    "openIntentDigest": "b657b8e2a2d4c0947d53a15c402e1d33978655833bd6658ab0ccca4641454445",
+    "priorHeadDigest": "e31d8dd3db46bd17a258972c5d951c99a1230710327d3a827e179e14e5603ceb",
+    "priorState": "unreserved",
+    "priorVersion": 1,
+    "reservedAtUnixMs": 1400,
+    "schema": "chio.channel.funding-acknowledgement.v1"
+  },
+  "keyEpoch": 4,
+  "signerId": "funding-authority",
+  "signerKey": "74f85cda34d1c27c4621484731e91579c3d9c6cfc0d94b281aa11e9162058aa9"
+}

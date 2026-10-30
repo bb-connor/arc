@@ -1,0 +1,15 @@
+{
+  "attenuations": [
+    {
+      "operation": "read_result",
+      "server_id": "*",
+      "tool_name": "*",
+      "type": "remove_operation"
+    }
+  ],
+  "capability_id": "cap-parent",
+  "delegatee": "31ad763a04f4b219e4c7ecf9ce179642ed3abb4d0c0e93129d63a89a0a7bb2f7",
+  "delegator": "625f00b4a935b96f27ee73babed6f27023f9d6b0e27b8dd023498ba89e673690",
+  "scope_hash": "fbd8c4fbfb8795566cf6b3764b20a1f03d1bd8f392544bd130f86deabf9c74d9",
+  "timestamp": 1500
+}

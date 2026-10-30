@@ -22,13 +22,13 @@ use chio_kernel_core::evidence_verify::{
 use crate::verify::{policy_covers, FindingCheckpointSignerStatusTrust, ResolvedReceiptEvidence};
 
 fn has_strict_checkpoint_signature(checkpoint: &KernelCheckpoint) -> bool {
-    matches!(
-        checkpoint
-            .body
-            .kernel_key
-            .verify_canonical_strict(&checkpoint.body, &checkpoint.signature),
-        Ok(true)
+    chio_core_types::crypto::verify_wrapped(
+        &checkpoint.body.kernel_key,
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
+        &checkpoint.body,
+        &checkpoint.signature,
     )
+    .is_ok()
 }
 
 /// Membership failures. Every variant is a rejection.
@@ -170,7 +170,12 @@ fn verify_checkpoint_membership_inner(
     if checkpoints.is_empty() {
         return Err(CheckpointMembershipError::NoCheckpoints);
     }
-    verify_checkpoint_transparency_records(checkpoints, transparency)
+    let pinned_signer_keys = profile
+        .checkpoint_logs
+        .iter()
+        .map(|log| log.signer.key.clone())
+        .collect::<Vec<_>>();
+    verify_checkpoint_transparency_records(checkpoints, transparency, &pinned_signer_keys)
         .map_err(|_| CheckpointMembershipError::TransparencyInvalid)?;
     let pinned_logs: BTreeMap<&str, _> = profile
         .checkpoint_logs
@@ -180,7 +185,7 @@ fn verify_checkpoint_membership_inner(
     let mut by_seq = BTreeMap::new();
     for checkpoint in checkpoints {
         let seq = checkpoint.body.checkpoint_seq;
-        let checkpoint = validate_checkpoint(checkpoint)
+        let checkpoint = validate_checkpoint(checkpoint, &pinned_signer_keys)
             .map_err(|_| CheckpointMembershipError::CheckpointInvalid(seq))?;
         if !has_strict_checkpoint_signature(&checkpoint) {
             return Err(CheckpointMembershipError::CheckpointSignatureInvalid(seq));
@@ -396,13 +401,13 @@ mod tests {
         )?;
         let signer = Keypair::from_seed(&[7; 32]);
         let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &signer)?;
-        verify_checkpoint_signature(&checkpoint)?;
+        verify_checkpoint_signature(&checkpoint, &[signer.public_key()])?;
         assert!(has_strict_checkpoint_signature(&checkpoint));
-        checkpoint.body.kernel_key = weak_key;
+        checkpoint.body.kernel_key = weak_key.clone();
         checkpoint.signature = forged_signature;
 
         assert!(matches!(
-            verify_checkpoint_signature(&checkpoint),
+            verify_checkpoint_signature(&checkpoint, &[weak_key]),
             Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
         ));
         assert!(!has_strict_checkpoint_signature(&checkpoint));

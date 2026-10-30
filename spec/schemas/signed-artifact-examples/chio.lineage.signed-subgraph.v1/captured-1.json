@@ -1,0 +1,71 @@
+{
+  "audience": "https://auditor.example/chio",
+  "challenge_nonce": "disclosure-lineage-fixture-nonce",
+  "checkpoint_inclusion_sha256": "0625f78dc425ec73a5181b6739b6ba634d87158ea1fa5fc7a27f741b4565570a",
+  "checkpoint_ref": "checkpoint-disclosure-valid",
+  "edges": [
+    {
+      "disclosure_state": "disclosed",
+      "edge_id": "edge-receipt-root-receipt-child",
+      "evidence_class": "observed",
+      "from": "receipt-root",
+      "kind": "continued_by",
+      "relation": "continued",
+      "source_artifact_sha256": "6fd235f07e8124080f885c5f8f5cbba75d0c1e262c073442f38556a6d8ff3d89",
+      "statement_sha256": "bc19759d0115cbdc11e8a36237271d3820cb4ce78c24b1e0c46d63a7ef0b61f4",
+      "to": "receipt-child"
+    }
+  ],
+  "frontier_sha256": "423a01fde9fd86c09e144c2ee9d56c17a7fceec12e45b986e636d341a0550ae9",
+  "generated_at": "2026-06-10T00:00:00Z",
+  "id": "lineage-subgraph-valid",
+  "leakage_ledger_sha256": "d1687794dd6b321d2fa95524500ce323bc5c23760c4a72f8df120e8e5b4fc228",
+  "lineage_anchor_ref": "lineage-anchor-local-fixture",
+  "max_depth": 1,
+  "nodes": [
+    {
+      "artifact_schema": "chio.receipt.v1",
+      "artifact_sha256": "cb2f11431a81d7112f32bd4fd9b46fe9f709b0306f946929f960afc5f387ef4c",
+      "depth": 0,
+      "disclosure_state": "disclosed",
+      "evidence_class": "observed",
+      "id": "receipt-root",
+      "kind": "receipt",
+      "parent_ids": [],
+      "receipt_ref": "receipt-root",
+      "source_id_hash": "cb2f11431a81d7112f32bd4fd9b46fe9f709b0306f946929f960afc5f387ef4c",
+      "source_table": "receipts",
+      "tenant_hash": "0f1c6f966ff3acd210a9376a3acb942edd2adfead0354f666749ad8a6cac505f"
+    },
+    {
+      "artifact_schema": "chio.receipt-lineage-statement.v1",
+      "artifact_sha256": "72bcdc602478d21442730557ce615c5b84dadb9a47647d027187a09e37fb0730",
+      "depth": 1,
+      "disclosure_state": "redacted",
+      "evidence_class": "derived",
+      "id": "receipt-child",
+      "kind": "receipt_lineage_statement",
+      "parent_ids": [
+        "receipt-root"
+      ],
+      "receipt_ref": "receipt-child",
+      "source_id_hash": "72bcdc602478d21442730557ce615c5b84dadb9a47647d027187a09e37fb0730",
+      "source_table": "receipt_lineage_statements",
+      "tenant_hash": "0f1c6f966ff3acd210a9376a3acb942edd2adfead0354f666749ad8a6cac505f"
+    }
+  ],
+  "policy_profile_id": "privacy-profile-valid",
+  "projection_manifest_sha256": "bb3e1382a31cd2ee5d1d2b0943f1e883021b05b7b050948ab14f78b7dbd0bf5f",
+  "redaction_map_sha256": "ed84047bbc1a919e44555a06c1f07421b898c00390993822c7a0889477a8659e",
+  "redactions": [
+    {
+      "node_id": "receipt-child",
+      "reason": "privacy_profile"
+    }
+  ],
+  "required_evidence_class": "observed",
+  "root_receipt_ids": [
+    "receipt-root"
+  ],
+  "transaction_passport_ref": "passport-disclosure-valid"
+}

@@ -1,0 +1,34 @@
+{
+  "boundary": {
+    "automaticTrustAdmission": false,
+    "explicitTrustActivationRequired": true,
+    "visibilityOnly": true
+  },
+  "compatibility": {
+    "sourceArtifactId": "artifact-1",
+    "sourceArtifactSha256": "deadbeef",
+    "sourceSchema": "chio.certify.check.v1"
+  },
+  "expiresAt": 1000,
+  "listingId": "listing-artifact-1",
+  "namespace": "https://registry.chio.example",
+  "namespaceOwnership": {
+    "namespace": "https://registry.chio.example",
+    "ownerId": "origin-a",
+    "ownerName": "Registry Operator",
+    "registeredAt": 100,
+    "registryUrl": "https://registry.chio.example",
+    "signerPublicKey": "8a9474a94aa6d386d20edbf8815540513fd7c44435c264db7263e24670c3e1f3"
+  },
+  "publishedAt": 110,
+  "schema": "chio.registry.listing.v1",
+  "status": "active",
+  "subject": {
+    "actorId": "tool-server-a",
+    "actorKind": "tool_server",
+    "displayName": "Tool Server A",
+    "homepageUrl": "https://tool.chio.example",
+    "metadataUrl": "https://tool.chio.example/metadata",
+    "resolutionUrl": "https://tool.chio.example/mcp"
+  }
+}

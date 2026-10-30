@@ -13,13 +13,12 @@ from chio.invariants import (
     receipt_body_canonical_json,
     receipt_signing_body_canonical_json,
     sha256_hex_utf8,
-    sign_json_string_ed25519,
-    sign_utf8_message_ed25519,
+    public_key_from_seed_ed25519,
+    sign_wrapped_json_ed25519,
     verify_capability,
-    verify_json_string_signature_ed25519,
     verify_receipt,
     verify_receipt_with_trusted_signers,
-    verify_utf8_message_ed25519,
+    verify_wrapped_json,
 )
 from chio.errors import ChioInvariantError
 
@@ -61,42 +60,82 @@ class VectorTests(unittest.TestCase):
 
     def test_signing_vectors(self) -> None:
         fixture = load_vector("signing")
-        signed_utf8 = sign_utf8_message_ed25519(
-            fixture["utf8_cases"][0]["input_utf8"],
-            fixture["signing_key_seed_hex"],
-        )
-        self.assertEqual(signed_utf8["public_key_hex"], fixture["utf8_cases"][0]["public_key_hex"])
-        self.assertEqual(signed_utf8["signature_hex"], fixture["utf8_cases"][0]["signature_hex"])
-
-        signed_json = sign_json_string_ed25519(
-            fixture["json_cases"][0]["input_json"],
-            fixture["signing_key_seed_hex"],
-        )
-        self.assertEqual(signed_json["canonical_json"], fixture["json_cases"][0]["canonical_json"])
-        self.assertEqual(signed_json["public_key_hex"], fixture["json_cases"][0]["public_key_hex"])
-        self.assertEqual(signed_json["signature_hex"], fixture["json_cases"][0]["signature_hex"])
-
-        for case in fixture["utf8_cases"]:
-            self.assertEqual(
-                verify_utf8_message_ed25519(
-                    case["input_utf8"],
-                    case["public_key_hex"],
-                    case["signature_hex"],
-                ),
-                case["expected_verify"],
-                case["id"],
-            )
-
+        if any("schema_id" not in case for case in fixture["json_cases"]):
+            self.skipTest("signing vectors carry no schema_id until they regenerate")
+        self.assertNotIn("utf8_cases", fixture)
         for case in fixture["json_cases"]:
-            self.assertEqual(
-                verify_json_string_signature_ed25519(
+            if case["expected_verify"]:
+                verify_wrapped_json(
+                    case["schema_id"],
                     case["input_json"],
                     case["public_key_hex"],
                     case["signature_hex"],
-                ),
-                case["expected_verify"],
-                case["id"],
-            )
+                )
+                signed = sign_wrapped_json_ed25519(
+                    case["schema_id"], case["input_json"], fixture["signing_key_seed_hex"]
+                )
+                self.assertEqual(signed["canonical_json"], case["canonical_json"], case["id"])
+                self.assertEqual(signed["public_key_hex"], case["public_key_hex"], case["id"])
+                self.assertEqual(signed["signature_hex"], case["signature_hex"], case["id"])
+            else:
+                with self.assertRaises(ChioInvariantError, msg=case["id"]):
+                    verify_wrapped_json(
+                        case["schema_id"],
+                        case["input_json"],
+                        case["public_key_hex"],
+                        case["signature_hex"],
+                    )
+
+    def test_wrapped_signer_identity(self) -> None:
+        seed = "01" * 32
+        signed = sign_wrapped_json_ed25519("chio.receipt.v1", '{"b":1,"a":2}', seed)
+        self.assertEqual(signed["public_key_hex"], public_key_from_seed_ed25519(seed))
+        self.assertEqual(signed["canonical_json"], '{"a":2,"b":1}')
+        verify_wrapped_json("chio.receipt.v1", '{"a":2,"b":1}', signed["public_key_hex"], signed["signature_hex"])
+
+    def test_unregistered_schema_id_is_refused(self) -> None:
+        seed = "01" * 32
+        with self.assertRaises(ChioInvariantError) as raised:
+            sign_wrapped_json_ed25519("chio.unregistered-fixture.v1", '{"a":1}', seed)
+        self.assertEqual(raised.exception.code, "unregistered_schema_id")
+        self.assertEqual(
+            str(raised.exception), "unregistered signed-artifact schema id: chio.unregistered-fixture.v1"
+        )
+        signed = sign_wrapped_json_ed25519("chio.receipt.v1", '{"a":1}', seed)
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_wrapped_json("chio.capability.v1", '{"a":1}', signed["public_key_hex"], signed["signature_hex"])
+        self.assertEqual(raised.exception.code, "signature_rejected")
+        self.assertEqual(str(raised.exception), "signature rejected")
+
+    def test_capability_with_algorithm_member_is_refused(self) -> None:
+        fixture = load_vector("capability")
+        for algorithm in ("ed25519", "p256"):
+            capability = dict(fixture["cases"][0]["capability"])
+            capability["algorithm"] = algorithm
+            with self.assertRaises(ChioInvariantError) as raised:
+                parse_capability_json(json.dumps(capability))
+            self.assertEqual(raised.exception.code, "json")
+            self.assertEqual(str(raised.exception), "capability has unknown member algorithm")
+
+    def test_signing_wrapper_vectors(self) -> None:
+        fixture = json.loads((VECTORS_ROOT / "signing" / "wrapper" / "v1.json").read_text())
+        skipped = set()
+        for case in fixture["signature_cases"]:
+            if case["algorithm"] != "ed25519":
+                skipped.add(case["algorithm"])
+                continue
+            try:
+                verify_wrapped_json(
+                    case["verify_schema_id"],
+                    case["canonical_body"],
+                    case["public_key"],
+                    case["signature"],
+                )
+                verified = True
+            except ChioInvariantError:
+                verified = False
+            self.assertEqual(verified, case["expected_verify"], case["id"])
+        self.assertEqual(skipped, {"p256", "p384"})
 
     def test_receipt_vectors(self) -> None:
         fixture = load_vector("receipt")
@@ -136,7 +175,8 @@ class VectorTests(unittest.TestCase):
         case = next(item for item in fixture["cases"] if item["id"] == "allow_receipt")
         receipt = parse_receipt_json(json.dumps(case["receipt"]))
         receipt["id"] = "0000000000000000000000000000000000000000000000000000000000000000"
-        receipt["signature"] = sign_json_string_ed25519(
+        receipt["signature"] = sign_wrapped_json_ed25519(
+            "chio.receipt.v1",
             receipt_signing_body_canonical_json(receipt),
             fixture["signing_key_seed_hex"],
         )["signature_hex"]

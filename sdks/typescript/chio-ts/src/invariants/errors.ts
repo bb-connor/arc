@@ -4,6 +4,10 @@ export type ChioInvariantErrorCode =
   | "invalid_hex"
   | "invalid_public_key"
   | "invalid_signature"
+  | "unregistered_schema_id"
+  | "signature_algorithm_mismatch"
+  | "unsupported_algorithm"
+  | "signature_rejected"
   | "disclosure";
 
 export class ChioInvariantError extends Error {

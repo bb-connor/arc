@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-round-finalization-body.schema.json",
+  "title": "chio.clearing.round-finalization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "clearingAuthorityId",
+    "clearingAuthorityKeyEpoch",
+    "finalizedAtUnixMs",
+    "governanceScopeId",
+    "outputManifestDigest",
+    "participantAcceptanceCount",
+    "participantAcceptanceRoot",
+    "roundCoreDigest",
+    "roundId",
+    "schema",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion"
+  ],
+  "properties": {
+    "clearingAuthorityId": {
+      "type": "string"
+    },
+    "clearingAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "finalizedAtUnixMs": {
+      "type": "integer"
+    },
+    "governanceScopeId": {
+      "type": "string"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "participantAcceptanceCount": {
+      "type": "integer"
+    },
+    "participantAcceptanceRoot": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.round-finalization.v1"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    }
+  }
+}

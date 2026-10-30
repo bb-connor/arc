@@ -1,0 +1,34 @@
+{
+  "decisions": [],
+  "filters": {
+    "decisionLimit": 50,
+    "receiptLimit": 100
+  },
+  "generatedAt": 200,
+  "positions": [],
+  "receipts": [],
+  "schema": "chio.credit.exposure-ledger.v1",
+  "summary": {
+    "actionableReceipts": 0,
+    "activeDecisions": 0,
+    "currencies": [],
+    "failedSettlementReceipts": 0,
+    "matchingDecisions": 0,
+    "matchingReceipts": 1,
+    "mixedCurrencyBook": false,
+    "pendingSettlementReceipts": 0,
+    "returnedDecisions": 0,
+    "returnedReceipts": 1,
+    "supersededDecisions": 0,
+    "truncatedDecisions": false,
+    "truncatedReceipts": false
+  },
+  "supportBoundary": {
+    "claimAdjudicationSupported": false,
+    "crossCurrencyNettingSupported": false,
+    "governedReceiptsAuthoritative": true,
+    "recoveryLifecycleSupported": false,
+    "settlementReconciliationAuthoritative": true,
+    "underwritingDecisionsAuthoritative": true
+  }
+}

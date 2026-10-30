@@ -151,7 +151,10 @@ impl SigningBackend for FaultyBackend {
         }
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature, chio_core::Error> {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> Result<Signature, chio_core::Error> {
         self.inner.sign_bytes(message)
     }
 }

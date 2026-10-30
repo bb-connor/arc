@@ -507,9 +507,11 @@ impl ProvisionedCagePolicyFactory {
             ));
         }
         let body = self.policy(head)?;
-        let (signature, _) = signer.sign_canonical(&body).map_err(|error| {
-            CliError::cli_other_error(format!("failed to sign cage policy: {error}"))
-        })?;
+        let signature = chio_core::canonical::CanonicalBytes::from_serializable(&body)
+            .and_then(|canonical| signer.sign_wrapped(MCP_CAGE_LAUNCH_POLICY_SCHEMA, &canonical))
+            .map_err(|error| {
+                CliError::cli_other_error(format!("failed to sign cage policy: {error}"))
+            })?;
         chio_core::canonical_json_bytes(&SignedMcpCageLaunchPolicy {
             body,
             signer_public_key: signer.public_key(),
@@ -835,13 +837,13 @@ fn decode_cage_policy(
         )));
     }
     if &policy.signer_public_key != trusted_policy_signer
-        || !trusted_policy_signer
-            .verify_canonical_strict(&policy.body, &policy.signature)
-            .map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "cage launch policy signature verification failed: {error}"
-                ))
-            })?
+        || chio_core::crypto::verify_wrapped(
+            trusted_policy_signer,
+            MCP_CAGE_LAUNCH_POLICY_SCHEMA,
+            &policy.body,
+            &policy.signature,
+        )
+        .is_err()
     {
         return Err(CliError::cli_other_error(
             "cage launch policy is not signed by the configured trust root".to_string(),

@@ -231,6 +231,7 @@ fn service_config(
         cluster_sync_interval: Duration::from_millis(25),
         authority_replication_max_future_skew_seconds: 0,
         roster_policy: None,
+        capital_authority: None,
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         finding_market: None,
     }

@@ -1,0 +1,49 @@
+{
+  "audience": "broker-service",
+  "brokerQuotaKeyId": "broker-quota",
+  "capabilityId": "broker-capability",
+  "constraints": {
+    "allowedCallerHeaders": [
+      "content-type"
+    ],
+    "maximumBodyBytes": 1024,
+    "maximumResponseBytes": 1024,
+    "maximumTimeoutMs": 500,
+    "providerOwnedHeaders": [
+      "authorization"
+    ],
+    "redirectPolicy": "disabled",
+    "requiredBodySha256": "239f59ed55e737c77147cf55ad0c1b030b6d7ee748a7426952f9b852d5a935e5",
+    "requiredPreviewSha256": null,
+    "streamingAllowed": false
+  },
+  "consumption": "capture_before_dispatch",
+  "credential": {
+    "credentialId": "credential-a",
+    "provider": "generic-https",
+    "version": 1
+  },
+  "destination": {
+    "exactPathAndQuery": "/v1?x=1",
+    "explicitPort": 443,
+    "method": "POST",
+    "normalizedHost": "example.com",
+    "scheme": "https"
+  },
+  "expiresAtUnixSeconds": 100,
+  "issuedAtUnixSeconds": 10,
+  "issuer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "maximumExecutions": 2,
+  "notBeforeUnixSeconds": 10,
+  "parentCapabilityId": "parent-capability",
+  "proof": {
+    "callerPublicKey": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+    "mode": "public_key",
+    "nonceTtlSeconds": 30
+  },
+  "providerAdapterId": "generic-bearer",
+  "providerAdapterVersion": 1,
+  "revocationId": "broker-revocation",
+  "schema": "chio.broker-capability.v1",
+  "subject": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+}

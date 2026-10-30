@@ -1,0 +1,200 @@
+{
+  "authorization_consumption": null,
+  "context": {
+    "coordinator_lease_epoch": 7,
+    "coordinator_lease_id": "coordinator-lease-1",
+    "expected_operation_version": 7,
+    "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+    "request_id": "req-participants",
+    "store_fence": {
+      "lease_id": "owner-lease-1",
+      "owner_epoch": 3,
+      "store_uuid": "store-1"
+    },
+    "trusted_time_unix_ms": 1000
+  },
+  "manifest_json": "eyJwcm9qZWN0aW9uX2JvZHlfZGlnZXN0IjoiZmZiYmNkYzI2NDcwOTgxNGE1MjFlMTA0ODliMjExZWNiZjJhN2FiYWJiOTY2NjVmMjE2ZGVmNjY4ZGI3ZTEzMyIsInJlY29yZHMiOlt7ImtpbmQiOiJpbmNpZGVudCIsInJlY29yZF9kaWdlc3QiOiI3M2VkOTg5YjEzOGJkYmNmOWQzYjZlZjQ0MzI5MTNjMTcwMjM5NTFjZjlkMDFlMmY2ZTgzN2Y1YzZkOTlmNTRiIiwicmVjb3JkX2lkIjoicmV0YWluZWQtdW5rbm93biJ9LHsia2luZCI6InJlY2VpcHQiLCJyZWNvcmRfZGlnZXN0IjoiMzFmNDRiMDIxNTA3NmM3ZWQ4MTQwNzZkZDE5OTdkZTcyOTM1NTMzYzRmOTBkOTA2ZmMzNGYwNmI4MjdkNjBmOCIsInJlY29yZF9pZCI6IjE1NTBkN2I4MTM1MDllNDUzYzRkY2U2ODYzZTljYzU0MDBhNzU3NWFiN2VjZDgwMWIwY2MyNGQwMzM4ODY0ODUifV0sInNjaGVtYSI6ImNoaW8uYWRtaXNzaW9uLXByb2plY3Rpb24tbWFuaWZlc3QudjEifQ==",
+  "observer": null,
+  "projection_json": "eyJjb250ZXh0Ijp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjo3LCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImNvb3JkaW5hdG9yLWxlYXNlLTEiLCJleHBlY3RlZF9vcGVyYXRpb25fdmVyc2lvbiI6Nywib3BlcmF0aW9uX2lkIjoiNGRmNWMyMDkzZDI0NDZlY2E3ZGJmMmM4NTY1NjZkNDNmNjk2YzgzMTUyMzBmMTMzYmVmOTk3ZDZjNDAyMjdlZCIsInJlcXVlc3RfaWQiOiJyZXEtcGFydGljaXBhbnRzIiwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJvd25lci1sZWFzZS0xIiwib3duZXJfZXBvY2giOjMsInN0b3JlX3V1aWQiOiJzdG9yZS0xIn0sInRydXN0ZWRfdGltZV91bml4X21zIjoxMDAwfSwiaW5jaWRlbnQiOnsiYmluZGluZyI6eyJjb29yZGluYXRvcl9sZWFzZV9lcG9jaCI6NywiY29vcmRpbmF0b3JfbGVhc2VfaWQiOiJjb29yZGluYXRvci1sZWFzZS0xIiwib3BlcmF0aW9uX2lkIjoiNGRmNWMyMDkzZDI0NDZlY2E3ZGJmMmM4NTY1NjZkNDNmNjk2YzgzMTUyMzBmMTMzYmVmOTk3ZDZjNDAyMjdlZCIsInByb2plY3RlZF9vcGVyYXRpb25fdmVyc2lvbiI6OCwicHJvamVjdGVkX3N0YXRlIjoib3V0Y29tZV91bmtub3duX2FmdGVyX2Rpc3BhdGNoIiwicmVxdWVzdF9iaW5kaW5nX2hhc2giOiI3NmFhYjM2MGYzZjk0NTQwM2RiNDczMGMwN2JjYmE3OTEwNDhiNjU3MTUxZjg5NThkMzE0OWUxNmY3NWM0ODhjIiwicmVxdWVzdF9pZCI6InJlcS1wYXJ0aWNpcGFudHMiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOnsiY29tbWl0dGVkX3ZlcnNpb24iOjYsImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjo3LCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImNvb3JkaW5hdG9yLWxlYXNlLTEiLCJkaXNwYXRjaF9sYXVuY2giOnsibmF0aXZlX2xhdW5jaCI6bnVsbCwid29ya2VyX3Byb2ZpbGUiOm51bGx9LCJwcm92aWRlcl9hdHRlbXB0Ijp7ImF0dGVtcHRfaWQiOiJhdHRlbXB0LTEiLCJvcGVyYXRpb25faWQiOiI0ZGY1YzIwOTNkMjQ0NmVjYTdkYmYyYzg1NjU2NmQ0M2Y2OTZjODMxNTIzMGYxMzNiZWY5OTdkNmM0MDIyN2VkIiwidHJhbnNwb3J0X2lkIjoidHJhbnNwb3J0LTEiLCJ0cmFuc3BvcnRfa2V5X2Vwb2NoIjoxfSwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJvd25lci1sZWFzZS0xIiwib3duZXJfZXBvY2giOjMsInN0b3JlX3V1aWQiOiJzdG9yZS0xIn19LCJzb3VyY2Vfb3BlcmF0aW9uX3ZlcnNpb24iOjcsInN0b3JlX2ZlbmNlIjp7ImxlYXNlX2lkIjoib3duZXItbGVhc2UtMSIsIm93bmVyX2Vwb2NoIjozLCJzdG9yZV91dWlkIjoic3RvcmUtMSJ9LCJ0cnVzdGVkX3RpbWVfdW5peF9tcyI6MTAwMH0sInJlY29yZF9kaWdlc3QiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIiwicmVjb3JkX2lkIjoicmV0YWluZWQtdW5rbm93biJ9LCJ0ZXJtaW5hbCI6Im91dGNvbWVfdW5rbm93bl9hZnRlcl9kaXNwYXRjaCJ9",
+  "records": [
+    {
+      "canonical_json": "eyJiaW5kaW5nIjp7ImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjo3LCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImNvb3JkaW5hdG9yLWxlYXNlLTEiLCJvcGVyYXRpb25faWQiOiI0ZGY1YzIwOTNkMjQ0NmVjYTdkYmYyYzg1NjU2NmQ0M2Y2OTZjODMxNTIzMGYxMzNiZWY5OTdkNmM0MDIyN2VkIiwicHJvamVjdGVkX29wZXJhdGlvbl92ZXJzaW9uIjo4LCJwcm9qZWN0ZWRfc3RhdGUiOiJvdXRjb21lX3Vua25vd25fYWZ0ZXJfZGlzcGF0Y2giLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6Ijc2YWFiMzYwZjNmOTQ1NDAzZGI0NzMwYzA3YmNiYTc5MTA0OGI2NTcxNTFmODk1OGQzMTQ5ZTE2Zjc1YzQ4OGMiLCJyZXF1ZXN0X2lkIjoicmVxLXBhcnRpY2lwYW50cyIsInJldGFpbmVkX2Rpc3BhdGNoX2NvbW1pdCI6eyJjb21taXR0ZWRfdmVyc2lvbiI6NiwiY29vcmRpbmF0b3JfbGVhc2VfZXBvY2giOjcsImNvb3JkaW5hdG9yX2xlYXNlX2lkIjoiY29vcmRpbmF0b3ItbGVhc2UtMSIsImRpc3BhdGNoX2xhdW5jaCI6eyJuYXRpdmVfbGF1bmNoIjpudWxsLCJ3b3JrZXJfcHJvZmlsZSI6bnVsbH0sInByb3ZpZGVyX2F0dGVtcHQiOnsiYXR0ZW1wdF9pZCI6ImF0dGVtcHQtMSIsIm9wZXJhdGlvbl9pZCI6IjRkZjVjMjA5M2QyNDQ2ZWNhN2RiZjJjODU2NTY2ZDQzZjY5NmM4MzE1MjMwZjEzM2JlZjk5N2Q2YzQwMjI3ZWQiLCJ0cmFuc3BvcnRfaWQiOiJ0cmFuc3BvcnQtMSIsInRyYW5zcG9ydF9rZXlfZXBvY2giOjF9LCJzdG9yZV9mZW5jZSI6eyJsZWFzZV9pZCI6Im93bmVyLWxlYXNlLTEiLCJvd25lcl9lcG9jaCI6Mywic3RvcmVfdXVpZCI6InN0b3JlLTEifX0sInNvdXJjZV9vcGVyYXRpb25fdmVyc2lvbiI6Nywic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJvd25lci1sZWFzZS0xIiwib3duZXJfZXBvY2giOjMsInN0b3JlX3V1aWQiOiJzdG9yZS0xIn0sInRydXN0ZWRfdGltZV91bml4X21zIjoxMDAwfSwicmVjb3JkX2RpZ2VzdCI6ImNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2MiLCJyZWNvcmRfaWQiOiJyZXRhaW5lZC11bmtub3duIn0=",
+      "kind": "incident",
+      "record_digest": "73ed989b138bdbcf9d3b6ef4432913c17023951cf9d01e2f6e837f5c6d99f54b",
+      "record_id": "retained-unknown"
+    },
+    {
+      "canonical_json": "eyJhY3Rpb24iOnsicGFyYW1ldGVyX2hhc2giOiI0NDEzNmZhMzU1YjM2NzhhMTE0NmFkMTZmN2U4NjQ5ZTk0ZmI0ZmMyMWZlNzdlODMxMGMwNjBmNjFjYWFmZjhhIiwicGFyYW1ldGVycyI6e319LCJib3VuZGFyeV9jbGFzcyI6InByZXZlbnQiLCJjYXBhYmlsaXR5X2lkIjoiY2FwLXBhcnRpY2lwYW50cyIsImNvbnRlbnRfaGFzaCI6Ijc0MjM0ZTk4YWZlNzQ5OGZiNWRhZjFmMzZhYzJkNzhhY2MzMzk0NjRmOTUwNzAzYjhjMDE5ODkyZjk4MmI5MGIiLCJkZWNpc2lvbiI6eyJndWFyZCI6Imtlcm5lbCIsInJlYXNvbiI6Im9wZXJhdGlvbiByZWZ1c2VkIiwidmVyZGljdCI6ImRlbnkifSwiaWQiOiIxNTUwZDdiODEzNTA5ZTQ1M2M0ZGNlNjg2M2U5Y2M1NDAwYTc1NzVhYjdlY2Q4MDFiMGNjMjRkMDMzODg2NDg1Iiwia2VybmVsX2tleSI6ImFjMjRlOWRkZWFmN2Y5MzM4MmFiNGJlYTUzNGJlYWZkNDU2N2Y2ZDk2OWVkOWE4YjBjOGQwYWFmNmE5OTczYTciLCJtZXRhZGF0YSI6eyJhZG1pc3Npb25fb3BlcmF0aW9uIjp7ImNvbXBlbnNhdGlvbl9zdGF0dXMiOiJub3RfY29tcGVuc2F0ZWQiLCJjb29yZGluYXRvcl9sZWFzZV9lcG9jaCI6NywiY29vcmRpbmF0b3JfbGVhc2VfaWQiOiJjb29yZGluYXRvci1sZWFzZS0xIiwib3BlcmF0aW9uX2lkIjoiNGRmNWMyMDkzZDI0NDZlY2E3ZGJmMmM4NTY1NjZkNDNmNjk2YzgzMTUyMzBmMTMzYmVmOTk3ZDZjNDAyMjdlZCIsInByb2plY3RlZF9kaXNwYXRjaF9zdGF0ZSI6InRlcm1pbmFsIiwicHJvamVjdGVkX29wZXJhdGlvbl92ZXJzaW9uIjo4LCJwcm9qZWN0ZWRfc3RhdGUiOiJvdXRjb21lX3Vua25vd25fYWZ0ZXJfZGlzcGF0Y2giLCJyZXF1ZXN0X2JpbmRpbmdfaGFzaCI6Ijc2YWFiMzYwZjNmOTQ1NDAzZGI0NzMwYzA3YmNiYTc5MTA0OGI2NTcxNTFmODk1OGQzMTQ5ZTE2Zjc1YzQ4OGMiLCJyZXF1ZXN0X2lkIjoicmVxLXBhcnRpY2lwYW50cyIsInJlcXVlc3RfbmFtZXNwYWNlX2RpZ2VzdCI6IjA5NGYzOGNmMGZmZjQ3NzczYzYwYzMwYjE2MTliNWQxZDM2MDViYmI3ZTc5ZDFlZWI4ZGEyNTRhZmFkYTIxNzYiLCJyZXRhaW5lZF9kaXNwYXRjaF9jb21taXQiOnsiY29tbWl0dGVkX3ZlcnNpb24iOjYsImNvb3JkaW5hdG9yX2xlYXNlX2Vwb2NoIjo3LCJjb29yZGluYXRvcl9sZWFzZV9pZCI6ImNvb3JkaW5hdG9yLWxlYXNlLTEiLCJkaXNwYXRjaF9sYXVuY2giOnsibmF0aXZlX2xhdW5jaCI6bnVsbCwid29ya2VyX3Byb2ZpbGUiOm51bGx9LCJwcm92aWRlcl9hdHRlbXB0Ijp7ImF0dGVtcHRfaWQiOiJhdHRlbXB0LTEiLCJvcGVyYXRpb25faWQiOiI0ZGY1YzIwOTNkMjQ0NmVjYTdkYmYyYzg1NjU2NmQ0M2Y2OTZjODMxNTIzMGYxMzNiZWY5OTdkNmM0MDIyN2VkIiwidHJhbnNwb3J0X2lkIjoidHJhbnNwb3J0LTEiLCJ0cmFuc3BvcnRfa2V5X2Vwb2NoIjoxfSwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJvd25lci1sZWFzZS0xIiwib3duZXJfZXBvY2giOjMsInN0b3JlX3V1aWQiOiJzdG9yZS0xIn19LCJzY2hlbWEiOiJjaGlvLmFkbWlzc2lvbi1yZWNlaXB0LnYxIiwic3RvcmVfZmVuY2UiOnsibGVhc2VfaWQiOiJvd25lci1sZWFzZS0xIiwib3duZXJfZXBvY2giOjMsInN0b3JlX3V1aWQiOiJzdG9yZS0xIn0sInRvb2xfb3V0Y29tZV9pZCI6bnVsbCwidG9vbF9vdXRjb21lX3ZlcnNpb24iOm51bGwsInRydXN0ZWRfdGltZV91bml4X21zIjoxMDAwfSwiY2hpb19yZWNlaXB0X3NpZ25pbmdfbm9uY2UiOiIwYzBkMDdkYzAxMjczOTA3NWIxNGEwMWE0MzI4ZmMwZTg1Y2Q2YTllNmEwYjgzM2VmM2E1YjgxNTBiMDAyM2Y2In0sInBvbGljeV9oYXNoIjoiY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjYyIsInJlY2VpcHRfa2luZCI6Im1lZGlhdGVkX2RlY2lzaW9uIiwicmVkYWN0aW9uX21vZGUiOiJub25lIiwic2lnbmF0dXJlIjoiMmVkNTg1MGIyNzQ1YmExMzE5MWRlZjNkNDk1YTkyNWJmY2YyYmJiZjgwOGU1ZjYwN2JkZjAzNWM5NzAzYTczMDAzMmY5NmU4MzZiNmYzNGE1NzI1ODdkMzBhYTk2ZDc0NDg1OWNkYjFlYTdkN2ZiZGE2N2E4NTY3MzNhNjQwMDEiLCJ0ZW5hbnRfaWQiOiJ0ZW5hbnQtMTIzIiwidGltZXN0YW1wIjoxLCJ0b29sX25hbWUiOiJ0ZXN0LXRvb2wiLCJ0b29sX29yaWdpbiI6ImNhbGxlcl9leGVjdXRlZCIsInRvb2xfc2VydmVyIjoidGVzdC1zZXJ2ZXIiLCJ0cnVzdF9sZXZlbCI6Im1lZGlhdGVkIn0=",
+      "kind": "receipt",
+      "record_digest": "31f44b0215076c7ed814076dd1997de72935533c4f90d906fc34f06b827d60f8",
+      "record_id": "1550d7b813509e453c4dce6863e9cc5400a7575ab7ecd801b0cc24d033886485"
+    }
+  ],
+  "schema": "chio.signed-admission-terminal-projection.v1",
+  "signer_key": "ac24e9ddeaf7f93382ab4bea534beafd4567f6d969ed9a8b0c8d0aaf6a9973a7",
+  "source_operation": {
+    "attachments": [
+      {
+        "BrokerAttempt": {
+          "attempt_id": "attempt-1",
+          "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+          "transport_id": "transport-1",
+          "transport_key_epoch": 1
+        }
+      },
+      {
+        "BudgetHoldId": "hold-1"
+      },
+      {
+        "ToolOutcomeId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "ChannelReservationProposalDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "ChannelReservationDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "binding": {
+      "authenticated_tenant_id": "tenant-123",
+      "authorization_capability_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capability_id": "cap-participants",
+      "coordinator_authority_id": "https://coordinator.example",
+      "effect_class": "monetary",
+      "kind": "tool_dispatch",
+      "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+      "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "request_binding": {
+        "action_parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "immutable_request_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "participant_requirements": {
+          "approval": false,
+          "authorization_consumption": false,
+          "broker_attempt": true,
+          "budget_capture": true,
+          "channel": true,
+          "execution_nonce": false,
+          "obligation": true,
+          "observation_attempt_zero": false,
+          "outcome_eligibility": false,
+          "payment": false
+        },
+        "request_binding_hash": "76aab360f3f945403db4730c07bcba791048b657151f8958d3149e16f75c488c"
+      },
+      "request_id": "req-participants",
+      "request_namespace_digest": "094f38cf0fff47773c60c30b1619b5d1d3605bbb7e79d1eeb8da254afada2176"
+    },
+    "coordinator_lease_epoch": 7,
+    "dispatch_commit": {
+      "committed_version": 6,
+      "coordinator_lease_epoch": 7,
+      "coordinator_lease_id": "coordinator-lease-1",
+      "dispatch_launch": {
+        "native_launch": null,
+        "worker_profile": null
+      },
+      "provider_attempt": {
+        "attempt_id": "attempt-1",
+        "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+        "transport_id": "transport-1",
+        "transport_key_epoch": 1
+      },
+      "store_fence": {
+        "lease_id": "owner-lease-1",
+        "owner_epoch": 3,
+        "store_uuid": "store-1"
+      }
+    },
+    "dispatch_state": "finalizing",
+    "last_error": null,
+    "schema": "chio.admission-operation.v1",
+    "state": "finalizing",
+    "terminal_replay": null,
+    "version": 7
+  },
+  "terminal_operation": {
+    "attachments": [
+      {
+        "BrokerAttempt": {
+          "attempt_id": "attempt-1",
+          "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+          "transport_id": "transport-1",
+          "transport_key_epoch": 1
+        }
+      },
+      {
+        "BudgetHoldId": "hold-1"
+      },
+      {
+        "ToolOutcomeId": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "ChannelReservationProposalDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "ChannelReservationDigest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "binding": {
+      "authenticated_tenant_id": "tenant-123",
+      "authorization_capability_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "capability_id": "cap-participants",
+      "coordinator_authority_id": "https://coordinator.example",
+      "effect_class": "monetary",
+      "kind": "tool_dispatch",
+      "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+      "policy_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "request_binding": {
+        "action_parameter_hash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "immutable_request_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "participant_requirements": {
+          "approval": false,
+          "authorization_consumption": false,
+          "broker_attempt": true,
+          "budget_capture": true,
+          "channel": true,
+          "execution_nonce": false,
+          "obligation": true,
+          "observation_attempt_zero": false,
+          "outcome_eligibility": false,
+          "payment": false
+        },
+        "request_binding_hash": "76aab360f3f945403db4730c07bcba791048b657151f8958d3149e16f75c488c"
+      },
+      "request_id": "req-participants",
+      "request_namespace_digest": "094f38cf0fff47773c60c30b1619b5d1d3605bbb7e79d1eeb8da254afada2176"
+    },
+    "coordinator_lease_epoch": 7,
+    "dispatch_commit": {
+      "committed_version": 6,
+      "coordinator_lease_epoch": 7,
+      "coordinator_lease_id": "coordinator-lease-1",
+      "dispatch_launch": {
+        "native_launch": null,
+        "worker_profile": null
+      },
+      "provider_attempt": {
+        "attempt_id": "attempt-1",
+        "operation_id": "4df5c2093d2446eca7dbf2c856566d43f696c8315230f133bef997d6c40227ed",
+        "transport_id": "transport-1",
+        "transport_key_epoch": 1
+      },
+      "store_fence": {
+        "lease_id": "owner-lease-1",
+        "owner_epoch": 3,
+        "store_uuid": "store-1"
+      }
+    },
+    "dispatch_state": "terminal",
+    "last_error": null,
+    "schema": "chio.admission-operation.v1",
+    "state": "outcome_unknown_after_dispatch",
+    "terminal_replay": {
+      "receipt": {
+        "projection_digest": "e10e3739c0e3d64d4a661eda32d52fbdd8420ffbaeaa36bf562dcbf970a39954",
+        "receipt_id": "1550d7b813509e453c4dce6863e9cc5400a7575ab7ecd801b0cc24d033886485"
+      }
+    },
+    "version": 8
+  }
+}

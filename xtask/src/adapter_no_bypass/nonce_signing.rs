@@ -72,17 +72,17 @@ const CONSTRUCTOR_SITES: &[ConstructorSite] = &[
     ConstructorSite {
         path: EXECUTION_NONCE_SOURCE,
         function: "mint_execution_nonce_with_reservation",
-        backend_signer: "sign_canonical_with_backend",
+        backend_signer: "sign_wrapped",
     },
     ConstructorSite {
         path: "crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs",
         function: "AdmissionExecutionNonceReservationV1::mint_for_operation",
-        backend_signer: "sign_bytes_with_identity",
+        backend_signer: "sign_wrapped",
     },
     ConstructorSite {
         path: VERIFIED_FIX_SOURCE,
         function: "signed_nonce",
-        backend_signer: "sign_canonical_with_backend_for_identity",
+        backend_signer: "sign_wrapped_for_identity",
     },
 ];
 
@@ -271,7 +271,7 @@ mod tests {
                     mint_execution_nonce_with_reservation(backend, binding, None, None, config, now)
                 }
                 fn mint_execution_nonce_with_reservation(backend: &dyn SigningBackend) {
-                    let (signature, _) = chio_core::crypto::sign_canonical_with_backend(backend, &nonce)?;
+                    let signature = backend.sign_wrapped(EXECUTION_NONCE_SCHEMA, &canonical)?.signature;
                     Ok(SignedExecutionNonce { nonce, signature })
                 }"
                 .to_owned(),
@@ -300,7 +300,7 @@ mod tests {
                 CONSTRUCTOR_SITES[1].path,
                 "impl AdmissionExecutionNonceReservationV1 {
                     fn mint_for_operation(issuer: &dyn SigningBackend) {
-                        let outcome = issuer.sign_bytes_with_identity(&bytes)?;
+                        let outcome = issuer.sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)?;
                         let signed = SignedExecutionNonce { nonce, signature: outcome.signature };
                     }
                 }"
@@ -309,7 +309,7 @@ mod tests {
             (
                 VERIFIED_FIX_SOURCE,
                 "fn signed_nonce(receipt: &ChioReceipt, kernel: &dyn SigningBackend) {
-                    let (outcome, _) = sign_canonical_with_backend_for_identity(kernel, &receipt.kernel_key, &nonce)?;
+                    let (outcome, _) = sign_wrapped_for_identity(kernel, &receipt.kernel_key, CHIO_EXECUTION_NONCE_SCHEMA, &nonce)?;
                     Ok(SignedExecutionNonce { signature: outcome.signature, nonce })
                 }"
                 .to_owned(),

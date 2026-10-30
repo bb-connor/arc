@@ -11,7 +11,7 @@ fn caller_lifecycle_under(floor: KernelCryptoFloor) -> TestResult {
     let runtime = fixture.open()?;
     let key = runtime.kernel.receipt_signing_public_key()?;
     let execution = reserve(&fixture, &runtime, "hybrid-caller-restart")?;
-    assert!(execution.capability.verify_signature()?);
+    assert!(execution.capability.verify_integrity_embedded_key()?);
     assert_eq!(execution.capability.issuer, key);
     drop(runtime);
     let runtime = fixture.open()?;

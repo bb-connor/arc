@@ -5,28 +5,33 @@ use super::*;
 use crate::execution_nonce::{
     validate_execution_nonce_binding_and_expiry, ExecutionNonce, ExecutionNonceConfig,
 };
-use chio_core::crypto::SigningBackend;
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped_bytes, SigningBackend};
 
 /// Nonce profile reserved for the operation-owned admission authority.
 pub const OPERATION_EXECUTION_NONCE_SCHEMA: &str = "chio.operation_execution_nonce.v1";
 
 #[derive(Serialize)]
 struct SigningContext<'a> {
-    schema: &'static str,
     operation_id: &'a crate::admission_operation::AdmissionOperationId,
     nonce: &'a ExecutionNonce,
 }
 
-fn signing_bytes(
+/// Canonical signing body; the wrapper binds it to
+/// `chio.operation_execution_nonce.v1`.
+fn signing_body(
     operation_id: &crate::admission_operation::AdmissionOperationId,
     nonce: &ExecutionNonce,
-) -> Result<Vec<u8>, AdmissionOperationStoreError> {
-    canonical_json_bytes(&SigningContext {
-        schema: "chio.admission-execution-nonce-signature.v1",
+) -> Result<CanonicalBytes, AdmissionOperationStoreError> {
+    let body = CanonicalBytes::from_serializable(&SigningContext {
         operation_id,
         nonce,
     })
-    .map_err(invalid)
+    .map_err(invalid)?;
+    if body.len() > MAX_NONCE_BYTES {
+        return Err(invalid("operation nonce exceeds its signing bound"));
+    }
+    Ok(body)
 }
 
 impl AdmissionExecutionNonceReservationV1 {
@@ -69,11 +74,10 @@ impl AdmissionExecutionNonceReservationV1 {
             reserved_hold_id: None,
             reserving_request_id: None,
         };
-        let bytes = signing_bytes(operation.binding().operation_id(), &nonce)?;
-        if bytes.len() > MAX_NONCE_BYTES {
-            return Err(invalid("operation nonce exceeds its signing bound"));
-        }
-        let outcome = issuer.sign_bytes_with_identity(&bytes).map_err(invalid)?;
+        let body = signing_body(operation.binding().operation_id(), &nonce)?;
+        let outcome = issuer
+            .sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)
+            .map_err(invalid)?;
         let signed = SignedExecutionNonce {
             nonce,
             signature: outcome.signature,
@@ -127,11 +131,15 @@ pub fn verify_operation_execution_nonce_at(
         return Err(invalid("operation nonce issuance interval is invalid"));
     }
     validate_execution_nonce_binding_and_expiry(presented, binding, now).map_err(invalid)?;
-    let bytes = signing_bytes(operation_id, &presented.nonce)?;
-    if bytes.len() > MAX_NONCE_BYTES {
-        return Err(invalid("operation nonce exceeds its signing bound"));
-    }
-    if !issuer.verify(&bytes, &presented.signature) {
+    let body = signing_body(operation_id, &presented.nonce)?;
+    if verify_wrapped_bytes(
+        issuer,
+        OPERATION_EXECUTION_NONCE_SCHEMA,
+        &body,
+        &presented.signature,
+    )
+    .is_err()
+    {
         return Err(invalid(
             "operation-bound execution nonce signature is invalid",
         ));
@@ -167,35 +175,29 @@ mod tests {
             reserved_hold_id: None,
             reserving_request_id: None,
         };
-        let signature = key.sign(&signing_bytes(&operation, &nonce)?);
+        let signature = key.sign_wrapped(
+            OPERATION_EXECUTION_NONCE_SCHEMA,
+            &signing_body(&operation, &nonce)?,
+        )?;
         let signed = SignedExecutionNonce { nonce, signature };
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 100)?;
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 129)?;
-        for schema in [
-            "chio.execution_nonce.v2",
-            "chio.execution_nonce.v3",
-            "chio.operation_execution_nonce.v2",
-            "chio.operation_execution_nonce.v3",
-        ] {
-            let mut retired = signed.clone();
-            retired.nonce.schema = schema.into();
-            let bytes = signing_bytes(&operation, &retired.nonce)?;
-            retired.signature = key.sign(&bytes);
-            assert!(key.public_key().verify(&bytes, &retired.signature));
-            assert_eq!(
-                verify_operation_execution_nonce_at(
-                    &retired,
-                    &operation,
-                    &key.public_key(),
-                    &binding,
-                    100
-                ),
-                Err(AdmissionOperationStoreError::Invariant(
-                    "operation nonce issuance interval is invalid".into()
-                )),
-                "{schema}"
-            );
-        }
+        let mut unregistered = signed.clone();
+        unregistered.nonce.schema = "chio.operation_execution_nonce.v2".into();
+        let body = signing_body(&operation, &unregistered.nonce)?;
+        unregistered.signature = key.sign_wrapped(OPERATION_EXECUTION_NONCE_SCHEMA, &body)?;
+        assert_eq!(
+            verify_operation_execution_nonce_at(
+                &unregistered,
+                &operation,
+                &key.public_key(),
+                &binding,
+                100
+            ),
+            Err(AdmissionOperationStoreError::Invariant(
+                "operation nonce issuance interval is invalid".into()
+            ))
+        );
         for now in [99, 130, 131] {
             assert!(verify_operation_execution_nonce_at(
                 &signed,
@@ -224,6 +226,24 @@ mod tests {
             100
         )
         .is_err());
+        let body = signing_body(&operation, &signed.nonce)?;
+        for (label, signature) in crate::wrapper_refusals::refused_signatures_over(&key, &body) {
+            let mut refused = signed.clone();
+            refused.signature = signature;
+            assert_eq!(
+                verify_operation_execution_nonce_at(
+                    &refused,
+                    &operation,
+                    &key.public_key(),
+                    &binding,
+                    100
+                ),
+                Err(AdmissionOperationStoreError::Invariant(
+                    "operation-bound execution nonce signature is invalid".into()
+                )),
+                "{label}"
+            );
+        }
         let mut substituted = binding;
         substituted.request_id = "another-request".into();
         assert!(verify_operation_execution_nonce_at(

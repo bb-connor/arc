@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/runtime-verifier-trust-bundle-body.schema.json",
+  "title": "chio.runtime.verifier-trust-bundle.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "keyId",
+    "revocationAuthorityRoots",
+    "revocationCheckpointSha256",
+    "schema",
+    "trustBundleSha256",
+    "verificationContextSha256",
+    "verifierId",
+    "version"
+  ],
+  "properties": {
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "keyId": {
+      "type": "string"
+    },
+    "previousHashSha256": {
+      "type": "string"
+    },
+    "revocationAuthorityRoots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "revocationCheckpointSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.verifier-trust-bundle.v1"
+    },
+    "trustBundleSha256": {
+      "type": "string"
+    },
+    "verificationContextSha256": {
+      "type": "string"
+    },
+    "verifierId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

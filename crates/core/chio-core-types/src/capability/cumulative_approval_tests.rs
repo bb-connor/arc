@@ -600,7 +600,7 @@ fn cumulative_approval_backend_root_round_trip() -> TestResult {
     let wire = serde_json::to_vec(&root)?;
     let decoded: CapabilityToken = serde_json::from_slice(&wire)?;
 
-    assert!(decoded.verify_signature()?);
+    assert!(decoded.verify_integrity_embedded_key()?);
     assert_eq!(
         canonical_json_bytes(binding(&root)?)?,
         canonical_json_bytes(binding(&decoded)?)?
@@ -628,7 +628,7 @@ fn cumulative_approval_root_binds_signer_key_epoch() -> TestResult {
     )?;
 
     assert_eq!(binding(&root)?.body.signer_key_epoch, 7);
-    assert!(root.verify_signature()?);
+    assert!(root.verify_integrity_embedded_key()?);
     Ok(())
 }
 

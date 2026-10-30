@@ -49,6 +49,8 @@ pub enum BiddingError {
     InvalidRequest(String),
     #[error("bid request signature is not verifiable")]
     BidSignatureInvalid,
+    #[error("bid request is not signed by the agent subject the grant binds to")]
+    BidSignerNotAgentSubject,
     #[error("listing signature is not verifiable")]
     ListingSignatureInvalid,
     #[error("listing pricing hint signature is not verifiable")]
@@ -272,7 +274,7 @@ impl VerifiedReservationReceipt {
         if &receipt.signer_key != expected_reservation_authority {
             return Err(BiddingError::ReservationReceiptInvalid);
         }
-        match receipt.verify_signature() {
+        match receipt.verify_signature(expected_reservation_authority) {
             Ok(true) => {}
             _ => return Err(BiddingError::ReservationReceiptInvalid),
         }
@@ -329,18 +331,27 @@ pub fn bid(
     context: BidMintContext<'_>,
 ) -> Result<SignedAskResponse, BiddingError> {
     request.body.validate()?;
-    match request.verify_signature() {
+    if request.signer_key != context.agent_subject {
+        return Err(BiddingError::BidSignerNotAgentSubject);
+    }
+    match request.verify_signature(&context.agent_subject) {
         Ok(true) => {}
         _ => return Err(BiddingError::BidSignatureInvalid),
     }
     let listing = context.listing;
 
     // Fail-closed: verify the underlying artifacts haven't been tampered.
-    match listing.listing.verify_signature() {
+    match listing
+        .listing
+        .verify_signature(&listing.listing.signer_key)
+    {
         Ok(true) => {}
         _ => return Err(BiddingError::ListingSignatureInvalid),
     }
-    match listing.pricing.verify_signature() {
+    match listing
+        .pricing
+        .verify_signature(&listing.pricing.signer_key)
+    {
         Ok(true) => {}
         _ => return Err(BiddingError::PricingSignatureInvalid),
     }
@@ -469,14 +480,14 @@ pub fn accept(
         )));
     }
     validate_required_field(&reservation.receipt_id, "reservation.receipt_id")?;
-    match ask.verify_signature() {
+    match ask.verify_signature(&ask.signer_key) {
         Ok(true) => {}
         _ => return Err(BiddingError::PricingSignatureInvalid),
     }
     if ask.body.token_offer.issuer != ask.signer_key {
         return Err(BiddingError::AuthorityMismatch);
     }
-    match ask.body.token_offer.verify_signature() {
+    match ask.body.token_offer.verify_integrity_embedded_key() {
         Ok(true) => {}
         _ => return Err(BiddingError::TokenSignatureInvalid),
     }
@@ -521,7 +532,7 @@ pub fn accept(
     };
     let signed = SignedAcceptedBid::sign(accepted, acceptor_keypair)
         .map_err(|error| invalid_request(error.to_string()))?;
-    match signed.verify_signature() {
+    match signed.verify_signature(&signed.signer_key) {
         Ok(true) => Ok(signed),
         _ => Err(invalid_request(
             "signed accepted bid signature is not verifiable",
@@ -583,3 +594,19 @@ fn is_lowercase_sha256(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AcceptedBid {
+    const SCHEMA_ID: &'static str = ACCEPTED_BID_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for AskResponse {
+    const SCHEMA_ID: &'static str = ASK_RESPONSE_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for BidRequest {
+    const SCHEMA_ID: &'static str = BID_REQUEST_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for ReservationReceipt {
+    const SCHEMA_ID: &'static str = RESERVATION_RECEIPT_SCHEMA;
+}

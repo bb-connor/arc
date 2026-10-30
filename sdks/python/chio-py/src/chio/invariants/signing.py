@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+import hashlib
 
 from pure25519.ed25519_oop import BadSignatureError, SigningKey, VerifyingKey
 
 from ..errors import ChioInvariantError
+from ._generated_signed_artifact_schemas import KNOWN_SIGNED_ARTIFACT_SCHEMAS
 from .json import canonicalize_json_string
+
+SIGNING_WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 
 
 def _normalize_hex(value: str) -> str:
@@ -33,6 +36,13 @@ def _verifying_key_from_hex(public_key_hex: str) -> VerifyingKey:
         raise ChioInvariantError("invalid_public_key", "value is not a valid Ed25519 public key") from exc
 
 
+def _encoded_algorithm(value: str) -> str:
+    for prefix in ("p256", "p384", "hybrid"):
+        if value.startswith(f"{prefix}:"):
+            return prefix
+    return "ed25519"
+
+
 def is_valid_public_key_hex(value: str) -> bool:
     try:
         _hex_to_bytes(value, expected_bytes=32, code="invalid_public_key")
@@ -53,87 +63,96 @@ def public_key_hex_matches(left: str, right: str) -> bool:
     return _normalize_hex(left).lower() == _normalize_hex(right).lower()
 
 
-def sign_utf8_message_ed25519(input_text: str, seed_hex: str) -> dict[str, str]:
+def signing_wrapper(schema_id: str, canonical_json: str) -> bytes:
+    """The 88 bytes a Chio signature covers; refuses an unregistered schema id."""
+
+    if schema_id not in KNOWN_SIGNED_ARTIFACT_SCHEMAS:
+        raise ChioInvariantError(
+            "unregistered_schema_id",
+            f"unregistered signed-artifact schema id: {schema_id}",
+        )
+    return (
+        SIGNING_WRAPPER_PREFIX
+        + hashlib.sha256(schema_id.encode("utf-8")).digest()
+        + hashlib.sha256(canonical_json.encode("utf-8")).digest()
+    )
+
+
+def public_key_from_seed_ed25519(seed_hex: str) -> str:
+    return _signing_key_from_seed_hex(seed_hex).get_verifying_key().to_bytes().hex()
+
+
+def sign_wrapped_json_ed25519(schema_id: str, input_text: str, seed_hex: str) -> dict[str, str]:
+    canonical_json = canonicalize_json_string(input_text)
+    wrapper = signing_wrapper(schema_id, canonical_json)
     signing_key = _signing_key_from_seed_hex(seed_hex)
-    signature = signing_key.sign(input_text.encode("utf-8"))
     return {
+        "schema_id": schema_id,
+        "canonical_json": canonical_json,
         "public_key_hex": signing_key.get_verifying_key().to_bytes().hex(),
-        "signature_hex": signature.hex(),
+        "signature_hex": signing_key.sign(wrapper).hex(),
     }
 
 
-def verify_utf8_message_ed25519(
-    input_text: str,
+def _verify_wrapped_canonical(
+    schema_id: str,
+    canonical_json: str,
     public_key_hex: str,
     signature_hex: str,
-) -> bool:
+) -> None:
+    wrapper = signing_wrapper(schema_id, canonical_json)
+    key_algorithm = _encoded_algorithm(public_key_hex)
+    signature_algorithm = _encoded_algorithm(signature_hex)
+    if key_algorithm != signature_algorithm:
+        raise ChioInvariantError(
+            "signature_algorithm_mismatch",
+            f"signature algorithm {signature_algorithm} does not match the pinned key algorithm {key_algorithm}",
+        )
+    if key_algorithm != "ed25519":
+        raise ChioInvariantError(
+            "unsupported_algorithm",
+            f"signature algorithm {key_algorithm} is not supported by this SDK",
+        )
     verifying_key = _verifying_key_from_hex(public_key_hex)
     signature = _hex_to_bytes(signature_hex, expected_bytes=64, code="invalid_signature")
     try:
-        verifying_key.verify(signature, input_text.encode("utf-8"))
-    except BadSignatureError:
-        return False
-    return True
+        verifying_key.verify(signature, wrapper)
+    except BadSignatureError as exc:
+        raise ChioInvariantError("signature_rejected", "signature rejected") from exc
 
 
-def sign_json_string_ed25519(input_text: str, seed_hex: str) -> dict[str, str]:
-    canonical_json = canonicalize_json_string(input_text)
-    signed = sign_utf8_message_ed25519(canonical_json, seed_hex)
-    return {
-        "canonical_json": canonical_json,
-        "public_key_hex": signed["public_key_hex"],
-        "signature_hex": signed["signature_hex"],
-    }
-
-
-def verify_json_string_signature_ed25519(
+def verify_wrapped_json(
+    schema_id: str,
     input_text: str,
     public_key_hex: str,
     signature_hex: str,
-) -> bool:
-    return verify_utf8_message_ed25519(
+) -> None:
+    """Verify a signature over the wrapper of ``input_text`` under ``schema_id``.
+
+    The pinned key's encoding alone selects the algorithm; a signature encoded
+    for another algorithm raises before any cryptographic check.
+    """
+
+    _verify_wrapped_canonical(
+        schema_id,
         canonicalize_json_string(input_text),
         public_key_hex,
         signature_hex,
     )
 
 
-def verify_chio_signature(
-    signed_bytes: bytes | str,
-    signature: str,
-    public_key: str,
+def wrapped_signature_valid(
+    schema_id: str,
+    canonical_json: str,
+    public_key_hex: str,
+    signature_hex: str,
 ) -> bool:
-    """Verify a Chio v1 wire signature, dispatching on its algorithm prefix.
+    """A rejected signature is ``False``; every other refusal raises."""
 
-    The v1 receipt signature pattern accepts bare 128-hex (Ed25519), ``p256:``
-    prefixed ECDSA P-256/sha256, and ``p384:`` prefixed ECDSA P-384/sha384
-    encodings. This SDK build currently supports Ed25519 inline via
-    ``pure25519``. ECDSA and hybrid post-quantum prefixes raise
-    ``ChioInvariantError`` until a FIPS-capable backend is wired in.
-    """
-
-    if isinstance(signed_bytes, (bytes, bytearray)):
-        message_text = bytes(signed_bytes).decode("utf-8")
-    else:
-        message_text = signed_bytes
-
-    if signature.startswith("p256:"):
-        # ECDSA P-256 verification is not wired; reject fail-closed so
-        # unsupported receipts cannot be silently accepted.
-        raise ChioInvariantError(
-            "invalid_signature",
-            "ECDSA P-256 signatures are not yet supported by this SDK build",
-        )
-    if signature.startswith("p384:"):
-        # ECDSA P-384 verification is not wired; reject fail-closed.
-        raise ChioInvariantError(
-            "invalid_signature",
-            "ECDSA P-384 signatures are not yet supported by this SDK build",
-        )
-    if signature.startswith("hybrid:"):
-        raise ChioInvariantError(
-            "invalid_signature",
-            "hybrid post-quantum signatures are not supported by this SDK build",
-        )
-
-    return verify_utf8_message_ed25519(message_text, public_key, signature)
+    try:
+        _verify_wrapped_canonical(schema_id, canonical_json, public_key_hex, signature_hex)
+    except ChioInvariantError as error:
+        if error.code == "signature_rejected":
+            return False
+        raise
+    return True

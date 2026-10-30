@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use chio_core_types::receipt::lineage::SignedExportEnvelope;
+use chio_core_types::receipt::lineage::{SignedExportEnvelope, SignedExportPayload};
 use chio_core_types::{canonical_json_bytes, sha256_hex, PublicKey, SigningBackend};
 use serde::{Deserialize, Serialize};
 
@@ -83,6 +83,10 @@ pub struct FindingWorkerCapabilityBody {
 
 pub type SignedFindingWorkerCapability = SignedExportEnvelope<FindingWorkerCapabilityBody>;
 
+impl SignedExportPayload for FindingWorkerCapabilityBody {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_CAPABILITY_SCHEMA;
+}
+
 impl FindingWorkerCapabilityBody {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.schema != FINDING_WORKER_CAPABILITY_SCHEMA
@@ -121,7 +125,7 @@ pub fn verify_job_capability(
         return Err("worker_capability_signer_mismatch");
     }
     if !capability
-        .verify_signature()
+        .verify_signature(expected_signer)
         .map_err(|_| "worker_capability_signature_invalid")?
     {
         return Err("worker_capability_signature_invalid");
@@ -677,6 +681,10 @@ pub struct FindingWorkerAttestedResult {
 
 pub type SignedFindingWorkerResult = SignedExportEnvelope<FindingWorkerAttestedResult>;
 
+impl SignedExportPayload for FindingWorkerAttestedResult {
+    const SCHEMA_ID: &'static str = FINDING_WORKER_ATTESTED_RESULT_SCHEMA;
+}
+
 impl FindingWorkerAttestedResult {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_guest(
@@ -752,7 +760,7 @@ pub fn verify_attested_result(
         return Err("worker_signer_mismatch");
     }
     if !envelope
-        .verify_signature()
+        .verify_signature(expected_signer)
         .map_err(|_| "worker_signature_invalid")?
     {
         return Err("worker_signature_invalid");

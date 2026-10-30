@@ -1,0 +1,47 @@
+{
+  "attenuation_proof": {
+    "childScopeHash": "733104b95a57917b81925336b2c155d6c797f95a8d3a000124c2fdeb2a368e72",
+    "normalizedSubsetProof": {
+      "normalizedChildScope": "{\"grants\":[{\"operations\":[\"invoke\"],\"server_id\":\"srv\",\"tool_name\":\"tool\"}]}",
+      "normalizedParentScope": "{\"grants\":[{\"operations\":[\"invoke\",\"delegate\"],\"server_id\":\"srv\",\"tool_name\":\"tool\"}]}",
+      "restrictedPredicates": [
+        "tool:srv:tool:removed_operation:Delegate"
+      ],
+      "subsetRelations": [
+        {
+          "childIndex": 0,
+          "grantKind": "tool",
+          "parentIndex": 0,
+          "subset": true
+        }
+      ]
+    },
+    "parentScopeHash": "4bd93ccc34ae229b34c8eb83fdc1c9482ea67b62348856bcc92f9ef5588fc4b6"
+  },
+  "budget_share_bps": 5000,
+  "expires_at": 20,
+  "id": "cap-attenuated",
+  "issued_at": 10,
+  "issuer": "b1a46df33dbc7e55267ec8c8e61c8a2340fe917a5a1c00df1b21cf2f4302d891",
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "operations": [
+          "invoke"
+        ],
+        "server_id": "srv",
+        "tool_name": "tool"
+      }
+    ]
+  },
+  "scope_attenuations": [
+    {
+      "operation": "read_result",
+      "server_id": "srv",
+      "tool_name": "tool",
+      "type": "remove_operation"
+    }
+  ],
+  "subject": "7ae025df819e45dbd3fc428e59263f26d7f61549a8936b767b8b56a4962bd48a"
+}

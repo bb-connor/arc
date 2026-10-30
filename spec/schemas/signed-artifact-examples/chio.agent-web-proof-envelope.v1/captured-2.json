@@ -1,0 +1,31 @@
+{
+  "agent_web_passport_scope_sha256": "b71239440ab8f916985337c77a0b401ad5fef846a74e2158000da0c01c40e85a",
+  "chio_claim_refs": [
+    "claim.agent_web.external_subject_digest_bound",
+    "claim.agent_web.projection_manifest_bound",
+    "claim.agent_web.unsupported_claims_limited",
+    "claim.agent_web.sidecar_not_native_authority"
+  ],
+  "disclosure_capsule_refs": [],
+  "envelope_id": "4164871bfc5efe6808e318f1335982ddc0d7f39382e74023969c16622868877a",
+  "external_subject": "webhook-delivery-agent-web-valid",
+  "external_subject_digest": "ba363cbd390f05dcb7b94cf773a86dd467bfb9bef145442a79ddf3f708c871f7",
+  "external_subject_path": "external/webhook-delivery.json",
+  "external_subject_signature_ref": "v1,5L5d/oR9uJZiOH43WGkTL7Q5Leb+QXd6x9VeYHmLzS4=",
+  "limitations": [
+    "Webhook signature evidence is not Chio capability authority."
+  ],
+  "projection_manifest_ref": "projection-standard-webhooks-valid",
+  "projection_manifest_sha256": "94be3a2325156e3b6f0ae94e0beaae9727d62f4a3c0bb6e5faa6ceb4010c8307",
+  "receipt_refs": [
+    "receipt-agent-web-webhook-allow"
+  ],
+  "risk_refs": [
+    "risk-report-unloaded"
+  ],
+  "schema": "chio.agent-web-proof-envelope.v1",
+  "settlement_refs": [],
+  "source_protocol": "standard-webhooks",
+  "source_protocol_version": "2026-06-09",
+  "transaction_passport_ref": "passport-agent-web-valid"
+}

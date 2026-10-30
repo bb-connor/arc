@@ -1,0 +1,13 @@
+{
+  "bodySha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "deployment": "dep-a",
+  "issuedAt": 1792234800,
+  "method": "GET",
+  "nodeId": "https://node-b.example:9101",
+  "nonce": "00000000000000195a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+  "path": "/v1/internal/cluster/status",
+  "query": "",
+  "recipient": "https://node-a.example:9101",
+  "scheme": "chio.cluster.peer-signature.v1",
+  "term": null
+}

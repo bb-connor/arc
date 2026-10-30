@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/fiscal/fiscal-proposal-body.schema.json",
+  "title": "chio.fiscal.proposal.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "proposalId",
+    "proposedAt",
+    "proposedBy",
+    "rationaleDigest",
+    "schema",
+    "target"
+  ],
+  "properties": {
+    "proposalId": {
+      "type": "string"
+    },
+    "proposedAt": {
+      "type": "integer"
+    },
+    "proposedBy": {
+      "type": "string"
+    },
+    "rationaleDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fiscal.proposal.v1"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature",
+            "signerKey"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "charterDigest",
+                "charterId",
+                "domain",
+                "issuedAt",
+                "issuedBy",
+                "params",
+                "scheduleId",
+                "schema",
+                "sequence",
+                "validFrom",
+                "validUntil"
+              ],
+              "properties": {
+                "charterDigest": {
+                  "type": "string"
+                },
+                "charterId": {
+                  "type": "string"
+                },
+                "domain": {
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "type": "integer"
+                },
+                "issuedBy": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind"
+                  ],
+                  "properties": {
+                    "ceilings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "currency",
+                          "units"
+                        ],
+                        "properties": {
+                          "currency": {
+                            "type": "string"
+                          },
+                          "units": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "feeSchedule": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "bondRequirements",
+                        "disputeFee",
+                        "expiresAt",
+                        "feeScheduleId",
+                        "governingOperatorId",
+                        "issuedAt",
+                        "issuedBy",
+                        "marketParticipationFee",
+                        "namespace",
+                        "publicationFee",
+                        "schema",
+                        "scope"
+                      ],
+                      "properties": {
+                        "bondRequirements": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "bondClass",
+                              "collateralReferenceKind",
+                              "requiredAmount",
+                              "slashable"
+                            ],
+                            "properties": {
+                              "bondClass": {
+                                "type": "string"
+                              },
+                              "collateralReferenceKind": {
+                                "type": "string"
+                              },
+                              "requiredAmount": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "currency",
+                                  "units"
+                                ],
+                                "properties": {
+                                  "currency": {
+                                    "type": "string"
+                                  },
+                                  "units": {
+                                    "type": "integer"
+                                  }
+                                }
+                              },
+                              "slashable": {
+                                "type": "boolean"
+                              }
+                            }
+                          }
+                        },
+                        "disputeFee": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "currency",
+                            "units"
+                          ],
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "expiresAt": {
+                          "type": "integer"
+                        },
+                        "feeScheduleId": {
+                          "type": "string"
+                        },
+                        "governingOperatorId": {
+                          "type": "string"
+                        },
+                        "issuedAt": {
+                          "type": "integer"
+                        },
+                        "issuedBy": {
+                          "type": "string"
+                        },
+                        "marketParticipationFee": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "currency",
+                            "units"
+                          ],
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "namespace": {
+                          "type": "string"
+                        },
+                        "publicationFee": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "currency",
+                            "units"
+                          ],
+                          "properties": {
+                            "currency": {
+                              "type": "string"
+                            },
+                            "units": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "schema": {
+                          "type": "string"
+                        },
+                        "scope": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "allowedActorKinds",
+                            "allowedAdmissionClasses",
+                            "allowedListingOperatorIds",
+                            "namespace"
+                          ],
+                          "properties": {
+                            "allowedActorKinds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "allowedAdmissionClasses": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "allowedListingOperatorIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "namespace": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "scheduleId": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer"
+                },
+                "supersedesScheduleId": {
+                  "type": "string"
+                },
+                "validFrom": {
+                  "type": "integer"
+                },
+                "validUntil": {
+                  "type": "integer"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signerKey": {
+              "type": "string"
+            }
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "successor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature",
+            "signerKey"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "approvalThreshold",
+                "approvalTtlSeconds",
+                "charterId",
+                "expiresAt",
+                "governedDomains",
+                "governingOperatorId",
+                "issuedAt",
+                "issuedBy",
+                "predecessorCharterDigest",
+                "proposalTtlSeconds",
+                "schema",
+                "sequence",
+                "signerSet",
+                "timelockSeconds"
+              ],
+              "properties": {
+                "approvalThreshold": {
+                  "type": "integer"
+                },
+                "approvalTtlSeconds": {
+                  "type": "integer"
+                },
+                "charterId": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "integer"
+                },
+                "governedDomains": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "governingOperatorId": {
+                  "type": "string"
+                },
+                "issuedAt": {
+                  "type": "integer"
+                },
+                "issuedBy": {
+                  "type": "string"
+                },
+                "predecessorCharterDigest": {
+                  "type": "string"
+                },
+                "proposalTtlSeconds": {
+                  "type": "integer"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "sequence": {
+                  "type": "integer"
+                },
+                "signerSet": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "keyId",
+                      "publicKey"
+                    ],
+                    "properties": {
+                      "keyId": {
+                        "type": "string"
+                      },
+                      "publicKey": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "timelockSeconds": {
+                  "type": "integer"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signerKey": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

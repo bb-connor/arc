@@ -1,0 +1,27 @@
+{
+  "audience": {
+    "serverId": "srv-pay",
+    "toolName": "charge"
+  },
+  "chainId": "chain-cont-1",
+  "currentSubject": "7f2f6eae4e84ec0c2070575bd32c0fd89236f955b7d91d222b01f4632261adb1",
+  "delegationLinkHash": "delegation-link-hash-1",
+  "delegatorSubject": "delegator-subject",
+  "expiresAt": 2000,
+  "governedIntentHash": "intent-hash-1",
+  "issuedAt": 1000,
+  "nonce": "nonce-1",
+  "originSubject": "origin-subject",
+  "parentCapabilityId": "cap-parent-1",
+  "parentReceiptHash": "receipt-hash-1",
+  "parentReceiptId": "rc-parent-cont-1",
+  "parentRequestId": "req-parent-cont-1",
+  "parentSessionAnchor": {
+    "sessionAnchorHash": "anchor-hash-1",
+    "sessionAnchorId": "anchor-1"
+  },
+  "schema": "chio.call_chain_continuation.v1",
+  "signer": "5482e4d78be3a7bfd7869f6470b7623fd438ff6f50c72d69f7c6c6f5fbbbe383",
+  "subject": "7f2f6eae4e84ec0c2070575bd32c0fd89236f955b7d91d222b01f4632261adb1",
+  "tokenId": "continuation-1"
+}

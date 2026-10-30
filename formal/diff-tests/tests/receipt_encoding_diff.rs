@@ -165,7 +165,7 @@ fn signed_vector_receipts_verify_against_canonical_bytes() {
             .unwrap_or_else(|err| panic!("parse receipt for case {id}: {err}"));
 
         let signature_valid = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|err| panic!("verify_signature for case {id}: {err}"));
         assert!(
             signature_valid,
@@ -364,7 +364,7 @@ proptest! {
         let receipt = build_receipt(&scaffold, &keypair);
 
         let valid = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .expect("verify_signature");
         prop_assert!(valid, "signed receipt failed self-verification");
     }

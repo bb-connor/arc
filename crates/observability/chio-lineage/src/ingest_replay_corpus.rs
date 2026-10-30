@@ -247,7 +247,7 @@ fn signed_lineage_statement_verifies(row: &CorpusReceiptRow, parent: &str) -> bo
     statement.parent_receipt_id == parent
         && statement.child_receipt_id == row.receipt_id
         && statement.evidence_class == ProvenanceEvidenceClass::Verified
-        && matches!(statement.verify_signature(), Ok(true))
+        && matches!(statement.verify_integrity_embedded_key(), Ok(true))
 }
 
 fn validate_row(row: &CorpusReceiptRow, row_index: usize) -> Result<(), CorpusIngestError> {

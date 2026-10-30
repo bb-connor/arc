@@ -128,7 +128,7 @@ fn host_cancel_before_dispatch(entry: EntryPoint) -> TestResult {
             reason: PRE_DISPATCH_CANCELLATION.into(),
         })
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response.receipt.metadata.as_ref().and_then(|metadata| {
             metadata

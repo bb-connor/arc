@@ -109,7 +109,7 @@ fn oversized_request_is_refused_before_admission(nested: bool) -> TestResult {
     assert!(state.retained_request.is_none());
     assert!(state.raw_outcome.is_none());
     assert!(state.budget_authorization.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         response
             .receipt
@@ -468,7 +468,7 @@ fn frozen_return_context_binds_the_decision_model_witness_into_the_terminal_rece
         None,
     )?;
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let block = response
         .receipt
         .metadata

@@ -6,6 +6,7 @@
       "path": "/workspace/docs/roadmap.md"
     }
   },
+  "boundary_class": "prevent",
   "capability_id": "cap-bindings-001",
   "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
   "decision": {
@@ -23,16 +24,21 @@
       "verdict": true
     }
   ],
-  "id": "rcpt-fuzz-tenant-mutated",
+  "id": "77379e940fdc6008faf016ed8dcf870c21ca0da1d7a6db725bbf43007aa22097",
   "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
   "metadata": {
+    "chio_receipt_signing_nonce": "c9909f733d5fb367922293f0167d06db715393be114f212096cf2866f29433ea",
     "surface": "bindings-vectors",
     "version": 1
   },
   "policy_hash": "policy-bindings-v1",
-  "signature": "c1420914fa6a85a668ba2bf79d8a3fcc6b0f467c6fe5f419a1efb64e81b3b2bd56de534c8c56f758eaaa72565889278288e4fa3c0a97a03f42acca86d915c30c",
+  "receipt_kind": "mediated_decision",
+  "redaction_mode": "none",
+  "signature": "5e8733a2f56ffaf2af84cb6f160ad3d7eb00c50b9bdf3ca7dfebf58f72417a347926c1361095b39af0b54e9341949a11cd632665b8fea3b745fabc7317a6ca0e",
   "tenant_id": "tenant-fuzz",
   "timestamp": 1710000200,
   "tool_name": "file_read",
-  "tool_server": "srv-files"
+  "tool_origin": "caller_executed",
+  "tool_server": "srv-files",
+  "trust_level": "mediated"
 }

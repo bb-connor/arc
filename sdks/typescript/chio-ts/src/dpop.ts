@@ -1,7 +1,11 @@
 import { randomBytes } from "node:crypto";
 
 import { DpopSignError } from "./errors.ts";
-import { signEd25519Message, sha256Hex } from "./invariants/crypto.ts";
+import {
+  publicKeyFromSeedEd25519,
+  sha256Hex,
+  signWrappedCanonicalEd25519,
+} from "./invariants/crypto.ts";
 import { canonicalizeJson } from "./invariants/json.ts";
 
 /**
@@ -38,7 +42,8 @@ export interface DpopProofBody {
 }
 
 /**
- * A signed DPoP proof. The signature is Ed25519 over the canonical JSON of the body.
+ * A signed DPoP proof. The signature is Ed25519 over the signing wrapper of the
+ * canonical body under `chio.dpop_proof.v1`.
  */
 export interface DpopProof {
   body: DpopProofBody;
@@ -116,11 +121,7 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
     // Compute action_hash: SHA-256 hex of canonical JSON of actionArgs
     const actionHash = sha256Hex(canonicalizeJson(actionArgs));
 
-    // Derive agent public key from seed
-    const { public_key_hex: agentKey, signature_hex: _unused } = signEd25519Message(
-      "derive_key",
-      agentSeedHex,
-    );
+    const agentKey = publicKeyFromSeedEd25519(agentSeedHex);
 
     // Build body with fields in alphabetical order (matches canonical JSON and Rust serde)
     const body: DpopProofBody = {
@@ -135,9 +136,7 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
       tool_server: toolServer,
     };
 
-    // Sign canonical JSON of body
-    const bodyCanonical = canonicalizeJson(body);
-    const { signature_hex } = signEd25519Message(Buffer.from(bodyCanonical, "utf8"), agentSeedHex);
+    const { signature_hex } = signWrappedCanonicalEd25519(DPOP_SCHEMA, canonicalizeJson(body), agentSeedHex);
 
     return { body, signature: signature_hex };
   } catch (cause) {

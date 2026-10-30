@@ -1,0 +1,15 @@
+{
+  "assertions": [
+    {
+      "comparator": {
+        "kind": "exists"
+      },
+      "pointer": "/items/+1"
+    }
+  ],
+  "expiresAtUnixMs": 2000,
+  "issuedAtUnixMs": 1000,
+  "predicateId": "0d15c800c2129b870683cee303cf2ce42373b278c1732eb00777b6d789ba52cd",
+  "providerId": "provider-1",
+  "schema": "chio.outcome.predicate.v1"
+}

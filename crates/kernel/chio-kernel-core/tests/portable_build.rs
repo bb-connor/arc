@@ -639,7 +639,7 @@ fn sign_receipt_with_backend() {
     };
 
     let receipt = sign_receipt_relaying_trusted_body(body, &backend).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -676,7 +676,7 @@ fn sign_receipt_preserves_signed_body_fields() {
 
     let receipt = sign_receipt_relaying_trusted_body(body.clone(), &backend).unwrap();
 
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     // body.id is the content-addressed hash assigned by signing (verify_signature
     // re-derives and checks it); the caller-supplied id becomes the signing nonce.
     assert_eq!(receipt.body().capability_id, body.capability_id);
@@ -783,8 +783,8 @@ fn sign_receipt_signature_changes_when_economic_authorization_changes() {
     }));
     let changed = sign_receipt_relaying_trusted_body(body, &backend).unwrap();
 
-    assert!(original.verify_signature().unwrap());
-    assert!(changed.verify_signature().unwrap());
+    assert!(original.verify_integrity_embedded_key().unwrap());
+    assert!(changed.verify_integrity_embedded_key().unwrap());
     assert_ne!(original.signature.to_hex(), changed.signature.to_hex());
 }
 
@@ -879,7 +879,7 @@ fn sign_receipt_with_handle_accepts_matching_content_and_binds_recomputed_hash()
 
     // The signature verifies and the signed receipt carries exactly the
     // recomputed hash -- the signed bytes correspond to the canonical content.
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.content_hash, recomputed);
     let expected = chio_core_types::crypto::sha256_hex(
         &chio_core_types::canonical::canonical_json_bytes(&content).unwrap(),
@@ -970,6 +970,6 @@ fn sign_receipt_production_path_accepts_matching_content() {
 
     let receipt = sign_receipt(body, &backend, &canonical).unwrap();
 
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.content_hash, recomputed);
 }

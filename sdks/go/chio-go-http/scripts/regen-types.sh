@@ -210,6 +210,18 @@ def rewrite(node, lifts: dict, prefix: str):
                     node["type"] = "integer"
                     node.setdefault("format", "int64")
 
+        # OpenAPI 3.0 has no type lists. `null` in the list becomes
+        # `nullable`; one remaining type stays, and several remaining types
+        # leave the node untyped, which oapi-codegen emits as interface{}.
+        # The canonical JSON schema still enforces the list.
+        if isinstance(node.get("type"), list):
+            kinds = node.pop("type")
+            if "null" in kinds:
+                node["nullable"] = True
+            kinds = [kind for kind in kinds if kind != "null"]
+            if len(kinds) == 1:
+                node["type"] = kinds[0]
+
         # OpenAPI 3.0 has no null primitive. Null-only schemas occur inside
         # validation branches that narrow an already-declared nullable field;
         # preserve the nullable marker and let the surrounding schema provide

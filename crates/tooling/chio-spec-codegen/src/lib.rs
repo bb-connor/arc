@@ -59,7 +59,7 @@
 
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsStr;
 use std::fmt;
 use std::fs;
@@ -69,8 +69,10 @@ use std::process::{Command, Stdio};
 
 use typify::{TypeSpace, TypeSpaceSettings};
 
+mod duplicate_types;
 mod errors_pass;
 mod schema_catalog;
+mod shared_types;
 pub use schema_catalog::LocalSchemaCatalog;
 pub mod statemachines_pass;
 pub mod threat_coverage_doc;
@@ -119,6 +121,9 @@ pub const CHIO_WIRE_V1_OUTPUT: &str = "chio_wire_v1.rs";
 /// File name for the header-only module marker under `_generated/`.
 pub const MOD_FILE: &str = "mod.rs";
 
+/// Upper bound on the rendered chio-wire/v1 Rust bindings.
+pub const MAX_CHIO_WIRE_V1_BYTES: usize = 9 * 1024 * 1024;
+
 /// Errors raised by the codegen pipeline.
 #[derive(Debug)]
 pub enum CodegenError {
@@ -146,6 +151,10 @@ pub enum CodegenError {
     GeneratedDrift(String),
     /// rustfmt rejected generated Rust source.
     Formatter(String),
+    /// Two generated types have the same body.
+    DuplicateTypes(String),
+    /// The rendered bindings exceed [`MAX_CHIO_WIRE_V1_BYTES`].
+    OutputTooLarge(usize),
 }
 
 impl fmt::Display for CodegenError {
@@ -181,6 +190,13 @@ impl fmt::Display for CodegenError {
             }
             Self::GeneratedDrift(msg) => write!(f, "generated state machine drift: {msg}"),
             Self::Formatter(msg) => write!(f, "generated Rust formatting failed: {msg}"),
+            Self::DuplicateTypes(msg) => {
+                write!(f, "generated types with identical bodies: {msg}")
+            }
+            Self::OutputTooLarge(bytes) => write!(
+                f,
+                "generated chio-wire/v1 bindings are {bytes} bytes, over {MAX_CHIO_WIRE_V1_BYTES}"
+            ),
         }
     }
 }
@@ -319,32 +335,204 @@ fn render_schema_modules(
     catalog: &LocalSchemaCatalog,
     referenced_schema_roots: &BTreeSet<PathBuf>,
 ) -> Result<String> {
-    let settings = TypeSpaceSettings::default();
-    let mut source = String::new();
-
+    let mut paths = Vec::new();
+    let mut modules = Vec::new();
     for path in schema_files {
         if should_skip_referenced_root(path, referenced_schema_roots)? {
             continue;
         }
-        let value = load_schema_value(path, catalog)?;
-        let schema: schemars::schema::RootSchema = serde_json::from_value(value)
-            .map_err(|err| CodegenError::SchemaShape(path.clone(), err))?;
-        let mut type_space = TypeSpace::new(&settings);
-        type_space
-            .add_root_schema(schema)
-            .map_err(|err| CodegenError::Typify(path.clone(), err.to_string()))?;
-        let tokens = type_space.to_stream();
-        let file: syn::File = syn::parse2(tokens).map_err(CodegenError::SynParse)?;
         let module_name = schema_module_name(path, schemas_dir)?;
-        source.push_str("pub mod ");
-        source.push_str(&module_name);
-        source.push_str(" {\n");
-        source.push_str(&prettyplease::unparse(&file));
-        source.push_str("}\n");
+        if module_name == shared_types::SHARED_MODULE {
+            return Err(CodegenError::SchemaRef(
+                path.clone(),
+                "module name is reserved for shared types".to_string(),
+            ));
+        }
+        paths.push(path.clone());
+        modules.push((module_name, load_schema_value(path, catalog)?));
+    }
+    let shared = shared_types::share_types(modules);
+
+    let mut source = String::new();
+    if !shared.shared.is_empty() {
+        let shared_path = schemas_dir.join(shared_types::SHARED_MODULE);
+        let mut defs = serde_json::Map::new();
+        for (name, schema) in &shared.shared {
+            defs.insert(name.clone(), schema.clone());
+        }
+        let root = serde_json::json!({ "$defs": defs });
+        let rendered = render_module(&shared_path, root, &TypeSpaceSettings::default())?;
+        let declared = declared_type_names(&rendered);
+        let missing: Vec<&String> = shared
+            .shared
+            .keys()
+            .filter(|name| !declared.contains(name.as_str()))
+            .collect();
+        if !missing.is_empty() {
+            return Err(CodegenError::SchemaRef(
+                shared_path,
+                format!("typify renamed shared types: {missing:?}"),
+            ));
+        }
+        push_module(&mut source, shared_types::SHARED_MODULE, &rendered);
+    }
+    for ((path, (module_name, mut schema)), uses) in
+        paths.iter().zip(shared.modules).zip(&shared.uses)
+    {
+        let mut settings = TypeSpaceSettings::default();
+        if !uses.is_empty() {
+            let Some(root) = schema.as_object_mut() else {
+                return Err(CodegenError::SchemaRef(
+                    path.clone(),
+                    "shared types need an object root schema".to_string(),
+                ));
+            };
+            let defs = root
+                .entry("$defs".to_string())
+                .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()));
+            let Some(defs) = defs.as_object_mut() else {
+                return Err(CodegenError::SchemaRef(
+                    path.clone(),
+                    "root $defs is not an object".to_string(),
+                ));
+            };
+            for name in shared_closure(&shared.shared, uses) {
+                if defs.contains_key(&name) {
+                    return Err(CodegenError::SchemaRef(
+                        path.clone(),
+                        format!("shared type {name} collides with a local definition"),
+                    ));
+                }
+                let Some(body) = shared.shared.get(&name) else {
+                    return Err(CodegenError::SchemaRef(
+                        path.clone(),
+                        format!("shared type {name} has no schema"),
+                    ));
+                };
+                defs.insert(name.clone(), body.clone());
+                settings.with_replacement(
+                    &name,
+                    format!("super::{}::{name}", shared_types::SHARED_MODULE),
+                    std::iter::empty(),
+                );
+            }
+        }
+        let rendered = render_module(path, schema, &settings)?;
+        push_module(&mut source, &module_name, &rendered);
     }
 
-    let file = syn::parse_file(&source).map_err(CodegenError::SynParse)?;
+    let mut file = syn::parse_file(&source).map_err(CodegenError::SynParse)?;
+    duplicate_types::alias_duplicate_types(&mut file);
+    check_no_duplicate_types(&file)?;
+    let pretty = prettyplease::unparse(&file);
+    if pretty.len() > MAX_CHIO_WIRE_V1_BYTES {
+        return Err(CodegenError::OutputTooLarge(pretty.len()));
+    }
+    Ok(pretty)
+}
+
+/// Shared type names reachable from `uses` through references between
+/// shared schemas.
+fn shared_closure(
+    shared: &BTreeMap<String, serde_json::Value>,
+    uses: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let mut reached = BTreeSet::new();
+    let mut pending: Vec<String> = uses.iter().cloned().collect();
+    while let Some(name) = pending.pop() {
+        if !reached.insert(name.clone()) {
+            continue;
+        }
+        if let Some(body) = shared.get(&name) {
+            collect_local_refs(body, &mut pending);
+        }
+    }
+    reached
+}
+
+fn collect_local_refs(value: &serde_json::Value, out: &mut Vec<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            if let Some(name) = map
+                .get("$ref")
+                .and_then(serde_json::Value::as_str)
+                .and_then(|reference| reference.strip_prefix("#/$defs/"))
+            {
+                out.push(name.to_string());
+            }
+            for item in map.values() {
+                collect_local_refs(item, out);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_local_refs(item, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn render_module(
+    path: &Path,
+    value: serde_json::Value,
+    settings: &TypeSpaceSettings,
+) -> Result<String> {
+    let schema: schemars::schema::RootSchema = serde_json::from_value(value)
+        .map_err(|err| CodegenError::SchemaShape(path.to_path_buf(), err))?;
+    let tokens = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut type_space = TypeSpace::new(settings);
+        type_space
+            .add_root_schema(schema)
+            .map(|_| type_space.to_stream())
+    }))
+    .map_err(|_| CodegenError::Typify(path.to_path_buf(), "typify panicked".to_string()))?
+    .map_err(|err| CodegenError::Typify(path.to_path_buf(), err.to_string()))?;
+    let file: syn::File = syn::parse2(tokens).map_err(CodegenError::SynParse)?;
     Ok(prettyplease::unparse(&file))
+}
+
+fn push_module(source: &mut String, name: &str, body: &str) {
+    source.push_str("pub mod ");
+    source.push_str(name);
+    source.push_str(" {\n");
+    source.push_str(body);
+    source.push_str("}\n");
+}
+
+fn declared_type_names(rendered: &str) -> BTreeSet<String> {
+    let Ok(file) = syn::parse_file(rendered) else {
+        return BTreeSet::new();
+    };
+    file.items
+        .iter()
+        .filter_map(|item| match item {
+            syn::Item::Struct(item) => Some(item.ident.to_string()),
+            syn::Item::Enum(item) => Some(item.ident.to_string()),
+            syn::Item::Type(item) => Some(item.ident.to_string()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Fails when two struct-with-fields or enum items render the same; see
+/// [`duplicate_types`].
+fn check_no_duplicate_types(file: &syn::File) -> Result<()> {
+    let duplicates = duplicate_types::duplicate_groups(file);
+    if duplicates.is_empty() {
+        Ok(())
+    } else {
+        Err(CodegenError::DuplicateTypes(format!(
+            "{} groups, first: {}",
+            duplicates.len(),
+            duplicates
+                .iter()
+                .take(5)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join("; ")
+        )))
+    }
 }
 
 fn schema_module_name(path: &Path, schemas_dir: &Path) -> Result<String> {
@@ -707,157 +895,4 @@ pub(crate) fn write_if_changed(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    pub(super) fn unique_temp_dir(prefix: &str) -> Result<PathBuf> {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| CodegenError::Io(PathBuf::from(prefix), std::io::Error::other(err)))?
-            .as_nanos();
-        Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}")))
-    }
-
-    #[test]
-    fn header_is_non_empty() {
-        assert!(GENERATED_HEADER.starts_with("// DO NOT EDIT"));
-        assert!(GENERATED_HEADER.contains("typify =0.4.3"));
-    }
-
-    #[test]
-    fn is_schema_json_recognises_canonical_extension() {
-        assert!(is_schema_json(Path::new("foo/bar.schema.json")));
-        assert!(!is_schema_json(Path::new("foo/bar.json")));
-        assert!(!is_schema_json(Path::new("foo/bar.schema.yaml")));
-    }
-
-    #[test]
-    fn missing_schemas_dir_is_error() {
-        let nonexistent = Path::new("/tmp/chio-spec-codegen-does-not-exist-xyz");
-        match render_chio_wire_v1(nonexistent) {
-            Err(CodegenError::SchemasDirMissing(_)) => {}
-            Err(other) => panic!("expected SchemasDirMissing, got {other}"),
-            Ok(_) => panic!("expected error, got Ok"),
-        }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn walk_schema_files_rejects_symlinked_schema_file() -> Result<()> {
-        let dir = unique_temp_dir("chio-spec-codegen-schemas")?;
-        let outside = unique_temp_dir("chio-spec-codegen-outside")?;
-        fs::create_dir_all(&dir).map_err(|err| CodegenError::Io(dir.clone(), err))?;
-        fs::create_dir_all(&outside).map_err(|err| CodegenError::Io(outside.clone(), err))?;
-        fs::write(outside.join("escape.schema.json"), "{}")
-            .map_err(|err| CodegenError::Io(outside.join("escape.schema.json"), err))?;
-        let link_path = dir.join("escape.schema.json");
-        std::os::unix::fs::symlink(outside.join("escape.schema.json"), &link_path)
-            .map_err(|err| CodegenError::Io(link_path.clone(), err))?;
-
-        let mut files = Vec::new();
-        let result = walk_schema_files(&dir, &mut files);
-
-        let _ = fs::remove_dir_all(dir);
-        let _ = fs::remove_dir_all(outside);
-        match result {
-            Err(CodegenError::SchemaRef(path, message)) => {
-                assert!(path.ends_with("escape.schema.json"));
-                assert!(message.contains("symlink"));
-            }
-            Err(error) => panic!("expected SchemaRef symlink error, got {error}"),
-            Ok(paths) => panic!("symlinked schema should fail closed: {paths:?}"),
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn render_chio_wire_v1_rejects_external_schema_ref() -> Result<()> {
-        let dir = unique_temp_dir("chio-spec-codegen-external-ref")?;
-        fs::create_dir_all(&dir).map_err(|err| CodegenError::Io(dir.clone(), err))?;
-        let schema_path = dir.join("external_ref.schema.json");
-        fs::write(
-            &schema_path,
-            br#"{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/test/v1/external-ref.schema.json",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "remote": {
-      "$ref": "https://example.invalid/not-local.schema.json"
-    }
-  }
-}"#,
-        )
-        .map_err(|err| CodegenError::Io(schema_path.clone(), err))?;
-
-        let result = render_chio_wire_v1(&dir);
-        let _ = fs::remove_dir_all(&dir);
-        match result {
-            Err(CodegenError::SchemaRef(path, message)) => {
-                assert!(path.ends_with("external_ref.schema.json"));
-                assert!(
-                    message.contains("external schema reference"),
-                    "unexpected message: {message}"
-                );
-            }
-            Err(error) => panic!("expected SchemaRef external-ref error, got {error}"),
-            Ok(rendered) => panic!("external schema ref should fail closed: {rendered}"),
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn tool_call_response_receipt_keeps_record_type(
-    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let workspace_root = manifest_dir
-            .parent()
-            .and_then(Path::parent)
-            .and_then(Path::parent)
-            .ok_or_else(|| std::io::Error::other("missing workspace"))?;
-        let schemas_dir = workspace_root.join("spec/schemas/chio-wire/v1");
-
-        let rendered = render_chio_wire_v1(&schemas_dir)?;
-
-        assert!(
-            rendered.contains("pub receipt: ChioReceiptRecord,"),
-            "tool_call_response.receipt must use the typed receipt record"
-        );
-        assert!(
-            !rendered.contains("External schema reference erased for Rust typify codegen"),
-            "local cross-file refs must not be erased before typify"
-        );
-        let file = syn::parse_file(&rendered).map_err(CodegenError::SynParse)?;
-        let mut receipt_modules = BTreeSet::new();
-        for item in &file.items {
-            if let syn::Item::Mod(module) = item {
-                if let Some((_, items)) = &module.content {
-                    let count = items
-                        .iter()
-                        .filter(|item| {
-                            matches!(item,
-                                syn::Item::Struct(item) if item.ident == "ChioReceiptRecord"
-                            )
-                        })
-                        .count();
-                    assert!(count <= 1, "duplicate receipt type in {}", module.ident);
-                    if count == 1 {
-                        receipt_modules.insert(module.ident.to_string());
-                    }
-                }
-            }
-        }
-        assert_eq!(receipt_modules, BTreeSet::from([
-            "recovery_command_result".to_owned(),
-                "kernel_tool_call_response".to_owned(),
-        ]), "each response owns a typed receipt and the referenced receipt root is not emitted separately");
-        assert_eq!(
-            rustfmt_generated(Path::new(CHIO_WIRE_V1_OUTPUT), &rendered)?,
-            rendered,
-            "wire bindings must already match rustfmt output"
-        );
-        Ok(())
-    }
-}
+mod tests;

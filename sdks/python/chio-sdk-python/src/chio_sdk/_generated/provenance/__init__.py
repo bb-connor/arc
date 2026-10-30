@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,20 +12,35 @@ from __future__ import annotations
 
 from .attestation_bundle_schema import ChioProvenanceAttestationBundle, CredentialKind, EvidenceClass, Scheme, Statement, Tier, WorkloadIdentity
 from .context_schema import ChioProvenanceCallChainContext
+from .provenance_stamp_schema import ChioProvenanceStampSignedBody, Principal, ReceivedAt
 from .stamp_schema import ChioProvenanceStamp
+from .trace_observation_schema import Action, Attribution, ChioRuntime, ChioTraceObservationSignedBody, Decision, Event, Metadata, Parameters, Receipt, ReceiptContext
 from .verdict_link_schema import ChioProvenanceVerdictLink, ChioProvenanceVerdictLink1, ChioProvenanceVerdictLink2, ChioProvenanceVerdictLink3, ChioProvenanceVerdictLink4, EvidenceClass, Verdict
 
 __all__ = [
+    "Action",
+    "Attribution",
     "ChioProvenanceAttestationBundle",
     "ChioProvenanceCallChainContext",
     "ChioProvenanceStamp",
+    "ChioProvenanceStampSignedBody",
     "ChioProvenanceVerdictLink",
     "ChioProvenanceVerdictLink1",
     "ChioProvenanceVerdictLink2",
     "ChioProvenanceVerdictLink3",
     "ChioProvenanceVerdictLink4",
+    "ChioRuntime",
+    "ChioTraceObservationSignedBody",
     "CredentialKind",
+    "Decision",
+    "Event",
     "EvidenceClass",
+    "Metadata",
+    "Parameters",
+    "Principal",
+    "Receipt",
+    "ReceiptContext",
+    "ReceivedAt",
     "Scheme",
     "Statement",
     "Tier",

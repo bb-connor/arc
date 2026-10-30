@@ -452,7 +452,7 @@ impl ChioKernel {
                 || !self
                     .finding_delivery_receipt_authorities
                     .contains(&parent.kernel_key)
-                || !parent.verify_signature().map_err(|error| {
+                || !parent.verify_integrity_embedded_key().map_err(|error| {
                     KernelError::Internal(format!(
                         "Finding delivery receipt signature verification failed: {error}"
                     ))
@@ -608,7 +608,7 @@ impl ChioKernel {
                 || !self
                     .finding_delivery_receipt_authorities
                     .contains(&parent.kernel_key)
-                || !parent.verify_signature().map_err(|error| {
+                || !parent.verify_integrity_embedded_key().map_err(|error| {
                     KernelError::Internal(format!(
                         "Finding delivery receipt signature verification failed: {error}"
                     ))
@@ -795,7 +795,7 @@ impl ChioKernel {
                 || !self
                     .finding_delivery_receipt_authorities
                     .contains(&parent.kernel_key)
-                || !parent.verify_signature().map_err(|error| {
+                || !parent.verify_integrity_embedded_key().map_err(|error| {
                     KernelError::Internal(format!(
                         "Finding delivery receipt signature verification failed: {error}"
                     ))

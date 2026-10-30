@@ -71,7 +71,7 @@ fn receipt_set_digest_has_an_exact_v1_golden_vector() -> TestResult {
     let (certificate, _) = valid_fixture()?;
     assert_eq!(
         certificate.body.receipt_set_digest,
-        "aedaddf6066ea64aab943075bcc6cca90f0e5af33f86dde1a4f72026de450dcd"
+        "1d9db3821b5ffe8d9db8209e60da73fe0919ac7a5c5d7f95402265304b9ef784"
     );
     Ok(())
 }
@@ -268,7 +268,10 @@ fn compliance_bundle_without_profile_does_not_assert_guard_or_scope_checks() -> 
 fn compliance_bundle_refuses_signed_time_coverage_mismatch() -> TestResult {
     let (signer, entries, config, mut certificate) = signed_fixture(&[1])?;
     certificate.body.issued_at = 50;
-    certificate.signature = signer.sign(&canonical_json_bytes(&certificate.body)?);
+    certificate.signature = signer.sign_wrapped(
+        COMPLIANCE_CERTIFICATE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&certificate.body)?,
+    )?;
     assert!(
         !verify_compliance_certificate(
             &certificate,

@@ -70,7 +70,7 @@ pub(super) fn receipt_bytes(connection: &Connection, start: u64, end: u64) -> Ve
         .map(|row| {
             let (sequence, raw) = row.unwrap();
             let receipt: ChioReceipt = serde_json::from_str(&raw).unwrap();
-            assert!(receipt.verify_signature().unwrap());
+            assert!(receipt.verify_integrity_embedded_key().unwrap());
             (
                 u64::try_from(sequence).unwrap(),
                 canonical_json_bytes(&receipt).unwrap(),

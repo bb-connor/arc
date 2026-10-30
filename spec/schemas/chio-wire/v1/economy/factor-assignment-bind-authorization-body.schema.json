@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/factor-assignment-bind-authorization-body.schema.json",
+  "title": "chio.factor.assignment-bind-authorization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "actionNonce",
+    "agreementId",
+    "authorityId",
+    "authorityKeyEpoch",
+    "buyerId",
+    "buyerSettlementDestinationRef",
+    "effectiveAtUnixMs",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "normalizedRequestDigest",
+    "obligationAtomDigest",
+    "operationId",
+    "schema",
+    "sellerId"
+  ],
+  "properties": {
+    "action": {
+      "type": "string"
+    },
+    "actionNonce": {
+      "type": "string"
+    },
+    "agreementId": {
+      "type": "string"
+    },
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "buyerId": {
+      "type": "string"
+    },
+    "buyerSettlementDestinationRef": {
+      "type": "string"
+    },
+    "effectiveAtUnixMs": {
+      "type": "integer"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "normalizedRequestDigest": {
+      "type": "string"
+    },
+    "obligationAtomDigest": {
+      "type": "string"
+    },
+    "operationId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.factor.assignment-bind-authorization.v1"
+    },
+    "sellerId": {
+      "type": "string"
+    }
+  }
+}

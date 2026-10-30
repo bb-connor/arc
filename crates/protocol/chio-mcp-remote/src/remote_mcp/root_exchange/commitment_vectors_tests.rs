@@ -66,9 +66,12 @@ fn prepared() -> PreparedAnchoredRoot {
     }))
     .test_expect("policy shape");
     let signature = policy_key
-        .sign_canonical(&unsigned.signing_body())
-        .test_expect("sign policy")
-        .0;
+        .sign_wrapped(
+            chio_core::root_authority::CHIO_ROOT_POLICY_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body())
+                .test_expect("canonical policy body"),
+        )
+        .test_expect("sign policy");
     let mut fields = unsigned.into_fields();
     fields.signature = signature;
     let policy = RootPolicy::new(fields)

@@ -236,11 +236,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "web3 test module with public-settlement review regressions; capped until split",
         max_lines=2_697,
     ),
-    "crates/kernel/chio-swarm-authority/src/verifier.rs": allow(
-        "2026-10-31",
-        "swarm authority verifier surface; capped to current size until split",
-        max_lines=2_004,
-    ),
     "crates/platform/chio-transaction-passport/src/runtime_security/artifacts.rs": allow(
         "2026-11-30",
         "runtime security artifact verifier with trusted join and overflow hardening; capped until split",
@@ -250,11 +245,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-11-30",
         "launch proof CLI fixture contract suite; capped to current size until split",
         max_lines=2_210,
-    ),
-    "crates/products/chio-cli/tests/proof_verify/support.rs": allow(
-        "2026-11-30",
-        "launch proof verifier support module; capped to current size until split",
-        max_lines=2_231,
     ),
     "crates/products/chio-proof-room/src/lib.rs": allow(
         "2026-10-31",
@@ -290,11 +280,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "2026-12-31",
         "trust-control cluster and reports surface with mixed-version revocation cursor coverage; capped to current size until split",
         max_lines=2_605,
-    ),
-    "crates/platform/chio-store-sqlite/src/budget_store/tests.rs": allow(
-        "2026-12-31",
-        "existing oversized budget store test suite; capped to current size until split",
-        max_lines=2_399,
     ),
     "crates/economy/chio-web3/src/settlement_proof.rs": allow(
         "2026-11-30",
@@ -380,11 +365,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cognition challenge authority store regression suite; capped to current size until split",
         max_lines=4_760,
         max_fragments=2,
-    ),
-    "crates/trust/chio-finding-challenge/tests/support/mod.rs": allow(
-        "2026-11-30",
-        "cognition challenge authenticated standing fixtures; capped to current size until split",
-        max_lines=2_142,
     ),
     "crates/platform/chio-store-sqlite/src/finding_purchase_store.rs": allow(
         "2026-12-31",

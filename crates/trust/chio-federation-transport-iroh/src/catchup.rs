@@ -1242,8 +1242,8 @@ mod tests {
     // -- Derived-binding tests: the lane-e production path resolves its signer
     // -- from the issuer-signed VerifiedDirectory, mirroring the direct push lane.
 
-    use crate::identity::revocation_signer_endorsement_preimage;
-    use crate::identity::transport_endorsement_preimage;
+    use crate::identity::sign_revocation_signer_endorsement;
+    use crate::identity::sign_transport_endorsement;
     use crate::identity::RevocationSignerEntry;
     use crate::identity::TransportDirectoryBundleBody;
     use crate::identity::TransportDirectoryBundleDocument;
@@ -1276,18 +1276,22 @@ mod tests {
             kernel_id: "did:chio:authority".to_string(),
             passport_public_key: passport.public_key(),
             transport_endpoint_id: transport,
-            passport_endorsement: passport.sign(&transport_endorsement_preimage(
+            passport_endorsement: sign_transport_endorsement(
+                &passport,
                 "did:chio:authority",
                 &transport,
-            )),
+            )
+            .unwrap(),
             revocation_signers: vec![RevocationSignerEntry {
                 signer_id: signer_id.to_string(),
                 oracle_public_key: oracle_public_key.clone(),
-                oracle_endorsement: passport.sign(&revocation_signer_endorsement_preimage(
+                oracle_endorsement: sign_revocation_signer_endorsement(
+                    &passport,
                     "did:chio:authority",
                     signer_id,
                     &oracle_public_key,
-                )),
+                )
+                .unwrap(),
             }],
             removed: false,
         };
@@ -1308,7 +1312,12 @@ mod tests {
             issued_at_unix_ms: BUNDLE_NOW - 1,
             expires_at_unix_ms: BUNDLE_NOW + 1,
         };
-        let (signature, _) = issuer.sign_canonical(&body).unwrap();
+        let signature = issuer
+            .sign_wrapped(
+                crate::identity::TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+            )
+            .unwrap();
         let bundle = TransportDirectoryBundleDocument {
             schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
             body,

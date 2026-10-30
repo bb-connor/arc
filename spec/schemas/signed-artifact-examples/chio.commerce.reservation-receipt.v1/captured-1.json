@@ -1,0 +1,12 @@
+{
+  "depositor_account": "buyer:alice",
+  "order_id": "order-commerce-001",
+  "receipt_id": " ",
+  "reserved_amount": {
+    "currency": "USD",
+    "units": 4200
+  },
+  "schema": "chio.commerce.reservation-receipt.v1",
+  "token_offer_id": "offer-token-1",
+  "token_offer_sha256": "1fabfbcb25e68b7d6e55828513b374d84755b27aa98ba5dddada2fe54bb572ba"
+}

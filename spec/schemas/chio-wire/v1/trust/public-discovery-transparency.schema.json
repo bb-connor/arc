@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/public-discovery-transparency.schema.json",
+  "title": "Chio public discovery transparency signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entries",
+    "expiresAt",
+    "importGuardrails",
+    "publishedAt",
+    "publisher",
+    "schema",
+    "signerPublicKey",
+    "transparencyId",
+    "version"
+  ],
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "discoveryId",
+          "documentSha256",
+          "expiresAt",
+          "kind",
+          "metadataUrl",
+          "publishedAt"
+        ],
+        "properties": {
+          "discoveryId": {
+            "type": "string"
+          },
+          "documentSha256": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "metadataUrl": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "importGuardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "informationalOnly",
+        "requiresExplicitPolicyImport",
+        "requiresManualReview"
+      ],
+      "properties": {
+        "informationalOnly": {
+          "type": "boolean"
+        },
+        "requiresExplicitPolicyImport": {
+          "type": "boolean"
+        },
+        "requiresManualReview": {
+          "type": "boolean"
+        }
+      }
+    },
+    "publishedAt": {
+      "type": "integer"
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.public-discovery-transparency.v1"
+    },
+    "signerPublicKey": {
+      "type": "string"
+    },
+    "transparencyId": {
+      "type": "string"
+    },
+    "version": {
+      "type": "integer"
+    }
+  }
+}

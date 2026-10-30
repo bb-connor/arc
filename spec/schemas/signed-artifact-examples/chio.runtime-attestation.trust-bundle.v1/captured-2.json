@@ -1,0 +1,31 @@
+{
+  "bundleId": "bundle-2",
+  "descriptors": [
+    {
+      "body": {
+        "adapter": "azure_maa",
+        "appraisalArtifactSchema": "chio.runtime-attestation.appraisal-artifact.v1",
+        "appraisalResultSchema": "chio.runtime-attestation.appraisal-result.v1",
+        "attestationSchemas": [
+          "chio.runtime-attestation.azure-maa.jwt.v1"
+        ],
+        "descriptorId": "azure-prod",
+        "expiresAt": 120,
+        "issuedAt": 100,
+        "schema": "chio.runtime-attestation.verifier-descriptor.v1",
+        "signingKeyFingerprints": [
+          "sha256:azure-key-1"
+        ],
+        "verifier": "https://maa.contoso.test",
+        "verifierFamily": "azure_maa"
+      },
+      "signature": "a67871ce69bc115abdd5d0c45e9746842366597ba5abbdcab69006e44a2c02576f6f0c77b1f00feef7cd25db2c6084d5ffe445f060cb8ff09e76e0a2ada04203",
+      "signerKey": "9048cc32cab1744afd3268276b6df8d2c82567c7fb94ec2cff5e1d5fa7c6cd73"
+    }
+  ],
+  "expiresAt": 300,
+  "issuedAt": 100,
+  "publisher": "https://trust.contoso.test",
+  "schema": "chio.runtime-attestation.trust-bundle.v1",
+  "version": 1
+}

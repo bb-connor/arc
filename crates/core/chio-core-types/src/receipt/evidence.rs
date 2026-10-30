@@ -513,7 +513,7 @@ impl CapabilitySnapshot {
                 "contains a signed token with an invalid schema: {error}"
             ))
         })?;
-        if !token.verify_signature().map_err(|error| {
+        if !token.verify_integrity_embedded_key().map_err(|error| {
             self.conflict(&format!(
                 "contains a signed token that could not be verified: {error}"
             ))
@@ -799,6 +799,10 @@ pub struct ExportCommitment {
     pub schema: String,
     pub manifest_sha256: String,
     pub payload_sha256: String,
+}
+
+impl crate::receipt::lineage::SignedExportPayload for ExportCommitment {
+    const SCHEMA_ID: &'static str = EVIDENCE_EXPORT_COMMITMENT_SCHEMA;
 }
 
 /// The signed `export-envelope.json` of a package.

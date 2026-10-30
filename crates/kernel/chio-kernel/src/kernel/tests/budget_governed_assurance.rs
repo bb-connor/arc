@@ -790,13 +790,17 @@ fn governed_autonomy_policy_denies_delegated_autonomy_with_expired_bond() {
     assert!(error.to_string().contains("is expired"), "{error}");
 }
 
-#[test]
-fn governed_autonomy_policy_accepts_signed_active_bond_while_unsigned_dispatch_denies() {
+/// Runs the bonded delegated-autonomy policy check with the bond signed by
+/// `bond_signer`, or by the kernel's capability authority when `None`.
+fn bonded_autonomy_validation(
+    bond_signer: Option<&Keypair>,
+    db_label: &str,
+) -> Result<(), KernelError> {
     let mut kernel = make_kernel(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
-    let path = unique_receipt_db_path("kernel-bond-active");
+    let path = unique_receipt_db_path(db_label);
     let store = SqliteReceiptStore::open(&path).unwrap();
 
     let grant = with_minimum_autonomy_tier(
@@ -807,7 +811,7 @@ fn governed_autonomy_policy_accepts_signed_active_bond_while_unsigned_dispatch_d
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
     let bond = make_credit_bond(CreditBondFixture {
-        signer: &kernel.config.keypair,
+        signer: bond_signer.unwrap_or(&kernel.config.keypair),
         cap: &cap,
         server: "cost-srv",
         tool: "compute",
@@ -896,7 +900,23 @@ fn governed_autonomy_policy_accepts_signed_active_bond_while_unsigned_dispatch_d
         Some(&verified),
         now,
     );
-    validation.unwrap();
+    validation
+}
+
+#[test]
+fn governed_autonomy_policy_accepts_signed_active_bond_while_unsigned_dispatch_denies() {
+    bonded_autonomy_validation(None, "kernel-bond-active").unwrap();
+}
+
+#[test]
+fn governed_autonomy_policy_refuses_a_bond_self_signed_by_an_untrusted_key() {
+    let error = bonded_autonomy_validation(Some(&Keypair::generate()), "kernel-bond-untrusted")
+        .unwrap_err();
+    assert!(
+        matches!(&error, KernelError::GovernedTransactionDenied(reason)
+            if reason.starts_with("delegation bond `") && reason.ends_with("` signer is not the trusted credit authority")),
+        "{error}"
+    );
 }
 
 #[test]
@@ -1310,8 +1330,17 @@ fn payment_authority_expiry_is_the_earliest_capability_or_approval_expiry() {
                 proposal_deadline: 1_744_000_050,
                 policy_authority: kernel.config.keypair.public_key(),
             },
-            algorithm: None,
-            signature: kernel.config.keypair.sign(b"payment-authority-expiry"),
+            signature: kernel
+                .config
+                .keypair
+                .sign_wrapped(
+                    chio_core::capability::governance::THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
+                    &chio_core::canonical::CanonicalBytes::from_serializable(
+                        &"payment-authority-expiry",
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
         },
     );
     assert_eq!(

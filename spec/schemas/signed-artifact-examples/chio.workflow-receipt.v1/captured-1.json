@@ -1,0 +1,74 @@
+{
+  "agent_id": "buyer-agent",
+  "capability_id": "cap-chio-workflow",
+  "completed_at": 1766000042,
+  "duration_ms": 42000,
+  "id": "wf-chio-refund-001",
+  "kernel_key": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+  "outcome": {
+    "status": "completed"
+  },
+  "schema": "chio.workflow-receipt.v1",
+  "session_id": "sess-chio-refund",
+  "skill_id": "refund-underwriting",
+  "skill_version": "0.1.0",
+  "started_at": 1766000000,
+  "steps": [
+    {
+      "allowed": true,
+      "bilateral_dsse_sha256": "5ff4486fdb6565a1398fb341e66ec21ea8f97d6aeed7239b87d7e6f11090c3bb",
+      "consistency_anchor": "chio:consistency:wf-chio-refund-001:0",
+      "cost": {
+        "currency": "USD",
+        "units": 100
+      },
+      "duration_ms": 77,
+      "outcome": "success",
+      "output_hash": "d4a0dc2e587e4acc3278024b42796fb9978466207933c82ceb0a626c3a1b314a",
+      "server_id": "vendor-a.files",
+      "step_index": 0,
+      "tool_name": "read_refund_case",
+      "tool_receipt_id": "14b79693334d566639bdb36299b1b1e7efa4e5695135811dbc281e0474eeabf1"
+    },
+    {
+      "allowed": true,
+      "bilateral_dsse_sha256": "db3538600aade2753ae7c3a623f95950a8c2055e1136368b5a5c0155254601aa",
+      "consistency_anchor": "chio:consistency:wf-chio-refund-001:1",
+      "cost": {
+        "currency": "USD",
+        "units": 200
+      },
+      "duration_ms": 18,
+      "outcome": "success",
+      "output_hash": "9b72477f137629bca082c3482686272608acbb578eed09d2e178e4d7184ec2ef",
+      "parent_receipt_sha256": "62640df586f03debec063c3ac872ad2d3a9b936f3026d0147ddffbbce28c4b08",
+      "server_id": "vendor-b.kyc",
+      "step_index": 1,
+      "tool_name": "verify_customer",
+      "tool_receipt_id": "d7f8482b209bff9b6f8bf50918075074ce01f8d1fff46e97f6500671a0a61737"
+    },
+    {
+      "allowed": true,
+      "bilateral_dsse_sha256": "0fa61e7e40c5e1efbb3624f2ecebe2449511e9b4e0eb8e44fc3413f296f0c0f7",
+      "consistency_anchor": "chio:consistency:wf-chio-refund-001:2",
+      "cost": {
+        "currency": "USD",
+        "units": 250
+      },
+      "destructive": true,
+      "duration_ms": 12,
+      "governance_receipt_id": "gov-refund-stage-authorization",
+      "outcome": "success",
+      "output_hash": "3274eda6e928644236b9db29c1d207745880f5678845390f77644d9cf2e75978",
+      "parent_receipt_sha256": "ac4b0dd3538c33a3b9eb4e6772a1e63ec8094a8b9990b0e702338f507ff566e4",
+      "server_id": "vendor-c.payments",
+      "step_index": 2,
+      "tool_name": "stage_refund",
+      "tool_receipt_id": "899df74e9f357ef7a4d2f945482f2da20db5d5ec975c6109587133fadcc03e7c"
+    }
+  ],
+  "total_cost": {
+    "currency": "USD",
+    "units": 550
+  }
+}

@@ -171,9 +171,13 @@ pub fn sign_relay_alert_assurance_archive_package(
         input.archive_report,
         input.closeout_report,
     )?;
-    let (signature, _) = input
-        .signing_key
-        .sign_canonical(&body)
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            input.signing_key.sign_wrapped(
+                PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
+                &canonical,
+            )
+        })
         .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?;
     Ok(RelayAlertAssuranceArchivePackage {
         manifest: RelayAlertAssuranceArchivePackageManifest {
@@ -805,10 +809,13 @@ fn validate_trusted_archive_packagers(
             "trusted archive packager key is outside its validity window".to_string(),
         ));
     }
-    if !packager
-        .public_key
-        .verify_canonical(&manifest.body, &manifest.signature)
-        .map_err(|error| PheromoneRelayError::CanonicalJson(error.to_string()))?
+    if chio_core_types::crypto::verify_wrapped(
+        &packager.public_key,
+        PHEROMONE_RELAY_ALERT_ASSURANCE_ARCHIVE_PACKAGE_MANIFEST_SCHEMA,
+        &manifest.body,
+        &manifest.signature,
+    )
+    .is_err()
     {
         return Err(PheromoneRelayError::SignatureInvalid);
     }

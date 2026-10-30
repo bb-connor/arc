@@ -180,7 +180,10 @@ mod retention {
                 end_seq,
                 &bytes,
                 keypair,
-                Some(&chio_kernel_core::evidence_verify::validate_checkpoint(previous).unwrap()),
+                Some(
+                    &chio_kernel_core::evidence_verify::verify_integrity_embedded_key(previous)
+                        .unwrap(),
+                ),
                 &[
                     chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&previous.body)
                         .unwrap(),
@@ -490,7 +493,11 @@ mod retention {
 
         // Verify the checkpoint signature.
         assert!(
-            verify_checkpoint_signature(&loaded_cp).is_ok(),
+            verify_checkpoint_signature(
+                &loaded_cp,
+                std::slice::from_ref(&loaded_cp.body.kernel_key)
+            )
+            .is_ok(),
             "checkpoint signature should verify in archive"
         );
 

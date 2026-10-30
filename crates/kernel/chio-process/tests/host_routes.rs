@@ -122,7 +122,7 @@ async fn authenticated_worker_context_cannot_replace_host_route_or_process_attri
             .as_str()
             .ok_or("missing receipt")?,
     )?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     let metadata = receipt.metadata.ok_or("missing signed attribution")?;
     assert_eq!(metadata["route"], expected_route());
     assert_eq!(metadata["chio_process"]["process_id"], "root");
@@ -223,7 +223,7 @@ async fn route_absence_denies_before_effect_and_unrouted_binding_cannot_gain_a_r
     let request = runtime.tool_request("root", "effect", "tools", "append", json!({}))?;
     let denied = runtime.invoke("root", "effect", &request).await?;
     assert_eq!(denied.verdict, Verdict::Deny);
-    assert!(denied.receipt.verify_signature()?);
+    assert!(denied.receipt.verify_integrity_embedded_key()?);
     assert_eq!(effects.load(Ordering::SeqCst), 0);
     let routed = runtime.with_routes(routes()?)?;
     assert!(matches!(
@@ -301,7 +301,7 @@ async fn host_bound_worker_profile_is_attributed_and_cannot_be_supplied_by_the_w
                     .as_str()
                     .ok_or("missing receipt")?,
             )?;
-            assert!(receipt.verify_signature()?);
+            assert!(receipt.verify_integrity_embedded_key()?);
             let metadata = receipt.metadata.ok_or("missing signed attribution")?;
             Result::<Option<Value>>::Ok(metadata["chio_process"].get("worker_profile").cloned())
         }

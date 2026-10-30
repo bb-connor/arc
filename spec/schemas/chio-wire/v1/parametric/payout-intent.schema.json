@@ -1,0 +1,634 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/parametric/payout-intent.schema.json",
+  "title": "Chio parametric payout intent signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "binding",
+    "capitalInstruction",
+    "payoutIntentId",
+    "schema"
+  ],
+  "properties": {
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "beneficiaryId",
+        "boundCoverageBodyDigest",
+        "capitalInstructionBodyDigest",
+        "capitalInstructionEnvelopeDigest",
+        "capitalInstructionId",
+        "capitalInstructionTemplateDigest",
+        "claimId",
+        "completionFlowRowId",
+        "coverageHeadDigest",
+        "coverageReservationId",
+        "coverageReservationLifecycleFence",
+        "coverageReservationVersion",
+        "custodianAuthorityKeyEpoch",
+        "effectIdempotencyKey",
+        "effectSlot",
+        "effectSlotId",
+        "expectedClaimVersion",
+        "expectedLifecycleFence",
+        "facilityAuthorityKeyEpoch",
+        "fundingFacilityId",
+        "governedReceiptId",
+        "instructionSignerKeyEpoch",
+        "operationId",
+        "parametricPolicyBodyDigest",
+        "payerId",
+        "payoutRail",
+        "request",
+        "schema",
+        "sourceAccountDigest",
+        "triggerInstanceId"
+      ],
+      "properties": {
+        "amount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "beneficiaryId": {
+          "type": "string"
+        },
+        "boundCoverageBodyDigest": {
+          "type": "string"
+        },
+        "capitalInstructionBodyDigest": {
+          "type": "string"
+        },
+        "capitalInstructionEnvelopeDigest": {
+          "type": "string"
+        },
+        "capitalInstructionId": {
+          "type": "string"
+        },
+        "capitalInstructionTemplateDigest": {
+          "type": "string"
+        },
+        "claimId": {
+          "type": "string"
+        },
+        "completionFlowRowId": {
+          "type": "string"
+        },
+        "coverageHeadDigest": {
+          "type": "string"
+        },
+        "coverageReservationId": {
+          "type": "string"
+        },
+        "coverageReservationLifecycleFence": {
+          "type": "integer"
+        },
+        "coverageReservationVersion": {
+          "type": "integer"
+        },
+        "custodianAuthorityKeyEpoch": {
+          "type": "integer"
+        },
+        "effectIdempotencyKey": {
+          "type": "string"
+        },
+        "effectSlot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "actionDigest",
+            "admissionHandoff",
+            "anchorId",
+            "effectKind",
+            "idempotencyKey",
+            "namespace",
+            "operationId",
+            "parametersDigest",
+            "request",
+            "resourceHeadDigest",
+            "resourceKey",
+            "schema",
+            "slotId",
+            "state",
+            "target"
+          ],
+          "properties": {
+            "actionDigest": {
+              "type": "string"
+            },
+            "admissionHandoff": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lifecycleFence",
+                "operationVersion",
+                "state",
+                "storeFence"
+              ],
+              "properties": {
+                "lifecycleFence": {
+                  "type": "integer"
+                },
+                "operationVersion": {
+                  "type": "integer"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "storeFence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "lease_id",
+                    "owner_epoch",
+                    "store_uuid"
+                  ],
+                  "properties": {
+                    "lease_id": {
+                      "type": "string"
+                    },
+                    "owner_epoch": {
+                      "type": "integer"
+                    },
+                    "store_uuid": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "anchorId": {
+              "type": "string"
+            },
+            "effectKind": {
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "operationId": {
+              "type": "string"
+            },
+            "parametersDigest": {
+              "type": "string"
+            },
+            "request": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "requestBindingDigest",
+                "requestId",
+                "requestNamespaceDigest"
+              ],
+              "properties": {
+                "requestBindingDigest": {
+                  "type": "string"
+                },
+                "requestId": {
+                  "type": "string"
+                },
+                "requestNamespaceDigest": {
+                  "type": "string"
+                }
+              }
+            },
+            "resourceHeadDigest": {
+              "type": "string"
+            },
+            "resourceKey": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "resourceFamily",
+                "resourceId",
+                "scopeId"
+              ],
+              "properties": {
+                "resourceFamily": {
+                  "type": "string"
+                },
+                "resourceId": {
+                  "type": "string"
+                },
+                "scopeId": {
+                  "type": "string"
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            },
+            "slotId": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "target": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "qualificationDigest",
+                "targetId",
+                "targetKeyEpoch"
+              ],
+              "properties": {
+                "qualificationDigest": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "targetKeyEpoch": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "effectSlotId": {
+          "type": "string"
+        },
+        "expectedClaimVersion": {
+          "type": "integer"
+        },
+        "expectedLifecycleFence": {
+          "type": "integer"
+        },
+        "facilityAuthorityKeyEpoch": {
+          "type": "integer"
+        },
+        "fundingFacilityId": {
+          "type": "string"
+        },
+        "governedReceiptId": {
+          "type": "string"
+        },
+        "instructionSignerKeyEpoch": {
+          "type": "integer"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "parametricPolicyBodyDigest": {
+          "type": "string"
+        },
+        "payerId": {
+          "type": "string"
+        },
+        "payoutRail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "destinationAccountDigest",
+            "kind",
+            "railId"
+          ],
+          "properties": {
+            "destinationAccountDigest": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "railId": {
+              "type": "string"
+            }
+          }
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "requestBindingDigest",
+            "requestId",
+            "requestNamespaceDigest"
+          ],
+          "properties": {
+            "requestBindingDigest": {
+              "type": "string"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "requestNamespaceDigest": {
+              "type": "string"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "sourceAccountDigest": {
+          "type": "string"
+        },
+        "triggerInstanceId": {
+          "type": "string"
+        }
+      }
+    },
+    "capitalInstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "signature",
+        "signerKey"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "action",
+            "amount",
+            "authorityChain",
+            "completionFlowRowId",
+            "counterpartyId",
+            "counterpartyRole",
+            "description",
+            "executionWindow",
+            "governedReceiptId",
+            "instructionId",
+            "intendedState",
+            "issuedAt",
+            "ownerRole",
+            "query",
+            "rail",
+            "reconciledState",
+            "schema",
+            "sourceId",
+            "sourceKind",
+            "subjectKey",
+            "supportBoundary"
+          ],
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "amount": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "authorityChain": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "approvedAt",
+                  "authorityProof",
+                  "expiresAt",
+                  "principalId",
+                  "role"
+                ],
+                "properties": {
+                  "approvedAt": {
+                    "type": "integer"
+                  },
+                  "authorityProof": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "body",
+                      "signature",
+                      "signerKey"
+                    ],
+                    "properties": {
+                      "body": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "approvedAt",
+                          "expiresAt",
+                          "principalId",
+                          "role",
+                          "schema"
+                        ],
+                        "properties": {
+                          "approvedAt": {
+                            "type": "integer"
+                          },
+                          "expiresAt": {
+                            "type": "integer"
+                          },
+                          "principalId": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "schema": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "signature": {
+                        "type": "string"
+                      },
+                      "signerKey": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "expiresAt": {
+                    "type": "integer"
+                  },
+                  "principalId": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "completionFlowRowId": {
+              "type": "string"
+            },
+            "counterpartyId": {
+              "type": "string"
+            },
+            "counterpartyRole": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "executionWindow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "notAfter",
+                "notBefore"
+              ],
+              "properties": {
+                "notAfter": {
+                  "type": "integer"
+                },
+                "notBefore": {
+                  "type": "integer"
+                }
+              }
+            },
+            "governedReceiptId": {
+              "type": "string"
+            },
+            "instructionId": {
+              "type": "string"
+            },
+            "intendedState": {
+              "type": "string"
+            },
+            "issuedAt": {
+              "type": "integer"
+            },
+            "ownerRole": {
+              "type": "string"
+            },
+            "query": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agentSubject",
+                "bondLimit",
+                "facilityLimit",
+                "lossEventLimit",
+                "receiptLimit"
+              ],
+              "properties": {
+                "agentSubject": {
+                  "type": "string"
+                },
+                "bondLimit": {
+                  "type": "integer"
+                },
+                "facilityLimit": {
+                  "type": "integer"
+                },
+                "lossEventLimit": {
+                  "type": "integer"
+                },
+                "receiptLimit": {
+                  "type": "integer"
+                }
+              }
+            },
+            "rail": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "custodyProviderId",
+                "destinationAccountRef",
+                "jurisdiction",
+                "kind",
+                "railId",
+                "sourceAccountRef"
+              ],
+              "properties": {
+                "custodyProviderId": {
+                  "type": "string"
+                },
+                "destinationAccountRef": {
+                  "type": "string"
+                },
+                "jurisdiction": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "railId": {
+                  "type": "string"
+                },
+                "sourceAccountRef": {
+                  "type": "string"
+                }
+              }
+            },
+            "reconciledState": {
+              "type": "string"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "sourceId": {
+              "type": "string"
+            },
+            "sourceKind": {
+              "type": "string"
+            },
+            "subjectKey": {
+              "type": "string"
+            },
+            "supportBoundary": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "automaticDispatchSupported",
+                "capitalBookAuthoritative",
+                "custodyNeutralInstructionSupported",
+                "externalExecutionAuthoritative"
+              ],
+              "properties": {
+                "automaticDispatchSupported": {
+                  "type": "boolean"
+                },
+                "capitalBookAuthoritative": {
+                  "type": "boolean"
+                },
+                "custodyNeutralInstructionSupported": {
+                  "type": "boolean"
+                },
+                "externalExecutionAuthoritative": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "signature": {
+          "type": "string"
+        },
+        "signerKey": {
+          "type": "string"
+        }
+      }
+    },
+    "payoutIntentId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.parametric.payout-intent.v1"
+    }
+  }
+}

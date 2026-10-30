@@ -88,14 +88,10 @@ pub(super) fn decision(
             "approval token does not authorize this record",
         ));
     }
-    if !token
-        .approver
-        .verify_canonical_strict(&token.body(), &token.signature)
-        .map_err(|error| {
-            warn!(error = %error, "operator approval signature could not be verified");
-            failure(StatusCode::BAD_REQUEST, "approval signature is invalid")
-        })?
-    {
+    if !token.verify_integrity_embedded_key().map_err(|error| {
+        warn!(error = %error, "operator approval signature could not be verified");
+        failure(StatusCode::BAD_REQUEST, "approval signature is invalid")
+    })? {
         return Err(failure(
             StatusCode::BAD_REQUEST,
             "approval signature is invalid",

@@ -22,19 +22,23 @@ pub fn verify_federation_policy(
             "federation policy created_at must be less than or equal to expires_at",
         ));
     }
-    let signed = policy
-        .body
-        .signer_public_key
-        .verify_canonical(&policy.body, &policy.signature)
-        .map_err(|error| {
-            BundleVerifyError::signature(format!(
+    match chio_core_types::crypto::verify_wrapped(
+        &policy.body.signer_public_key,
+        FEDERATION_POLICY_SCHEMA,
+        &policy.body,
+        &policy.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core_types::Error::SignatureRejected) => {
+            return Err(BundleVerifyError::signature(
+                "federation policy signature verification failed",
+            ));
+        }
+        Err(error) => {
+            return Err(BundleVerifyError::signature(format!(
                 "federation policy signature verification failed: {error}"
-            ))
-        })?;
-    if !signed {
-        return Err(BundleVerifyError::signature(
-            "federation policy signature verification failed",
-        ));
+            )));
+        }
     }
     match &policy.body.query.read_boundary {
         Some(ReceiptReadBoundary::TenantScoped { tenant }) => {

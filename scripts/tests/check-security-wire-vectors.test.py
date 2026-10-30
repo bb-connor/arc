@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import hashlib
 import importlib.util
 import json
 import tempfile
@@ -566,6 +567,50 @@ class SecurityWireVectorContract(unittest.TestCase):
         )
         with self.assertRaisesRegex(MODULE.ContractError, "non-empty array"):
             MODULE.validate_corpus(self.root)
+
+
+class BrokerAuditSigningWrapper(unittest.TestCase):
+    POSITIVE = ROOT / "tests/bindings/vectors/security/signed-wire/positive"
+
+    def load(self, name: str) -> dict:
+        return json.loads((self.POSITIVE / name).read_text(encoding="utf-8"))
+
+    def test_wrapper_is_prefix_schema_digest_and_body_digest(self) -> None:
+        wrapper = MODULE.signing_wrapper("chio.example.v1", {"a": 1})
+        self.assertEqual(len(wrapper), 88)
+        self.assertEqual(wrapper[:24], b"chio.signing-wrapper.v1\0")
+        self.assertEqual(
+            wrapper[24:56], hashlib.sha256(b"chio.example.v1").digest()
+        )
+        self.assertEqual(wrapper[56:], hashlib.sha256(b'{"a":1}').digest())
+
+    def test_committed_pair_verifies_under_the_wrapper(self) -> None:
+        comparison = self.load("broker-audit-comparison-envelope-v1.json")
+        runner = self.load("broker-audit-runner-authorization-envelope-v1.json")
+        self.assertTrue(MODULE.broker_audit_pair_semantic_valid(comparison, runner))
+
+    def test_envelopes_carry_no_algorithm_member(self) -> None:
+        runner = self.load("broker-audit-runner-authorization-envelope-v1.json")
+        runner["algorithm"] = "ed25519"
+        self.assertFalse(MODULE.broker_audit_signed_envelope_semantic_valid(runner, True))
+
+    def test_signature_over_another_schema_id_is_rejected(self) -> None:
+        runner = self.load("broker-audit-runner-authorization-envelope-v1.json")
+        message = MODULE.signing_wrapper(
+            "chio.broker-audit-comparison.v1", runner["body"]
+        )
+        self.assertFalse(
+            MODULE.ed25519_verify(runner["signer"], runner["signature"], message)
+        )
+
+    def test_prefixed_domain_message_is_rejected(self) -> None:
+        runner = self.load("broker-audit-runner-authorization-envelope-v1.json")
+        message = b"chio.broker-audit-runner-authorization-signature.v1\0" + (
+            MODULE.canonical_json(runner["body"])
+        )
+        self.assertFalse(
+            MODULE.ed25519_verify(runner["signer"], runner["signature"], message)
+        )
 
 
 if __name__ == "__main__":

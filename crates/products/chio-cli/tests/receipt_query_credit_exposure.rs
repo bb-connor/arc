@@ -138,7 +138,7 @@ fn test_exposure_ledger_report_surfaces() {
     assert_eq!(response.status(), reqwest::StatusCode::OK);
     let report: SignedExposureLedgerReport = response.json().expect("parse signed exposure ledger");
     assert!(report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .expect("verify exposure ledger signature"));
     assert_eq!(report.body.schema, "chio.credit.exposure-ledger.v1");
     assert_eq!(report.body.summary.matching_receipts, 3);
@@ -211,7 +211,7 @@ fn test_exposure_ledger_report_surfaces() {
     let cli_report: SignedExposureLedgerReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse exposure ledger CLI json");
     assert!(cli_report
-        .verify_signature()
+        .verify_signature(&cli_report.signer_key)
         .expect("verify exposure ledger CLI signature"));
     assert_eq!(cli_report.body.summary.matching_receipts, 3);
     assert_eq!(cli_report.body.summary.matching_decisions, 1);
@@ -459,7 +459,7 @@ fn test_credit_scorecard_report_surfaces() {
     let report: SignedCreditScorecardReport =
         response.json().expect("parse signed credit scorecard");
     assert!(report
-        .verify_signature()
+        .verify_signature(&report.signer_key)
         .expect("verify credit scorecard signature"));
     assert_eq!(report.body.schema, "chio.credit.scorecard.v1");
     assert_eq!(report.body.summary.matching_receipts, 3);
@@ -518,7 +518,7 @@ fn test_credit_scorecard_report_surfaces() {
     let cli_report: SignedCreditScorecardReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse credit scorecard CLI json");
     assert!(cli_report
-        .verify_signature()
+        .verify_signature(&cli_report.signer_key)
         .expect("verify credit scorecard CLI signature"));
     assert_eq!(cli_report.body.summary.matching_receipts, 3);
     assert!(cli_report.body.summary.probationary);

@@ -2253,7 +2253,7 @@ fn mcp_serve_enforces_filesystem_resource_roots_with_signed_evidence() {
     let receipt: ChioReceipt = serde_json::from_value(denied["error"]["data"]["receipt"].clone())
         .expect("deserialize deny receipt");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("verify receipt signature"));
     assert!(receipt.is_denied());
     assert_eq!(receipt.tool_name, "resources/read");
@@ -2345,7 +2345,7 @@ fn mcp_serve_denies_filesystem_resources_when_roots_are_missing() {
     let receipt: ChioReceipt = serde_json::from_value(denied["error"]["data"]["receipt"].clone())
         .expect("deserialize deny receipt");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .expect("verify receipt signature"));
     assert!(receipt.is_denied());
     assert_eq!(receipt.tool_name, "resources/read");

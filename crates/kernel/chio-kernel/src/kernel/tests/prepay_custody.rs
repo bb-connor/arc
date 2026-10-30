@@ -293,7 +293,7 @@ impl Fixture {
             100,
             "unconfirmed prepaid capture retains its budget exposure"
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let receipts = self.kernel.receipt_log();
         assert_eq!(receipts.len(), 1);
         assert_eq!(
@@ -442,7 +442,7 @@ fn settled_prepayment_mints_one_nonce_without_tool_dispatch() -> TestResult {
     assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.exposure()?, 100);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -470,7 +470,7 @@ fn definite_authorization_decline_keeps_clean_pre_dispatch_denial() -> TestResul
     assert!(financial
         .and_then(|financial| financial.get("authorization_id"))
         .is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -483,7 +483,7 @@ fn outcome_unknown_prepayment_signs_its_rail_evidence() -> TestResult {
     assert_eq!(fixture.counters.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 0);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response
         .receipt
         .metadata
@@ -520,7 +520,7 @@ fn outcome_unknown_prepayment_denial_keeps_the_fixed_reason() -> TestResult {
         }
         other => panic!("expected a kernel deny decision, got {other:?}"),
     }
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert!(!serde_json::to_string(&response.receipt)?.contains(SENSITIVE_ERROR));
     let financial = &response
         .receipt

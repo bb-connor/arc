@@ -268,7 +268,7 @@ pub fn compose_clearing_zero_intent_reconciliation_transition(
     )?;
     if expected != *body
         || signed_reconciliation.signer_key != trust.obligation_authority_key
-        || !signed_reconciliation.verify_signature()?
+        || !signed_reconciliation.verify_integrity_embedded_key()?
     {
         return Err(ClearingError::AuthorityVerification);
     }

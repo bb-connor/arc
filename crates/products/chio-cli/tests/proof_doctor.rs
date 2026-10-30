@@ -1409,8 +1409,11 @@ fn sign_bundle_signature(bundle: &Path, signature: &mut serde_json::Value) {
     signature["payloadRef"]["sha256"] =
         serde_json::Value::String(chio_core::sha256_hex(&manifest_bytes));
     signature["signatures"][0]["keyid"] = serde_json::Value::String(keypair.public_key().to_hex());
-    signature["signatures"][0]["sig"] =
-        serde_json::Value::String(keypair.sign(&signed_payload).to_hex());
+    signature["signatures"][0]["sig"] = serde_json::Value::String(
+        keypair
+            .sign_exempt(chio_core::crypto::ExemptFormat::DssePae, &signed_payload)
+            .to_hex(),
+    );
 }
 
 fn refresh_bundle_signature(bundle: &Path) {

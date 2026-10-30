@@ -264,7 +264,7 @@ fn fully_enforced_release_receipt_is_signed_verified_and_persistable() {
     let receipt = sign_cage_receipt(body.clone(), &signing_context(), &backend)
         .test_expect("signed cage receipt");
     assert!(receipt
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_expect("signature verification"));
     assert_eq!(
         verify_signed_cage_receipt(&receipt).test_expect("cage receipt verification"),

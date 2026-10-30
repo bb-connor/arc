@@ -1,0 +1,66 @@
+{
+  "authorityKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+  "delegationDepthLimit": 4,
+  "event": {
+    "admission_sequence": 1,
+    "delegation_depth": 1,
+    "kind": "evaluate",
+    "receipt": {
+      "action": {
+        "parameter_hash": "015c56323a283d5727a00db50dd2d1f310efa12c5a804e945880d910664f177b",
+        "parameters": {
+          "nonce": 1
+        }
+      },
+      "boundary_class": "prevent",
+      "capability_id": "cap-runtime-trace-child",
+      "content_hash": "015c56323a283d5727a00db50dd2d1f310efa12c5a804e945880d910664f177b",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "60a912b91ef9e6f883299db9e8a79e014c2c605fc62d39d0e83d1a26745f407b",
+      "kernel_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 1,
+          "grant_index": 0,
+          "issuer_key": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
+          "subject_key": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a"
+        },
+        "chio_receipt_signing_nonce": "rcpt-01a1827d-8105-7552-b8d2-72e53cfc292f",
+        "chio_runtime": {
+          "identity_disposition": "terminal"
+        },
+        "receipt_context": {
+          "evaluation_id": "01a1827d-80d2-7373-ac1a-473fc5656001",
+          "request_id": "runtime-trace-allow",
+          "request_namespace_digest": "37131c9d952c3f926b2d209f3d1efcb4cc8e038c408ca608e3ad4320efa824b1"
+        }
+      },
+      "policy_hash": "0150fc694e0fc8af62b7f7d219f2beef53350bf69424ef205e18b2a4bc87bd5d",
+      "receipt_kind": "mediated_decision",
+      "redaction_mode": "none",
+      "signature": "9d4e9c14d4a30f3c60ece18a70fc7ce1c582b8d52f2f0cacb648aee4185b3a433b2197d7f63bcb762d82059f8c3156019e6a75490ee3bcaff0c5f1a2e38ce403",
+      "timestamp": 1793190625,
+      "tool_name": "echo",
+      "tool_origin": "caller_executed",
+      "tool_server": "conformance",
+      "trust_level": "mediated"
+    },
+    "receipt_time": 1,
+    "request_id": "runtime-trace-allow",
+    "revocation_admitted": true,
+    "revocation_source_id": null,
+    "revocation_subject_ids": [
+      "cap-runtime-trace-child",
+      "cap-01a1827d-7ee8-7f17-9988-251212b8adf2"
+    ],
+    "seen_epoch": 0
+  },
+  "runtimeEventCount": 5,
+  "schema": "chio.trace-observation.v1",
+  "sequence": 1,
+  "sourceSequence": 2,
+  "traceId": "runtime:a1ce180b11962e6ec5d9d8d3bd3896a58a7e8e53d7bace19d5dab5134b29621e:42c7104259d13e3c2fb6eb3b37dae6753b87a0d6076876c56a998e3f1607ec1f",
+  "traceLength": 3
+}

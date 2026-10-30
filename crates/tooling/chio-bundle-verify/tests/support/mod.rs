@@ -192,10 +192,26 @@ pub fn manifest_for_bundle(bundle: &EvidenceExportBundle) -> EvidenceExportManif
     }
 }
 
+/// The distinct kernel keys `checkpoints` carry.
+pub fn carried_keys(checkpoints: &[KernelCheckpoint]) -> Vec<PublicKey> {
+    let mut keys: Vec<PublicKey> = Vec::new();
+    for checkpoint in checkpoints {
+        if !keys.contains(&checkpoint.body.kernel_key) {
+            keys.push(checkpoint.body.kernel_key.clone());
+        }
+    }
+    keys
+}
+
 /// Write `bundle` as a package signed by `signer`, with the transparency the
 /// checkpoints derive.
 pub fn write(dir: &Path, bundle: &EvidenceExportBundle, signer: &Keypair) {
-    let transparency = verify_transparency(&bundle.checkpoints, None).test_unwrap();
+    let transparency = verify_transparency(
+        &bundle.checkpoints,
+        None,
+        &carried_keys(&bundle.checkpoints),
+    )
+    .test_unwrap();
     write_with_transparency(dir, bundle, &transparency, signer);
 }
 

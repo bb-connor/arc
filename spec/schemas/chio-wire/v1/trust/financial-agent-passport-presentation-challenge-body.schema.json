@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/financial-agent-passport-presentation-challenge-body.schema.json",
+  "title": "chio.financial-agent-passport-presentation-challenge.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "challengeDigest",
+    "challengeId",
+    "expiresAt",
+    "issuedAt",
+    "nonce",
+    "schema",
+    "selectors",
+    "sourcePassportId",
+    "verifier",
+    "verifierKeyEpoch"
+  ],
+  "properties": {
+    "challengeDigest": {
+      "type": "string"
+    },
+    "challengeId": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "string"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial-agent-passport-presentation-challenge.v1"
+    },
+    "selectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "credentialRefDigest",
+          "family"
+        ],
+        "properties": {
+          "credentialRefDigest": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sourcePassportId": {
+      "type": "string"
+    },
+    "verifier": {
+      "type": "string"
+    },
+    "verifierKeyEpoch": {
+      "type": "integer"
+    }
+  }
+}

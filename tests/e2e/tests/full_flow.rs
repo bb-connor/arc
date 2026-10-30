@@ -312,7 +312,7 @@ async fn full_flow_allowed_tool_call() {
     // The receipt should be Allow and its signature should verify.
     assert!(resp.receipt.is_allowed());
     assert!(
-        resp.receipt.verify_signature().unwrap(),
+        resp.receipt.verify_integrity_embedded_key().unwrap(),
         "receipt signature must verify"
     );
     assert_eq!(resp.receipt.capability_id, cap.id);
@@ -345,7 +345,7 @@ async fn full_flow_denied_by_forbidden_path() {
     // The receipt should be Deny and its signature should still verify.
     assert!(resp.receipt.is_denied());
     assert!(
-        resp.receipt.verify_signature().unwrap(),
+        resp.receipt.verify_integrity_embedded_key().unwrap(),
         "deny receipt signature must verify"
     );
 }
@@ -373,7 +373,7 @@ async fn full_flow_denied_shell_command() {
         "expected denial by shell_command guard, got: {reason}"
     );
     assert!(resp.receipt.is_denied());
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Denied by capability -- wrong tool
@@ -402,7 +402,7 @@ async fn full_flow_denied_wrong_tool() {
         "expected out-of-scope denial, got: {reason}"
     );
     assert!(resp.receipt.is_denied());
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Denied by capability -- expired
@@ -457,7 +457,7 @@ async fn full_flow_denied_expired_capability() {
         "expected expiration denial, got: {reason}"
     );
     assert!(resp.receipt.is_denied());
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Revocation cascade
@@ -600,7 +600,10 @@ async fn full_flow_revocation_cascade() {
         "expected delegation chain revocation, got: {reason}"
     );
     assert!(resp_revoked.receipt.is_denied());
-    assert!(resp_revoked.receipt.verify_signature().unwrap());
+    assert!(resp_revoked
+        .receipt
+        .verify_integrity_embedded_key()
+        .unwrap());
 }
 
 // Test: Receipt chain integrity
@@ -631,7 +634,7 @@ async fn full_flow_receipt_chain() {
     for (i, receipt) in receipts.iter().enumerate() {
         // Signature must verify.
         assert!(
-            receipt.verify_signature().unwrap(),
+            receipt.verify_integrity_embedded_key().unwrap(),
             "receipt {i} signature must verify"
         );
 
@@ -695,7 +698,7 @@ async fn full_flow_guard_error_fails_closed() {
         "expected fail-closed denial, got: {reason}"
     );
     assert!(resp.receipt.is_denied());
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Multiple guard types in pipeline
@@ -741,7 +744,7 @@ async fn full_flow_guard_pipeline_mixed_verdicts() {
     );
     let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(resp_ok.verdict, Verdict::Allow);
-    assert!(resp_ok.receipt.verify_signature().unwrap());
+    assert!(resp_ok.receipt.verify_integrity_embedded_key().unwrap());
 
     // A call with a forbidden path should be denied.
     let req_bad = make_request(
@@ -753,7 +756,7 @@ async fn full_flow_guard_pipeline_mixed_verdicts() {
     let resp_bad = kernel.evaluate_tool_call(&req_bad).await.unwrap();
     assert_eq!(resp_bad.verdict, Verdict::Deny);
     assert!(resp_bad.receipt.is_denied());
-    assert!(resp_bad.receipt.verify_signature().unwrap());
+    assert!(resp_bad.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Receipt signature verified against kernel public key
@@ -770,7 +773,7 @@ async fn full_flow_receipt_verified_against_kernel_pk() {
     assert_eq!(resp.receipt.kernel_key, ca_kp.public_key());
 
     // And verify_signature checks against that embedded key.
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Invocation budget exhaustion
@@ -810,7 +813,7 @@ async fn full_flow_budget_exhaustion() {
         );
         let resp = kernel.evaluate_tool_call(&req).await.unwrap();
         assert_eq!(resp.verdict, Verdict::Allow, "call {i} should succeed");
-        assert!(resp.receipt.verify_signature().unwrap());
+        assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
     }
 
     // Third call should be denied due to budget exhaustion.
@@ -823,7 +826,7 @@ async fn full_flow_budget_exhaustion() {
         "expected budget exhaustion, got: {reason}"
     );
     assert!(resp.receipt.is_denied());
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Direct capability revocation
@@ -860,7 +863,7 @@ async fn full_flow_direct_revocation() {
         reason.contains("revoked"),
         "expected revocation denial, got: {reason}"
     );
-    assert!(resp2.receipt.verify_signature().unwrap());
+    assert!(resp2.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 // Test: Untrusted issuer rejected
@@ -926,5 +929,5 @@ async fn full_flow_untrusted_issuer() {
         reason.contains("not a trusted CA"),
         "expected untrusted issuer denial, got: {reason}"
     );
-    assert!(resp.receipt.verify_signature().unwrap());
+    assert!(resp.receipt.verify_integrity_embedded_key().unwrap());
 }

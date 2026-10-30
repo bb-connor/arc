@@ -567,7 +567,7 @@ fn signed_anchored_economic_terminal_preserves_the_anchor_requirement() -> TestR
         &economic_terminal_capabilities(),
         &signer,
     )?
-    .verify()?;
+    .verify_integrity_embedded_key()?;
     assert!(not_applied.requires_anchored_economic_commit());
     Ok(())
 }
@@ -595,7 +595,7 @@ fn signed_legacy_factor_terminals_remain_unanchored() -> TestResult {
             &economic_terminal_capabilities(),
             &signer,
         )?
-        .verify()?;
+        .verify_integrity_embedded_key()?;
         assert!(!verified.requires_anchored_economic_commit());
     }
     Ok(())

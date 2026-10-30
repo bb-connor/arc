@@ -26,7 +26,7 @@ fn compensated_replay_retains_signer(cancelled: bool) -> TestResult {
     )?;
     drop(admission);
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert!(matches!(
         (response.receipt.decision.as_ref(), cancelled),
         (Some(Decision::Deny { .. }), false) | (Some(Decision::Cancelled { .. }), true)

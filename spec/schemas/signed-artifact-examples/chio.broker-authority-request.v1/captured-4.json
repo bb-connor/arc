@@ -1,0 +1,134 @@
+{
+  "broker": "58936604abda112bc94933569c82f8d0cc0ddf92a3f8329f2f448f7f484a594c",
+  "issuedAtUnixSeconds": 1793191221,
+  "operation": {
+    "kind": "prepare_execution",
+    "request": {
+      "capability": {
+        "body": {
+          "audience": "native-broker",
+          "brokerQuotaKeyId": "native-broker-quota",
+          "capabilityId": "native-broker-cap",
+          "constraints": {
+            "allowedCallerHeaders": [
+              "content-type"
+            ],
+            "maximumBodyBytes": 128,
+            "maximumResponseBytes": 256,
+            "maximumTimeoutMs": 1000,
+            "providerOwnedHeaders": [
+              "authorization"
+            ],
+            "redirectPolicy": "disabled",
+            "requiredBodySha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+            "requiredPreviewSha256": null,
+            "streamingAllowed": false
+          },
+          "consumption": "capture_before_dispatch",
+          "credential": {
+            "credentialId": "credential",
+            "provider": "generic-https",
+            "version": 1
+          },
+          "destination": {
+            "exactPathAndQuery": "/v1",
+            "explicitPort": 443,
+            "method": "POST",
+            "normalizedHost": "example.com",
+            "scheme": "https"
+          },
+          "expiresAtUnixSeconds": 1800000300,
+          "issuedAtUnixSeconds": 1800000000,
+          "issuer": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+          "maximumExecutions": 1,
+          "notBeforeUnixSeconds": 1800000000,
+          "parentCapabilityId": "cap-01a3185c-5000-7530-b303-f498a188ff64",
+          "proof": {
+            "callerPublicKey": "54f094f69cbb3de09eb307b48d1c25e6666cf1f90993452e64d543d822931a98",
+            "mode": "public_key",
+            "nonceTtlSeconds": 300
+          },
+          "providerAdapterId": "bearer",
+          "providerAdapterVersion": 1,
+          "revocationId": "native-broker-revocation",
+          "schema": "chio.broker-capability.v1",
+          "subject": "54f094f69cbb3de09eb307b48d1c25e6666cf1f90993452e64d543d822931a98"
+        },
+        "signature": "83297aa340c3f088ac701f925ed373a5b07dfbc05396a49dad4a9a5574ebcb53b34ac0239ec2f8680b29483b89210ae7235899cea0bfe0719911f26c12f1c402"
+      },
+      "invocationId": "request-a",
+      "proof": {
+        "body": {
+          "authorityKey": "54f094f69cbb3de09eb307b48d1c25e6666cf1f90993452e64d543d822931a98",
+          "bodySha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "brokerCapabilityId": "native-broker-cap",
+          "callerHeadersSha256": "265e7b877c8e1768b9488972380d00a9601aac5e72d0e060cc1c3b951f3a1a13",
+          "callerOptionsSha256": "a313c3518b3952a0966c9e95322cea77df57b94e9e640030125a58654d073039",
+          "capabilityExpiresAtUnixSeconds": 1800000300,
+          "credential": {
+            "credentialId": "credential",
+            "provider": "generic-https",
+            "version": 1
+          },
+          "destination": {
+            "exactPathAndQuery": "/v1",
+            "explicitPort": 443,
+            "method": "POST",
+            "normalizedHost": "example.com",
+            "scheme": "https"
+          },
+          "issuedAtUnixSeconds": 1800000000,
+          "nonce": "11111111111111111111111111111111",
+          "parentCapabilityId": "cap-01a3185c-5000-7530-b303-f498a188ff64",
+          "schema": "chio.broker-request-proof.v1"
+        },
+        "signature": "ae02614575bb2b330a9860e9cfc7f450a23f84f224c31fbacc59ab1fd64fba80a5908405b348848d84b3c06a42bff4aed0f3354d8c0180710ece2dc13572950b"
+      },
+      "request": {
+        "approvedPreviewSha256": null,
+        "body": [
+          123,
+          125
+        ],
+        "destination": {
+          "exactPathAndQuery": "/v1",
+          "explicitPort": 443,
+          "method": "POST",
+          "normalizedHost": "example.com",
+          "scheme": "https"
+        },
+        "headers": [
+          {
+            "name": "content-type",
+            "value": [
+              97,
+              112,
+              112,
+              108,
+              105,
+              99,
+              97,
+              116,
+              105,
+              111,
+              110,
+              47,
+              106,
+              115,
+              111,
+              110
+            ]
+          }
+        ],
+        "options": {
+          "responseLimitBytes": 256,
+          "streaming": false,
+          "timeoutMs": 1000
+        }
+      },
+      "schema": "chio.broker-execute.v1"
+    }
+  },
+  "requestId": "a602643e0c9b2c2c923692a06d5dce6ecc16c232bb8a4662ee3b8a84bad2b350",
+  "schema": "chio.broker-authority-request.v1"
+}

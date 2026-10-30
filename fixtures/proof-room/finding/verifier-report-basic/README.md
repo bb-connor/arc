@@ -1,8 +1,7 @@
 # Verifier report fixture
 
-`report.json` is generated deterministically by the ignored
-`regenerate_market_golden_fixtures` test in `chio-finding`
-(`tests/market_schemas.rs`). The verifier authority, who signs the
+`report.json` is generated deterministically by
+`chio proof fixture regenerate`. The verifier authority, who signs the
 envelope, uses the test-only seed `[15_u8; 32]`, matching the
 verifier-report signer policy pinned by the profile fixture.
 

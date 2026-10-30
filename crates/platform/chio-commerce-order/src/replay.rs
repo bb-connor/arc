@@ -304,7 +304,7 @@ fn validate_event_authority_receipt(
             event.authority_receipt_ref
         )));
     }
-    let signature_valid = receipt.verify_signature().map_err(|error| {
+    let signature_valid = receipt.verify_integrity_embedded_key().map_err(|error| {
         CommerceOrderError::ReplaySignatureInvalid(format!(
             "authority receipt signature invalid: {}: {error}",
             event.authority_receipt_ref

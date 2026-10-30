@@ -272,7 +272,7 @@ pub(super) fn proof_package_contains_signed_receipt(
                 return Err("chio_buyer_review_proof_package_mismatch");
             }
             let signature_valid = receipt
-                .verify_signature()
+                .verify_integrity_embedded_key()
                 .map_err(|_| "chio_buyer_review_proof_package_mismatch")?;
             if !signature_valid {
                 return Err("chio_buyer_review_proof_package_mismatch");
@@ -379,7 +379,7 @@ pub(super) fn proof_package_receipt_subject(
             return Err("chio_buyer_review_proof_package_mismatch");
         }
         let signature_valid = receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .map_err(|_| "chio_buyer_review_proof_package_mismatch")?;
         if !signature_valid {
             return Err("chio_buyer_review_proof_package_mismatch");

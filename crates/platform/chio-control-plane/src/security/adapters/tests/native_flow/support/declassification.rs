@@ -143,7 +143,7 @@ fn native_declassification_executes_once_without_lowering_inherited_state() -> T
     assert!(
         matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
     );
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
     assert_completed(&fixture, false, false)?;
     let store = fixture.authority.admission_operation_store();

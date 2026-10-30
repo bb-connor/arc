@@ -1,0 +1,19 @@
+{
+  "chainId": "chain-1",
+  "currentSubject": "f8a8ac82ae92141213887846c987a41a0a4fc9770e4eaf2b757cd7310cbf7e82",
+  "delegationLinkHash": "delegation-link-hash-1",
+  "delegatorSubject": "delegator-subject",
+  "expiresAt": 2000,
+  "governedIntentHash": "intent-hash-1",
+  "issuedAt": 1000,
+  "nonce": "nonce-1",
+  "originSubject": "origin-subject",
+  "parentCapabilityId": "cap-parent-1",
+  "parentReceiptHash": "receipt-hash-1",
+  "parentReceiptId": "rc-parent-1",
+  "parentRequestId": "req-parent-1",
+  "schema": "chio.call_chain_continuation.v1",
+  "signer": "d551476e42a133192477ace30640db43fca0e2bdb42053ccfe69453c18d9fcf7",
+  "subject": "f8a8ac82ae92141213887846c987a41a0a4fc9770e4eaf2b757cd7310cbf7e82",
+  "tokenId": "continuation-1"
+}

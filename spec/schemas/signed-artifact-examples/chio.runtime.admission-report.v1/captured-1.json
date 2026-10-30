@@ -1,0 +1,151 @@
+{
+  "accepted": true,
+  "admissionId": "adm-live-1",
+  "checks": [
+    {
+      "code": "profile.schema",
+      "passed": true
+    },
+    {
+      "code": "profile.freshness",
+      "passed": true
+    },
+    {
+      "code": "bundle.schema",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.profile_verifier",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.schema",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.signature",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.signer",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.freshness",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.version",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.revocation_roots",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.bundle_binding",
+      "passed": true
+    },
+    {
+      "code": "bundle.host_kernel",
+      "passed": true
+    },
+    {
+      "code": "request.binding",
+      "passed": true
+    },
+    {
+      "code": "pheromone.query_report_signed",
+      "passed": true
+    },
+    {
+      "code": "runtime_policy.signature",
+      "passed": true
+    },
+    {
+      "code": "runtime_pheromone_query_report.signature",
+      "passed": true
+    },
+    {
+      "code": "runtime_peer_weights.signature",
+      "passed": true
+    },
+    {
+      "code": "runtime_policy.bindings",
+      "passed": true
+    },
+    {
+      "code": "pheromone.observe_only",
+      "passed": true
+    },
+    {
+      "code": "destructive.lease_reserved",
+      "passed": true
+    },
+    {
+      "code": "runtime_trust.floor",
+      "passed": true
+    }
+  ],
+  "pheromoneAdvisory": {
+    "accepted": true,
+    "distinctOriginPairs": 1,
+    "evaluatedAtUnixMs": 1800000001000,
+    "observeOnly": true,
+    "reputationEpoch": 7,
+    "sourceReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+    "subjectClass": "workflow.destructive_step",
+    "subjectClassNamespace": "chio.runtime",
+    "totalStrength": 0.1
+  },
+  "pheromonePolicyDecision": {
+    "decision": "allow",
+    "enforced": true,
+    "peerWeightsSha256": "76d0e582d1073a18fe175c9841bd36f77535763d9f956dd15b707c969b07607a",
+    "policyId": "policy-runtime-risk",
+    "policySha256": "057d34bda50e239a86d871dcc68fdf37288733854638b3b43e69db488e682b4b",
+    "queryReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+    "reasonCode": "runtime_pheromone_policy_allow",
+    "reputationEpoch": 7,
+    "schema": "chio.runtime.pheromone-policy-decision.v1"
+  },
+  "receiptMetadata": {
+    "chio_runtime": {
+      "accepted": true,
+      "admission_id": "adm-live-1",
+      "destructive": true,
+      "failure_code": null,
+      "governance_receipt_id": "gov-live-1",
+      "lease_id": "lease-live-1",
+      "pheromone_advisory": {
+        "accepted": true,
+        "distinctOriginPairs": 1,
+        "evaluatedAtUnixMs": 1800000001000,
+        "observeOnly": true,
+        "reputationEpoch": 7,
+        "sourceReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+        "subjectClass": "workflow.destructive_step",
+        "subjectClassNamespace": "chio.runtime",
+        "totalStrength": 0.1
+      },
+      "pheromone_policy_decision": {
+        "decision": "allow",
+        "enforced": true,
+        "peerWeightsSha256": "76d0e582d1073a18fe175c9841bd36f77535763d9f956dd15b707c969b07607a",
+        "policyId": "policy-runtime-risk",
+        "policySha256": "057d34bda50e239a86d871dcc68fdf37288733854638b3b43e69db488e682b4b",
+        "queryReportSha256": "d6ab5262c21fdd6a6ec636fe69c43cddccc632ce0952fb671cd068e4f9f6fcd4",
+        "reasonCode": "runtime_pheromone_policy_allow",
+        "reputationEpoch": 7,
+        "schema": "chio.runtime.pheromone-policy-decision.v1"
+      },
+      "reserved_destructive_lease_id": "lease-live-1",
+      "step_index": 1,
+      "trust_bundle_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "verification_context_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "workflow_grant_id": "grant-live-1",
+      "workflow_id": "wf-live-1"
+    }
+  },
+  "schema": "chio.runtime.admission-report.v1"
+}

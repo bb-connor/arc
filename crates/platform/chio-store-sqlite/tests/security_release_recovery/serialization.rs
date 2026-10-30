@@ -83,7 +83,7 @@ fn run_sequence(nested: bool, asynchronous: bool) -> TestResult {
     let response = result??;
     assert_eq!(response.verdict, chio_kernel::Verdict::Allow);
     assert!(response.output.is_some());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let (operation, state) =
         operation_state(&fixture, &request.request_id)?.ok_or("completed operation")?;
     assert_eq!(state, "completed");

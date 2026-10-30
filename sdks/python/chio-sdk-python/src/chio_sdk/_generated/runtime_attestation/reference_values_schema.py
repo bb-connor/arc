@@ -1,0 +1,43 @@
+# DO NOT EDIT - regenerate via 'cargo xtask codegen --lang python'.
+#
+# Source: spec/schemas/chio-wire/v1/**/*.schema.json
+# Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
+#
+# Manual edits will be overwritten by the next regeneration; the
+# spec-drift CI lane enforces this header on every file
+# under sdks/python/chio-sdk-python/src/chio_sdk/_generated/.
+
+
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class Measurements(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    hwModel: str | None = None
+    mrEnclave: str | None = None
+
+
+class ChioRuntimeAttestationReferenceValuesSignedBody(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    attestationSchema: str
+    descriptorId: str
+    expiresAt: int
+    issuedAt: int
+    measurements: Measurements
+    referenceValueId: str
+    schema_: Literal["chio.runtime-attestation.reference-values.v1"] = Field(
+        ..., alias="schema"
+    )
+    sourceUri: str | None = None
+    state: str
+    supersededBy: str | None = None
+    verifierFamily: str

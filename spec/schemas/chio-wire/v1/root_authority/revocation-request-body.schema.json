@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/revocation-request-body.schema.json",
+  "title": "chio.revocation-request.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fixture",
+    "n"
+  ],
+  "properties": {
+    "fixture": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    }
+  }
+}

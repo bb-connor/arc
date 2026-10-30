@@ -682,3 +682,27 @@ fn pricing_decision_rejects_future_training_cutoff() {
         Err(AutonomyContractError::InvalidDecision(_))
     ));
 }
+
+fn sign_and_verify<T>(body: T) -> Result<(), Box<dyn std::error::Error>>
+where
+    T: chio_core_types::receipt::lineage::SignedExportPayload + Clone,
+{
+    let keypair = chio_core_types::crypto::Keypair::from_seed(&[7; 32]);
+    let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(body, &keypair)?;
+    assert!(signed.verify_signature(&keypair.public_key())?);
+    Ok(())
+}
+
+#[test]
+fn signed_artifact_capture_autonomy_artifacts() -> Result<(), Box<dyn std::error::Error>> {
+    sign_and_verify(sample_input())?;
+    sign_and_verify(sample_authority_envelope())?;
+    sign_and_verify(sample_decision())?;
+    sign_and_verify(sample_optimization())?;
+    sign_and_verify(sample_simulation())?;
+    sign_and_verify(sample_execution_decision())?;
+    sign_and_verify(sample_comparison_report())?;
+    sign_and_verify(sample_rollback_plan())?;
+    sign_and_verify(sample_drift_report())?;
+    Ok(())
+}

@@ -1,0 +1,10 @@
+{
+  "eventId": "4f8e35aced73b759eef6b21bf10ea63434a10e25d96f9f6926f34b7af4680c9c",
+  "keyId": "key-2",
+  "occurredAt": 200,
+  "operation": {
+    "kind": "revoked"
+  },
+  "schema": "chio.finding.hosted-api-key-lifecycle.v1",
+  "tenantId": "tenant-a"
+}

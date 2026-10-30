@@ -22,6 +22,7 @@ extern crate alloc;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use chio_core_types::crypto::{verify_exempt, ExemptFormat};
 
 use chio_core_types::{
     canonical_json_bytes, canonical_json_string, canonicalize, sha256, sha256_hex, CapabilityId,
@@ -54,8 +55,8 @@ fn canonical_json_roundtrip() -> std::result::Result<(), Box<dyn std::error::Err
 fn keypair_sign_verify() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let kp = Keypair::generate();
     let msg = b"portable-kernel";
-    let sig: Signature = kp.sign(msg);
-    assert!(kp.public_key().verify(msg, &sig));
+    let sig: Signature = kp.sign_exempt(ExemptFormat::JwsSigningInput, msg);
+    assert!(verify_exempt(&kp.public_key(), ExemptFormat::JwsSigningInput, msg, &sig).is_ok());
     assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
     let pk_hex = kp.public_key().to_hex();
     let restored = PublicKey::from_hex(&pk_hex)?;

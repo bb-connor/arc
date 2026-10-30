@@ -1,0 +1,19 @@
+{
+  "accountingMutationCount": 0,
+  "auditAuthorizationSha256": "7aefb91e9b6c5f317242a6238ab60ebe1bb3ffbc38ec55260abe8473c5bf5091",
+  "auditIdSha256": "4a8760b00dc32f9c365376cff1ad0352e2026cd488303896cb8a9ef038779f2c",
+  "authorityContextSha256": "a0870d22ff84c2a1bb284f4e2d540d299180b26fc7476f0d9bf2fa2a0985ead8",
+  "brokerOutboundProjectionCommitmentSha256": "04915b6eb730dfa004eb1437b149e2abf60caeedb582373dc6ed2bac504627b3",
+  "canonicalRequestSha256": "5d6c3d61d3dcc892bd83c29c20598064189d64e2ef394158fac58607b5465f8b",
+  "capabilitySha256": "232fb50a8fdbbe5f9e9bc9f468297da41049a26e6fb72b95696198ed8633d7e3",
+  "governedAuditIntentSha256": "9bc22e388d6a8f3240662bb2a47932e4b6eca160765f2fd04e247924010e2a84",
+  "issuedAtUnixSeconds": 20,
+  "networkDispatchCount": 0,
+  "projectionsEqual": true,
+  "proofSha256": "16a9d007828d15c9afe6e6ac1a87678c624615c512a64fe54f5ca36b1d7d43c0",
+  "rawCredentialReturned": false,
+  "referenceOutboundProjectionCommitmentSha256": "04915b6eb730dfa004eb1437b149e2abf60caeedb582373dc6ed2bac504627b3",
+  "referenceSourceSha256": "99315e451015eb4d1dabc23f34169ead19d6d0dedd87d5af4c0190816665b1ec",
+  "runnerAuthorizationSha256": "a89ba5105aa6bd82d57ed013735bc99d7a6f2ad6d4716a886baadf8fc2635df7",
+  "schema": "chio.broker-audit-comparison.v1"
+}

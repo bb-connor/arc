@@ -11,6 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const PROPOSAL_ALGORITHM: &str = "threshold proposal algorithm is not permitted or consistent";
+#[cfg(feature = "pq")]
 const TOKEN_SIGNER: &str = "approval token signer is not valid";
 
 #[track_caller]
@@ -290,50 +291,6 @@ fn tool_threshold_verifier_enforces_pq_floor_independently() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn shared_threshold_rejects_proposal_algorithm_metadata_substitution() -> TestResult {
-    let mut fixture = Fixture::new(false, false)?;
-    let proposal = fixture
-        .request
-        .threshold_approval_proposal
-        .as_mut()
-        .ok_or("fixture omitted its proposal")?;
-    proposal.algorithm = Some(SigningAlgorithm::P256);
-    assert!(proposal.verify_signature()?);
-    fixture.rebind_vote_to_proposal()?;
-    assert_shared_denied(
-        fixture.verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256]),
-        PROPOSAL_ALGORITHM,
-    );
-    Ok(())
-}
-
-#[test]
-fn tool_threshold_rejects_proposal_algorithm_metadata_substitution() -> TestResult {
-    let mut fixture = Fixture::new(false, false)?;
-    let proposal = fixture
-        .request
-        .threshold_approval_proposal
-        .as_mut()
-        .ok_or("fixture omitted its proposal")?;
-    proposal.algorithm = Some(SigningAlgorithm::P256);
-    assert!(proposal.verify_signature()?);
-    fixture.rebind_vote_to_proposal()?;
-    assert_tool_verification_denied(fixture.verify_tool(), PROPOSAL_ALGORITHM);
-    Ok(())
-}
-
-#[test]
-fn tool_threshold_rejects_vote_algorithm_metadata_substitution() -> TestResult {
-    let mut fixture = Fixture::new(false, false)?;
-    for token in &mut fixture.request.approval_tokens {
-        token.algorithm = Some(SigningAlgorithm::P256);
-        assert!(token.verify_signature()?);
-    }
-    assert_tool_verification_denied(fixture.verify_tool(), TOKEN_SIGNER);
-    Ok(())
-}
-
 #[cfg(feature = "pq")]
 #[test]
 fn pq_capability_cannot_authorize_classical_threshold_votes() -> TestResult {
@@ -529,7 +486,7 @@ fn threshold_verifiers_enforce_replay_member_id_bounds() -> TestResult {
     ] {
         fixture.request.approval_tokens[0].id = id;
         fixture.rebind_vote_to_proposal()?;
-        assert!(fixture.request.approval_tokens[0].verify_signature()?);
+        assert!(fixture.request.approval_tokens[0].verify_integrity_embedded_key()?);
         assert_eq!(fixture.verify_tool().is_ok(), permitted);
         assert_eq!(
             fixture.verify_shared(&[SigningAlgorithm::Ed25519]).is_ok(),
@@ -540,77 +497,11 @@ fn threshold_verifiers_enforce_replay_member_id_bounds() -> TestResult {
 }
 
 #[test]
-fn classical_envelopes_allow_omitted_ed25519_metadata() -> TestResult {
-    let mut fixture = Fixture::new(false, false)?;
-    fixture
-        .request
-        .threshold_approval_proposal
-        .as_mut()
-        .ok_or("fixture omitted its proposal")?
-        .algorithm = None;
-    fixture.rebind_vote_to_proposal()?;
-    fixture.request.approval_tokens[0].algorithm = None;
-    let tool = fixture.verify_tool()?;
-    let shared = fixture.verify_shared(&[SigningAlgorithm::Ed25519])?;
-    assert_eq!(tool.body, *shared.body());
-    Ok(())
-}
-
-#[test]
-fn shared_threshold_rejects_vote_algorithm_metadata_substitution() -> TestResult {
-    let mut fixture = Fixture::new(false, false)?;
-    fixture.request.approval_tokens[0].algorithm = Some(SigningAlgorithm::P256);
-    assert!(fixture.request.approval_tokens[0].verify_signature()?);
-    assert_shared_denied(
-        fixture.verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256]),
-        TOKEN_SIGNER,
-    );
-    Ok(())
-}
-
-#[test]
 fn empty_algorithm_allowlist_denies() -> TestResult {
     assert_shared_denied(
         Fixture::new(false, false)?.verify_shared(&[]),
         PROPOSAL_ALGORITHM,
     );
-    Ok(())
-}
-
-#[cfg(feature = "pq")]
-#[test]
-fn hybrid_envelopes_require_explicit_consistent_metadata() -> TestResult {
-    for algorithm in [None, Some(SigningAlgorithm::P256)] {
-        for mutate_proposal in [true, false] {
-            let mut fixture = Fixture::new(true, true)?;
-            fixture
-                .kernel
-                .set_capability_crypto_floor(KernelCryptoFloor::AllowHybrid);
-            if mutate_proposal {
-                let proposal = fixture
-                    .request
-                    .threshold_approval_proposal
-                    .as_mut()
-                    .ok_or("fixture omitted its proposal")?;
-                proposal.algorithm = algorithm;
-                assert!(proposal.verify_signature()?);
-                fixture.rebind_vote_to_proposal()?;
-            } else {
-                fixture.request.approval_tokens[0].algorithm = algorithm;
-                assert!(fixture.request.approval_tokens[0].verify_signature()?);
-            }
-            let expected = if mutate_proposal {
-                PROPOSAL_ALGORITHM
-            } else {
-                TOKEN_SIGNER
-            };
-            assert_tool_verification_denied(fixture.verify_tool(), expected);
-            assert_shared_denied(
-                fixture.verify_shared(KernelCryptoFloor::AllowHybrid.allowed_signing_algorithms()),
-                expected,
-            );
-        }
-    }
     Ok(())
 }
 

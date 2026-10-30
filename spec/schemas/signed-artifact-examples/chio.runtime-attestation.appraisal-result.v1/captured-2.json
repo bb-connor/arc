@@ -1,0 +1,102 @@
+{
+  "appraisal": {
+    "claims": {
+      "normalizedAssertions": {
+        "attestationType": "sgx",
+        "runtimeIdentity": "spiffe://contoso.test/runtime/worker",
+        "workloadIdentityScheme": "spiffe",
+        "workloadIdentityUri": "spiffe://contoso.test/runtime/worker"
+      },
+      "normalizedClaims": [
+        {
+          "category": "platform",
+          "code": "attestation_type",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "vendor_claims",
+          "value": "sgx"
+        },
+        {
+          "category": "identity",
+          "code": "runtime_identity",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "evidence_envelope",
+          "value": "spiffe://contoso.test/runtime/worker"
+        },
+        {
+          "category": "identity",
+          "code": "workload_identity_scheme",
+          "confidence": "derived",
+          "freshness": "evidence_window",
+          "provenance": "workload_projection",
+          "value": "spiffe"
+        },
+        {
+          "category": "identity",
+          "code": "workload_identity_uri",
+          "confidence": "derived",
+          "freshness": "evidence_window",
+          "provenance": "workload_projection",
+          "value": "spiffe://contoso.test/runtime/worker"
+        }
+      ],
+      "vendorClaims": {
+        "attestationType": "sgx"
+      }
+    },
+    "evidence": {
+      "evidenceSha256": "abc123",
+      "expiresAt": 200,
+      "issuedAt": 100,
+      "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+      "verifier": "https://maa.contoso.test"
+    },
+    "policy": {
+      "effectiveTier": "attested",
+      "reasonCodes": [
+        "evidence_verified"
+      ],
+      "reasons": [
+        {
+          "code": "evidence_verified",
+          "description": "The verifier accepted the evidence and Chio derived a portable appraisal.",
+          "disposition": "pass",
+          "group": "verification"
+        }
+      ],
+      "verdict": "accepted"
+    },
+    "schema": "chio.runtime-attestation.appraisal-artifact.v1",
+    "verifier": {
+      "adapter": "azure_maa",
+      "verifierFamily": "azure_maa"
+    },
+    "workloadIdentity": {
+      "credentialKind": "uri",
+      "path": "/runtime/worker",
+      "scheme": "spiffe",
+      "trustDomain": "contoso.test",
+      "uri": "spiffe://contoso.test/runtime/worker"
+    }
+  },
+  "exportedAt": 150,
+  "exporterPolicyOutcome": {
+    "accepted": true,
+    "effectiveTier": "attested",
+    "trustPolicyConfigured": false
+  },
+  "issuer": "did:chio:test:issuer",
+  "resultId": "appraisal-result-602220737230fb9e5d8dbf1fd290637e5c64b73da25969496bd2e1255bcb14f4",
+  "schema": "chio.runtime-attestation.appraisal-result.v1",
+  "subject": {
+    "runtimeIdentity": "spiffe://contoso.test/runtime/worker",
+    "workloadIdentity": {
+      "credentialKind": "uri",
+      "path": "/runtime/worker",
+      "scheme": "spiffe",
+      "trustDomain": "contoso.test",
+      "uri": "spiffe://contoso.test/runtime/worker"
+    }
+  }
+}

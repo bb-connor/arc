@@ -1,0 +1,93 @@
+{
+  "appraisal": {
+    "claims": {
+      "normalizedAssertions": {
+        "attestationType": "confidential_vm",
+        "hardwareModel": "GCP_AMD_SEV",
+        "runtimeIdentity": "spiffe://chio.example/workloads/google",
+        "secureBoot": "enabled"
+      },
+      "normalizedClaims": [
+        {
+          "category": "platform",
+          "code": "attestation_type",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "vendor_claims",
+          "value": "confidential_vm"
+        },
+        {
+          "category": "platform",
+          "code": "hardware_model",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "vendor_claims",
+          "value": "GCP_AMD_SEV"
+        },
+        {
+          "category": "identity",
+          "code": "runtime_identity",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "evidence_envelope",
+          "value": "spiffe://chio.example/workloads/google"
+        },
+        {
+          "category": "configuration",
+          "code": "secure_boot_state",
+          "confidence": "verified",
+          "freshness": "evidence_window",
+          "provenance": "vendor_claims",
+          "value": "enabled"
+        }
+      ],
+      "vendorClaims": {
+        "attestationType": "confidential_vm",
+        "audiences": [
+          "https://chio.example/verifier"
+        ],
+        "hardwareModel": "GCP_AMD_SEV",
+        "secureBoot": "enabled"
+      }
+    },
+    "evidence": {
+      "evidenceSha256": "sha256-google-attestation-report",
+      "expiresAt": 1793204930,
+      "issuedAt": 1793204600,
+      "schema": "chio.runtime-attestation.google-confidential-vm.jwt.v1",
+      "verifier": "https://confidentialcomputing.googleapis.com"
+    },
+    "policy": {
+      "effectiveTier": "attested",
+      "reasonCodes": [
+        "evidence_verified"
+      ],
+      "reasons": [
+        {
+          "code": "evidence_verified",
+          "description": "The verifier accepted the evidence and Chio derived a portable appraisal.",
+          "disposition": "pass",
+          "group": "verification"
+        }
+      ],
+      "verdict": "accepted"
+    },
+    "schema": "chio.runtime-attestation.appraisal-artifact.v1",
+    "verifier": {
+      "adapter": "google_confidential_vm",
+      "verifierFamily": "google_attestation"
+    }
+  },
+  "exportedAt": 1793204630,
+  "exporterPolicyOutcome": {
+    "accepted": true,
+    "effectiveTier": "attested",
+    "trustPolicyConfigured": true
+  },
+  "issuer": "did:chio:test:stale-replay-exporter",
+  "resultId": "appraisal-result-458519f03fab319ec0d3ea3bcc1cb7083ee3d62255f482f8ccbcc5124701e1dc",
+  "schema": "chio.runtime-attestation.appraisal-result.v1",
+  "subject": {
+    "runtimeIdentity": "spiffe://chio.example/workloads/google"
+  }
+}

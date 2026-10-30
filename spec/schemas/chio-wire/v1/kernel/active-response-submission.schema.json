@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/active-response-submission.schema.json",
+  "title": "Chio active response submission signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actionId",
+    "expiresAtUnixMs",
+    "governedIntentHash",
+    "issuedAtUnixMs",
+    "planBodyHash",
+    "schema",
+    "submitter",
+    "tenantId"
+  ],
+  "properties": {
+    "actionId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "governedIntentHash": {
+      "type": "string"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "planBodyHash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.active-response-submission.v1"
+    },
+    "submitter": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

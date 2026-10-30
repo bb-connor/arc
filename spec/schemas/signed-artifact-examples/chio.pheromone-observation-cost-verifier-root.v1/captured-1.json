@@ -1,0 +1,19 @@
+{
+  "allowedSubjectClassNamespaces": [
+    "dev.chio.support"
+  ],
+  "allowedSubjectClasses": [
+    "support.prompt_injection"
+  ],
+  "allowedTreaties": [
+    "treaty:buyer-llamaworks:support-ops"
+  ],
+  "issuerKernelId": "did:chio:receiver-runtime",
+  "publicKey": "1398f62c6d1a457c51ba6a4b5f3dbd2f69fca93216218dc8997e416bd17d93ca",
+  "runtimePolicySha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "schema": "chio.pheromone-observation-cost-verifier-root.v1",
+  "validFromUnixMs": 1699999000000,
+  "validUntilUnixMs": 1800000000000,
+  "verifierId": "did:chio:cost-verifier",
+  "verifierKeyId": "cost-root-key-1"
+}

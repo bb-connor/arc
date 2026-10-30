@@ -61,8 +61,12 @@ fn sign_payment_lifecycle_value(payment_lifecycle: &mut serde_json::Value) {
         .as_object_mut()
         .test_expect("payment lifecycle object")
         .remove("signature");
-    let (signature, _) = commerce_payment_signer()
-        .sign_canonical(payment_lifecycle)
+    let signature = commerce_payment_signer()
+        .sign_wrapped(
+            "chio.commerce.payment-lifecycle.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(payment_lifecycle)
+                .test_expect("payment lifecycle canonicalizes"),
+        )
         .test_expect("payment lifecycle signs");
     payment_lifecycle["signature"] = serde_json::Value::String(signature.to_hex());
 }

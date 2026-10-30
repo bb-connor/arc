@@ -127,7 +127,10 @@ async fn ap23_mcp_rejects_unconfigured_signers_and_altered_decision_bindings() -
         );
     }
     let mut invalid_signature = good.clone();
-    invalid_signature.signature = Keypair::generate().sign(b"unrelated message");
+    invalid_signature.signature = Keypair::generate().sign_exempt(
+        chio_core::crypto::ExemptFormat::JwsSigningInput,
+        b"unrelated message",
+    );
     assert_eq!(
         decide(&state, &pending, &invalid_signature).await?.status(),
         StatusCode::BAD_REQUEST

@@ -1,0 +1,40 @@
+{
+  "agentPassportKeyHash": "34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e",
+  "commitmentId": "cost-commitment-001",
+  "cost": {
+    "amount": 125,
+    "unit": "chio.observation.microunit.v1"
+  },
+  "depositBodySha256": "9a551064be640c75b21270928f4659ab0047aad71465d9a61f9a6046bed2ebdf",
+  "depositSignatureSha256": "ba225bd3958825311295695b5ba643acb06e81ad5ca488fe35741665ce31ab2a",
+  "eventDigestSha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "inclusionProof": {
+    "audit_path": [
+      "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "leaf_index": 0,
+    "tree_size": 1
+  },
+  "kernelId": "did:chio:llamaworks",
+  "leafPreimageSha256": "a697a4d08de97d8f11b23f8e3573b7076698328f6446410781d369a3899ac751",
+  "observationWindowEndUnixMs": 1700000010000,
+  "observationWindowStartUnixMs": 1699999999000,
+  "observedAtUnixMs": 1700000000000,
+  "runtimePolicySha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "scarcityPolicySha256": "481052167cbdfad94e9497d12a2ce67232b7a5e1e1d440b4961a0e632e8a0013",
+  "schema": "chio.pheromone-observation-cost-statement.v1",
+  "subjectClass": "support.prompt_injection",
+  "subjectClassNamespace": "dev.chio.support",
+  "telemetry": {
+    "algorithm": "rfc6962-sha256-v1",
+    "closedAtUnixMs": 1700000000250,
+    "rootHash": "0xdc743d9a7adf57a3d176183780f94e590cc2422f62f0c1cb7baf43276d32d167",
+    "schema": "chio.pheromone-observation-cost-telemetry-root.v1",
+    "treeSize": 1,
+    "verifierId": "did:chio:cost-verifier",
+    "verifierKeyId": "cost-root-key-1"
+  },
+  "treatyId": "treaty:buyer-llamaworks:support-ops",
+  "verifierId": "did:chio:cost-verifier",
+  "verifierKeyId": "cost-root-key-1"
+}

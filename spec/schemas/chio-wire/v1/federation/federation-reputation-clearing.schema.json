@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/federation-reputation-clearing.schema.json",
+  "title": "Chio federation reputation clearing signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acceptedInputIds",
+    "admissionPolicyRef",
+    "clearingId",
+    "continuity",
+    "effectiveAdmissionClass",
+    "generatedAt",
+    "inputs",
+    "localWeightingPolicyRef",
+    "namespace",
+    "note",
+    "participatingOperatorIds",
+    "rejectedInputIds",
+    "schema",
+    "subjectKey",
+    "sybilControl"
+  ],
+  "properties": {
+    "acceptedInputIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "admissionPolicyRef": {
+      "type": "string"
+    },
+    "clearingId": {
+      "type": "string"
+    },
+    "continuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "continuityId"
+      ],
+      "properties": {
+        "continuityId": {
+          "type": "string"
+        }
+      }
+    },
+    "effectiveAdmissionClass": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "integer"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifactRef",
+          "blocking",
+          "expiresAt",
+          "issuerIndependenceGroupId",
+          "issuerOperatorId",
+          "kind",
+          "note",
+          "publishedAt",
+          "subjectKey",
+          "weightBps"
+        ],
+        "properties": {
+          "artifactRef": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "artifactId",
+              "kind",
+              "operatorId",
+              "schema",
+              "sha256",
+              "uri"
+            ],
+            "properties": {
+              "artifactId": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "operatorId": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              }
+            }
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "issuerIndependenceGroupId": {
+            "type": "string"
+          },
+          "issuerOperatorId": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "integer"
+          },
+          "subjectKey": {
+            "type": "string"
+          },
+          "weightBps": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "localWeightingPolicyRef": {
+      "type": "string"
+    },
+    "namespace": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "participatingOperatorIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "rejectedInputIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.federation-reputation-clearing.v1"
+    },
+    "subjectKey": {
+      "type": "string"
+    },
+    "sybilControl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "localWeightingRequired",
+        "maximumInputsPerIssuer",
+        "minimumIndependentIssuers",
+        "negativeEventCorroborationRequired",
+        "oracleCapBps"
+      ],
+      "properties": {
+        "localWeightingRequired": {
+          "type": "boolean"
+        },
+        "maximumInputsPerIssuer": {
+          "type": "integer"
+        },
+        "minimumIndependentIssuers": {
+          "type": "integer"
+        },
+        "negativeEventCorroborationRequired": {
+          "type": "boolean"
+        },
+        "oracleCapBps": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/security/declassification-grant-body.schema.json",
+  "title": "chio.declassification-grant.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "authority_key_id",
+    "capability_id",
+    "destination_id",
+    "domain_version",
+    "expires_at_unix_seconds",
+    "grant_id",
+    "issued_at_unix_seconds",
+    "purpose",
+    "request_hash",
+    "session_id",
+    "source_label_hash",
+    "subject_id",
+    "target_label",
+    "tenant_id",
+    "tool_name"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "authority_key_id": {
+      "type": "string"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "destination_id": {
+      "type": "string"
+    },
+    "domain_version": {
+      "type": "integer"
+    },
+    "expires_at_unix_seconds": {
+      "type": "integer"
+    },
+    "grant_id": {
+      "type": "string"
+    },
+    "issued_at_unix_seconds": {
+      "type": "integer"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "request_hash": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "source_label_hash": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "subject_id": {
+      "type": "string"
+    },
+    "target_label": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compartments",
+        "kind",
+        "owners"
+      ],
+      "properties": {
+        "compartments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "owners": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner-a"
+          ],
+          "properties": {
+            "owner-a": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "tool_name": {
+      "type": "string"
+    }
+  }
+}

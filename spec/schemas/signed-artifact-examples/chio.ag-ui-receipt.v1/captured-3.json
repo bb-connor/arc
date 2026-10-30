@@ -1,0 +1,18 @@
+{
+  "agent_id": "agent-1",
+  "allowed": true,
+  "capability_id": "cap-valid-metadata-sibling",
+  "classification": "submit",
+  "event_id": "evt-valid-metadata-sibling",
+  "event_type": "form_action",
+  "id": "agui-evt-valid-metadata-sibling",
+  "kernel_key": "a3a23fab21891d03dce82acccd7633672229fd50fe009b5b8c915e304ba02038",
+  "payload_hash": "27c893994d4137a55cdae7de06bb7904ea3f737672f7a4dc9205779312470d16",
+  "session_id": "sess-1",
+  "target": {
+    "component_id": "composer",
+    "component_type": "chat"
+  },
+  "timestamp": 1700000000,
+  "transport": "web_socket"
+}

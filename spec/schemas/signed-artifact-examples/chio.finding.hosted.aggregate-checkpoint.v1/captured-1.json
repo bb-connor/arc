@@ -1,0 +1,10 @@
+{
+  "aggregateId": "1d0718644a8beaa372c089357ba060278c06076aa801b869c8848eb5300c98ab",
+  "aggregateKind": "finding",
+  "createdAt": 9007199254740993,
+  "eventSha256": "a22be5516e0601abcbe541f5558bce6ba5268fe909d1f66fed10d93a085dc77c",
+  "previousCheckpointSha256": null,
+  "revision": 2,
+  "schema": "chio.finding.hosted.aggregate-checkpoint.v1",
+  "tenantId": "integration-a-1793209486471803644"
+}

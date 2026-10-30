@@ -1,0 +1,18 @@
+{
+  "adapter": "azure_maa",
+  "appraisalArtifactSchema": "chio.runtime-attestation.appraisal-artifact.v1",
+  "appraisalResultSchema": "chio.runtime-attestation.appraisal-result.v1",
+  "attestationSchemas": [
+    "chio.runtime-attestation.azure-maa.jwt.v1"
+  ],
+  "descriptorId": "azure-prod",
+  "expiresAt": 300,
+  "issuedAt": 100,
+  "referenceValuesUri": "https://maa.contoso.test/reference-values",
+  "schema": "chio.runtime-attestation.verifier-descriptor.v1",
+  "signingKeyFingerprints": [
+    "sha256:azure-key-1"
+  ],
+  "verifier": "https://maa.contoso.test",
+  "verifierFamily": "azure_maa"
+}

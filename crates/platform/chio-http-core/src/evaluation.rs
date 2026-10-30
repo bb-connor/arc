@@ -47,7 +47,7 @@ pub struct VerifyReceiptResponse {
 impl VerifyReceiptResponse {
     #[must_use]
     pub fn from_http_receipt(receipt: &HttpReceipt, signer_trusted: bool) -> Self {
-        let signature_valid = receipt.verify_signature().unwrap_or(false);
+        let signature_valid = receipt.verify_integrity_embedded_key().unwrap_or(false);
         let receipt_id_valid = receipt.receipt_id_valid().unwrap_or(false);
         let parameter_hash_valid = is_lower_hex_64(&receipt.content_hash);
         let ok = signature_valid && signer_trusted && receipt_id_valid && parameter_hash_valid;

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/financial/cross-issuer-lifecycle-generation-pin.schema.json",
+  "title": "Chio financial cross issuer lifecycle generation pin signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "anchorId",
+    "checkpointDigest",
+    "issuerDid",
+    "pinDigest",
+    "resolverIdentity",
+    "schema",
+    "signerKeyEpoch",
+    "sourceIndexCount",
+    "sourceIndexRoot",
+    "storeGeneration",
+    "trustedClockHighWater"
+  ],
+  "properties": {
+    "anchorId": {
+      "type": "string"
+    },
+    "checkpointDigest": {
+      "type": "string"
+    },
+    "issuerDid": {
+      "type": "string"
+    },
+    "pinDigest": {
+      "type": "string"
+    },
+    "previousPinDigest": {
+      "type": "string"
+    },
+    "resolverIdentity": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.financial.cross-issuer.lifecycle-generation-pin.v1"
+    },
+    "signerKeyEpoch": {
+      "type": "integer"
+    },
+    "sourceIndexCount": {
+      "type": "integer"
+    },
+    "sourceIndexRoot": {
+      "type": "string"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "trustedClockHighWater": {
+      "type": "integer"
+    }
+  }
+}

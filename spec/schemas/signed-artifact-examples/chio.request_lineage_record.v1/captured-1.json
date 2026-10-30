@@ -1,0 +1,18 @@
+{
+  "capabilityId": "cap-1",
+  "continuationTokenId": "continuation-1",
+  "evidenceClass": "verified",
+  "intentHash": "intent-hash-1",
+  "issuerKey": "issuer-key-1",
+  "lineageMode": "continued",
+  "operationKind": "tool_call",
+  "parentRequestId": "req-parent-1",
+  "requestId": "req-child-1",
+  "schema": "chio.request_lineage_record.v1",
+  "sessionAnchor": {
+    "sessionAnchorHash": "anchor-hash-1",
+    "sessionAnchorId": "anchor-1"
+  },
+  "startedAt": 1710000020,
+  "subjectKey": "subject-key-1"
+}

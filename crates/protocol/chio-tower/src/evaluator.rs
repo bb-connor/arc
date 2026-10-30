@@ -605,7 +605,7 @@ mod tests {
         assert!(result.verdict.is_allowed());
         assert!(result
             .receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|e| panic!("verify failed: {e}")));
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
@@ -816,7 +816,7 @@ mod tests {
         assert_eq!(result.receipt.response_status, 403);
         assert!(result
             .receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|e| panic!("verify failed: {e}")));
         assert_eq!(
             http_status_scope(result.receipt.metadata.as_ref()),
@@ -1070,7 +1070,7 @@ mod tests {
             Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
         );
         assert!(receipt
-            .verify_signature()
+            .verify_integrity_embedded_key()
             .unwrap_or_else(|e| panic!("verify failed: {e}")));
     }
 }

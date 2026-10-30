@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/underwriting/decision.schema.json",
+  "title": "Chio underwriting decision signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "budget",
+    "decisionId",
+    "evaluation",
+    "issuedAt",
+    "lifecycleState",
+    "premium",
+    "reviewState",
+    "schema"
+  ],
+  "properties": {
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "rationale"
+      ],
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "ceilingFactor": {
+          "type": "number"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "decisionId": {
+      "type": "string"
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generatedAt",
+        "input",
+        "outcome",
+        "policy",
+        "riskClass",
+        "schema"
+      ],
+      "properties": {
+        "generatedAt": {
+          "type": "integer"
+        },
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "filters",
+            "generatedAt",
+            "receipts",
+            "schema",
+            "taxonomy"
+          ],
+          "properties": {
+            "certification": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "artifactId",
+                "checkedAt",
+                "publishedAt",
+                "state",
+                "toolServerId",
+                "verdict"
+              ],
+              "properties": {
+                "artifactId": {
+                  "type": "string"
+                },
+                "checkedAt": {
+                  "type": "integer"
+                },
+                "publishedAt": {
+                  "type": "integer"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "toolServerId": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "type": "string"
+                }
+              }
+            },
+            "filters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "agentSubject",
+                "receiptLimit"
+              ],
+              "properties": {
+                "agentSubject": {
+                  "type": "string"
+                },
+                "receiptLimit": {
+                  "type": "integer"
+                }
+              }
+            },
+            "generatedAt": {
+              "type": "integer"
+            },
+            "receipts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "actionableMeteredReceipts",
+                "actionableSettlementReceipts",
+                "allowCount",
+                "approvalReceipts",
+                "approvedReceipts",
+                "callChainReceipts",
+                "cancelledCount",
+                "denyCount",
+                "failedSettlementReceipts",
+                "governedReceipts",
+                "incompleteCount",
+                "matchingReceipts",
+                "meteredReceipts",
+                "pendingSettlementReceipts",
+                "returnedReceipts",
+                "runtimeAssuranceReceipts",
+                "sharedEvidenceProofRequiredCount",
+                "sharedEvidenceReferenceCount"
+              ],
+              "properties": {
+                "actionableMeteredReceipts": {
+                  "type": "integer"
+                },
+                "actionableSettlementReceipts": {
+                  "type": "integer"
+                },
+                "allowCount": {
+                  "type": "integer"
+                },
+                "approvalReceipts": {
+                  "type": "integer"
+                },
+                "approvedReceipts": {
+                  "type": "integer"
+                },
+                "callChainReceipts": {
+                  "type": "integer"
+                },
+                "cancelledCount": {
+                  "type": "integer"
+                },
+                "denyCount": {
+                  "type": "integer"
+                },
+                "failedSettlementReceipts": {
+                  "type": "integer"
+                },
+                "governedReceipts": {
+                  "type": "integer"
+                },
+                "incompleteCount": {
+                  "type": "integer"
+                },
+                "matchingReceipts": {
+                  "type": "integer"
+                },
+                "meteredReceipts": {
+                  "type": "integer"
+                },
+                "pendingSettlementReceipts": {
+                  "type": "integer"
+                },
+                "receiptRefs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "locator",
+                      "observedAt",
+                      "referenceId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "locator": {
+                        "type": "string"
+                      },
+                      "observedAt": {
+                        "type": "integer"
+                      },
+                      "referenceId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "returnedReceipts": {
+                  "type": "integer"
+                },
+                "runtimeAssuranceReceipts": {
+                  "type": "integer"
+                },
+                "sharedEvidenceProofRequiredCount": {
+                  "type": "integer"
+                },
+                "sharedEvidenceReferenceCount": {
+                  "type": "integer"
+                }
+              }
+            },
+            "reputation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "acceptedImportedSignalCount",
+                "effectiveScore",
+                "importedSignalCount",
+                "probationary",
+                "resolvedTier",
+                "subjectKey"
+              ],
+              "properties": {
+                "acceptedImportedSignalCount": {
+                  "type": "integer"
+                },
+                "effectiveScore": {
+                  "type": "number"
+                },
+                "importedSignalCount": {
+                  "type": "integer"
+                },
+                "probationary": {
+                  "type": "boolean"
+                },
+                "resolvedTier": {
+                  "type": "string"
+                },
+                "subjectKey": {
+                  "type": "string"
+                }
+              }
+            },
+            "runtimeAssurance": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "governedReceipts",
+                "highestTier",
+                "latestEvidenceSha256",
+                "latestSchema",
+                "latestVerifier",
+                "latestVerifierFamily",
+                "observedVerifierFamilies",
+                "runtimeAssuranceReceipts"
+              ],
+              "properties": {
+                "governedReceipts": {
+                  "type": "integer"
+                },
+                "highestTier": {
+                  "type": "string"
+                },
+                "latestEvidenceSha256": {
+                  "type": "string"
+                },
+                "latestSchema": {
+                  "type": "string"
+                },
+                "latestVerifier": {
+                  "type": "string"
+                },
+                "latestVerifierFamily": {
+                  "type": "string"
+                },
+                "observedVerifierFamilies": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "runtimeAssuranceReceipts": {
+                  "type": "integer"
+                }
+              }
+            },
+            "schema": {
+              "type": "string"
+            },
+            "taxonomy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "supportedClasses",
+                "supportedReasons",
+                "version"
+              ],
+              "properties": {
+                "supportedClasses": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "supportedReasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "version": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "denyReputationScoreBelow",
+            "maximumReceiptAgeSeconds",
+            "minimumApproveReputationScore",
+            "minimumApproveRuntimeAssuranceTier",
+            "minimumReceiptHistory",
+            "minimumStepUpRuntimeAssuranceTier",
+            "reduceCeilingFactor",
+            "requireActiveToolCertification",
+            "requireComplianceScoreReference",
+            "schema",
+            "version"
+          ],
+          "properties": {
+            "denyReputationScoreBelow": {
+              "type": "number"
+            },
+            "maximumReceiptAgeSeconds": {
+              "type": "integer"
+            },
+            "minimumApproveReputationScore": {
+              "type": "number"
+            },
+            "minimumApproveRuntimeAssuranceTier": {
+              "type": "string"
+            },
+            "minimumReceiptHistory": {
+              "type": "integer"
+            },
+            "minimumStepUpRuntimeAssuranceTier": {
+              "type": "string"
+            },
+            "reduceCeilingFactor": {
+              "type": "number"
+            },
+            "requireActiveToolCertification": {
+              "type": "boolean"
+            },
+            "requireComplianceScoreReference": {
+              "type": "boolean"
+            },
+            "schema": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          }
+        },
+        "riskClass": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "suggestedCeilingFactor": {
+          "type": "number"
+        }
+      }
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lifecycleState": {
+      "type": "string"
+    },
+    "premium": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rationale",
+        "state"
+      ],
+      "properties": {
+        "basisPoints": {
+          "type": "integer"
+        },
+        "quotedAmount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      }
+    },
+    "reviewState": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.underwriting.decision.v1"
+    },
+    "supersedesDecisionId": {
+      "type": "string"
+    }
+  }
+}

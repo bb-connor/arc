@@ -1,0 +1,19 @@
+{
+  "claim_set_path": "claim-set.json",
+  "claim_set_sha256": "ba7948a6ea038b3846c2402ae41a5d122a39133124cb493ddd7a30166b7a6dae",
+  "evidence_graph_path": "evidence-graph.json",
+  "evidence_graph_sha256": "a82a9def3d84e629008bd5c3eb82527c221e12bbed8ed5e8b333925cb8df6e38",
+  "id": "passport-minimal-valid",
+  "issued_at": "2026-06-10T00:00:00Z",
+  "issuer": "did:chio:68f4b6017d0f876a55c80a82b8388a54aad264d367269e2de8be079c935b5f96",
+  "omission_policy": [
+    {
+      "claim_id": "claim.transaction.settlement_finality_verified",
+      "reason": "offline minimal fixture has no settlement leg",
+      "status": "omitted_not_applicable"
+    }
+  ],
+  "schema": "chio.transaction-passport.v1",
+  "verifier_policy_path": "verifier-policy.json",
+  "verifier_policy_sha256": "1d2102d0e2b0bc6d1ba5863fec741f10d97b1de549ace4d9fa1a0e663e09c63c"
+}

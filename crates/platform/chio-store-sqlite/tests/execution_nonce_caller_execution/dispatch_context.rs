@@ -61,7 +61,7 @@ fn caller_report_retains_typed_private_context_with_capture_and_exact_restart_re
         );
         let completed = reconcile(&fixture, &runtime, &execution)?;
         assert_eq!(completed.verdict, Verdict::Allow, "{completed:#?}");
-        assert!(completed.receipt.verify_signature()?);
+        assert!(completed.receipt.verify_integrity_embedded_key()?);
         let frame = load(&runtime, &execution)?;
         let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
         assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v1");

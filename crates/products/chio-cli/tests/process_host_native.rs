@@ -47,7 +47,7 @@ fn process_host_runs_existing_mcp_tools_and_recovers_after_host_death(
     let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     let receipt: ChioReceipt =
         serde_json::from_str(evidence["receipt_json"].as_str().ok_or("missing receipt")?)?;
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     assert_eq!(receipt.kernel_key.to_hex(), evidence["kernel_key"]);
     assert_eq!(evidence["publications"], 1);
     Ok(())
@@ -102,7 +102,7 @@ fn process_host_survives_os_death_at_each_dispatch_cutpoint(
         assert_eq!(case["cutpoint"], cutpoint);
         let receipt: ChioReceipt =
             serde_json::from_str(case["receipt_json"].as_str().ok_or("missing receipt")?)?;
-        assert!(receipt.verify_signature()?, "{cutpoint}");
+        assert!(receipt.verify_integrity_embedded_key()?, "{cutpoint}");
         assert_eq!(
             receipt.kernel_key.to_hex(),
             case["kernel_key"],
@@ -139,7 +139,7 @@ fn process_host_keeps_a_durable_stop_across_os_death() -> Result<(), Box<dyn std
         assert_eq!(case["cutpoint"], cutpoint);
         for raw in case["receipts"].as_array().ok_or("missing receipts")? {
             let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("receipt")?)?;
-            assert!(receipt.verify_signature()?, "{cutpoint}");
+            assert!(receipt.verify_integrity_embedded_key()?, "{cutpoint}");
             assert_eq!(
                 receipt.kernel_key.to_hex(),
                 case["kernel_key"],

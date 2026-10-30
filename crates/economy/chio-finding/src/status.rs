@@ -31,11 +31,13 @@ use crate::validate::{
 pub const FINDING_STATUS_EPOCH_SCHEMA_V1: &str =
     chio_core_types::signed_artifact::CHIO_FINDING_STATUS_EPOCH_V1_SCHEMA;
 
+/// Signing-wrapper schema id of the governance-signed status operator
+/// authorization.
+pub const FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1: &str =
+    "chio.finding-status-operator-authorization.v1";
+
 /// Registered unsigned portable proof-input schema.
 pub const FINDING_STATUS_PROOF_INPUT_SCHEMA_V1: &str = "chio.finding.status-proof-input.v1";
-
-/// Signature domain bound inside the signed body.
-pub const FINDING_STATUS_SIGNATURE_DOMAIN: &str = "chio.finding.status.v1";
 
 /// Maximum number of anchoring references a root can carry.
 pub const MAX_FINDING_STATUS_ANCHOR_REFS: usize = 16;
@@ -77,7 +79,6 @@ pub struct FindingStatusEpoch {
     pub schema: String,
     /// SHA-256 of the domain-separated canonical body with this field empty.
     pub status_epoch_id: String,
-    pub signature_domain: String,
     pub status_map_version: String,
     pub proof_semantics: String,
     pub feed_id: String,
@@ -193,9 +194,6 @@ impl FindingStatusEpoch {
             return Err(FindingError::UnsupportedSchema(self.schema.clone()));
         }
         require_hex64(&self.status_epoch_id, "status_epoch_id")?;
-        if self.signature_domain != FINDING_STATUS_SIGNATURE_DOMAIN {
-            return Err(FindingError::InvalidField("signature_domain"));
-        }
         if self.status_map_version != FINDING_STATUS_MAP_VERSION {
             return Err(FindingError::InvalidField("status_map_version"));
         }
@@ -690,4 +688,12 @@ fn decode_hex_32(value: &str, field: &'static str) -> Result<[u8; 32], FindingEr
     decoded
         .try_into()
         .map_err(|_| FindingError::MalformedDigest(field))
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingStatusEpoch {
+    const SCHEMA_ID: &'static str = FINDING_STATUS_EPOCH_SCHEMA_V1;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingStatusOperatorAuthorization {
+    const SCHEMA_ID: &'static str = FINDING_STATUS_OPERATOR_AUTHORIZATION_SCHEMA_V1;
 }

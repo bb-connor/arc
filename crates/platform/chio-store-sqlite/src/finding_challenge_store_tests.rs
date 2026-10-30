@@ -116,7 +116,10 @@ fn usd(units: u64) -> MonetaryAmount {
     }
 }
 
-fn envelope_string<T: serde::Serialize + Clone>(body: &T, signer: &Keypair) -> String {
+fn envelope_string<T: chio_core::receipt::lineage::SignedExportPayload + Clone>(
+    body: &T,
+    signer: &Keypair,
+) -> String {
     let signed = SignedExportEnvelope::sign(body.clone(), signer).expect("sign envelope");
     String::from_utf8(canonical_json_bytes(&signed).expect("canonical envelope"))
         .expect("utf8 envelope")

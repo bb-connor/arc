@@ -1,0 +1,23 @@
+{
+  "expiresAtUnixMs": 1100000,
+  "issuedAtUnixMs": 900000,
+  "participants": [
+    {
+      "kernelId": "buyer",
+      "ladderManifestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "publicKey": "bc01c1e3a7d694b9d61bb05510bd06342a146b1a1f32cfaebe18c5e53f2e59bb"
+    },
+    {
+      "kernelId": "vendor",
+      "ladderManifestSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "publicKey": "75352a64aa410fd57bcd6277eea25734c155adc4a99714961b279d50fb59f53b"
+    }
+  ],
+  "previousRecordSha256": "3b96c2187dd85bdcd5e2a846e519febce8cfe780358819c2d235dcc2e63915b6",
+  "schema": "chio.treaty-epoch.v1",
+  "sequence": 2,
+  "status": "active",
+  "treatyId": "treaty",
+  "trustBundleSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "verifierId": "verifier"
+}

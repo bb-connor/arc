@@ -1,0 +1,16 @@
+{
+  "authority": "d4eec1869fb1b8a4e817516ad5a931557cb56805c3eb16e8f3a803d647df7869",
+  "issuedAtUnixSeconds": 20,
+  "requestDigest": "f0482ed735671e075ff30a3fe17ba1585713db4e0fc8e5869a979a588a3b855a",
+  "requestId": "5352cbe96ffad8238f8f141a553e1fe689e3f1afc22b76796fa9d8fdc930c425",
+  "result": {
+    "kind": "revocation",
+    "response": {
+      "authorityDomain": "combined-authority",
+      "commitIndex": 1,
+      "observedAtUnixSeconds": 20,
+      "revoked": false
+    }
+  },
+  "schema": "chio.broker-authority-response.v1"
+}

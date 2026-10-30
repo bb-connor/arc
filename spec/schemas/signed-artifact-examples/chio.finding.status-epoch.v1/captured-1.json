@@ -1,0 +1,26 @@
+{
+  "anchor_refs": [
+    "anchor/status-feed/1"
+  ],
+  "branch_domain": "chio.finding.status.v1:branch",
+  "empty_leaf_domain": "chio.finding.status.v1:empty-leaf",
+  "empty_leaf_hash": "80a7fe55f5efd9a02893aca68310d8ebd7f0ed7b8dd36686abda7704755a6755",
+  "feed_id": "venue-status-feed",
+  "generated_at": 1700000100,
+  "hash_algorithm": "sha256",
+  "key_domain_nonce": 3318287169837494,
+  "key_hash_domain": "chio.finding.status.v1:key",
+  "map_epoch": 1,
+  "occupied_leaf_domain": "chio.finding.status.v1:occupied-leaf",
+  "operator_id": "venue-status-operator",
+  "operator_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+  "operator_key_epoch": 7,
+  "proof_semantics": "siblings_leaf_to_root_v1",
+  "root_hash": "3e32c22164772a7ffbba979dcf5e18dd13406f2bd278780dbcd4a4d76a4463a3",
+  "schema": "chio.finding.status-epoch.v1",
+  "status_epoch_id": "cb80c6e8768b66efcff50c5c24e2025a21fc747f311cbe491d8ba9f3df2496fe",
+  "status_map_version": "sparse_map_v1",
+  "tree_depth": 256,
+  "valid_from": 0,
+  "valid_until": 1700000300
+}

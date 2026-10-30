@@ -266,11 +266,13 @@ fn bid_happy_path_mints_scoped_capability_token() {
             .units,
         1_000
     );
-    assert!(ask.verify_signature().test_expect("verify ask"));
+    assert!(ask
+        .verify_signature(&ask.signer_key)
+        .test_expect("verify ask"));
     assert!(ask
         .body
         .token_offer
-        .verify_signature()
+        .verify_integrity_embedded_key()
         .test_expect("verify token"));
 }
 
@@ -305,6 +307,47 @@ fn bid_rejects_unbound_token_issuer() {
     .test_expect_err("unbound issuer rejected");
 
     assert_eq!(error, BiddingError::AuthorityMismatch);
+}
+
+#[test]
+fn bid_rejects_a_valid_bid_signed_by_another_key() {
+    let registry_keypair = Keypair::generate();
+    let operator_keypair = Keypair::generate();
+    let issuer_keypair = operator_keypair.clone();
+    let agent_keypair = Keypair::generate();
+    let other_keypair = Keypair::generate();
+    let listing = listing_entry(
+        &registry_keypair,
+        &operator_keypair,
+        GenericListingStatus::Active,
+        100,
+        110,
+        600,
+    );
+    let request = signed_bid_request(&other_keypair, "agent-alpha", 200, 300, 120);
+    assert!(
+        matches!(
+            request.verify_signature(&other_keypair.public_key()),
+            Ok(true)
+        ),
+        "the bid is validly self-signed"
+    );
+
+    let error = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &issuer_keypair,
+            agent_subject: agent_keypair.public_key(),
+            token_id: "token-1".to_string(),
+            now: 120,
+            grant_constraints: Vec::new(),
+            dpop_required: None,
+        },
+    )
+    .test_expect_err("bid signed by another key rejected");
+
+    assert_eq!(error, BiddingError::BidSignerNotAgentSubject);
 }
 
 #[test]
@@ -511,7 +554,7 @@ fn accept_records_receipt_and_verifies_ask_signature() {
     assert!(!accepted.body.ask_digest.is_empty());
     assert!(!accepted.body.bid_digest.is_empty());
     assert!(accepted
-        .verify_signature()
+        .verify_signature(&accepted.signer_key)
         .test_expect("verify accepted bid"));
 }
 

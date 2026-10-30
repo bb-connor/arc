@@ -1,0 +1,25 @@
+{
+  "breach_verdict": "none",
+  "computed_metric_results": [
+    {
+      "metric": "availability_percent",
+      "passed": true,
+      "unit": "minutes",
+      "value": 18
+    }
+  ],
+  "dispute_ref": "",
+  "id": "sla-performance-trust-market-valid",
+  "issued_at": "2026-06-10T01:00:00Z",
+  "measured_at": "2026-06-10T01:00:00Z",
+  "measurement_evidence_refs": [
+    "fulfillment-measurement-valid"
+  ],
+  "measurement_policy_ref": "measurement-policy-market-valid",
+  "order_id": "order-commerce-001",
+  "performance_id": "sla-performance-trust-market-valid",
+  "provider_subject": "did:chio:provider-alpha",
+  "remedy_ref": "",
+  "schema": "chio.commerce.sla-performance-report.v1",
+  "sla_ref": "sla-commitment-trust-market-valid"
+}

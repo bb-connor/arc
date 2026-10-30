@@ -1,0 +1,28 @@
+{
+  "allowedReputationEpochs": [
+    7
+  ],
+  "expiresAtUnixMs": 3000,
+  "issuedAtUnixMs": 1000,
+  "keyId": "key-preparation",
+  "maxQueryReportAgeMs": 1000,
+  "minDistinctOriginPairs": 1,
+  "mode": "enforce",
+  "peerWeightsSha256": "47ab974cacd5b3bc0385daee9e039cb77c076ab6dcf6969b9977341da8284a77",
+  "policyId": "policy-preparation",
+  "policyVersion": 1,
+  "rules": [
+    {
+      "actionClassId": "*",
+      "direction": "deny_if_at_or_above",
+      "effect": "deny",
+      "ruleId": "deny-high-destructive-risk",
+      "subjectClass": "workflow.destructive_step",
+      "subjectClassNamespace": "chio.runtime",
+      "thresholdTotalStrength": 0.75
+    }
+  ],
+  "runtimeTrustBundleSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "schema": "chio.runtime.pheromone-policy.v1",
+  "verifierId": "verifier-preparation"
+}

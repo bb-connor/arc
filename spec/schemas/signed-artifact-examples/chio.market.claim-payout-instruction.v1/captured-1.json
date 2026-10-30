@@ -1,0 +1,652 @@
+{
+  "adjudication": {
+    "body": {
+      "adjudicationId": "cla-1",
+      "adjudicator": "arbiter.chio",
+      "awardedAmount": {
+        "currency": "USD",
+        "units": 6000
+      },
+      "dispute": {
+        "body": {
+          "disputeId": "cld-1",
+          "issuedAt": 1700010700,
+          "openedBy": "subject-1",
+          "providerResponse": {
+            "body": {
+              "claim": {
+                "body": {
+                  "bond": {
+                    "body": {
+                      "bondId": "bond-1",
+                      "expiresAt": 1700096760,
+                      "issuedAt": 1700010360,
+                      "lifecycleState": "active",
+                      "report": {
+                        "disposition": "lock",
+                        "exposure": {
+                          "actionableReceipts": 0,
+                          "activeDecisions": 1,
+                          "currencies": [
+                            "USD"
+                          ],
+                          "failedSettlementReceipts": 0,
+                          "matchingDecisions": 1,
+                          "matchingReceipts": 2,
+                          "mixedCurrencyBook": false,
+                          "pendingSettlementReceipts": 0,
+                          "returnedDecisions": 1,
+                          "returnedReceipts": 2,
+                          "supersededDecisions": 0,
+                          "truncatedDecisions": false,
+                          "truncatedReceipts": false
+                        },
+                        "filters": {
+                          "agentSubject": "subject-1",
+                          "decisionLimit": 50,
+                          "receiptLimit": 100
+                        },
+                        "generatedAt": 1700010359,
+                        "latestFacilityId": "cfd-1",
+                        "prerequisites": {
+                          "activeFacilityMet": true,
+                          "activeFacilityRequired": true,
+                          "certificationMet": true,
+                          "certificationRequired": false,
+                          "currencyCoherent": true,
+                          "runtimeAssuranceMet": true
+                        },
+                        "schema": "chio.credit.bond-report.v1",
+                        "scorecard": {
+                          "anomalyCount": 0,
+                          "band": "prime",
+                          "confidence": "high",
+                          "currencies": [
+                            "USD"
+                          ],
+                          "matchingDecisions": 1,
+                          "matchingReceipts": 2,
+                          "mixedCurrencyBook": false,
+                          "overallScore": 0.94,
+                          "probationary": false,
+                          "returnedDecisions": 1,
+                          "returnedReceipts": 2
+                        },
+                        "supportBoundary": {
+                          "autonomyGatingSupported": false,
+                          "externalEscrowExecutionSupported": false,
+                          "reserveAccountingAuthoritative": true
+                        },
+                        "terms": {
+                          "capitalSource": "operator_internal",
+                          "collateralAmount": {
+                            "currency": "USD",
+                            "units": 6000
+                          },
+                          "coverageRatioBps": 12000,
+                          "creditLimit": {
+                            "currency": "USD",
+                            "units": 12000
+                          },
+                          "facilityId": "cfd-1",
+                          "outstandingExposureAmount": {
+                            "currency": "USD",
+                            "units": 9000
+                          },
+                          "reserveRatioBps": 1500,
+                          "reserveRequirementAmount": {
+                            "currency": "USD",
+                            "units": 3000
+                          }
+                        }
+                      },
+                      "schema": "chio.credit.bond.v1"
+                    },
+                    "signature": "94b0966041e57ebd88d6f9910275f6d73e6415aa591d62ed42d4c79a245eb8d3be429dc9434fd988d4e59fff95938b959bb0ffe3028a3ae8af8b62328d79cf01",
+                    "signerKey": "2d54377c1e15ec15126b14d1fffa62c87d7f382f097b6ccb58dd2d984b6a29e5"
+                  },
+                  "boundCoverage": {
+                    "body": {
+                      "boundAt": 1700000171,
+                      "boundCoverageId": "lbc-1",
+                      "carrierReference": "carrier-ref-1",
+                      "coverageAmount": {
+                        "currency": "USD",
+                        "units": 10000
+                      },
+                      "effectiveFrom": 1700010000,
+                      "effectiveUntil": 1700020000,
+                      "issuedAt": 1700000170,
+                      "placement": {
+                        "body": {
+                          "effectiveFrom": 1700010000,
+                          "effectiveUntil": 1700020000,
+                          "issuedAt": 1700000160,
+                          "placementId": "lpl-1",
+                          "placementRef": "placement-ref-1",
+                          "quoteResponse": {
+                            "body": {
+                              "disposition": "quoted",
+                              "issuedAt": 1700000120,
+                              "providerQuoteRef": "carrier-alpha-quote",
+                              "quoteRequest": {
+                                "body": {
+                                  "issuedAt": 1700000000,
+                                  "notes": "initial market inquiry",
+                                  "providerPolicy": {
+                                    "boundCoverageSupported": true,
+                                    "claimsSupported": true,
+                                    "coverageClass": "tool_execution",
+                                    "currency": "USD",
+                                    "displayName": "Carrier Alpha",
+                                    "jurisdiction": "us-ny",
+                                    "maxCoverageAmount": {
+                                      "currency": "USD",
+                                      "units": 50000
+                                    },
+                                    "providerId": "carrier-alpha",
+                                    "providerRecordId": "lpr-1",
+                                    "quoteTtlSeconds": 3600,
+                                    "requiredEvidence": [
+                                      "credit_provider_risk_package"
+                                    ]
+                                  },
+                                  "quoteRequestId": "lqr-1",
+                                  "requestedCoverageAmount": {
+                                    "currency": "USD",
+                                    "units": 10000
+                                  },
+                                  "requestedEffectiveFrom": 1700010000,
+                                  "requestedEffectiveUntil": 1700020000,
+                                  "riskPackage": {
+                                    "body": {
+                                      "certification": {
+                                        "required": false
+                                      },
+                                      "exposure": {
+                                        "body": {
+                                          "decisions": [],
+                                          "filters": {
+                                            "agentSubject": "subject-1",
+                                            "decisionLimit": 50,
+                                            "receiptLimit": 100
+                                          },
+                                          "generatedAt": 1,
+                                          "positions": [
+                                            {
+                                              "activeQuotedPremiumUnits": 0,
+                                              "currency": "USD",
+                                              "failedUnits": 0,
+                                              "governedMaxExposureUnits": 4000,
+                                              "pendingUnits": 0,
+                                              "provisionalLossUnits": 0,
+                                              "quotedPremiumUnits": 0,
+                                              "recoveredUnits": 0,
+                                              "reservedUnits": 0,
+                                              "settledUnits": 4000
+                                            }
+                                          ],
+                                          "receipts": [],
+                                          "schema": "chio.credit.exposure-ledger.v1",
+                                          "summary": {
+                                            "actionableReceipts": 0,
+                                            "activeDecisions": 0,
+                                            "currencies": [
+                                              "USD"
+                                            ],
+                                            "failedSettlementReceipts": 0,
+                                            "matchingDecisions": 0,
+                                            "matchingReceipts": 1,
+                                            "mixedCurrencyBook": false,
+                                            "pendingSettlementReceipts": 0,
+                                            "returnedDecisions": 0,
+                                            "returnedReceipts": 1,
+                                            "supersededDecisions": 0,
+                                            "truncatedDecisions": false,
+                                            "truncatedReceipts": false
+                                          },
+                                          "supportBoundary": {
+                                            "claimAdjudicationSupported": false,
+                                            "crossCurrencyNettingSupported": false,
+                                            "governedReceiptsAuthoritative": true,
+                                            "recoveryLifecycleSupported": false,
+                                            "settlementReconciliationAuthoritative": true,
+                                            "underwritingDecisionsAuthoritative": true
+                                          }
+                                        },
+                                        "signature": "1e4352f890923060842dae79ac32c0527f1fb48fff57a9f828d77be448cdd1090b9bc44ee801e3188af67fec8830f423bb3d952723b0c49e01b86d237f368b0e",
+                                        "signerKey": "646fd29652de9e9fb5cd60a109e0027a5001ea38b08afda77fe69cc63d5a5a03"
+                                      },
+                                      "facilityReport": {
+                                        "disposition": "grant",
+                                        "filters": {
+                                          "agentSubject": "subject-1",
+                                          "decisionLimit": 50,
+                                          "receiptLimit": 100
+                                        },
+                                        "generatedAt": 3,
+                                        "prerequisites": {
+                                          "certificationMet": true,
+                                          "certificationRequired": false,
+                                          "manualReviewRequired": false,
+                                          "minimumRuntimeAssuranceTier": "verified",
+                                          "runtimeAssuranceMet": true
+                                        },
+                                        "schema": "chio.credit.facility-report.v1",
+                                        "scorecard": {
+                                          "anomalyCount": 0,
+                                          "band": "prime",
+                                          "confidence": "high",
+                                          "currencies": [
+                                            "USD"
+                                          ],
+                                          "matchingDecisions": 0,
+                                          "matchingReceipts": 1,
+                                          "mixedCurrencyBook": false,
+                                          "overallScore": 0.95,
+                                          "probationary": false,
+                                          "returnedDecisions": 0,
+                                          "returnedReceipts": 1
+                                        },
+                                        "supportBoundary": {
+                                          "bondExecutionSupported": false,
+                                          "crossCurrencyAllocationSupported": false,
+                                          "providerNeutralPolicy": true
+                                        },
+                                        "terms": {
+                                          "capitalSource": "operator_internal",
+                                          "concentrationCapBps": 3000,
+                                          "creditLimit": {
+                                            "currency": "USD",
+                                            "units": 4000
+                                          },
+                                          "reserveRatioBps": 1500,
+                                          "ttlSeconds": 86400,
+                                          "utilizationCeilingBps": 8000
+                                        }
+                                      },
+                                      "filters": {
+                                        "agentSubject": "subject-1",
+                                        "decisionLimit": 50,
+                                        "receiptLimit": 100,
+                                        "recentLossLimit": 10
+                                      },
+                                      "generatedAt": 3,
+                                      "latestFacility": {
+                                        "creditLimit": {
+                                          "currency": "USD",
+                                          "units": 4000
+                                        },
+                                        "disposition": "grant",
+                                        "expiresAt": 4,
+                                        "facilityId": "cfd-1",
+                                        "issuedAt": 3,
+                                        "lifecycleState": "active",
+                                        "signerKey": "646fd29652de9e9fb5cd60a109e0027a5001ea38b08afda77fe69cc63d5a5a03"
+                                      },
+                                      "recentLossHistory": {
+                                        "entries": [],
+                                        "summary": {
+                                          "failedSettlementEvents": 0,
+                                          "matchingLossEvents": 0,
+                                          "provisionalLossEvents": 0,
+                                          "recoveredEvents": 0,
+                                          "returnedLossEvents": 0
+                                        }
+                                      },
+                                      "runtimeAssurance": {
+                                        "governedReceipts": 1,
+                                        "highestTier": "verified",
+                                        "latestEvidenceSha256": "sha256-runtime",
+                                        "latestSchema": "chio.runtime-attestation.azure-maa.jwt.v1",
+                                        "latestVerifier": "verifier.chio",
+                                        "latestVerifierFamily": "azure_maa",
+                                        "observedVerifierFamilies": [
+                                          "azure_maa"
+                                        ],
+                                        "runtimeAssuranceReceipts": 1,
+                                        "stale": false
+                                      },
+                                      "schema": "chio.credit.provider-risk-package.v1",
+                                      "scorecard": {
+                                        "body": {
+                                          "dimensions": [],
+                                          "filters": {
+                                            "agentSubject": "subject-1",
+                                            "decisionLimit": 50,
+                                            "receiptLimit": 100
+                                          },
+                                          "generatedAt": 2,
+                                          "positions": [
+                                            {
+                                              "activeQuotedPremiumUnits": 0,
+                                              "currency": "USD",
+                                              "failedUnits": 0,
+                                              "governedMaxExposureUnits": 4000,
+                                              "pendingUnits": 0,
+                                              "provisionalLossUnits": 0,
+                                              "quotedPremiumUnits": 0,
+                                              "recoveredUnits": 0,
+                                              "reservedUnits": 0,
+                                              "settledUnits": 4000
+                                            }
+                                          ],
+                                          "probation": {
+                                            "probationary": false,
+                                            "receiptCount": 1,
+                                            "spanDays": 1,
+                                            "targetReceiptCount": 1,
+                                            "targetSpanDays": 1
+                                          },
+                                          "reputation": {
+                                            "acceptedImportedSignalCount": 0,
+                                            "effectiveScore": 0.95,
+                                            "importedSignalCount": 0,
+                                            "probationary": false
+                                          },
+                                          "schema": "chio.credit.scorecard.v1",
+                                          "summary": {
+                                            "anomalyCount": 0,
+                                            "band": "prime",
+                                            "confidence": "high",
+                                            "currencies": [
+                                              "USD"
+                                            ],
+                                            "matchingDecisions": 0,
+                                            "matchingReceipts": 1,
+                                            "mixedCurrencyBook": false,
+                                            "overallScore": 0.95,
+                                            "probationary": false,
+                                            "returnedDecisions": 0,
+                                            "returnedReceipts": 1
+                                          },
+                                          "supportBoundary": {
+                                            "capitalAllocationSupported": false,
+                                            "crossCurrencyNettingSupported": false,
+                                            "facilityPolicySupported": false,
+                                            "subjectScopedOnly": true
+                                          }
+                                        },
+                                        "signature": "04d81105dbfca035183597e5e7df4a23ac3178c076070a0709494557be5a60ecb5ab211a3653816aa2cdf162ce258b2866f51495d379be67518bf3576658f60a",
+                                        "signerKey": "646fd29652de9e9fb5cd60a109e0027a5001ea38b08afda77fe69cc63d5a5a03"
+                                      },
+                                      "subjectKey": "subject-1",
+                                      "supportBoundary": {
+                                        "autonomousPricingSupported": false,
+                                        "complianceScoreReferenceSupported": true,
+                                        "externalCapitalReviewSupported": true,
+                                        "facilityPolicyAuthoritative": true,
+                                        "liabilityMarketSupported": false,
+                                        "signedExposureAuthoritative": true,
+                                        "signedScorecardAuthoritative": true
+                                      }
+                                    },
+                                    "signature": "5762c608e6840bff27c5e0e0ac573cf87bdef497b7eff4c243054bbca32ea7585b31ad89ec5aa5b3f84c40b01b7714a1c766c8a246ccce9a0ebd9809043c7303",
+                                    "signerKey": "646fd29652de9e9fb5cd60a109e0027a5001ea38b08afda77fe69cc63d5a5a03"
+                                  },
+                                  "schema": "chio.market.quote-request.v1"
+                                },
+                                "signature": "2985619138bbb00c1f5b05e895d5dab8f0f11091f78e28b925ad8dc480b08028a16f35401b7d73b626c59508d530848b1436fd530978f220c978c4507c53ee01",
+                                "signerKey": "f15fb371d988eb66494c7142f925659ec599aca2c1a2a5c57a504a3d30ab886a"
+                              },
+                              "quoteResponseId": "lqp-1",
+                              "quotedTerms": {
+                                "expiresAt": 1700003000,
+                                "quotedCoverageAmount": {
+                                  "currency": "USD",
+                                  "units": 10000
+                                },
+                                "quotedDeductibleAmount": {
+                                  "currency": "USD",
+                                  "units": 1000
+                                },
+                                "quotedPremiumAmount": {
+                                  "currency": "USD",
+                                  "units": 500
+                                }
+                              },
+                              "schema": "chio.market.quote-response.v1"
+                            },
+                            "signature": "716a1098f020e5c14298dc75019c5e66e548bb2fd6b6cf2b0bd8af5cbc51a2bced7926214e169c0e391ffa6f02571ba56094710003a5232da6e025d4c7377001",
+                            "signerKey": "28ba5efcdb869e398584741f81c1d621d6107218dbd21be16b0c0d9beb828591"
+                          },
+                          "schema": "chio.market.placement.v1",
+                          "selectedCoverageAmount": {
+                            "currency": "USD",
+                            "units": 10000
+                          },
+                          "selectedPremiumAmount": {
+                            "currency": "USD",
+                            "units": 500
+                          }
+                        },
+                        "signature": "239c3d5008bcac6a57798201716db3c98124325d16784d6d5949bca2c770b87640d85b4eeb8df6a9f3991685573249a1fdb2e0d0c083dc89607f62e2cd254a03",
+                        "signerKey": "298692539f24545c78b95a47f59c465ee5e2684affd0d5b3b454b4d33fbbd949"
+                      },
+                      "policyNumber": "POL-Chio-1",
+                      "premiumAmount": {
+                        "currency": "USD",
+                        "units": 500
+                      },
+                      "schema": "chio.market.bound-coverage.v1"
+                    },
+                    "signature": "8566c73ac85c6f5882b26345f2258af4e38fe90f9f531fe304462e92bffe63632819acd3a497afebbaf46d4db76c1d0bff67705886c2d11702515d4c4e36bc06",
+                    "signerKey": "04a61428055ee3682ccf6671f2bd03bb9156c759022c4cbfd1e0d5869afa88d6"
+                  },
+                  "claimAmount": {
+                    "currency": "USD",
+                    "units": 9000
+                  },
+                  "claimEventAt": 1700010500,
+                  "claimId": "clm-1",
+                  "claimRef": "claim-ref-1",
+                  "claimant": "subject-1",
+                  "exposure": {
+                    "body": {
+                      "decisions": [],
+                      "filters": {
+                        "agentSubject": "subject-1",
+                        "decisionLimit": 50,
+                        "receiptLimit": 100
+                      },
+                      "generatedAt": 1700010350,
+                      "positions": [
+                        {
+                          "activeQuotedPremiumUnits": 500,
+                          "currency": "USD",
+                          "failedUnits": 0,
+                          "governedMaxExposureUnits": 10000,
+                          "pendingUnits": 0,
+                          "provisionalLossUnits": 0,
+                          "quotedPremiumUnits": 500,
+                          "recoveredUnits": 0,
+                          "reservedUnits": 0,
+                          "settledUnits": 10000
+                        }
+                      ],
+                      "receipts": [],
+                      "schema": "chio.credit.exposure-ledger.v1",
+                      "summary": {
+                        "actionableReceipts": 0,
+                        "activeDecisions": 1,
+                        "currencies": [
+                          "USD"
+                        ],
+                        "failedSettlementReceipts": 0,
+                        "matchingDecisions": 1,
+                        "matchingReceipts": 2,
+                        "mixedCurrencyBook": false,
+                        "pendingSettlementReceipts": 0,
+                        "returnedDecisions": 1,
+                        "returnedReceipts": 2,
+                        "supersededDecisions": 0,
+                        "truncatedDecisions": false,
+                        "truncatedReceipts": false
+                      },
+                      "supportBoundary": {
+                        "claimAdjudicationSupported": false,
+                        "crossCurrencyNettingSupported": false,
+                        "governedReceiptsAuthoritative": true,
+                        "recoveryLifecycleSupported": false,
+                        "settlementReconciliationAuthoritative": true,
+                        "underwritingDecisionsAuthoritative": true
+                      }
+                    },
+                    "signature": "18fee9950494f0bccbf8d7ce9fa9d088736d3076c6fe78d0846c61d337f9b678e6530f3a5510b87529494e3f12d6cb8968feaf5418aa004c97be1a24485df106",
+                    "signerKey": "5858bc23766da3da9b0864db8e9aa068891719fea8ee769077a84ceafa3fa597"
+                  },
+                  "issuedAt": 1700010400,
+                  "lossEvent": {
+                    "body": {
+                      "bondId": "bond-1",
+                      "description": "claim loss marker",
+                      "eventId": "loss-1",
+                      "eventKind": "delinquency",
+                      "issuedAt": 1700010370,
+                      "projectedBondLifecycleState": "active",
+                      "report": {
+                        "generatedAt": 1700010369,
+                        "query": {
+                          "amount": {
+                            "currency": "USD",
+                            "units": 1000
+                          },
+                          "bondId": "bond-1",
+                          "eventKind": "delinquency"
+                        },
+                        "schema": "chio.credit.loss-lifecycle-report.v1",
+                        "summary": {
+                          "agentSubject": "subject-1",
+                          "bondId": "bond-1",
+                          "capabilityId": "cap-1",
+                          "currentBondLifecycleState": "active",
+                          "currentDelinquentAmount": {
+                            "currency": "USD",
+                            "units": 1000
+                          },
+                          "eventAmount": {
+                            "currency": "USD",
+                            "units": 1000
+                          },
+                          "facilityId": "cfd-1",
+                          "outstandingDelinquentAmount": {
+                            "currency": "USD",
+                            "units": 1000
+                          },
+                          "projectedBondLifecycleState": "active",
+                          "releaseableReserveAmount": {
+                            "currency": "USD",
+                            "units": 2000
+                          },
+                          "toolName": "tool-a",
+                          "toolServer": "server-1"
+                        },
+                        "supportBoundary": {
+                          "appealWindowSupported": true,
+                          "automaticCapitalExecutionSupported": false,
+                          "bondLifecycleProjectionAuthoritative": true,
+                          "externalClaimAdjudicationSupported": false,
+                          "immutableLifecycleAuthoritative": true,
+                          "reserveControlExecutionSupported": true
+                        }
+                      },
+                      "schema": "chio.credit.loss-lifecycle.v1"
+                    },
+                    "signature": "77270f54acacb3eef99cbed88a96660541f212b2a2d1709d6d9b8c1e8556f426c7b7b477f286d8d8910d6268a341f06a58affc8f5d5815c53e21d8420c79bd0a",
+                    "signerKey": "0685b10257f053413d51e1b975f8f1318de73a831b9c95544973e3faba3c2800"
+                  },
+                  "narrative": "tool execution loss",
+                  "receiptIds": [
+                    "rcpt-1",
+                    "rcpt-2"
+                  ],
+                  "schema": "chio.market.claim-package.v1"
+                },
+                "signature": "9b28c3009a00ea0dbcb1b0e18a46fdafd1cbd6b81fd9189f935220014b2ed098f39fe39c96db60eb08119af2235e73f779e26bada54d545dcb2db6cade65e301",
+                "signerKey": "49b274b1d824f572aea7e6e7a1b6117365badc6b5cd2d203b56a224d0b7eed22"
+              },
+              "claimResponseId": "clr-1",
+              "coveredAmount": {
+                "currency": "USD",
+                "units": 7000
+              },
+              "disposition": "accepted",
+              "issuedAt": 1700010600,
+              "providerResponseRef": "provider-claim-1",
+              "responseNote": "partial acceptance",
+              "schema": "chio.market.claim-response.v1"
+            },
+            "signature": "e04b72f55ac11677b12a84670825b8d932710de788ea9c045e282b473a4632ed8d72fb11939d54b8a656cefd63b11f9e7b2664a7a2e042ea2be2c2f57e651800",
+            "signerKey": "2ab63999223a591dcd4b65490248cafe11beb4a1775e3327f40010ec5e076f3c"
+          },
+          "reason": "remaining uncovered amount disputed",
+          "schema": "chio.market.claim-dispute.v1"
+        },
+        "signature": "769652fcb56aaf7edaf046d0b3775e0291988a906cc2b4bbd5b1643b334d559a629af91cb4e4dfb90bcbbd8e0f1b9c01f5e83b32ab18d06d03e53aa42c91790a",
+        "signerKey": "cbd0079c350b4b79d6d7da5dd80adf870fe69b2183264dd0c6879c32aef56684"
+      },
+      "issuedAt": 1700010800,
+      "note": "partial settlement ordered",
+      "outcome": "partial_settlement",
+      "schema": "chio.market.claim-adjudication.v1"
+    },
+    "signature": "90549a6d0fec95fc76c8427709a4759d9374befe85f64aaf52e74a9a1c9f903ed8da41d7ee69a7068748a013cb306d6bb5f7a1d351f36ebbc05079c034766f08",
+    "signerKey": "44fbc5b3e9eb3c3fd499e8074b946d3819515f892c19e328e06de28f84c3ef32"
+  },
+  "capitalInstruction": {
+    "body": {
+      "action": "transfer_funds",
+      "amount": {
+        "currency": "USD",
+        "units": 6000
+      },
+      "authorityChain": [],
+      "completionFlowRowId": "economic-completion-flow:rc-1",
+      "counterpartyId": "subject-1",
+      "counterpartyRole": "agent_counterparty",
+      "description": "claim payout transfer",
+      "executionWindow": {
+        "notAfter": 1700011200,
+        "notBefore": 1700010850
+      },
+      "governedReceiptId": "rc-1",
+      "instructionId": "cei-1",
+      "intendedState": "pending_execution",
+      "issuedAt": 1700010850,
+      "ownerRole": "facility_provider",
+      "query": {
+        "agentSubject": "subject-1",
+        "bondLimit": 10,
+        "facilityLimit": 10,
+        "lossEventLimit": 25,
+        "receiptLimit": 100
+      },
+      "rail": {
+        "custodyProviderId": "custody-1",
+        "jurisdiction": "us-ny",
+        "kind": "api",
+        "railId": "rail-1"
+      },
+      "reconciledState": "not_observed",
+      "schema": "chio.credit.capital-instruction.v1",
+      "sourceId": "facility-source-1",
+      "sourceKind": "facility_commitment",
+      "subjectKey": "subject-1",
+      "supportBoundary": {
+        "automaticDispatchSupported": false,
+        "capitalBookAuthoritative": true,
+        "custodyNeutralInstructionSupported": true,
+        "externalExecutionAuthoritative": false
+      }
+    },
+    "signature": "4aab37620b888d5fa0563f0af5b0aeacfb46529fc3b25a6f2044bf0e58bdc2cca8ac779458f5a43939d52327770311bebf2e56599f6effa72c3282cde2ce3606",
+    "signerKey": "0e596cd9704708aca9aa062629e05645e383e5860972a27359397d05bc8837a2"
+  },
+  "issuedAt": 1700010900,
+  "payoutAmount": {
+    "currency": "USD",
+    "units": 6000
+  },
+  "payoutInstructionId": "cpi-1",
+  "schema": "chio.market.claim-payout-instruction.v1"
+}

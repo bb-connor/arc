@@ -117,7 +117,7 @@ impl GovernedApprovalCredentialV1 {
     /// The originating kernel must perform its configured trust checks first.
     pub fn from_token(token: &GovernedApprovalToken) -> Result<Self, Error> {
         if token.decision != GovernedApprovalDecision::Approved
-            || !token.verify_signature().map_err(invalid)?
+            || !token.verify_integrity_embedded_key().map_err(invalid)?
         {
             return Err(invalid(
                 "approval artifact does not carry a valid approved signature",

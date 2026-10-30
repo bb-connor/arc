@@ -122,9 +122,10 @@ pub(super) fn make_signed_finding_report(
             })
             .collect(),
         checkpoints: vec![inputs.checkpoint.clone()],
-        checkpoint_transparency: build_checkpoint_transparency(std::slice::from_ref(
-            inputs.checkpoint,
-        ))?,
+        checkpoint_transparency: build_checkpoint_transparency(
+            std::slice::from_ref(inputs.checkpoint),
+            std::slice::from_ref(&inputs.checkpoint.body.kernel_key),
+        )?,
         finding_delivery: None,
         recipe_preimage: Some(inputs.recipe_bytes),
         status_proof_input: None,
@@ -176,7 +177,10 @@ pub(super) fn checkpoint_at(
     signer: &Keypair,
 ) -> Result<KernelCheckpoint, Box<dyn std::error::Error>> {
     checkpoint.body.issued_at = issued_at;
-    checkpoint.signature = signer.sign(&canonical_json_bytes(&checkpoint.body)?);
+    checkpoint.signature = signer.sign_wrapped(
+        chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&checkpoint.body)?,
+    )?;
     Ok(checkpoint)
 }
 
@@ -348,6 +352,9 @@ fn signed_nonce(
         reserved_hold_id: Some(budget.hold_id),
         reserving_request_id: None,
     };
-    let signature = kernel.sign(&canonical_json_bytes(&nonce)?);
+    let signature = kernel.sign_wrapped(
+        chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA,
+        &chio_core::CanonicalBytes::from_serializable(&nonce)?,
+    )?;
     Ok(SignedExecutionNonce { nonce, signature })
 }

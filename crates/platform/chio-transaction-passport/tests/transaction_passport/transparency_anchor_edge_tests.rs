@@ -99,10 +99,12 @@ fn standalone_minimal_passport_rejects_anchor_over_a_non_receipt_artifact() {
             );
             body["chain_root"] = json!(format!("0x{}", chain_root.to_hex()));
             let signature = kernel
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical policy-anchor statement body"),
                 )
+                .test_expect("checkpoint statement signs")
                 .to_hex();
             artifact["artifact_ref"] = json!(sha256_hex(&policy_bytes));
             artifact["root_hash"] = json!(leaf_hex);
@@ -201,10 +203,12 @@ fn standalone_minimal_passport_rejects_signed_checkpoint_missing_required_body_f
                 .test_expect("checkpoint body is an object")
                 .remove("checkpoint_seq");
             let signature = transparency_checkpoint_keypair()
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical malformed checkpoint body"),
                 )
+                .test_expect("checkpoint statement signs")
                 .to_hex();
             artifact["checkpoint_statement"] = json!({
                 "body": body,
@@ -228,10 +232,12 @@ fn standalone_minimal_passport_rejects_signed_checkpoint_unknown_body_fields() {
             let mut body = artifact["checkpoint_statement"]["body"].clone();
             body["smuggled"] = json!("field");
             let signature = transparency_checkpoint_keypair()
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical field-smuggled checkpoint body"),
                 )
+                .test_expect("checkpoint statement signs")
                 .to_hex();
             artifact["checkpoint_statement"] = json!({
                 "body": body,
@@ -257,10 +263,12 @@ fn standalone_minimal_passport_rejects_signed_checkpoint_explicit_null_options()
             let mut body = artifact["checkpoint_statement"]["body"].clone();
             body["previous_checkpoint_sha256"] = Value::Null;
             let signature = transparency_checkpoint_keypair()
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical explicit-null checkpoint body"),
                 )
+                .test_expect("checkpoint statement signs")
                 .to_hex();
             artifact["checkpoint_statement"] = json!({
                 "body": body,
@@ -298,10 +306,12 @@ fn standalone_minimal_passport_rejects_noncanonical_checkpoint_body_encodings() 
                 );
                 body[field] = json!(noncanonical);
                 let signature = transparency_checkpoint_keypair()
-                    .sign(
-                        &chio_core_types::canonical_json_bytes(&body)
+                    .sign_wrapped(
+                        "chio.checkpoint_statement.v1",
+                        &chio_core_types::CanonicalBytes::from_serializable(&body)
                             .test_expect("canonical noncanonical-wire checkpoint body"),
                     )
+                    .test_expect("checkpoint statement signs")
                     .to_hex();
                 artifact["checkpoint_statement"] = json!({
                     "body": body,
@@ -449,10 +459,12 @@ fn configure_two_leaf_transparency_proof(artifact: &mut Value) {
     );
     body["chain_root"] = json!(chain_root.to_hex_prefixed());
     let signature = transparency_checkpoint_keypair()
-        .sign(
-            &chio_core_types::canonical_json_bytes(&body)
+        .sign_wrapped(
+            "chio.checkpoint_statement.v1",
+            &chio_core_types::CanonicalBytes::from_serializable(&body)
                 .test_expect("canonical two-leaf checkpoint body"),
         )
+        .test_expect("checkpoint statement signs")
         .to_hex();
     artifact["checkpoint_statement"] = json!({
         "body": body,
@@ -467,10 +479,12 @@ fn standalone_minimal_passport_rejects_zero_checkpoint_issuance_time() {
             let mut body = artifact["checkpoint_statement"]["body"].clone();
             body["issued_at"] = json!(0);
             let signature = transparency_checkpoint_keypair()
-                .sign(
-                    &chio_core_types::canonical_json_bytes(&body)
+                .sign_wrapped(
+                    "chio.checkpoint_statement.v1",
+                    &chio_core_types::CanonicalBytes::from_serializable(&body)
                         .test_expect("canonical zero-time checkpoint body"),
                 )
+                .test_expect("checkpoint statement signs")
                 .to_hex();
             artifact["checkpoint_statement"] = json!({
                 "body": body,

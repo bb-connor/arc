@@ -8,29 +8,31 @@ execution state.
 
 ## Usage
 
-Sign a JSON value and verify the signature over the same canonical value:
+Sign a JSON value under a registered schema id and verify the signature over
+the same canonical value:
 
 ```rust
-use chio_binding_helpers::{
-    sign_json_str_ed25519, verify_json_str_signature_ed25519,
-};
+use chio_binding_helpers::{sign_wrapped_json_ed25519, verify_wrapped_json};
 
 fn main() -> chio_binding_helpers::Result<()> {
     // Fixed seeds are useful for examples; applications must protect real keys.
-    let signed = sign_json_str_ed25519(r#"{"z":1,"a":2}"#, &"09".repeat(32))?;
+    let signed =
+        sign_wrapped_json_ed25519("chio.receipt.v1", r#"{"z":1,"a":2}"#, &"09".repeat(32))?;
     assert_eq!(signed.canonical_json, r#"{"a":2,"z":1}"#);
-    assert!(verify_json_str_signature_ed25519(
+    verify_wrapped_json(
+        "chio.receipt.v1",
         r#"{"a":2,"z":1}"#,
         &signed.public_key_hex,
         &signed.signature_hex,
-    )?);
+    )?;
     Ok(())
 }
 ```
 
-The sample uses the crate's existing dependencies and runs offline. UTF-8
-message signing uses the exact message bytes; JSON signing canonicalizes a
-`serde_json::Value` first. Seed input is a hex-encoded Ed25519 seed.
+The sample uses the crate's existing dependencies and runs offline. JSON signing
+canonicalizes a `serde_json::Value` and signs the signing wrapper over it under
+the schema id; an id outside the signed-artifact registry is refused. Seed input
+is a hex-encoded Ed25519 seed.
 
 ## Guarantees
 

@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/facility.schema.json",
+  "title": "Chio credit facility signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "expiresAt",
+    "facilityId",
+    "issuedAt",
+    "lifecycleState",
+    "report",
+    "schema"
+  ],
+  "properties": {
+    "expiresAt": {
+      "type": "integer"
+    },
+    "facilityId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lifecycleState": {
+      "type": "string"
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "filters",
+        "generatedAt",
+        "prerequisites",
+        "schema",
+        "scorecard",
+        "supportBoundary"
+      ],
+      "properties": {
+        "disposition": {
+          "type": "string"
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agentSubject"
+          ],
+          "properties": {
+            "agentSubject": {
+              "type": "string"
+            },
+            "capabilityId": {
+              "type": "string"
+            },
+            "decisionLimit": {
+              "type": "integer"
+            },
+            "receiptLimit": {
+              "type": "integer"
+            },
+            "toolName": {
+              "type": "string"
+            },
+            "toolServer": {
+              "type": "string"
+            }
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "description",
+              "evidenceRefs"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "evidenceRefs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "locator",
+                    "referenceId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "locator": {
+                      "type": "string"
+                    },
+                    "referenceId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "generatedAt": {
+          "type": "integer"
+        },
+        "prerequisites": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "certificationMet",
+            "certificationRequired",
+            "manualReviewRequired",
+            "minimumRuntimeAssuranceTier",
+            "runtimeAssuranceMet"
+          ],
+          "properties": {
+            "certificationMet": {
+              "type": "boolean"
+            },
+            "certificationRequired": {
+              "type": "boolean"
+            },
+            "manualReviewRequired": {
+              "type": "boolean"
+            },
+            "minimumRuntimeAssuranceTier": {
+              "type": "string"
+            },
+            "runtimeAssuranceMet": {
+              "type": "boolean"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "scorecard": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "anomalyCount",
+            "band",
+            "confidence",
+            "currencies",
+            "matchingDecisions",
+            "matchingReceipts",
+            "mixedCurrencyBook",
+            "overallScore",
+            "probationary",
+            "returnedDecisions",
+            "returnedReceipts"
+          ],
+          "properties": {
+            "anomalyCount": {
+              "type": "integer"
+            },
+            "band": {
+              "type": "string"
+            },
+            "confidence": {
+              "type": "string"
+            },
+            "currencies": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "matchingDecisions": {
+              "type": "integer"
+            },
+            "matchingReceipts": {
+              "type": "integer"
+            },
+            "mixedCurrencyBook": {
+              "type": "boolean"
+            },
+            "overallScore": {
+              "type": "number"
+            },
+            "probationary": {
+              "type": "boolean"
+            },
+            "returnedDecisions": {
+              "type": "integer"
+            },
+            "returnedReceipts": {
+              "type": "integer"
+            }
+          }
+        },
+        "supportBoundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "bondExecutionSupported",
+            "crossCurrencyAllocationSupported",
+            "providerNeutralPolicy"
+          ],
+          "properties": {
+            "bondExecutionSupported": {
+              "type": "boolean"
+            },
+            "crossCurrencyAllocationSupported": {
+              "type": "boolean"
+            },
+            "providerNeutralPolicy": {
+              "type": "boolean"
+            }
+          }
+        },
+        "terms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capitalSource",
+            "concentrationCapBps",
+            "creditLimit",
+            "reserveRatioBps",
+            "ttlSeconds",
+            "utilizationCeilingBps"
+          ],
+          "properties": {
+            "capitalSource": {
+              "type": "string"
+            },
+            "concentrationCapBps": {
+              "type": "integer"
+            },
+            "creditLimit": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "currency",
+                "units"
+              ],
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "units": {
+                  "type": "integer"
+                }
+              }
+            },
+            "reserveRatioBps": {
+              "type": "integer"
+            },
+            "ttlSeconds": {
+              "type": "integer"
+            },
+            "utilizationCeilingBps": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.credit.facility.v1"
+    },
+    "supersedesFacilityId": {
+      "type": "string"
+    }
+  }
+}

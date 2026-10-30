@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/factor-assignment-acknowledgement-body.schema.json",
+  "title": "chio.factor.assignment-acknowledgement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "acknowledgedAtUnixMs",
+    "acknowledgementId",
+    "agreementBodyDigest",
+    "agreementId",
+    "assignmentAuthorizationSetDigest",
+    "authorityId",
+    "authorityKeyEpoch",
+    "buyerId",
+    "buyerSettlementDestinationRef",
+    "dueAtUnixMs",
+    "effectiveAtUnixMs",
+    "expectedResourceFence",
+    "expectedSnapshotVersion",
+    "normalizedRequestDigest",
+    "obligationAtomDigest",
+    "obligationId",
+    "operationId",
+    "priorDispositionDigest",
+    "priorDispositionKind",
+    "priorDispositionLifecycleFence",
+    "priorDispositionVersion",
+    "resultingDispositionDigest",
+    "resultingDispositionLifecycleFence",
+    "resultingDispositionVersion",
+    "resultingResourceFence",
+    "resultingSnapshotVersion",
+    "schema",
+    "statusProofDigest"
+  ],
+  "properties": {
+    "acknowledgedAtUnixMs": {
+      "type": "integer"
+    },
+    "acknowledgementId": {
+      "type": "string"
+    },
+    "agreementBodyDigest": {
+      "type": "string"
+    },
+    "agreementId": {
+      "type": "string"
+    },
+    "assignmentAuthorizationSetDigest": {
+      "type": "string"
+    },
+    "authorityId": {
+      "type": "string"
+    },
+    "authorityKeyEpoch": {
+      "type": "integer"
+    },
+    "buyerId": {
+      "type": "string"
+    },
+    "buyerSettlementDestinationRef": {
+      "type": "string"
+    },
+    "dueAtUnixMs": {
+      "type": "integer"
+    },
+    "effectiveAtUnixMs": {
+      "type": "integer"
+    },
+    "expectedResourceFence": {
+      "type": "integer"
+    },
+    "expectedSnapshotVersion": {
+      "type": "integer"
+    },
+    "normalizedRequestDigest": {
+      "type": "string"
+    },
+    "obligationAtomDigest": {
+      "type": "string"
+    },
+    "obligationId": {
+      "type": "string"
+    },
+    "operationId": {
+      "type": "string"
+    },
+    "priorDispositionDigest": {
+      "type": "string"
+    },
+    "priorDispositionKind": {
+      "type": "string"
+    },
+    "priorDispositionLifecycleFence": {
+      "type": "integer"
+    },
+    "priorDispositionVersion": {
+      "type": "integer"
+    },
+    "resultingDispositionDigest": {
+      "type": "string"
+    },
+    "resultingDispositionLifecycleFence": {
+      "type": "integer"
+    },
+    "resultingDispositionVersion": {
+      "type": "integer"
+    },
+    "resultingResourceFence": {
+      "type": "integer"
+    },
+    "resultingSnapshotVersion": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.factor.assignment-acknowledgement.v1"
+    },
+    "statusProofDigest": {
+      "type": "string"
+    }
+  }
+}

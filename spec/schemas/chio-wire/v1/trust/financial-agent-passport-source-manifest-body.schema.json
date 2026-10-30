@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/financial-agent-passport-source-manifest-body.schema.json",
+  "title": "chio.financial-agent-passport.source-manifest.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "credentialCount",
+    "credentialRoot",
+    "expiresAt",
+    "issuedAt",
+    "issuer",
+    "merkleRoots",
+    "schema",
+    "sourcePassportId",
+    "subject"
+  ],
+  "properties": {
+    "credentialCount": {
+      "type": "integer"
+    },
+    "credentialRoot": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "merkleRoots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.financial-agent-passport.source-manifest.v1"
+    },
+    "sourcePassportId": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

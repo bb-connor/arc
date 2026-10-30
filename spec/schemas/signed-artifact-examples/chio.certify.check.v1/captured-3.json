@@ -1,0 +1,34 @@
+{
+  "checkedAt": 1,
+  "criteria": [],
+  "criteriaProfile": "conformance-all-pass-v1",
+  "evidence": {
+    "evidenceProfile": "conformance-report-bundle-v1",
+    "generatedReportBytes": 1,
+    "generatedReportMediaType": "text/markdown",
+    "generatedReportSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "normalizedResultsSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "normalizedScenariosSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "provenanceMode": "artifact-signer-key",
+    "resultsDir": "results",
+    "scenariosDir": "scenarios"
+  },
+  "findings": [],
+  "schema": "chio.certify.check.v1",
+  "summary": {
+    "evaluatedPeerCount": 1,
+    "failCount": 0,
+    "missingScenariosCount": 0,
+    "passCount": 1,
+    "resultCount": 1,
+    "scenarioCount": 1,
+    "skippedCount": 0,
+    "unknownResultsCount": 0,
+    "unsupportedCount": 0,
+    "xfailCount": 0
+  },
+  "target": {
+    "toolServerId": "ingress-tool"
+  },
+  "verdict": "pass"
+}

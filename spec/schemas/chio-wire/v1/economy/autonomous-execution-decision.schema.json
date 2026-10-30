@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/autonomous-execution-decision.schema.json",
+  "title": "Chio autonomous execution decision signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "authority_envelope_ref",
+    "auto_bind_decision_ref",
+    "bound_coverage_ref",
+    "currency",
+    "execution_id",
+    "issued_at",
+    "lifecycle_state",
+    "note",
+    "optimization_ref",
+    "pricing_decision_ref",
+    "provider_id",
+    "quote_response_ref",
+    "rollback_control",
+    "safety_gates",
+    "schema",
+    "settlement_dispatch_ref",
+    "subject_key"
+  ],
+  "properties": {
+    "action": {
+      "type": "string"
+    },
+    "authority_envelope_ref": {
+      "type": "string"
+    },
+    "auto_bind_decision_ref": {
+      "type": "string"
+    },
+    "bound_coverage_ref": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "execution_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "lifecycle_state": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string"
+    },
+    "optimization_ref": {
+      "type": "string"
+    },
+    "pricing_decision_ref": {
+      "type": "string"
+    },
+    "provider_id": {
+      "type": "string"
+    },
+    "quote_response_ref": {
+      "type": "string"
+    },
+    "rollback_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "human_interrupt_contact",
+        "interruptible",
+        "rollback_plan_ref"
+      ],
+      "properties": {
+        "human_interrupt_contact": {
+          "type": "string"
+        },
+        "interruptible": {
+          "type": "boolean"
+        },
+        "rollback_plan_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "safety_gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "name",
+          "passed"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.autonomous-execution-decision.v1"
+    },
+    "settlement_dispatch_ref": {
+      "type": "string"
+    },
+    "subject_key": {
+      "type": "string"
+    }
+  }
+}

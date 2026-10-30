@@ -26,9 +26,8 @@ fn governed_approval_token_stamps_the_signing_identity() -> Result<()> {
         &backend,
     )?;
     assert_eq!(token.approver, backend.keypair().public_key());
-    assert_eq!(token.algorithm, Some(SigningAlgorithm::Ed25519));
     assert_eq!(token.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(token.verify_signature()?);
+    assert!(token.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -52,9 +51,8 @@ fn threshold_approval_proposal_stamps_the_signing_identity() -> Result<()> {
         },
         &backend,
     )?;
-    assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Ed25519));
     assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(proposal.verify_signature()?);
+    assert!(proposal.verify_integrity_embedded_key()?);
     Ok(())
 }
 
@@ -77,17 +75,22 @@ fn child_request_receipt_stamps_the_signing_identity() -> Result<()> {
         },
         &backend,
     )?;
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Ed25519);
-    assert!(receipt.verify_signature()?);
+    assert!(receipt.verify_integrity_embedded_key()?);
     Ok(())
 }
 
 #[test]
 fn signed_export_envelope_stamps_the_signing_identity() -> Result<()> {
     let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
-    let envelope = SignedExportEnvelope::sign_with_backend("export-rotated".to_string(), &backend)?;
+    #[derive(Clone, serde::Serialize)]
+    struct RotatedExport(&'static str);
+    impl crate::receipt::lineage::SignedExportPayload for RotatedExport {
+        const SCHEMA_ID: &'static str = crate::CHIO_COMPTROLLER_SURFACE_REPORT_V1_SCHEMA;
+    }
+    let envelope =
+        SignedExportEnvelope::sign_with_backend(RotatedExport("export-rotated"), &backend)?;
     assert_eq!(envelope.signer_key, backend.keypair().public_key());
-    assert!(envelope.verify_signature()?);
+    assert!(envelope.verify_signature(&backend.keypair().public_key())?);
     Ok(())
 }

@@ -1,0 +1,13 @@
+{
+  "claims": {
+    "azureMaa": {
+      "attestationType": "sgx"
+    }
+  },
+  "evidence_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "expires_at": 1800000000,
+  "issued_at": 1749000000,
+  "schema": "chio.runtime-attestation.azure-maa.jwt.v1",
+  "tier": "attested",
+  "verifier": "https://maa.cognition-market.test"
+}

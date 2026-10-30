@@ -13,7 +13,7 @@ use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use chio_core::crypto::{Keypair, PublicKey, SigningAlgorithm};
-use chio_core::{canonical_json_bytes, Signature};
+use chio_core::{verify_wrapped_bytes, CanonicalBytes, CanonicalJsonWitness, Signature};
 use chio_store_sqlite::{ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore};
 use serde::Deserialize;
 use serde_json::json;
@@ -30,7 +30,8 @@ use super::{
 /// scheme, node id, method, path, raw query, SHA-256 of the request body,
 /// single-use nonce, issue time, cluster term, the deployment and the
 /// recipient node id.
-pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str = "chio.cluster.peer-signature.v1";
+pub const CLUSTER_PEER_SIGNATURE_SCHEME: &str =
+    chio_core::signed_artifact::CHIO_CLUSTER_PEER_REQUEST_V1_SCHEMA;
 
 /// A peer request is fresh only while its `issued_at` is at most this many
 /// seconds before the highest receiver time its nonce cache has observed.
@@ -1082,9 +1083,13 @@ impl ClusterPeerPins {
         };
         let payload =
             peer_signature_payload(request, &signed).map_err(|_| PeerAuthError::Unauthenticated)?;
-        if !peer.public_key.verify_strict(&payload, &signature) {
-            return Err(PeerAuthError::BadSignature);
-        }
+        verify_wrapped_bytes(
+            &peer.public_key,
+            CLUSTER_PEER_SIGNATURE_SCHEME,
+            &payload,
+            &signature,
+        )
+        .map_err(|_| PeerAuthError::BadSignature)?;
         let received_body_sha256 = hex::encode(Sha256::digest(request.body));
         if !bool::from(
             received_body_sha256
@@ -1378,8 +1383,8 @@ struct SignedPeerFields<'a> {
 fn peer_signature_payload(
     request: &PeerRequestTarget<'_>,
     signed: &SignedPeerFields<'_>,
-) -> Result<Vec<u8>, TrustAccessError> {
-    canonical_json_bytes(&json!({
+) -> Result<CanonicalBytes<CanonicalJsonWitness>, TrustAccessError> {
+    CanonicalBytes::from_serializable(&json!({
         "scheme": CLUSTER_PEER_SIGNATURE_SCHEME,
         "deployment": signed.deployment,
         "recipient": signed.recipient,
@@ -1439,8 +1444,11 @@ pub fn sign_cluster_peer_request(
         term,
     };
     let payload = peer_signature_payload(request, &signed)?;
+    let signature = keypair
+        .sign_wrapped(CLUSTER_PEER_SIGNATURE_SCHEME, &payload)
+        .map_err(|error| TrustAccessError::SignaturePayload(error.to_string()))?;
     Ok(PeerRequestSignature {
-        signature: keypair.sign(&payload).to_hex(),
+        signature: signature.to_hex(),
         body_sha256,
         nonce,
     })

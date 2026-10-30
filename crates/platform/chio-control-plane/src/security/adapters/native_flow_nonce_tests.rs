@@ -68,7 +68,7 @@ fn native_nonce_preflight_issues_without_dispatch_or_standalone_nonce_custody() 
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert!(response.execution_nonce.is_some());
     assert!(response.output.is_none());
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.budget_observer()()?, 0);
@@ -191,7 +191,7 @@ fn native_nonce_preflight_callback_faults_deny_issuance_but_preserve_committed_t
         assert_eq!(response.verdict, Verdict::Deny, "{fault:?}");
         assert!(response.execution_nonce.is_none());
         assert!(response.output.is_none());
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
         assert_eq!(standalone_calls.load(Ordering::SeqCst), 0);
         assert_eq!(fixture.budget_observer()()?, 0);

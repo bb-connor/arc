@@ -421,9 +421,9 @@ proptest! {
         prop_assert_eq!(&sig_a, &sig_c);
 
         // Verification must succeed for every signed copy.
-        prop_assert!(receipt_a.verify_signature().expect("verify a"));
-        prop_assert!(receipt_b.verify_signature().expect("verify b"));
-        prop_assert!(receipt_c.verify_signature().expect("verify c"));
+        prop_assert!(receipt_a.verify_integrity_embedded_key().expect("verify a"));
+        prop_assert!(receipt_b.verify_integrity_embedded_key().expect("verify b"));
+        prop_assert!(receipt_c.verify_integrity_embedded_key().expect("verify c"));
 
         // Canonical body bytes must round-trip independent of which receipt
         // we project from: the body is the input to signing and must remain

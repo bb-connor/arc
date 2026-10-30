@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/mcp/operator-approval.schema.json",
+  "title": "Chio mcp operator approval signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "arguments",
+    "capability_id",
+    "created_at",
+    "expires_at",
+    "id",
+    "intent",
+    "policy_fingerprint",
+    "request_id",
+    "runtime_contract_fingerprint",
+    "schema",
+    "session_id",
+    "subject"
+  ],
+  "properties": {
+    "arguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "integer"
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "approver",
+        "decision",
+        "expires_at",
+        "governed_intent_hash",
+        "id",
+        "issued_at",
+        "request_id",
+        "signature",
+        "subject"
+      ],
+      "properties": {
+        "approver": {
+          "type": "string"
+        },
+        "decision": {
+          "type": "string"
+        },
+        "expires_at": {
+          "type": "integer"
+        },
+        "governed_intent_hash": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        }
+      }
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "id": {
+      "type": "string"
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "body",
+        "context",
+        "id",
+        "purpose",
+        "server_id",
+        "tool_name"
+      ],
+      "properties": {
+        "body": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "value": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "capability_id",
+                "parameters_hash"
+              ],
+              "properties": {
+                "capability_id": {
+                  "type": "string"
+                },
+                "parameters_hash": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chio_tool_approval",
+            "mcpSessionId"
+          ],
+          "properties": {
+            "chio_tool_approval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "arguments",
+                "capability_hash",
+                "policy_hash",
+                "request_id",
+                "schema",
+                "tenant_id"
+              ],
+              "properties": {
+                "arguments": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "message"
+                  ],
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "capability_hash": {
+                  "type": "string"
+                },
+                "policy_hash": {
+                  "type": "string"
+                },
+                "request_id": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                },
+                "tenant_id": {
+                  "type": "string"
+                }
+              }
+            },
+            "mcpSessionId": {
+              "type": "string"
+            }
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        },
+        "server_id": {
+          "type": "string"
+        },
+        "tool_name": {
+          "type": "string"
+        }
+      }
+    },
+    "policy_fingerprint": {
+      "type": "string"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "runtime_contract_fingerprint": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.mcp.operator-approval.v1"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

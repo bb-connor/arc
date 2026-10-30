@@ -1,4 +1,4 @@
-use chio_security_types::ports::ACTIVE_RESPONSE_AUTHORITY_SCHEMA;
+use chio_security_types::ports::ACTIVE_RESPONSE_AUTHORITY_PROTOCOL;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -52,7 +52,7 @@ impl AuthorityRuntimeConfig {
 
     fn validate_with_deployment_digest(&self, require_deployment_digest: bool) -> Result<()> {
         if self.schema != AUTHORITY_RUNTIME_CONFIG_SCHEMA
-            || self.protocol != ACTIVE_RESPONSE_AUTHORITY_SCHEMA
+            || self.protocol != ACTIVE_RESPONSE_AUTHORITY_PROTOCOL
             || (require_deployment_digest && self.deployment_digest.is_zero())
             || self.store_digest.is_zero()
             || self.service_identity.process_id == 0

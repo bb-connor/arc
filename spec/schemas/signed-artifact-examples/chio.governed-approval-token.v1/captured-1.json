@@ -1,0 +1,11 @@
+{
+  "approver": "25a0218b74be2ddf935d6ddbc6ce1cbe7345b0171057161bdc7dcb015632c4c5",
+  "decision": "approved",
+  "expires_at": 199,
+  "governed_intent_hash": "282bcbc3f0a34a8a4ac6f00c276fcf66cf3757a3332e83d92208e5079af46922",
+  "id": "bob",
+  "issued_at": 101,
+  "request_id": "request-1",
+  "subject": "14cccccb49399eac699c56fd90c8097b300d3f527623e672977ee451c8546fc3",
+  "threshold_proposal_hash": "7160b37e709a6620f1ece89ea881dc37743658617d6c14f908ff81e76f37c867"
+}

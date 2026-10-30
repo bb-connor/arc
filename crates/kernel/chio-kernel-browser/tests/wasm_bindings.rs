@@ -154,7 +154,7 @@ fn sign_receipt_uses_webcrypto_seed() {
         .expect("receipt_json is a string");
     let receipt: chio_core_types::receipt::body::ChioReceipt =
         serde_json::from_str(&receipt_json).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[wasm_bindgen_test]

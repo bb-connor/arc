@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust-control/cluster-budget-anchor-body.schema.json",
+  "title": "Chio cluster budget anchor signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chain"
+  ],
+  "properties": {
+    "chain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "body",
+          "signature"
+        ],
+        "properties": {
+          "body": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "anchorSetDigest",
+              "chainDigest",
+              "commitSequence",
+              "committedAt",
+              "electionTerm",
+              "leaderUrl",
+              "previousChainDigest",
+              "schema",
+              "signerPublicKey"
+            ],
+            "properties": {
+              "anchorSetDigest": {
+                "type": "string"
+              },
+              "chainDigest": {
+                "type": "string"
+              },
+              "commitSequence": {
+                "type": "integer"
+              },
+              "committedAt": {
+                "type": "integer"
+              },
+              "electionTerm": {
+                "type": "integer"
+              },
+              "leaderUrl": {
+                "type": "string"
+              },
+              "previousChainDigest": {
+                "type": "string"
+              },
+              "schema": {
+                "type": "string"
+              },
+              "signerPublicKey": {
+                "type": "string"
+              }
+            }
+          },
+          "signature": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

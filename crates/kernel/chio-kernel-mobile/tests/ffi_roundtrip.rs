@@ -12,13 +12,14 @@
 //! core correctly, and produces a JSON result that round-trips through
 //! the expected schema.
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::capability::{
     attenuation::{DelegationLink, DelegationLinkBody},
     scope::{ChioScope, MonetaryAmount, Operation, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
-use chio_core_types::crypto::Keypair;
+use chio_core_types::crypto::{Keypair, Signature};
 use chio_core_types::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     kinds::TrustLevel,
@@ -463,7 +464,7 @@ fn sign_receipt_roundtrip_and_verifies() {
     let signed_json =
         sign_receipt(body_json, hex::encode(&canonical_content), seed_hex).expect("sign receipt");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -483,7 +484,7 @@ fn sign_receipt_accepts_empty_preimage_stream_receipt() {
     let signed_json = sign_receipt(body_json, String::new(), keypair.seed_hex())
         .expect("empty-preimage stream receipt must sign");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -588,7 +589,7 @@ fn sign_receipt_relaying_trusted_body_signs_without_preimage() {
     let signed_json = sign_receipt_relaying_trusted_body(body_json, keypair.seed_hex())
         .expect("relay seam signs an upstream-trusted body");
     let receipt: ChioReceipt = serde_json::from_str(&signed_json).expect("parse signed receipt");
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -709,6 +710,15 @@ fn verify_capability_rejects_untrusted_issuer() {
     }
 }
 
+fn sign_passport_body(issuer: &Keypair, body: &PortablePassportBody) -> Signature {
+    issuer
+        .sign_wrapped(
+            PORTABLE_PASSPORT_SCHEMA,
+            &CanonicalBytes::from_serializable(body).unwrap(),
+        )
+        .unwrap()
+}
+
 #[test]
 fn verify_passport_happy_path() {
     let issuer = Keypair::generate();
@@ -726,7 +736,7 @@ fn verify_passport_happy_path() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: payload_canonical_bytes.clone(),
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 
@@ -758,7 +768,7 @@ fn verify_passport_rejects_expired_envelope() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: vec![],
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 
@@ -788,7 +798,7 @@ fn verify_passport_rejects_untrusted_issuer() {
         expires_at: EXPIRES_AT,
         payload_canonical_bytes: vec![],
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = sign_passport_body(&issuer, &body);
     let envelope = PortablePassportEnvelope { body, signature };
     let envelope_json = serde_json::to_string(&envelope).unwrap();
 

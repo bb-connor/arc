@@ -286,7 +286,10 @@ fn kg2_authority_wire_without_explicit_lifecycle_is_refused() -> TestResult {
         issuer_set_digest: sha256_hex(&chio_core::canonical_json_bytes(&derived.trusted_keys)?),
         change,
     };
-    let signature = source.current_keypair()?.sign_canonical(&body)?.0;
+    let signature = source.current_keypair()?.sign_wrapped(
+        "chio.authority-lifecycle.v1",
+        &chio_core::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let result = verify_authority_chain(
         &anchor,
         &[SignedAuthorityTransition {
@@ -416,7 +419,10 @@ fn kg2_signed_history_cannot_promote_recovery_root_to_issuer() -> TestResult {
         issuer_set_digest: sha256_hex(&chio_core::canonical_json_bytes(&derived.trusted_keys)?),
         change,
     };
-    let signature = source.current_keypair()?.sign_canonical(&body)?.0;
+    let signature = source.current_keypair()?.sign_wrapped(
+        "chio.authority-lifecycle.v1",
+        &chio_core::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let result = verify_authority_chain(&anchor, &[SignedAuthorityTransition { body, signature }]);
     assert!(
         matches!(result, Err(chio_kernel::AuthorityStoreError::Fence(message))

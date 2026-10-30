@@ -1,0 +1,13 @@
+{
+  "archiveSha256": "877c6f54b5beb7e107b619cacfd79686ac6ccbfec2c7b9e5246e8a4eea91e366",
+  "completedAt": 1793209511,
+  "schema": "chio.finding.hosted-gc-receipt.v1",
+  "target": {
+    "resourceFamily": "finding.purchase",
+    "resourceId": "job-1",
+    "resourceKind": "job",
+    "resourceRevision": 0,
+    "resourceSha256": "6a0ef63913cfd75ce9d24a204e6329016d3a14c00952ef49d9b7322d6d290148"
+  },
+  "tenantId": "integration-a-1793209486471803644"
+}

@@ -389,7 +389,7 @@ async fn subprocess_worker() -> Result {
             response.reason
         );
         assert_eq!(response.verdict, Verdict::Deny);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(response.request_id, request.request_id);
         let metadata = response.receipt.metadata.as_ref().ok_or("metadata")?;
         assert_eq!(metadata["chio_process"]["attempt"], 1);
@@ -426,7 +426,7 @@ async fn subprocess_worker() -> Result {
         assert!(phase.starts_with("recover-"));
         assert_eq!(response.verdict, Verdict::Deny);
         assert_eq!(response.request_id, original_id);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response.receipt.metadata.as_ref().ok_or("metadata")?["chio_process"]["attempt"],
             1
@@ -442,7 +442,7 @@ async fn subprocess_worker() -> Result {
         let response = runtime.invoke("root", "peek", &request).await?;
         assert_eq!(phase, "recover-repeated-read");
         assert_eq!(response.verdict, Verdict::Deny);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let metadata = response.receipt.metadata.as_ref().ok_or("metadata")?;
         assert_eq!(metadata["chio_process"]["attempt"], 3);
         assert_eq!(
@@ -477,7 +477,7 @@ async fn subprocess_worker() -> Result {
         assert_eq!(phase, "recover-known-read");
         assert_eq!(response.verdict, Verdict::Deny);
         assert_eq!(response.request_id, runtime.request_id("root", "model")?);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert!(matches!(
             runtime.invoke("root", "model", &request).await,
             Err(chio_process::ProcessError::Conflict)
@@ -485,7 +485,7 @@ async fn subprocess_worker() -> Result {
         let again = runtime.invoke_known_only("root", "model", &request).await?;
         assert_eq!(again.verdict, Verdict::Deny);
         assert_eq!(again.request_id, response.request_id);
-        assert!(again.receipt.verify_signature()?);
+        assert!(again.receipt.verify_integrity_embedded_key()?);
         let receipt = serde_json::to_value(&again.receipt)?;
         assert_eq!(
             receipt["metadata"]["chio_process"]["recovery_policy"],
@@ -548,7 +548,7 @@ async fn subprocess_worker() -> Result {
                 .request_id,
             request.request_id
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         return Ok(());
     }
     if phase == "crash-in-read" || phase == "recover-read" {
@@ -571,7 +571,7 @@ async fn subprocess_worker() -> Result {
             response.receipt.metadata
         );
         assert_ne!(response.request_id, first);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let again = runtime.tool_request("root", "peek", "tools", "read", json!({}))?;
         assert_eq!(again.request_id, response.request_id);
         let replay = runtime.invoke("root", "peek", &again).await?;
@@ -598,7 +598,7 @@ async fn subprocess_worker() -> Result {
     if phase == "recover-unknown" {
         assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
         assert!(response.output.is_none());
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert_eq!(
             response.reason.as_deref(),
             Some("dispatch outcome is unknown after recovery")

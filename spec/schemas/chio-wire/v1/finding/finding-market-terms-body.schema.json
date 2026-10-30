@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-market-terms-body.schema.json",
+  "title": "chio.finding.market-terms.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "appeal_window_secs",
+    "audit_eligible",
+    "audit_epoch_length_secs",
+    "backing_requirement",
+    "challenge_bond_limits",
+    "claim_window_secs",
+    "decision_rule_refs",
+    "expires_at",
+    "filing_window_secs",
+    "finding_artifact_sha256",
+    "finding_id",
+    "issued_at",
+    "listing_id",
+    "payout_policy",
+    "schema",
+    "seller",
+    "terms_id",
+    "verifier_profile_envelope_sha256"
+  ],
+  "properties": {
+    "appeal_window_secs": {
+      "type": "integer"
+    },
+    "audit_eligible": {
+      "type": "boolean"
+    },
+    "audit_epoch_length_secs": {
+      "type": "integer"
+    },
+    "backing_requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base_finding_stake",
+        "collateral_policy",
+        "maximum_sale_exposure"
+      ],
+      "properties": {
+        "base_finding_stake": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "collateral_policy": {
+          "type": "string"
+        },
+        "maximum_sale_exposure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "challenge_bond_limits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "guarantee_class",
+          "max_bond",
+          "min_bond"
+        ],
+        "properties": {
+          "guarantee_class": {
+            "type": "string"
+          },
+          "max_bond": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "min_bond": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_window_secs": {
+      "type": "integer"
+    },
+    "decision_rule_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "filing_window_secs": {
+      "type": "integer"
+    },
+    "finding_artifact_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "payout_policy": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.market-terms.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "terms_id": {
+      "type": "string"
+    },
+    "verifier_profile_envelope_sha256": {
+      "type": "string"
+    }
+  }
+}

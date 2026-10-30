@@ -93,7 +93,7 @@ fn capability_token_signature_verification() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn wrong_key_signature_fails() {
     let mut token = CapabilityToken::sign(body, &kp).unwrap();
     token.issuer = other_kp.public_key();
     // Tampering the embedded verifier key after signing should fail.
-    assert!(!token.verify_signature().unwrap());
+    assert!(!token.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -346,11 +346,11 @@ fn attenuated_capability_schema_and_budget_fail_closed() {
     )
     .unwrap();
     assert_eq!(token.schema, CHIO_CAPABILITY_SCHEMA);
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 
     let mut bad_schema = token.clone();
     bad_schema.schema = "chio.capability.v999".to_string();
-    assert!(bad_schema.verify_signature().is_err());
+    assert!(bad_schema.verify_integrity_embedded_key().is_err());
 
     let bad_budget = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -447,7 +447,7 @@ fn attenuated_capability_requires_attenuation_proof() -> Result<()> {
     )?;
     token.attenuation_proof = None;
 
-    assert!(token.verify_signature().is_err());
+    assert!(token.verify_integrity_embedded_key().is_err());
     Ok(())
 }
 
@@ -629,7 +629,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
 
     // The leaf-token signature still verifies and the chain links still
     // validate independently.
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
     assert!(validate_delegation_chain(&token.delegation_chain, None).is_ok());
 
     // The chain-binding entry point is a no-op for non-attenuated tokens.
@@ -935,7 +935,7 @@ fn governed_approval_token_signature_roundtrip() {
     let mut changed_token = token.clone();
     changed_token.request_id = "req-2".to_string();
 
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
     assert!(token.is_valid_at(1500));
     assert!(!token.is_valid_at(2000));
     assert_eq!(token.subject, subject.public_key());
@@ -985,7 +985,7 @@ fn governed_upstream_call_chain_proof_roundtrip_and_context_extraction() {
         body: GovernedTransactionIntentBody::ToolInvocation,
     };
 
-    assert!(proof.verify_signature().unwrap());
+    assert!(proof.verify_integrity_embedded_key().unwrap());
     assert!(proof.is_valid_at(1500));
     assert!(!proof.is_valid_at(2000));
     assert!(proof.matches_context(intent.call_chain.as_ref().unwrap()));
@@ -1049,7 +1049,7 @@ fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
         body: GovernedTransactionIntentBody::ToolInvocation,
     };
 
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
     assert!(token.matches_context(&call_chain));
     assert!(token.matches_session_anchor(&session_anchor));
     assert!(token.matches_target("srv-pay", "charge"));
@@ -1666,7 +1666,7 @@ fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
         json.get("algorithm").is_none(),
         "Ed25519 tokens must omit the `algorithm` envelope field"
     );
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -1684,11 +1684,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(
-        token.algorithm,
-        Some(crate::crypto::SigningAlgorithm::Ed25519)
-    );
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 }
 
 #[cfg(feature = "fips")]
@@ -1696,7 +1692,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
 fn capability_token_p256_round_trip() {
     // A capability token signed with P-256 verifies when reconstructed
     // through the exact same API path the kernel uses
-    // (`verify_signature` -> `PublicKey::verify_canonical`).
+    // (`verify_signature` -> `verify_wrapped`).
     let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
@@ -1710,15 +1706,14 @@ fn capability_token_p256_round_trip() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 
     // Round-trip through JSON (the wire format the kernel receives).
     let wire = serde_json::to_string(&token).unwrap();
     assert!(wire.contains("\"p256:"));
-    assert!(wire.contains("\"algorithm\":\"p256\""));
+    assert!(!wire.contains("\"algorithm\""));
     let restored: CapabilityToken = serde_json::from_str(&wire).unwrap();
-    assert!(restored.verify_signature().unwrap());
+    assert!(restored.verify_integrity_embedded_key().unwrap());
 }
 
 #[cfg(feature = "fips")]
@@ -1737,8 +1732,7 @@ fn capability_token_p384_round_trip() {
         aggregate_invocation_budget: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 }
 
 #[cfg(feature = "fips")]
@@ -1758,7 +1752,7 @@ fn capability_token_p256_tampered_body_fails() {
     };
     let mut token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     token.id = "cap-tampered".to_string();
-    assert!(!token.verify_signature().unwrap());
+    assert!(!token.verify_integrity_embedded_key().unwrap());
 }
 
 #[cfg(feature = "fips")]
@@ -1778,8 +1772,7 @@ fn governed_approval_token_p256_verifies() {
         decision: GovernedApprovalDecision::Approved,
     };
     let token = GovernedApprovalToken::sign_with_backend(body, &backend).unwrap();
-    assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
-    assert!(token.verify_signature().unwrap());
+    assert!(token.verify_integrity_embedded_key().unwrap());
 }
 
 // ----- `delegate` mint helper -----------------------------------
@@ -1832,7 +1825,7 @@ fn delegate_mints_signed_link_for_subset_scope() {
     )
     .unwrap();
 
-    assert!(receipt.link.verify_signature().unwrap());
+    assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(
         receipt.link.scope_hash,
         Some(scope_hash(&parent_scope).unwrap())
@@ -2099,9 +2092,9 @@ fn bac573_capability_token(issued_at: u64, expires_at: u64) -> (Keypair, Capabil
 #[test]
 fn bac573_capability_token_verify_at_within_window_passes() {
     let (_kp, token) = bac573_capability_token(1000, 2000);
-    assert!(token.verify_signature_at(1500).unwrap());
+    assert!(token.verify_integrity_embedded_key_at(1500).unwrap());
     // Boundaries: issued_at is inclusive, expires_at is exclusive.
-    assert!(token.verify_signature_at(1000).unwrap());
+    assert!(token.verify_integrity_embedded_key_at(1000).unwrap());
 }
 
 #[test]
@@ -2109,11 +2102,11 @@ fn bac573_capability_token_verify_at_expired_is_rejected() {
     let (_kp, token) = bac573_capability_token(1000, 2000);
     // now == expires_at and now > expires_at both reject (fail-closed).
     assert!(matches!(
-        token.verify_signature_at(2000),
+        token.verify_integrity_embedded_key_at(2000),
         Err(Error::CapabilityExpired { expires_at: 2000 })
     ));
     assert!(matches!(
-        token.verify_signature_at(9999),
+        token.verify_integrity_embedded_key_at(9999),
         Err(Error::CapabilityExpired { expires_at: 2000 })
     ));
 }
@@ -2122,7 +2115,7 @@ fn bac573_capability_token_verify_at_expired_is_rejected() {
 fn bac573_capability_token_verify_at_not_yet_valid_is_rejected() {
     let (_kp, token) = bac573_capability_token(1000, 2000);
     assert!(matches!(
-        token.verify_signature_at(999),
+        token.verify_integrity_embedded_key_at(999),
         Err(Error::CapabilityNotYetValid { not_before: 1000 })
     ));
 }
@@ -2134,9 +2127,9 @@ fn bac573_capability_token_verify_at_bad_signature_fails_before_time_check() {
     // first, so the time window cannot leak through a forged token.
     let (_kp, mut token) = bac573_capability_token(1000, 2000);
     token.subject = Keypair::generate().public_key(); // breaks the signature
-    assert!(!token.verify_signature_at(9999).unwrap());
+    assert!(!token.verify_integrity_embedded_key_at(9999).unwrap());
     // And in-window with a broken signature is still a plain rejection.
-    assert!(!token.verify_signature_at(1500).unwrap());
+    assert!(!token.verify_integrity_embedded_key_at(1500).unwrap());
 }
 
 #[test]
@@ -2144,24 +2137,33 @@ fn bac573_capability_token_verify_with_floor_at_folds_time_and_floor() {
     let (_kp, token) = bac573_capability_token(1000, 2000);
     // In-window + allowed floor verifies.
     assert!(matches!(
-        token.verify_signature_with_floor_at(CapabilityCryptoFloor::AllowClassical, 1500),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            1500
+        ),
         Ok(true)
     ));
     // In-window but floor rejects classical: floor error, not a time error.
     assert!(matches!(
-        token.verify_signature_with_floor_at(CapabilityCryptoFloor::PqRequired, 1500),
+        token.verify_integrity_embedded_key_with_floor_at(CapabilityCryptoFloor::PqRequired, 1500),
         Err(CapabilityFloorVerifyError::RejectedByCryptoFloor { .. })
     ));
     // Floor + signature pass but expired: surfaced as Crypto(CapabilityExpired).
     assert!(matches!(
-        token.verify_signature_with_floor_at(CapabilityCryptoFloor::AllowClassical, 2000),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            2000
+        ),
         Err(CapabilityFloorVerifyError::Crypto(
             Error::CapabilityExpired { expires_at: 2000 }
         ))
     ));
     // Not yet valid: surfaced as Crypto(CapabilityNotYetValid).
     assert!(matches!(
-        token.verify_signature_with_floor_at(CapabilityCryptoFloor::AllowClassical, 999),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            999
+        ),
         Err(CapabilityFloorVerifyError::Crypto(
             Error::CapabilityNotYetValid { not_before: 1000 }
         ))
@@ -2176,7 +2178,10 @@ fn bac573_capability_token_verify_with_floor_at_bad_signature_fails_first() {
     // Expired AND broken signature: floor ok, signature fails -> Ok(false),
     // never the time error.
     assert!(matches!(
-        token.verify_signature_with_floor_at(CapabilityCryptoFloor::AllowClassical, 9999),
+        token.verify_integrity_embedded_key_with_floor_at(
+            CapabilityCryptoFloor::AllowClassical,
+            9999
+        ),
         Ok(false)
     ));
 }
@@ -2201,13 +2206,13 @@ fn bac573_approval_token(issued_at: u64, expires_at: u64) -> (Keypair, GovernedA
 #[test]
 fn bac573_approval_token_verify_at_window_enforced() {
     let (_approver, token) = bac573_approval_token(1000, 2000);
-    assert!(token.verify_signature_at(1500).unwrap());
+    assert!(token.verify_integrity_embedded_key_at(1500).unwrap());
     assert!(matches!(
-        token.verify_signature_at(2000),
+        token.verify_integrity_embedded_key_at(2000),
         Err(Error::CapabilityExpired { expires_at: 2000 })
     ));
     assert!(matches!(
-        token.verify_signature_at(999),
+        token.verify_integrity_embedded_key_at(999),
         Err(Error::CapabilityNotYetValid { not_before: 1000 })
     ));
 }
@@ -2217,7 +2222,7 @@ fn bac573_approval_token_verify_at_bad_signature_fails_first() {
     let (_approver, mut token) = bac573_approval_token(1000, 2000);
     // Break the signature; expired and forged -> signature failure first.
     token.subject = Keypair::generate().public_key();
-    assert!(!token.verify_signature_at(9999).unwrap());
+    assert!(!token.verify_integrity_embedded_key_at(9999).unwrap());
 }
 
 fn bac573_upstream_proof(
@@ -2246,13 +2251,13 @@ fn bac573_upstream_proof(
 #[test]
 fn bac573_upstream_proof_verify_at_window_enforced() {
     let (_signer, proof) = bac573_upstream_proof(1000, 2000);
-    assert!(proof.verify_signature_at(1500).unwrap());
+    assert!(proof.verify_integrity_embedded_key_at(1500).unwrap());
     assert!(matches!(
-        proof.verify_signature_at(2000),
+        proof.verify_integrity_embedded_key_at(2000),
         Err(Error::CapabilityExpired { expires_at: 2000 })
     ));
     assert!(matches!(
-        proof.verify_signature_at(999),
+        proof.verify_integrity_embedded_key_at(999),
         Err(Error::CapabilityNotYetValid { not_before: 1000 })
     ));
 }
@@ -2261,7 +2266,7 @@ fn bac573_upstream_proof_verify_at_window_enforced() {
 fn bac573_upstream_proof_verify_at_bad_signature_fails_first() {
     let (_signer, mut proof) = bac573_upstream_proof(1000, 2000);
     proof.subject = Keypair::generate().public_key(); // breaks the signature
-    assert!(!proof.verify_signature_at(9999).unwrap());
+    assert!(!proof.verify_integrity_embedded_key_at(9999).unwrap());
 }
 
 fn bac573_continuation_token(
@@ -2301,13 +2306,13 @@ fn bac573_continuation_token(
 #[test]
 fn bac573_continuation_token_verify_at_window_enforced() {
     let (_signer, token) = bac573_continuation_token(1000, 2000);
-    assert!(token.verify_signature_at(1500).unwrap());
+    assert!(token.verify_integrity_embedded_key_at(1500).unwrap());
     assert!(matches!(
-        token.verify_signature_at(2000),
+        token.verify_integrity_embedded_key_at(2000),
         Err(Error::CapabilityExpired { expires_at: 2000 })
     ));
     assert!(matches!(
-        token.verify_signature_at(999),
+        token.verify_integrity_embedded_key_at(999),
         Err(Error::CapabilityNotYetValid { not_before: 1000 })
     ));
 }
@@ -2316,7 +2321,7 @@ fn bac573_continuation_token_verify_at_window_enforced() {
 fn bac573_continuation_token_verify_at_bad_signature_fails_first() {
     let (_signer, mut token) = bac573_continuation_token(1000, 2000);
     token.subject = Keypair::generate().public_key(); // breaks the signature
-    assert!(!token.verify_signature_at(9999).unwrap());
+    assert!(!token.verify_integrity_embedded_key_at(9999).unwrap());
 }
 
 // ---------------------------------------------------------------------------
@@ -2387,7 +2392,7 @@ fn delegate_accepts_valid_narrowing_step() {
         [9_u8; 16],
     )
     .unwrap();
-    assert!(receipt.link.verify_signature().unwrap());
+    assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
 
@@ -2567,7 +2572,7 @@ fn delegate_enforces_parent_relative_budget_share() {
         &issuer,
     )
     .unwrap();
-    assert!(attenuated_parent.verify_signature().unwrap());
+    assert!(attenuated_parent.verify_integrity_embedded_key().unwrap());
     let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
 
     // A child claiming 50% exceeds the parent's 30% -> reject.
@@ -2644,7 +2649,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
         &issuer,
     )
     .unwrap();
-    assert!(attenuated_parent.verify_signature().unwrap());
+    assert!(attenuated_parent.verify_integrity_embedded_key().unwrap());
     let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
 
     // Child OMITS budget_share_bps while the parent holds a reduced 30% share ->
@@ -2735,7 +2740,7 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
         [3_u8; 16],
     )
     .unwrap();
-    assert!(receipt.link.verify_signature().unwrap());
+    assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
 
@@ -2786,7 +2791,7 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
     )]);
     let plain = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
     let full_share_parent = attenuated_share_parent(&issuer, &plain, 10_000);
-    assert!(full_share_parent.verify_signature().unwrap());
+    assert!(full_share_parent.verify_integrity_embedded_key().unwrap());
     let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
 
     // Child OMITS budget_share_bps; the parent holds the full 100% share, so the
@@ -2858,7 +2863,7 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
         [8_u8; 16],
     )
     .unwrap();
-    assert!(receipt.link.verify_signature().unwrap());
+    assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
 
@@ -3000,7 +3005,7 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
         [10_u8; 16],
     )
     .unwrap();
-    assert!(receipt.link.verify_signature().unwrap());
+    assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
 

@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/hosted-replication-event.schema.json",
+  "title": "Chio finding hosted replication event signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "aggregateId",
+    "artifactSignerKey",
+    "authorityEpoch",
+    "committedAt",
+    "eventId",
+    "eventKind",
+    "expectedEventSha256",
+    "expectedRevision",
+    "payload",
+    "schema",
+    "sequence",
+    "sourceAuthority",
+    "tenantId"
+  ],
+  "properties": {
+    "aggregateId": {
+      "type": "string"
+    },
+    "artifactSignerKey": {
+      "type": "string"
+    },
+    "authorityEpoch": {
+      "type": "integer"
+    },
+    "committedAt": {
+      "type": "integer"
+    },
+    "eventId": {
+      "type": "string"
+    },
+    "eventKind": {
+      "type": "string"
+    },
+    "expectedEventSha256": {
+      "type": "null"
+    },
+    "expectedRevision": {
+      "type": "integer"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bond_ref": {
+          "type": "string"
+        },
+        "descriptor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "context_sha256",
+            "outcome_class",
+            "topic"
+          ],
+          "properties": {
+            "context_sha256": {
+              "type": "string"
+            },
+            "outcome_class": {
+              "type": "string"
+            },
+            "topic": {
+              "type": "string"
+            }
+          }
+        },
+        "evidence_checkpoint_ref": {
+          "type": "string"
+        },
+        "evidence_class": {
+          "type": "string"
+        },
+        "evidence_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "evidence_receipt_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expires_at": {
+          "type": "integer"
+        },
+        "finding_id": {
+          "type": "string"
+        },
+        "guarantee_class": {
+          "type": "string"
+        },
+        "invalid": {
+          "type": "boolean"
+        },
+        "issued_at": {
+          "type": "integer"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "payload_media_type": {
+          "type": "string"
+        },
+        "payload_sha256": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "status_feed_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.finding.hosted-replication-event.v1"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "sourceAuthority": {
+      "type": "string"
+    },
+    "tenantId": {
+      "type": "string"
+    }
+  }
+}

@@ -1,43 +1,36 @@
 //! Issuer-side capability signing.
 //!
-//! The mint path takes the canonical-JSON encoding of an unsigned
-//! [`PasskeyCapability`] (the envelope with `signature = ""`) and detaches a
-//! signature over those exact bytes via a `chio_core_types::SigningBackend`.
-//! The resulting hex-encoded signature is written into the capability's
-//! `signature` field; the rest of the envelope is byte-identical to the
-//! pre-signed form, so the kernel-side verifier can reconstruct the message
-//! by clearing `signature` to `""` before re-canonicalising.
+//! The signature covers the signing wrapper over the canonical JSON of the
+//! unsigned [`PasskeyCapability`] (the envelope with `signature = ""`) under
+//! `chio.passkey-capability.v1`. Verifiers rebuild the same body by clearing
+//! `signature` to `""` before re-canonicalising.
 //!
 //! # Crypto floor
 //!
-//! `crypto_floor=allow_classical` MUST preserve byte-identity with
-//! classical signatures. The mint path is generic over `SigningBackend`,
-//! so the same call site works with:
-//!
-//! - [`chio_core_types::crypto::Ed25519Backend`] (default classical),
-//! - the FIPS-gated P-256 / P-384 backends, and
-//! - [`chio_core_types::pq::HybridBackend`] (gated on the `pq` feature).
-//!
-//! The unsigned canonical envelope is identical across modes; only the bytes
-//! the `signature` slot ultimately holds differ.
+//! The mint path is generic over `SigningBackend`, so the same call site works
+//! with [`chio_core_types::crypto::Ed25519Backend`], the FIPS-gated P-256 /
+//! P-384 backends and [`chio_core_types::pq::HybridBackend`] (gated on the
+//! `pq` feature). The unsigned canonical envelope is identical across modes;
+//! only the bytes the `signature` slot ultimately holds differ.
 //!
 //! # Trust contract
 //!
-//! - The signed capability MUST be produced from the canonical-JSON bytes of
-//!   the envelope WITH `signature = ""`. Verifiers reconstruct the message
-//!   the same way.
 //! - Empty signatures NEVER verify. The signing function refuses to return
 //!   `Ok(_)` with an empty signature; the kernel verifier refuses to accept
 //!   any capability whose `signature` is empty.
 
-use chio_core_types::crypto::SigningBackend;
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped_bytes, PublicKey, Signature, SigningBackend};
 
 use crate::capability::PasskeyCapability;
 use crate::error::CustodyError;
 
+/// Signing-wrapper schema id of a passkey capability.
+pub const PASSKEY_CAPABILITY_SCHEMA: &str = "chio.passkey-capability.v1";
+
 /// Sign `capability` in place using `backend`, replacing its `signature`
-/// field with the hex-encoded detached signature over the canonical-JSON
-/// bytes of the envelope (with `signature = ""`).
+/// field with the hex-encoded signature over the signing wrapper of the
+/// envelope (with `signature = ""`).
 ///
 /// Fail-closed: any encoding or signing failure returns
 /// [`CustodyError::Encoding`]. The function refuses to return `Ok(_)` if the
@@ -50,11 +43,12 @@ pub fn sign_capability(
     // signature slot ensures resigning a previously-signed capability does
     // not embed the old signature in the message.
     capability.signature = String::new();
-    let canonical = capability.to_canonical_json()?;
+    let canonical = signing_body(capability)?;
 
     let signature = backend
-        .sign_bytes(&canonical)
-        .map_err(|err| CustodyError::Encoding(format!("issuer sign_bytes failed: {err}")))?;
+        .sign_wrapped(PASSKEY_CAPABILITY_SCHEMA, &canonical)
+        .map_err(|err| CustodyError::Encoding(format!("issuer signing failed: {err}")))?
+        .signature;
 
     let hex = signature.to_hex();
     if hex.is_empty() {
@@ -66,15 +60,34 @@ pub fn sign_capability(
     Ok(())
 }
 
-/// Reconstruct the canonical-JSON message that was signed for `capability`.
-///
-/// This is the inverse of [`sign_capability`]'s message construction step.
-/// Verifiers call this to recover the bytes covered by the detached
-/// signature.
-pub fn signing_message(capability: &PasskeyCapability) -> Result<Vec<u8>, CustodyError> {
+/// Canonical body the wrapper covers for `capability`: the envelope with
+/// `signature` cleared.
+pub fn signing_body(capability: &PasskeyCapability) -> Result<CanonicalBytes, CustodyError> {
     let mut shadow = capability.clone();
     shadow.signature = String::new();
-    shadow.to_canonical_json()
+    CanonicalBytes::from_serializable(&shadow)
+        .map_err(|err| CustodyError::Encoding(format!("canonical-json encode: {err}")))
+}
+
+/// Verify `capability.signature` against `issuer` under
+/// `chio.passkey-capability.v1`. An empty signature never verifies.
+pub fn verify_capability_signature(
+    capability: &PasskeyCapability,
+    issuer: &PublicKey,
+) -> Result<(), CustodyError> {
+    if capability.signature.is_empty() {
+        return Err(CustodyError::AssertionRejected("empty signature".into()));
+    }
+    let signature = Signature::from_hex(&capability.signature).map_err(|err| {
+        CustodyError::AssertionRejected(format!("signature hex decode failed: {err}"))
+    })?;
+    verify_wrapped_bytes(
+        issuer,
+        PASSKEY_CAPABILITY_SCHEMA,
+        &signing_body(capability)?,
+        &signature,
+    )
+    .map_err(|err| CustodyError::AssertionRejected(format!("signature rejected: {err}")))
 }
 
 #[cfg(test)]
@@ -116,19 +129,19 @@ mod tests {
     }
 
     #[test]
-    fn signing_message_clears_signature_slot_for_byte_stability() {
+    fn signing_body_clears_signature_slot_for_byte_stability() {
         let backend = Ed25519Backend::new(Keypair::from_seed(&[7u8; 32]));
         let mut cap = fixture_cap();
-        let pre = match signing_message(&cap) {
+        let pre = match signing_body(&cap) {
             Ok(b) => b,
-            Err(e) => panic!("pre signing_message must encode: {e}"),
+            Err(e) => panic!("pre signing_body must encode: {e}"),
         };
         if let Err(e) = sign_capability(&mut cap, &backend) {
             panic!("sign must succeed: {e}");
         }
-        let post = match signing_message(&cap) {
+        let post = match signing_body(&cap) {
             Ok(b) => b,
-            Err(e) => panic!("post signing_message must encode: {e}"),
+            Err(e) => panic!("post signing_body must encode: {e}"),
         };
         assert_eq!(
             pre, post,

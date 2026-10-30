@@ -758,7 +758,7 @@ fn anchor_emits_chio_anchor_round_latency_seconds() -> Result<(), Box<dyn Error>
         &keypair,
     )?;
 
-    assert!(batch.verify_signature()?);
+    assert!(batch.verify_integrity_embedded_key()?);
     let after = chio_anchor::anchor_round_count(chio_anchor::ANCHOR_OUTCOME_SUCCESS);
     assert!(
         after > before,
@@ -906,10 +906,9 @@ fn iroh_transport_bundle(
     Box<dyn Error>,
 > {
     use chio_federation_transport_iroh::identity::{
-        transport_endorsement_preimage, TransportDirectoryBundleBody,
-        TransportDirectoryBundleDocument, TransportDirectoryBundleTrust,
-        TransportDirectoryDocument, TransportDirectoryEntry, TrustedTransportDirectoryIssuer,
-        TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        sign_transport_endorsement, TransportDirectoryBundleBody, TransportDirectoryBundleDocument,
+        TransportDirectoryBundleTrust, TransportDirectoryDocument, TransportDirectoryEntry,
+        TrustedTransportDirectoryIssuer, TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
     };
 
     let passport = Keypair::from_seed(&[1u8; 32]);
@@ -919,10 +918,7 @@ fn iroh_transport_bundle(
         kernel_id: "did:chio:alice".to_string(),
         passport_public_key: passport.public_key(),
         transport_endpoint_id: transport,
-        passport_endorsement: passport.sign(&transport_endorsement_preimage(
-            "did:chio:alice",
-            &transport,
-        )),
+        passport_endorsement: sign_transport_endorsement(&passport, "did:chio:alice", &transport)?,
         revocation_signers: Vec::new(),
         removed: false,
     };
@@ -944,7 +940,10 @@ fn iroh_transport_bundle(
         issued_at_unix_ms: now - 1,
         expires_at_unix_ms: now + 1,
     };
-    let (signature, _) = issuer.sign_canonical(&body)?;
+    let signature = issuer.sign_wrapped(
+        TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&body)?,
+    )?;
     let bundle = TransportDirectoryBundleDocument {
         schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
         body,

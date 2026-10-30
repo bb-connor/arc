@@ -10,6 +10,7 @@ use super::cumulative_approval::{
 };
 use super::scope::{ChioScope, MonetaryAmount};
 use super::token::{CapabilityToken, CapabilityTokenBody};
+use crate::crypto::SigningMessage;
 use crate::crypto::{
     Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningOutcome,
 };
@@ -39,15 +40,19 @@ impl SigningBackend for IdentityBackend {
         self.original.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+    fn sign_bytes(&self, message: SigningMessage<'_>) -> Result<Signature> {
         self.replacement.sign_bytes(message)
     }
 
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
+    fn sign_bytes_with_identity(&self, message: SigningMessage<'_>) -> Result<SigningOutcome> {
         self.replacement.sign_bytes_with_identity(message)
     }
 
-    fn sign_bytes_for_identity(&self, key: &PublicKey, message: &[u8]) -> Result<SigningOutcome> {
+    fn sign_bytes_for_identity(
+        &self,
+        key: &PublicKey,
+        message: SigningMessage<'_>,
+    ) -> Result<SigningOutcome> {
         self.bound_calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(key, &self.original.public_key()?);
         let mut outcome = self.original.sign_bytes_for_identity(key, message)?;
@@ -98,7 +103,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             };
             Ok((
                 crate::canonical_json_bytes(&token)?,
-                token.verify_signature()?,
+                token.verify_integrity_embedded_key()?,
             ))
         }
         2 => {
@@ -117,7 +122,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             )?;
             Ok((
                 crate::canonical_json_bytes(&root)?,
-                root.verify_signature()?,
+                root.verify_integrity_embedded_key()?,
             ))
         }
         _ => {
@@ -143,7 +148,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
             )?;
             Ok((
                 crate::canonical_json_bytes(&root)?,
-                root.verify_signature()?,
+                root.verify_integrity_embedded_key()?,
             ))
         }
     }

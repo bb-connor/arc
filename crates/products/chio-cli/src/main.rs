@@ -186,7 +186,7 @@ mod runtime_cli;
 pub(crate) use runtime_cli::{
     cmd_api_protect, cmd_check, cmd_mcp_serve, cmd_mcp_serve_http, cmd_run, cmd_start,
     cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
-    require_receipt_db_path,
+    parse_capital_authority_keys, require_local_capital_authority, require_receipt_db_path,
 };
 #[path = "cli/runtime/trust_reports.rs"]
 mod runtime_trust_reports;

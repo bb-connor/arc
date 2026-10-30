@@ -3,12 +3,13 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+use chio_core::canonical::CanonicalBytes;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedTransactionIntent, GovernedTransactionIntentBody,
 };
 use chio_core::capability::scope::MonetaryAmount;
-use chio_core::crypto::Keypair;
+use chio_core::crypto::{ExemptFormat, Keypair};
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use chio_security_types::clock::{Clock, ClockError, ClockReading, FixedClock};
 use chio_settle::{
@@ -183,6 +184,22 @@ fn a_modified_signature_body_cannot_issue_a_witness() {
 }
 
 #[test]
+fn an_unwrapped_approval_signature_is_refused() {
+    let f = Fixture::new();
+    let intent = f.intent();
+    let mut token = f.token(&intent);
+    let canonical = CanonicalBytes::from_serializable(&token.body()).test_unwrap();
+    token.signature = f
+        .approver
+        .sign_exempt(ExemptFormat::JwsSigningInput, canonical.as_bytes());
+    verification_refused(
+        f.verify(&token, &intent),
+        "settlement approval signature invalid",
+    );
+    f.x402(f.witness()).test_unwrap();
+}
+
+#[test]
 fn a_valid_signature_from_an_untrusted_approver_is_refused() {
     let f = Fixture::new();
     let intent = f.intent();
@@ -190,7 +207,7 @@ fn a_valid_signature_from_an_untrusted_approver_is_refused() {
     let mut body = f.token(&intent).body();
     body.approver = other.public_key();
     let token = GovernedApprovalToken::sign(body, &other).test_unwrap();
-    assert!(token.verify_signature().test_unwrap());
+    assert!(token.verify_integrity_embedded_key().test_unwrap());
     verification_refused(
         f.verify(&token, &intent),
         "settlement approval approver mismatch",
@@ -212,7 +229,7 @@ fn signed_subject_and_request_bindings_are_enforced() {
             "settlement approval request mismatch"
         };
         let token = GovernedApprovalToken::sign(body, &f.approver).test_unwrap();
-        assert!(token.verify_signature().test_unwrap());
+        assert!(token.verify_integrity_embedded_key().test_unwrap());
         verification_refused(f.verify(&token, &intent), reason);
         f.x402(f.witness()).test_unwrap();
     }

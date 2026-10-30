@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::{
     body::{prepare_receipt_body_for_signing, ChioReceipt, ChioReceiptBody},
     crypto_floor::ReceiptCryptoFloor,
@@ -16,10 +16,13 @@ use chio_core_types::receipt::{
     metadata::ActorRef,
     metadata::GuardEvidence,
 };
-use chio_core_types::{canonical_json_bytes, sha256_hex};
+use chio_core_types::{canonical_json_bytes, sha256_hex, CanonicalBytes, Error};
 
 use crate::method::HttpMethod;
 use crate::verdict::Verdict;
+
+/// Signing-wrapper schema id of an HTTP receipt.
+pub const CHIO_HTTP_RECEIPT_SCHEMA: &str = "chio.http-receipt.v1";
 
 pub const CHIO_HTTP_STATUS_SCOPE_KEY: &str = "chio_http_status_scope";
 pub const CHIO_DECISION_RECEIPT_ID_KEY: &str = "chio_decision_receipt_id";
@@ -190,7 +193,10 @@ impl HttpReceipt {
     pub fn sign(mut body: HttpReceiptBody, keypair: &Keypair) -> chio_core_types::Result<Self> {
         body.id = compute_http_receipt_id(&body)?;
         body.validate_authority_semantics()?;
-        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        let signature = keypair.sign_wrapped(
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &CanonicalBytes::from_serializable(&body)?,
+        )?;
         Ok(Self {
             id: body.id,
             request_id: body.request_id,
@@ -248,7 +254,10 @@ impl HttpReceipt {
     }
 
     /// Verify the receipt signature against the embedded kernel key.
-    pub fn verify_signature(&self) -> chio_core_types::Result<bool> {
+    ///
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> chio_core_types::Result<bool> {
         let body = self.body();
         if body.validate_authority_semantics().is_err() {
             return Ok(false);
@@ -256,7 +265,16 @@ impl HttpReceipt {
         if compute_http_receipt_id(&body)? != self.id {
             return Ok(false);
         }
-        self.kernel_key.verify_canonical(&body, &self.signature)
+        match verify_wrapped(
+            &self.kernel_key,
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &body,
+            &self.signature,
+        ) {
+            Ok(()) => Ok(true),
+            Err(Error::SignatureRejected) => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     /// Recompute the content-addressed HTTP receipt id.
@@ -341,7 +359,7 @@ impl HttpReceipt {
         &self,
         keypair: &Keypair,
     ) -> chio_core_types::Result<ChioReceipt> {
-        if !self.verify_signature()? || keypair.public_key() != self.kernel_key {
+        if !self.verify_integrity_embedded_key()? || keypair.public_key() != self.kernel_key {
             return Err(chio_core_types::Error::InvalidSignature(
                 "HTTP evidence projection requires an authentic receipt and its matching signer"
                     .into(),
@@ -356,11 +374,11 @@ impl HttpReceipt {
         &self,
         projected: &ChioReceipt,
     ) -> chio_core_types::Result<bool> {
-        if self.kernel_key != projected.kernel_key || !self.verify_signature()? {
+        if self.kernel_key != projected.kernel_key || !self.verify_integrity_embedded_key()? {
             return Ok(false);
         }
         if !projected
-            .verify_signature_with_floor(ReceiptCryptoFloor::AllowHybrid)
+            .verify_signature_with_floor(&self.kernel_key, ReceiptCryptoFloor::AllowHybrid)
             .map_err(|error| {
                 chio_core_types::Error::InvalidSignature(format!(
                     "HTTP evidence outer signature verification failed: {error}"
@@ -463,7 +481,7 @@ mod tests {
         let kp = test_keypair();
         let body = sample_body(&kp);
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert!(receipt.is_allowed());
         assert!(!receipt.is_denied());
     }
@@ -476,7 +494,7 @@ mod tests {
         body.response_status = 403;
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         assert!(receipt.is_denied());
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -503,10 +521,14 @@ mod tests {
         receipt.boundary_class = BoundaryClass::DetectOnly;
         receipt.observation_outcome = Some(ObservationOutcome::Observed);
         receipt.trust_level = TrustLevel::Verified;
-        let (signature, _) = kp.sign_canonical(&receipt.body()).test_unwrap();
-        receipt.signature = signature;
+        receipt.signature = kp
+            .sign_wrapped(
+                CHIO_HTTP_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_serializable(&receipt.body()).test_unwrap(),
+            )
+            .test_unwrap();
 
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -530,7 +552,7 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         let json = serde_json::to_string(&receipt).test_unwrap();
         let back: HttpReceipt = serde_json::from_str(&json).test_unwrap();
-        assert!(back.verify_signature().test_unwrap());
+        assert!(back.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -550,7 +572,7 @@ mod tests {
             },
         ];
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(receipt.evidence.len(), 2);
         assert_eq!(receipt.evidence[0].guard_name, "PolicyGuard");
         assert!(receipt.evidence[0].verdict);
@@ -565,7 +587,7 @@ mod tests {
             "tags": ["production", "v2"]
         }));
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         let meta = receipt.metadata.as_ref().test_unwrap();
         assert_eq!(meta["trace_id"], "abc123");
     }
@@ -576,11 +598,11 @@ mod tests {
         let mut body = sample_body(&kp);
         body.capability_id = Some("cap-xyz-789".to_string());
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
         assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
         let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert_eq!(chio_receipt.capability_id, "cap-xyz-789");
-        assert!(chio_receipt.verify_signature().test_unwrap());
+        assert!(chio_receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -595,7 +617,7 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         let chio_receipt = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert!(
-            chio_receipt.verify_signature().test_unwrap(),
+            chio_receipt.verify_integrity_embedded_key().test_unwrap(),
             "converted receipt signature must verify"
         );
         assert!(
@@ -611,7 +633,7 @@ mod tests {
         let mut receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         // Tamper with the response status
         receipt.response_status = 500;
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -625,7 +647,7 @@ mod tests {
             http_status_scope(receipt.metadata.as_ref()),
             Some(CHIO_HTTP_STATUS_SCOPE_FINAL)
         );
-        assert!(receipt.verify_signature().test_unwrap());
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -637,7 +659,7 @@ mod tests {
         let mut receipt = HttpReceipt::sign(body, &kp).test_unwrap();
         receipt.metadata = Some(http_status_metadata_final(Some("decision-001")));
 
-        assert!(!receipt.verify_signature().test_unwrap());
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 
     #[test]
@@ -651,7 +673,7 @@ mod tests {
         let projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
         let original = &projected.metadata.as_ref().test_unwrap()["chio_http_receipt_v1"];
         assert_eq!(original, &serde_json::to_value(&receipt).test_unwrap());
-        assert!(projected.verify_signature().test_unwrap());
+        assert!(projected.verify_integrity_embedded_key().test_unwrap());
         assert!(projected.action.verify_hash().test_unwrap());
         assert!(receipt
             .verify_chio_receipt_projection(&projected)
@@ -681,14 +703,15 @@ mod tests {
         let kp = test_keypair();
         let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
         let mut projected = receipt.to_chio_receipt_with_keypair(&kp).test_unwrap();
-        projected.algorithm = Some(chio_core_types::crypto::SigningAlgorithm::P256);
+        projected.signature =
+            Signature::from_p256_der(&[0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01]);
         let error = receipt
             .verify_chio_receipt_projection(&projected)
             .test_unwrap_err();
         match error {
             chio_core_types::Error::InvalidSignature(message) => assert_eq!(
                 message,
-                "HTTP evidence outer signature verification failed: receipt algorithm envelope field p256 disagrees with signature ed25519"
+                "HTTP evidence outer signature verification failed: receipt cryptographic verification failed: signature algorithm P256 does not match the pinned key algorithm Ed25519"
             ),
             other => panic!("expected signature refusal, received {other:?}"),
         }
@@ -722,7 +745,7 @@ mod tests {
             reason: "reported by operator".into(),
         };
         let observation = HttpReceipt::sign(body.clone(), &kp).test_unwrap();
-        assert!(observation.verify_signature().test_unwrap());
+        assert!(observation.verify_integrity_embedded_key().test_unwrap());
         assert!(!observation.is_authorized());
         let projection = observation.to_chio_receipt_with_keypair(&kp).test_unwrap();
         assert_eq!(projection.receipt_kind, ReceiptKind::AdvisoryEvaluation);
@@ -741,5 +764,41 @@ mod tests {
                 Err(chio_core_types::Error::CanonicalJson(_))
             ));
         }
+    }
+
+    #[test]
+    fn http_receipt_signs_and_verifies_through_the_wrapper() {
+        let kp = test_keypair();
+        let receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        assert!(receipt.verify_integrity_embedded_key().test_unwrap());
+        verify_wrapped(
+            &kp.public_key(),
+            CHIO_HTTP_RECEIPT_SCHEMA,
+            &receipt.body(),
+            &receipt.signature,
+        )
+        .test_unwrap();
+    }
+
+    #[test]
+    fn http_receipt_signature_rejected_under_another_schema_id() {
+        let kp = test_keypair();
+        let mut receipt = HttpReceipt::sign(sample_body(&kp), &kp).test_unwrap();
+        receipt.signature = kp
+            .sign_wrapped(
+                chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+                &CanonicalBytes::from_serializable(&receipt.body()).test_unwrap(),
+            )
+            .test_unwrap();
+        assert!(matches!(
+            verify_wrapped(
+                &kp.public_key(),
+                CHIO_HTTP_RECEIPT_SCHEMA,
+                &receipt.body(),
+                &receipt.signature,
+            ),
+            Err(Error::SignatureRejected)
+        ));
+        assert!(!receipt.verify_integrity_embedded_key().test_unwrap());
     }
 }

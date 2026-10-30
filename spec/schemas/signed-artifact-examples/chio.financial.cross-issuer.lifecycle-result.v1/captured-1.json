@@ -1,0 +1,24 @@
+{
+  "effectiveAt": 1710000099,
+  "issuerDid": "did:chio:db995fe25169d141cab9bbba92baa01f9f2e1ece7df4cb2ac05190f37fcc1f9d",
+  "resolverIdentity": "resolver-a",
+  "resultDigest": "d62b3106b3a45166cfa38be38a38bd1ca804b45e6dc85bfef9000c085f7d21c0",
+  "schema": "chio.financial.cross-issuer.lifecycle-result.v1",
+  "signerKeyEpoch": 2,
+  "signerKeyId": "resolver-key",
+  "sourceIndexLeaf": {
+    "resultDigest": "d62b3106b3a45166cfa38be38a38bd1ca804b45e6dc85bfef9000c085f7d21c0",
+    "sourcePassportId": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+  },
+  "sourceIndexProof": {
+    "audit_path": [],
+    "leaf_index": 0,
+    "tree_size": 1
+  },
+  "sourceManifestDigest": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+  "sourcePassportId": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
+  "status": "active",
+  "statusVersion": 11,
+  "storeGeneration": 1,
+  "trustedClockHighWater": 1710000100
+}

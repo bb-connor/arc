@@ -126,8 +126,14 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
         &signer,
     )?;
     checkpoint.body.issued_at = original.timestamp;
-    checkpoint.signature = signer.sign(&canonical_json_bytes(&checkpoint.body)?);
-    chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint)?;
+    checkpoint.signature = signer.sign_wrapped(
+        chio_core::receipt::checkpoint::CHECKPOINT_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&checkpoint.body)?,
+    )?;
+    chio_kernel_core::evidence_verify::validate_checkpoint(
+        &checkpoint,
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
     let proof = chio_kernel_core::evidence_verify::build_inclusion_proof(&tree, 0, 1, 1)?;
     assert!(proof.verify(&foreign_bytes, &checkpoint.body.merkle_root));
     let foreign_log = json!({"checkpoint": checkpoint, "inclusion": proof});
@@ -275,7 +281,7 @@ fn completed_run_binds_actual_worker_results_and_rejects_semantic_substitutions(
         body.content_hash = sha256_hex(&canonical_json_bytes(&value)?);
         body.id.clear();
         let signed = ChioReceipt::sign(body, &signer)?;
-        assert!(signed.verify_signature()?);
+        assert!(signed.verify_integrity_embedded_key()?);
         let path = root.join(format!("substitution-{index}.json"));
         std::fs::write(&path, canonical_json_bytes(&signed)?)?;
         let denied = verify(&path, runtime)?;

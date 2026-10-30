@@ -124,8 +124,10 @@ pub fn build_checkpoint_with_chain_frontier_at(
             .transpose()?,
         chain_root,
     };
-    let body_bytes =
-        canonical_json_bytes(&body).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
-    let signature = keypair.sign(&body_bytes);
+    let canonical = CanonicalBytes::from_serializable(&body)
+        .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+    let signature = keypair
+        .sign_wrapped(CHECKPOINT_SCHEMA, &canonical)
+        .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
     Ok(KernelCheckpoint { body, signature })
 }

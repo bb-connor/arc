@@ -66,10 +66,16 @@ pub fn sign_dsse_envelope_full(
     let backend_a = Ed25519Backend::new(org_a_keypair.clone());
     let backend_b = Ed25519Backend::new(org_b_keypair.clone());
     let sig_a = backend_a
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
     let sig_b = backend_b
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
 
     let envelope = DsseEnvelope {
@@ -133,10 +139,16 @@ pub fn sign_chio_bilateral_dsse_envelope(
     let backend_a = Ed25519Backend::new(org_a_keypair.clone());
     let backend_b = Ed25519Backend::new(org_b_keypair.clone());
     let sig_a = backend_a
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
     let sig_b = backend_b
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
 
     let envelope = DsseEnvelope {
@@ -224,7 +236,10 @@ fn co_sign_signature_slice(
 
     let backend_b = Ed25519Backend::new(org_b_keypair.clone());
     let sig_b = backend_b
-        .sign_bytes(&pae_bytes)
+        .sign_bytes(chio_core_types::crypto::SigningMessage::exempt(
+            chio_core_types::crypto::ExemptFormat::DssePae,
+            &pae_bytes,
+        ))
         .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
     let request = DsseCoSigningRequest::new(
         org_a_kernel_id.to_string(),
@@ -236,7 +251,14 @@ fn co_sign_signature_slice(
     if response.schema != crate::bilateral::BILATERAL_DSSE_COSIGNING_SCHEMA {
         return Err(BilateralCoSigningError::UnsupportedSchema(response.schema));
     }
-    if !org_a_public_key.verify(&pae_bytes, &response.org_a_signature) {
+    if chio_core_types::crypto::verify_exempt(
+        org_a_public_key,
+        chio_core_types::crypto::ExemptFormat::DssePae,
+        &pae_bytes,
+        &response.org_a_signature,
+    )
+    .is_err()
+    {
         return Err(BilateralCoSigningError::OrgASignatureInvalid);
     }
 

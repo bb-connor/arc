@@ -1,0 +1,12 @@
+{
+  "authorizationDigest": "da80890e39ca9fe33eebe932e1131fec468ca370c045fbb89d018a6e9d4c45e5",
+  "completedAtUnixSeconds": 100,
+  "intentDigest": "dfaf8f477786c4688527050a94b640509f185b200d631eaa23c7bf6616ed0f37",
+  "operation": "status",
+  "operationId": "d380b6109e03096c2c26a309f47b7cbd43fddda8a5569c47273f5c7d0ba8a79d",
+  "outcome": "applied",
+  "requestId": "request-control-recovery-1",
+  "responseDigest": "2c3729bcbe61cab9dfabd9a34e0815f17851a2540dd9017b1ebedbd75a827d67",
+  "schema": "chio.broker-admin-control-receipt.v1",
+  "tenantScope": "tenant-production"
+}

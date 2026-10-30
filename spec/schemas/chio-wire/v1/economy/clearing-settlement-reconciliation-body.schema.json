@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-settlement-reconciliation-body.schema.json",
+  "title": "chio.clearing.settlement-reconciliation.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attemptNumber",
+    "authorityDigest",
+    "dispositionAuthorityId",
+    "dispositionAuthorityKeyEpoch",
+    "effectSlotId",
+    "externalReferences",
+    "intentDigest",
+    "intentId",
+    "nextLifecycleFence",
+    "nextLifecycleVersion",
+    "observedAtUnixMs",
+    "observedStatus",
+    "outputManifestDigest",
+    "roundCoreDigest",
+    "roundId",
+    "schema",
+    "settlementOutcomeDigest",
+    "sourceEffectSlotDigest",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion"
+  ],
+  "properties": {
+    "attemptNumber": {
+      "type": "integer"
+    },
+    "authorityDigest": {
+      "type": "string"
+    },
+    "dispositionAuthorityId": {
+      "type": "string"
+    },
+    "dispositionAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "effectSlotId": {
+      "type": "string"
+    },
+    "externalReferences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "intentDigest": {
+      "type": "string"
+    },
+    "intentId": {
+      "type": "string"
+    },
+    "nextLifecycleFence": {
+      "type": "integer"
+    },
+    "nextLifecycleVersion": {
+      "type": "integer"
+    },
+    "observedAtUnixMs": {
+      "type": "integer"
+    },
+    "observedStatus": {
+      "type": "string"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.settlement-reconciliation.v1"
+    },
+    "settlementOutcomeDigest": {
+      "type": "string"
+    },
+    "sourceEffectSlotDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    }
+  }
+}

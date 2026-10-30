@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/channel-funding-acknowledgement-body.schema.json",
+  "title": "chio.channel.funding-acknowledgement.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "keyEpoch",
+    "signerId",
+    "signerKey"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchoredHeadDigest",
+        "escrowReference",
+        "expiresAtUnixMs",
+        "newState",
+        "newVersion",
+        "openIntentDigest",
+        "priorHeadDigest",
+        "priorState",
+        "priorVersion",
+        "reservedAtUnixMs",
+        "schema"
+      ],
+      "properties": {
+        "anchoredHeadDigest": {
+          "type": "string"
+        },
+        "escrowReference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "chainId",
+            "escrowContract",
+            "escrowId"
+          ],
+          "properties": {
+            "chainId": {
+              "type": "string"
+            },
+            "escrowContract": {
+              "type": "string"
+            },
+            "escrowId": {
+              "type": "string"
+            }
+          }
+        },
+        "expiresAtUnixMs": {
+          "type": "integer"
+        },
+        "newState": {
+          "type": "string"
+        },
+        "newVersion": {
+          "type": "integer"
+        },
+        "openIntentDigest": {
+          "type": "string"
+        },
+        "priorHeadDigest": {
+          "type": "string"
+        },
+        "priorState": {
+          "type": "string"
+        },
+        "priorVersion": {
+          "type": "integer"
+        },
+        "reservedAtUnixMs": {
+          "type": "integer"
+        },
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "keyEpoch": {
+      "type": "integer"
+    },
+    "signerId": {
+      "type": "string"
+    },
+    "signerKey": {
+      "type": "string"
+    }
+  }
+}

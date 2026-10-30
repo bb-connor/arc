@@ -1,0 +1,13 @@
+{
+  "allocation_envelope_sha256": "ab4ad0a20506d7b278f963894114099ad2e235afd20ff31a14a9f9133bba013d",
+  "arguments_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+  "capability_id": "capability:purchase:second",
+  "expected_output_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "expires_at_unix_ms": "62000",
+  "purchase_context_sha256": "b5ea4a14a891352da7c3f4c7a2bd3941c8e607e349fba02dbfeefded76920e96",
+  "purchase_id": "purchase:second",
+  "purchaser_id": "buyer-agent-2",
+  "schema": "chio.finding.pool-debit-authorization.v1",
+  "server_id": "finding-server",
+  "tool_name": "read_finding"
+}

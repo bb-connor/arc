@@ -26,10 +26,9 @@
         "signature": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["signer_id", "algorithm", "signature_bytes"],
+          "required": ["signer_id", "signature_bytes"],
           "properties": {
             "signer_id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-            "algorithm": { "const": "ed25519" },
             "signature_bytes": {
               "type": "array",
               "items": { "$ref": "#/$defs/byte" },

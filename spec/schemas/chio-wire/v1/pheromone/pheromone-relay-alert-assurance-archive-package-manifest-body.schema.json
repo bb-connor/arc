@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/pheromone/pheromone-relay-alert-assurance-archive-package-manifest-body.schema.json",
+  "title": "chio.pheromone.relay-alert-assurance-archive-package-manifest.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundleCount",
+    "bundles",
+    "compressionFormat",
+    "createdAtUnixMs",
+    "localKernelId",
+    "memberCount",
+    "members",
+    "packageGeneration",
+    "packageId",
+    "packagerId",
+    "packagerKeyId",
+    "safetyClaims",
+    "schema",
+    "sourceArchiveReportSha256",
+    "sourceCloseoutReportSha256",
+    "totalByteCount"
+  ],
+  "properties": {
+    "bundleCount": {
+      "type": "integer"
+    },
+    "bundles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifactCount",
+          "bundleId",
+          "bundlePath",
+          "exportManifestSha256",
+          "exportReportSha256",
+          "sourcePackageSha256"
+        ],
+        "properties": {
+          "artifactCount": {
+            "type": "integer"
+          },
+          "bundleId": {
+            "type": "string"
+          },
+          "bundlePath": {
+            "type": "string"
+          },
+          "exportManifestSha256": {
+            "type": "string"
+          },
+          "exportReportSha256": {
+            "type": "string"
+          },
+          "sourcePackageSha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "compressionFormat": {
+      "type": "string"
+    },
+    "createdAtUnixMs": {
+      "type": "integer"
+    },
+    "localKernelId": {
+      "type": "string"
+    },
+    "memberCount": {
+      "type": "integer"
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "artifactRole",
+          "bundleId",
+          "byteCount",
+          "kind",
+          "path",
+          "retentionClass",
+          "schema",
+          "sha256"
+        ],
+        "properties": {
+          "artifactRole": {
+            "type": "string"
+          },
+          "bundleId": {
+            "type": "string"
+          },
+          "byteCount": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "retentionClass": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "packageGeneration": {
+      "type": "integer"
+    },
+    "packageId": {
+      "type": "string"
+    },
+    "packagerId": {
+      "type": "string"
+    },
+    "packagerKeyId": {
+      "type": "string"
+    },
+    "safetyClaims": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "schema": {
+      "const": "chio.pheromone.relay-alert-assurance-archive-package-manifest.v1"
+    },
+    "sourceArchiveReportSha256": {
+      "type": "string"
+    },
+    "sourceCloseoutReportSha256": {
+      "type": "string"
+    },
+    "totalByteCount": {
+      "type": "integer"
+    }
+  }
+}

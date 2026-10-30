@@ -1,0 +1,19 @@
+{
+  "blobAbsenceProofDigest": "668bde5c6c65d6faa4f8e3da645b6dce4af1375d39f24586237d6de3c43e7891",
+  "cancellationFenceDigest": "dcb5f7061e992063cb7ea335a57a8d500510a133ea2738a34f6b635653e79d59",
+  "cancelledAtUnixMs": 1550,
+  "deliveryCheckpointDigest": "aca6d43c4d1e499dcede2a0821a87681ff0078a3966ff00477b2f43d8ce24ae7",
+  "deliveryCheckpointSequence": 2,
+  "deliveryId": "delivery-1",
+  "eligibilityDigest": "8d2e3b34566f44d35b57399dcfed9f83daf6eb3405ad2edca57a7f9ceb107035",
+  "idempotencyKey": "delivery-idempotency-1",
+  "nonacceptanceId": "829d8df48b50a4ca486201db98ee49e5fb0f243657027587f2e81306843b5b06",
+  "outputDigest": "f8e47492019d9c323180e4e193315b4ab6b96a74ae7761db3ffcf126108abd6d",
+  "providerAcceptanceDigest": "43d810149c113c91cb4a46f74f63b69c42f64b1640a647f91c6d2f5af0000a4c",
+  "receiverBindingDigest": "c8146bdb1e9de877751182f91b38b622ea6f6fa86077d2409d40c13b18e321ca",
+  "receiverKeyEpoch": 9,
+  "receiverKeyId": "receiver-key-1",
+  "receiverQueueId": "receiver-queue-1",
+  "requestId": "req-outcome-1",
+  "schema": "chio.outcome.delivery-nonacceptance.v1"
+}

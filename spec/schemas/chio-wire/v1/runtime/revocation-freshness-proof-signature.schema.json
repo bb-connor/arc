@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/revocation-freshness-proof-signature.schema.json",
+  "title": "Chio runtime revocation freshness proof signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "epochId",
+    "epochRoot",
+    "fetchedAt",
+    "maxStalenessMs",
+    "oracleId",
+    "proofId",
+    "revokedLeafResult",
+    "schema",
+    "sequence"
+  ],
+  "properties": {
+    "ancestorCapabilityDigest": {
+      "type": "string"
+    },
+    "epochId": {
+      "type": "string"
+    },
+    "epochRoot": {
+      "type": "string"
+    },
+    "fetchedAt": {
+      "type": "string"
+    },
+    "maxStalenessMs": {
+      "type": "integer"
+    },
+    "oracleId": {
+      "type": "string"
+    },
+    "proofId": {
+      "type": "string"
+    },
+    "revokedAncestorResult": {
+      "type": "boolean"
+    },
+    "revokedLeafResult": {
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "chio.runtime.revocation-freshness-proof-signature.v1"
+    },
+    "sequence": {
+      "type": "integer"
+    },
+    "subjectCapabilityDigest": {
+      "type": "string"
+    }
+  }
+}

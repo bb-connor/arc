@@ -1,0 +1,54 @@
+{
+  "authorizeEventId": "authorize",
+  "brokerCapabilityId": "broker-capability",
+  "brokerQuotaKeyId": "broker-quota",
+  "callerHeadersSha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "callerOptionsSha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "captureEventId": "capture",
+  "credentialReferenceHash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "credentialVersion": 1,
+  "evidence": {
+    "attemptId": "attempt",
+    "authorityCommitIndex": 3,
+    "budgetCommitIndex": 1,
+    "capabilityDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "holdId": "hold",
+    "invocationId": "invocation",
+    "leaderEpoch": 4,
+    "requestDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "responseBodySha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "responseHeadersSha256": "e4f02c3535297966e00921d897c0f2af6a2d2cf91a935b20efd718766701bec1",
+    "revocationCommitIndex": 2,
+    "revocationSetDigest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "schema": "chio.broker-execution-evidence.v1",
+    "upstreamStatus": 200
+  },
+  "issuedAtUnixSeconds": 1,
+  "normalizedDestination": {
+    "exactPathAndQuery": "/v1",
+    "explicitPort": 443,
+    "method": "POST",
+    "normalizedHost": "example.com",
+    "scheme": "https"
+  },
+  "operationId": "operation",
+  "outcome": "completed",
+  "parentCapabilityId": "parent-capability",
+  "providerAdapterId": "generic-bearer",
+  "providerAdapterVersion": 1,
+  "quotas": [
+    {
+      "keyId": "broker-quota",
+      "maximumExecutions": 1
+    }
+  ],
+  "receiptId": "broker-receipt-attempt",
+  "requestBodyBytes": 9,
+  "requestBodySha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "responseBodyBytes": 9,
+  "schema": "chio.broker-execution-receipt.v1",
+  "sourceReceiptIds": [
+    "source-receipt"
+  ],
+  "subject": "8e486e8fb79499dba2a789c6b1639d409495233c79e0eaf52e2ea1fc9dbbb73f"
+}

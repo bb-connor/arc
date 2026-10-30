@@ -1,0 +1,19 @@
+{
+  "attestedAt": 55,
+  "genesisPolicyDigest": "cae65af4fa2f86f8a31387454fce3e81923b2ebc836ee13735b533e4fe45be52",
+  "genesisPolicyId": "b567fc99500509c4f9e611958122520ee82212de4335a185bad0624e7316b41b",
+  "governingOperatorId": "other.example",
+  "readinessId": "0f4fcc8202c0934f360cbe36736ca68930bc158d08160d72cce539b8d10ebb78",
+  "readinessSequence": 1,
+  "readyDomains": [
+    "tier_limits",
+    "marketplace_discount_per_hundred",
+    "decision_premium_basis_points",
+    "insurance_premium_schedule",
+    "open_market_fee_and_bond_schedule"
+  ],
+  "runtimeRegistryDigest": "d4f3fc0ebe9e4aeececfbf29c3df1fae0b807bb06de6d80b474e8e2c0070da31",
+  "schema": "chio.fiscal.consumer-readiness.v1",
+  "signerKeyEpoch": 1,
+  "signerKeyId": "5c29b78f10a35a49a6231d08ee840a04bcc3a37a4f9d46df327dec56b8a9b7c9"
+}

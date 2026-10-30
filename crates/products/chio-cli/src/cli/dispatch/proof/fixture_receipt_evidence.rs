@@ -74,11 +74,12 @@ fn sign_receipt_evidence(
     receipt: &mut serde_json::Value,
     keypair: &Keypair,
 ) -> Result<(), CliError> {
-    let (signature, _) = keypair.sign_canonical(receipt).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof fixture receipt evidence signing failed: {error}"
-        ))
-    })?;
+    let signature =
+        fixture_wrapped_signature(keypair, RECEIPT_EVIDENCE_SCHEMA, receipt).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "proof fixture receipt evidence signing failed: {error}"
+            ))
+        })?;
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
     Ok(())
 }

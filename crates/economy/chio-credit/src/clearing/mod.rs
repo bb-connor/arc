@@ -1,6 +1,6 @@
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{sha256_hex, verify_wrapped, Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
 use crate::obligation::{
@@ -66,13 +66,19 @@ pub struct SignedClearingEnvelopeV1<T> {
     pub signature: Signature,
 }
 
+/// A clearing body a [`SignedClearingEnvelopeV1`] signs, with its
+/// signing-wrapper schema id.
+pub trait ClearingPayload: Serialize {
+    const SCHEMA_ID: &'static str;
+}
+
 impl<T> SignedClearingEnvelopeV1<T>
 where
-    T: Serialize + Clone,
+    T: ClearingPayload + Clone,
 {
     pub fn sign(body: T, keypair: &Keypair) -> Result<Self, ClearingError> {
-        let (signature, _) = keypair
-            .sign_canonical(&body)
+        let signature = CanonicalBytes::from_serializable(&body)
+            .and_then(|canonical| keypair.sign_wrapped(T::SCHEMA_ID, &canonical))
             .map_err(|error| ClearingError::Canonicalization(error.to_string()))?;
         Ok(Self {
             body,
@@ -81,15 +87,79 @@ where
         })
     }
 
-    pub fn verify_signature(&self) -> Result<bool, ClearingError> {
-        self.signer_key
-            .verify_canonical(&self.body, &self.signature)
-            .map_err(|_| ClearingError::AuthorityVerification)
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool, ClearingError> {
+        match verify_wrapped(&self.signer_key, T::SCHEMA_ID, &self.body, &self.signature) {
+            Ok(()) => Ok(true),
+            Err(chio_core_types::Error::SignatureRejected) => Ok(false),
+            Err(_) => Err(ClearingError::AuthorityVerification),
+        }
     }
 
     pub fn digest(&self) -> Result<String, ClearingError> {
         domain_digest(SIGNED_ENVELOPE_DIGEST_DOMAIN, self)
     }
+}
+
+impl ClearingPayload for ClearingParticipantSnapshotBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_PARTICIPANT_SNAPSHOT_SCHEMA;
+}
+
+impl ClearingPayload for ClearingParticipantSnapshotAcknowledgementBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_PARTICIPANT_SNAPSHOT_ACKNOWLEDGEMENT_SCHEMA;
+}
+
+impl ClearingPayload for ClearingInputManifestBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_INPUT_MANIFEST_SCHEMA;
+}
+
+impl ClearingPayload for NettingRoundCoreV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ROUND_CORE_SCHEMA;
+}
+
+impl ClearingPayload for ClearingParticipantStatementV1 {
+    const SCHEMA_ID: &'static str = CLEARING_PARTICIPANT_STATEMENT_SCHEMA;
+}
+
+impl ClearingPayload for ClearingSettlementIntentV1 {
+    const SCHEMA_ID: &'static str = CLEARING_SETTLEMENT_INTENT_SCHEMA;
+}
+
+impl ClearingPayload for ClearingAtomTransformationV1 {
+    const SCHEMA_ID: &'static str = CLEARING_TRANSFORMATION_SCHEMA;
+}
+
+impl ClearingPayload for ClearingOutputManifestV1 {
+    const SCHEMA_ID: &'static str = CLEARING_OUTPUT_MANIFEST_SCHEMA;
+}
+
+impl ClearingPayload for ClearingParticipantAcceptanceBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_PARTICIPANT_ACCEPTANCE_SCHEMA;
+}
+
+impl ClearingPayload for ClearingRoundFinalizationBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ROUND_FINALIZATION_SCHEMA;
+}
+
+impl ClearingPayload for ClearingZeroDispatchProofBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ZERO_DISPATCH_PROOF_SCHEMA;
+}
+
+impl ClearingPayload for ClearingRoundAbortBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ROUND_ABORT_SCHEMA;
+}
+
+impl ClearingPayload for ClearingRoundSatisfactionBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ROUND_SATISFACTION_SCHEMA;
+}
+
+impl ClearingPayload for ClearingSettlementReconciliationBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_SETTLEMENT_RECONCILIATION_SCHEMA;
+}
+
+impl ClearingPayload for ClearingZeroIntentReconciliationBodyV1 {
+    const SCHEMA_ID: &'static str = CLEARING_ZERO_INTENT_RECONCILIATION_SCHEMA;
 }
 
 #[derive(Debug, thiserror::Error)]

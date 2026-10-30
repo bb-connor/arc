@@ -24,8 +24,7 @@ use chio_finding::{
     compute_status_epoch_id, FindingHostedPurchaseVerdict, FindingHostedSettlementTerminal,
     FindingPurchaseResult, FindingStatusEpoch, FindingVoluntaryRetraction,
     FindingVoluntaryRetractionReason, FINDING_PURCHASE_RESULT_SCHEMA_V1,
-    FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_SIGNATURE_DOMAIN,
-    FINDING_VOLUNTARY_RETRACTION_SCHEMA_V1,
+    FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_VOLUNTARY_RETRACTION_SCHEMA_V1,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -142,7 +141,6 @@ pub(super) async fn assert_catalog_retractions(
     let mut epoch = FindingStatusEpoch {
         schema: FINDING_STATUS_EPOCH_SCHEMA_V1.to_owned(),
         status_epoch_id: String::new(),
-        signature_domain: FINDING_STATUS_SIGNATURE_DOMAIN.to_owned(),
         status_map_version: "sparse_map_v1".to_owned(),
         proof_semantics: "siblings_leaf_to_root_v1".to_owned(),
         feed_id: "integration-status".to_owned(),

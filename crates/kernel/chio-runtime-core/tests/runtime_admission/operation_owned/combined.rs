@@ -210,7 +210,7 @@ fn combined_owned_dispatch_retains_all_three_resources_and_replays_without_reacq
     )?;
     assert_eq!(response.verdict, Verdict::Allow, "{response:#?}");
     assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 1);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     assert!(kernel
         .federation_dsse_envelope(&response.receipt.id)
         .is_some());
@@ -303,7 +303,7 @@ fn combined_owned_denial_panic_and_source_loss_release_every_resource() -> TestR
         )?;
         assert_eq!(response.verdict, Verdict::Deny, "{response:#?}");
         assert_eq!(fixture.inner.invocations.load(Ordering::SeqCst), 0);
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let history = faults::history(&fixture.inner)?;
         assert_eq!(history.len(), 1, "failure must follow actual acquisition");
         assert_eq!(history[0].intent.resources().len(), 3);

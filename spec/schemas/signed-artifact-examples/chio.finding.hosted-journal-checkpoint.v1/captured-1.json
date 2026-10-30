@@ -1,0 +1,10 @@
+{
+  "aggregateHeadsSha256": "63cd6a96734331b5716dd58171bcce5546badb634127b4d7379ad6397eb485fa",
+  "configurationRevision": "integration-revision-1",
+  "createdAt": 1793209496,
+  "migrationVersion": 1,
+  "previousCheckpointSha256": "1946e72c1b9bf23b797558ed7c54d5733408d60c4018cb0e51f6f28004589509",
+  "schema": "chio.finding.hosted-journal-checkpoint.v1",
+  "tenantId": "integration-a-1793209486471803644",
+  "terminalJobsSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+}

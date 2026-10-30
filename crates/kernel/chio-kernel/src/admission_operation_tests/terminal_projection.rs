@@ -1025,13 +1025,13 @@ fn denied_after_delivery_projection_round_trips_through_the_signed_envelope() {
         )
         .expect("the test envelope must be re-signed");
     assert_eq!(
-        mismatched_replay.verify(),
+        mismatched_replay.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch),
         "the terminal replay must identify the projected receipt"
     );
 
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .expect("denied terminal envelope must import");
     assert_eq!(verified.source_operation(), &operation);
     assert_eq!(
@@ -1095,7 +1095,7 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
     )
     .expect("verified projection must produce a signed envelope");
     let verified = envelope
-        .verify()
+        .verify_integrity_embedded_key()
         .expect("untampered terminal envelope must verify");
     assert_eq!(verified.source_operation(), &operation);
     assert_eq!(
@@ -1103,12 +1103,28 @@ fn signed_terminal_projection_envelope_rejects_canonical_body_tampering() {
         AdmissionOperationState::Completed
     );
 
-    let mut encoded = serde_json::to_value(&envelope).expect("envelope must encode");
+    let encoded = serde_json::to_value(&envelope).expect("envelope must encode");
+    for (label, signature) in crate::wrapper_refusals::refused_signatures(&kernel, &encoded["body"])
+    {
+        let mut refused = encoded.clone();
+        refused["signature"] = serde_json::to_value(signature).expect("signature must encode");
+        let refused: SignedAdmissionTerminalProjectionV1 =
+            serde_json::from_value(refused).expect("refused wire value must decode structurally");
+        assert!(
+            matches!(
+                refused.verify_integrity_embedded_key(),
+                Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
+            ),
+            "{label}"
+        );
+    }
+
+    let mut encoded = encoded;
     encoded["body"]["projection_json"] = serde_json::Value::String("e30=".to_string());
     let tampered: SignedAdmissionTerminalProjectionV1 =
         serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
     assert!(matches!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
 }
@@ -1132,7 +1148,7 @@ fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
         &full_projection_capabilities(),
         &kernel,
     )?;
-    envelope.verify()?;
+    envelope.verify_integrity_embedded_key()?;
 
     let mut encoded = serde_json::to_value(envelope)?;
     let record = encoded["body"]["records"]
@@ -1181,13 +1197,13 @@ fn resigned_compensation_envelope_rejects_semantically_tampered_release_proof(
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     *replay_digest = serde_json::Value::String(chio_core::crypto::sha256_hex(&manifest_bytes));
 
-    let canonical_body = canonical_json_bytes(&encoded["body"])?;
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend_from_slice(&canonical_body);
-    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    encoded["signature"] = serde_json::to_value(kernel.sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::canonical::CanonicalBytes::from_serializable(&encoded["body"])?,
+    )?)?;
     let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())
@@ -1233,13 +1249,13 @@ fn signed_terminal_projection_rejects_channel_attachment_substitution(
         .find(|attachment| attachment.get("ChannelReservationDigest").is_some())
         .ok_or(AdmissionOperationError::TerminalProjectionBindingMismatch)?;
     reservation["ChannelReservationDigest"] = serde_json::Value::String(AUTH_HASH.to_owned());
-    let canonical_body = canonical_json_bytes(&encoded["body"])?;
-    let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-    preimage.extend_from_slice(&canonical_body);
-    encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+    encoded["signature"] = serde_json::to_value(kernel.sign_wrapped(
+        "chio.signed-admission-terminal-projection.v1",
+        &chio_core::canonical::CanonicalBytes::from_serializable(&encoded["body"])?,
+    )?)?;
     let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
     assert_eq!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     );
     Ok(())
@@ -1290,7 +1306,7 @@ fn signed_terminal_projection_envelope_rejects_signer_substitution() {
     let tampered: SignedAdmissionTerminalProjectionV1 =
         serde_json::from_value(encoded).expect("tampered wire value must decode structurally");
     assert!(matches!(
-        tampered.verify(),
+        tampered.verify_integrity_embedded_key(),
         Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
     ));
 }
@@ -1908,7 +1924,7 @@ fn unknown_terminal_envelope_requires_receipt_and_closed_body_shape(
         &full_projection_capabilities(),
         &kernel,
     )?;
-    let verified = envelope.verify()?;
+    let verified = envelope.verify_integrity_embedded_key()?;
     assert_eq!(
         verified.terminal_operation().attachments(),
         operation.attachments()
@@ -1945,12 +1961,13 @@ fn unknown_terminal_envelope_requires_receipt_and_closed_body_shape(
         encoded["body"]["manifest_json"] = serde_json::json!(STANDARD.encode(&manifest_bytes));
         encoded["body"]["terminal_operation"]["terminal_replay"]["receipt"]["projection_digest"] =
             serde_json::json!(sha256_hex(&manifest_bytes));
-        let mut preimage = b"chio.signed-admission-terminal-projection.v1\0".to_vec();
-        preimage.extend_from_slice(&canonical_json_bytes(&encoded["body"])?);
-        encoded["signature"] = serde_json::to_value(kernel.sign(&preimage))?;
+        encoded["signature"] = serde_json::to_value(kernel.sign_wrapped(
+            "chio.signed-admission-terminal-projection.v1",
+            &chio_core::canonical::CanonicalBytes::from_serializable(&encoded["body"])?,
+        )?)?;
         let tampered: SignedAdmissionTerminalProjectionV1 = serde_json::from_value(encoded)?;
         assert_eq!(
-            tampered.verify(),
+            tampered.verify_integrity_embedded_key(),
             Err(AdmissionOperationError::TerminalProjectionBindingMismatch)
         );
     }

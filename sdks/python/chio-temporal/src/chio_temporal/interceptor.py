@@ -54,7 +54,7 @@ from temporalio.worker import (
 )
 
 from chio_temporal.errors import ChioTemporalConfigError, ChioTemporalError
-from chio_temporal.executor import CallerExecutor, canonical_json_bytes
+from chio_temporal.executor import CallerExecutor, canonical_json_bytes, signing_wrapper
 from chio_temporal.grants import ChioClientLike, WorkflowGrant
 from chio_temporal.receipt import WorkflowReceipt
 
@@ -69,6 +69,8 @@ SIDECAR_ERROR_TYPE = "ChioSidecarError"
 
 CALLER_DELIVERY_PROTOCOL = "chio.caller-delivery.v1"
 CALLER_DELIVERY_REPORT_SCHEMA = "chio.caller-delivery-report.v1"
+CALLER_DISPATCH_AUTHORIZATION_SCHEMA = "chio.caller-dispatch-authorization.v1"
+CHIO_RECEIPT_SCHEMA = "chio.receipt.v1"
 
 
 def _wall_clock_ms() -> int:
@@ -613,7 +615,8 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             )
         try:
             signed = executor.verify_kernel_signature(
-                canonical_json_bytes(body), authorization["signature"]
+                signing_wrapper(CALLER_DISPATCH_AUTHORIZATION_SCHEMA, canonical_json_bytes(body)),
+                authorization["signature"],
             )
         except Exception as exc:
             raise _sidecar_error(
@@ -653,7 +656,9 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             }
             report = {
                 "report": report_body,
-                "signature": executor.sign(canonical_json_bytes(report_body)),
+                "signature": executor.sign(
+                    signing_wrapper(CALLER_DELIVERY_REPORT_SCHEMA, canonical_json_bytes(report_body))
+                ),
             }
             return await client.report_mediated_execution(
                 control_token=self._parent._control_token,
@@ -705,21 +710,24 @@ def _result_sha256(converter: PayloadConverter, result: Any) -> str:
 
 
 def _kernel_receipt_signing_bytes(raw: dict[str, Any]) -> tuple[bytes, bytes]:
-    """Canonical ``ChioReceiptSigningBody`` bytes and receipt-id input bytes.
+    """Receipt signing-wrapper bytes and receipt-id input bytes.
 
-    The id input is every receipt field except ``id``, ``signature``,
-    ``algorithm`` and ``bbs_signature``; the signing body is
-    ``{"id", "body": <id input>, "bbs_signature"?}``.
+    The id input is every receipt field except ``id``, ``signature`` and
+    ``bbs_signature``; the signature covers the ``chio.receipt.v1`` wrapper
+    of the canonical ``{"id", "body": <id input>, "bbs_signature"?}``.
     """
     id_input = {
         key: value
         for key, value in raw.items()
-        if key not in {"id", "signature", "algorithm", "bbs_signature"}
+        if key not in {"id", "signature", "bbs_signature"}
     }
     signing: dict[str, Any] = {"id": raw["id"], "body": id_input}
     if raw.get("bbs_signature") is not None:
         signing["bbs_signature"] = raw["bbs_signature"]
-    return canonical_json_bytes(signing), canonical_json_bytes(id_input)
+    return (
+        signing_wrapper(CHIO_RECEIPT_SCHEMA, canonical_json_bytes(signing)),
+        canonical_json_bytes(id_input),
+    )
 
 
 def _sidecar_error(message: str) -> ApplicationError:

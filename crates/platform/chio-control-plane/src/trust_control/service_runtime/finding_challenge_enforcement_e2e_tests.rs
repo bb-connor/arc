@@ -43,29 +43,29 @@ use chio_core::receipt::metadata::{
 };
 use chio_core::web3::anchors::AnchorInclusionProof;
 use chio_finding::{
-    audit_epoch_precommitment_sha256, audit_seed_witness_signing_bytes, compute_admission_id,
-    compute_allocation_id, compute_audit_epoch_id, compute_challenge_id, compute_enforcement_id,
+    audit_epoch_precommitment_sha256, compute_admission_id, compute_allocation_id,
+    compute_audit_epoch_id, compute_challenge_id, compute_enforcement_id,
     compute_failed_delivery_id, compute_finding_id, compute_profile_id, compute_snapshot_id,
-    compute_terms_id, derive_audit_seed_commitment, derive_purchase_key, sign_finding,
-    signed_envelope_sha256, Finding, FindingAdmission, FindingAffectedDelivery, FindingAuditEpoch,
-    FindingAuditRoundAuthorization, FindingAuthorityKeyPolicy, FindingBackingRequirement,
-    FindingBbsIssuerPolicy, FindingBondBacking, FindingBondClass, FindingBuyerSubmission,
-    FindingChallenge, FindingChallengeAuthorization, FindingChallengeBondLimit,
-    FindingChallengeEnforcement, FindingChallengeEvidence, FindingChallengeFacet,
-    FindingChallengeStanding, FindingChallengeVerifierProfile, FindingCheckpointLogPolicy,
-    FindingCheckpointRef, FindingClaimedVerdict, FindingCollateralVault, FindingDescriptor,
-    FindingDisputeBondClass, FindingDisputeFeeEvent, FindingDisputeFeeTerminal,
-    FindingDisputeLockRef, FindingEffectIntentBinding, FindingEnforcementDestination,
-    FindingEvidenceClass, FindingEvidenceInvalidity, FindingFacetKind, FindingFailedDelivery,
-    FindingFeeEvent, FindingFeeTerminalBinding, FindingFinalizedBondSnapshot,
-    FindingGuaranteeClass, FindingHoldReleaseTerminal, FindingMarketTerms, FindingObservedFinality,
-    FindingOutcomeClass, FindingPoolBinding, FindingPredicate, FindingPurchaseRecord,
-    FindingReceiptRef, FindingReceiptRole, FindingReceiptSignerRole, FindingRecipeEnvironment,
-    FindingRecipePhase, FindingRecipePhaseKind, FindingReplayObservation,
-    FindingReplayPredicateResult, FindingReplayRecipeInput, FindingReplayReproduction,
-    FindingResourceCaps, FindingVaultReference, FindingVenueAuditAuthorization,
-    SignedFindingAdmission, SignedFindingAuthorityStatus, SignedFindingChallenge,
-    SignedFindingChallengeEnforcement, SignedFindingChallengeOutcome,
+    compute_terms_id, derive_audit_seed_commitment, derive_purchase_key, sign_audit_seed_witness,
+    sign_finding, signed_envelope_sha256, Finding, FindingAdmission, FindingAffectedDelivery,
+    FindingAuditEpoch, FindingAuditRoundAuthorization, FindingAuthorityKeyPolicy,
+    FindingBackingRequirement, FindingBbsIssuerPolicy, FindingBondBacking, FindingBondClass,
+    FindingBuyerSubmission, FindingChallenge, FindingChallengeAuthorization,
+    FindingChallengeBondLimit, FindingChallengeEnforcement, FindingChallengeEvidence,
+    FindingChallengeFacet, FindingChallengeStanding, FindingChallengeVerifierProfile,
+    FindingCheckpointLogPolicy, FindingCheckpointRef, FindingClaimedVerdict,
+    FindingCollateralVault, FindingDescriptor, FindingDisputeBondClass, FindingDisputeFeeEvent,
+    FindingDisputeFeeTerminal, FindingDisputeLockRef, FindingEffectIntentBinding,
+    FindingEnforcementDestination, FindingEvidenceClass, FindingEvidenceInvalidity,
+    FindingFacetKind, FindingFailedDelivery, FindingFeeEvent, FindingFeeTerminalBinding,
+    FindingFinalizedBondSnapshot, FindingGuaranteeClass, FindingHoldReleaseTerminal,
+    FindingMarketTerms, FindingObservedFinality, FindingOutcomeClass, FindingPoolBinding,
+    FindingPredicate, FindingPurchaseRecord, FindingReceiptRef, FindingReceiptRole,
+    FindingReceiptSignerRole, FindingRecipeEnvironment, FindingRecipePhase, FindingRecipePhaseKind,
+    FindingReplayObservation, FindingReplayPredicateResult, FindingReplayRecipeInput,
+    FindingReplayReproduction, FindingResourceCaps, FindingVaultReference,
+    FindingVenueAuditAuthorization, SignedFindingAdmission, SignedFindingAuthorityStatus,
+    SignedFindingChallenge, SignedFindingChallengeEnforcement, SignedFindingChallengeOutcome,
     SignedFindingChallengeVerifierProfile, SignedFindingFailedDelivery,
     SignedFindingFinalizedBondSnapshot, SignedFindingMarketTerms, SignedFindingPurchaseRecord,
     FINDING_ADMISSION_SCHEMA_V1, FINDING_AUDIT_EPOCH_SCHEMA_V1,
@@ -2105,8 +2105,10 @@ fn digest_mismatch_case(
         ),
         Filing::VenueAudit => (challenged.venue_authorization()?, Vec::new()),
     };
-    let deny_checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&deny_checkpoint))?;
+    let deny_checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&deny_checkpoint),
+        std::slice::from_ref(&deny_checkpoint.body.kernel_key),
+    )?;
     Ok(DigestMismatchCase {
         challenge: challenged.sign_challenge(authorization, evidence, affected)?,
         failed_delivery,
@@ -2245,10 +2247,14 @@ fn evidence_invalid_case(
         ),
         Filing::VenueAudit => (challenged.venue_authorization()?, Vec::new()),
     };
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&evidence.checkpoint))?;
-    let unresolved_checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&unresolved_checkpoint))?;
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&evidence.checkpoint),
+        std::slice::from_ref(&evidence.checkpoint.body.kernel_key),
+    )?;
+    let unresolved_checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&unresolved_checkpoint),
+        std::slice::from_ref(&unresolved_checkpoint.body.kernel_key),
+    )?;
     let production_log_id = log_id_for(&production_log_signer())?;
     let checkpoint_policy = challenged
         .profile
@@ -2463,8 +2469,10 @@ fn replay_case(
         ),
         &checkpoint_ref,
     )];
-    let checkpoint_transparency =
-        build_checkpoint_transparency(core::slice::from_ref(&checkpoint))?;
+    let checkpoint_transparency = build_checkpoint_transparency(
+        core::slice::from_ref(&checkpoint),
+        std::slice::from_ref(&checkpoint.body.kernel_key),
+    )?;
     let replay_policy = challenged
         .profile
         .body
@@ -2611,14 +2619,15 @@ fn audit_round_over(eligible: Vec<EligibleListing>) -> Result<FindingAuditRound,
         seed_witnessed_at,
         eligible_snapshot_at,
         seed_witness: randomness_witness.public_key(),
-        seed_witness_signature: randomness_witness.sign(&audit_seed_witness_signing_bytes(
+        seed_witness_signature: sign_audit_seed_witness(
+            &randomness_witness,
             &audit_authority.public_key(),
             1,
             &eligible_snapshot_digest,
             &seed_commitment,
             eligible_snapshot_at,
             seed_witnessed_at,
-        )),
+        )?,
         eligible_snapshot_digest,
         eligible_listing_count: u64::try_from(eligible.len())?,
         fee_schedule_envelope_sha256: signed_envelope_sha256(&published_fee_schedule()?)?,

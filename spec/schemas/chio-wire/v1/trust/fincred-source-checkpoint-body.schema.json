@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/fincred-source-checkpoint-body.schema.json",
+  "title": "chio.fincred.source-checkpoint.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "checkpointAuthorityEpoch",
+    "checkpointAuthorityKey",
+    "checkpointSequence",
+    "cutoff",
+    "expiresAt",
+    "indexRoot",
+    "indexSize",
+    "issuedAt",
+    "lowerBoundary",
+    "rangeRoot",
+    "schema",
+    "sourceId",
+    "storeGeneration",
+    "upperBoundary",
+    "window"
+  ],
+  "properties": {
+    "checkpointAuthorityEpoch": {
+      "type": "integer"
+    },
+    "checkpointAuthorityKey": {
+      "type": "string"
+    },
+    "checkpointSequence": {
+      "type": "integer"
+    },
+    "cutoff": {
+      "type": "integer"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "indexRoot": {
+      "type": "string"
+    },
+    "indexSize": {
+      "type": "integer"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "lowerBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "rangeRoot": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fincred.source-checkpoint.v1"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "storeGeneration": {
+      "type": "integer"
+    },
+    "upperBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string"
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "endsAt",
+        "startsAt"
+      ],
+      "properties": {
+        "endsAt": {
+          "type": "integer"
+        },
+        "startsAt": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

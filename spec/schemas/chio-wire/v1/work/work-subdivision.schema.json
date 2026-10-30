@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/work/work-subdivision.schema.json",
+  "title": "Chio work subdivision signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "body",
+    "signer"
+  ],
+  "properties": {
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "child",
+        "parent_allocation_hash",
+        "parent_id"
+      ],
+      "properties": {
+        "child": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "contract",
+            "holder",
+            "id"
+          ],
+          "properties": {
+            "contract": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "acceptance",
+                "currency",
+                "depth",
+                "effects",
+                "expires_at",
+                "max_units",
+                "readers"
+              ],
+              "properties": {
+                "acceptance": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "clauses"
+                  ],
+                  "properties": {
+                    "clauses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "pointer"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "max": {
+                            "type": "integer"
+                          },
+                          "min": {
+                            "type": "integer"
+                          },
+                          "pointer": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "depth": {
+                  "type": "integer"
+                },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "server",
+                      "tool"
+                    ],
+                    "properties": {
+                      "server": {
+                        "type": "string"
+                      },
+                      "tool": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "expires_at": {
+                  "type": "integer"
+                },
+                "max_units": {
+                  "type": "integer"
+                },
+                "readers": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "holder": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          }
+        },
+        "parent_allocation_hash": {
+          "type": "string"
+        },
+        "parent_id": {
+          "type": "string"
+        }
+      }
+    },
+    "signer": {
+      "type": "string"
+    }
+  }
+}

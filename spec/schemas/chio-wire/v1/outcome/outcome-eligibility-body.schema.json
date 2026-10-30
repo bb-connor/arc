@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/outcome/outcome-eligibility-body.schema.json",
+  "title": "chio.outcome.eligibility.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capabilityId",
+    "deliveryAckDeadlineUnixMs",
+    "eligibilityId",
+    "expiresAtUnixMs",
+    "issuedAtUnixMs",
+    "kernelAuthorityId",
+    "kernelKeyEpoch",
+    "listingDigest",
+    "listingId",
+    "outcomePrice",
+    "postGuardPolicyDigest",
+    "preActionAuthorityDigest",
+    "predicateDigest",
+    "predicateId",
+    "pricingDigest",
+    "pricingId",
+    "providerBindingDigest",
+    "providerId",
+    "qualifiedRailCapabilityDigest",
+    "qualifiedRailId",
+    "quoteDigest",
+    "railCaptureDeadlineUnixMs",
+    "receiverBindingDigest",
+    "requestExtensionDigest",
+    "requestId",
+    "schema",
+    "settlementMode",
+    "slaDigest",
+    "toolName",
+    "toolServer"
+  ],
+  "properties": {
+    "capabilityId": {
+      "type": "string"
+    },
+    "deliveryAckDeadlineUnixMs": {
+      "type": "integer"
+    },
+    "eligibilityId": {
+      "type": "string"
+    },
+    "expiresAtUnixMs": {
+      "type": "integer"
+    },
+    "issuedAtUnixMs": {
+      "type": "integer"
+    },
+    "kernelAuthorityId": {
+      "type": "string"
+    },
+    "kernelKeyEpoch": {
+      "type": "integer"
+    },
+    "listingDigest": {
+      "type": "string"
+    },
+    "listingId": {
+      "type": "string"
+    },
+    "outcomePrice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "postGuardPolicyDigest": {
+      "type": "string"
+    },
+    "preActionAuthorityDigest": {
+      "type": "string"
+    },
+    "predicateDigest": {
+      "type": "string"
+    },
+    "predicateId": {
+      "type": "string"
+    },
+    "pricingDigest": {
+      "type": "string"
+    },
+    "pricingId": {
+      "type": "string"
+    },
+    "providerBindingDigest": {
+      "type": "string"
+    },
+    "providerId": {
+      "type": "string"
+    },
+    "qualifiedRailCapabilityDigest": {
+      "type": "string"
+    },
+    "qualifiedRailId": {
+      "type": "string"
+    },
+    "quoteDigest": {
+      "type": "string"
+    },
+    "railCaptureDeadlineUnixMs": {
+      "type": "integer"
+    },
+    "receiverBindingDigest": {
+      "type": "string"
+    },
+    "requestExtensionDigest": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.outcome.eligibility.v1"
+    },
+    "settlementMode": {
+      "type": "string"
+    },
+    "slaDigest": {
+      "type": "string"
+    },
+    "toolName": {
+      "type": "string"
+    },
+    "toolServer": {
+      "type": "string"
+    }
+  }
+}

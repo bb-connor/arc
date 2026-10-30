@@ -665,13 +665,14 @@ impl FindingOperatorPurchaseExecutor {
                 || job.principal_id != claim.principal_id
                 || job.request_sha256 != claim.request_sha256
                 || job.prepared_at != job.bid.body.issued_at
-                || !matches!(job.bid.verify_signature(), Ok(true))
-                || !matches!(job.ask.verify_signature(), Ok(true))
+                || !matches!(job.bid.verify_signature(&job.bid.signer_key), Ok(true))
+                || !matches!(job.ask.verify_signature(&job.ask.signer_key), Ok(true))
                 || job.ask.body.bid_digest != bid_digest
-                || !job
-                    .bid
-                    .signer_key
-                    .verify(ask_digest.as_bytes(), &buyer_signature)
+                || !super::finding_purchase_coordinator::verify_buyer_ask(
+                    &job.bid.signer_key,
+                    &job.ask.body,
+                    &buyer_signature,
+                )
             {
                 return Err(execution_internal(
                     "terminal capacity claim has an invalid prepared purchase job",
@@ -845,9 +846,10 @@ impl FindingOperatorPurchaseExecutor {
         )
         .map_err(execution_internal)?;
         let ask = verified_ask.signed_ask().clone();
-        let ask_digest = canonical_json_bytes(&ask.body)
-            .map(|bytes| sha256_hex(&bytes))
-            .map_err(execution_internal)?;
+        let buyer_signature =
+            super::finding_purchase_coordinator::sign_buyer_ask(&credential.signing_key, &ask.body)
+                .map_err(execution_internal)?
+                .to_hex();
         let job = FindingOperatorPurchaseJob {
             schema: FINDING_OPERATOR_PURCHASE_JOB_SCHEMA.to_owned(),
             principal_id: buyer.principal_id().to_owned(),
@@ -855,7 +857,7 @@ impl FindingOperatorPurchaseExecutor {
             prepared_at: now,
             bid,
             ask,
-            buyer_signature: credential.signing_key.sign(ask_digest.as_bytes()).to_hex(),
+            buyer_signature,
         };
         self.validate_purchase_job(&job, credential, request, request_sha256, bundle)?;
         let bytes = canonical_json_bytes(&job).map_err(execution_internal)?;
@@ -882,9 +884,6 @@ impl FindingOperatorPurchaseExecutor {
         let bid_digest = canonical_json_bytes(&job.bid.body)
             .map(|bytes| sha256_hex(&bytes))
             .map_err(execution_internal)?;
-        let ask_digest = canonical_json_bytes(&job.ask.body)
-            .map(|bytes| sha256_hex(&bytes))
-            .map_err(execution_internal)?;
         let signature =
             chio_core::Signature::from_hex(&job.buyer_signature).map_err(execution_internal)?;
         if job.schema != FINDING_OPERATOR_PURCHASE_JOB_SCHEMA
@@ -892,8 +891,8 @@ impl FindingOperatorPurchaseExecutor {
             || job.request_sha256 != request_sha256
             || job.prepared_at != job.bid.body.issued_at
             || job.bid.signer_key != credential.signing_key.public_key()
-            || !matches!(job.bid.verify_signature(), Ok(true))
-            || !matches!(job.ask.verify_signature(), Ok(true))
+            || !matches!(job.bid.verify_signature(&job.bid.signer_key), Ok(true))
+            || !matches!(job.ask.verify_signature(&job.ask.signer_key), Ok(true))
             || job.ask.body.bid_digest != bid_digest
             || job.ask.body.listing_id != bundle.admission.body.listing_id
             || job.ask.body.agent_id != credential.signing_key.public_key().to_hex()
@@ -903,10 +902,11 @@ impl FindingOperatorPurchaseExecutor {
                 != Some(credential.payout_destination.as_str())
             || (job.ask.signer_key != bundle.seller_authorization.body.issuer
                 && job.ask.signer_key != bundle.seller_authorization.body.seller)
-            || !credential
-                .signing_key
-                .public_key()
-                .verify(ask_digest.as_bytes(), &signature)
+            || !super::finding_purchase_coordinator::verify_buyer_ask(
+                &credential.signing_key.public_key(),
+                &job.ask.body,
+                &signature,
+            )
         {
             return Err(execution_internal(
                 "prepared purchase job failed signature or request binding",

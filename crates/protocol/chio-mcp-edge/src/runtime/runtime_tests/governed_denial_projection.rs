@@ -83,7 +83,7 @@ fn governed_denial_display_preserves_the_real_signed_receipt() {
     let receipt: ChioReceipt =
         serde_json::from_value(result["_meta"]["chioEvidence"]["receipt"].clone()).unwrap();
     assert_eq!(receipt.kernel_key, signer.public_key());
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     let expected_error = KernelError::GovernedTransactionDenied(
         "governed transaction intent target does not match the tool call".to_string(),
     );

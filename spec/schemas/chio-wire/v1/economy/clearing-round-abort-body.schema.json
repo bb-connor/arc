@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/clearing-round-abort-body.schema.json",
+  "title": "chio.clearing.round-abort.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorityDigest",
+    "authorizedAtUnixMs",
+    "dispositionAuthorityId",
+    "dispositionAuthorityKeyEpoch",
+    "governanceScopeId",
+    "nextLifecycleFence",
+    "nextLifecycleVersion",
+    "outputManifestDigest",
+    "reason",
+    "reservationCount",
+    "reservationRoot",
+    "roundCoreDigest",
+    "roundId",
+    "schema",
+    "sourceLifecycleFence",
+    "sourceLifecycleHeadDigest",
+    "sourceLifecycleVersion",
+    "zeroDispatchProofDigest"
+  ],
+  "properties": {
+    "authorityDigest": {
+      "type": "string"
+    },
+    "authorizedAtUnixMs": {
+      "type": "integer"
+    },
+    "dispositionAuthorityId": {
+      "type": "string"
+    },
+    "dispositionAuthorityKeyEpoch": {
+      "type": "integer"
+    },
+    "governanceScopeId": {
+      "type": "string"
+    },
+    "nextLifecycleFence": {
+      "type": "integer"
+    },
+    "nextLifecycleVersion": {
+      "type": "integer"
+    },
+    "outputManifestDigest": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "reservationCount": {
+      "type": "integer"
+    },
+    "reservationRoot": {
+      "type": "string"
+    },
+    "roundCoreDigest": {
+      "type": "string"
+    },
+    "roundId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.clearing.round-abort.v1"
+    },
+    "sourceLifecycleFence": {
+      "type": "integer"
+    },
+    "sourceLifecycleHeadDigest": {
+      "type": "string"
+    },
+    "sourceLifecycleVersion": {
+      "type": "integer"
+    },
+    "zeroDispatchProofDigest": {
+      "type": "string"
+    }
+  }
+}

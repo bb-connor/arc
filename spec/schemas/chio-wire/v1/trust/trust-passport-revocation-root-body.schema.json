@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/trust-passport-revocation-root-body.schema.json",
+  "title": "chio.trust.passport-revocation-root.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "epoch",
+    "issued_at_unix_ms",
+    "leaf_count",
+    "root_hash"
+  ],
+  "properties": {
+    "epoch": {
+      "type": "integer"
+    },
+    "issued_at_unix_ms": {
+      "type": "integer"
+    },
+    "leaf_count": {
+      "type": "integer"
+    },
+    "root_hash": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  }
+}

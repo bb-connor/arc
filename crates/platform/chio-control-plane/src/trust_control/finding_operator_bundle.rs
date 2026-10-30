@@ -96,7 +96,7 @@ impl FindingOperatorBundle {
             || !self
                 .listing
                 .pricing
-                .verify_signature()
+                .verify_signature(&listing_key)
                 .map_err(|error| FindingOperatorBundleError::Artifact(error.to_string()))?
         {
             return Err(FindingOperatorBundleError::Binding("pricing authority"));
@@ -130,7 +130,7 @@ impl FindingOperatorBundle {
             .map_err(FindingOperatorBundleError::Artifact)?;
         if !self
             .fee_schedule
-            .verify_signature()
+            .verify_signature(&self.fee_schedule.signer_key)
             .map_err(|error| FindingOperatorBundleError::Artifact(error.to_string()))?
             || !config
                 .fee_schedule_operators()

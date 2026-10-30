@@ -1,0 +1,32 @@
+{
+  "anchorDigest": "47af16f6acebf383c809106fda70d01e9ce38e5eb03f885dcfec672809529b35",
+  "chainCommitment": "4ecb5dda5924d1e16e4ca5579aad61360fe87ecae6ce29596d93beb5dc659091",
+  "expiresAt": 401,
+  "issuedAt": 101,
+  "schema": "chio.authority-snapshot.v1",
+  "snapshot": {
+    "generation": 2,
+    "publicKeyHex": "5d4e4d9a08cd52257f4dfa649cd9cd06a0ae6c47fa14b9dc1ae39825b400fa02",
+    "rotatedAt": 101,
+    "trustedKeys": [
+      {
+        "activatedAt": 100,
+        "generation": 1,
+        "lifecycle": {
+          "at": 101,
+          "state": "revoked"
+        },
+        "publicKeyHex": "d6194c27891425ff0712b03fa8e2df6d6cf6c218d6a19a98acf2640ad3ac6f7f"
+      },
+      {
+        "activatedAt": 101,
+        "generation": 2,
+        "lifecycle": {
+          "state": "active"
+        },
+        "publicKeyHex": "5d4e4d9a08cd52257f4dfa649cd9cd06a0ae6c47fa14b9dc1ae39825b400fa02"
+      }
+    ]
+  },
+  "streamId": "recoverable"
+}

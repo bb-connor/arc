@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-seller-authorization-body.schema.json",
+  "title": "chio.finding.seller-authorization.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorization_id",
+    "expires_at",
+    "finding_artifact_sha256",
+    "finding_id",
+    "issued_at",
+    "issuer",
+    "listing_id",
+    "payee",
+    "provider_server_id",
+    "provider_tool",
+    "revocation_status_ref",
+    "schema",
+    "seller"
+  ],
+  "properties": {
+    "authorization_id": {
+      "type": "string"
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "finding_artifact_sha256": {
+      "type": "string"
+    },
+    "finding_id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "listing_id": {
+      "type": "string"
+    },
+    "payee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "beneficiary"
+      ],
+      "properties": {
+        "beneficiary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "destination"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "provider_server_id": {
+      "type": "string"
+    },
+    "provider_tool": {
+      "type": "string"
+    },
+    "revocation_status_ref": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.seller-authorization.v1"
+    },
+    "seller": {
+      "type": "string"
+    }
+  }
+}

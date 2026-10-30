@@ -1254,7 +1254,6 @@
     "crates/products/chio-proof-room/src/tests/support.rs::standard_webhooks_clock_env": 1,
     "crates/protocol/chio-a2a-adapter/src/clock.rs::default::native-adapter": 1,
     "crates/protocol/chio-acp-edge/src/bridge.rs::current_unix_timestamp::native-adapter": 1,
-    "crates/protocol/chio-acp-edge/src/edge.rs::evaluate_permission_with_dpop_policy::native-adapter": 1,
     "crates/protocol/chio-acp-proxy/src/clock.rs::default::native-adapter": 1,
     "crates/protocol/chio-anthropic-tools-adapter/src/adapter.rs::invocation_from_tool_use": 1,
     "crates/protocol/chio-bedrock-converse-adapter/src/adapter.rs::invocation_from_tool_use": 1,

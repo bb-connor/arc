@@ -337,7 +337,7 @@ mod tests {
 
     use chio_control_plane::security::{
         AttestedFindingResponsePolicyPlanner, ProductionActiveResponseAuthorityClient,
-        ProductionActiveResponseAuthorityFileConfig, ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
+        ProductionActiveResponseAuthorityFileConfig, ACTIVE_RESPONSE_AUTHORITY_PROTOCOL,
     };
     use chio_core::canonical_json_bytes;
     use chio_secure_ipc::{harden_process_custody, PeerIdentity};
@@ -571,7 +571,7 @@ mod tests {
             deployment_digest: Digest32::new([0; 32]),
             response_authority: AuthorityRuntimeConfig {
                 schema: AUTHORITY_RUNTIME_CONFIG_SCHEMA.to_string(),
-                protocol: ACTIVE_RESPONSE_AUTHORITY_SCHEMA.to_string(),
+                protocol: ACTIVE_RESPONSE_AUTHORITY_PROTOCOL.to_string(),
                 response_execution_mode: chio_security_types::ResponseExecutionMode::Live,
                 socket_path: socket_path.clone(),
                 store_path: store_path.clone(),

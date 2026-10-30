@@ -92,7 +92,7 @@ fn ap23_concurrent_resolution_retains_one_signed_decision_after_reopen() -> Test
     assert_eq!(retained.request, request);
     assert_eq!(retained.token, decision.token);
     assert_eq!(retained.approver_hex, decision.approver.to_hex());
-    assert!(retained.token.verify_signature()?);
+    assert!(retained.token.verify_integrity_embedded_key()?);
     Ok(())
 }
 

@@ -12,7 +12,7 @@ pub(super) fn normalize_dynamic_transport_fields(value: &mut Value) {
             if let Some(value) = map.get_mut("receipt") {
                 let receipt: chio_core::receipt::body::ChioReceipt =
                     serde_json::from_value(value.clone()).unwrap();
-                assert!(receipt.verify_signature().unwrap());
+                assert!(receipt.verify_integrity_embedded_key().unwrap());
                 // These transcripts use separately constructed kernels and
                 // sessions. Verify each signature, then compare decision and
                 // tool semantics without comparing fresh signing identities.

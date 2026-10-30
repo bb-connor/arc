@@ -1,0 +1,17 @@
+{
+  "challengeDigest": "a384e6baa8e46c0e403e9763500c06f86f3e6b21c287e32c2f820da72f454539",
+  "challengeId": "challenge-a",
+  "expiresAt": "2024-03-09T16:01:40Z",
+  "issuedAt": "2024-03-09T16:00:00Z",
+  "nonce": "nonce-a",
+  "schema": "chio.financial-agent-passport-presentation-challenge.v1",
+  "selectors": [
+    {
+      "credentialRefDigest": "efdc8e6a8b1aae73d4899b872e2874b33297def148712663c24c872a7fa6eb09",
+      "family": "reputation"
+    }
+  ],
+  "sourcePassportId": "b10cf8618ac7f4cb40d9fe9a2884cac5b07c6c579daf73856278d684b5ac8ab3",
+  "verifier": "did:chio:31f3322d4923d36c41c109bdb0099193187bed99942096e4926a24c77efd0d2f",
+  "verifierKeyEpoch": 1
+}

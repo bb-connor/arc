@@ -74,7 +74,9 @@ async fn worker(path: &Path, phase: &str) -> Result {
                 json!({"worker": index}),
             )?;
             let response = process.invoke(&id, "publish", &request).await?;
-            if response.verdict != Verdict::Allow || !response.receipt.verify_signature()? {
+            if response.verdict != Verdict::Allow
+                || !response.receipt.verify_integrity_embedded_key()?
+            {
                 return Err(chio_process::ProcessError::Invalid(
                     "worker did not receive a signed allow receipt",
                 ));

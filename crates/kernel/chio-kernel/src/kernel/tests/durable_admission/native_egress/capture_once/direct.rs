@@ -291,7 +291,7 @@ fn direct_retention(retention: Retention) -> CaptureResult {
         "{label}"
     );
     assert!(denied.output.is_none(), "{label}");
-    assert!(denied.receipt.verify_signature()?, "{label}");
+    assert!(denied.receipt.verify_integrity_embedded_key()?, "{label}");
     let (egress_committed, ledger) = match retention {
         Retention::CommittedThenCaptureRefused => (Some(true), true),
         Retention::CommitAcknowledgementLost => (Some(true), false),

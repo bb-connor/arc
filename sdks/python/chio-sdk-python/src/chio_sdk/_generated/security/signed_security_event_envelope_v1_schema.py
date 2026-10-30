@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -10,8 +10,6 @@
 
 
 from __future__ import annotations
-
-from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, RootModel, constr
 
@@ -28,13 +26,6 @@ class PublicKey(
     root: constr(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )
-
-
-class Algorithm(Enum):
-    ed25519 = "ed25519"
-    p256 = "p256"
-    p384 = "p384"
-    hybrid = "hybrid"
 
 
 class Signature(
@@ -55,5 +46,4 @@ class ChioSignedSecurityEventProvenanceEnvelopeV1(BaseModel):
     )
     body: security_event_body_v1_schema.ChioSecurityEventBodyV1
     producer_key: PublicKey
-    algorithm: Algorithm
     signature: Signature

@@ -1,0 +1,67 @@
+{
+  "body": {
+    "allocation_hash": "38a2f5f578adcf4341e779412da15dde92ca0bcea7e9b3dfb2f15adde7cbd6aa",
+    "issued_at": 1000,
+    "root_id": "root",
+    "selection": {
+      "body": {
+        "capability_hash": "38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe",
+        "expected_revision": 0,
+        "offer": {
+          "body": {
+            "allocation_hash": "3f180a84b7d88797e27e1c75629e01e822ba4228db43f53f7f41c3efe513426e",
+            "arguments_hash": "b192017da47f5d35fb73a303a7ba74a8f4648d05176804ae49d9cdaa1d780812",
+            "contract_hash": "7200b4157e0eb83919527aea672cadf2f93490b46cb465e463a9b2f28cffaa05",
+            "effect": {
+              "server": "research",
+              "tool": "analyze"
+            },
+            "expires_at": 1900,
+            "price_units": 20,
+            "receiver": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+            "slot_id": "leaf"
+          },
+          "signature": "43482c99f4000e59be4840febb2ce9305a6e07d58943b4b5416ff22607aa62b1f32001b98fe7fe1969f64ef9eae798bded51dacb44daabdcb40c8314e215c007",
+          "signer": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        },
+        "request_id": "request-3"
+      },
+      "signature": "cb4b0328f69a7f1d4284a67ae46741cdf1ae6b38920e8795321246e8fe680d323f483be8c1102f9d1b2be4519f9822dcde29968fb8738ac985952a38b7d5ca00",
+      "signer": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    },
+    "slot": {
+      "contract": {
+        "acceptance": {
+          "clauses": [
+            {
+              "kind": "integer_range",
+              "max": 10,
+              "min": 1,
+              "pointer": "/count"
+            }
+          ]
+        },
+        "currency": "USD",
+        "depth": 2,
+        "effects": [
+          {
+            "server": "research",
+            "tool": "analyze"
+          }
+        ],
+        "expires_at": 2000,
+        "max_units": 60,
+        "readers": [
+          "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+          "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+          "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+          "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
+        ]
+      },
+      "holder": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "id": "leaf"
+    }
+  },
+  "signer": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
+}

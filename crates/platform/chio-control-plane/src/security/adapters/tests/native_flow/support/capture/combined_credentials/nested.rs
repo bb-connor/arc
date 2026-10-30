@@ -154,7 +154,7 @@ fn native_declassification_supports_public_nested_sync_and_async_with_all_creden
                 assert!(
                     matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
                 );
-                assert!(response.receipt.verify_signature()?);
+                assert!(response.receipt.verify_integrity_embedded_key()?);
                 declassification::assert_completed(&fixture, combined, nonce)?;
                 if let Some(legacy) = legacy {
                     assert_eq!(legacy.load(Ordering::SeqCst), 0);
@@ -209,7 +209,7 @@ fn native_nonce_supports_public_nested_sync_and_async_dispatch() -> TestResult {
                 assert!(
                     matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
                 );
-                assert!(response.receipt.verify_signature()?);
+                assert!(response.receipt.verify_integrity_embedded_key()?);
                 assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
                 assert_eq!(legacy.load(Ordering::SeqCst), 0);
                 let store = fixture.authority.admission_operation_store();
@@ -327,7 +327,7 @@ fn native_captured_lifecycle_supports_public_nested_sync_and_async_dispatch() ->
                 assert!(
                     matches!(&response.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &fixture.request.arguments)
                 );
-                assert!(response.receipt.verify_signature()?);
+                assert!(response.receipt.verify_integrity_embedded_key()?);
                 assert_eq!(fixture.invocations.load(Ordering::SeqCst), 1);
                 assert_eq!(fixture.hook.legacy_dispatch.load(Ordering::SeqCst), 0);
                 if combined {
@@ -350,7 +350,7 @@ fn public_nested_declassification_proof_reaches_native_untrusted_issuer_denial()
         )
         .declassification_grant
         .ok_or("signed grant absent")?;
-        assert!(grant.verify_signature()?);
+        assert!(grant.verify_integrity_embedded_key()?);
         let classifier = Arc::new(CountingEmptyClassifier::new());
         fixture
             .kernel

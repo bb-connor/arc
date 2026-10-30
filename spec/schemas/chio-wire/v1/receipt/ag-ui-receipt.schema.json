@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/ag-ui-receipt.schema.json",
+  "title": "Chio ag ui receipt signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "allowed",
+    "capability_id",
+    "classification",
+    "event_id",
+    "event_type",
+    "id",
+    "kernel_key",
+    "payload_hash",
+    "timestamp",
+    "transport"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "allowed": {
+      "type": "boolean"
+    },
+    "capability_id": {
+      "type": "string"
+    },
+    "classification": {
+      "type": "string"
+    },
+    "denial_reason": {
+      "type": "string"
+    },
+    "event_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "kernel_key": {
+      "type": "string"
+    },
+    "payload_hash": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "component_type"
+      ],
+      "properties": {
+        "component_id": {
+          "type": "string"
+        },
+        "component_type": {
+          "type": "string"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "integer"
+    },
+    "transport": {
+      "type": "string"
+    }
+  }
+}

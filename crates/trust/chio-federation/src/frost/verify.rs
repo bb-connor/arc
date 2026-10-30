@@ -1,3 +1,4 @@
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use frost_ed25519::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
@@ -22,8 +23,6 @@ const CHIO_FROST_AUTHORIZATION_SESSION_ID_PREFIX: &[u8] =
     b"chio.frost.authorization.session.id.v1\0";
 const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_DIGEST_PREFIX: &[u8] =
     b"chio.frost.authorization-slot-checkpoint.digest.v1\0";
-const CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SIGNING_PREFIX: &[u8] =
-    b"CHIO-FROST-AUTHORIZATION-SLOT-CHECKPOINT-V1\0";
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum FrostVerificationError {
@@ -193,11 +192,11 @@ struct FrostAuthorizationSlotCheckpointDigestPreimage<'a> {
 }
 
 impl FrostAuthorizationSlotCheckpointV1 {
-    pub fn signing_bytes(&self) -> Result<Vec<u8>, FrostVerificationError> {
-        canonical_prefixed_bytes(
-            CHIO_FROST_AUTHORIZATION_SLOT_CHECKPOINT_SIGNING_PREFIX,
-            &self.signing_preimage(),
-        )
+    /// Canonical body the slot anchor signs under
+    /// `chio.frost.authorization-slot-checkpoint.v1`.
+    pub fn signing_body(&self) -> Result<CanonicalBytes, FrostVerificationError> {
+        CanonicalBytes::from_serializable(&self.signing_preimage())
+            .map_err(|error| FrostVerificationError::Canonical(error.to_string()))
     }
 
     pub fn recompute_checkpoint_digest(&self) -> Result<String, FrostVerificationError> {

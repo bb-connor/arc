@@ -173,7 +173,7 @@ impl AttestedFindingAdmissionArtifacts {
                 )?;
                 let signature_valid = payload
                     .authority_attestation
-                    .verify_signature()
+                    .verify_integrity_embedded_key()
                     .map_err(|_| PortError::integrity_failure())?;
                 if &payload.artifact_ref != expected_ref
                     || &attestation.artifact_ref != expected_ref
@@ -190,7 +190,7 @@ impl AttestedFindingAdmissionArtifacts {
                     || payload.submission_proof.body.tenant_id != response_plan.tenant_id
                     || !payload
                         .submission_proof
-                        .verify_signature()
+                        .verify_integrity_embedded_key()
                         .map_err(|_| PortError::integrity_failure())?
                     || attestation.issued_at_unix_ms
                         != payload.submission_proof.body.issued_at_unix_ms

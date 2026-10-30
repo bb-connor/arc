@@ -139,7 +139,14 @@ fn signed_identity_binding_with_window(
         expires_at,
         nonce: nonce.to_string(),
     };
-    let Ok((signature, _)) = signer.sign_canonical(&certificate) else {
+    let Ok(signature) =
+        chio_core_types::CanonicalBytes::from_serializable(&certificate).and_then(|canonical| {
+            signer.sign_wrapped(
+                crate::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+                &canonical,
+            )
+        })
+    else {
         panic!("sample identity binding signs");
     };
     SignedWeb3IdentityBinding {
@@ -373,7 +380,11 @@ fn sample_anchor_inclusion_proof_for_receipt(receipt: ChioReceipt) -> AnchorIncl
         .unwrap(),
     };
     let body = checkpoint_statement_body(&statement);
-    let (signature, _) = operator.sign_canonical(&body).unwrap();
+    let signature = chio_core_types::CanonicalBytes::from_serializable(&body)
+        .and_then(|canonical| {
+            operator.sign_wrapped(crate::anchors::CHIO_CHECKPOINT_STATEMENT_SCHEMA, &canonical)
+        })
+        .unwrap();
     statement.signature = signature;
 
     AnchorInclusionProof {
@@ -691,11 +702,17 @@ pub(super) fn sample_public_settlement_proof_bundle() -> PublicSettlementProofBu
 pub(super) fn sign_sample_public_settlement_bundle(bundle: &mut PublicSettlementProofBundle) {
     bundle.bundle_signature = None;
     let keypair = settlement_bundle_keypair();
-    let Ok((signature, _)) = keypair.sign_canonical(bundle) else {
+    let Ok(signature) =
+        chio_core_types::CanonicalBytes::from_serializable(bundle).and_then(|canonical| {
+            keypair.sign_wrapped(
+                crate::settlement_proof::CHIO_WEB3_SETTLEMENT_PROOF_BUNDLE_SCHEMA,
+                &canonical,
+            )
+        })
+    else {
         panic!("sample public settlement bundle signs")
     };
     bundle.bundle_signature = Some(PublicSettlementBundleSignature {
-        algorithm: "ed25519-rfc8785-v1".to_string(),
         signer_key: keypair.public_key().to_hex(),
         signature: signature.to_hex(),
     });
@@ -2445,170 +2462,8 @@ fn public_settlement_proof_rejects_observed_execution_outside_dispatch_window() 
     ));
 }
 
-#[test]
-fn public_settlement_proof_rejects_failed_settlement_before_finality_claims() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.settlement_receipt.lifecycle_state = Web3SettlementLifecycleState::Failed;
-    bundle.settlement_receipt.failure_reason = Some("provider execution failed".to_string());
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("public settlement finality requires successful settlement state")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_reorged_settlement_before_finality_claims() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.settlement_receipt.lifecycle_state = Web3SettlementLifecycleState::Reorged;
-    bundle.settlement_receipt.failure_reason = Some("settlement transaction reorged".to_string());
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("public settlement finality requires successful settlement state")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_escrow_locked_before_finality_claims() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.settlement_receipt.lifecycle_state = Web3SettlementLifecycleState::EscrowLocked;
-    bundle.settlement_receipt.observed_execution.amount.units = 0;
-    bundle.settlement_receipt.settled_amount.units = 0;
-    bundle.settlement_receipt.reconciled_anchor_proof = None;
-    bundle.settlement_receipt.oracle_evidence = None;
-    bundle.chain_snapshot.escrow.released_amount.units = 0;
-
-    let result = verify_sample_public_settlement_proof(&bundle);
-    assert!(
-        matches!(
-            result,
-            Err(Web3ContractError::InvalidSettlement(ref message))
-                if message.contains("public settlement finality requires successful settlement state")
-        ),
-        "{result:?}"
-    );
-}
-
-#[test]
-fn public_settlement_proof_rejects_missing_observed_execution_reference() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle
-        .settlement_receipt
-        .observed_execution
-        .external_reference_id
-        .clear();
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::MissingField(
-            "web3_settlement_receipt.observed_execution.external_reference_id"
-        ))
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_malformed_observed_execution_tx_hash() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle
-        .settlement_receipt
-        .observed_execution
-        .external_reference_id = "settlement-web3-reference".to_string();
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("observed execution reference must be an eip155 transaction hash")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_finality_with_active_dispute() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.dispute_posture = PublicSettlementDisputePosture::Challenged;
-    let Some(dispute_snapshot) = bundle.dispute_snapshot.as_mut() else {
-        panic!("sample public settlement proof bundle has dispute snapshot");
-    };
-    dispute_snapshot.posture = PublicSettlementDisputePosture::Challenged;
-    dispute_snapshot.dispute_id = "dispute-public-settlement-challenged".to_string();
-    dispute_snapshot.open_dispute_count = 1;
-    dispute_snapshot
-        .linked_receipt_ids
-        .push(bundle.settlement_receipt.execution_receipt_id.clone());
-    let event_block = add_public_settlement_dispute_event_evidence(&mut bundle);
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof_with_dispute_event_evidence(&bundle, event_block),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("public settlement active dispute blocks finality")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_dispute_not_linked_to_settlement_receipt() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.dispute_posture = PublicSettlementDisputePosture::Challenged;
-    let Some(dispute_snapshot) = bundle.dispute_snapshot.as_mut() else {
-        panic!("sample public settlement proof bundle has dispute snapshot");
-    };
-    dispute_snapshot.posture = PublicSettlementDisputePosture::Challenged;
-    dispute_snapshot.dispute_id = "dispute-public-settlement-challenged".to_string();
-    dispute_snapshot.open_dispute_count = 1;
-    dispute_snapshot
-        .linked_receipt_ids
-        .push("receipt-web3-unrelated".to_string());
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidProof(message))
-            if message.contains("public settlement dispute not linked to settlement receipt")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_closed_posture_with_open_dispute() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.dispute_posture = PublicSettlementDisputePosture::Closed;
-    let Some(dispute_snapshot) = bundle.dispute_snapshot.as_mut() else {
-        panic!("sample public settlement proof bundle has dispute snapshot");
-    };
-    dispute_snapshot.posture = PublicSettlementDisputePosture::Closed;
-    dispute_snapshot.dispute_id = "dispute-public-settlement-closed".to_string();
-    dispute_snapshot.open_dispute_count = 1;
-    dispute_snapshot
-        .linked_receipt_ids
-        .push(bundle.settlement_receipt.execution_receipt_id.clone());
-    let event_block = add_public_settlement_dispute_event_evidence(&mut bundle);
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof_with_dispute_event_evidence(&bundle, event_block),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("public settlement active dispute blocks finality")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_refunded_posture_without_reversal() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.dispute_posture = PublicSettlementDisputePosture::Refunded;
-    let Some(dispute_snapshot) = bundle.dispute_snapshot.as_mut() else {
-        panic!("sample public settlement proof bundle has dispute snapshot");
-    };
-    dispute_snapshot.posture = PublicSettlementDisputePosture::Refunded;
-    dispute_snapshot.dispute_id = "dispute-public-settlement-refunded".to_string();
-    dispute_snapshot
-        .linked_receipt_ids
-        .push(bundle.settlement_receipt.execution_receipt_id.clone());
-    let event_block = add_public_settlement_dispute_event_evidence(&mut bundle);
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof_with_dispute_event_evidence(&bundle, event_block),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("refunded dispute posture requires reversed or timed out settlement")
-    ));
-}
+#[path = "tests/settlement_finality.rs"]
+mod settlement_finality;
 
 #[test]
 fn public_settlement_fixture_remains_verifiable() {
@@ -2682,4 +2537,48 @@ fn reference_artifacts_parse_and_validate() {
     validate_web3_settlement_dispatch(&dispatch).unwrap();
     validate_web3_settlement_execution_receipt(&receipt).unwrap();
     validate_web3_qualification_matrix(&matrix).unwrap();
+}
+
+const REFERENCE_ARTIFACTS_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/standards");
+
+fn reference_artifact_bytes<T: serde::Serialize>(artifact: &T) -> Vec<u8> {
+    let mut bytes = serde_json::to_vec_pretty(artifact).unwrap();
+    bytes.push(b'\n');
+    bytes
+}
+
+fn generated_reference_artifacts() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (
+            "CHIO_WEB3_TRUST_PROFILE.json",
+            reference_artifact_bytes(&sample_trust_profile()),
+        ),
+        (
+            "CHIO_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
+            reference_artifact_bytes(&sample_anchor_inclusion_proof()),
+        ),
+        (
+            "CHIO_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json",
+            reference_artifact_bytes(&sample_dispatch()),
+        ),
+        (
+            "CHIO_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json",
+            reference_artifact_bytes(&sample_execution_receipt()),
+        ),
+    ]
+}
+
+/// Set `CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS=1` to rewrite the committed
+/// reference artifacts from this generator.
+#[test]
+fn reference_artifacts_are_the_generator_output() {
+    let write = std::env::var_os("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS").is_some();
+    for (name, bytes) in generated_reference_artifacts() {
+        let path = std::path::Path::new(REFERENCE_ARTIFACTS_DIR).join(name);
+        if write {
+            std::fs::write(&path, &bytes).unwrap();
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), bytes, "{name}");
+    }
 }

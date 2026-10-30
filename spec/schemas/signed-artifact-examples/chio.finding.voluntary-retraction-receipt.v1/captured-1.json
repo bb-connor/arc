@@ -1,0 +1,8 @@
+{
+  "feed_id": "status-feed/test",
+  "finding_id": "8bf18252cb6dadd5f42fca108271e688696209cdb6fae22e32318b204e6eb37d",
+  "issued_at": 1793191342,
+  "key_domain_nonce": 3318287169837494,
+  "schema": "chio.finding.voluntary-retraction-receipt.v1",
+  "source_authority_id": "f80cccdce4ae1c07ae208a2adf99a310ae4207e0306fa0236110b06827bbb8d0"
+}

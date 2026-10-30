@@ -1,0 +1,86 @@
+{
+  "filters": {
+    "agentSubject": "subject-1",
+    "receiptLimit": 10
+  },
+  "generatedAt": 1743379200,
+  "receipts": {
+    "actionableMeteredReceipts": 0,
+    "actionableSettlementReceipts": 0,
+    "allowCount": 2,
+    "approvalReceipts": 2,
+    "approvedReceipts": 2,
+    "callChainReceipts": 0,
+    "cancelledCount": 0,
+    "denyCount": 0,
+    "failedSettlementReceipts": 0,
+    "governedReceipts": 2,
+    "incompleteCount": 0,
+    "matchingReceipts": 2,
+    "meteredReceipts": 0,
+    "pendingSettlementReceipts": 0,
+    "receiptRefs": [
+      {
+        "kind": "receipt",
+        "locator": "receipt:rcpt-1",
+        "observedAt": 1743379080,
+        "referenceId": "rcpt-1"
+      },
+      {
+        "kind": "receipt",
+        "locator": "receipt:rcpt-2",
+        "observedAt": 1743379170,
+        "referenceId": "rcpt-2"
+      }
+    ],
+    "returnedReceipts": 2,
+    "runtimeAssuranceReceipts": 2,
+    "sharedEvidenceProofRequiredCount": 0,
+    "sharedEvidenceReferenceCount": 0
+  },
+  "reputation": {
+    "acceptedImportedSignalCount": 0,
+    "effectiveScore": 0.93,
+    "importedSignalCount": 0,
+    "probationary": false,
+    "resolvedTier": "trusted",
+    "subjectKey": "subject-1"
+  },
+  "runtimeAssurance": {
+    "governedReceipts": 2,
+    "highestTier": "verified",
+    "latestEvidenceSha256": "sha256-runtime",
+    "latestSchema": "chio.runtime-attestation.azure-maa.jwt.v1",
+    "latestVerifier": "verifier.chio",
+    "latestVerifierFamily": "azure_maa",
+    "observedVerifierFamilies": [
+      "azure_maa"
+    ],
+    "runtimeAssuranceReceipts": 2
+  },
+  "schema": "chio.underwriting.policy-input.v1",
+  "taxonomy": {
+    "supportedClasses": [
+      "baseline",
+      "guarded",
+      "elevated",
+      "critical"
+    ],
+    "supportedReasons": [
+      "probationary_history",
+      "low_reputation",
+      "imported_trust_dependency",
+      "missing_certification",
+      "failed_certification",
+      "revoked_certification",
+      "missing_runtime_assurance",
+      "weak_runtime_assurance",
+      "pending_settlement_exposure",
+      "failed_settlement_exposure",
+      "metered_billing_mismatch",
+      "delegated_call_chain",
+      "shared_evidence_proof_required"
+    ],
+    "version": "chio.underwriting.taxonomy.v1"
+  }
+}

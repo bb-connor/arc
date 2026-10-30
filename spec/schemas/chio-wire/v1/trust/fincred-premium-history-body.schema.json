@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/trust/fincred-premium-history-body.schema.json",
+  "title": "chio.fincred.premium-history.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "@context",
+    "credentialId",
+    "credentialSubject",
+    "evidence",
+    "expirationDate",
+    "family",
+    "issuanceDate",
+    "issuer",
+    "issuerKeyEpoch",
+    "presentationEvidenceClass",
+    "schema",
+    "sourceEvidenceClass",
+    "type"
+  ],
+  "properties": {
+    "@context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "credentialId": {
+      "type": "string"
+    },
+    "credentialSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claims",
+        "family"
+      ],
+      "properties": {
+        "claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "quotedAmounts",
+            "quotedCount"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "quotedAmounts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "quotedCount": {
+              "type": "integer"
+            }
+          }
+        },
+        "family": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceCompletenessAttestations",
+        "sourceDisclosure",
+        "window"
+      ],
+      "properties": {
+        "sourceCompletenessAttestations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signature",
+              "signerKey"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "attestationReference",
+                  "checkpointAuthorityEpoch",
+                  "checkpointAuthorityKey",
+                  "checkpointDigest",
+                  "checkpointSequence",
+                  "committedLeaves",
+                  "cutoff",
+                  "disclosureDigest",
+                  "expiresAt",
+                  "indexRoot",
+                  "issuedAt",
+                  "lowerBoundary",
+                  "rangeRoot",
+                  "schema",
+                  "sourceArtifactDigests",
+                  "sourceEvidenceClass",
+                  "sourceFamily",
+                  "sourceId",
+                  "sourceSignerKey",
+                  "storeGeneration",
+                  "subject",
+                  "upperBoundary",
+                  "window"
+                ],
+                "properties": {
+                  "attestationReference": {
+                    "type": "string"
+                  },
+                  "checkpointAuthorityEpoch": {
+                    "type": "integer"
+                  },
+                  "checkpointAuthorityKey": {
+                    "type": "string"
+                  },
+                  "checkpointDigest": {
+                    "type": "string"
+                  },
+                  "checkpointSequence": {
+                    "type": "integer"
+                  },
+                  "committedLeaves": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "indexProof",
+                        "leaf"
+                      ],
+                      "properties": {
+                        "indexProof": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "auditPath",
+                            "leafIndex",
+                            "treeSize"
+                          ],
+                          "properties": {
+                            "auditPath": {
+                              "type": "array",
+                              "maxItems": 64,
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              }
+                            },
+                            "leafIndex": {
+                              "type": "integer"
+                            },
+                            "treeSize": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "leaf": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "index",
+                            "queryKey",
+                            "sourceArtifactDigest"
+                          ],
+                          "properties": {
+                            "index": {
+                              "type": "integer"
+                            },
+                            "queryKey": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "artifactId",
+                                "occurredAt",
+                                "sourceFamily",
+                                "subject"
+                              ],
+                              "properties": {
+                                "artifactId": {
+                                  "type": "string"
+                                },
+                                "occurredAt": {
+                                  "type": "integer"
+                                },
+                                "sourceFamily": {
+                                  "type": "string"
+                                },
+                                "subject": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "sourceArtifactDigest": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "cutoff": {
+                    "type": "integer"
+                  },
+                  "disclosureDigest": {
+                    "type": "string"
+                  },
+                  "expiresAt": {
+                    "type": "integer"
+                  },
+                  "indexRoot": {
+                    "type": "string"
+                  },
+                  "issuedAt": {
+                    "type": "integer"
+                  },
+                  "lowerBoundary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "rangeRoot": {
+                    "type": "string"
+                  },
+                  "schema": {
+                    "type": "string"
+                  },
+                  "sourceArtifactDigests": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "sourceEvidenceClass": {
+                    "type": "string"
+                  },
+                  "sourceFamily": {
+                    "type": "string"
+                  },
+                  "sourceId": {
+                    "type": "string"
+                  },
+                  "sourceSignerKey": {
+                    "type": "string"
+                  },
+                  "storeGeneration": {
+                    "type": "integer"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "upperBoundary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "window": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "endsAt",
+                      "startsAt"
+                    ],
+                    "properties": {
+                      "endsAt": {
+                        "type": "integer"
+                      },
+                      "startsAt": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "signature": {
+                "type": "string"
+              },
+              "signerKey": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "sourceDisclosure": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "artifacts",
+            "kind"
+          ],
+          "properties": {
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "artifactDigest",
+                  "artifactSchema",
+                  "canonicalArtifact",
+                  "role"
+                ],
+                "properties": {
+                  "artifactDigest": {
+                    "type": "string"
+                  },
+                  "artifactSchema": {
+                    "type": "string"
+                  },
+                  "canonicalArtifact": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "kind": {
+              "type": "string"
+            }
+          }
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endsAt",
+            "startsAt"
+          ],
+          "properties": {
+            "endsAt": {
+              "type": "integer"
+            },
+            "startsAt": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "expirationDate": {
+      "type": "string"
+    },
+    "family": {
+      "type": "string"
+    },
+    "issuanceDate": {
+      "type": "string"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "issuerKeyEpoch": {
+      "type": "integer"
+    },
+    "presentationEvidenceClass": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.fincred.premium-history.v1"
+    },
+    "sourceEvidenceClass": {
+      "type": "string"
+    },
+    "type": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

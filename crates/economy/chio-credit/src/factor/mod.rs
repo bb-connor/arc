@@ -1,6 +1,6 @@
-use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core_types::capability::scope::MonetaryAmount;
-use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use chio_core_types::crypto::{sha256_hex, verify_wrapped, Keypair, PublicKey, Signature};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 pub use chio_core_types::{
     CHIO_FACTOR_ASSIGNMENT_ACKNOWLEDGEMENT_V1_SCHEMA, CHIO_FACTOR_ASSIGNMENT_AGREEMENT_V1_SCHEMA,

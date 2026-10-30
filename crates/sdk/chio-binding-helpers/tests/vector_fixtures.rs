@@ -3,11 +3,11 @@ use std::path::{Path, PathBuf};
 
 use chio_binding_helpers::{
     canonicalize_json_str, capability_signing_body_canonical_json, receipt_body_canonical_json,
-    sha256_hex_utf8, sign_json_str_ed25519, sign_utf8_message_ed25519,
-    signed_manifest_body_canonical_json, verify_capability, verify_json_str_signature_ed25519,
-    verify_receipt, verify_receipt_json, verify_receipt_json_with_trusted_signer_hex,
-    verify_receipt_with_trusted_signers, verify_signed_manifest, verify_utf8_message_ed25519,
-    CapabilityVerification, ErrorCode, ManifestVerification, ReceiptVerification,
+    sha256_hex_utf8, sign_wrapped_json_ed25519, signed_manifest_body_canonical_json,
+    verify_capability, verify_receipt, verify_receipt_json,
+    verify_receipt_json_with_trusted_signer_hex, verify_receipt_with_trusted_signers,
+    verify_signed_manifest, verify_wrapped_json, CapabilityVerification, ErrorCode,
+    ManifestVerification, ReceiptVerification,
 };
 use chio_core::{
     capability::{
@@ -199,27 +199,11 @@ fn hashing_vector_fixture() -> Value {
     })
 }
 
-fn signing_utf8_case_value(
-    id: &str,
-    description: &str,
-    input_utf8: &str,
-    public_key_hex: &str,
-    signature_hex: &str,
-    expected_verify: bool,
-) -> Value {
-    json!({
-        "id": id,
-        "description": description,
-        "input_utf8": input_utf8,
-        "public_key_hex": public_key_hex,
-        "signature_hex": signature_hex,
-        "expected_verify": expected_verify,
-    })
-}
-
+#[allow(clippy::too_many_arguments)]
 fn signing_json_case_value(
     id: &str,
     description: &str,
+    schema_id: &str,
     input_json: &str,
     canonical_json: &str,
     public_key_hex: &str,
@@ -229,6 +213,7 @@ fn signing_json_case_value(
     json!({
         "id": id,
         "description": description,
+        "schema_id": schema_id,
         "input_json": input_json,
         "canonical_json": canonical_json,
         "public_key_hex": public_key_hex,
@@ -237,39 +222,23 @@ fn signing_json_case_value(
     })
 }
 
+const SIGNING_VECTOR_SCHEMA_ID: &str = "chio.receipt.v1";
+
 fn signing_vector_fixture() -> Value {
     let seed_hex = "09".repeat(32);
-    let signed_utf8 =
-        sign_utf8_message_ed25519("hello chio", &seed_hex).test_unwrap("sign utf8 message");
     let signed_json =
-        sign_json_str_ed25519("{\"z\":1,\"a\":2}", &seed_hex).test_unwrap("sign json string");
+        sign_wrapped_json_ed25519(SIGNING_VECTOR_SCHEMA_ID, "{\"z\":1,\"a\":2}", &seed_hex)
+            .test_unwrap("sign json string");
 
     json!({
         "version": 1,
         "generated_by": "chio-binding-helpers",
         "signing_key_seed_hex": seed_hex,
-        "utf8_cases": [
-            signing_utf8_case_value(
-                "valid_utf8_message",
-                "A UTF-8 message signs and verifies with a deterministic Ed25519 seed.",
-                "hello chio",
-                &signed_utf8.public_key_hex,
-                &signed_utf8.signature_hex,
-                true,
-            ),
-            signing_utf8_case_value(
-                "tampered_utf8_message",
-                "The same signature fails if the UTF-8 message bytes change.",
-                "hello chio!",
-                &signed_utf8.public_key_hex,
-                &signed_utf8.signature_hex,
-                false,
-            ),
-        ],
         "json_cases": [
             signing_json_case_value(
-                "valid_canonical_json_message",
-                "Signing raw JSON first canonicalizes it, then signs the canonical bytes.",
+                "valid_wrapped_json_message",
+                "Signing raw JSON canonicalizes it, then signs the signing wrapper under the schema id.",
+                SIGNING_VECTOR_SCHEMA_ID,
                 "{\"z\":1,\"a\":2}",
                 &signed_json.canonical_json,
                 &signed_json.public_key_hex,
@@ -277,10 +246,21 @@ fn signing_vector_fixture() -> Value {
                 true,
             ),
             signing_json_case_value(
-                "tampered_canonical_json_message",
+                "tampered_wrapped_json_message",
                 "Verification fails if the JSON payload changes after signing.",
+                SIGNING_VECTOR_SCHEMA_ID,
                 "{\"z\":2,\"a\":2}",
                 &canonicalize_json_str("{\"z\":2,\"a\":2}").test_unwrap("canonicalize tampered json"),
+                &signed_json.public_key_hex,
+                &signed_json.signature_hex,
+                false,
+            ),
+            signing_json_case_value(
+                "substituted_schema_id",
+                "Verification fails if the signature is checked under another schema id.",
+                "chio.capability.v1",
+                "{\"z\":1,\"a\":2}",
+                &signed_json.canonical_json,
                 &signed_json.public_key_hex,
                 &signed_json.signature_hex,
                 false,
@@ -581,8 +561,12 @@ fn signed_manifest_with_manual_signature(
     manifest: SignedToolManifest,
     signer: &Keypair,
 ) -> SignedManifest {
-    let (signature, _bytes) = signer
-        .sign_canonical(&manifest)
+    let signature = signer
+        .sign_wrapped(
+            chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&manifest)
+                .test_unwrap("canonical manifest"),
+        )
         .test_unwrap("manual manifest signature");
     SignedManifest {
         manifest,
@@ -773,8 +757,14 @@ fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLev
     body.trust_level = trust_level;
     bind_receipt_signing_nonce(&mut body);
     body.id = chio_receipt_id(&body).test_unwrap("trust level receipt id");
-    let (signature, _bytes) = keypair
-        .sign_canonical(&ChioReceiptSigningBody::from(&body))
+    let signature = keypair
+        .sign_wrapped(
+            chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(
+                &ChioReceiptSigningBody::from(&body),
+            )
+            .test_unwrap("canonical trust level receipt body"),
+        )
         .test_unwrap("sign trust level receipt body");
     let mut receipt_json = serde_json::to_value(&body).test_unwrap("serialize trust level body");
     receipt_json["signature"] =
@@ -793,6 +783,42 @@ fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLev
     })
 }
 
+/// Re-signs every receipt case with the corpus key over the case's own signing
+/// body and moves every occurrence of each old signature in `raw` to the new
+/// one. Each case is then rejected only by the rule it names, never by a
+/// signature in another format.
+fn resign_corpus_receipts(mut raw: String, fixture: &Value, keypair: &Keypair) -> String {
+    let corpus_key = keypair.public_key().to_hex();
+    for case in fixture["cases"]
+        .as_array()
+        .test_unwrap("receipt cases array")
+    {
+        let id = case["id"].as_str().test_unwrap("receipt case id");
+        assert_eq!(
+            case["receipt"]["kernel_key"].as_str(),
+            Some(corpus_key.as_str()),
+            "receipt case {id} is not under the corpus key"
+        );
+        let receipt: ChioReceipt =
+            serde_json::from_value(case["receipt"].clone()).test_unwrap("parse receipt case");
+        let signature = keypair
+            .sign_wrapped(
+                chio_core::receipt::body::CHIO_RECEIPT_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(
+                    &ChioReceiptSigningBody::from(&receipt.body()),
+                )
+                .test_unwrap("canonical receipt signing body"),
+            )
+            .test_unwrap("re-sign receipt");
+        let old_signature = case["receipt"]["signature"]
+            .as_str()
+            .test_unwrap("receipt signature")
+            .to_string();
+        raw = raw.replace(&old_signature, &signature.to_hex());
+    }
+    raw
+}
+
 #[test]
 #[ignore = "regenerator: rewrite each expected block of the checked-in receipt corpus in place from verify_receipt and append missing cases; run with --ignored, then `cargo xtask freeze-vectors`"]
 fn refresh_receipt_vector_fixture() {
@@ -801,6 +827,8 @@ fn refresh_receipt_vector_fixture() {
     let mut fixture: Value = serde_json::from_str(&raw).test_unwrap("parse receipt fixture");
     let keypair = Keypair::from_seed(&[7u8; 32]);
     assert_eq!(fixture["signing_key_seed_hex"], keypair.seed_hex());
+    raw = resign_corpus_receipts(raw, &fixture, &keypair);
+    fixture = serde_json::from_str(&raw).test_unwrap("parse re-signed receipt fixture");
 
     let cases = fixture["cases"]
         .as_array_mut()
@@ -853,9 +881,18 @@ fn refresh_receipt_vector_fixture() {
 }
 
 #[test]
-#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn signing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&signing_fixture_path(), &signing_vector_fixture());
+}
+
+#[test]
+#[ignore = "regenerator: rewrite the signing vector fixture from signing_vector_fixture(); run with --ignored, then `cargo xtask freeze-vectors`"]
+fn regenerate_signing_vector_fixture() {
+    fs::write(
+        signing_fixture_path(),
+        pretty_json(&signing_vector_fixture()),
+    )
+    .test_unwrap("write signing vector fixture");
 }
 
 #[test]
@@ -889,7 +926,7 @@ fn regenerate_manifest_vector_fixture() {
 #[test]
 #[ignore = "regenerator: re-sign capability vectors after a signing-schema change; run with --ignored"]
 fn rebless_capability_vector_signatures() {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
     let path = capability_fixture_path();
     let raw = fs::read_to_string(&path).test_unwrap("read capability fixture");
     let fixture: Value = serde_json::from_str(&raw).test_unwrap("parse capability fixture");
@@ -909,50 +946,57 @@ fn rebless_capability_vector_signatures() {
             by_pub.insert(keypair.public_key().to_hex(), keypair);
         }
     }
+    let keypair_for = |key: &chio_core::PublicKey| {
+        let hex = key.to_hex();
+        by_pub
+            .get(&hex)
+            .unwrap_or_else(|| panic!("no seed keypair for {hex}"))
+    };
 
-    let mut replacements: Vec<(String, String)> = Vec::new();
+    // Links are re-signed where the case expects a valid chain shape and the
+    // token where it expects a valid signature; the token signs its links.
+    let mut replacements: BTreeMap<String, String> = BTreeMap::new();
+    let mut kept: Vec<String> = Vec::new();
     for case in fixture["cases"].as_array().test_unwrap("cases array") {
-        if !case["expected"]["signature_valid"]
-            .as_bool()
-            .unwrap_or(false)
-        {
-            continue;
-        }
-        let issuer_hex = case["capability"]["issuer"].as_str().test_unwrap("issuer");
-        let keypair = by_pub
-            .get(issuer_hex)
-            .unwrap_or_else(|| panic!("no seed keypair for issuer {issuer_hex}"));
-        let token: CapabilityToken =
+        let mut token: CapabilityToken =
             serde_json::from_value(case["capability"].clone()).test_unwrap("parse capability");
-        let resigned = CapabilityToken::sign(token.body(), keypair).test_unwrap("re-sign");
-        let resigned_value = serde_json::to_value(&resigned).test_unwrap("serialize resigned");
-        let old_sig = case["capability"]["signature"]
-            .as_str()
-            .test_unwrap("old signature")
-            .to_string();
-        let new_sig = resigned_value["signature"]
-            .as_str()
-            .test_unwrap("new signature")
-            .to_string();
-        if old_sig != new_sig {
-            replacements.push((old_sig, new_sig));
+        let resign_links = case["expected"]["delegation_chain_shape_valid"]
+            .as_bool()
+            .unwrap_or(false);
+        let resign_token = case["expected"]["signature_valid"]
+            .as_bool()
+            .unwrap_or(false);
+        for link in &mut token.delegation_chain {
+            let old = link.signature.to_hex();
+            if resign_links {
+                *link = DelegationLink::sign(link.body(), keypair_for(&link.delegator))
+                    .test_unwrap("re-sign delegation link");
+                replacements.insert(old, link.signature.to_hex());
+            } else {
+                kept.push(old);
+            }
         }
+        let old = token.signature.to_hex();
+        if resign_token {
+            let resigned = CapabilityToken::sign(token.body(), keypair_for(&token.issuer))
+                .test_unwrap("re-sign capability");
+            replacements.insert(old, resigned.signature.to_hex());
+        } else {
+            kept.push(old);
+        }
+    }
+    for old in &kept {
+        assert!(
+            !replacements.contains_key(old),
+            "signature {old} is both re-signed and kept invalid"
+        );
     }
 
     let mut text = raw;
     for (old, new) in &replacements {
-        assert_eq!(
-            text.matches(old.as_str()).count(),
-            1,
-            "stored signature {old} is not unique; cannot re-bless in place"
-        );
         text = text.replace(old.as_str(), new.as_str());
     }
     fs::write(&path, text).test_unwrap("write capability fixture");
-    eprintln!(
-        "re-signed {} capability vector signatures",
-        replacements.len()
-    );
 }
 
 #[test]
@@ -1215,45 +1259,11 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         .as_str()
         .test_unwrap("signing_key_seed_hex");
 
-    for case in fixture["utf8_cases"]
-        .as_array()
-        .test_unwrap("utf8_cases array")
-    {
-        let input = case["input_utf8"].as_str().test_unwrap("input_utf8");
-        let public_key_hex = case["public_key_hex"]
-            .as_str()
-            .test_unwrap("public_key_hex");
-        let signature_hex = case["signature_hex"].as_str().test_unwrap("signature_hex");
-        let expected_verify = case["expected_verify"]
-            .as_bool()
-            .test_unwrap("expected_verify");
-        let seed_hex = case["signing_key_seed_hex"]
-            .as_str()
-            .unwrap_or(global_seed_hex);
-
-        if expected_verify {
-            let signed = sign_utf8_message_ed25519(input, seed_hex).test_unwrap("sign utf8 case");
-            assert_eq!(
-                signed.public_key_hex, public_key_hex,
-                "utf8 sign {}",
-                case["id"]
-            );
-            assert_eq!(
-                signed.signature_hex, signature_hex,
-                "utf8 sign {}",
-                case["id"]
-            );
-        }
-
-        let actual = verify_utf8_message_ed25519(input, public_key_hex, signature_hex)
-            .test_unwrap("verify utf8 case");
-        assert_eq!(actual, expected_verify, "utf8 verify {}", case["id"]);
-    }
-
     for case in fixture["json_cases"]
         .as_array()
         .test_unwrap("json_cases array")
     {
+        let schema_id = case["schema_id"].as_str().test_unwrap("schema_id");
         let input = case["input_json"].as_str().test_unwrap("input_json");
         let canonical_json = case["canonical_json"]
             .as_str()
@@ -1277,7 +1287,8 @@ fn signing_fixture_cases_round_trip_through_public_api() {
         );
 
         if expected_verify {
-            let signed = sign_json_str_ed25519(input, seed_hex).test_unwrap("sign json case");
+            let signed =
+                sign_wrapped_json_ed25519(schema_id, input, seed_hex).test_unwrap("sign json case");
             assert_eq!(
                 signed.canonical_json, canonical_json,
                 "json sign {}",
@@ -1295,9 +1306,25 @@ fn signing_fixture_cases_round_trip_through_public_api() {
             );
         }
 
-        let actual = verify_json_str_signature_ed25519(input, public_key_hex, signature_hex)
-            .test_unwrap("verify json case");
-        assert_eq!(actual, expected_verify, "json verify {}", case["id"]);
+        let actual = verify_wrapped_json(schema_id, input, public_key_hex, signature_hex);
+        assert_eq!(
+            actual.is_ok(),
+            expected_verify,
+            "json verify {}",
+            case["id"]
+        );
+        if !expected_verify {
+            assert!(
+                matches!(
+                    actual,
+                    Err(chio_binding_helpers::Error::Core(
+                        chio_core::Error::SignatureRejected
+                    ))
+                ),
+                "json verify refusal {}",
+                case["id"]
+            );
+        }
     }
 }
 
@@ -1375,8 +1402,12 @@ fn old_manifest_shape_under_the_current_id_is_refused_structurally() {
         serde_json::to_value(&sample_signed_manifest(public_key.clone(), &["file_read"]).tools[0])
             .test_unwrap("current tool definition");
     let signed = |manifest: Value| {
-        let (signature, _) = server
-            .sign_canonical(&manifest)
+        let signature = server
+            .sign_wrapped(
+                chio_core::signed_artifact::CHIO_TOOL_MANIFEST_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(&manifest)
+                    .test_unwrap("canonical old-shape manifest"),
+            )
             .test_unwrap("sign old-shape manifest");
         json!({
             "manifest": manifest,

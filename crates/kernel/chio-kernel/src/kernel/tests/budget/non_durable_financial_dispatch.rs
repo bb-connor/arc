@@ -48,7 +48,7 @@ fn non_durable_monetary_kernel_denies_before_ambiguous_dispatch() {
     );
 
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     let usage = kernel
         .budget_store
         .get_usage(&response.receipt.capability_id, 0)
@@ -181,7 +181,7 @@ fn non_durable_tool_keeps_its_signed_receipt_when_the_post_dispatch_clock_sample
             unavailable.load(Ordering::SeqCst),
             "ordinary values need no post-dispatch clock read"
         );
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         let financial = response
             .receipt
             .metadata
@@ -242,7 +242,7 @@ fn non_durable_stream_refuses_an_unmeasured_duration_after_dispatch(
             "streams must measure duration"
         );
         assert!(response.output.is_none());
-        assert!(response.receipt.verify_signature()?);
+        assert!(response.receipt.verify_integrity_embedded_key()?);
         assert!(response
             .reason
             .as_deref()

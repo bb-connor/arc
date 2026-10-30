@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/finding-finalized-bond-snapshot-body.schema.json",
+  "title": "chio.finding.finalized-bond-snapshot.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocation_id",
+    "block_hash",
+    "block_number",
+    "chain_id",
+    "currency",
+    "finality_policy",
+    "held_amount",
+    "identity_registry_record",
+    "locked_amount",
+    "observed_at",
+    "observed_finality",
+    "operator_key_epoch",
+    "operator_key_hash",
+    "schema",
+    "seller",
+    "slashed_amount",
+    "snapshot_id",
+    "vault_contract",
+    "vault_id"
+  ],
+  "properties": {
+    "allocation_id": {
+      "type": "string"
+    },
+    "block_hash": {
+      "type": "string"
+    },
+    "block_number": {
+      "type": "integer"
+    },
+    "chain_id": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "finality_policy": {
+      "type": "string"
+    },
+    "held_amount": {
+      "type": "integer"
+    },
+    "identity_registry_record": {
+      "type": "string"
+    },
+    "locked_amount": {
+      "type": "integer"
+    },
+    "observed_at": {
+      "type": "integer"
+    },
+    "observed_finality": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "confirmations"
+          ],
+          "properties": {
+            "confirmations": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "depth"
+              ],
+              "properties": {
+                "depth": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "operator_key_epoch": {
+      "type": "integer"
+    },
+    "operator_key_hash": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.finalized-bond-snapshot.v1"
+    },
+    "seller": {
+      "type": "string"
+    },
+    "slashed_amount": {
+      "type": "integer"
+    },
+    "snapshot_id": {
+      "type": "string"
+    },
+    "vault_contract": {
+      "type": "string"
+    },
+    "vault_id": {
+      "type": "string"
+    }
+  }
+}

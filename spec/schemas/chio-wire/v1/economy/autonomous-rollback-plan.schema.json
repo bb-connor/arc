@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/economy/autonomous-rollback-plan.schema.json",
+  "title": "Chio autonomous rollback plan signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actions",
+    "issued_at",
+    "note",
+    "plan_id",
+    "requires_operator_ack",
+    "safe_state",
+    "schema",
+    "subject_key",
+    "triggers"
+  ],
+  "properties": {
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "note": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "requires_operator_ack": {
+      "type": "boolean"
+    },
+    "safe_state": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.autonomous-rollback-plan.v1"
+    },
+    "subject_key": {
+      "type": "string"
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

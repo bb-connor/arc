@@ -158,7 +158,7 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
         .as_deref()
         .is_some_and(|reason| reason.contains("issuer lifecycle denied")));
     assert_eq!(effects.load(Ordering::SeqCst), 2);
-    assert!(allowed.receipt.verify_signature()?);
+    assert!(allowed.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         kernel
             .evaluate_tool_call_blocking(&request(&b, "new-head"))?
@@ -214,6 +214,6 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
         .as_deref()
         .is_some_and(|reason| reason.contains("trusted clock unavailable")));
     assert_eq!(effects.load(Ordering::SeqCst), 4);
-    assert!(allowed.receipt.verify_signature()?);
+    assert!(allowed.receipt.verify_integrity_embedded_key()?);
     Ok(())
 }

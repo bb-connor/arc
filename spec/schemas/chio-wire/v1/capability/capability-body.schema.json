@@ -1,0 +1,659 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/capability-body.schema.json",
+  "title": "chio.capability.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "aggregate_invocation_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_invocations",
+        "root_binding",
+        "scope"
+      ],
+      "properties": {
+        "max_invocations": {
+          "type": "integer"
+        },
+        "root_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "body",
+            "signature"
+          ],
+          "properties": {
+            "body": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "max_invocations",
+                "root_capability_hash",
+                "root_capability_id",
+                "root_expires_at",
+                "root_issuer",
+                "root_scope_hash",
+                "root_subject",
+                "schema"
+              ],
+              "properties": {
+                "max_invocations": {
+                  "type": "integer"
+                },
+                "root_capability_hash": {
+                  "type": "string"
+                },
+                "root_capability_id": {
+                  "type": "string"
+                },
+                "root_expires_at": {
+                  "type": "integer"
+                },
+                "root_issuer": {
+                  "type": "string"
+                },
+                "root_scope_hash": {
+                  "type": "string"
+                },
+                "root_subject": {
+                  "type": "string"
+                },
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "signature": {
+              "type": "string"
+            }
+          }
+        },
+        "scope": {
+          "type": "string"
+        }
+      }
+    },
+    "attenuation_proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "childScopeHash",
+        "normalizedSubsetProof",
+        "parentScopeHash"
+      ],
+      "properties": {
+        "childScopeHash": {
+          "type": "string"
+        },
+        "normalizedSubsetProof": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "normalizedChildScope",
+            "normalizedParentScope",
+            "restrictedPredicates",
+            "subsetRelations"
+          ],
+          "properties": {
+            "cumulativeApproval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bindings"
+              ],
+              "properties": {
+                "bindings": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "approval_budget_epoch",
+                      "approval_budget_id",
+                      "currency",
+                      "root_binding_digest"
+                    ],
+                    "properties": {
+                      "approval_budget_epoch": {
+                        "type": "integer"
+                      },
+                      "approval_budget_id": {
+                        "type": "string"
+                      },
+                      "currency": {
+                        "type": "string"
+                      },
+                      "root_binding_digest": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "normalizedChildScope": {
+              "type": "string"
+            },
+            "normalizedParentScope": {
+              "type": "string"
+            },
+            "restrictedPredicates": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "subsetRelations": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "childIndex",
+                  "grantKind",
+                  "parentIndex",
+                  "subset"
+                ],
+                "properties": {
+                  "childIndex": {
+                    "type": "integer"
+                  },
+                  "grantKind": {
+                    "type": "string"
+                  },
+                  "parentIndex": {
+                    "type": "integer"
+                  },
+                  "subset": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parentScopeHash": {
+          "type": "string"
+        }
+      }
+    },
+    "budget_share_bps": {
+      "type": "integer"
+    },
+    "delegation_chain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "capability_id",
+          "delegatee",
+          "delegator",
+          "signature",
+          "timestamp"
+        ],
+        "properties": {
+          "aggregate_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_invocations",
+              "root_binding_digest"
+            ],
+            "properties": {
+              "max_invocations": {
+                "type": "integer"
+              },
+              "root_binding_digest": {
+                "type": "string"
+              }
+            }
+          },
+          "attenuations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "server_id",
+                "tool_name",
+                "type"
+              ],
+              "properties": {
+                "constraint": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type",
+                    "value"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "max_invocations": {
+                  "type": "integer"
+                },
+                "server_id": {
+                  "type": "string"
+                },
+                "tool_name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "capability_id": {
+            "type": "string"
+          },
+          "cumulative_approval": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bindings"
+            ],
+            "properties": {
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "approval_budget_epoch",
+                    "approval_budget_id",
+                    "currency",
+                    "root_binding_digest"
+                  ],
+                  "properties": {
+                    "approval_budget_epoch": {
+                      "type": "integer"
+                    },
+                    "approval_budget_id": {
+                      "type": "string"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "root_binding_digest": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "delegatee": {
+            "type": "string"
+          },
+          "delegator": {
+            "type": "string"
+          },
+          "scope_hash": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "expires_at": {
+      "type": "integer"
+    },
+    "fixture": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issued_at": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "n": {
+      "type": "integer"
+    },
+    "schema": {
+      "const": "chio.capability.v1"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operations",
+              "server_id",
+              "tool_name"
+            ],
+            "properties": {
+              "constraints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "type"
+                  ],
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "integer"
+                        },
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "allowed_model_ids": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "approval_budget_epoch": {
+                              "type": "integer"
+                            },
+                            "approval_budget_id": {
+                              "type": "string"
+                            },
+                            "cumulative_approval_root_binding": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "body",
+                                "signature"
+                              ],
+                              "properties": {
+                                "body": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "approval_budget_epoch",
+                                    "approval_budget_id",
+                                    "root_capability_hash",
+                                    "root_capability_id",
+                                    "root_expires_at",
+                                    "root_grant_hash",
+                                    "root_issuer",
+                                    "root_scope_hash",
+                                    "root_subject",
+                                    "schema",
+                                    "signer_key_epoch",
+                                    "threshold"
+                                  ],
+                                  "properties": {
+                                    "approval_budget_epoch": {
+                                      "type": "integer"
+                                    },
+                                    "approval_budget_id": {
+                                      "type": "string"
+                                    },
+                                    "root_capability_hash": {
+                                      "type": "string"
+                                    },
+                                    "root_capability_id": {
+                                      "type": "string"
+                                    },
+                                    "root_expires_at": {
+                                      "type": "integer"
+                                    },
+                                    "root_grant_hash": {
+                                      "type": "string"
+                                    },
+                                    "root_issuer": {
+                                      "type": "string"
+                                    },
+                                    "root_scope_hash": {
+                                      "type": "string"
+                                    },
+                                    "root_subject": {
+                                      "type": "string"
+                                    },
+                                    "schema": {
+                                      "type": "string"
+                                    },
+                                    "signer_key_epoch": {
+                                      "type": "integer"
+                                    },
+                                    "threshold": {
+                                      "type": "object",
+                                      "additionalProperties": false,
+                                      "required": [
+                                        "currency",
+                                        "units"
+                                      ],
+                                      "properties": {
+                                        "currency": {
+                                          "type": "string"
+                                        },
+                                        "units": {
+                                          "type": "integer"
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "signature": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "finding_id": {
+                              "type": "string"
+                            },
+                            "listing_id": {
+                              "type": "string"
+                            },
+                            "max_recoveries": {
+                              "type": "integer"
+                            },
+                            "min_safety_tier": {
+                              "type": "string"
+                            },
+                            "original_capability_id": {
+                              "type": "string"
+                            },
+                            "original_delivery_receipt_id": {
+                              "type": "string"
+                            },
+                            "purchase_key": {
+                              "type": "string"
+                            },
+                            "recovery_id": {
+                              "type": "string"
+                            },
+                            "settlement": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "mode"
+                              ],
+                              "properties": {
+                                "mode": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "threshold": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "currency",
+                                "units"
+                              ],
+                              "properties": {
+                                "currency": {
+                                  "type": "string"
+                                },
+                                "units": {
+                                  "type": "integer"
+                                }
+                              }
+                            },
+                            "threshold_units": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              "dpop_required": {
+                "type": "boolean"
+              },
+              "max_cost_per_invocation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "max_invocations": {
+                "type": "integer"
+              },
+              "max_total_cost": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "units"
+                ],
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "units": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "server_id": {
+                "type": "string"
+              },
+              "tool_name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "prompt_grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operations",
+              "prompt_name"
+            ],
+            "properties": {
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "prompt_name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "resource_grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operations",
+              "uri_pattern"
+            ],
+            "properties": {
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "uri_pattern": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "scope_attenuations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "server_id",
+          "tool_name",
+          "type"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string"
+          },
+          "server_id": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "subject": {
+      "type": "string"
+    }
+  }
+}

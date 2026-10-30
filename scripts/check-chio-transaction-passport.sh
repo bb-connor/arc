@@ -49,9 +49,12 @@ if len(rows) != 1:
 if not (root / schema_file).is_file():
     raise SystemExit(f"transaction-passport schema file is missing: {schema_file}")
 
-signed_artifact = (
-    root / "crates/core/chio-core-types/src/signed_artifact.rs"
-).read_text(encoding="utf-8")
+signed_artifact_root = root / "crates/core/chio-core-types/src"
+signed_artifact = "".join(
+    (signed_artifact_root / relative).read_text(encoding="utf-8")
+    for relative in ("signed_artifact.rs", "signed_artifact/schema_specs.rs")
+    if (signed_artifact_root / relative).is_file()
+)
 if 'CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1"' not in signed_artifact:
     raise SystemExit("transaction-passport schema is not named by chio-core-types")
 if '"transaction_passport", "transaction-passport-v1"' not in signed_artifact:

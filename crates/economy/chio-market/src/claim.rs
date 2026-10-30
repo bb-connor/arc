@@ -517,3 +517,19 @@ impl LiabilityClaimAdjudicationArtifact {
 /// Signed claim adjudication envelope.
 pub type SignedLiabilityClaimAdjudication =
     SignedExportEnvelope<LiabilityClaimAdjudicationArtifact>;
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimAdjudicationArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimDisputeArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimPackageArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA;
+}
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for LiabilityClaimResponseArtifact {
+    const SCHEMA_ID: &'static str = crate::LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA;
+}

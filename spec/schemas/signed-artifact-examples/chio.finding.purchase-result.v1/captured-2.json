@@ -1,0 +1,24 @@
+{
+  "accepted_price": {
+    "currency": "USD",
+    "units": 10
+  },
+  "authoritative_payment_operation_id": "payment-a",
+  "delivery_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "finding_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "payer": "43046bfe4092b3e94994eada15dcc20d8aaa07b658fd3954eb8e0efb8bdca5de",
+  "purchase_intent_id": "purchase-intent-a",
+  "purchase_record_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "realized_spend": {
+    "currency": "USD",
+    "units": 10
+  },
+  "recorded_at": 21,
+  "request_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "reservation_id": "reservation-a",
+  "result_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "schema": "chio.finding.purchase-result.v1",
+  "settlement": "captured",
+  "verdict": "allow"
+}

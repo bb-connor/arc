@@ -17,6 +17,7 @@ pub const CHIO_RUNTIME_PHEROMONE_POLICY_SCHEMA: &str = "chio.runtime.pheromone-p
 pub const CHIO_RUNTIME_PHEROMONE_POLICY_DECISION_SCHEMA: &str =
     "chio.runtime.pheromone-policy-decision.v1";
 pub const CHIO_RUNTIME_PEER_WEIGHTS_SCHEMA: &str = "chio.runtime.peer-weights.v1";
+pub const CHIO_PHEROMONE_QUERY_REPORT_SCHEMA: &str = "chio.pheromone.query-report.v1";
 
 pub const CHIO_RUNTIME_ORCHESTRATION_PLAN_SCHEMA: &str = "chio.runtime.orchestration-plan.v1";
 pub const CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA: &str = "chio.runtime.orchestration-profile.v1";

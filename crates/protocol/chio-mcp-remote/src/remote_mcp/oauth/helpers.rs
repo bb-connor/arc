@@ -33,7 +33,7 @@ pub(super) fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> Result<
         encode(&json!({"alg": "EdDSA", "typ": "JWT", "kid": jwk_key_id(&keypair.public_key())}))?;
     let payload = encode(claims)?;
     let signing_input = format!("{header}.{payload}");
-    let signature = URL_SAFE_NO_PAD.encode(keypair.sign(signing_input.as_bytes()).to_bytes());
+    let signature = URL_SAFE_NO_PAD.encode(keypair.sign_exempt(chio_core::crypto::ExemptFormat::JwsSigningInput, signing_input.as_bytes()).to_bytes());
     Ok(format!("{signing_input}.{signature}"))
 }
 

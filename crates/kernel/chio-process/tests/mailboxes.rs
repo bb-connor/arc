@@ -215,7 +215,7 @@ async fn committed_renewal_with_unknown_kernel_outcome_is_not_redispatched() -> 
     let runtime = ProcessRuntime::open(directory.path().join("process.db"), kernel)?;
     let replay = Box::pin(invoke(&runtime, "root", "renew", "renew_jobs", renewal)).await?;
     assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         serde_json::to_value(&replay.receipt)?["metadata"]["admission_operation"]
             ["projected_state"],
@@ -410,7 +410,7 @@ async fn renewal_requires_its_grant_and_replays_the_original_deadline_after_rest
             ))
             .await?;
             assert_eq!(refused.verdict, Verdict::Deny);
-            assert!(refused.receipt.verify_signature()?);
+            assert!(refused.receipt.verify_integrity_embedded_key()?);
         }
         let renewed = Box::pin(invoke(
             &runtime,
@@ -473,7 +473,7 @@ async fn renewal_requires_its_grant_and_replays_the_original_deadline_after_rest
 
 fn value(response: &ToolCallResponse) -> Result<Value> {
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     match response.output.clone() {
         Some(ToolCallOutput::Value(value)) => Ok(value),
         _ => Err("missing mailbox value".into()),

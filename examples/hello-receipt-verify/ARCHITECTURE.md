@@ -5,7 +5,7 @@
 This example owns the minimal offline evidence-verification path. It does not
 start trust-control, issue capabilities, run an app, or mint fresh receipts.
 Its checked-in `fixtures/minimal-evidence/` directory is the product surface:
-a captured evidence export with one tool receipt, one capability-lineage
+a generated evidence export with one tool receipt, one capability-lineage
 record, no checkpoints, an explicit `admin_all` read boundary, and an
 `export-envelope.json` signed by the committed example seed
 `fixtures/kernel.seed`. `verifier-trust.json` pins that seed's public key.
@@ -21,8 +21,8 @@ inspection.
 
 - Preserve this as an offline-only verifier example. Do not add live
   trust-control, app, sidecar, or receipt-minting steps.
-- Preserve the checked-in fixture's explicit `admin_all` read boundary as a
-  captured operator export. The example verifies that boundary; it does not
+- Preserve the checked-in fixture's explicit `admin_all` read boundary as an
+  operator export. The example verifies that boundary; it does not
   teach implicit cross-tenant reads.
 - Preserve manifest-backed tamper detection: changing any covered file must
   make `chio evidence verify` fail.

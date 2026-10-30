@@ -13,7 +13,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::Request;
 use axum::middleware::{from_fn_with_state, Next};
 use axum::response::{IntoResponse, Response};
-use chio_core::{receipt::body::ChioReceipt, SigningAlgorithm};
+use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::tool_outcome::{ToolOutcomeStore, ToolOutcomeStoreError};
 use chio_kernel::{KernelError, ReceiptStoreError, Verdict};
 use rusqlite::{Connection, OpenFlags};
@@ -65,7 +65,13 @@ async fn fault_reply(
             .ok_or_else(|| std::io::Error::other("missing receipt result"))?;
         let mut receipt: ChioReceipt = serde_json::from_value(result.value.clone())?;
         if mode == 2 {
-            receipt.algorithm = Some(SigningAlgorithm::Hybrid);
+            let mut value = serde_json::to_value(&receipt)?;
+            value
+                .as_object_mut()
+                .ok_or_else(|| std::io::Error::other("receipt is not an object"))?
+                .insert("algorithm".to_owned(), serde_json::json!("hybrid"));
+            result.value = value;
+            return Ok::<_, Box<dyn Error>>(envelope);
         } else if mode == 6 {
             let other = chio_core::Keypair::generate();
             let mut foreign_body = receipt.body();
@@ -286,6 +292,16 @@ fn replay_fault(mode: u8, expected_code: &str, native: bool) -> TestResult {
             KernelError::ReceiptPersistence(ReceiptStoreError::Fenced)
         ));
     }
+    if mode == 2 {
+        assert!(
+            matches!(
+                &error,
+                KernelError::ReceiptPersistence(ReceiptStoreError::ReadBoundary(reason))
+                    if reason.starts_with("unknown field `algorithm`")
+            ),
+            "a receipt carrying an algorithm member must fail decoding: {error:?}"
+        );
+    }
     if mode == 3 || mode == 7 {
         let mut source = error.source();
         let mut found = false;
@@ -347,8 +363,8 @@ fn compacted_payload_rpc_receipt_fence_preserves_native_store_cause() -> TestRes
     replay_fault(1, "CHIO-KERNEL-RECEIPT-PERSISTENCE", true)
 }
 #[test]
-fn compacted_payload_rpc_receipt_algorithm_preserves_native_verification_cause() -> TestResult {
-    replay_fault(2, "urn:chio:error:attest:receipt-verification-failed", true)
+fn compacted_payload_rpc_receipt_algorithm_member_is_refused_at_the_read_boundary() -> TestResult {
+    replay_fault(2, "CHIO-KERNEL-RECEIPT-PERSISTENCE", false)
 }
 
 #[test]

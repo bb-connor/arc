@@ -143,3 +143,73 @@ fn generated_bindings_accept_exactly_the_pinned_schema_only_rejections() {
         "generated bindings must accept exactly SCHEMA_ONLY_REJECTIONS"
     );
 }
+
+/// Signed valid examples: example stem, JSON pointer of the signed object,
+/// member holding its signer key, and the wrapper id that signs it.
+const PLACEHOLDER_SIGNED_EXAMPLES: &[(&str, &str, &str, &str)] = &[
+    ("root-policy", "", "policy_key", "chio.root-policy.v1"),
+    (
+        "idp-key-snapshot",
+        "",
+        "exchange_key",
+        "chio.idp-key-snapshot.v1",
+    ),
+    (
+        "revocation-request",
+        "",
+        "revoker_key",
+        "chio.revocation-request.v1",
+    ),
+    (
+        "settlement-closure",
+        "",
+        "kernel_key",
+        "chio.settlement-closure.v1",
+    ),
+    ("presentation", "/leaf", "issuer", "chio.capability.v1"),
+];
+
+/// The examples carry placeholder signatures. A verifier holding the signer
+/// key the example names refuses each one under its wrapper id.
+#[test]
+fn placeholder_example_signatures_are_refused() {
+    let mut refused = 0;
+    for path in examples("valid") {
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("example file name");
+        let stem = name.split('.').next().expect("example stem");
+        let Some((_, pointer, signer, schema_id)) = PLACEHOLDER_SIGNED_EXAMPLES
+            .iter()
+            .find(|(candidate, ..)| *candidate == stem)
+        else {
+            continue;
+        };
+        let document: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).expect("example bytes"))
+                .expect("example parses");
+        let mut signed = document
+            .pointer(pointer)
+            .expect("signed object")
+            .as_object()
+            .expect("signed object is an object")
+            .clone();
+        let signature = signed
+            .remove("signature")
+            .and_then(|value| value.as_str().map(str::to_owned))
+            .unwrap_or_else(|| panic!("{name} carries a signature"));
+        let key = chio_core_types::PublicKey::from_hex(
+            signed[*signer].as_str().expect("signer key member"),
+        )
+        .expect("signer key decodes");
+        let signature =
+            chio_core_types::Signature::from_hex(&signature).expect("signature decodes");
+        assert!(
+            chio_core_types::verify_wrapped(&key, schema_id, &signed, &signature).is_err(),
+            "{name} placeholder signature verifies under {schema_id}"
+        );
+        refused += 1;
+    }
+    assert_eq!(refused, 7);
+}

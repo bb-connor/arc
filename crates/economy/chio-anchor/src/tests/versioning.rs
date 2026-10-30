@@ -19,7 +19,14 @@ fn sample_primary_proof_with_chain_anchor() -> AnchorInclusionProof {
         nonce: "anchored-bundle-binding".to_string(),
     };
     let binding = chio_core::web3::identity::SignedWeb3IdentityBinding {
-        signature: checkpoint_key.sign_canonical(&certificate).test_unwrap().0,
+        signature: chio_core::canonical::CanonicalBytes::from_serializable(&certificate)
+            .and_then(|canonical| {
+                checkpoint_key.sign_wrapped(
+                    chio_core::web3::identity::CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
+                    &canonical,
+                )
+            })
+            .test_unwrap(),
         certificate,
     };
     let receipt_bytes = chio_core::canonical_json_bytes(&receipt.body()).test_unwrap();

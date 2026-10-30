@@ -260,7 +260,12 @@ pub(super) fn provision(
         binding,
         routes,
     };
-    let (signature, _) = issuer.sign_canonical(&body).map_err(error)?;
+    let signature = issuer
+        .sign_wrapped(
+            SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body).map_err(error)?,
+        )
+        .map_err(error)?;
     let (bundle_name, bundle_bytes) =
         if let [bundle] = bundles.as_slice() {
             (
@@ -296,10 +301,13 @@ pub(super) fn provision(
 fn load(directory: &Path, issuer: &Keypair) -> Result<SignedProfile, CliError> {
     let signed: SignedProfile = read_json(&directory.join(PROFILE))?;
     if signed.body.schema != SCHEMA
-        || !issuer
-            .public_key()
-            .verify_canonical(&signed.body, &signed.signature)
-            .map_err(error)?
+        || chio_core::crypto::verify_wrapped(
+            &issuer.public_key(),
+            SCHEMA,
+            &signed.body,
+            &signed.signature,
+        )
+        .is_err()
     {
         return Err(error("invalid process swarm profile signature or schema"));
     }
@@ -492,6 +500,48 @@ mod plan_tests {
             "graphs": [graph("first", &children), graph("second", &["alice", "bob"])],
         }))
         .is_err());
+    }
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+
+    #[test]
+    fn signed_artifact_capture_process_swarm_profile() -> Result<(), Box<dyn std::error::Error>> {
+        let issuer = Keypair::from_seed(&[7; 32]);
+        let body = ProfileBody {
+            schema: SCHEMA.into(),
+            runtime_id: "runtime-1".into(),
+            record_sha256: sha256_hex(b"record"),
+            admission: RuntimeAdmissionProfile {
+                schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.into(),
+                profile_id: "process-capture".into(),
+                local_kernel_id: format!("kernel:{}", issuer.public_key().to_hex()),
+                verifier_id: format!("did:chio:{}", issuer.public_key().to_hex()),
+                issued_at_unix_ms: 1_743_379_200_000,
+                expires_at_unix_ms: 1_743_379_260_000,
+            },
+            binding: RuntimeParticipantAuthorityBindingV1::new(
+                AdmissionIdentifier::try_new("runtime_id", "runtime-1".to_owned())?,
+                AdmissionIdentifier::try_new("expectation_id", "expectation-1".to_owned())?,
+            ),
+            routes: BTreeMap::from([(
+                "alice".to_owned(),
+                Route {
+                    bridge: "chio-ipc".into(),
+                    protocol_target: "send_jobs".into(),
+                    selected_route: "chio-ipc/send_jobs".into(),
+                    manifest_sha256: sha256_hex(b"manifest"),
+                },
+            )]),
+        };
+        let signature = issuer.sign_wrapped(
+            SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body)?,
+        )?;
+        chio_core::crypto::verify_wrapped(&issuer.public_key(), SCHEMA, &body, &signature)?;
+        Ok(())
     }
 }
 

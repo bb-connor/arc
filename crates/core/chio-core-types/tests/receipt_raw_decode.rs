@@ -128,7 +128,7 @@ fn raw_duplicate_keys_refused_by_decode_signed() -> TestResult {
 fn decode_signed_keeps_native_numeric_domain() -> TestResult {
     let receipt = signed_receipt(json!({"count": 9_007_199_254_740_993_u64, "ratio": 100.0}))?;
     let decoded: ChioReceipt = UntrustedJsonText::new(&receipt).decode_signed()?;
-    assert!(decoded.verify_signature()?);
+    assert!(decoded.verify_integrity_embedded_key()?);
     assert_eq!(String::from_utf8(canonical_json_bytes(&decoded)?)?, receipt);
     Ok(())
 }

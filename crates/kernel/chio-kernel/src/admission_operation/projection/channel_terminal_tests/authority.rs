@@ -66,7 +66,7 @@ impl QualifiedChannelTerminalAuthority for InjectedChannelTerminalAuthority {
         }
         let verified = request
             .envelope()
-            .verify()
+            .verify_integrity_embedded_key()
             .map_err(|_| ChannelTerminalAuthorityError::BindingMismatch)?;
         let operation = verified.terminal_operation();
         let replay = operation

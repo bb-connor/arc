@@ -182,7 +182,7 @@ fn exercise_delivery(
     assert!(
         matches!(&completed.output, Some(chio_kernel::ToolCallOutput::Value(value)) if value == &report.report.output)
     );
-    assert!(completed.receipt.verify_signature()?);
+    assert!(completed.receipt.verify_integrity_embedded_key()?);
     assert!(completed.execution_nonce.is_none());
     assert_eq!(
         fixture

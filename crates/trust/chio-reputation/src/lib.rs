@@ -64,7 +64,7 @@ fn receipt_integrity_valid(receipt: &ChioReceipt, config: &ReputationConfig) -> 
     {
         return false;
     }
-    if !receipt.verify_signature().unwrap_or(false) {
+    if !receipt.verify_integrity_embedded_key().unwrap_or(false) {
         return false;
     }
     if !receipt.action.verify_hash().unwrap_or(false) {

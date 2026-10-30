@@ -110,7 +110,9 @@ fn raw_attestation_export_without_policy_is_only_observation() {
     )
     .test_expect("signed observation");
     assert_eq!(report.signer_key, authority.public_key());
-    assert!(report.verify_signature().test_expect("export signature"));
+    assert!(report
+        .verify_signature(&authority.public_key())
+        .test_expect("export signature"));
     assert!(!report.body.policy_outcome.trust_policy_configured);
     assert_report_is_observation(&report.body);
 }
@@ -119,7 +121,8 @@ fn raw_attestation_export_without_policy_is_only_observation() {
 fn raw_attestation_export_matching_policy_is_only_observation() {
     let directory = chio_test_support::private_tempdir().test_expect("private export fixture");
     let seed = directory.path().join("authority.seed");
-    crate::load_or_create_authority_keypair(&seed).test_expect("owner provisions local authority");
+    let authority = crate::load_or_create_authority_keypair(&seed)
+        .test_expect("owner provisions local authority");
     let evidence = unsigned_evidence();
     let policy = matching_policy();
     let resolved = evidence
@@ -136,7 +139,9 @@ fn raw_attestation_export_matching_policy_is_only_observation() {
         &evidence,
     )
     .test_expect("signed observation");
-    assert!(report.verify_signature().test_expect("export signature"));
+    assert!(report
+        .verify_signature(&authority.public_key())
+        .test_expect("export signature"));
     assert!(report.body.policy_outcome.trust_policy_configured);
     assert_report_is_observation(&report.body);
 }
@@ -161,7 +166,7 @@ fn raw_attestation_export_import_cannot_restore_authority() {
         .test_expect("signed observation result");
         assert_eq!(signed_result.signer_key, authority.public_key());
         assert!(signed_result
-            .verify_signature()
+            .verify_signature(&authority.public_key())
             .test_expect("result signature"));
         let imported = build_runtime_attestation_appraisal_import_report(
             &RuntimeAttestationAppraisalImportRequest {

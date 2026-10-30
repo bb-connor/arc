@@ -1,8 +1,7 @@
-use chio_core_types::{
-    canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningBackend};
 use serde::{Deserialize, Serialize};
 
+use crate::signing::{sign_wrapped_value, verify_wrapped_value};
 use crate::{
     derive_key_id, EventId, KeyId, KeyLogPolicy, KeyringError, LogId, RecoveryAuthorizerId, Result,
     SignedKeyActivationCommit, SignedKeyLogCheckpoint, SignedKeyLogEvent, WitnessRosterId,
@@ -10,7 +9,6 @@ use crate::{
 };
 
 pub const KEY_ENTERPRISE_RECEIPT_SCHEMA: &str = "chio.key-log.enterprise-receipt.v1";
-const RECEIPT_SIGNATURE_DOMAIN: &[u8] = b"chio.key-log.enterprise-receipt-signature.v1\0";
 const TRANSACTION_ID_DOMAIN: &[u8] = b"chio.key-log.enterprise-transaction-id.v1\0";
 const RECEIPT_ID_DOMAIN: &[u8] = b"chio.key-log.enterprise-receipt-id.v1\0";
 const ACTIVATION_HASH_DOMAIN: &[u8] = b"chio.key-log.activation-envelope.v1\0";
@@ -148,7 +146,6 @@ impl KeyEnterpriseReceiptBody {
 pub struct SignedKeyEnterpriseReceipt {
     pub body: KeyEnterpriseReceiptBody,
     pub operator_key_id: KeyId,
-    pub operator_algorithm: SigningAlgorithm,
     pub operator_signature: Signature,
 }
 
@@ -175,13 +172,14 @@ impl SignedKeyEnterpriseReceipt {
     pub fn verify_operator(&self, operator_key: &PublicKey) -> Result<()> {
         self.body.validate()?;
         if self.operator_key_id != self.body.operator_key_id
-            || operator_key.algorithm() != self.operator_algorithm
-            || self.operator_signature.algorithm() != self.operator_algorithm
             || derive_key_id(operator_key.algorithm(), operator_key)? != self.operator_key_id
-            || !operator_key.verify_strict(
-                &domain_canonical_bytes(RECEIPT_SIGNATURE_DOMAIN, &self.body)?,
+            || verify_wrapped_value(
+                operator_key,
+                KEY_ENTERPRISE_RECEIPT_SCHEMA,
+                &self.body,
                 &self.operator_signature,
             )
+            .is_err()
         {
             return Err(KeyringError::InvalidSignature);
         }
@@ -343,22 +341,15 @@ impl SignedKeyEnterpriseReceipt {
 
     fn sign(body: KeyEnterpriseReceiptBody, operator: &dyn SigningBackend) -> Result<Self> {
         body.validate()?;
-        let outcome = operator
-            .sign_bytes_with_identity(&domain_canonical_bytes(RECEIPT_SIGNATURE_DOMAIN, &body)?)?;
-        let operator_algorithm = outcome.algorithm;
-        let operator_key_id = derive_key_id(operator_algorithm, &outcome.public_key)?;
+        let outcome = sign_wrapped_value(operator, KEY_ENTERPRISE_RECEIPT_SCHEMA, &body)?;
+        let operator_key_id = derive_key_id(outcome.public_key.algorithm(), &outcome.public_key)?;
         if operator_key_id != body.operator_key_id {
-            return Err(KeyringError::AlgorithmMismatch);
-        }
-        let operator_signature = outcome.signature;
-        if operator_signature.algorithm() != operator_algorithm {
             return Err(KeyringError::AlgorithmMismatch);
         }
         Ok(Self {
             body,
             operator_key_id,
-            operator_algorithm,
-            operator_signature,
+            operator_signature: outcome.signature,
         })
     }
 }
@@ -450,18 +441,6 @@ fn validate_source_receipt_ids(ids: &[String]) -> Result<()> {
         validate_receipt_identifier(id, "source key receipt identifier")?;
     }
     Ok(())
-}
-
-fn domain_canonical_bytes<T: Serialize>(domain: &[u8], value: &T) -> Result<Vec<u8>> {
-    let canonical = canonical_json_bytes(value)?;
-    let capacity = domain
-        .len()
-        .checked_add(canonical.len())
-        .ok_or(KeyringError::NumericRange)?;
-    let mut bytes = Vec::with_capacity(capacity);
-    bytes.extend_from_slice(domain);
-    bytes.extend_from_slice(&canonical);
-    Ok(bytes)
 }
 
 fn domain_hash(domain: &[u8], bytes: &[u8]) -> Result<Hash> {

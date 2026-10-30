@@ -1,0 +1,45 @@
+{
+  "authority_chain_refs": [
+    "underwriting-committee-approval",
+    "operator-treasury-approval"
+  ],
+  "automation_mode": "active",
+  "currency": "USD",
+  "delegated_authority_reference": "lpa-1",
+  "envelope_id": "ape-1",
+  "issued_at": 1743379200,
+  "kind": "delegated_market_authority",
+  "max_coverage_amount": {
+    "currency": "USD",
+    "units": 150000
+  },
+  "max_daily_decisions": 20,
+  "max_premium_amount": {
+    "currency": "USD",
+    "units": 6000
+  },
+  "max_rate_change_bps": 750,
+  "not_after": 1743465600,
+  "not_before": 1743379200,
+  "note": "Binds automation to one delegated pricing authority envelope.",
+  "permitted_actions": [
+    "reprice",
+    "renew",
+    "decline",
+    "bind"
+  ],
+  "provider_id": "carrier-1",
+  "requires_human_review_above_premium": {
+    "currency": "USD",
+    "units": 5000
+  },
+  "requires_human_review_for_bind": false,
+  "schema": "chio.autonomous-pricing-authority-envelope.v1",
+  "subject_key": "subject-1",
+  "support_boundary": {
+    "delegated_authority_required": true,
+    "live_bind_supported": true,
+    "operator_override_supported": true,
+    "reserve_optimization_required": true
+  }
+}

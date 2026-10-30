@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/swarm/swarm-join-receipt-body.schema.json",
+  "title": "chio.swarm.join-receipt.v1 signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actualParentReceiptIds",
+    "chainId",
+    "dagOrdinal",
+    "expectedParentReceiptIds",
+    "graphId",
+    "hlcUnixMs",
+    "issuer",
+    "joinId",
+    "joinPredicate",
+    "nextTaskId",
+    "parentSetHash",
+    "parentTaskReceipts",
+    "resultDigest",
+    "schema"
+  ],
+  "properties": {
+    "actualParentReceiptIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "chainId": {
+      "type": "string"
+    },
+    "dagOrdinal": {
+      "type": "integer"
+    },
+    "expectedParentReceiptIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "graphId": {
+      "type": "string"
+    },
+    "hlcUnixMs": {
+      "type": "integer"
+    },
+    "issuer": {
+      "type": "string"
+    },
+    "joinId": {
+      "type": "string"
+    },
+    "joinPredicate": {
+      "type": "string"
+    },
+    "nextTaskId": {
+      "type": "string"
+    },
+    "parentSetHash": {
+      "type": "string"
+    },
+    "parentTaskReceipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receiptId",
+          "taskId"
+        ],
+        "properties": {
+          "receiptId": {
+            "type": "string"
+          },
+          "taskId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "resultDigest": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.swarm.join-receipt.v1"
+    }
+  }
+}

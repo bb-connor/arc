@@ -1,0 +1,15 @@
+{
+  "createdAt": 1793191893,
+  "expiresAt": 1793195553,
+  "policy": {
+    "minReceiptCount": 1,
+    "requireActiveLifecycle": false,
+    "requireCheckpointCoverage": false,
+    "requireEnterpriseIdentityProvenance": false,
+    "requireReceiptLogUrls": false
+  },
+  "policyId": "admission",
+  "schema": "chio.passport-verifier-policy.v1",
+  "signerPublicKey": "772c8a442b7db06e166cfbc1ccbcbcde6f3eba76a4e98ef3ffc519502237d6ef",
+  "verifier": "https://verifier.example.test"
+}

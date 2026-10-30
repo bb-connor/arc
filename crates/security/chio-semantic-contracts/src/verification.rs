@@ -246,7 +246,7 @@ fn verify_invocation(
     let acl = audience.body();
     if semantic_key_digest(audience.authority_key()).map_err(|_| ContractError::Malformed)?
         != route.resolver_key
-        || !signed(audience.verify_signature())?
+        || !signed(audience.verify_integrity_embedded_key())?
         || acl.scope != action.scope
         || acl.provider != destination.provider
         || acl.account != destination.account
@@ -299,7 +299,7 @@ fn verify_invocation(
             .iter()
             .find(|authority| authority.key == key)
             .ok_or(ContractError::BindingMismatch)?;
-        if !signed(annotation.verify_signature())?
+        if !signed(annotation.verify_integrity_embedded_key())?
             || body.scope != action.scope
             || !action.inputs.as_slice().contains(&body.input)
             || (body.externally_influenced && !action.externally_influenced)
@@ -402,7 +402,7 @@ fn verify_invocation(
         observed_facts = add_facts(observed_facts, body.assertions.as_slice().len())?;
         if semantic_key_digest(endorsement.authority_key()).map_err(|_| ContractError::Malformed)?
             != route.endorsement_key
-            || !signed(endorsement.verify_signature())?
+            || !signed(endorsement.verify_integrity_embedded_key())?
             || body.scope != action.scope
             || body.target != (SemanticEndorsementTargetV1::ExactAction { action: digest })
             || body.influence != action.influence
@@ -443,7 +443,7 @@ fn verify_invocation(
         if semantic_key_digest(transformation.authority_key())
             .map_err(|_| ContractError::Malformed)?
             != route.transformation_key
-            || !signed(transformation.verify_signature())?
+            || !signed(transformation.verify_integrity_embedded_key())?
             || body.scope != action.scope
             || body.output != action.payload
             || body.output_label != action.source_label
@@ -473,7 +473,7 @@ fn verify_invocation(
         if semantic_key_digest(prerequisite.authority_key())
             .map_err(|_| ContractError::Malformed)?
             != route.prerequisite_key
-            || !signed(prerequisite.verify_signature())?
+            || !signed(prerequisite.verify_integrity_embedded_key())?
             || body.scope != action.scope
             || body.action != digest
             || body.purpose != destination.purpose

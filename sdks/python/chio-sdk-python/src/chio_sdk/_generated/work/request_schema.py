@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -107,7 +107,7 @@ class Terms(BaseModel):
     terms_reference: WorkId
 
 
-class Terms1(BaseModel):
+class Terms29(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -124,7 +124,7 @@ class Action(BaseModel):
     subdivision: DelegationRecord
 
 
-class Action2(BaseModel):
+class Action5(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -132,7 +132,7 @@ class Action2(BaseModel):
     selection: DelegationRecord
 
 
-class Action3(BaseModel):
+class Action6(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -257,7 +257,7 @@ class Proposal4(BaseModel):
     parents: list[Handle] = Field(..., max_length=16)
 
 
-class Action4(BaseModel):
+class Action7(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -266,7 +266,7 @@ class Action4(BaseModel):
     draft_ref: DraftRef
 
 
-class Action6(BaseModel):
+class Action9(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -274,7 +274,7 @@ class Action6(BaseModel):
     handle: Handle
 
 
-class Action7(BaseModel):
+class Action10(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -290,7 +290,7 @@ class Query(BaseModel):
     handle: Handle
 
 
-class Query1(BaseModel):
+class Query25(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -298,7 +298,7 @@ class Query1(BaseModel):
     command_ref: CommandRef
 
 
-class Query2(BaseModel):
+class Query26(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -306,7 +306,7 @@ class Query2(BaseModel):
     preparation_ref: PreparationRef
 
 
-class Query3(BaseModel):
+class Query27(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -315,7 +315,7 @@ class Query3(BaseModel):
     cursor: CatalogCursor | None = None
 
 
-class Query4(BaseModel):
+class Query28(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -328,7 +328,7 @@ class Body(BaseModel):
         extra="forbid",
     )
     kind: Literal["query"]
-    query: Query | Query1 | Query2 | Query3 | Query4
+    query: Query | Query25 | Query26 | Query27 | Query28
 
 
 class Commitment(BaseModel):
@@ -349,7 +349,7 @@ class Proposal5(BaseModel):
     )
     kind: Literal["agreement"]
     commitment: Commitment
-    terms: Terms | Terms1
+    terms: Terms | Terms29
 
 
 class Preparation(BaseModel):
@@ -363,7 +363,7 @@ class Preparation(BaseModel):
     proposal: Proposal | Proposal1 | Proposal2 | Proposal3 | Proposal4 | Proposal5
 
 
-class Body7(BaseModel):
+class Body205(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -371,7 +371,7 @@ class Body7(BaseModel):
     preparation: Preparation
 
 
-class Action5(BaseModel):
+class Action8(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -387,10 +387,10 @@ class Command(BaseModel):
     version: Literal[1]
     program_id: WorkId
     command_id: WorkId
-    action: Action | Action2 | Action3 | Action4 | Action5 | Action6 | Action7
+    action: Action | Action5 | Action6 | Action7 | Action8 | Action9 | Action10
 
 
-class Body8(BaseModel):
+class Body206(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -404,4 +404,4 @@ class WorkRequestV1(BaseModel):
     )
     schema_: Literal["chio.work.request.v1"] = Field(..., alias="schema")
     version: Literal[1]
-    body: Body7 | Body8 | Body
+    body: Body205 | Body206 | Body

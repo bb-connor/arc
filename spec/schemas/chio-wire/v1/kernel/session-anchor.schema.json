@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/kernel/session-anchor.schema.json",
+  "title": "Chio session anchor signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentId",
+    "authContext",
+    "authContextHash",
+    "authEpoch",
+    "authMethodHash",
+    "id",
+    "issuedAt",
+    "kernelKey",
+    "schema",
+    "sessionId"
+  ],
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "authContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "transport"
+      ],
+      "properties": {
+        "method": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "audience": {
+              "type": "string"
+            },
+            "enterpriseIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "federationMethod",
+                "principal",
+                "providerId",
+                "providerKind",
+                "subjectKey"
+              ],
+              "properties": {
+                "attributeSources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "clientId",
+                    "principal"
+                  ],
+                  "properties": {
+                    "clientId": {
+                      "type": "string"
+                    },
+                    "groups": {
+                      "type": "string"
+                    },
+                    "principal": {
+                      "type": "string"
+                    },
+                    "tenantId": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "clientId": {
+                  "type": "string"
+                },
+                "federationMethod": {
+                  "type": "string"
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "principal": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "providerKind": {
+                  "type": "string"
+                },
+                "sourceSubject": {
+                  "type": "string"
+                },
+                "subjectKey": {
+                  "type": "string"
+                },
+                "tenantId": {
+                  "type": "string"
+                }
+              }
+            },
+            "federatedClaims": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "clientId": {
+                  "type": "string"
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "tenantId": {
+                  "type": "string"
+                }
+              }
+            },
+            "issuer": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            },
+            "principal": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "subject": {
+              "type": "string"
+            },
+            "token_fingerprint": {
+              "type": "string"
+            }
+          }
+        },
+        "origin": {
+          "type": "string"
+        },
+        "transport": {
+          "type": "string"
+        }
+      }
+    },
+    "authContextHash": {
+      "type": "string"
+    },
+    "authEpoch": {
+      "type": "integer"
+    },
+    "authMethodHash": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "kernelKey": {
+      "type": "string"
+    },
+    "proofBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tokenFingerprint"
+      ],
+      "properties": {
+        "dpopPublicKeyThumbprint": {
+          "type": "string"
+        },
+        "tokenFingerprint": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.session_anchor.v1"
+    },
+    "sessionId": {
+      "type": "string"
+    }
+  }
+}

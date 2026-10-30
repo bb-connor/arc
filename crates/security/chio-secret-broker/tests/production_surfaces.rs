@@ -546,6 +546,15 @@ fn governed_admin_control_replays_the_exact_signed_response_after_restart() {
         &Ed25519Backend::new(receipt_signer),
     )
     .test_expect("signed control receipt");
+    let untrusted_completion = sign_admin_control_receipt(
+        receipt.body.clone(),
+        &Ed25519Backend::new(Keypair::from_seed(&[91; 32])),
+    )
+    .test_expect("untrusted control receipt");
+    denied(
+        authorizer.complete_control_operation(&operation, &untrusted_completion, &response),
+        "admin control receipt signer is not trusted",
+    );
     let completed = authorizer
         .complete_control_operation(&operation, &receipt, &response)
         .test_expect("complete control operation");

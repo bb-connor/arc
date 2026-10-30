@@ -947,6 +947,10 @@ fn dedupe_findings(findings: &mut Vec<UnderwritingDecisionFinding>) {
     *findings = deduped;
 }
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for UnderwritingDecisionArtifact {
+    const SCHEMA_ID: &'static str = crate::UNDERWRITING_DECISION_ARTIFACT_SCHEMA;
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -1079,6 +1083,17 @@ mod tests {
         assert!(taxonomy
             .supported_reasons
             .contains(&UnderwritingReasonCode::MeteredBillingMismatch));
+    }
+
+    #[test]
+    fn signed_artifact_capture_underwriting_policy_input() {
+        let keypair = crate::crypto::Keypair::from_seed(&[7; 32]);
+        let signed = chio_core_types::receipt::lineage::SignedExportEnvelope::sign(
+            sample_underwriting_input(1_743_379_200),
+            &keypair,
+        )
+        .unwrap();
+        assert!(signed.verify_signature(&keypair.public_key()).unwrap());
     }
 
     fn sample_underwriting_input(generated_at: u64) -> UnderwritingPolicyInput {
@@ -1337,6 +1352,6 @@ mod tests {
             build_underwriting_decision_artifact(evaluation, 1_000_100, None, None).unwrap();
         let keypair = crate::crypto::Keypair::generate();
         let signed = SignedUnderwritingDecision::sign(artifact, &keypair).unwrap();
-        assert!(signed.verify_signature().unwrap());
+        assert!(signed.verify_signature(&signed.signer_key).unwrap());
     }
 }

@@ -48,8 +48,10 @@ _ID_OPTIONAL_FIELDS = (
     "tenant_id",
 )
 _KNOWN_RECEIPT_FIELDS = frozenset(
-    {"id", "signature", "algorithm", *_ID_REQUIRED_FIELDS, *_ID_OPTIONAL_FIELDS}
+    {"id", "signature", *_ID_REQUIRED_FIELDS, *_ID_OPTIONAL_FIELDS}
 )
+RECEIPT_SCHEMA = "chio.receipt.v1"
+_SIGNING_WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 _VALID_OBSERVATION_OUTCOMES = frozenset({"observed", "evaluated", "dropped"})
 _VALID_REDACTION_MODES = frozenset({"none", "summary", "redacted"})
 
@@ -118,6 +120,17 @@ def _receipt_id_input(receipt: Mapping[str, Any]) -> dict[str, Any]:
 
 def _content_addressed_receipt_id(receipt: Mapping[str, Any]) -> str:
     return _hash_value(_receipt_id_input(receipt))
+
+
+def _receipt_signing_wrapper(body: Mapping[str, Any]) -> bytes:
+    """The 88 bytes an Ed25519 Chio receipt signature covers."""
+
+    signing_body = {"id": body["id"], "body": _receipt_id_input(body)}
+    return (
+        _SIGNING_WRAPPER_PREFIX
+        + hashlib.sha256(RECEIPT_SCHEMA.encode("utf-8")).digest()
+        + hashlib.sha256(_canonical_json(signing_body).encode("utf-8")).digest()
+    )
 
 
 def _sign_body(body: Mapping[str, Any], signing_key: str) -> str:
@@ -320,7 +333,7 @@ def _coerce_ed25519_public_key(public_key: Any) -> ed25519.Ed25519PublicKey:
 
 
 def sign_trusted_receipt_body(body: Mapping[str, Any], signing_key: Any) -> str:
-    """Produce an ed25519 hex signature over the canonical id-bound body.
+    """Produce an ed25519 hex signature over the signing wrapper of the id-bound body.
 
     The body must already have its `id` populated. This helper is the
     counterpart of `verify_trusted_receipt`: tests and the local kernel
@@ -331,9 +344,7 @@ def sign_trusted_receipt_body(body: Mapping[str, Any], signing_key: Any) -> str:
     if "id" not in body:
         raise ValueError("body must contain an id before signing")
     private_key = _coerce_ed25519_private_key(signing_key)
-    signing_body = {"id": body["id"], "body": _receipt_id_input(body)}
-    signature = private_key.sign(_canonical_json(signing_body).encode("utf-8"))
-    return signature.hex()
+    return private_key.sign(_receipt_signing_wrapper(body)).hex()
 
 
 def verify_trusted_receipt(
@@ -346,9 +357,9 @@ def verify_trusted_receipt(
 
     Runs four independent checks and surfaces each outcome:
 
-    1. The receipt carries a valid ed25519 signature over the canonical
-       id-bound body, verified using the receipt's `kernel_key` (a hex
-       ed25519 public key).
+    1. The receipt carries a valid ed25519 signature over the signing
+       wrapper of the canonical id-bound body under `chio.receipt.v1`,
+       verified using the receipt's `kernel_key` (a hex ed25519 public key).
     2. The receipt id is the content-addressed v1 SHA-256 of the canonical
        id input.
     3. `action.parameter_hash` binds to the canonical hash of the
@@ -397,16 +408,16 @@ def verify_trusted_receipt(
             if signature_bytes is not None:
                 body_for_signing = dict(receipt)
                 body_for_signing.pop("signature", None)
-                if "id" not in body_for_signing:
+                unknown = sorted(set(body_for_signing) - _KNOWN_RECEIPT_FIELDS)
+                if unknown:
+                    reasons.append(f"receipt has unknown member {unknown[0]}")
+                elif "id" not in body_for_signing:
                     reasons.append("receipt is missing id for signature verification")
                 else:
                     try:
-                        signing_body = {
-                            "id": body_for_signing["id"],
-                            "body": _receipt_id_input(body_for_signing),
-                        }
-                        message = _canonical_json(signing_body).encode("utf-8")
-                        public_key.verify(signature_bytes, message)
+                        public_key.verify(
+                            signature_bytes, _receipt_signing_wrapper(body_for_signing)
+                        )
                         signature_ok = True
                     except InvalidSignature:
                         reasons.append("ed25519 signature did not verify")

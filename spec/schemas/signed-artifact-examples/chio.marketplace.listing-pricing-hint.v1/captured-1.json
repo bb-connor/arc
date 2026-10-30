@@ -1,0 +1,20 @@
+{
+  "capabilityScope": "tools:search",
+  "expiresAt": 500,
+  "issuedAt": 100,
+  "listingId": "listing-b",
+  "namespace": "https://registry.chio.example",
+  "pricePerCall": {
+    "currency": "EUR",
+    "units": 80
+  },
+  "providerOperatorId": "operator-a",
+  "recentReceiptsVolume": 10,
+  "revocationRateBps": 0,
+  "schema": "chio.marketplace.listing-pricing-hint.v1",
+  "sla": {
+    "availabilityBps": 9990,
+    "maxLatencyMs": 500,
+    "throughputRps": 10
+  }
+}

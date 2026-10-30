@@ -79,7 +79,7 @@ fn expired_refusal(nested: bool) {
         .as_deref()
         .is_some_and(|reason| reason.contains("expired")));
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     let metadata = response.receipt.metadata.as_ref().unwrap();
     assert_eq!(metadata["client_note"], "preserved");
     assert_eq!(
@@ -106,7 +106,7 @@ fn healthy_allow_remains_signed_and_executes_once() {
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
 }
 
 #[test]
@@ -157,7 +157,7 @@ fn reusable_refusals_bind_identical_request_ids_to_distinct_tenants() {
         .unwrap();
         assert_eq!(response.verdict, Verdict::Deny);
         assert_eq!(response.receipt.tenant_id.as_deref(), Some(tenant));
-        assert!(response.receipt.verify_signature().unwrap());
+        assert!(response.receipt.verify_integrity_embedded_key().unwrap());
         let metadata = response.receipt.metadata.as_ref().unwrap();
         assert_eq!(
             metadata["receipt_context"]["request_id"],

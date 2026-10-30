@@ -1598,7 +1598,7 @@ fn sign_transport_deny_receipt_signs_final_scope_deny() {
         })
         .test_unwrap();
 
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     assert!(receipt.is_denied());
     assert_eq!(receipt.response_status, 413);
     assert_eq!(receipt.request_id, "req-transport-deny");

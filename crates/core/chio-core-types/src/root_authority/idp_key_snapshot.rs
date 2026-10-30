@@ -146,13 +146,19 @@ impl IdpKeySnapshot {
         if &self.exchange_key != pinned_exchange_key {
             return Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned);
         }
-        let verified = pinned_exchange_key
-            .verify_canonical_strict(&self.signing_body(), &self.signature)
-            .map_err(|error| IdpKeySnapshotSignatureError::Canonicalization(error.to_string()))?;
-        if verified {
-            Ok(())
-        } else {
-            Err(IdpKeySnapshotSignatureError::InvalidSignature)
+        match crate::crypto::verify_wrapped(
+            pinned_exchange_key,
+            super::CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+            &self.signing_body(),
+            &self.signature,
+        ) {
+            Ok(()) => Ok(()),
+            Err(crate::error::Error::SignatureRejected) => {
+                Err(IdpKeySnapshotSignatureError::InvalidSignature)
+            }
+            Err(error) => Err(IdpKeySnapshotSignatureError::Canonicalization(
+                error.to_string(),
+            )),
         }
     }
 }

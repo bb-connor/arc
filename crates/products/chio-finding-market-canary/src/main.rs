@@ -1003,7 +1003,7 @@ fn validate_job(profile: &FindingHostedProfile, job: &CanaryJob) -> Result<(), &
         || !job
             .payload
             .capability
-            .verify_signature()
+            .verify_signature(&authority)
             .map_err(|_| "canary_capability_invalid")?
     {
         return Err("canary_capability_invalid");
@@ -1121,7 +1121,7 @@ async fn verify(
     let enforcement = &body.result.guest_enforcement;
     if envelope.signer_key != signer
         || !envelope
-            .verify_signature()
+            .verify_signature(&signer)
             .map_err(|_| "canary_result_invalid")?
         || body.tenant_id != job.tenant_id
         || body.job_id != job.job_id

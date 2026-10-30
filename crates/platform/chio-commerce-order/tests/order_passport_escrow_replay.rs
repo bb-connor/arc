@@ -278,8 +278,12 @@ fn merchant_keyed_bundle(merchant_key: &PublicKey) -> CommerceOrderVerificationB
         .as_object_mut()
         .test_expect("payment lifecycle object")
         .remove("signature");
-    let (signature, _) = commerce_payment_signer()
-        .sign_canonical(&payment)
+    let signature = commerce_payment_signer()
+        .sign_wrapped(
+            chio_commerce_order::COMMERCE_PAYMENT_LIFECYCLE_SCHEMA_ID,
+            &chio_core_types::CanonicalBytes::from_serializable(&payment)
+                .test_expect("payment lifecycle canonicalizes"),
+        )
         .test_expect("payment lifecycle signs");
     payment["signature"] = serde_json::json!(signature.to_hex());
     bundle.payment_lifecycle_bytes = json_bytes(&payment);

@@ -1,0 +1,52 @@
+{
+  "name": "Platform server",
+  "public_key": "9475c6cf0eda34057528d8694781ecc92ad639d7e2bd27761ed3ef74924beb07",
+  "required_permissions": {
+    "environment_variables": [
+      "CHIO_MODE"
+    ],
+    "native_syscall_profile": "brokered_native_v1",
+    "network_destinations": [
+      {
+        "host": "api.example.com",
+        "port": 443
+      }
+    ],
+    "read_paths": [
+      "/srv/data"
+    ]
+  },
+  "schema": "chio.manifest.v1",
+  "server_id": "srv-platform",
+  "tools": [
+    {
+      "annotations": {
+        "destructive": false,
+        "idempotent": true,
+        "read_only": true,
+        "requires_approval": false
+      },
+      "description": "Read",
+      "input_schema": {
+        "properties": {
+          "large": {
+            "maximum": 18446744073709551615,
+            "type": "integer"
+          },
+          "whole": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "zero": {
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "latency_hint": "instant",
+      "name": "read"
+    }
+  ],
+  "version": "2.0.0"
+}

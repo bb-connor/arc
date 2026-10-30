@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/worker-attested-result.schema.json",
+  "title": "Chio finding worker attested result signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "completedAtUnixSecs",
+    "firecrackerSha256",
+    "guestResultSha256",
+    "jailerSha256",
+    "jobId",
+    "kernelSha256",
+    "requestSha256",
+    "result",
+    "rootfsSha256",
+    "schema",
+    "tenantId",
+    "workerBinarySha256"
+  ],
+  "properties": {
+    "completedAtUnixSecs": {
+      "type": "integer"
+    },
+    "firecrackerSha256": {
+      "type": "string"
+    },
+    "guestResultSha256": {
+      "type": "string"
+    },
+    "jailerSha256": {
+      "type": "string"
+    },
+    "jobId": {
+      "type": "string"
+    },
+    "kernelSha256": {
+      "type": "string"
+    },
+    "requestSha256": {
+      "type": "string"
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "diagnostics",
+        "findingArtifactSha256",
+        "guestEnforcement",
+        "jobId",
+        "outputArtifacts",
+        "requestSha256",
+        "resourceUsage",
+        "schema",
+        "tenantId"
+      ],
+      "properties": {
+        "classification": {
+          "type": "string"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "findingArtifactSha256": {
+          "type": "string"
+        },
+        "guestEnforcement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "openFilesBoundary",
+            "openFilesHardLimit",
+            "openFilesLimitHits",
+            "openFilesLimitProbePassed",
+            "openFilesSoftLimit",
+            "processBoundary",
+            "processLimit",
+            "processLimitHits",
+            "processLimitProbePassed",
+            "schema"
+          ],
+          "properties": {
+            "openFilesBoundary": {
+              "type": "string"
+            },
+            "openFilesHardLimit": {
+              "type": "integer"
+            },
+            "openFilesLimitHits": {
+              "type": "integer"
+            },
+            "openFilesLimitProbePassed": {
+              "type": "boolean"
+            },
+            "openFilesSoftLimit": {
+              "type": "integer"
+            },
+            "processBoundary": {
+              "type": "string"
+            },
+            "processLimit": {
+              "type": "integer"
+            },
+            "processLimitHits": {
+              "type": "integer"
+            },
+            "processLimitProbePassed": {
+              "type": "boolean"
+            },
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "outputArtifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "sha256",
+              "sizeBytes"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "sizeBytes": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "requestSha256": {
+          "type": "string"
+        },
+        "resourceUsage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "cpuTimeMillis",
+            "openFilesPeak",
+            "outputBytes",
+            "peakMemoryBytes",
+            "processPeak",
+            "wallTimeMillis",
+            "workspaceBytes"
+          ],
+          "properties": {
+            "cpuTimeMillis": {
+              "type": "integer"
+            },
+            "openFilesPeak": {
+              "type": "integer"
+            },
+            "outputBytes": {
+              "type": "integer"
+            },
+            "peakMemoryBytes": {
+              "type": "integer"
+            },
+            "processPeak": {
+              "type": "integer"
+            },
+            "wallTimeMillis": {
+              "type": "integer"
+            },
+            "workspaceBytes": {
+              "type": "integer"
+            }
+          }
+        },
+        "schema": {
+          "type": "string"
+        },
+        "tenantId": {
+          "type": "string"
+        }
+      }
+    },
+    "rootfsSha256": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.finding.worker-attested-result.v1"
+    },
+    "tenantId": {
+      "type": "string"
+    },
+    "workerBinarySha256": {
+      "type": "string"
+    }
+  }
+}

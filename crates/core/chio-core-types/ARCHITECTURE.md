@@ -31,8 +31,14 @@ Typed values pass through `serde_json::to_value` into canonical serialization.
 Raw signing text instead enters `canonical_json_bytes_from_str`, which validates
 input constraints before canonicalization.
 `CanonicalBytes` wraps the resulting immutable buffer with a witness.
-`Keypair::sign_canonical` signs that buffer and returns its exact bytes.
-Consumers can therefore retain the signed representation without rebuilding it.
+`Keypair::sign_wrapped` and `SigningBackend::sign_wrapped` sign the 88-byte
+signing wrapper over that buffer under a registered schema id; an unregistered
+id refuses before any signing call. `verify_wrapped` and `verify_wrapped_bytes`
+take the pinned key and the expected schema id from the caller. JWS signing
+inputs and DSSE pre-authentication encoding are the only bytes signed without
+the wrapper, through `SigningMessage::exempt` and `verify_exempt` with a named
+`ExemptFormat`.
+Consumers can retain the canonical body without rebuilding it.
 Capability attenuation compares a child scope with the parent scope.
 Delegation-chain helpers additionally operate on signed link sequences.
 Receipt and manifest consumers choose the applicable validation and signature

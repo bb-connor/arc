@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: dddda9292ac892d95b9c06f77c067304ba7529e49eddd46850a728e4a94812c6
+# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -214,7 +214,7 @@ class HoldOperation(
     root: HoldOperation1 | HoldOperation2 | HoldOperation3 | HoldOperation4
 
 
-class Operation3(Enum):
+class Operation4(Enum):
     issue = "issue"
     revoke = "revoke"
     status = "status"
@@ -232,7 +232,7 @@ class ControlRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    operation: Operation3
+    operation: Operation4
     tenantScope: AuthorityRpcIdentifier
     authorization: list[AuthorizationItem] = Field(..., max_length=65536, min_length=1)
     payload: list[PayloadItem] = Field(..., max_length=1048576, min_length=1)
@@ -278,7 +278,7 @@ class ChioBrokerAuthorityRpcRequestBodyV1(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Literal["chio.broker-authority-rpc.v1"] = Field(..., alias="schema")
+    schema_: Literal["chio.broker-authority-request.v1"] = Field(..., alias="schema")
     requestId: AuthorityRpcIdentifier
     issuedAtUnixSeconds: PositiveU64
     broker: PublicKey

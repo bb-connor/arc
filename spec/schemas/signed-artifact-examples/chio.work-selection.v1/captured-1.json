@@ -1,0 +1,25 @@
+{
+  "body": {
+    "capability_hash": "38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe",
+    "expected_revision": 0,
+    "offer": {
+      "body": {
+        "allocation_hash": "9887cdb9ee2ccbf6be8d04d3051f523583a399f768f0b45728a30fdf5d146432",
+        "arguments_hash": "b192017da47f5d35fb73a303a7ba74a8f4648d05176804ae49d9cdaa1d780812",
+        "contract_hash": "8354d2934d48974e3e1cac6c9396dc43d18dc5fd61378bcf2e6d70c78d4e782e",
+        "effect": {
+          "server": "research",
+          "tool": "analyze"
+        },
+        "expires_at": 1900,
+        "price_units": 20,
+        "receiver": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+        "slot_id": "a"
+      },
+      "signature": "ba59f4915d5d29bc413a03e8c0cd2072dd273a53c63e4d4624fef4728d141955da3902ca6be13da0904afaf032c26380e972d37c8002ec812788d1d1e48a470a",
+      "signer": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c"
+    },
+    "request_id": "request-4"
+  },
+  "signer": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+}

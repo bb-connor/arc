@@ -1,0 +1,16 @@
+{
+  "bilateralCreditCancelledUnits": 0,
+  "bilateralDebitCancelledUnits": 0,
+  "contributingAtomDigests": [
+    "62615150fdc9d4de7c98ddb2fd75e78531e5873dc0d29d242f083844b446f222"
+  ],
+  "grossCreditUnits": 0,
+  "grossDebitUnits": 100,
+  "netBalance": {
+    "direction": "debit",
+    "units": 100
+  },
+  "participantId": "A",
+  "roundCoreDigest": "a698cce5d9ccf489b3d08ee346a090cf3472ca0e5534fec703c786dd2cfb128d",
+  "schema": "chio.clearing.participant-statement.v1"
+}

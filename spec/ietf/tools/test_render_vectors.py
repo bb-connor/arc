@@ -133,6 +133,15 @@ def verify_hex(public_hex, message, signature_hex):
     return ed25519_verify(bytes.fromhex(public_hex), message, bytes.fromhex(signature_hex))
 
 
+def wrap(schema_id, canonical_body):
+    """The signing wrapper, built without the renderer."""
+    return (
+        b"chio.signing-wrapper.v1\x00"
+        + hashlib.sha256(schema_id.encode("utf-8")).digest()
+        + hashlib.sha256(canonical_body).digest()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Independent verifiers for the corpus objects.
 # ---------------------------------------------------------------------------
@@ -144,7 +153,8 @@ def verify_capability(cap, now):
     chain_ok = True
     for i, link in enumerate(chain):
         link_body = {k: v for k, v in link.items() if k != "signature"}
-        if not verify_hex(link["delegator"], rv.canonical_bytes(link_body), link["signature"]):
+        link_wrapper = wrap("chio.delegation-link.v1", rv.canonical_bytes(link_body))
+        if not verify_hex(link["delegator"], link_wrapper, link["signature"]):
             chain_ok = False
             break
         if i > 0 and (
@@ -160,7 +170,9 @@ def verify_capability(cap, now):
     else:
         status = "valid"
     return {
-        "signature_valid": verify_hex(cap["issuer"], rv.canonical_bytes(signing), cap["signature"]),
+        "signature_valid": verify_hex(
+            cap["issuer"], wrap("chio.capability.v1", rv.canonical_bytes(signing)), cap["signature"]
+        ),
         "delegation_chain_shape_valid": chain_ok,
         "time_valid": status == "valid",
         "time_status": status,
@@ -178,7 +190,9 @@ def receipt_checks(receipt):
     return {
         "receipt_id_valid": id_valid,
         "signature_valid": id_valid
-        and verify_hex(receipt["kernel_key"], rv.canonical_bytes(signing), receipt["signature"]),
+        and verify_hex(
+            receipt["kernel_key"], wrap("chio.receipt.v1", rv.canonical_bytes(signing)), receipt["signature"]
+        ),
         "parameter_hash_valid": hashlib.sha256(
             rv.canonical_bytes(receipt["action"]["parameters"])
         ).hexdigest()
@@ -667,7 +681,7 @@ class CorpusClaimTests(unittest.TestCase):
                 [receipt["signing_key_seed_hex"]],
             ),
             "signing": (
-                by_id(signing["json_cases"])["valid_canonical_json_message"]["public_key_hex"],
+                by_id(signing["json_cases"])["valid_wrapped_json_message"]["public_key_hex"],
                 [signing["signing_key_seed_hex"]],
             ),
         }
@@ -688,53 +702,62 @@ class CorpusClaimTests(unittest.TestCase):
         self.assertTrue(broken["signature_valid"])
         self.assertFalse(broken["delegation_chain_shape_valid"])
 
-    def test_capability_signatures_cover_the_body_with_schema_and_not_the_body_alone(self):
+    def test_the_signing_wrapper_is_88_octets_and_matches_the_independent_build(self):
+        body = b'{"a":2,"z":1}'
+        wrapper = rv.signing_wrapper("chio.receipt.v1", body)
+        self.assertEqual(len(wrapper), 88)
+        self.assertEqual(wrapper, wrap("chio.receipt.v1", body))
+        self.assertEqual(wrapper[:24], b"chio.signing-wrapper.v1\x00")
+        self.assertNotEqual(wrapper, rv.signing_wrapper("chio.capability.v1", body))
+
+    def test_capability_signatures_cover_the_wrapper_and_not_the_body(self):
         for case in load("capability")["cases"]:
             cap = case["capability"]
             self.assertEqual(cap["schema"], "chio.capability.v1", case["id"])
-            signing_input = rv.capability_signing_input(cap)
+            signing_body = rv.capability_signing_body(cap)
             body = {k: v for k, v in cap.items() if k != "signature"}
-            self.assertEqual(signing_input, rv.canonicalize(body), case["id"])
-            self.assertEqual(signing_input, case["capability_signing_body_canonical_json"], case["id"])
-            self.assertNotIn("algorithm", json.loads(signing_input))
-            over_signing_input = verify_hex(cap["issuer"], signing_input.encode("ascii"), cap["signature"])
-            without_schema = {k: v for k, v in body.items() if k != "schema"}
-            over_body_alone = verify_hex(cap["issuer"], rv.canonicalize(without_schema).encode("ascii"), cap["signature"])
-            self.assertEqual(over_signing_input, case["expected"]["signature_valid"], case["id"])
-            self.assertFalse(over_body_alone, case["id"])
+            self.assertEqual(signing_body, rv.canonicalize(body), case["id"])
+            self.assertEqual(signing_body, case["capability_signing_body_canonical_json"], case["id"])
+            self.assertNotIn("algorithm", json.loads(signing_body))
+            encoded = signing_body.encode("ascii")
+            over_wrapper = verify_hex(cap["issuer"], wrap("chio.capability.v1", encoded), cap["signature"])
+            over_body = verify_hex(cap["issuer"], encoded, cap["signature"])
+            over_other_schema = verify_hex(cap["issuer"], wrap("chio.receipt.v1", encoded), cap["signature"])
+            self.assertEqual(over_wrapper, case["expected"]["signature_valid"], case["id"])
+            self.assertFalse(over_body, case["id"])
+            self.assertFalse(over_other_schema, case["id"])
 
-    def test_the_signing_input_leaves_out_the_algorithm_member(self):
+    def test_the_signing_body_leaves_out_the_algorithm_member(self):
         token = {"id": "x", "algorithm": "ed25519", "schema": "chio.capability.v1", "signature": "00", "scope": {}}
         self.assertEqual(
-            rv.capability_signing_input(token), '{"id":"x","schema":"chio.capability.v1","scope":{}}'
+            rv.capability_signing_body(token), '{"id":"x","schema":"chio.capability.v1","scope":{}}'
         )
 
     def test_a_token_without_schema_is_refused(self):
         with self.assertRaises(rv.RenderError):
-            rv.capability_signing_input({"id": "x", "signature": "00", "scope": {}})
+            rv.capability_signing_body({"id": "x", "signature": "00", "scope": {}})
         with self.assertRaises(rv.RenderError):
-            rv.capability_signing_input({"id": "x", "schema": "chio.capability.v2", "signature": "00", "scope": {}})
+            rv.capability_signing_body({"id": "x", "schema": "chio.capability.v2", "signature": "00", "scope": {}})
 
-    def test_receipt_signing_input_wraps_the_body_and_its_content_addressed_id(self):
+    def test_receipt_signing_body_holds_the_body_and_its_content_addressed_id(self):
         for case in load("receipt")["cases"]:
             receipt = case["receipt"]
             if not case["expected"]["receipt_id_valid"]:
                 continue
-            signing_input = rv.receipt_signing_input(receipt)
-            members = json.loads(signing_input)
+            signing_body = rv.receipt_signing_body(receipt)
+            members = json.loads(signing_body)
             self.assertEqual(sorted(members), ["body", "id"], case["id"])
             self.assertEqual(
                 hashlib.sha256(rv.canonical_bytes(members["body"])).hexdigest(), members["id"], case["id"]
             )
-            over_signing_input = verify_hex(
-                receipt["kernel_key"], signing_input.encode("ascii"), receipt["signature"]
+            encoded = signing_body.encode("ascii")
+            over_wrapper = verify_hex(
+                receipt["kernel_key"], wrap("chio.receipt.v1", encoded), receipt["signature"]
             )
-            over_body = verify_hex(
-                receipt["kernel_key"], case["receipt_body_canonical_json"].encode("ascii"), receipt["signature"]
-            )
+            over_body = verify_hex(receipt["kernel_key"], encoded, receipt["signature"])
             self.assertFalse(over_body, case["id"])
             if case["expected"]["signature_valid"]:
-                self.assertTrue(over_signing_input, case["id"])
+                self.assertTrue(over_wrapper, case["id"])
 
     def test_receipt_cases_have_the_outcomes_they_are_chosen_for(self):
         cases = by_id(load("receipt")["cases"])
@@ -756,10 +779,11 @@ class CorpusClaimTests(unittest.TestCase):
             message = rv.canonical_bytes(rv.loads_strict(case["input_json"]))
             self.assertEqual(message.decode("utf-8"), case["canonical_json"], case["id"])
             self.assertEqual(
-                verify_hex(case["public_key_hex"], message, case["signature_hex"]),
+                verify_hex(case["public_key_hex"], wrap(case["schema_id"], message), case["signature_hex"]),
                 case["expected_verify"],
                 case["id"],
             )
+            self.assertFalse(verify_hex(case["public_key_hex"], message, case["signature_hex"]), case["id"])
 
     def test_hashing_cases_match_hashlib(self):
         for case in load("hashing")["cases"]:
@@ -794,40 +818,46 @@ class AppendixATests(unittest.TestCase):
         ):
             self.assertIn(needle, text)
 
-    def test_capability_example_is_the_valid_case_with_its_signing_input(self):
+    def test_capability_example_is_the_valid_case_with_its_signing_body(self):
         items = self.by_anchor["example-capability"]["items"]
         match = PROVENANCE.search(items[0][1])
         self.assertEqual((match.group(1), match.group(2)), ("capability/v1.json", "valid_no_delegation_chain"))
         blocks = blocks_of(items)
-        self.assertEqual([lang for lang, _ in blocks], ["json", "json"])
+        self.assertEqual([lang for lang, _ in blocks], ["json", "json", None])
         self.assertIn("pretty-printed", items[0][1])
         cap = self.capability["capability"]
         self.assertEqual(json.loads(blocks[0][1]), cap)
         self.assertEqual(blocks[0][1], json.dumps(cap, indent=2))
-        # The signing input is the token body with "schema" added, never the body alone.
+        # The signing body is the token body with "schema" added, never the body alone.
         body = {k: v for k, v in cap.items() if k != "signature"}
         self.assertEqual(blocks[1][1], rv.canonicalize(dict(body, schema="chio.capability.v1")))
         self.assertEqual(blocks[1][1], self.capability["capability_signing_body_canonical_json"])
+        self.assertEqual(blocks[2][1], wrap("chio.capability.v1", blocks[1][1].encode("ascii")).hex())
         text = text_of(items)
         self.assertIn('`"schema":"chio.capability.v1"`', text)
         self.assertIn("`capability_signing_body_canonical_json`", text)
-        self.assertIn("signing input", text)
+        self.assertIn("signing body", text)
+        self.assertIn("{{signing-wrapper}}", text)
 
-    def test_the_displayed_signing_input_verifies_against_the_issuer_key(self):
-        """The bytes shown in the appendix are exactly what the vector signature covers."""
+    def test_the_displayed_wrapper_verifies_against_the_issuer_key(self):
+        """The octets shown in the appendix are exactly what the vector signature covers."""
         items = self.by_anchor["example-capability"]["items"]
         cap = self.capability["capability"]
         signing = blocks_of(items)[1][1]
+        wrapper = bytes.fromhex(blocks_of(items)[2][1])
         members = json.loads(signing)
         self.assertEqual(members["issuer"], cap["issuer"])
         self.assertEqual(members["schema"], "chio.capability.v1")
-        self.assertTrue(verify_hex(members["issuer"], signing.encode("ascii"), cap["signature"]))
+        self.assertTrue(verify_hex(members["issuer"], wrapper, cap["signature"]))
         names = list(members)
         self.assertEqual(names[names.index("schema") - 1 : names.index("schema") + 2], ["issuer", "schema", "scope"])
-        # One changed octet, or the body without "schema", does not verify.
-        self.assertFalse(verify_hex(members["issuer"], signing.replace("3", "4", 1).encode("ascii"), cap["signature"]))
+        # The bare body, one changed octet, or the body without "schema" does not verify.
+        self.assertFalse(verify_hex(members["issuer"], signing.encode("ascii"), cap["signature"]))
+        changed = wrap("chio.capability.v1", signing.replace("3", "4", 1).encode("ascii"))
+        self.assertFalse(verify_hex(members["issuer"], changed, cap["signature"]))
         body = {k: v for k, v in cap.items() if k not in ("signature", "schema")}
-        self.assertFalse(verify_hex(members["issuer"], rv.canonicalize(body).encode("ascii"), cap["signature"]))
+        without_schema = wrap("chio.capability.v1", rv.canonicalize(body).encode("ascii"))
+        self.assertFalse(verify_hex(members["issuer"], without_schema, cap["signature"]))
 
     def test_frame_example(self):
         items = self.by_anchor["example-frame"]["items"]
@@ -867,13 +897,14 @@ class AppendixATests(unittest.TestCase):
         delegated = by_id(load("capability")["cases"])["valid_delegated_capability"]["capability"]
         self.assertFalse(rv.full_chain_shape_holds(delegated))
 
-    def test_receipt_example_is_the_allow_case_with_its_signing_input(self):
+    def test_receipt_example_is_the_allow_case_with_its_signing_body(self):
         items = self.by_anchor["example-receipt"]["items"]
         match = PROVENANCE.search(items[0][1])
         self.assertEqual((match.group(1), match.group(2)), ("receipt/v1.json", "allow_receipt"))
         blocks = blocks_of(items)
         receipt = self.receipt["receipt"]
-        self.assertEqual([lang for lang, _ in blocks], ["json", "json"])
+        self.assertEqual([lang for lang, _ in blocks], ["json", "json", None])
+        self.assertEqual(blocks[2][1], wrap("chio.receipt.v1", blocks[1][1].encode("ascii")).hex())
         self.assertEqual(blocks[0][1], json.dumps(receipt, indent=2))
         signing = blocks[1][1]
         members = json.loads(signing)
@@ -888,13 +919,15 @@ class AppendixATests(unittest.TestCase):
         self.assertEqual(receipt["capability_id"], "cap-bindings-001")
         self.assertNotEqual(receipt["capability_id"], self.capability["capability"]["id"])
 
-    def test_the_displayed_receipt_signing_input_verifies_against_the_kernel_key(self):
+    def test_the_displayed_receipt_wrapper_verifies_against_the_kernel_key(self):
         items = self.by_anchor["example-receipt"]["items"]
         receipt = self.receipt["receipt"]
         signing = blocks_of(items)[1][1]
+        wrapper = bytes.fromhex(blocks_of(items)[2][1])
         members = json.loads(signing)
         self.assertEqual(members["body"]["kernel_key"], receipt["kernel_key"])
-        self.assertTrue(verify_hex(receipt["kernel_key"], signing.encode("ascii"), receipt["signature"]))
+        self.assertTrue(verify_hex(receipt["kernel_key"], wrapper, receipt["signature"]))
+        self.assertFalse(verify_hex(receipt["kernel_key"], signing.encode("ascii"), receipt["signature"]))
         self.assertEqual(hashlib.sha256(rv.canonical_bytes(members["body"])).hexdigest(), members["id"])
         self.assertFalse(
             verify_hex(
@@ -953,7 +986,7 @@ class AppendixBTests(unittest.TestCase):
             {
                 "vectors-canonical": 4,
                 "vectors-hashing": 3,
-                "vectors-signing": 2,
+                "vectors-signing": 3,
                 "vectors-capability": 3,
                 "vectors-receipt": 2,
             },
@@ -1005,16 +1038,19 @@ class AppendixBTests(unittest.TestCase):
         cases = by_id(load("signing")["json_cases"])
         found = self.section_groups("vectors-signing", "signing/v1.json")
         self.assertEqual(
-            [g["id"] for g in found], ["valid_canonical_json_message", "tampered_canonical_json_message"]
+            [g["id"] for g in found],
+            ["valid_wrapped_json_message", "tampered_wrapped_json_message", "substituted_schema_id"],
         )
         for group in found:
             case = cases[group["id"]]
             blocks = blocks_of(group["items"])
+            wrapper = wrap(case["schema_id"], case["canonical_json"].encode("utf-8"))
             self.assertEqual(
                 blocks,
                 [
                     ("json", case["input_json"]),
                     ("json", case["canonical_json"]),
+                    (None, wrapper.hex()),
                     (None, case["public_key_hex"]),
                     (None, case["signature_hex"]),
                 ],
@@ -1022,13 +1058,15 @@ class AppendixBTests(unittest.TestCase):
             )
             text = text_of(group["items"])
             self.assertIn("succeed" if case["expected_verify"] else "fail", text)
-            # The shown message, key, and signature give the recorded outcome.
+            self.assertIn("`%s`" % case["schema_id"], text)
+            # The shown wrapper, key, and signature give the recorded outcome.
             self.assertEqual(
-                verify_hex(blocks[2][1], blocks[1][1].encode("ascii"), blocks[3][1]),
+                verify_hex(blocks[3][1], bytes.fromhex(blocks[2][1]), blocks[4][1]),
                 case["expected_verify"],
             )
-        self.assertTrue(cases["valid_canonical_json_message"]["expected_verify"])
-        self.assertFalse(cases["tampered_canonical_json_message"]["expected_verify"])
+        self.assertTrue(cases["valid_wrapped_json_message"]["expected_verify"])
+        self.assertFalse(cases["tampered_wrapped_json_message"]["expected_verify"])
+        self.assertFalse(cases["substituted_schema_id"]["expected_verify"])
 
     def test_capability_cases(self):
         cases = by_id(load("capability")["cases"])
@@ -1040,14 +1078,17 @@ class AppendixBTests(unittest.TestCase):
         for group in found:
             case = cases[group["id"]]
             blocks = blocks_of(group["items"])
-            self.assertEqual([lang for lang, _ in blocks], ["json", None, "json"], group["id"])
-            signing_text, signature, expected_text = (content for _, content in blocks)
+            self.assertEqual([lang for lang, _ in blocks], ["json", None, None, "json"], group["id"])
+            signing_text, wrapper_hex, signature, expected_text = (content for _, content in blocks)
             expected = json.loads(expected_text)
             self.assertEqual(expected, case["expected"], group["id"])
             self.assertEqual(expected_text, json.dumps(case["expected"], indent=2), group["id"])
             self.assertEqual(signature, case["capability"]["signature"], group["id"])
             self.assertIn(str(case["verify_at"]), text_of(group["items"]), group["id"])
-            # The signing input is the corpus signing body, and the token is that
+            self.assertEqual(
+                wrapper_hex, wrap("chio.capability.v1", signing_text.encode("ascii")).hex(), group["id"]
+            )
+            # The signing body is the corpus signing body, and the token is that
             # body plus the signature.
             members = json.loads(signing_text)
             self.assertEqual(rv.canonicalize(members), signing_text, group["id"])
@@ -1055,10 +1096,10 @@ class AppendixBTests(unittest.TestCase):
             self.assertEqual(members["schema"], "chio.capability.v1", group["id"])
             token = dict(members, signature=signature)
             self.assertEqual(token, case["capability"], group["id"])
-            # The shown bytes verify under the shown issuer key, or not, as the result says.
+            # The shown wrapper verifies under the shown issuer key, or not, as the result says.
             shown_issuer = json.loads(signing_text)["issuer"]
             self.assertEqual(
-                verify_hex(shown_issuer, signing_text.encode("ascii"), signature),
+                verify_hex(shown_issuer, bytes.fromhex(wrapper_hex), signature),
                 expected["signature_valid"],
                 group["id"],
             )
@@ -1085,9 +1126,12 @@ class AppendixBTests(unittest.TestCase):
         for group in found:
             case = cases[group["id"]]
             blocks = blocks_of(group["items"])
-            self.assertEqual([lang for lang, _ in blocks], ["json", None, "json"], group["id"])
-            signing_text, signature, expected_text = (content for _, content in blocks)
+            self.assertEqual([lang for lang, _ in blocks], ["json", None, None, "json"], group["id"])
+            signing_text, wrapper_hex, signature, expected_text = (content for _, content in blocks)
             expected = json.loads(expected_text)
+            self.assertEqual(
+                wrapper_hex, wrap("chio.receipt.v1", signing_text.encode("ascii")).hex(), group["id"]
+            )
             self.assertEqual(expected_text, json.dumps(case["expected"], indent=2), group["id"])
             self.assertEqual(expected, case["expected"], group["id"])
             self.assertEqual(signature, case["receipt"]["signature"], group["id"])
@@ -1105,7 +1149,7 @@ class AppendixBTests(unittest.TestCase):
             for name, value in checks.items():
                 self.assertEqual(value, expected[name], (group["id"], name))
             self.assertEqual(
-                verify_hex(members["body"]["kernel_key"], signing_text.encode("ascii"), signature),
+                verify_hex(members["body"]["kernel_key"], bytes.fromhex(wrapper_hex), signature),
                 expected["signature_valid"],
                 group["id"],
             )
@@ -1113,7 +1157,8 @@ class AppendixBTests(unittest.TestCase):
         self.assertIn("allow", text_of(found[0]["items"]))
         self.assertIn("deny", text_of(found[1]["items"]))
         lead = text_of(self.by_anchor["vectors-receipt"]["items"][:1])
-        self.assertIn("signing input", lead)
+        self.assertIn("signing body", lead)
+        self.assertIn("`chio.receipt.v1`", lead)
         self.assertIn("`receipt_body_canonical_json`", lead)
 
 

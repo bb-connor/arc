@@ -75,3 +75,7 @@ pub fn verify_signed_audit_round_authorization(
         "audit_round_authorization",
     )
 }
+
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingAuditRoundAuthorization {
+    const SCHEMA_ID: &'static str = FINDING_AUDIT_ROUND_AUTHORIZATION_SCHEMA_V1;
+}

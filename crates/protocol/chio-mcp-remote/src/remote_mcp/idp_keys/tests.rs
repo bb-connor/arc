@@ -961,7 +961,10 @@ impl SigningBackend for SwitchableBackend {
         self.exchange.public_key()
     }
 
-    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<Signature> {
+    fn sign_bytes(
+        &self,
+        message: chio_core::crypto::SigningMessage<'_>,
+    ) -> chio_core::error::Result<Signature> {
         if self.fail.load(Ordering::SeqCst) {
             self.other.sign_bytes(message)
         } else {

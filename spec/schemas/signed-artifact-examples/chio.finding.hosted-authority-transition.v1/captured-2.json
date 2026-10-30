@@ -1,0 +1,15 @@
+{
+  "configurationRevision": "integration-revision-1",
+  "createdAt": 1793209487,
+  "fromAuthority": "sqlite",
+  "fromEpoch": 1,
+  "operation": "freeze",
+  "rollbackWindowEndsAt": null,
+  "schema": "chio.finding.hosted-authority-transition.v1",
+  "sourceCheckpointSha256": "149fa1c2fca7b7b805760a30933a1061943166c87ee7131ed55b6264b00be95b",
+  "targetCheckpointSha256": "149fa1c2fca7b7b805760a30933a1061943166c87ee7131ed55b6264b00be95b",
+  "tenantId": "integration-a-1793209486471803644",
+  "throughSequence": 3,
+  "toAuthority": "sqlite",
+  "toEpoch": 2
+}

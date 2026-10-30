@@ -147,7 +147,7 @@ fn exercise_cumulative_approval(
         "{:?}",
         pending.reason
     );
-    assert!(pending.receipt.verify_signature()?);
+    assert!(pending.receipt.verify_integrity_embedded_key()?);
     assert_eq!(
         pending
             .receipt

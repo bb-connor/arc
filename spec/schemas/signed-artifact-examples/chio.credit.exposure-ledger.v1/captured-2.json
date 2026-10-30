@@ -1,0 +1,50 @@
+{
+  "decisions": [],
+  "filters": {
+    "agentSubject": "subject",
+    "decisionLimit": 50,
+    "receiptLimit": 100
+  },
+  "generatedAt": 1,
+  "positions": [
+    {
+      "activeQuotedPremiumUnits": 0,
+      "currency": "USD",
+      "failedUnits": 0,
+      "governedMaxExposureUnits": 4000,
+      "pendingUnits": 0,
+      "provisionalLossUnits": 0,
+      "quotedPremiumUnits": 0,
+      "recoveredUnits": 0,
+      "reservedUnits": 0,
+      "settledUnits": 4000
+    }
+  ],
+  "receipts": [],
+  "schema": "chio.credit.exposure-ledger.v1",
+  "summary": {
+    "actionableReceipts": 0,
+    "activeDecisions": 0,
+    "currencies": [
+      "USD"
+    ],
+    "failedSettlementReceipts": 0,
+    "matchingDecisions": 0,
+    "matchingReceipts": 1,
+    "mixedCurrencyBook": false,
+    "pendingSettlementReceipts": 0,
+    "returnedDecisions": 0,
+    "returnedReceipts": 1,
+    "supersededDecisions": 0,
+    "truncatedDecisions": false,
+    "truncatedReceipts": false
+  },
+  "supportBoundary": {
+    "claimAdjudicationSupported": false,
+    "crossCurrencyNettingSupported": false,
+    "governedReceiptsAuthoritative": true,
+    "recoveryLifecycleSupported": false,
+    "settlementReconciliationAuthoritative": true,
+    "underwritingDecisionsAuthoritative": true
+  }
+}

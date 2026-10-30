@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/finding/status-operator-authorization.schema.json",
+  "title": "Chio finding status operator authorization signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "feed_id",
+    "operator",
+    "revoked_from",
+    "role"
+  ],
+  "properties": {
+    "feed_id": {
+      "type": "string"
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id",
+        "key",
+        "key_epoch",
+        "revocation_status_ref",
+        "rotation_policy_ref",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "authority_id": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "key_epoch": {
+          "type": "integer"
+        },
+        "revocation_status_ref": {
+          "type": "string"
+        },
+        "rotation_policy_ref": {
+          "type": "string"
+        },
+        "valid_from": {
+          "type": "integer"
+        },
+        "valid_until": {
+          "type": "integer"
+        }
+      }
+    },
+    "revoked_from": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "role": {
+      "type": "string"
+    }
+  }
+}

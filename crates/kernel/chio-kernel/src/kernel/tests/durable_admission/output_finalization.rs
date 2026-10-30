@@ -1,7 +1,7 @@
 use super::*;
 
 fn assert_terminal_identity(response: &ToolCallResponse, operation: &AdmissionOperationV1) {
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     let metadata = response.receipt.metadata.as_ref().unwrap();
     assert_eq!(metadata["chio_runtime"]["identity_disposition"], "terminal");
     assert_eq!(

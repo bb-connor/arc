@@ -1,0 +1,20 @@
+{
+  "childReceiptId": "child",
+  "childRequestId": "child-request",
+  "childSessionAnchor": {
+    "sessionAnchorHash": "child-hash",
+    "sessionAnchorId": "child-anchor"
+  },
+  "evidenceClass": "verified",
+  "id": "stmt-1",
+  "issuedAt": 1,
+  "kernelKey": "017d650e8879f17cbe5ce3a7b593a4a2b13e0f0bd88a38617ffca8770064162c",
+  "parentReceiptId": "parent",
+  "parentRequestId": "parent-request",
+  "parentSessionAnchor": {
+    "sessionAnchorHash": "parent-hash",
+    "sessionAnchorId": "parent-anchor"
+  },
+  "relationKind": "local_child",
+  "schema": "chio.receipt_lineage_statement.v1"
+}

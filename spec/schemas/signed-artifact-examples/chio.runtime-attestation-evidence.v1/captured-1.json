@@ -1,0 +1,13 @@
+{
+  "claims": {
+    "enterpriseVerifier": {
+      "attestationType": "enterprise_confidential_vm"
+    }
+  },
+  "evidence_sha256": "sha256-enterprise-attestation",
+  "expires_at": 1793190952,
+  "issued_at": 1793190622,
+  "schema": "chio.runtime-attestation.enterprise-verifier.json.v1",
+  "tier": "attested",
+  "verifier": "https://attest.contoso.example"
+}

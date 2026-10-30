@@ -161,6 +161,10 @@ pub struct FindingBondStoreSnapshot {
 /// Collateral-authority-signed store snapshot.
 pub type SignedFindingBondStoreSnapshot = SignedExportEnvelope<FindingBondStoreSnapshot>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for FindingBondStoreSnapshot {
+    const SCHEMA_ID: &'static str = FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1;
+}
+
 /// Fresh authority view of the named collateral allocation, resolved by
 /// the caller from the venue collateral store immediately before
 /// evaluation. A stale, unsigned, or absent snapshot reports bond backing

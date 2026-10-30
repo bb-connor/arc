@@ -1,0 +1,15 @@
+{
+  "expiresAtUnixMs": 1800003600000,
+  "issuedAtUnixMs": 1800000000000,
+  "keyId": "verifier-key-1",
+  "previousHashSha256": "b79a34694cdc7fde28bf54ecc859448134f541625849cab20e42be22961061fb",
+  "revocationAuthorityRoots": [
+    "did:chio:revocation-authority"
+  ],
+  "revocationCheckpointSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "schema": "chio.runtime.verifier-trust-bundle.v1",
+  "trustBundleSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "verificationContextSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "verifierId": "did:chio:buyer-verifier",
+  "version": 2
+}

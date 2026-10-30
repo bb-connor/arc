@@ -1,0 +1,4 @@
+{
+  "probe": "response_simulation",
+  "schema": "chio.signer-readiness-probe.v1"
+}

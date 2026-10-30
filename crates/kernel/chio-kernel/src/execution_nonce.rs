@@ -27,8 +27,8 @@
 //! Set `require_nonce` when every execution-bound call must present one.
 //! Every installed replay store enforces signed expiry and owned rollback.
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::crypto::{sign_canonical_with_backend, PublicKey, SigningBackend};
+use chio_core::canonical::CanonicalBytes;
+use chio_core::crypto::{verify_wrapped_bytes, PublicKey, SigningBackend};
 use tracing::warn;
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ use crate::KernelError;
 pub use chio_core_types::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 
 /// Schema identifier for Chio execution nonces.
-pub const EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v1";
+pub use chio_core::message::CHIO_EXECUTION_NONCE_SCHEMA as EXECUTION_NONCE_SCHEMA;
 
 /// Default TTL for a freshly minted execution nonce.
 pub const DEFAULT_EXECUTION_NONCE_TTL_SECS: u64 = 30;
@@ -150,9 +150,12 @@ pub fn mint_execution_nonce_with_reservation(
         reserved_hold_id,
         reserving_request_id,
     };
-    let (signature, _bytes) = sign_canonical_with_backend(backend, &nonce).map_err(|e| {
-        KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
-    })?;
+    let signature = CanonicalBytes::from_serializable(&nonce)
+        .and_then(|canonical| backend.sign_wrapped(EXECUTION_NONCE_SCHEMA, &canonical))
+        .map_err(|e| {
+            KernelError::ReceiptSigningFailed(format!("failed to sign execution nonce: {e}"))
+        })?
+        .signature;
     Ok(SignedExecutionNonce { nonce, signature })
 }
 
@@ -349,9 +352,16 @@ pub(crate) fn validate_execution_nonce<'a>(
     }
 
     validate_execution_nonce_binding_and_expiry(presented, expected, now)?;
-    let signed_bytes = canonical_json_bytes(&presented.nonce)
+    let canonical = CanonicalBytes::from_serializable(&presented.nonce)
         .map_err(|e| ExecutionNonceError::Encoding(e.to_string()))?;
-    if !kernel_pubkey.verify(&signed_bytes, &presented.signature) {
+    if verify_wrapped_bytes(
+        kernel_pubkey,
+        EXECUTION_NONCE_SCHEMA,
+        &canonical,
+        &presented.signature,
+    )
+    .is_err()
+    {
         warn!(
             nonce_id = %presented.nonce.nonce_id,
             "execution nonce signature verification failed"
@@ -513,7 +523,12 @@ mod tests {
         for (issued_at, expires_at) in [(-1, 130), (100, 100), (101, 100)] {
             signed.nonce.issued_at = issued_at;
             signed.nonce.expires_at = expires_at;
-            signed.signature = kp.sign_canonical(&signed.nonce).unwrap().0;
+            signed.signature = kp
+                .sign_wrapped(
+                    EXECUTION_NONCE_SCHEMA,
+                    &CanonicalBytes::from_serializable(&signed.nonce).unwrap(),
+                )
+                .unwrap();
             assert!(matches!(
                 validate_execution_nonce(&signed, &kp.public_key(), &binding, 100),
                 Err(ExecutionNonceError::InvalidWindow)
@@ -537,6 +552,35 @@ mod tests {
             KernelError::from(error),
             KernelError::ExecutionNonceCapacity
         ));
+    }
+
+    #[test]
+    fn admission_refuses_unwrapped_and_foreign_id_nonce_signatures() {
+        let kp = Keypair::generate();
+        let store = InMemoryExecutionNonceStore::with_clock(
+            16,
+            std::sync::Arc::new(chio_security_types::clock::FixedClock::new(1_000_000)),
+        );
+        let binding = sample_binding();
+        let now = 1_000_000;
+        let mut signed = mint_execution_nonce(
+            &Ed25519Backend::new(kp.clone()),
+            binding.clone(),
+            &ExecutionNonceConfig::default(),
+            now,
+        )
+        .unwrap();
+        for (label, signature) in crate::wrapper_refusals::refused_signatures(&kp, &signed.nonce) {
+            signed.signature = signature;
+            assert!(
+                matches!(
+                    verify_execution_nonce(&signed, &kp.public_key(), &binding, now + 1, &store),
+                    Err(ExecutionNonceError::InvalidSignature)
+                ),
+                "{label}"
+            );
+        }
+        assert!(!store.is_consumed(signed.nonce_id()).unwrap());
     }
 
     #[test]

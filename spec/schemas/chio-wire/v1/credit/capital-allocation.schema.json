@@ -1,0 +1,449 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/capital-allocation.schema.json",
+  "title": "Chio credit capital allocation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "allocationId",
+    "approvalTokenId",
+    "authorityChain",
+    "bondId",
+    "capabilityId",
+    "concentrationCapAmount",
+    "currentOutstandingAmount",
+    "currentReserveAmount",
+    "description",
+    "evidenceRefs",
+    "executionWindow",
+    "facilityId",
+    "governedReceiptId",
+    "instructionDrafts",
+    "intentId",
+    "issuedAt",
+    "outcome",
+    "projectedOutstandingAmount",
+    "query",
+    "rail",
+    "requestedAmount",
+    "requiredReserveAmount",
+    "reserveSourceId",
+    "schema",
+    "sourceId",
+    "sourceKind",
+    "subjectKey",
+    "supportBoundary",
+    "toolName",
+    "toolServer",
+    "utilizationCeilingAmount"
+  ],
+  "properties": {
+    "allocationId": {
+      "type": "string"
+    },
+    "approvalTokenId": {
+      "type": "string"
+    },
+    "authorityChain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approvedAt",
+          "authorityProof",
+          "expiresAt",
+          "principalId",
+          "role"
+        ],
+        "properties": {
+          "approvedAt": {
+            "type": "integer"
+          },
+          "authorityProof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signature",
+              "signerKey"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "approvedAt",
+                  "expiresAt",
+                  "principalId",
+                  "role",
+                  "schema"
+                ],
+                "properties": {
+                  "approvedAt": {
+                    "type": "integer"
+                  },
+                  "expiresAt": {
+                    "type": "integer"
+                  },
+                  "principalId": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              },
+              "signature": {
+                "type": "string"
+              },
+              "signerKey": {
+                "type": "string"
+              }
+            }
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "principalId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "bondId": {
+      "type": "string"
+    },
+    "capabilityId": {
+      "type": "string"
+    },
+    "concentrationCapAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "currentOutstandingAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "currentReserveAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "description": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "locator",
+          "observedAt",
+          "referenceId"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "integer"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "executionWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notAfter",
+        "notBefore"
+      ],
+      "properties": {
+        "notAfter": {
+          "type": "integer"
+        },
+        "notBefore": {
+          "type": "integer"
+        }
+      }
+    },
+    "facilityId": {
+      "type": "string"
+    },
+    "governedReceiptId": {
+      "type": "string"
+    },
+    "instructionDrafts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action",
+          "amount",
+          "description",
+          "sourceId",
+          "sourceKind"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "units"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "units": {
+                "type": "integer"
+              }
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "intentId": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "outcome": {
+      "type": "string"
+    },
+    "projectedOutstandingAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agentSubject",
+        "bondLimit",
+        "facilityLimit",
+        "lossEventLimit",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "bondLimit": {
+          "type": "integer"
+        },
+        "facilityLimit": {
+          "type": "integer"
+        },
+        "lossEventLimit": {
+          "type": "integer"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "rail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custodyProviderId",
+        "destinationAccountRef",
+        "jurisdiction",
+        "kind",
+        "railId",
+        "sourceAccountRef"
+      ],
+      "properties": {
+        "custodyProviderId": {
+          "type": "string"
+        },
+        "destinationAccountRef": {
+          "type": "string"
+        },
+        "jurisdiction": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "railId": {
+          "type": "string"
+        },
+        "sourceAccountRef": {
+          "type": "string"
+        }
+      }
+    },
+    "requestedAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "requiredReserveAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "reserveSourceId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.credit.capital-allocation.v1"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "sourceKind": {
+      "type": "string"
+    },
+    "subjectKey": {
+      "type": "string"
+    },
+    "supportBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automaticDispatchSupported",
+        "capitalBookAuthoritative",
+        "externalExecutionAuthoritative",
+        "simulationFirstOnly"
+      ],
+      "properties": {
+        "automaticDispatchSupported": {
+          "type": "boolean"
+        },
+        "capitalBookAuthoritative": {
+          "type": "boolean"
+        },
+        "externalExecutionAuthoritative": {
+          "type": "boolean"
+        },
+        "simulationFirstOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "toolName": {
+      "type": "string"
+    },
+    "toolServer": {
+      "type": "string"
+    },
+    "utilizationCeilingAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

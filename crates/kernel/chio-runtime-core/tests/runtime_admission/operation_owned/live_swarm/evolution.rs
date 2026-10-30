@@ -141,7 +141,7 @@ fn native_swarm_evolution_runs_added_work_and_preserves_original_replay() -> Tes
         canonical_json_bytes(&first.receipt)?,
         canonical_json_bytes(&replay.receipt)?
     );
-    assert!(replay.receipt.verify_signature()?);
+    assert!(replay.receipt.verify_integrity_embedded_key()?);
     assert_eq!(history(&fixture, &reference)?, original_history);
     let rebound = request(&fixture.source, &next, "task-child-a", "rebound")?;
     let denied = reopened

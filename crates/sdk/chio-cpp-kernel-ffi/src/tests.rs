@@ -160,7 +160,12 @@ fn passport_envelope_at(issuer: &Keypair, issued_at: u64, expires_at: u64) -> St
         expires_at,
         payload_canonical_bytes: canonical_json_bytes(&payload).unwrap(),
     };
-    let (signature, _) = issuer.sign_canonical(&body).unwrap();
+    let signature = issuer
+        .sign_wrapped(
+            PORTABLE_PASSPORT_SCHEMA,
+            &chio_core_types::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+        )
+        .unwrap();
     serde_json::to_string(&PortablePassportEnvelope { body, signature }).unwrap()
 }
 
@@ -546,7 +551,7 @@ fn ffi_sign_receipt_recompute_accepts_matching_content() {
     chio_kernel_buffer_free(result.data);
 
     let receipt: ChioReceipt = serde_json::from_str(&signed).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 
@@ -592,7 +597,7 @@ fn ffi_sign_receipt_relay_signs_without_preimage() {
     chio_kernel_buffer_free(result.data);
 
     let receipt: ChioReceipt = serde_json::from_str(&signed).unwrap();
-    assert!(receipt.verify_signature().unwrap());
+    assert!(receipt.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.kernel_key, keypair.public_key());
 }
 

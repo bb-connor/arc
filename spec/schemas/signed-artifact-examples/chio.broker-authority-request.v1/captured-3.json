@@ -1,0 +1,15 @@
+{
+  "broker": "e28a8970753332bd72fef413e6b0b2ef1b4aadda7aa2c141f233712a6876b351",
+  "issuedAtUnixSeconds": 20,
+  "operation": {
+    "kind": "verify_live_parent",
+    "request": {
+      "expectedAudience": "broker-parent",
+      "expectedSubject": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+      "nowUnixSeconds": 20,
+      "parentCapabilityId": "parent-capability"
+    }
+  },
+  "requestId": "dc5ddceb3513ddb059f16444d0001758ba27987ba6a4dbc3aad0da3ccf3ca192",
+  "schema": "chio.broker-authority-request.v1"
+}

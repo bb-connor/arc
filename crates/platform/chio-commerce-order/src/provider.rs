@@ -8,7 +8,7 @@ use super::types::{
     CommerceReputationSnapshot,
 };
 use super::validation::{parse_rfc3339_utc, require_non_empty};
-use chio_core_types::crypto::{PublicKey, Signature};
+use chio_core_types::crypto::{verify_wrapped, PublicKey, Signature};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
@@ -89,6 +89,7 @@ fn validate_provider_passport(
     validate_provider_trust_recency("provider passport", context_issued_at, &passport.issued_at)?;
     verify_provider_trust_signature(
         "provider passport",
+        COMMERCE_PROVIDER_PASSPORT_SCHEMA_ID,
         passport,
         &passport.signature,
         trusted_provider_trust_signer_keys,
@@ -150,6 +151,7 @@ fn validate_reputation_snapshot(
     )?;
     verify_provider_trust_signature(
         "reputation snapshot",
+        COMMERCE_REPUTATION_SNAPSHOT_SCHEMA_ID,
         reputation,
         &reputation.signature,
         trusted_provider_trust_signer_keys,
@@ -203,6 +205,7 @@ fn validate_federation_trust_bundle(
     )?;
     verify_provider_trust_signature(
         "federation trust bundle",
+        COMMERCE_FEDERATION_TRUST_BUNDLE_SCHEMA_ID,
         trust_bundle,
         &trust_bundle.signature,
         trusted_provider_trust_signer_keys,
@@ -234,6 +237,7 @@ fn validate_provider_trust_recency(
 
 fn verify_provider_trust_signature<T: Serialize>(
     label: &'static str,
+    schema_id: &'static str,
     artifact: &T,
     signature: &str,
     trusted_provider_trust_signer_keys: &[PublicKey],
@@ -254,14 +258,7 @@ fn verify_provider_trust_signature<T: Serialize>(
     })?;
     body.remove("signature");
     for trusted_key in trusted_provider_trust_signer_keys {
-        let verified = trusted_key
-            .verify_canonical(&signature_body, &signature)
-            .map_err(|_| {
-                CommerceOrderError::ProviderTrustSignatureInvalid(format!(
-                    "{label} signature invalid"
-                ))
-            })?;
-        if verified {
+        if verify_wrapped(trusted_key, schema_id, &signature_body, &signature).is_ok() {
             return Ok(());
         }
     }

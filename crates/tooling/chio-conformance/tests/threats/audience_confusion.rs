@@ -17,11 +17,11 @@
 
 use std::sync::Arc;
 
-use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
+use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use chio_custody_hw::capability::{PasskeyCapability, ScopeSet};
 use chio_custody_hw::error::CustodyError;
 use chio_custody_hw::issuer::{IssuerService, MintRequest};
-use chio_custody_hw::mint::signing_message;
+use chio_custody_hw::mint::verify_capability_signature;
 use chio_custody_hw::verifier::VerifiedAssertion;
 use chrono::{TimeZone, Utc};
 
@@ -126,16 +126,15 @@ fn threat_audience_confusion_post_signing_audience_tamper_breaks_signature() {
     // signature must no longer verify after the rewrite.
     let (mut capability, public_key) = signed_capability("urn:chio:audience:kernel");
     capability.audience = "urn:chio:audience:other".to_string();
-    let message = match signing_message(&capability) {
-        Ok(message) => message,
-        Err(error) => panic!("tampered capability MUST remain encodable: {error}"),
+    let error = match verify_capability_signature(&capability, &public_key) {
+        Ok(()) => panic!("post-signing audience rewrite MUST invalidate the issuer signature"),
+        Err(error) => error,
     };
-    let signature = match Signature::from_hex(&capability.signature) {
-        Ok(signature) => signature,
-        Err(error) => panic!("fixture signature MUST decode: {error}"),
-    };
-    assert!(
-        !public_key.verify(&message, &signature),
-        "post-signing audience rewrite MUST invalidate the issuer signature"
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "custody: WebAuthn assertion rejected: signature rejected: {}",
+            chio_core::Error::SignatureRejected
+        )
     );
 }

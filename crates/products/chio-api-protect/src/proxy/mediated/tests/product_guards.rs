@@ -54,7 +54,7 @@ async fn product_default_guards_caller_reservation_refuses_internal_target_witho
     let receipt: chio_core_types::receipt::body::ChioReceipt =
         serde_json::from_value(reply["receipt"].clone()).test_unwrap();
     assert_eq!(receipt.kernel_key, signer.public_key());
-    assert!(receipt.verify_signature().test_unwrap());
+    assert!(receipt.verify_integrity_embedded_key().test_unwrap());
     assert!(matches!(
         receipt.decision,
         Some(chio_core_types::receipt::decision::Decision::Deny { .. })

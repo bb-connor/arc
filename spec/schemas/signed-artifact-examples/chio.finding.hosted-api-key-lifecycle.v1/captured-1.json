@@ -1,0 +1,17 @@
+{
+  "eventId": "a86d8a65e4d8de74dd4f78a6e697dbf65359568b0d3e925904a4519f7aa645f7",
+  "keyId": "key-retry",
+  "occurredAt": 100,
+  "operation": {
+    "activeFrom": 101,
+    "allowedActions": [
+      "finding.purchase"
+    ],
+    "expiresAt": 1000,
+    "kind": "issued",
+    "principalId": "buyer-a",
+    "rotatedFromKeyId": null
+  },
+  "schema": "chio.finding.hosted-api-key-lifecycle.v1",
+  "tenantId": "tenant-a"
+}

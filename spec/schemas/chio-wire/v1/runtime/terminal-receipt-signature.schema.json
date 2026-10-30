@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/runtime/terminal-receipt-signature.schema.json",
+  "title": "Chio runtime terminal receipt signature signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kernelKey",
+    "policyDigest",
+    "receiptId",
+    "schema",
+    "terminalStatus"
+  ],
+  "properties": {
+    "executionLeaseRef": {
+      "type": "string"
+    },
+    "incidentRef": {
+      "type": "string"
+    },
+    "kernelKey": {
+      "type": "string"
+    },
+    "policyDigest": {
+      "type": "string"
+    },
+    "receiptId": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.runtime.terminal-receipt-signature.v1"
+    },
+    "terminalStatus": {
+      "type": "string"
+    }
+  }
+}

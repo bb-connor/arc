@@ -1,6 +1,3 @@
-const LISTING_ID: &str = "listing-qualified-transaction";
-const RESERVATION_ID: &str = "reservation-qualified-transaction";
-
 fn purchase_authority_keypair() -> Keypair {
     Keypair::from_seed(&[11_u8; 32])
 }
@@ -22,60 +19,6 @@ fn purchase_authority_status(
         },
         status_authority,
     )?)
-}
-
-fn finding_delivery_overlay() -> FindingDelivery {
-    FindingDelivery {
-        schema: FINDING_DELIVERY_SCHEMA.to_owned(),
-        finding_id: FINDING_ID.to_owned(),
-        listing_id: LISTING_ID.to_owned(),
-        transform_profile: FindingTransformProfile::Identity,
-        digest_check: DeliveryResult::Matched,
-        media_type_check: FindingMediaTypeCheck::Matched,
-        settlement_mode: FindingDeliverySettlementMode::LocalReversibleHold,
-        accepted_bid_envelope_sha256: "ab".repeat(32),
-        venue_admission_envelope_sha256: "cd".repeat(32),
-        reservation_id: RESERVATION_ID.to_owned(),
-        purchase_intent_id: derive_purchase_intent_id(RESERVATION_ID),
-        authoritative_payment_operation_id: derive_payment_operation_id(RESERVATION_ID),
-        status_proof: None,
-    }
-}
-
-fn purchase_record_bytes() -> TestResult<Vec<u8>> {
-    let delivery = finding_delivery_overlay();
-    let purchase = FindingPurchaseRecord {
-        schema: FINDING_PURCHASE_RECORD_SCHEMA_V1.to_owned(),
-        purchase_key: derive_purchase_key(
-            &delivery.accepted_bid_envelope_sha256,
-            &delivery.authoritative_payment_operation_id,
-        ),
-        purchase_intent_id: delivery.purchase_intent_id.clone(),
-        authoritative_payment_operation_id: delivery.authoritative_payment_operation_id.clone(),
-        buyer: Keypair::from_seed(&[12_u8; 32]).public_key(),
-        payer: Keypair::from_seed(&[13_u8; 32]).public_key(),
-        finding_id: delivery.finding_id.clone(),
-        listing_id: delivery.listing_id.clone(),
-        accepted_bid_envelope_sha256: delivery.accepted_bid_envelope_sha256.clone(),
-        venue_admission_envelope_sha256: delivery.venue_admission_envelope_sha256.clone(),
-        accepted_price: MonetaryAmount {
-            units: 50,
-            currency: "USD".to_owned(),
-        },
-        realized_spend: MonetaryAmount {
-            units: 50,
-            currency: "USD".to_owned(),
-        },
-        seller_backing_envelope_sha256: "ef".repeat(32),
-        encumbrance_id: "encumbrance-qualified-transaction".to_owned(),
-        delivery_receipt_id: "89".repeat(32),
-        payment_reference: delivery.authoritative_payment_operation_id.clone(),
-        payout_destination: "0x1111111111111111111111111111111111111111".to_owned(),
-        recorded_at: CHECKED_AT,
-    };
-    purchase.validate()?;
-    let signed = SignedExportEnvelope::sign(purchase, &purchase_authority_keypair())?;
-    Ok(canonical_json_bytes(&signed)?)
 }
 
 fn replace_purchase_record(

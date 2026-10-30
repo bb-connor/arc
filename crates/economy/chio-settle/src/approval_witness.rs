@@ -3,8 +3,9 @@ use std::sync::Arc;
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedTransactionIntent,
+    GOVERNED_APPROVAL_TOKEN_SCHEMA,
 };
-use chio_core::crypto::PublicKey;
+use chio_core::crypto::{verify_wrapped, PublicKey};
 use chio_security_types::clock::{AuthorityDeadline, Clock, UnixMillis};
 
 use crate::{ApprovalBinding, SettlementError};
@@ -72,11 +73,17 @@ pub fn verify_governed_approval(
     if token.approver != *expected_approver {
         return Err(refused("settlement approval approver mismatch"));
     }
-    let signature_valid = expected_approver
-        .verify_canonical(&token.body(), &token.signature)
-        .map_err(|_| refused("settlement approval signature malformed"))?;
-    if !signature_valid {
-        return Err(refused("settlement approval signature invalid"));
+    match verify_wrapped(
+        expected_approver,
+        GOVERNED_APPROVAL_TOKEN_SCHEMA,
+        &token.body(),
+        &token.signature,
+    ) {
+        Ok(()) => {}
+        Err(chio_core::Error::SignatureRejected) => {
+            return Err(refused("settlement approval signature invalid"));
+        }
+        Err(_) => return Err(refused("settlement approval signature malformed")),
     }
     if token.decision != GovernedApprovalDecision::Approved {
         return Err(refused("settlement approval decision denied"));

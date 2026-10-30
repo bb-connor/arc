@@ -1,7 +1,8 @@
 //! Signed evidence that a container worker started under the fixed profile.
 
 use chio_cage_plan::CageEnforcementState;
-use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::canonical::CanonicalBytes;
+use chio_core_types::crypto::{verify_wrapped, Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
 use crate::ProcessError;
@@ -105,7 +106,10 @@ pub struct SignedContainerLaunchRecord {
 impl SignedContainerLaunchRecord {
     pub fn sign(record: ContainerLaunchRecord, keypair: &Keypair) -> Result<Self, ProcessError> {
         record.validate()?;
-        let (signature, _) = keypair.sign_canonical(&record)?;
+        let signature = keypair.sign_wrapped(
+            CONTAINER_LAUNCH_RECORD_SCHEMA,
+            &CanonicalBytes::from_serializable(&record)?,
+        )?;
         Ok(Self {
             record,
             signer: keypair.public_key(),
@@ -118,9 +122,13 @@ impl SignedContainerLaunchRecord {
         trusted_signer: &PublicKey,
     ) -> Result<&ContainerLaunchRecord, ProcessError> {
         if &self.signer != trusted_signer
-            || !self
-                .signer
-                .verify_canonical_strict(&self.record, &self.signature)?
+            || verify_wrapped(
+                trusted_signer,
+                CONTAINER_LAUNCH_RECORD_SCHEMA,
+                &self.record,
+                &self.signature,
+            )
+            .is_err()
         {
             return Err(ProcessError::Invalid("container launch record signature"));
         }

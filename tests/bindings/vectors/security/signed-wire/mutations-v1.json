@@ -29,7 +29,7 @@
     {
       "id": "broker_audit_runner_signer_tampered",
       "base": "positive/broker-audit-runner-authorization-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/signer", "value": "da74b4d2194ba67ccbb8df1a75d3e23c60a0fbd686e7c9fc2f9900b2ff6e0fc3" },
+      "mutation": { "op": "replace", "path": "/signer", "value": "65e8f9b0bc6eae124169f0576f97362d295a8cf5f770b45e14357ce647d33eec" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "runner_signer_binding" }
     },
     {
@@ -89,7 +89,7 @@
     {
       "id": "broker_audit_comparison_signer_tampered",
       "base": "positive/broker-audit-comparison-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/signer", "value": "8edce6750687ae5c03ed36cfb624cdf7e83ae2e59ef25510c837958dc89d4ac3" },
+      "mutation": { "op": "replace", "path": "/signer", "value": "bc7cbcb5636375fa1d82434d466724d92377f53b980695dd49d26d0ce12205a5" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "comparison_signer_binding" }
     },
     {
@@ -115,12 +115,6 @@
       "base": "positive/keyring-artifact-signature-v1.json",
       "mutation": { "op": "replace", "path": "/key_id", "value": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "key_identity_binding" }
-    },
-    {
-      "id": "keyring_algorithm_tampered",
-      "base": "positive/keyring-artifact-signature-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
     },
     {
       "id": "keyring_artifact_signature_tampered",
@@ -159,12 +153,6 @@
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "anchor_key_binding" }
     },
     {
-      "id": "artifact_time_algorithm_tampered",
-      "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
-    },
-    {
       "id": "artifact_time_signature_tampered",
       "base": "positive/key-log-artifact-time-anchor-envelope-v1.json",
       "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
@@ -189,12 +177,6 @@
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
     },
     {
-      "id": "witness_readiness_algorithm_tampered",
-      "base": "positive/key-log-witness-readiness-proof-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
-    },
-    {
       "id": "witness_readiness_signature_tampered",
       "base": "positive/key-log-witness-readiness-proof-v1.json",
       "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
@@ -217,12 +199,6 @@
       "base": "positive/key-log-audit-readiness-proof-v1.json",
       "mutation": { "op": "replace", "path": "/body/last_successful_poll_at", "value": 1700000000101 },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "body_signature_binding" }
-    },
-    {
-      "id": "audit_readiness_algorithm_tampered",
-      "base": "positive/key-log-audit-readiness-proof-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
     },
     {
       "id": "audit_readiness_signature_tampered",
@@ -255,12 +231,6 @@
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "broker_key_binding" }
     },
     {
-      "id": "authority_request_algorithm_tampered",
-      "base": "positive/broker-authority-request-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
-    },
-    {
       "id": "authority_request_signature_tampered",
       "base": "positive/broker-authority-request-envelope-v1.json",
       "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
@@ -291,12 +261,6 @@
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "authority_key_binding" }
     },
     {
-      "id": "authority_response_algorithm_tampered",
-      "base": "positive/broker-authority-response-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
-    },
-    {
       "id": "authority_response_signature_tampered",
       "base": "positive/broker-authority-response-envelope-v1.json",
       "mutation": { "op": "replace", "path": "/signature", "value": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" },
@@ -325,12 +289,6 @@
       "base": "positive/signed-security-event-envelope-v1.json",
       "mutation": { "op": "replace", "path": "/producer_key", "value": "17cb79fb2b4120f2b1ec65e4198d6e08b28e813feb01e4a400839b85e18080ce" },
       "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "producer_key_binding" }
-    },
-    {
-      "id": "security_event_algorithm_tampered",
-      "base": "positive/signed-security-event-envelope-v1.json",
-      "mutation": { "op": "replace", "path": "/algorithm", "value": "p256" },
-      "expected": { "json_parse_valid": true, "json_schema_valid": true, "semantic_valid": false, "failure": "algorithm_binding" }
     },
     {
       "id": "security_event_signature_tampered",

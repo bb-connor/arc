@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/federation/enterprise-migration-transition.schema.json",
+  "title": "Chio enterprise migration transition signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "authorization_digest",
+    "evidence_digest",
+    "intent_digest",
+    "key",
+    "posture_digest",
+    "schema_version",
+    "signature_domain",
+    "signer_public_key",
+    "trusted_at_unix_ms"
+  ],
+  "properties": {
+    "authorization_digest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "evidence_digest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "intent_digest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control",
+        "deployment_id",
+        "scope_id",
+        "scope_kind"
+      ],
+      "properties": {
+        "control": {
+          "type": "string"
+        },
+        "deployment_id": {
+          "type": "string"
+        },
+        "scope_id": {
+          "type": "string"
+        },
+        "scope_kind": {
+          "type": "string"
+        }
+      }
+    },
+    "posture_digest": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "schema_version": {
+      "type": "integer"
+    },
+    "signature_domain": {
+      "type": "string"
+    },
+    "signer_public_key": {
+      "type": "string"
+    },
+    "trusted_at_unix_ms": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "allocation_id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "block_hash": "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "block_number": 21000000,
+  "chain_id": "eip155:8453",
+  "currency": "USD",
+  "finality_policy": "confirmations>=64",
+  "held_amount": 120000,
+  "identity_registry_record": "registry/operators/venue-42",
+  "locked_amount": 500000,
+  "observed_at": 1750090000,
+  "observed_finality": "finalized",
+  "operator_key_epoch": 3,
+  "operator_key_hash": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+  "schema": "chio.finding.finalized-bond-snapshot.v1",
+  "seller": "a87b8a99bd88a69686c994a80b629d8154871aa295540834c01d79f4f916502f",
+  "slashed_amount": 0,
+  "snapshot_id": "8ac4c8c129140e1b1281a25aa16cb751c79531cac2c306d9164f34917b4dca02",
+  "vault_contract": "0x00000000000000000000000000000000000000bd",
+  "vault_id": "vault-42"
+}

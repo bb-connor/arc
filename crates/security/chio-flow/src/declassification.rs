@@ -307,7 +307,7 @@ pub fn verify_declassification(
     request: &DeclassificationVerificationRequest,
 ) -> Result<VerifiedDeclassification, DeclassificationError> {
     verify_common_declassification(grant.body(), request, grant.authority_key(), || {
-        grant.verify_signature()
+        grant.verify_integrity_embedded_key()
     })
 }
 
@@ -336,7 +336,7 @@ pub fn verify_recovery_declassification(
     }
     coverage.verify_grant_binding(grant.body(), request.now_unix_ms)?;
     verify_common_declassification(&grant.body().claims, request, grant.authority_key(), || {
-        grant.verify_signature()
+        grant.verify_integrity_embedded_key()
     })
 }
 
@@ -790,9 +790,19 @@ mod tests {
 
         let mut invalid_signature_value = serde_json::to_value(&base_grant)
             .unwrap_or_else(|error| panic!("serialize grant: {error}"));
-        invalid_signature_value["signature"] =
-            serde_json::to_value(key.sign(b"invalid declassification signature"))
-                .unwrap_or_else(|error| panic!("serialize signature: {error}"));
+        invalid_signature_value["signature"] = serde_json::to_value(
+            chio_core_types::canonical::CanonicalBytes::from_serializable(
+                &"invalid declassification signature",
+            )
+            .and_then(|canonical| {
+                key.sign_wrapped(
+                    chio_core_types::declassification::CHIO_DECLASSIFICATION_GRANT_SCHEMA,
+                    &canonical,
+                )
+            })
+            .unwrap_or_else(|error| panic!("sign invalid body: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("serialize signature: {error}"));
         let invalid_signature: SignedDeclassificationGrant =
             serde_json::from_value(invalid_signature_value)
                 .unwrap_or_else(|error| panic!("decode invalid signature grant: {error}"));

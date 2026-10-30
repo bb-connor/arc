@@ -180,6 +180,10 @@ impl GenericGovernanceCharterArtifact {
 
 pub type SignedGenericGovernanceCharter = SignedExportEnvelope<GenericGovernanceCharterArtifact>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for GenericGovernanceCharterArtifact {
+    const SCHEMA_ID: &'static str = GENERIC_GOVERNANCE_CHARTER_ARTIFACT_SCHEMA;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericGovernanceCaseArtifact {
@@ -260,6 +264,10 @@ impl GenericGovernanceCaseArtifact {
 
 pub type SignedGenericGovernanceCase = SignedExportEnvelope<GenericGovernanceCaseArtifact>;
 
+impl chio_core_types::receipt::lineage::SignedExportPayload for GenericGovernanceCaseArtifact {
+    const SCHEMA_ID: &'static str = GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct GenericGovernanceCharterIssueRequest {
@@ -321,14 +329,14 @@ impl GenericGovernanceCaseIssueRequest {
         self.listing.body.validate()?;
         if !self
             .listing
-            .verify_signature()
+            .verify_signature(&self.listing.signer_key)
             .map_err(|error| error.to_string())?
         {
             return Err("governance case listing signature is invalid".to_string());
         }
         if !self
             .charter
-            .verify_signature()
+            .verify_signature(&self.charter.signer_key)
             .map_err(|error| error.to_string())?
         {
             return Err("governance charter signature is invalid".to_string());
@@ -336,7 +344,7 @@ impl GenericGovernanceCaseIssueRequest {
         self.charter.body.validate()?;
         if let Some(activation) = self.activation.as_ref() {
             if !activation
-                .verify_signature()
+                .verify_signature(&activation.signer_key)
                 .map_err(|error| error.to_string())?
             {
                 return Err("trust activation signature is invalid".to_string());

@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/credit/capital-instruction.schema.json",
+  "title": "Chio credit capital instruction signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "amount",
+    "authorityChain",
+    "counterpartyId",
+    "counterpartyRole",
+    "description",
+    "executionWindow",
+    "instructionId",
+    "intendedState",
+    "issuedAt",
+    "ownerRole",
+    "query",
+    "rail",
+    "reconciledState",
+    "schema",
+    "sourceId",
+    "sourceKind",
+    "subjectKey",
+    "supportBoundary"
+  ],
+  "properties": {
+    "action": {
+      "type": "string"
+    },
+    "amount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "units"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "units": {
+          "type": "integer"
+        }
+      }
+    },
+    "authorityChain": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "approvedAt",
+          "authorityProof",
+          "expiresAt",
+          "principalId",
+          "role"
+        ],
+        "properties": {
+          "approvedAt": {
+            "type": "integer"
+          },
+          "authorityProof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "body",
+              "signature",
+              "signerKey"
+            ],
+            "properties": {
+              "body": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "approvedAt",
+                  "expiresAt",
+                  "principalId",
+                  "role",
+                  "schema"
+                ],
+                "properties": {
+                  "approvedAt": {
+                    "type": "integer"
+                  },
+                  "expiresAt": {
+                    "type": "integer"
+                  },
+                  "principalId": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              },
+              "signature": {
+                "type": "string"
+              },
+              "signerKey": {
+                "type": "string"
+              }
+            }
+          },
+          "expiresAt": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "principalId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "completionFlowRowId": {
+      "type": "string"
+    },
+    "counterpartyId": {
+      "type": "string"
+    },
+    "counterpartyRole": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "locator",
+          "observedAt",
+          "referenceId"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "locator": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "integer"
+          },
+          "referenceId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "executionWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "notAfter",
+        "notBefore"
+      ],
+      "properties": {
+        "notAfter": {
+          "type": "integer"
+        },
+        "notBefore": {
+          "type": "integer"
+        }
+      }
+    },
+    "governedReceiptId": {
+      "type": "string"
+    },
+    "instructionId": {
+      "type": "string"
+    },
+    "intendedState": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "observedExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "externalReferenceId",
+        "observedAt"
+      ],
+      "properties": {
+        "amount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "units"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "units": {
+              "type": "integer"
+            }
+          }
+        },
+        "externalReferenceId": {
+          "type": "string"
+        },
+        "observedAt": {
+          "type": "integer"
+        }
+      }
+    },
+    "ownerRole": {
+      "type": "string"
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agentSubject",
+        "bondLimit",
+        "facilityLimit",
+        "lossEventLimit",
+        "receiptLimit"
+      ],
+      "properties": {
+        "agentSubject": {
+          "type": "string"
+        },
+        "bondLimit": {
+          "type": "integer"
+        },
+        "facilityLimit": {
+          "type": "integer"
+        },
+        "lossEventLimit": {
+          "type": "integer"
+        },
+        "receiptLimit": {
+          "type": "integer"
+        }
+      }
+    },
+    "rail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "custodyProviderId",
+        "kind",
+        "railId"
+      ],
+      "properties": {
+        "custodyProviderId": {
+          "type": "string"
+        },
+        "destinationAccountRef": {
+          "type": "string"
+        },
+        "jurisdiction": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "railId": {
+          "type": "string"
+        },
+        "sourceAccountRef": {
+          "type": "string"
+        }
+      }
+    },
+    "reconciledState": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "chio.credit.capital-instruction.v1"
+    },
+    "sourceId": {
+      "type": "string"
+    },
+    "sourceKind": {
+      "type": "string"
+    },
+    "subjectKey": {
+      "type": "string"
+    },
+    "supportBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "automaticDispatchSupported",
+        "capitalBookAuthoritative",
+        "custodyNeutralInstructionSupported",
+        "externalExecutionAuthoritative"
+      ],
+      "properties": {
+        "automaticDispatchSupported": {
+          "type": "boolean"
+        },
+        "capitalBookAuthoritative": {
+          "type": "boolean"
+        },
+        "custodyNeutralInstructionSupported": {
+          "type": "boolean"
+        },
+        "externalExecutionAuthoritative": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

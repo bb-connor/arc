@@ -215,7 +215,7 @@ fn threshold_recovery(controlled_clock: bool) -> TestResult {
     let response = executor.block_on(process.invoke("root", "read", &request))?;
     assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
     assert_eq!(response.request_id, process.request_id("root", "read")?);
-    assert!(response.receipt.verify_signature()?);
+    assert!(response.receipt.verify_integrity_embedded_key()?);
     let metadata = response.receipt.metadata.as_ref().ok_or("metadata")?;
     assert_eq!(metadata["chio_process"]["attempt"], 1);
     assert_eq!(

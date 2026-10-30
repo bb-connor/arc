@@ -305,9 +305,14 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
         request.capability.signature = kernel
             .config
             .keypair
-            .sign_canonical(&request.capability.signing_body())
-            .expect("sign request")
-            .0;
+            .sign_wrapped(
+                chio_core::capability::token::CHIO_CAPABILITY_SCHEMA,
+                &chio_core::canonical::CanonicalBytes::from_serializable(
+                    &request.capability.signing_body(),
+                )
+                .expect("canonical request"),
+            )
+            .expect("sign request");
         kernel.register_tool_server(Box::new(UnknownRead {
             inner: DurableUrlElicitationServer {
                 store: store.clone(),
@@ -653,7 +658,10 @@ fn durable_terminal_receipt_uses_the_admitted_tenant() {
         response.receipt.tenant_id.as_deref(),
         Some("tenant-durable")
     );
-    assert!(response.receipt.verify_signature().expect("signed receipt"));
+    assert!(response
+        .receipt
+        .verify_integrity_embedded_key()
+        .expect("signed receipt"));
     assert_eq!(
         store
             .operation()
@@ -899,7 +907,7 @@ fn a_missing_nested_session_root_compensates_the_durable_admission() {
         store.operation().state(),
         AdmissionOperationState::CompensatedBeforeDispatch
     );
-    assert!(response.receipt.verify_signature().unwrap());
+    assert!(response.receipt.verify_integrity_embedded_key().unwrap());
     let metadata = response.receipt.metadata.as_ref().unwrap();
     assert_eq!(
         metadata

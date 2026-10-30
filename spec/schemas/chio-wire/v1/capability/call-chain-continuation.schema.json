@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/call-chain-continuation.schema.json",
+  "title": "Chio call chain continuation signed body",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "chainId",
+    "currentSubject",
+    "delegatorSubject",
+    "expiresAt",
+    "issuedAt",
+    "nonce",
+    "originSubject",
+    "parentRequestId",
+    "schema",
+    "signer",
+    "subject",
+    "tokenId"
+  ],
+  "properties": {
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "serverId",
+        "toolName"
+      ],
+      "properties": {
+        "serverId": {
+          "type": "string"
+        },
+        "toolName": {
+          "type": "string"
+        }
+      }
+    },
+    "chainId": {
+      "type": "string"
+    },
+    "currentSubject": {
+      "type": "string"
+    },
+    "delegationLinkHash": {
+      "type": "string"
+    },
+    "delegatorSubject": {
+      "type": "string"
+    },
+    "expiresAt": {
+      "type": "integer"
+    },
+    "governedIntentHash": {
+      "type": "string"
+    },
+    "issuedAt": {
+      "type": "integer"
+    },
+    "nonce": {
+      "type": "string"
+    },
+    "originSubject": {
+      "type": "string"
+    },
+    "parentCapabilityId": {
+      "type": "string"
+    },
+    "parentReceiptHash": {
+      "type": "string"
+    },
+    "parentReceiptId": {
+      "type": "string"
+    },
+    "parentRequestId": {
+      "type": "string"
+    },
+    "parentSessionAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionAnchorHash",
+        "sessionAnchorId"
+      ],
+      "properties": {
+        "sessionAnchorHash": {
+          "type": "string"
+        },
+        "sessionAnchorId": {
+          "type": "string"
+        }
+      }
+    },
+    "schema": {
+      "const": "chio.call_chain_continuation.v1"
+    },
+    "signer": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "tokenId": {
+      "type": "string"
+    }
+  }
+}

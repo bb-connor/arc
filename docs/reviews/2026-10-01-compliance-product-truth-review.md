@@ -405,7 +405,7 @@ record is in the store.
 Owner: `STRUCTURAL-SECURITY-FIXES.md` section 5. Related: AC6.
 
 **EV12, Low. Receipt and checkpoint signatures use non-strict Ed25519 verification.**
-`ChioReceipt::verify_signature` (`crates/core/chio-core-types/src/receipt/body.rs:491-506`) and
+`ChioReceipt::verify_integrity_embedded_key` (`crates/core/chio-core-types/src/receipt/body.rs:491-506`) and
 `verify_checkpoint_signature` (`chio-kernel/src/checkpoint.rs:1785-1788`) call the loose verifier
 (`crypto.rs:440-444,524-548`; `ed25519_verification.rs:11-22`) although `verify_strict` exists and the
 finding verifier uses it; the in-tree test at `ed25519_verification.rs:122-135` shows an identity-key
