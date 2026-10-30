@@ -199,25 +199,25 @@ Internet-Draft                Chio Protocol               September 2026
      12.3.  Receipt Query  . . . . . . . . . . . . . . . . . . . . . 107
        12.3.1.  Paging . . . . . . . . . . . . . . . . . . . . . . . 109
      12.4.  Revocation . . . . . . . . . . . . . . . . . . . . . . . 109
-   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 110
-   14. Error Model . . . . . . . . . . . . . . . . . . . . . . . . . 110
-     14.1.  Error Registry . . . . . . . . . . . . . . . . . . . . . 111
-     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 111
-   15. Security Considerations . . . . . . . . . . . . . . . . . . . 111
-     15.1.  Assets and Trust Boundaries  . . . . . . . . . . . . . . 111
-     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 112
-     15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 113
-     15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 113
-     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 114
-     15.6.  Signature Algorithm Downgrade  . . . . . . . . . . . . . 114
-     15.7.  Canonicalization . . . . . . . . . . . . . . . . . . . . 115
-     15.8.  Tool Server Confinement  . . . . . . . . . . . . . . . . 115
-     15.9.  Resource Exhaustion  . . . . . . . . . . . . . . . . . . 115
-     15.10. Budgets and Approvals  . . . . . . . . . . . . . . . . . 115
-     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 116
-     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 116
-     15.13. Attestation  . . . . . . . . . . . . . . . . . . . . . . 116
-     15.14. Clock Skew . . . . . . . . . . . . . . . . . . . . . . . 116
+   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 111
+   14. Error Model . . . . . . . . . . . . . . . . . . . . . . . . . 112
+     14.1.  Error Registry . . . . . . . . . . . . . . . . . . . . . 112
+     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 112
+   15. Security Considerations . . . . . . . . . . . . . . . . . . . 112
+     15.1.  Assets and Trust Boundaries  . . . . . . . . . . . . . . 113
+     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 113
+     15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 115
+     15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 115
+     15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 116
+     15.6.  Signature Algorithm Downgrade  . . . . . . . . . . . . . 116
+     15.7.  Canonicalization . . . . . . . . . . . . . . . . . . . . 116
+     15.8.  Tool Server Confinement  . . . . . . . . . . . . . . . . 117
+     15.9.  Resource Exhaustion  . . . . . . . . . . . . . . . . . . 117
+     15.10. Budgets and Approvals  . . . . . . . . . . . . . . . . . 117
+     15.11. Checkpoint Equivocation  . . . . . . . . . . . . . . . . 118
+     15.12. Provenance Inflation . . . . . . . . . . . . . . . . . . 118
+     15.13. Attestation  . . . . . . . . . . . . . . . . . . . . . . 118
+     15.14. Clock Skew . . . . . . . . . . . . . . . . . . . . . . . 118
 
 
 
@@ -226,37 +226,37 @@ Whelan                    Expires 3 April 2027                  [Page 4]
 Internet-Draft                Chio Protocol               September 2026
 
 
-   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 116
-   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 118
-     17.1.  Chio Error Codes . . . . . . . . . . . . . . . . . . . . 118
-     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 122
-     17.3.  Chio Native Message Types  . . . . . . . . . . . . . . . 123
-     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 123
-   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 124
-   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 126
-     19.1.  Normative References . . . . . . . . . . . . . . . . . . 126
-     19.2.  Informative References . . . . . . . . . . . . . . . . . 128
-   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 130
-     A.1.  Capability Token  . . . . . . . . . . . . . . . . . . . . 130
-     A.2.  Tool Call Request Frame . . . . . . . . . . . . . . . . . 132
-     A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 133
-   Appendix B.  Test Vectors . . . . . . . . . . . . . . . . . . . . 135
-     B.1.  Canonical JSON  . . . . . . . . . . . . . . . . . . . . . 135
-     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 137
-     B.3.  Ed25519 Signatures  . . . . . . . . . . . . . . . . . . . 137
-     B.4.  Capability Token Verification . . . . . . . . . . . . . . 140
-     B.5.  Receipt Verification  . . . . . . . . . . . . . . . . . . 143
-   Appendix C.  Relationship to Other Work . . . . . . . . . . . . . 146
-     C.1.  Agent Communication Protocols . . . . . . . . . . . . . . 146
-     C.2.  Delegated Authorization . . . . . . . . . . . . . . . . . 146
-     C.3.  Capability Tokens . . . . . . . . . . . . . . . . . . . . 147
-     C.4.  Workload Identity and Attestation . . . . . . . . . . . . 147
-     C.5.  Signed Evidence and Transparency  . . . . . . . . . . . . 147
-     C.6.  Verifiable Credentials  . . . . . . . . . . . . . . . . . 147
-     C.7.  Candidate Companion Documents . . . . . . . . . . . . . . 148
-   Appendix D.  Document History . . . . . . . . . . . . . . . . . . 148
-   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . . 148
-   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . . 148
+   16. Privacy Considerations  . . . . . . . . . . . . . . . . . . . 118
+   17. IANA Considerations . . . . . . . . . . . . . . . . . . . . . 120
+     17.1.  Chio Error Codes . . . . . . . . . . . . . . . . . . . . 120
+     17.2.  Chio Signature Suites  . . . . . . . . . . . . . . . . . 124
+     17.3.  Chio Native Message Types  . . . . . . . . . . . . . . . 124
+     17.4.  Chio Signed Artifact Schemas . . . . . . . . . . . . . . 125
+   18. Implementation Status . . . . . . . . . . . . . . . . . . . . 126
+   19. References  . . . . . . . . . . . . . . . . . . . . . . . . . 127
+     19.1.  Normative References . . . . . . . . . . . . . . . . . . 127
+     19.2.  Informative References . . . . . . . . . . . . . . . . . 130
+   Appendix A.  Examples . . . . . . . . . . . . . . . . . . . . . . 132
+     A.1.  Capability Token  . . . . . . . . . . . . . . . . . . . . 132
+     A.2.  Tool Call Request Frame . . . . . . . . . . . . . . . . . 134
+     A.3.  Receipt . . . . . . . . . . . . . . . . . . . . . . . . . 135
+   Appendix B.  Test Vectors . . . . . . . . . . . . . . . . . . . . 137
+     B.1.  Canonical JSON  . . . . . . . . . . . . . . . . . . . . . 137
+     B.2.  SHA-256 Digests . . . . . . . . . . . . . . . . . . . . . 139
+     B.3.  Ed25519 Signatures  . . . . . . . . . . . . . . . . . . . 139
+     B.4.  Capability Token Verification . . . . . . . . . . . . . . 142
+     B.5.  Receipt Verification  . . . . . . . . . . . . . . . . . . 145
+   Appendix C.  Relationship to Other Work . . . . . . . . . . . . . 148
+     C.1.  Agent Communication Protocols . . . . . . . . . . . . . . 148
+     C.2.  Delegated Authorization . . . . . . . . . . . . . . . . . 148
+     C.3.  Capability Tokens . . . . . . . . . . . . . . . . . . . . 149
+     C.4.  Workload Identity and Attestation . . . . . . . . . . . . 149
+     C.5.  Signed Evidence and Transparency  . . . . . . . . . . . . 149
+     C.6.  Verifiable Credentials  . . . . . . . . . . . . . . . . . 149
+     C.7.  Candidate Companion Documents . . . . . . . . . . . . . . 150
+   Appendix D.  Document History . . . . . . . . . . . . . . . . . . 150
+   Acknowledgments . . . . . . . . . . . . . . . . . . . . . . . . . 150
+   Author's Address  . . . . . . . . . . . . . . . . . . . . . . . . 150
 
 1.  Introduction
 
@@ -5615,10 +5615,11 @@ Internet-Draft                Chio Protocol               September 2026
 
    The trust-control service offers an HTTP interface [RFC9110] whose
    paths begin with /v1 (Section 13).  Request and response bodies are
-   JSON objects with camelCase member names.  Nested capability tokens,
-   receipts, and attestation statements keep their own member names.
-   This section specifies four endpoints: issuance, delegated issuance,
-   receipt query, and revocation.
+   JSON objects with camelCase member names, except at the revocation
+   endpoint (Section 12.4).  Nested capability tokens, receipts, and
+   attestation statements keep their own member names.  This section
+   specifies four endpoints: issuance, delegated issuance, receipt
+   query, and revocation.
 
    A caller authenticates with an Authorization header that carries the
    Bearer scheme and the service token.  The service compares the token
@@ -5641,7 +5642,6 @@ Internet-Draft                Chio Protocol               September 2026
    with an empty delegation chain.  Table 41 lists the request members.
    A 200 response has one member, capability, which holds the token
    (Section 5.1).
-
 
 
 
@@ -6074,30 +6074,30 @@ Internet-Draft                Chio Protocol               September 2026
 
 12.4.  Revocation
 
-   POST /v1/revocations revokes a capability.  Its request body has one
-   REQUIRED member, capabilityId, a string that identifies the
-   capability.  Only the service token authenticates this endpoint.  The
-   service records the identifier as revoked without checking that it
-   names an issued capability, so a caller can revoke an identifier
+   The revocation endpoint departs from the camelCase convention of this
+   section: its request members, query parameters, and response members
+   are snake_case, and the service refuses an unknown request member or
+   query parameter with 400.
+
+   POST /v1/revocations revokes a capability.  Its request body has two
+   REQUIRED members:
+
+   capability_id:  A string that identifies the capability.
+
+   reason:  One of operator_request, credential_compromise,
+      principal_offboarded, tenant_offboarded, policy_withdrawn, or
+      incident_response.
+
+   {"capability_id": "cap-1", "reason": "operator_request"}
+
+   A caller authenticates with a credential holding revocations:write.
+   The service records the identifier as revoked without checking that
+   it names an issued capability, so a caller can revoke an identifier
    before any token uses it.  It answers 200 only after the revocation
-   is visible in its store, 409 if it has no revocation store, and 500
-   if the store fails.  A 200 response has these members:
+   is visible in its store, 400 for a body that is not this structure,
+   409 if it has no revocation store, and 503 if the store fails.  A 200
+   response has these members:
 
-   capabilityId:  The identifier from the request.
-
-   revoked:  true.
-
-   newlyRevoked:  false if the identifier was already revoked, and true
-      otherwise.
-
-   {"capabilityId": "cap-1", "newlyRevoked": true, "revoked": true}
-
-   GET /v1/revocations, authenticated by the service token, reports
-   revocation state.  With the parameter capabilityId, its response
-   includes capabilityId and a boolean revoked for that identifier.  The
-   response also has configured (boolean), backend (string), count
-   (integer), and revocations, an array of up to limit objects with
-   members capabilityId and revokedAt (Unix seconds).
 
 
 
@@ -6106,17 +6106,81 @@ Whelan                    Expires 3 April 2027                [Page 109]
 Internet-Draft                Chio Protocol               September 2026
 
 
+   entry:  The stored revocation entry.  If the identifier was already
+      revoked, the entry keeps the revoked_at and reason of the first
+      revocation.
+
+   newly_revoked:  true if this request recorded the entry, and false if
+      the identifier was already revoked.
+
+   roots_matched:  The number of capabilities that the target names and
+      that stand revoked after the request.
+
+   roots_revoked:  How many of those this request marked revoked.
+
+   A revocation entry is a JSON object with these members:
+
+   schema:  chio.revocation-entry.v1.
+
+   entry_id:  rev_ followed by the lowercase hexadecimal SHA-256 digest
+      of the octets of chio.revocation-entry-id.v1, a zero octet,
+      target_kind, a zero octet, and target_value.
+
+   target_kind:  The kind of target: capability_id for an entry that
+      this endpoint records.  Other kinds are root_policy_rule,
+      anchor_subject, tenant_tag, and replay_key; their entries are
+      recorded by means outside this document.
+
+   target_value:  The target identifier, here the capability_id of the
+      request.
+
+   revoked_at:  The time of the first revocation, in Unix seconds.
+
+   reason:  The reason of the first revocation.
+
+   GET /v1/revocations, authenticated by a credential holding
+   revocations:read, reports revocation state.  With the parameter
+   capability_id, it reports one capability and accepts no other
+   parameter.  The response has the members capability_id, the
+   identifier; revoked, a boolean; and entry_id, the entry_id of the
+   entry that revokes the capability, or null when revoked is false.
+
+   {"capability_id": "cap-1", "revoked": false, "entry_id": null}
+
+   Without capability_id, the endpoint returns a page of entries.  Its
+   OPTIONAL parameters are after, an entry sequence number (default 0);
+   limit, the largest number of entries to return (default 100, and 400
+   outside the range 1 to 500); and kind, a target_kind value that
+   selects entries of that kind.  The response has the members entries,
+   an array of objects with members entry_seq (integer) and entry (a
+   revocation entry), in ascending entry_seq order after after;
+
+
+
+Whelan                    Expires 3 April 2027                [Page 110]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
+   next_after, the last entry_seq returned, or after when entries is
+   empty; and head, the highest stored entry sequence number.  Both
+   forms answer 409 if the service has no revocation store and 503 if
+   the store fails.
+
    A kernel learns of a revocation only when it checks.  Before it
    dispatches a call, the kernel checks the revocation state of the
    token's id and of each capability in the token's delegation chain
    (Section 5.8).  A kernel configured with a trust-control service
-   makes each check a GET /v1/revocations request with capabilityId set
-   to the identifier and limit set to 1, reads revoked, and keeps no
-   cache.  The kernel MUST deny the call, with a signed receipt, if any
-   identifier is revoked or if a check fails.  The trust-control service
-   does not notify kernels of revocations.  The reference native driver
-   does not notify agents; the optional capability_revoked message
-   remains a permitted wire allocation (Section 10.2).
+   makes each check a GET /v1/revocations request with capability_id set
+   to the identifier, reads revoked, and keeps no cache.  A response
+   whose capability_id differs from the identifier, or whose entry_id is
+   not the identifier's entry when revoked is true or is not null when
+   revoked is false, is a failed check.  The kernel MUST deny the call,
+   with a signed receipt, if any identifier is revoked or if a check
+   fails.  The trust-control service does not notify kernels of
+   revocations.  The reference native driver does not notify agents; the
+   optional capability_revoked message remains a permitted wire
+   allocation (Section 10.2).
 
 13.  Versioning and Negotiation
 
@@ -6147,6 +6211,13 @@ Internet-Draft                Chio Protocol               September 2026
    selects that prefix explicitly.  There is no downgrade negotiation
    for that interface.  Future prefixes are separate interface versions.
 
+
+
+Whelan                    Expires 3 April 2027                [Page 111]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
 14.  Error Model
 
    Errors describe a failed operation, not proof that a side effect did
@@ -6154,13 +6225,6 @@ Internet-Draft                Chio Protocol               September 2026
    about the tool's terminal state.  Before repeating an operation with
    side effects, an agent determines whether it completed or uses the
    tool's own idempotency contract.
-
-
-
-Whelan                    Expires 3 April 2027                [Page 110]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
 14.1.  Error Registry
 
@@ -6203,6 +6267,13 @@ Internet-Draft                Chio Protocol               September 2026
    in which authority moves: issuance, delivery to the kernel,
    admission, dispatch to a tool server, and the receipt.
 
+
+
+Whelan                    Expires 3 April 2027                [Page 112]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
 15.1.  Assets and Trust Boundaries
 
    The assets are capability tokens and delegation state, session
@@ -6210,13 +6281,6 @@ Internet-Draft                Chio Protocol               September 2026
    confinement of tool execution, the integrity of receipts and of the
    decisions they record, and the availability of the kernel and its
    services.
-
-
-
-Whelan                    Expires 3 April 2027                [Page 111]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    Authority crosses five boundaries: from the trust-control service to
    the agent at issuance, from the agent to the kernel over the native
@@ -6231,6 +6295,40 @@ Internet-Draft                Chio Protocol               September 2026
 
    Table 46 states the transport requirements for each surface.  TLS
    supplies channel protection; [RFC8446] defines TLS 1.3.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 113]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    +===============+==============+====================+===============+
    | Surface       | TLS          | Mutual TLS         | Without       |
@@ -6267,13 +6365,6 @@ Internet-Draft                Chio Protocol               September 2026
 
                  Table 46: Transport Security Requirements
 
-
-
-Whelan                    Expires 3 April 2027                [Page 112]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    A deployment that is missing a transport property that Table 46
    requires MUST deny the request or restrict itself to a local
    development configuration.  A deployment MUST NOT claim
@@ -6285,6 +6376,15 @@ Internet-Draft                Chio Protocol               September 2026
    The edge then trusts that header.  An operator MUST ensure that only
    the proxy can reach the edge, because a client that reaches the edge
    directly can set the header itself.
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 114]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 15.3.  Token Theft and Replay
 
@@ -6320,16 +6420,6 @@ Internet-Draft                Chio Protocol               September 2026
    distributes kernel keys; this document does not define a public
    transparency system for them (Section 9.6).
 
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 113]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    In the same way, a kernel accepts a capability token only from an
    issuer in its configured set of trusted issuer keys (Section 5.8).
    Distributions SHOULD pin or securely provision kernel keys, issuer
@@ -6341,6 +6431,16 @@ Internet-Draft                Chio Protocol               September 2026
    that run kernels in different trust domains SHOULD use a distinct
    issuer key for each domain, so that a token issued for one domain is
    not accepted in another.
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 115]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 15.5.  Delegation Abuse
 
@@ -6376,16 +6476,6 @@ Internet-Draft                Chio Protocol               September 2026
    attacker who can produce a classical signature for a key the verifier
    trusts.
 
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 114]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 15.7.  Canonicalization
 
    Signatures cover the signing wrapper of canonical bytes (Section 4.5,
@@ -6399,6 +6489,14 @@ Internet-Draft                Chio Protocol               September 2026
    member order, since verification reconstructs canonical bytes
    (Section 10.5).  They MUST NOT add unauthenticated members and
    represent them as part of the signed statement.
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 116]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 15.8.  Tool Server Confinement
 
@@ -6434,20 +6532,27 @@ Internet-Draft                Chio Protocol               September 2026
    replay record can allow replay within its validity interval, so
    deployments relying on singular approvals SHOULD keep that record in
    durable storage.  Threshold approval MUST use the durable admission
-
-
-
-Whelan                    Expires 3 April 2027                [Page 115]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    replay reservation in Section 8.5.2 and MUST deny admission when that
    durable reservation is unavailable.
 
    Threshold approval counts distinct keys.  Distinct keys are not
    distinct people or organizations: an operator who configures an
    eligible key set decides how independent the approvers are.
+
+
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 117]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 15.11.  Checkpoint Equivocation
 
@@ -6488,16 +6593,6 @@ Internet-Draft                Chio Protocol               September 2026
    arguments remain in signed audit evidence; protect receipt storage
    and read access independently of tool admission.
 
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 116]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    Receipts are designed to be kept and shown to other parties, and they
    contain more than a verdict.  A receipt records the tool server and
    tool, the capability identifier, the call's parameters as the agent
@@ -6507,6 +6602,13 @@ Internet-Draft                Chio Protocol               September 2026
    deployments, the tenant (Section 6.1).  A receipt has no dedicated
    output field.  Free-form metadata can still contain output or other
    sensitive data.
+
+
+
+Whelan                    Expires 3 April 2027                [Page 118]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    Parameters are the most sensitive part.  Because a receipt signs the
    parameters that the agent sent, anyone who can read the receipt can
@@ -6546,14 +6648,6 @@ Internet-Draft                Chio Protocol               September 2026
    build a profile of an agent's activity and of the organization behind
    it.
 
-
-
-
-Whelan                    Expires 3 April 2027                [Page 117]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    The redaction_mode field records how much of a receipt's detail was
    redacted when it was signed or exported.  It describes the receipt;
    it does not by itself remove anything.
@@ -6564,6 +6658,13 @@ Internet-Draft                Chio Protocol               September 2026
    every tenant that a kernel serves, so the size and timing of a batch
    can reveal aggregate activity across tenants to anyone who can see
    the checkpoint.
+
+
+
+Whelan                    Expires 3 April 2027                [Page 119]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    When MCP logging is enabled, a hosted edge can send the client log
    messages that name denied tools and carry error text (Section 11).
@@ -6602,14 +6703,6 @@ Internet-Draft                Chio Protocol               September 2026
    to their separate namespace and are not values in this registry.
    Experts check that the retry guidance distinguishes a changed
    condition from repeating an unsafe side effect.  The initial
-
-
-
-Whelan                    Expires 3 April 2027                [Page 118]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    allocations follow.  Core allocations reference this document.
    Values 7100 through 7119 are reserved for related transaction
    profiles, rather than allocated by this document; their diagnostic
@@ -6620,6 +6713,14 @@ Internet-Draft                Chio Protocol               September 2026
    1000 (protocol_version_unsupported):  Category protocol; transient
       false; retry do_not_retry_until_version_change.  JSON-RPC code:
       -32600.  Retry only after selecting a supported protocol version.
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 120]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    1001 (session_not_initialized):  Category protocol; transient false;
       retry reinitialize.  JSON-RPC code: -32002.  Open a new session
@@ -6656,16 +6757,6 @@ Internet-Draft                Chio Protocol               September 2026
       grant widening, or billing reconciliation.
 
    5100 (tool_server_error):  Category tool; transient true; retry
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 119]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
       retry_with_backoff.  Native name: tool_server_error.  Use bounded
       exponential backoff unless upstream tooling documents a permanent
       failure.
@@ -6679,6 +6770,13 @@ Internet-Draft                Chio Protocol               September 2026
       diagnostic name: transaction_passport_schema_unsupported.
       Regenerate the passport with a registered transaction passport
       schema.
+
+
+
+Whelan                    Expires 3 April 2027                [Page 121]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    7101 (transaction_passport_hash_mismatch):  Category transaction;
       transient false; retry do_not_retry.  Related-profile diagnostic
@@ -6715,13 +6813,6 @@ Internet-Draft                Chio Protocol               September 2026
       name: transaction_authorization_not_bound.  Bind capability,
       policy, approval, or guard evidence to the governed transaction.
 
-
-
-Whelan                    Expires 3 April 2027                [Page 120]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    7108 (transaction_receipt_uncheckpointed):  Category transaction;
       transient false; retry do_not_retry.  Related-profile diagnostic
       name: transaction_receipt_uncheckpointed.  Provide checkpointed
@@ -6734,6 +6825,15 @@ Internet-Draft                Chio Protocol               September 2026
       terminal receipt evidence.
 
    7110 (transaction_buyer_review_rejected):  Category transaction;
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 122]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
       transient false; retry do_not_retry.  Related-profile diagnostic
       name: transaction_buyer_review_rejected.  Regenerate buyer review
       evidence that matches the transaction passport and verifier
@@ -6768,16 +6868,6 @@ Internet-Draft                Chio Protocol               September 2026
       artifact against its registered schema.
 
    7116 (transaction_signature_invalid):  Category transaction;
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 121]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
       transient false; retry do_not_retry.  Related-profile diagnostic
       name: transaction_signature_invalid.  Re-sign the proof bundle
       with a key the verifier trusts.
@@ -6789,6 +6879,17 @@ Internet-Draft                Chio Protocol               September 2026
       unsupported feature from the proof bundle.
 
    7118 (transaction_negative_case_mismatch):  Category transaction;
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 123]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
       transient false; retry do_not_retry.  Related-profile diagnostic
       name: transaction_negative_case_mismatch.  Regenerate the negative
       case so it fails with its declared failure code, or correct the
@@ -6827,19 +6928,23 @@ Internet-Draft                Chio Protocol               September 2026
    suite and does not select its components.  The composite's encoded
    algorithm set selects them.
 
-
-
-Whelan                    Expires 3 April 2027                [Page 122]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 17.3.  Chio Native Message Types
 
    The registration template is: type value; direction (agent to kernel
    or kernel to agent); payload fields and types; terminal or streaming
    behavior; and reference.  Experts check that state transitions,
    correlation, and failure behavior are defined.  Initial values are:
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 124]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
           +====================+=================+==============+
           | Value              | Direction       | Reference    |
@@ -6883,18 +6988,19 @@ Internet-Draft                Chio Protocol               September 2026
 
    *  chio.receipt.v1: receipt signing projection (Section 6).
 
-
-
-Whelan                    Expires 3 April 2027                [Page 123]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    *  chio.aggregate-budget-root.v1: aggregate budget root
       (Section 7.5).
 
    *  chio.execution_nonce.v1: authoritative execution nonce
       (Section 7.7).
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 125]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    *  chio.operation_execution_nonce.v1: operation-owned execution nonce
       with an operation-bound signing context (Section 7.7.1).
@@ -6937,15 +7043,6 @@ Internet-Draft                Chio Protocol               September 2026
    configurations establish public transparency or distributed spend
    linearizability.
 
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 124]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    TLS and proxy-only reachability requirements are deployment duties.
    The hosted listeners themselves accept plain TCP; operators provide
    the required transport protection.  The local token issuer pairs
@@ -6953,6 +7050,13 @@ Internet-Draft                Chio Protocol               September 2026
    but imported JWT and introspection paths can accept attestation-only
    confirmation.  Such imports require an issuer or deployment policy
    enforcing Section 15.13; that property is not a universal edge check.
+
+
+
+Whelan                    Expires 3 April 2027                [Page 126]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    The portable core and the hosted kernel have different enforcement
    surfaces.  The portable core handles tool grants and refuses
@@ -6994,17 +7098,21 @@ Internet-Draft                Chio Protocol               September 2026
    certify budget durability, deployment isolation, checkpoint
    publication, or end-to-end behavior of a third-party tool.
 
-
-
-
-Whelan                    Expires 3 April 2027                [Page 125]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
 19.  References
 
 19.1.  Normative References
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 127]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    [FIPS180-4]
               National Institute of Standards and Technology, "Secure
@@ -7050,17 +7158,17 @@ Internet-Draft                Chio Protocol               September 2026
               Signature (JWS)", RFC 7515, DOI 10.17487/RFC7515, May
               2015, <https://www.rfc-editor.org/rfc/rfc7515>.
 
-
-
-
-Whelan                    Expires 3 April 2027                [Page 126]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
               (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
               <https://www.rfc-editor.org/rfc/rfc7519>.
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 128]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    [RFC7662]  Richer, J., Ed., "OAuth 2.0 Token Introspection",
               RFC 7662, DOI 10.17487/RFC7662, October 2015,
@@ -7103,21 +7211,20 @@ Internet-Draft                Chio Protocol               September 2026
               Transparency Version 2.0", RFC 9162, DOI 10.17487/RFC9162,
               December 2021, <https://www.rfc-editor.org/rfc/rfc9162>.
 
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 127]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [RFC9449]  Fett, D., Campbell, B., Bradley, J., Lodderstedt, T.,
               Jones, M., and D. Waite, "OAuth 2.0 Demonstrating Proof of
               Possession (DPoP)", RFC 9449, DOI 10.17487/RFC9449,
               September 2023, <https://www.rfc-editor.org/rfc/rfc9449>.
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 129]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    [RFC9728]  Jones, M.B., Hunt, P., and A. Parecki, "OAuth 2.0
               Protected Resource Metadata", RFC 9728,
@@ -7159,17 +7266,6 @@ Internet-Draft                Chio Protocol               September 2026
               symposium.org/ndss2014/programme/macaroons-cookies-
               contextual-caveats-decentralized-authorization-cloud/>.
 
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 128]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [OID4VCI]  OpenID Foundation, "OpenID for Verifiable Credential
               Issuance 1.0", 16 September 2025,
               <https://openid.net/specs/openid-4-verifiable-credential-
@@ -7178,6 +7274,13 @@ Internet-Draft                Chio Protocol               September 2026
    [OID4VP]   OpenID Foundation, "OpenID for Verifiable Presentations
               1.0", 9 July 2025, <https://openid.net/specs/openid-4-
               verifiable-presentations-1_0.html>.
+
+
+
+Whelan                    Expires 3 April 2027                [Page 130]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    [RFC7942]  Sheffer, Y. and A. Farrel, "Improving Awareness of Running
               Code: The Implementation Status Section", BCP 205,
@@ -7218,18 +7321,22 @@ Internet-Draft                Chio Protocol               September 2026
    [UCAN]     UCAN Working Group, "User Controlled Authorization Network
               (UCAN) Specification", <https://github.com/ucan-wg/spec>.
 
-
-
-
-Whelan                    Expires 3 April 2027                [Page 129]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [VC-DATA-MODEL-2.0]
               World Wide Web Consortium, "Verifiable Credentials Data
               Model v2.0", 15 May 2025,
               <https://www.w3.org/TR/vc-data-model-2.0/>.
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 131]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 Appendix A.  Examples
 
@@ -7277,7 +7384,12 @@ A.1.  Capability Token
 
 
 
-Whelan                    Expires 3 April 2027                [Page 130]
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 132]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7333,7 +7445,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 131]
+Whelan                    Expires 3 April 2027                [Page 133]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7389,7 +7501,7 @@ A.2.  Tool Call Request Frame
 
 
 
-Whelan                    Expires 3 April 2027                [Page 132]
+Whelan                    Expires 3 April 2027                [Page 134]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7445,7 +7557,7 @@ A.3.  Receipt
 
 
 
-Whelan                    Expires 3 April 2027                [Page 133]
+Whelan                    Expires 3 April 2027                [Page 135]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7501,7 +7613,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 134]
+Whelan                    Expires 3 April 2027                [Page 136]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7557,7 +7669,7 @@ B.1.  Canonical JSON
 
 
 
-Whelan                    Expires 3 April 2027                [Page 135]
+Whelan                    Expires 3 April 2027                [Page 137]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7613,7 +7725,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 136]
+Whelan                    Expires 3 April 2027                [Page 138]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7669,7 +7781,7 @@ B.3.  Ed25519 Signatures
 
 
 
-Whelan                    Expires 3 April 2027                [Page 137]
+Whelan                    Expires 3 April 2027                [Page 139]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7725,7 +7837,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 138]
+Whelan                    Expires 3 April 2027                [Page 140]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7781,7 +7893,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 139]
+Whelan                    Expires 3 April 2027                [Page 141]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7837,7 +7949,7 @@ B.4.  Capability Token Verification
 
 
 
-Whelan                    Expires 3 April 2027                [Page 140]
+Whelan                    Expires 3 April 2027                [Page 142]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7893,7 +8005,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 141]
+Whelan                    Expires 3 April 2027                [Page 143]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -7949,7 +8061,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 142]
+Whelan                    Expires 3 April 2027                [Page 144]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8005,7 +8117,7 @@ B.5.  Receipt Verification
 
 
 
-Whelan                    Expires 3 April 2027                [Page 143]
+Whelan                    Expires 3 April 2027                [Page 145]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8061,7 +8173,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 144]
+Whelan                    Expires 3 April 2027                [Page 146]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8117,7 +8229,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 
 
-Whelan                    Expires 3 April 2027                [Page 145]
+Whelan                    Expires 3 April 2027                [Page 147]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8173,7 +8285,7 @@ C.2.  Delegated Authorization
 
 
 
-Whelan                    Expires 3 April 2027                [Page 146]
+Whelan                    Expires 3 April 2027                [Page 148]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8229,7 +8341,7 @@ C.6.  Verifiable Credentials
 
 
 
-Whelan                    Expires 3 April 2027                [Page 147]
+Whelan                    Expires 3 April 2027                [Page 149]
 
 Internet-Draft                Chio Protocol               September 2026
 
@@ -8285,4 +8397,4 @@ Author's Address
 
 
 
-Whelan                    Expires 3 April 2027                [Page 148]
+Whelan                    Expires 3 April 2027                [Page 150]

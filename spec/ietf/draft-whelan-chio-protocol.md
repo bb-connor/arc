@@ -3576,10 +3576,11 @@ present. For the request above, the receipt records:
 
 The trust-control service offers an HTTP interface {{RFC9110}} whose
 paths begin with `/v1` ({{versioning}}). Request and response bodies are
-JSON objects with camelCase member names. Nested capability tokens,
-receipts, and attestation statements keep their own member names. This
-section specifies four endpoints: issuance, delegated issuance, receipt
-query, and revocation.
+JSON objects with camelCase member names, except at the revocation
+endpoint ({{revocation}}). Nested capability tokens, receipts, and
+attestation statements keep their own member names. This section
+specifies four endpoints: issuance, delegated issuance, receipt query,
+and revocation.
 
 A caller authenticates with an `Authorization` header that carries the
 `Bearer` scheme and the service token. The service compares the token
@@ -3796,47 +3797,111 @@ verify. A query that matches nothing returns:
 
 ## Revocation {#revocation}
 
-`POST /v1/revocations` revokes a capability. Its request body has one
-REQUIRED member, `capabilityId`, a string that identifies the
-capability. Only the service token authenticates this endpoint. The
-service records the identifier as revoked without checking that it
-names an issued capability, so a caller can revoke an identifier before
-any token uses it. It answers 200 only after the revocation is visible
-in its store, 409 if it has no revocation store, and 500 if the store
-fails. A 200 response has these members:
+The revocation endpoint departs from the camelCase convention of this
+section: its request members, query parameters, and response members
+are snake_case, and the service refuses an unknown request member or
+query parameter with 400.
 
-`capabilityId`:
-: The identifier from the request.
+`POST /v1/revocations` revokes a capability. Its request body has two
+REQUIRED members:
 
-`revoked`:
-: `true`.
+`capability_id`:
+: A string that identifies the capability.
 
-`newlyRevoked`:
-: `false` if the identifier was already revoked, and `true` otherwise.
+`reason`:
+: One of `operator_request`, `credential_compromise`,
+  `principal_offboarded`, `tenant_offboarded`, `policy_withdrawn`, or
+  `incident_response`.
 
 ~~~ json
-{"capabilityId": "cap-1", "newlyRevoked": true, "revoked": true}
+{"capability_id": "cap-1", "reason": "operator_request"}
 ~~~
 
-`GET /v1/revocations`, authenticated by the service token, reports
-revocation state. With the parameter `capabilityId`, its response
-includes `capabilityId` and a boolean `revoked` for that identifier. The
-response also has `configured` (boolean), `backend` (string), `count`
-(integer), and `revocations`, an array of up to `limit` objects with
-members `capabilityId` and `revokedAt` (Unix seconds).
+A caller authenticates with a credential holding `revocations:write`.
+The service records the identifier as revoked without checking that it
+names an issued capability, so a caller can revoke an identifier before
+any token uses it. It answers 200 only after the revocation is visible in its store,
+400 for a body that is not this structure, 409 if it has no revocation
+store, and 503 if the store fails. A 200 response has these members:
+
+`entry`:
+: The stored revocation entry. If the identifier was already revoked,
+  the entry keeps the `revoked_at` and `reason` of the first revocation.
+
+`newly_revoked`:
+: `true` if this request recorded the entry, and `false` if the
+  identifier was already revoked.
+
+`roots_matched`:
+: The number of capabilities that the target names and that stand
+  revoked after the request.
+
+`roots_revoked`:
+: How many of those this request marked revoked.
+
+A revocation entry is a JSON object with these members:
+
+`schema`:
+: `chio.revocation-entry.v1`.
+
+`entry_id`:
+: `rev_` followed by the lowercase hexadecimal SHA-256 digest of the
+  octets of `chio.revocation-entry-id.v1`, a zero octet, `target_kind`,
+  a zero octet, and `target_value`.
+
+`target_kind`:
+: The kind of target: `capability_id` for an entry that this endpoint
+  records. Other kinds are `root_policy_rule`, `anchor_subject`,
+  `tenant_tag`, and `replay_key`; their entries are recorded by means
+  outside this document.
+
+`target_value`:
+: The target identifier, here the `capability_id` of the request.
+
+`revoked_at`:
+: The time of the first revocation, in Unix seconds.
+
+`reason`:
+: The reason of the first revocation.
+
+`GET /v1/revocations`, authenticated by a credential holding
+`revocations:read`, reports revocation state. With the parameter
+`capability_id`, it reports one capability and accepts no other
+parameter. The response has the members
+`capability_id`, the identifier; `revoked`, a boolean; and `entry_id`,
+the `entry_id` of the entry that revokes the capability, or `null` when
+`revoked` is `false`.
+
+~~~ json
+{"capability_id": "cap-1", "revoked": false, "entry_id": null}
+~~~
+
+Without `capability_id`, the endpoint returns a page of entries. Its
+OPTIONAL parameters are `after`, an entry sequence number (default 0);
+`limit`, the largest number of entries to return (default 100, and 400
+outside the range 1 to 500); and `kind`, a `target_kind` value that
+selects entries of that kind. The response has the members `entries`,
+an array of objects with members `entry_seq` (integer) and `entry` (a
+revocation entry), in ascending `entry_seq` order after `after`;
+`next_after`, the last `entry_seq` returned, or `after` when `entries`
+is empty; and `head`, the highest stored entry sequence number. Both
+forms answer 409 if the service has no revocation store and 503 if the
+store fails.
 
 A kernel learns of a revocation only when it checks. Before it
 dispatches a call, the kernel checks the revocation state of the
 token's `id` and of each capability in the token's delegation chain
 ({{capability-verification}}). A kernel configured with a trust-control
 service makes each check a `GET /v1/revocations` request with
-`capabilityId` set to the identifier and `limit` set to 1, reads
-`revoked`, and keeps no cache. The kernel MUST deny the call, with a
-signed receipt, if any identifier is revoked or if a check fails. The
-trust-control service does not notify kernels of revocations. The
-reference native driver does not notify agents; the optional
-`capability_revoked` message remains a permitted wire allocation
-({{native-messages}}).
+`capability_id` set to the identifier, reads `revoked`, and keeps no
+cache. A response whose `capability_id` differs from the identifier, or
+whose `entry_id` is not the identifier's entry when `revoked` is `true`
+or is not `null` when `revoked` is `false`, is a failed check. The
+kernel MUST deny the call, with a signed receipt, if any identifier is
+revoked or if a check fails. The trust-control service does not notify
+kernels of revocations. The reference native driver does not notify
+agents; the optional `capability_revoked` message remains a permitted
+wire allocation ({{native-messages}}).
 
 # Versioning and Negotiation {#versioning}
 

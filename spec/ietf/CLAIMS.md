@@ -129,6 +129,34 @@ signing-wrapper implementation. It does not requalify other rows.
   the wrapper under their own schema ids and still never use the
   ordinary receipt content-addressed identifier or signing body.
 
+### 2026-10-30: snake_case revocation wire alignment
+
+This targeted source review covers the revocation rows below at the
+snake_case trust-control revocation wire (`spec/WIRE_PROTOCOL.md`
+section 4.4). It does not requalify other rows.
+
+- **Revocation wire.** `POST /v1/revocations` takes `capability_id` and
+  a closed `reason`, refuses unknown members, and answers `entry`,
+  `newly_revoked`, `roots_matched`, and `roots_revoked`.
+  `GET /v1/revocations?capability_id=<id>` answers `capability_id`,
+  `revoked`, and `entry_id`. Without `capability_id` it pages entries
+  by `after`, `limit`, and `kind` as `entries`, `next_after`, and
+  `head`. A store failure answers 503, not 500. The camelCase
+  `capabilityId`, `newlyRevoked`, `configured`, `backend`, `count`, and
+  `revocations` members are gone. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs`
+  (`handle_revoke_capability`, `handle_list_revocations`) and
+  `crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs`
+  (`RevocationQuery`, `RevocationStatusResponse`, `RevocationEntryPage`).
+- **Rows updated.** Trust-control rows C24, C25, and C26 and the BCP 14
+  row for C27 now state the snake_case wire. Their draft line pointers
+  other than the C27 BCP 14 row stay at the frozen snapshot.
+- **Authentication not requalified.** The draft now names the scopes
+  the revocation handlers check (`revocations:write` for POST,
+  `revocations:read` for GET), but this change does NOT requalify the
+  authentication model. The draft-wide trust-control credential model
+  (service token versus scoped caller credentials) is open.
+
 ## Abstract and Sections 1-3
 
 # Final opening-section claim review
@@ -1201,7 +1229,7 @@ Occurrence counts in sections 10-12: MUST=21, SHOULD=2, MAY=6, REQUIRED=36, OPTI
 | 3557 | MUST | C11-C17 | The service MUST perform these checks, in this order, and reject the |
 | 3633 | MUST | C20 | The service MUST reject the query with 400 if `minCost` exceeds |
 | 3640 | MAY | C21 | service MAY also accept read tokens that are each bound to one tenant; a |
-| 3708 | MUST | C27 | `revoked`, and keeps no cache. The kernel MUST deny the call, with a |
+| 3899 | MUST | C27 | kernel MUST deny the call, with a signed receipt, if any identifier is |
 
 REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07-N09 (both split tables), native response N15-N17, native chunks N18, direct issuance C04/C08, delegated request C10, signed policy C11, delegated response C18, receipt query C19, revocation C24, model metadata H41-H42. The table layout changes preserve the same fields and presence rules; both hosted alias/native-equivalent tables are covered by H32.
 
@@ -1314,9 +1342,9 @@ REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07
 | C21 | Deployment-authority credential all tenants; MAY tenant credentials constrain returned tenant | receipt-query (draft line 3611) | `crates/platform/chio-control-plane/src/trust_control/report_validation.rs:501-522`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:264-286`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:299-312` | FINAL SUPPORTED |
 | C22 | Default50/max200/min1; sequence ascending strictly after cursor; total ignores cursor/limit; last-seq cursor when page full, null otherwise | receipt-query-paging (draft line 3644) | `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:972-976`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:49-59`; `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:411-445` | FINAL SUPPORTED |
 | C23 | Receipt signatures verified before return; bad stored receipt500; only receipt objects exposed, no seq; zero matches empty response | receipt-query-paging (draft line 3644) | `crates/platform/chio-store-sqlite/src/receipt_store/evidence_retention.rs:400-406`; `crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs:124-146`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:291-313`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:505-512` | FINAL QUALIFIED: Stored receipt verification checks the embedded signer signature and receipt/action hashes. It does not establish separate trust in that signer. |
-| C24 | POST revocation service-auth only, required capabilityId arbitrary string; no issued-token lookup;200 only after readback;409 missing store;500 errors | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:484-529`; `crates/platform/chio-control-plane/src/trust_control/service_types/state.rs:189-197` | FINAL SUPPORTED |
-| C25 | Response capabilityId/revoked=true/newlyRevoked boolean; GET configured/backend/count/list id/time and optional targeted status | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:446-482`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:517-522`; `crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs:238-265`; `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:951-975` | FINAL SUPPORTED |
-| C26 | Token and all delegation ancestors checked before dispatch; remote store GET capabilityId/limit1 reads revoked without cache | revocation (draft line 3671) | `crates/kernel/chio-kernel/src/kernel/validation.rs:718-730`; `crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs:31-72`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs:122-137` | FINAL SUPPORTED |
+| C24 | POST revocation: required snake_case `capability_id` (valid identifier, no issued-token lookup) and closed `reason`; unknown members refused; 400 malformed; 200 only after readback; 409 missing store; 503 store failure | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:574-631`; `crates/platform/chio-control-plane/src/trust_control/config_and_public.rs:23-37`; `crates/platform/chio-control-plane/src/trust_control/service_types/state.rs:300-309`; `crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs:289-305` | FINAL SUPPORTED |
+| C25 | POST response `entry`/`newly_revoked`/`roots_matched`/`roots_revoked`; `chio.revocation-entry.v1` members and `entry_id` derivation; GET `capability_id` status `{capability_id, revoked, entry_id}` with no page members; GET page `after`/`limit` (default 100, 1-500)/`kind` as `{entries: [{entry_seq, entry}], next_after, head}` | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:532-572`; `crates/platform/chio-control-plane/src/trust_control/service_types/responses.rs:240-343`; `crates/core/chio-core-types/src/root_authority/revocation_entry.rs:18-20,27-82,234-256` | FINAL SUPPORTED |
+| C26 | Token and all delegation ancestors checked before dispatch; remote store GET `capability_id` reads `revoked` without cache; a status that names another capability or entry is a failed check | revocation (draft line 3671) | `crates/kernel/chio-kernel/src/kernel/validation.rs:718-730`; `crates/kernel/chio-kernel/src/kernel/validation/revocation_trace.rs:31-72`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs:67-73`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/client/operations.rs:494-516` | FINAL SUPPORTED |
 | C27 | Kernel MUST deny with signed receipt if revoked/check fails | revocation (draft line 3671) | `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs:267-277`; `crates/kernel/chio-kernel/src/kernel/responses/deny_responses.rs:495-519` | FINAL QUALIFIED: The revocation denial path signs a receipt when signing/storage succeeds. An arbitrary signer/store failure can prevent evidence production. |
 | C28 | Trust-control service has no pushed revocation updates; reference native driver does not notify agents, while capability_revoked remains an optional permitted native wire message | revocation (draft line 3671) | `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs:122-137`; `crates/products/chio-cli/src/cli/session/response.rs:51-58`; `crates/core/chio-core-types/src/message.rs:208-212` | FINAL QUALIFIED: No-notice behavior is now explicitly scoped to the reference native driver and no longer contradicts the optional native wire allocation. |
 
