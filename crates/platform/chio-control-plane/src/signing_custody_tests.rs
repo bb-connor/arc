@@ -277,3 +277,53 @@ fn credential_outside_private_or_systemd_custody_is_refused() {
         KeyCustodyError::CredentialCustodyRefused
     );
 }
+
+#[test]
+fn missing_seed_file_reads_as_absent_and_is_created_private() {
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let seed = directory.path().join("authority.seed");
+    let development = custody(CustodyPolicy::AllowFiles, None);
+
+    assert_eq!(development.public_key(&seed).test_unwrap(), None);
+    let created = development.load_or_create(&seed).test_unwrap();
+    assert_eq!(
+        development.public_key(&seed).test_unwrap(),
+        Some(created.public_key())
+    );
+    assert_eq!(
+        development.load_or_create(&seed).test_unwrap().public_key(),
+        created.public_key()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn plain_seed_reads_refuse_permissive_or_linked_seed_files() {
+    use std::os::unix::fs::{symlink, PermissionsExt as _};
+
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let seed = directory.path().join("authority.seed");
+    let alias = directory.path().join("authority-alias.seed");
+    write_authority_seed_file(&seed, &Keypair::generate()).test_unwrap();
+    let development = custody(CustodyPolicy::AllowFiles, None);
+
+    fs::set_permissions(&seed, fs::Permissions::from_mode(0o644)).test_unwrap();
+    let before = fs::read(&seed).test_unwrap();
+    for error in [
+        development.public_key(&seed).map(|_| ()).test_unwrap_err(),
+        development.load_or_create(&seed).map(|_| ()).test_unwrap_err(),
+    ] {
+        assert!(error.to_string().contains("mode 0600"), "{error}");
+    }
+    assert_eq!(fs::read(&seed).test_unwrap(), before);
+
+    fs::set_permissions(&seed, fs::Permissions::from_mode(0o600)).test_unwrap();
+    symlink(&seed, &alias).test_unwrap();
+    for error in [
+        development.public_key(&alias).map(|_| ()).test_unwrap_err(),
+        development.load_or_create(&alias).map(|_| ()).test_unwrap_err(),
+    ] {
+        assert!(error.to_string().contains("regular file"), "{error}");
+    }
+    assert_eq!(fs::read(&seed).test_unwrap(), before);
+}

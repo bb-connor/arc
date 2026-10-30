@@ -173,14 +173,13 @@ impl SeedCustody {
         self.load_key(&key)
     }
 
+    /// `None` only for an absent seed file; a missing credential is an error.
     fn public_key(&self, path: &Path) -> Result<Option<chio_core::PublicKey>, CliError> {
-        match self.resolve(path)? {
-            KeyRef::File(path) => match fs::read_to_string(&path) {
-                Ok(seed_hex) => Ok(Some(Keypair::from_seed_hex(seed_hex.trim())?.public_key())),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(error) => Err(CliError::Io(error)),
-            },
-            key @ KeyRef::SystemdCredential { .. } => Ok(Some(self.load_key(&key)?.public_key())),
+        let key = self.resolve(path)?;
+        match self.load_key(&key) {
+            Ok(keypair) => Ok(Some(keypair.public_key())),
+            Err(error) if is_missing_seed_file(&key, &error) => Ok(None),
+            Err(error) => Err(error),
         }
     }
 
@@ -192,19 +191,14 @@ impl SeedCustody {
     }
 
     fn load_or_create(&self, path: &Path) -> Result<Keypair, CliError> {
-        match self.resolve(path)? {
-            KeyRef::File(path) => match self.public_key(&path)? {
-                Some(_) => {
-                    let seed_hex = fs::read_to_string(&path)?;
-                    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
-                }
-                None => {
-                    let keypair = Keypair::generate();
-                    write_authority_seed_file(&path, &keypair)?;
-                    Ok(keypair)
-                }
-            },
-            key @ KeyRef::SystemdCredential { .. } => self.load_key(&key),
+        let key = self.resolve(path)?;
+        match self.load_key(&key) {
+            Err(error) if is_missing_seed_file(&key, &error) => {
+                let keypair = Keypair::generate();
+                write_authority_seed_file(path, &keypair)?;
+                Ok(keypair)
+            }
+            loaded => loaded,
         }
     }
 
@@ -239,6 +233,11 @@ impl SeedCustody {
             }
         }
     }
+}
+
+fn is_missing_seed_file(key: &KeyRef, error: &CliError) -> bool {
+    matches!(key, KeyRef::File(_))
+        && matches!(error, CliError::Io(error) if error.kind() == std::io::ErrorKind::NotFound)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
