@@ -22,7 +22,7 @@ import csv, os, re, subprocess, sys
 BLOCKS = [
     "financial", "governed_transaction", "governed_transaction_diagnostics", "receipt_context",
     "stream", "memory_provenance", "post_invocation", "session_report", "chio_receipt_signing_nonce",
-    "protocol_admission", "finding_pool_mutation", "otel", "active_defense_backfill_v1",
+    "protocol_admission", "finding_pool_mutation", "otel",
     "scimLifecycle", "mercury", "authorizationContext", "guardOutcome", "deniedAccessRecord",
     "acp", "batch_witness", "chio_http_receipt_v1", "delivery_contract", "cage_receipt",
     "active_defense_evidence_id", "protocol_refusal", "admission_operation", "policySnapshot",
