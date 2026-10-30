@@ -3555,11 +3555,11 @@ id `chio.operator-root-request.v1`. A verifier:
    JSON, a `schema` member other than the id, a `signature` that is missing
    or not canonical hex, an absent `tenant_value`, and any member not listed
    above;
-2. verifies the signature through the wrapper against the pinned operator
-   key and the schema id, and refuses a signature that does not verify,
-   including one made under any other schema id;
-3. records the request digest as SHA-256 of the canonical JSON that was
-   signed.
+2. verifies the signature through the wrapper, against the pinned operator
+   key and the schema id, over the canonical JSON of the members exactly as
+   received (never a re-serialized typed form), and refuses a signature that
+   does not verify, including one made under any other schema id;
+3. records the request digest as SHA-256 of that canonical JSON.
 
 Each refusal answers `invalid_request` and names its reason. The minted
 root's issuer string is `urn:chio:operator-key`, and its tenant and
@@ -3568,7 +3568,8 @@ principal reach the delegation context only as salted commitments.
 `chio mcp root-request sign --operator-seed-file <path>` is the operator-side
 signer. It reads the unsigned request (every member above except `schema`
 and `signature`) on standard input and writes the signed request as
-canonical JSON. The seed file must already exist as a regular, singly
+canonical JSON. It refuses a request whose signed form would exceed the
+64 KiB bound a verifier reads. The seed file must already exist as a regular, singly
 linked file owned by the invoking user with mode 0600 or stricter; it is
 never created or repaired.
 

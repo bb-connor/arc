@@ -98,50 +98,63 @@ struct OperatorRootRequestSigningBody<'a> {
     expires_at: u64,
 }
 
-#[derive(Serialize)]
-struct SignedOperatorRootRequestWire<'a> {
-    schema: &'static str,
-    request_id: &'a Identifier,
-    principal: &'a Identifier,
-    tenant_value: &'a Identifier,
-    scope: &'a ChioScope,
-    holder: HolderClass,
-    expires_at: u64,
-    signature: &'a Signature,
-}
-
 /// A `chio.operator-root-request.v1`: the request members, `schema`, and
 /// the operator's `signature` over the canonical JSON of the rest.
+///
+/// The signed body is kept exactly as received (every member except
+/// `signature`), so the signature and the request digest cover what the
+/// operator signed; the typed request is decoded from the same members and
+/// only enforces their shape.
 #[derive(Debug, Clone)]
 pub struct SignedOperatorRootRequest {
     request: OperatorRootRequest,
+    signed_body: Map<String, Value>,
+    signed_canonical: Vec<u8>,
     signature: Signature,
 }
 
 impl SignedOperatorRootRequest {
-    /// Sign `request` with the operator key `backend` holds.
+    /// Sign `request` with the operator key `backend` holds. A request whose
+    /// signed form would exceed [`MAX_OPERATOR_ROOT_REQUEST_BYTES`] refuses,
+    /// since no reader would admit it.
     pub fn sign(
         request: OperatorRootRequest,
         backend: &dyn SigningBackend,
     ) -> Result<Self, RootExchangeError> {
-        let (outcome, _) = sign_wrapped(
+        let Value::Object(signed_body) = serde_json::to_value(request.signing_body())
+            .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?
+        else {
+            return Err(RootExchangeError::Canonicalization(
+                "signing body is not a JSON object".to_owned(),
+            ));
+        };
+        let (outcome, canonical) = sign_wrapped(
             backend,
             CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
-            &request.signing_body(),
+            &Value::Object(signed_body.clone()),
         )
         .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
-        Ok(Self {
+        let signed = Self {
             request,
+            signed_body,
+            signed_canonical: canonical.into_vec(),
             signature: outcome.signature,
-        })
+        };
+        if signed.to_canonical_json()?.len() > MAX_OPERATOR_ROOT_REQUEST_BYTES {
+            return Err(RootExchangeError::OperatorRootRequestMalformed(
+                "signed request exceeds the size bound",
+            ));
+        }
+        Ok(signed)
     }
 
     /// Decode a signed request strictly: the size bound, duplicate-free
     /// JSON, a `schema` member equal to `chio.operator-root-request.v1`, a
-    /// canonical hex `signature`, and the request members with no other.
+    /// canonical hex `signature`, a body with a canonical JSON form, and the
+    /// request members with no other.
     pub fn parse(body: &[u8]) -> Result<Self, RootExchangeError> {
-        let mut members = decode_document(body)?;
-        match members.remove("schema") {
+        let mut signed_body = decode_document(body)?;
+        match signed_body.get("schema") {
             Some(Value::String(schema)) if schema == CHIO_OPERATOR_ROOT_REQUEST_SCHEMA => {}
             _ => {
                 return Err(RootExchangeError::OperatorRootRequestMalformed(
@@ -149,7 +162,7 @@ impl SignedOperatorRootRequest {
                 ))
             }
         }
-        let signature = match members.remove("signature") {
+        let signature = match signed_body.remove("signature") {
             None => {
                 return Err(RootExchangeError::OperatorRootRequestMalformed(
                     "signature is missing",
@@ -163,37 +176,43 @@ impl SignedOperatorRootRequest {
         .ok_or(RootExchangeError::OperatorRootRequestMalformed(
             "signature is not a canonical hex signature",
         ))?;
+        let signed_canonical = chio_core::canonical_json_bytes(&signed_body).map_err(|_| {
+            RootExchangeError::OperatorRootRequestMalformed("body has no canonical JSON form")
+        })?;
+        let mut members = signed_body.clone();
+        members.remove("schema");
         let request = OperatorRootRequest::from_members(members)?;
-        Ok(Self { request, signature })
-    }
-
-    /// The canonical JSON of the signed request.
-    pub fn to_canonical_json(&self) -> Result<Vec<u8>, RootExchangeError> {
-        let request = &self.request;
-        chio_core::canonical_json_bytes(&SignedOperatorRootRequestWire {
-            schema: CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
-            request_id: &request.request_id,
-            principal: &request.principal,
-            tenant_value: &request.tenant_value,
-            scope: &request.scope,
-            holder: request.holder,
-            expires_at: request.expires_at,
-            signature: &self.signature,
+        Ok(Self {
+            request,
+            signed_body,
+            signed_canonical,
+            signature,
         })
-        .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))
     }
 
-    /// Verify the signature under `pinned_operator_key`, the key the
-    /// operator configured; the request carries no key of its own.
+    /// The canonical JSON of the signed request: the signed body and its
+    /// `signature`.
+    pub fn to_canonical_json(&self) -> Result<Vec<u8>, RootExchangeError> {
+        let mut wire = self.signed_body.clone();
+        wire.insert(
+            "signature".to_owned(),
+            Value::String(self.signature.to_hex()),
+        );
+        chio_core::canonical_json_bytes(&wire)
+            .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))
+    }
+
+    /// Verify the signature over the signed body as received, under
+    /// `pinned_operator_key`, the key the operator configured; the request
+    /// carries no key of its own.
     pub fn verify(
         self,
         pinned_operator_key: &PublicKey,
     ) -> Result<VerifiedOperatorRootRequest, RootExchangeError> {
-        let body = self.request.signing_body();
         match verify_wrapped(
             pinned_operator_key,
             CHIO_OPERATOR_ROOT_REQUEST_SCHEMA,
-            &body,
+            &self.signed_body,
             &self.signature,
         ) {
             Ok(()) => {}
@@ -203,12 +222,9 @@ impl SignedOperatorRootRequest {
             ) => return Err(RootExchangeError::OperatorRootRequestSignatureInvalid),
             Err(error) => return Err(RootExchangeError::Canonicalization(error.to_string())),
         }
-        let signed_bytes = chio_core::canonical_json_bytes(&body)
-            .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
-        let request_digest = Sha256Digest::from_hash(chio_core::sha256(&signed_bytes));
         Ok(VerifiedOperatorRootRequest {
             request: self.request,
-            request_digest,
+            request_digest: Sha256Digest::from_hash(chio_core::sha256(&self.signed_canonical)),
         })
     }
 }

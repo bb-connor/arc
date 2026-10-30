@@ -3040,7 +3040,12 @@
       "introducedBy": "root-authority-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/root_authority/operator-root-request-body.schema.json",
       "title": "chio.operator-root-request.v1 signed body",
-      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/root_authority/operator-root-request.schema.json"
+      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/root_authority/operator-root-request.schema.json",
+      "overrides": {
+        "/scope": {
+          "$ref": "../capability/token.schema.json#/$defs/chioScope"
+        }
+      }
     },
     {
       "schema": "chio.outcome.contractual-zero.v1",

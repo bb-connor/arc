@@ -394,3 +394,40 @@ mod properties {
         }
     }
 }
+
+/// The schema corpus under `spec/.../root_authority/examples` and the Rust
+/// decoder agree: the valid request decodes, and each invalid one refuses
+/// with its typed refusal.
+#[test]
+fn operator_request_schema_corpus_matches_the_decoder() {
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../spec/schemas/chio-wire/v1/root_authority/examples");
+    let read = |kind: &str, name: &str| std::fs::read(examples.join(kind).join(name)).unwrap();
+
+    let valid = SignedOperatorRootRequest::parse(&read(
+        "valid",
+        "operator-root-request.constrained-scope.json",
+    ))
+    .unwrap();
+    assert_eq!(
+        valid.verify(&pinned_key()).unwrap_err(),
+        RootExchangeError::OperatorRootRequestSignatureInvalid
+    );
+
+    for (name, expected) in [
+        (
+            "operator-root-request.missing-tenant.json",
+            RootExchangeError::OperatorRootRequestMissingTenant,
+        ),
+        (
+            "operator-root-request.unknown-member.json",
+            RootExchangeError::OperatorRootRequestMalformed("body does not have the request shape"),
+        ),
+    ] {
+        assert_eq!(
+            SignedOperatorRootRequest::parse(&read("invalid", name)).unwrap_err(),
+            expected,
+            "{name}"
+        );
+    }
+}
