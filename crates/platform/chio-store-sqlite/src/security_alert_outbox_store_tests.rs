@@ -356,6 +356,29 @@ fn a_tampered_row_status_fails_every_read_path_as_an_integrity_failure() {
 }
 
 #[test]
+fn a_stored_backend_name_that_is_not_a_backend_name_fails_every_read_path() {
+    let fixture = Fixture::open();
+    let store = &fixture.store;
+    let first = alert(1);
+    store.admit(&first).test_unwrap();
+    let row = fixture.due_row(&first);
+    store
+        .record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS)
+        .test_unwrap();
+    let changed = fixture
+        .database()
+        .execute(
+            "UPDATE chio_security_alert_outbox_backend SET backend_name = ' pagerduty'",
+            [],
+        )
+        .test_unwrap();
+    assert_eq!(changed, 1);
+
+    integrity(store.load_backend_deliveries(&first));
+    integrity(store.confirmed_backends(&row));
+}
+
+#[test]
 fn sqlite_corruption_maps_to_an_integrity_failure() {
     let corrupt = rusqlite::Error::SqliteFailure(
         rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CORRUPT),
