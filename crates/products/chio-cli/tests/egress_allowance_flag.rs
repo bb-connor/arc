@@ -54,7 +54,8 @@ fn every_command_loads_the_allowance_file_before_it_runs() {
     let init_target = directory.join("scaffold");
     let init_target = init_target.to_str().expect("utf8 path");
     let loader_refusal = format!(
-        "error [urn:chio:error:cli:other]: {}",
+        "error [urn:chio:error:cli:other]: egress allowance file {} is refused: {}",
+        allowances.display(),
         PrivateNetworkAllowanceError::CidrIncludesReservedAddress {
             cidr: "169.254.0.0/16".to_string(),
             reserved: "169.254.0.0/16".to_string(),
@@ -174,7 +175,8 @@ fn trust_config_check_reports_the_digest_of_the_consumed_allowance_file() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "{stderr}");
-    let set = EgressAllowanceSet::load_file(&allowances).expect("valid allowance file");
+    let set = EgressAllowanceSet::from_toml_str(&std::fs::read_to_string(&allowances).expect("allowance file"))
+        .expect("valid allowance file");
     let digest = private_network_allowance_digest(set.entries()).expect("digest");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(

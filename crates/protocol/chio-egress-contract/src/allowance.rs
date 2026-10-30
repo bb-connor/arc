@@ -278,12 +278,10 @@ pub enum PrivateNetworkAllowanceError {
     DuplicateAllowance { host: String, port: u16 },
     #[error("allowance for {host}:{port} names both http and https")]
     SchemeConflict { host: String, port: u16 },
-    #[error("egress allowance file {path} cannot be read: {reason}")]
-    FileUnreadable { path: String, reason: String },
-    #[error("egress allowance file {path} exceeds {max_bytes} bytes")]
-    FileTooLarge { path: String, max_bytes: u64 },
-    #[error("egress allowance file {path} is invalid: {reason}")]
-    FileInvalid { path: String, reason: String },
+    #[error("egress allowance document exceeds {max_bytes} bytes")]
+    DocumentTooLarge { max_bytes: usize },
+    #[error("egress allowance document is invalid: {reason}")]
+    DocumentInvalid { reason: String },
 }
 
 /// Ranges an allowance may open: RFC 1918, RFC 6598 shared address space and
@@ -443,7 +441,7 @@ fn validate_cidr(cidr: &IpCidr) -> Result<(), PrivateNetworkAllowanceError> {
 }
 
 /// An operator's declared allowances, each entry validated on its own and no
-/// two for the same `host:port`. [`EgressAllowanceSet::load_file`] is the only
+/// two for the same `host:port`. [`EgressAllowanceSet::from_toml_str`] is the only
 /// document form. A contract takes only the entries for its own
 /// authorities (see `HttpEgressContract::with_private_network_allowances`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

@@ -20,7 +20,7 @@ pub use allowance::{
     EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST, MIN_IPV4_ALLOWANCE_PREFIX, MIN_IPV6_ALLOWANCE_PREFIX,
     PRIVATE_NETWORK_ALLOWANCE_DIGEST_SCHEMA,
 };
-pub use allowance_file::MAX_EGRESS_ALLOWANCE_FILE_BYTES;
+pub use allowance_file::MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES;
 
 /// Typed egress policy that must be declared before substrate HTTP egress.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

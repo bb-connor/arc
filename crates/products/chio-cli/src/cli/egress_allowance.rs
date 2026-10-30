@@ -1,9 +1,11 @@
 //! The operator egress allowance file named by `--egress-allowance-file`.
 
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use chio_egress_contract::EgressAllowanceSet;
+use chio_egress_contract::{EgressAllowanceSet, MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES};
 
 use crate::CliError;
 
@@ -17,10 +19,45 @@ pub(crate) fn none() -> Arc<EgressAllowanceSet> {
 pub(crate) fn load(path: Option<&Path>) -> Result<Arc<EgressAllowanceSet>, CliError> {
     match path {
         None => Ok(none()),
-        Some(path) => EgressAllowanceSet::load_file(path)
-            .map(Arc::new)
-            .map_err(|error| CliError::cli_other_error(error.to_string())),
+        Some(path) => {
+            let text = read(path)?;
+            EgressAllowanceSet::from_toml_str(&text)
+                .map(Arc::new)
+                .map_err(|error| {
+                    CliError::cli_other_error(format!(
+                        "egress allowance file {} is refused: {error}",
+                        path.display()
+                    ))
+                })
+        }
     }
+}
+
+fn read(path: &Path) -> Result<String, CliError> {
+    let unreadable = |reason: String| {
+        CliError::cli_other_error(format!(
+            "egress allowance file {} cannot be read: {reason}",
+            path.display()
+        ))
+    };
+    let file = File::open(path).map_err(|error| unreadable(error.to_string()))?;
+    let metadata = file
+        .metadata()
+        .map_err(|error| unreadable(error.to_string()))?;
+    if !metadata.is_file() {
+        return Err(unreadable("not a regular file".to_string()));
+    }
+    let ceiling = u64::try_from(MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES).unwrap_or(u64::MAX);
+    let mut bytes = Vec::new();
+    file.take(ceiling.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| unreadable(error.to_string()))?;
+    if bytes.len() > MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES {
+        return Err(unreadable(format!(
+            "file exceeds {MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES} bytes"
+        )));
+    }
+    String::from_utf8(bytes).map_err(|_| unreadable("file is not UTF-8".to_string()))
 }
 
 #[cfg(test)]
@@ -126,7 +163,37 @@ mod tests {
             };
         assert_eq!(
             error.to_string(),
-            CliError::cli_other_error(refusal.to_string()).to_string()
+            CliError::cli_other_error(format!(
+                "egress allowance file {} is refused: {refusal}",
+                path.display()
+            ))
+            .to_string()
         );
+    }
+
+    #[test]
+    fn a_directory_a_missing_file_and_non_utf8_text_are_unreadable() {
+        let directory = tempfile::tempdir().expect("dir");
+        for (path, reason) in [
+            (directory.path().to_path_buf(), "not a regular file"),
+            (directory.path().join("absent.toml"), "No such file"),
+        ] {
+            let error = load(Some(&path)).expect_err("unreadable").to_string();
+            assert!(error.contains("cannot be read"), "{error}");
+            assert!(error.contains(reason), "{error}");
+        }
+        let binary = directory.path().join("binary.toml");
+        std::fs::write(&binary, [0xff, 0xfe, b'\n']).expect("write");
+        let error = load(Some(&binary)).expect_err("not UTF-8").to_string();
+        assert!(error.contains("file is not UTF-8"), "{error}");
+    }
+
+    #[test]
+    fn a_file_over_the_ceiling_is_unreadable() {
+        let directory = tempfile::tempdir().expect("dir");
+        let path = directory.path().join("big.toml");
+        std::fs::write(&path, vec![b'\n'; MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES + 1]).expect("write");
+        let error = load(Some(&path)).expect_err("too large").to_string();
+        assert!(error.contains("exceeds"), "{error}");
     }
 }
