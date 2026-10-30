@@ -95,14 +95,18 @@ def chainSigned (verifies : DelegationLink → PublicKeyHex → Bool)
 
 /-- Full delegation chain validation.
     Mirrors: validate_delegation_chain in
-    crates/core/chio-core-types/src/capability/attenuation.rs. -/
+    crates/core/chio-core-types/src/capability/attenuation.rs.
+    Only the accept set is mirrored: the Rust validator checks link by link
+    and reports the first fault in link order, while this model checks each
+    property over the whole chain, so a chain with several faults can report
+    a different first error. -/
 def validateDelegationChain (chain : List DelegationLink) (rootDelegator : PublicKeyHex)
     (verifies : DelegationLink → PublicKeyHex → Bool) (maxDepth : Option Nat)
     : Except String Unit :=
   if !(match maxDepth with
       | some max => chainWithinDepth chain max
       | none => true) then
-    .error s!"delegation depth {chain.length} exceeds maximum"
+    .error s!"delegation depth {chain.length} exceeds maximum {maxDepth.getD 0}"
   else if !chainRooted rootDelegator chain then
     .error "link 0 delegator does not match the parent capability subject"
   else if !chainConnected chain then
@@ -113,6 +117,16 @@ def validateDelegationChain (chain : List DelegationLink) (rootDelegator : Publi
     .error "delegation chain signature invalid"
   else
     .ok ()
+
+/-- A chain the validator accepts starts at the verifier-supplied root. -/
+theorem validateDelegationChain_ok_rooted
+    (chain : List DelegationLink) (rootDelegator : PublicKeyHex)
+    (verifies : DelegationLink → PublicKeyHex → Bool) (maxDepth : Option Nat)
+    (h : validateDelegationChain chain rootDelegator verifies maxDepth = .ok ()) :
+    chainRooted rootDelegator chain = true := by
+  unfold validateDelegationChain at h
+  repeat' split at h
+  all_goals simp_all
 
 /-- Simplified kernel evaluation pipeline.
     Every path returns a Decision. Errors map to deny.
