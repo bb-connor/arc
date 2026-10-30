@@ -1,0 +1,349 @@
+# Session-id keyed handle
+
+Status: design for backlog row SESSION-ID-KEYED-HANDLE. arc-63 ruled on D1-D8 on 2026-10-30 (section 9). Implementation not started. Base `936ecc1e1f7c0393cfc6c4febeebb294186f244f`. Line numbers below are from that base.
+
+## 1. Intent
+
+Signed receipts carry a session identifier in three metadata members: `acp.sessionId`, `receipt_context.session_id` and `protocol_refusal.session_id`. Each holds the raw identifier the session started with. Two readers join receipts into a session on it: the retained-session reader behind `chio cert` and the ACP compliance verifier.
+
+This design replaces the raw identifier with a session handle in an enumerated set of signed fields. The handle is a keyed value under the deployment's tenant index key set, computed by the receipt signer and covered by the receipt signature. Both readers join on the handle. There is no dual field, no fallback reader and no version bump: every schema stays at v1.
+
+After the flip (PR 4), these signed fields carry the handle and no raw session id:
+
+- the receipt metadata members `acp.sessionHandle`, `receipt_context.session_handle` and `protocol_refusal.session_handle`;
+- the ACP authorization-path carriers in section 3.2: the `acp-session:` capability id fallback, the kernel authorization receipt's `action.parameters`, `source_receipt_context` and route metadata, and `AuthorizationReceiptConsumption` together with the signed admission terminal projection;
+- the bodies of `chio.compliance.certificate.v1` and `chio.session-compliance-certificate.v1`.
+
+These signed carriers still hold the raw kernel `SessionId` until row SESSION-HANDLE-KERNEL-CARRIERS lands (section 9.2):
+
+- signed child receipts: `ChildRequestReceiptBody.session_id` and `ChildRequestReceipt.session_id` (`receipt/lineage.rs:35,54`);
+- the session anchor `SessionAnchorBody.session_id` (`session/anchor.rs:82`, `chio.session_anchor.v1`).
+
+The privacy claims in this document cover the first list only.
+
+## 2. Threat
+
+The raw identifier is a poor join key for signed, exportable evidence.
+
+- **Correlation leak.** Receipts leave the deployment in compliance bundles, evidence exports, replication and SIEM pipelines. The raw ACP `sessionId` is the identifier the agent also uses in its own transport, logs and telemetry. Any holder of a receipt can link it to those external records and to every other receipt of the session. The registry description of all three members accepts this today (`key_registry.rs:185,209,537`).
+- **Attacker-chosen value.** ACP session ids are minted by the ACP agent. Kernel session ids are random (`session_ops.rs:51-61`) except where a host opens a session with a chosen id: `open_session_with_id` (`session_ops.rs:108`), called from `chio-mcp-edge` `runtime.rs:358` and `runtime/requests.rs:174`, and the remote restore path, which derives `sess-restore-` plus 16 hex characters of an unkeyed SHA-256 of the client's session header (`chio-mcp-remote` `http_service.rs:1178-1181`). A chosen value can be low-entropy and guessable, so a receipt holder can confirm a guessed id.
+- **Cross-signer linkage and collision.** Both readers already refuse a session whose receipts come from more than one signer (`compliance/bundle.rs:238`, `session_certificate_read.rs:295`). A raw id still links sessions across signers for any receipt holder, and two agents behind signers that share a key and pick the same id (`session-1`) land in one session.
+
+For the fields in the first list of section 1, a handle closes the first two because a holder without the key set cannot compute or test it. A holder of the key set can still confirm a guessed id (section 4.5). Binding the signer into the preimage (section 4.3) removes cross-signer linkage. Same-key collisions are a known limit (section 9.2).
+
+## 3. Current producers and readers
+
+### 3.1 Writers of the three members
+
+| Member | Writer | Value source |
+|---|---|---|
+| `acp.sessionId` | `chio-acp-proxy` `kernel_signer.rs:512` | `AcpToolCallAuditEntry.session_id`, agent-minted |
+| `receipt_context.session_id` (ACP form) | `chio-acp-proxy` `kernel_signer.rs:534` | same |
+| `protocol_refusal.session_id` | `chio-kernel` `session_ops/protocol_refusal.rs:233`, struct at `:182-192`, block at `:266` | kernel `SessionAnchorSnapshot.session_id` (`session.rs:761,994`) |
+| `acp.sessionId` (target projection, not yet wired) | `chio-core-types` `receipt/metadata/acp.rs:41,119` (`AcpReceiptProjection`, `AcpReceiptFields.session_id` at `:23`) | writer input |
+
+Callers that reach the refusal writer: `chio-mcp-edge` `runtime/refusals.rs:10-22` (from `requests.rs:448,561,751,856`, `tool_calls.rs:380`, `runtime.rs:666`, `runtime_flow.rs:367`) and `chio-mcp-remote` `remote_mcp/session_core/session.rs:99-117` (from `protocol_refusal_http.rs:25`).
+
+### 3.2 Other signed carriers of the same raw ACP id
+
+These carry the same value on the ACP authorization path. They are in scope because leaving any one of them defeats the handle.
+
+| Carrier | Site |
+|---|---|
+| ACP receipt `capability_id` fallback `acp-session:<id>` | `kernel_signer.rs:496` |
+| Kernel authorization receipt `action.parameters.session_id` | `kernel_checker.rs:237`; checked at `kernel_signer.rs:290-296` and `chio-kernel` `admission_operation/projection/authorization.rs:101-104` |
+| Kernel authorization receipt `source_receipt_context.session_id` | source envelope `kernel_checker.rs:267`, copied by `chio-cross-protocol` `execution.rs:238-250` |
+| Source envelope `sessionId` and protocol context | `kernel_checker.rs:258`, `:92` (`protocol_context`) |
+| Cross-protocol `origin_request_id` `acp-guard-<id>-<hash>` | `kernel_checker.rs:350`; carried at `chio-cross-protocol` `orchestrator.rs:385,410`, `execution.rs:217` |
+| Authorization request hash input | `kernel_checker.rs:328` (hashed only; no change needed once the input is the handle) |
+| `AuthorizationReceiptConsumption.session_id` | `chio-kernel` `receipt_store.rs:327`; built at `kernel_signer.rs:362,576` (`VerifiedAuthorizationContext.session_id`, `:57`) |
+| Signed admission terminal projection `authorizationConsumption.sessionId` | `spec/schemas/chio-wire/v1/kernel/signed-admission-terminal-projection.schema.json:34,53` |
+| ACP compliance certificate body `session_id` | `chio-acp-proxy` `compliance.rs:252`; coverage `compliance/bundle/coverage.rs:14`; schema `spec/schemas/chio-wire/v1/compliance/certificate.schema.json:25,143,184`; examples `spec/schemas/signed-artifact-examples/chio.compliance.certificate.v1/captured-{1,2,3}.json` |
+| Kernel session compliance certificate body `session_id` | `chio-kernel` `compliance_certificate.rs:47` (issue `:141`, verify `:190`); schema `spec/schemas/chio-wire/v1/kernel/session-compliance-certificate.schema.json:13,31` |
+
+### 3.3 Readers
+
+| Reader | Site | Use |
+|---|---|---|
+| Retained-session reader | `chio-store-sqlite` `receipt_store/session_certificate_read.rs:381-425` (`signed_membership`), used at `:304`; input check `:185`; coverage `RetainedSessionSnapshotCoverage.session_id` `:42` | reads all three members, requires agreement, joins on equality with the requested id |
+| ACP compliance verifier | `chio-acp-proxy` `compliance.rs:345-375` (`receipt_session_id`), used at `:419`; `SessionMismatch` `:80-85`; bundle `compliance/bundle.rs:183-310`, `bundle/bounds.rs:160-214` | same three members, same rule, independent copy |
+| `chio cert generate` and `chio cert verify` | `chio-cli` `cert.rs:25,73-99,171-173,234`; `cert/session_receipts.rs:12,22,52`; argument `cli/types.rs:1163-1167` | passes the operator's raw id to the reader; prints it |
+| ACP signer authorization check | `kernel_signer.rs:290-296` | compares the authorization receipt's `action.parameters.session_id` with the audit entry |
+| Durable admission authorization projection | `admission_operation/projection/authorization.rs:101-104,121` | compares `action.parameters.session_id` with the consumption row |
+| OTel export | `chio-acp-proxy` `telemetry.rs:383-384` (`cert.session_id`), `:418-436` (`chio.session_id` span attribute), `:445-449` (`derive_trace_id`, unkeyed SHA-256 of the raw id) | outside receipts; follow-up row SESSION-HANDLE-TELEMETRY (section 9.3) |
+
+### 3.4 SDKs, spec and wire schemas
+
+- **SDKs.** No SDK reads any of the three members. The generated types that change are the two certificate bodies: `sdks/python/chio-sdk-python/src/chio_sdk/_generated/compliance/certificate_schema.py`, `.../kernel/session_compliance_certificate_schema.py`, `sdks/go/chio-go-http/types.go`, `sdks/typescript/packages/conformance/src/_generated/index.ts`, and the signed-artifact schema tables `sdks/go/chio-go/invariants/signed_artifact_schemas_gen.go`, `sdks/python/chio-py/src/chio/invariants/_generated_signed_artifact_schemas.py`, `sdks/typescript/chio-ts/src/invariants/_generated/signed_artifact_schemas.ts`. The generated `ReceiptContext` types model only `request_id` and `request_namespace_digest` (`receipt-body.schema.json:4871-4885`), so they do not change.
+- **spec/PROTOCOL.md.** 6.4 key table rows `protocol_refusal` (`:1871`), `receipt_context` (`:1874`) and `acp` (`:1915`) render the registry descriptions; `chio-core-types` `tests/receipt_metadata_registry.rs:444-466` pins the table to the registry. The signed-artifact table names `chio.session-compliance-certificate.v1` (`:437`) and `chio.compliance.certificate.v1` (`:538`). PROTOCOL has no normative text for the tenant index key set or its purpose labels.
+- **Other spec text.** `spec/COMPLIANCE-CERTIFICATE.md:46,104-107,160,236-271`; `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md:21-22,89,220-222,376,388,415,438`.
+- **spec/wire-schemas.lock.** Holds `chio.compliance.certificate.v1` (`:1158`) and `chio.session-compliance-certificate.v1` (`:5548`). `chio.session.protocol-refusal.v1` is missing: it is an inline literal at three sites (`protocol_refusal.rs:232`, `session_certificate_read.rs:413`, `compliance.rs:359`) and never declared, so `scripts/check-wire-schemas.py` does not see it.
+
+## 4. Handle construction
+
+### 4.1 Primitive
+
+The handle reuses the tenant index key set (`chio-core-types` `tenant_index/mod.rs`) and `MetadataProjector::keyed` (`receipt/metadata/projector.rs:63-69`), the primitive behind F23's keyed enterprise subject (`enterprise_subject.rs`, #1795). No new key material, loader or rotation machinery is added.
+
+- New purpose `IndexPurpose::SessionHandle`, label `session-handle`, string prefix `sh1`. Its HKDF subkey is `K[session-handle] = HKDF-SHA256(IKM = set key, salt = "chio.tenant-index.v1", info = "chio.tenant-index.v1/session-handle", L = 32)`.
+- New domain `IndexDomain::SessionHandle`, constant `SESSION_HANDLE_DOMAIN = b"chio.session-handle.v1\0"`, purpose `SessionHandle`. `IndexPurpose::ALL` and `IndexDomain::ALL` grow by one, so the existing NUL-terminator assertion (`tenant_index/mod.rs:170`) and purpose-isolation test cover it.
+- Value: `HMAC-SHA256(K[session-handle], "chio.session-handle.v1\0" || field(origin) || field(signer) || field(session_id))`, with `field(x) = be32(len(x)) || x`. The length-prefixed encoder in `enterprise_subject.rs:62-80` moves to `tenant_index` as one shared `pub(crate)` function taking a slice of named fields; enterprise subject and session handle both call it.
+- `origin` is a closed set: `kernel` for a kernel `SessionId`, `acp` for an ACP-Client `sessionId`.
+- `signer` is `PublicKey::to_hex()` of the receipt signing key that writes the session's receipts (section 4.3).
+- Type: `chio_core_types::session::SessionHandle(KeyedIndexValue)`, serialized as the string form `sh1.<64 hex key_id>.<64 hex value>` (133 bytes), parsed exactly by `KeyedIndexValue::parse_string_form(IndexPurpose::SessionHandle, ..)`. Constructors: `SessionHandle::derive(keys, origin, signer, session_id)` under the active generation, `SessionHandle::derive_in(keys, key_id, origin, signer, session_id)` under a named generation, and `SessionHandle::verify(keys, origin, signer, session_id)`, which selects the generation by `key_id` and compares in constant time. An unknown `key_id` refuses with `TenantBindingError::TenantIndexKeyUnknown`. Equality, ordering and hashing cover `(key_id, value)`.
+
+### 4.2 Length
+
+The value is the full 32-byte HMAC output. Truncation would save 32 hex characters per member and would require a second string-form grammar. The 133-byte string fits every existing bound on these readers (`session_certificate_read.rs:185`, `compliance.rs:475`, `bundle/bounds.rs:184`, all 1024 bytes).
+
+### 4.3 Binding and domain separation
+
+- **Purpose.** A separate HKDF subkey means a session handle never verifies as an enterprise subject, tenant binding, tag or active-defense digest, and the reverse, whatever the preimages.
+- **Origin.** A kernel session and an ACP session that share a raw string get distinct handles.
+- **Signer.** Two signers that see the same raw id get distinct handles. Both readers already fix the signer: the retained reader pins one trusted kernel key (`session_certificate_read.rs:244-247,295`), and the compliance bundle requires one `kernel_key` across its receipts (`compliance/bundle.rs:238`) from the trusted set (`compliance.rs:409-415`). Signers that share one key are a known limit (section 9.2).
+- **Tenant.** The tenant is left out of the preimage. ACP receipts in one session can carry different tenant scope: audit-only entries sign `tenant_id: None` while enforced entries carry the authorization receipt's tenant (`kernel_signer.rs:544-546`). Tenant scoping stays with `tenant_id` and `tenant_binding`.
+
+### 4.4 Generation and rotation
+
+Each session has exactly one handle. The signer fixes it when the session first appears, and every later receipt of the session carries it, including receipts signed after a key rotation. It verifies under the generation that keyed it. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed). Readers therefore join by `(key_id, value)` equality with no all-generation search.
+
+How a session's handle is fixed:
+
+- **New session.** A kernel `open_session_with_id` call for a new session, or an ACP `session/new`, derives the handle under the active generation.
+- **Continuing session.** A kernel restore (the `chio-mcp-remote` resume path, `session_core/factory.rs:503,729`), an ACP `session/load`, or an ACP entry for a `sessionId` the proxy has not seen open in this process continues an existing session. It resolves the handle through `SessionHandleResolver` (section 4.6):
+  - no pin for the session: derive under the active generation; pins are never archived, so zero pins means the session never signed a handle-bearing receipt;
+  - exactly one pin: re-derive under that pin's original `key_id` with `derive_in` and require equality;
+  - more than one pin, or any pin of that signer under a generation that is not loaded: refuse the restore or load with a typed error.
+- **Carrying the handle.** The kernel takes the outcome as `HandleGeneration::Active` or `HandleGeneration::Pinned(SessionHandle)` on `open_session_with_id`, re-derives the pinned handle under its `key_id`, and refuses an unloaded generation (`TenantIndexKeyUnknown`) or a mismatch. It holds the handle in session state, and `SessionAnchorSnapshot` exposes it. The ACP proxy keeps a bounded in-memory map from `sessionId` to handle, which `KernelReceiptSigner` and `KernelCapabilityChecker` share.
+
+A session never changes handle on restart, restore or rotation. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed).
+
+### 4.5 Auditor correlation
+
+Any holder groups receipts by handle without learning the raw id. This within-session linkage is what the certificate needs.
+
+A holder of the key set who has a raw session id (from the agent's own records) correlates by resolving it as in section 4.6 with an explicit origin. `chio cert generate` does exactly this (section 6). Without the key set, a handle cannot be inverted or tested against a guess. With the key set, a holder can confirm a guessed id, because the lookup above is a keyed dictionary check, so low-entropy ids give no protection against key holders. One-wayness holds only for high-entropy ids the holder does not know. Receipts from different deployments, and therefore different key sets, never correlate.
+
+### 4.6 Session handle resolution
+
+`SessionHandleResolver` is a port trait in `chio-kernel` beside `ReceiptStore`, implemented by `chio-store-sqlite`. Both of its methods are required, with no default bodies:
+
+```rust
+pub trait SessionHandleResolver {
+    /// Per query, the pinned handles among its candidates.
+    fn pinned_handles(
+        &self,
+        queries: &[SessionHandleQuery],
+    ) -> Result<Vec<SessionHandleMatches>, SessionHandleResolveError>;
+    /// The key generations recorded for `signer` in `session_handle_generations`.
+    fn pinned_generations(
+        &self,
+        signer: &PublicKey,
+    ) -> Result<BTreeSet<Sha256Digest>, SessionHandleResolveError>;
+}
+```
+
+- **Query.** `SessionHandleQuery` holds the signer key and the candidate handles: one per loaded generation, built by `SessionHandle::candidates(keys, origin, signer, session_id)` in `chio-core-types`.
+- **Pin table.** `chio-store-sqlite` keeps `session_handle_pins(signer, origin, key_id, handle_value, opened_at)` with `PRIMARY KEY (signer, key_id, handle_value)`.
+  - The store writes a session's pin once, in the transaction that appends the session's first handle-bearing receipt. It uses `INSERT ... ON CONFLICT DO NOTHING`, so later appends of that session are no-ops.
+  - The handle and origin come from `session_membership`, which reports the origin from the carrying member: `protocol_refusal` gives `kernel`, `acp` and `receipt_context` give `acp`. `opened_at` is the receipt's trusted timestamp.
+  - An append whose membership refuses is itself refused.
+- **Generations table.** `session_handle_generations(signer, key_id)` has `PRIMARY KEY (signer, key_id)`. The same transaction writes it with `INSERT OR IGNORE` whenever it writes a pin, so it lists every key generation that keyed a pin for that signer.
+- **Retention exclusion.** Pins and generations are never archived or pruned. The retention and rotation paths (`receipt_store/evidence_retention.rs`) exclude both tables, and store tests pin that exclusion.
+- **No receipt scan.** Resolution reads only `session_handle_pins`. It never scans receipts, the claim log or the archive. A session whose receipts were all archived still has its pin.
+- **Lookups.**
+  - `pinned_handles` runs `WHERE signer = ?1 AND key_id = ?2 AND handle_value IN (...)`, or the equivalent per-generation seek, for each query. The candidates are one per loaded generation, and every query in a call is batched in one read transaction. Each lookup is a primary-key seek.
+  - `pinned_generations` runs `SELECT key_id FROM session_handle_generations WHERE signer = ?1`, a primary-key prefix seek on that table. It reads neither the pins nor the receipts, and its result is bounded by the number of generations.
+  - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed). This applies to the restore, load and unseen-session ACP paths and to `chio cert generate`.
+- **Store files.** Both tables' DDL and each query are their own `.sql` files in a `session_handle_pins` module of the store, loaded through named consts.
+- **Batching.** `chio-mcp-remote` resolves every session it restores at startup in one call.
+- **One store.** The ACP proxy holds an `Arc<dyn SessionHandleResolver>` backed by the same `chio-store-sqlite` receipt store that its `KernelReceiptSigner` appends to. Its pins are written by that store's append transaction. There is no second store.
+- **Coverage.** Every path that fixes a continuing session's handle goes through the pin lookup:
+  - kernel restore (`chio-mcp-remote`);
+  - ACP `session/load`;
+  - an ACP entry for a `sessionId` the proxy has not seen open in this process;
+  - `chio cert generate`.
+
+  No path derives a continuing session's handle any other way.
+- **Cardinality.** One pure function in `chio-core-types`, `SessionHandleMatches::into_resolution`, applies the rule: zero pins gives `None`, one pin gives `Some(handle)`, and more than one gives `Ambiguous`.
+- **Consumers.** Kernel restore, ACP `session/load` and `chio cert generate` share it. The store keeps only the pins and their lookups; the rule stays in the domain crate.
+- **Certification.** `chio cert generate` uses the resolver only to name the handle. It still reads the session through the checkpoint-authenticated claim corpus (`session_certificate_read.rs`), because certification needs authenticated completeness, which the pin table cannot give.
+
+## 5. Interaction with in-flight work
+
+- **F23 and ITEM4-PG-SUBJECT-KEY-UNIFY.** That row replaces the two unkeyed `derive_enterprise_subject_key` copies (`chio-mcp-remote` `session_identity.rs:473`, `chio-control-plane` `scim_lifecycle.rs:454`) with the keyed `EnterpriseSubject` in `chio-core-types`. This design adds a sibling purpose to the same set and shares that row's field encoder. The only shared file is `enterprise_subject.rs` (encoder extraction in PR 1), so PR 1 rebases on whichever lands second.
+- **Receipt metadata registry.** `key_registry.rs` keeps one row per block. PR 4 rewrites the `protocol_refusal`, `receipt_context` and `acp` descriptions: the session member becomes a keyed session handle that confirms no guessed id without the tenant index key set. The rows stay `Unsafe` because other members are still unsalted or caller-chosen; the session member stops being one of the reasons. PROTOCOL 6.4 regenerates from the registry.
+- **PD2 committed metadata (`MetadataCommitter`, `MetadataOpenings`, acpcopy's PD2-F).** The handle is a deterministic keyed value. A salted `MetadataCommitment` would force both readers to hold openings to join, and erasing openings would drop a receipt from its session. It goes through `MetadataProjector::keyed`, so a block built by a projector commits its other members and carries the handle in one pass. PR 1 changes `AcpReceiptFields.session_id` to `session_handle: &SessionHandle` and `AcpReceiptProjection.session_id: String` to `session_handle: SessionHandle`. The projection has no wired writer yet, so this changes no signed bytes. The PD2-F writer flip then writes the handle from its first commit. The `metadata.acp.*` and `metadata.receipt_context.*` salt refs are unchanged; the handle has no salt ref.
+- **Tenant index key provisioning (item 2 F Task 6).** The plan provisions `--tenant-index-keys <dir>` to trust-control and the kernel-hosting processes, but no process loads the set on main yet (only `tenant_index/load.rs:125` exists). PR 2 below wires it to the processes this design needs. Rulings D5 and D8.
+
+## 6. Changes
+
+The changes are listed per PR in section 8. The end state:
+
+- `acp.sessionId` becomes `acp.sessionHandle`; `receipt_context.session_id` becomes `receipt_context.session_handle`; `protocol_refusal.session_id` becomes `protocol_refusal.session_handle`. Each holds the `sh1.` string form. The old member names are refused by both readers as a malformed membership block, so a receipt carrying a raw id is never joined.
+- One reader, `chio_core_types::receipt::metadata::session_membership(metadata) -> Result<Option<SessionHandle>, SessionMembershipError>`, replaces `signed_membership` (`session_certificate_read.rs:381`) and `receipt_session_id` (`compliance.rs:345`). Both copies are deleted. It reads the three handle members, refuses a non-object container, a non-string or malformed handle, a refusal block whose schema is not `chio.session.protocol-refusal.v1`, a raw-id member (`acp.sessionId`, `receipt_context.session_id`, `protocol_refusal.session_id`), and disagreement among present members.
+- `chio.session.protocol-refusal.v1` becomes a declared constant in `chio-core-types` used at all three sites and registered in `spec/wire-schemas.lock`.
+- `collect_retained_session_receipts_read_only` takes `&SessionHandle`. `RetainedSessionSnapshotCoverage.session_id` and `ComplianceCoverage::RetainedSnapshotReference.session_id` become `session_handle: SessionHandle`.
+- `ComplianceCertificateBody.session_id` (`compliance.rs:252`) and `SessionComplianceCertificateBody.session_id` (`compliance_certificate.rs:47`) become `session_handle`. `SessionMismatch` and `EmptySession` carry the handle. Schemas, signed-artifact examples and generated SDK types regenerate in the same PR.
+- ACP authorization path: `kernel_checker.rs:237,258,267,92,350` put the handle where they put the raw id; `kernel_signer.rs:290-296,362,496,576` compare and record the handle; `AuthorizationReceiptConsumption.session_id` becomes `session_handle`, with its schema and the projection check at `authorization.rs:101-104,121`. The `acp-session:` fallback capability id becomes `acp-session:<sh1 string>`.
+- `chio cert generate --session-id <raw>` gains two required flags: `--tenant-index-keys <dir>`, and `--origin kernel|acp`, a closed enum with no default, so kernel-only sessions such as refusal-only sessions are findable. It resolves the raw id through `SessionHandleResolver` (section 4.6) with that origin and the store's trusted kernel key. No match refuses as `EmptySession`, and more than one match refuses as `AmbiguousSessionHandle`. It never certifies a subset. It then reads by the one resolved handle. `chio cert verify` and `chio cert inspect` print the handle. No CLI path prints or stores a raw id.
+- PROTOCOL gains a 6.4 subsection "Session handle" stating the construction in 4.1, the binding in 4.3, the generation rule in 4.4 and the reader rule above. The tenant index purpose label list (which PROTOCOL 6 is to carry per the item 2 plan) includes `session-handle`. `spec/COMPLIANCE-CERTIFICATE.md` and `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` change their field tables, algorithm inputs and CLI examples.
+
+## 7. RED-first test plan
+
+Each test is written first and fails on the base for the stated reason.
+
+PR 1 (`chio-core-types`):
+
+1. `session_handle_string_form_parses_exactly`: `sh1.` round-trips; `esk1.` prefix, uppercase hex, short fields and a third dot refuse. Fails: no `SessionHandle`.
+2. `index_value_never_verifies_under_another_purpose` (existing) covers `session-handle` once it is in `IndexPurpose::ALL`; add `session_handle_never_verifies_as_enterprise_subject` with an identical preimage.
+3. `session_handle_separates_origin_signer_and_id`: same raw id under `kernel` and `acp`, under two signer keys, and the pairs `("ab","c")` against `("a","bc")` all differ.
+4. `session_handle_verifies_after_rotation` and `session_handle_unknown_key_id_refuses`.
+5. `acp_projection_carries_no_raw_member` replaces `acp_projection_carries_no_raw_member_but_the_session_id` (`tests/receipt_metadata_blocks.rs:268`): the serialized projection contains no byte substring of the raw session id. Fails: the projection serializes `sessionId`.
+6. `session_membership_refuses_raw_id_members` and `session_membership_refuses_conflicting_handles`.
+
+PR 2 (key-set wiring):
+
+7. `mcp_serve_refuses_start_without_tenant_index_keys` (`chio-cli`) with the exact startup error. The ACP constructors take the set by type, so a missing set is a compile error.
+
+PR 4 (flip):
+
+8. `protocol_refusal_receipt_bytes_exclude_raw_session_id` (`chio-kernel` `kernel/tests/protocol_refusal.rs`): canonical receipt bytes do not contain the session id; `protocol_refusal.session_handle` verifies under the fixture key set.
+9. `acp_receipt_bytes_exclude_raw_session_id` (`chio-acp-proxy` `tests/attestation_signer.rs`) for an enforced entry and an audit-only entry (covers the `capability_id` fallback at `:181`).
+10. `kernel_authorization_receipt_excludes_raw_acp_session_id`: the authorization receipt's `action.parameters`, `source_receipt_context` and route metadata contain no raw id.
+11. `retained_session_read_joins_on_handle` and `retained_session_read_refuses_raw_member` (`session_certificate_read/tests.rs`, which today seeds `{"receipt_context":{"session_id":"target"}}` at `:25`).
+12. `compliance_bundle_refuses_raw_session_member` (`compliance/bundle_tests.rs`): a receipt whose `acp` block carries `sessionId` fails with the membership error. Fails on the base: the raw member is the join key.
+13. `chio-cli` `tests/session_certificate.rs`:
+    - `cert_generate_without_tenant_index_keys_refuses`;
+    - `cert_generate_without_origin_refuses`;
+    - `cert_generate_kernel_only_refusal_session` (a session with only `protocol_refusal` receipts certifies with `--origin kernel`);
+    - `cert_generate_same_raw_id_under_both_origins_certifies_each_separately`;
+    - `cert_generate_single_generation_after_rotation` (a session opened before a rotation certifies as one handle);
+    - `cert_generate_ambiguous_raw_id_refuses` (two handles for one raw id under one origin refuse with `AmbiguousSessionHandle`).
+14. `scripts/check-wire-schemas.py` fails before the protocol-refusal constant lands and passes after.
+15. Restore and load (`chio-mcp-remote` `remote_mcp/tests.rs`, `chio-acp-proxy` tests):
+    - `restore_after_rotation_keeps_original_handle`;
+    - `restore_refuses_when_original_generation_unloaded`;
+    - `restore_refuses_ambiguous_handles`;
+    - `open_session_refuses_pinned_handle_mismatch`;
+    - `acp_session_load_keeps_original_handle`;
+    - `acp_entry_for_unopened_session_resolves_before_signing`.
+16. `session_handle_resolution_cardinality` (`chio-core-types`): zero, one and two matches map to `None`, `Some` and `Ambiguous`.
+17. Store tests (`chio-store-sqlite`):
+    - `session_handle_pin_written_once_on_first_append`;
+    - `append_refuses_malformed_session_membership`;
+    - `session_handle_pins_survive_retention`: rotation and archive leave every pin and generation row in place;
+    - `generation_row_written_with_pin`;
+    - `archived_session_resolves_to_original_handle`: session H1 is opened under G1, all its receipts are archived, then a restart under active G2 resolves the same raw id to H1. Fails with any receipt-backed lookup;
+    - `pin_under_unloaded_generation_refuses`;
+    - `two_pins_for_one_raw_id_refuse_as_ambiguous`;
+    - `pinned_handles_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the pin lookup shows `SEARCH session_handle_pins USING PRIMARY KEY`, never `SCAN`;
+    - `pinned_generations_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the generation lookup names `session_handle_generations` and shows `SEARCH session_handle_generations USING PRIMARY KEY`. The test asserts the table name, so a plan that reads `session_handle_pins` (including a per-signer prefix `SEARCH` over its primary key) fails, as does any `SCAN`.
+
+Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<raw>` changes to the handle in the same PR: `chio-core-types` `tests/receipt_metadata_blocks.rs`, `tests/security_receipts.rs`; `chio-kernel` `compliance_certificate/tests.rs`, `kernel/tests/{protocol_refusal,reserved_session_metadata,session,post_effect_receipts}.rs`, `kernel/tests/reserved_session_metadata/kernel_written.rs`, `kernel/tests/durable_admission/review_regressions.rs`, `admission_operation_tests/terminal_projection.rs`, `tests/compliance_certificate_hybrid.rs`; `chio-store-sqlite` `receipt_store/session_certificate_read/tests.rs`, `tests/session_certificate_read.rs`, `admission_operation_store_tests/authorization_consumption.rs`; `chio-cli` `cert/session_receipts_tests.rs`, `tests/session_certificate.rs`, `cli/session/tests/pending_approval.rs`; `chio-acp-proxy` `compliance/bundle_tests.rs`, `tests/attestation_{denials,signer,support,compliance,clock,telemetry_transport}.rs`; `chio-acp-edge` `tests/all.rs`; `chio-cross-protocol` `tests.rs`; `chio-mcp-edge` `runtime/nested_flow_tests.rs`, `runtime/source_receipt_tests.rs`, `runtime/runtime_tests/{execution_evidence,stateless_revision}.rs`; `chio-mcp-remote` `remote_mcp/hosted_tests/protocol_refusal.rs`, `remote_mcp/tests.rs`; `chio-http-core` `authority/tests.rs`; `chio-control-plane` `security/active_defense_host_tests/terminal_response_refusal.rs`.
+
+## 8. PR slicing
+
+1. **Primitive** (`chio-core-types` only, no signed bytes). `IndexPurpose::SessionHandle`, `IndexDomain::SessionHandle`, shared field encoder, `SessionHandle`, `session_membership`, the `AcpReceiptProjection` type change and the protocol-refusal schema constant. Tests 1-6. Lands first so PD2-F writes the handle directly.
+2. **Key-set wiring** (no signed bytes; after #1996). The directory reader in `tenant_index/load.rs` moves to `chio-secure-ipc` as a module beside `seed_custody`. It keeps the directory walk and the directory owner and mode checks. It reads each key file through `seed_custody::read_private_file(path, 32)`, which checks for a regular, singly linked file owned by the process user with mode 0600 or stricter, opens it with no-follow, re-checks file identity around the read and refuses over-length input. The module copies each file into a `Zeroizing<[u8; 32]>` after an exact length check. That function's `UnsafeFile` messages become purpose-neutral in `seed_custody` itself, together with the two control-plane tests that match them. The module returns the active key and the retired `(file name, key)` pairs. `TenantIndexKeySet` gains one pure constructor that refuses a retired file name other than the derived `key_id` hex, so that check stays with the key type, and `chio-secure-ipc` takes no dependency on `chio-core-types`. The core copy, its `std`-gated module and its `TenantIndexKeyLoadError` are deleted, and the loader tests in `chio-core-types` `tests/tenant_index.rs:363-395` move with it. `Arc<TenantIndexKeySet>` becomes a required argument of `KernelReceiptSigner::new` (`kernel_signer.rs:70`), `KernelCapabilityChecker::new` (`kernel_checker.rs:149`) and the kernel configuration that `open_session_with_id` reads. The `chio mcp` hosts and `chio cert` take `--tenant-index-keys <dir>` and refuse to start without it, local dev flows included. `chio init` and the dev quickstart provision a key set explicitly through `chio keys tenant-index generate`. The kernel never generates one itself. Test 7.
+3. **Retained-session statements and resolver** (no signed bytes). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3), and the existing reader tests stay green unchanged. The same PR adds the `SessionHandleResolver` port in `chio-kernel` (required methods only), the `session_handle_pins` and `session_handle_generations` tables with their append writes and their exclusion from retention, its `chio-store-sqlite` implementation with its own `.sql` files and consts, and the cardinality function. The table is an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path. It runs test 16 and the store tests in section 7 item 17.
+4. **Flip** (signed bytes, one PR). All three writers, both readers through `session_membership`, the authorization-path carriers in 3.2, both certificate bodies, schemas, signed-artifact examples, generated SDK types, `wire-schemas.lock`, registry descriptions, PROTOCOL 6.4, `spec/COMPLIANCE-CERTIFICATE.md`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` and the CLI. Writers and readers move together because the reader compares across members and receipts; a split leaves a window where the readers join raw ids against handles. Tests 8-15 and every fixture in section 7. `docs/formal/COVERAGE.md` regenerates last if the proof-coverage check asks for it.
+
+## 9. Decisions
+
+### 9.1 arc-63 rulings (2026-10-30)
+
+- **D1. Member names.** The members are renamed to `sessionHandle` and `session_handle`. The old names are removed.
+- **D2. Purpose.** The handle gets a new `session-handle` purpose with its own subkey and the `sh1` prefix.
+- **D3. Signer binding.** The preimage binds the receipt signer key. In v1 it does not also bind the agent subject (section 9.2).
+- **D4. Generation.** The handle is fixed at session open (section 4.4).
+- **D5. Provisioning.** PR 2 provisions the key set. Every flow without a configured key set fails closed, local dev included. `chio init` and the dev quickstart provision a set explicitly, and the kernel never provisions one.
+- **D6. Kernel-session carriers.** These are handled by follow-up row SESSION-HANDLE-KERNEL-CARRIERS (section 9.3).
+- **D7. Telemetry.** This is handled by follow-up row SESSION-HANDLE-TELEMETRY (section 9.3), outside this PR sequence.
+- **D8. Loader location.** PR 2 moves the key-set directory reader from `chio-core-types` into `chio-secure-ipc` beside `seed_custody` (#1996), changes every caller and deletes the core copy. PR 2 starts after #1996 lands.
+
+### 9.2 Known limits
+
+**Raw kernel session ids in child receipts and session anchors.** Section 1 lists the signed carriers that still hold the raw kernel `SessionId` after the flip: signed child receipts (`receipt/lineage.rs:35,54`) and the session anchor (`session/anchor.rs:82`). A holder of those artifacts can still link a kernel session to its raw id. Row SESSION-HANDLE-KERNEL-CARRIERS closes this.
+
+**Signers that share a key.**
+
+The handle separates sessions by origin, signer key and raw id. When several ACP proxies sign under one key and their agents pick the same `sessionId`, their receipts get one handle and join one session. The readers cannot tell them apart. Operators avoid this by giving each proxy its own signing key. Binding the authenticated agent subject would close the gap, but audit-only ACP entries carry no capability, so the subject would have to come from proxy configuration. That work is follow-up row SESSION-HANDLE-SHARED-SIGNER.
+
+**Handle key generation retirement.** Removing a handle key generation is not possible while pins reference it. Pins store handles only, so a refusal cannot be narrowed to the sessions under one generation. Explicit retirement is follow-up row SESSION-HANDLE-GENERATION-RETIRE.
+
+### 9.3 Follow-up rows
+
+- **SESSION-HANDLE-SHARED-SIGNER.** Bind the authenticated agent subject into the ACP session handle, so that proxies sharing one signing key cannot merge sessions (section 9.2).
+- **SESSION-HANDLE-KERNEL-CARRIERS.** Move these to the handle:
+  - the session anchor `sessionId` (`chio.session_anchor.v1`, `session/anchor.rs:82,97,151`, schema `kernel/session-anchor.schema.json:191`);
+  - the request lineage `session_id` (`receipt/lineage.rs:35,54`).
+
+  Also replace the unkeyed `restored_kernel_session_id` (`chio-mcp-remote` `http_service.rs:1178-1181`) with a keyed derivation.
+- **SESSION-HANDLE-GENERATION-RETIRE.** Explicit retirement of a handle key generation that pins still reference (section 9.2).
+- **SESSION-HANDLE-TELEMETRY.** OTel export carries the raw id (`telemetry.rs:383-384`, `cert.session_id`; `:435-436`, `chio.session_id`) and an unkeyed SHA-256 trace id (`derive_trace_id`, `:445-449`). This row moves export to the handle and derives the trace id from it.
+
+## 10. Design charter compliance
+
+This section maps the design onto `DESIGN-QUALITY-CHARTER.md` and the R1-R15 checklist in `ARC-DESIGN-RULES.md`.
+
+### 10.1 Persistence
+
+The design persists no key. Handles persist in two places: inside signed receipts, and in one new store-owned table, `session_handle_pins` in `chio-store-sqlite` (section 4.6). The design also adds `session_handle_generations`, which holds no handles.
+
+- **Pin table.**
+  - It sits behind the `SessionHandleResolver` port and is written once per session in the receipt append transaction.
+  - It holds the signer key, the origin, the handle `(key_id, value)` and an open timestamp. It holds no raw session id, so it discloses nothing beyond what the signed receipts already carry.
+- **Generations table.** `session_handle_generations(signer, key_id)` holds a signer key and a key id, and no handle value or raw id.
+- **Retention policy change.**
+  - Today retention archives and prunes receipt-store tables along checkpoint boundaries (`receipt_store/evidence_retention.rs`). This design adds the first two receipt-store tables that retention never archives or prunes: `session_handle_pins` and `session_handle_generations`. The retention module lists both as excluded, and store tests pin that.
+  - Their growth is bounded by the workload: one pin row per session that signed a handle-bearing receipt, and one generation row per signer and key generation.
+  - The exclusion is what lets a session whose receipts are all archived keep its original handle across a rotation.
+  - Both tables are an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path.
+
+- **Kernel.** The kernel holds a session's handle in memory for the life of the session. On restore it recovers the handle from the pin table (section 4.6), so the restore record gains nothing.
+- **ACP proxy.** The proxy keeps a bounded in-memory map for the life of the process.
+- **Receipts.** Receipts carry the handle inside signed metadata, so the existing receipt store keeps it as part of the receipt JSON with no schema change.
+- **Keys.** Keys stay in the operator-provisioned `--tenant-index-keys <dir>` layout, and no crate writes them.
+- **Resolver.** It answers from the pin table through the `SessionHandleResolver` port in `chio-kernel`. Its DDL and queries are named `.sql` files in the store's `session_handle_pins` module.
+
+### 10.2 Crate boundaries (R1, R2, R3)
+
+| Crate | Change | Boundary |
+|---|---|---|
+| `chio-core-types` | `IndexPurpose`/`IndexDomain` variants, `SessionHandle`, shared field encoder, `session_membership`, `AcpReceiptProjection` type change, protocol-refusal schema constant | pure types and functions; no IO, no storage |
+| `chio-kernel` | `SessionHandleResolver` port, `HandleGeneration` on session open (new module `kernel/session_ops/handle.rs`), refusal writer, consumption field, certificate body | port only; no storage or SQL added |
+| `chio-acp-proxy` | signer, checker, compliance verifier, bounded handle map | no storage or SQL added |
+| `chio-cross-protocol` | carries the handle in place of the raw id | no storage |
+| `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership`; owns `session_handle_pins` and `session_handle_generations` (written on append, never archived or pruned) and implements `SessionHandleResolver` with its own `.sql` files and consts | persistence stays in the store crate |
+| `chio-secure-ipc` | key-set directory reader moved from `chio-core-types` (PR 2) | custody IO stays in the security crate; no dependency on `chio-core-types` |
+| `chio-mcp-remote` | restore resolves handles in one batched call and passes `HandleGeneration::Pinned` | no storage or SQL added |
+| `chio-cli` | `--tenant-index-keys`, `--origin`, `chio cert` input and output | host crate; no SQL |
+| `chio-control-plane` | none | none |
+
+`tenant_index/load.rs` is existing file IO inside `chio-core-types`. The design adds none, and PR 2 moves it to `chio-secure-ipc` (D8).
+
+### 10.3 Queries (R4)
+
+The design adds two tables and their two lookups, each a named `.sql` file in a `session_handle_pins` module of `chio-store-sqlite`, loaded through consts. The retained-session reader already embeds SQL in its logic: `git grep -c 'SELECT\|INSERT\|UPDATE '` counts 4 lines in `session_certificate_read.rs` and 6 in `session_certificate_read/preflight.rs`. PR 4 edits that reader, so PR 3 first moves those statements into named `.sql` files in `receipt_store/session_certificate_read/` and loads them with `include_str!`, following the `admission_operation_*.sql` convention in the same crate. The files are grouped by the retained-session aggregate.
+
+### 10.4 Abstractions and their payoff (R5)
+
+- `SessionHandle` newtype: it encodes the invariant that a signed session member is never a raw id, and its parser accepts only the `sh1.` form.
+- `session_membership`: it removes the duplicated membership readers (`signed_membership`, `receipt_session_id`), which today enforce the same rule in two crates.
+- Shared length-prefixed field encoder: it removes the second copy that the session handle would otherwise add next to `enterprise_subject.rs`.
+- `IndexPurpose::SessionHandle`: it uses the purpose mechanism the key set already defines.
+- `SessionHandleResolver` port, with required methods only: three consumers (kernel restore, ACP `session/load` and `chio cert generate`) share one resolution and cardinality rule, and the store side holds only the pins and their lookups. The ACP handle map stays a private type with no seam.
+
+### 10.5 File budgets (R11)
+
+Every touched production file stays below the 1,200-line warning level except `chio-kernel` `session.rs` (1,660), `receipt_store.rs` (1,642) and `kernel/session_ops.rs` (1,161, near the warning level). `session.rs` gains one field and one accessor, `receipt_store.rs` renames one field, and derivation goes into the new `kernel/session_ops/handle.rs`, so none of the three grows by more than a few lines. The other touched files are `kernel_signer.rs` (605), `compliance.rs` (797), `kernel_checker.rs` (430), `session_certificate_read.rs` (445), `tenant_index/mod.rs` (497), `metadata.rs` (698) and `key_registry.rs` (723).
+
+### 10.6 Remaining rules
+
+- **Fail-closed (R7):** a missing key set refuses startup. An ambiguous or unloaded-generation resolution refuses restore, load and certification. An unknown `key_id`, a malformed handle, a raw-id member or conflicting members refuse membership, and the receipt is excluded with an error. No path falls back to the raw id.
+- **No legacy (R6):** the old member names, both reader copies and the raw-id certificate fields are deleted in PR 4, with every caller and fixture in section 7 moved in the same PR. Nothing decodes both forms.
+- **v1 only:** every schema id stays at v1.
+- **Typed errors (R7, R9):** `SessionMembershipError` is a closed enum, and handle errors reuse `TenantBindingError`. No `String` identifiers are added.
+- **Tests (R12, R13):** section 7 covers behaviour and refusal paths. The `sh1.` parser gets one `proptest` (arbitrary strings never panic, and every derived handle round-trips) in place of more hand-written cases, with no harness-only or duplicate cases. Test 14 runs the existing wire-schema gate and adds no script.
+- **Spec in the same PR (R14):** PR 4 carries the PROTOCOL 6.4 change with the wire change.
