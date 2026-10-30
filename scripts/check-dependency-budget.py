@@ -92,9 +92,10 @@ BUDGETS: dict[str, Budget] = {
         # 480 -> 481: add cage-plan and cage-init, remove upstream nono.
         # 481 -> 482: chio-semantic-contracts, which chio-store-sqlite needs to
         # install bounded semantic registries; it brings no external package.
+        # 482 -> 483: chio-rollback-anchor, split out of chio-store-sqlite; it brings no external package.
         # Other shared platform dependencies remain in the broker's graph.
-        ceiling=482,
-        measured="2026-10-29",
+        ceiling=483,
+        measured="2026-10-30",
         features=(),
         deny=COMMON_DENY,
     ),
