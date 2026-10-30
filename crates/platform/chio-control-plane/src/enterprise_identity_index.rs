@@ -21,8 +21,9 @@ use chio_core_types::tenant_index::{TenantBindingError, TenantIndexKeySet};
 use serde::{Deserialize, Serialize};
 
 use crate::passport_verifier::RegistryUpdateError;
-use crate::signed_input::{self, RegistryLock, RevocationReserve};
+use crate::signed_input::{self, RevocationReserve};
 use crate::CliError;
+use chio_secure_ipc::registry_file::RegistryFile;
 
 pub const ENTERPRISE_IDENTITY_INDEX_SCHEMA: &str = "chio.enterprise-identity-index.v1";
 
@@ -452,7 +453,8 @@ pub fn with_enterprise_identity_index<R>(
     keys: &TenantIndexKeySet,
     operation: impl FnOnce(&mut EnterpriseIdentityIndex<'_>) -> Result<R, EnterpriseIdentityIndexError>,
 ) -> Result<R, EnterpriseIdentityIndexError> {
-    let lock = signed_input::lock_registry(path).map_err(EnterpriseIdentityIndexError::Registry)?;
+    let lock = RegistryFile::lock(path)
+        .map_err(|error| EnterpriseIdentityIndexError::Registry(error.into()))?;
     let mut index = load(lock.destination(), keys)?;
     index.rekey()?;
     persist_if_changed(&lock, &mut index)?;
@@ -477,7 +479,8 @@ pub fn deactivate_enterprise_identity(
     identity_id: &EnterpriseIdentityId,
     at: u64,
 ) -> Result<u64, EnterpriseIdentityIndexError> {
-    let lock = signed_input::lock_registry(path).map_err(EnterpriseIdentityIndexError::Registry)?;
+    let lock = RegistryFile::lock(path)
+        .map_err(|error| EnterpriseIdentityIndexError::Registry(error.into()))?;
     let mut index = load(lock.destination(), keys)?;
     let row = index
         .identities
@@ -514,7 +517,7 @@ fn load<'k>(
 }
 
 fn persist_if_changed(
-    lock: &RegistryLock,
+    lock: &RegistryFile,
     index: &mut EnterpriseIdentityIndex<'_>,
 ) -> Result<(), EnterpriseIdentityIndexError> {
     if !index.changed {
