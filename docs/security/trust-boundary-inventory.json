@@ -1650,6 +1650,7 @@
     "crates/trust/chio-credentials/src/jwt_decode.rs::decode_compact_jwt_without_signature::from_wire",
     "crates/trust/chio-credentials/src/jwt_decode.rs::decode_compact_jwt_without_signature::from_wire",
     "crates/trust/chio-credentials/src/portable_sd_jwt.rs::parse_sd_jwt_disclosure::from_wire",
+    "crates/trust/chio-credentials/src/verifier_ledger.rs::decode_stored::from_wire",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::select_jwks::from_wire",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity::from_wire",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity_input.rs::validate_token::from_wire",
@@ -17689,6 +17690,7 @@
     "crates/trust/chio-credentials/src/jwt_decode.rs::decode_compact_jwt_without_signature::from_wire#1::decode_signed",
     "crates/trust/chio-credentials/src/jwt_decode.rs::decode_compact_jwt_without_signature::from_wire#2::decode_signed",
     "crates/trust/chio-credentials/src/portable_sd_jwt.rs::parse_sd_jwt_disclosure::from_wire#1::decode_signed",
+    "crates/trust/chio-credentials/src/verifier_ledger.rs::decode_stored::from_wire#1::decode_signed",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::select_jwks#1::from_wire#1::bounds_only",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs::verify_play_integrity::from_wire#1::decode_external",
     "crates/trust/chio-custody-hw/src/attestation/play_integrity_input.rs::validate_token::from_wire#1::decode_external",
@@ -18783,12 +18785,9 @@
       "decode_root::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
     ],
     "crates/platform/chio-control-plane/src/passport_verifier.rs": [
-      "fetch_active#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
-      "fetch_active#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#3::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
-      "snapshot::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "update#2::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::update_registry"
     ],
     "crates/platform/chio-control-plane/src/policy/loader.rs": [
@@ -19140,19 +19139,30 @@
     ],
     "crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs": [
       "execute_federated_issue::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs::ensure_requested_capability_within_parent_snapshot",
+      "get_public_oid4vp_request::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::fetch_active_oid4vp_request",
       "handle_create_oid4vp_request::request-json::CreateOid4vpRequest",
       "handle_create_passport_challenge::request-json::CreatePassportChallengeRequest",
       "handle_create_passport_issuance_offer::request-json::CreatePassportIssuanceOfferRequest",
       "handle_federated_issue::request-json::FederatedIssueRequest",
       "handle_federated_issue::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::execute_federated_issue",
+      "handle_public_get_oid4vp_request::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::get_public_oid4vp_request",
+      "handle_public_get_passport_challenge::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/challenges.rs::fetch_active_presentation_challenge",
+      "handle_public_get_wallet_exchange::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::oid4vp_request_snapshot",
+      "handle_public_launch_oid4vp_request::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::fetch_active_oid4vp_request",
       "handle_public_submit_oid4vp_response::request-form::Oid4vpDirectPostForm",
+      "handle_public_submit_oid4vp_response::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::fetch_active_oid4vp_request",
       "handle_public_verify_passport_challenge::request-json::VerifyPassportChallengeRequest",
+      "handle_public_verify_passport_challenge::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::verify_public_passport_challenge_in_lane",
       "handle_publish_passport_status::request-json::PublishPassportStatusRequest",
       "handle_redeem_passport_issuance_credential::request-json::Oid4vciCredentialRequest",
       "handle_redeem_passport_issuance_token::request-json::Oid4vciTokenRequest",
       "handle_revoke_passport_status::request-json::PassportStatusRevocationRequest",
       "handle_upsert_verifier_policy::request-json::SignedPassportVerifierPolicy",
-      "handle_verify_passport_challenge::request-json::VerifyPassportChallengeRequest"
+      "handle_verify_passport_challenge::request-json::VerifyPassportChallengeRequest",
+      "stored_public_challenge::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/challenges.rs::fetch_active_presentation_challenge",
+      "verify_public_passport_challenge::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::stored_public_challenge",
+      "verify_public_passport_challenge::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::stored_public_challenge",
+      "verify_public_passport_challenge_in_lane::shared-reader::crates/platform/chio-control-plane/src/trust_control/passport_handlers.rs::verify_public_passport_challenge"
     ],
     "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs": [
       "handle_append_child_receipt::request-signed-json::ChildRequestReceipt",
@@ -19421,6 +19431,9 @@
     "crates/platform/chio-manifest/src/admission.rs": [
       "load_existing_verified_manifest_registry::shared-reader::crates/platform/chio-manifest/src/admission.rs::read_existing_signed_manifest",
       "read_existing_signed_manifest::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-rollback-anchor/src/lib.rs": [
+      "decode_slot::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs": [
       "begin_prepared_operation_tx::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",
@@ -20672,9 +20685,6 @@
       "trusted_retention_archive::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection",
       "trusted_retention_archive_for_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection_with_preflight",
       "trusted_retention_archive_for_connection_with_preflight::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::retention_archive_connection_is_trusted"
-    ],
-    "crates/platform/chio-rollback-anchor/src/lib.rs": [
-      "decode_slot::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/root_exchange_store.rs": [
       "decode_blob::original-json-reader::UntrustedJsonText"
@@ -23096,6 +23106,17 @@
     "crates/trust/chio-credentials/src/portable_sd_jwt.rs": [
       "parse_sd_jwt_disclosure::original-json-reader::UntrustedJsonText",
       "verify_chio_passport_sd_jwt_vc::shared-reader::crates/trust/chio-credentials/src/portable_sd_jwt.rs::parse_sd_jwt_disclosure"
+    ],
+    "crates/trust/chio-credentials/src/verifier_ledger.rs": [
+      "decode_stored::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/trust/chio-credentials/src/verifier_ledger/challenges.rs": [
+      "fetch_active_presentation_challenge::shared-reader::crates/trust/chio-credentials/src/verifier_ledger.rs::decode_stored"
+    ],
+    "crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs": [
+      "decoded::shared-reader::crates/trust/chio-credentials/src/verifier_ledger.rs::decode_stored",
+      "fetch_active_oid4vp_request::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::decoded",
+      "oid4vp_request_snapshot::shared-reader::crates/trust/chio-credentials/src/verifier_ledger/oid4vp.rs::decoded"
     ],
     "crates/trust/chio-custody-hw/src/attestation/play_integrity.rs": [
       "select_jwks#1::original-json-reader::UntrustedJsonText",

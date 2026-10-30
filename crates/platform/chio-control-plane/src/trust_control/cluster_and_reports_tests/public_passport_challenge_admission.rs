@@ -120,10 +120,8 @@ impl HolderSubmissions {
             },
         )
         .test_unwrap();
-        PassportVerifierChallengeStore::open(&self.challenge_db)
-            .test_unwrap()
-            .register(&challenge)
-            .test_unwrap();
+        let store = SqlitePassportVerifierStore::open(&self.challenge_db).test_unwrap();
+        register_presentation_challenge(&store, &challenge).test_unwrap();
         let presentation = respond_to_passport_presentation_challenge(
             &self.holder,
             &self.passport,
@@ -253,9 +251,8 @@ fn next_verification_polled_once(
 }
 
 fn challenge_status(holders: &HolderSubmissions, challenge_id: &str) -> Result<(), String> {
-    PassportVerifierChallengeStore::open(&holders.challenge_db)
-        .test_unwrap()
-        .fetch_active(challenge_id, holders.now)
+    let store = SqlitePassportVerifierStore::open(&holders.challenge_db).test_unwrap();
+    fetch_active_presentation_challenge(&store, challenge_id, holders.now)
         .map(|_| ())
         .map_err(|error| error.to_string())
 }

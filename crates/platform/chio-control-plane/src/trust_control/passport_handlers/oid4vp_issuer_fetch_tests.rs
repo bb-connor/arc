@@ -259,10 +259,8 @@ pub(super) fn register_request(
     let transport =
         chio_credentials::build_oid4vp_request_transport(&request, &signing_key).test_unwrap();
     let db_path = configured_verifier_challenge_db_path(config).test_unwrap();
-    let store = Oid4vpVerifierTransactionStore::open(db_path).test_unwrap();
-    store
-        .register(&request, &transport.request_jwt)
-        .test_unwrap();
+    let store = SqlitePassportVerifierStore::open(db_path).test_unwrap();
+    register_oid4vp_request(&store, &request, &transport.request_jwt).test_unwrap();
     request
 }
 
@@ -409,11 +407,11 @@ async fn public_direct_post_refuses_acceptance_past_request_expiry() {
     );
     assert!(body.contains("expired"), "refusal must cite expiry: {body}");
 
-    let store = Oid4vpVerifierTransactionStore::open(
+    let store = SqlitePassportVerifierStore::open(
         configured_verifier_challenge_db_path(&state.config).test_unwrap(),
     )
     .test_unwrap();
-    let snapshot = store.snapshot(&request.jti, base).test_unwrap();
+    let snapshot = oid4vp_request_snapshot(&store, &request.jti, base).test_unwrap();
     assert_ne!(
         snapshot.transaction.status.label(),
         "consumed",
@@ -470,11 +468,11 @@ async fn public_direct_post_refuses_credential_expired_during_the_wait() {
         "a credential that expired during the wait must be refused, body: {body}"
     );
 
-    let store = Oid4vpVerifierTransactionStore::open(
+    let store = SqlitePassportVerifierStore::open(
         configured_verifier_challenge_db_path(&state.config).test_unwrap(),
     )
     .test_unwrap();
-    let snapshot = store.snapshot(&request.jti, base).test_unwrap();
+    let snapshot = oid4vp_request_snapshot(&store, &request.jti, base).test_unwrap();
     assert_ne!(
         snapshot.transaction.status.label(),
         "consumed",

@@ -1,5 +1,6 @@
 //! Stable control-plane errors and structured diagnostic projection.
 
+use chio_credentials::verifier_ledger::LedgerError;
 use chio_errors::_generated::error_codes::{
     ATTEST_PROVENANCE_MISSING, CAPABILITY_SCOPE_EXCEEDED, CAPABILITY_SUBJECT_MISMATCH, CLI_IO,
     CLI_JSON, CLI_OTHER, CLI_YAML, GUARD_DENIED, GUARD_WASM_TRAP, MANIFEST_SCHEMA_INVALID,
@@ -416,6 +417,32 @@ impl From<chio_bundle_verify::BundleVerifyError> for CliError {
                 Some(spec) => Self::registry_error(spec, error.message()),
                 None => Self::cli_io_error(error.message()),
             },
+        }
+    }
+}
+
+impl From<chio_store_sqlite::PassportVerifierStoreError> for CliError {
+    fn from(error: chio_store_sqlite::PassportVerifierStoreError) -> Self {
+        Self::cli_other_error(error.to_string())
+    }
+}
+
+impl<E: std::fmt::Display> From<LedgerError<E>> for CliError {
+    fn from(error: LedgerError<E>) -> Self {
+        match error {
+            LedgerError::Binding(fields) => Self::RecordBinding(fields),
+            LedgerError::Decode(error) => Self::SignedJson(error),
+            LedgerError::Encode(error) => Self::Json(error),
+            LedgerError::Canonical(error) => Self::Core(error),
+            LedgerError::Credential(error) => Self::policy_error(error.to_string()),
+            refusal @ (LedgerError::NotRegistered(..)
+            | LedgerError::AlreadyConsumed(..)
+            | LedgerError::AlreadyExpired(..)
+            | LedgerError::ExpiredInUse(..)
+            | LedgerError::Mismatch(..)
+            | LedgerError::Contended(..)
+            | LedgerError::Field(_)
+            | LedgerError::Store(_)) => Self::cli_other_error(refusal.to_string()),
         }
     }
 }

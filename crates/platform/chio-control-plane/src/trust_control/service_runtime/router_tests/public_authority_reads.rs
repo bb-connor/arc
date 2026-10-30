@@ -169,7 +169,11 @@ fn register_oid4vp_request(
     )?;
     let transport = build_oid4vp_request_transport(&request, signer)?;
     let path = configured_verifier_challenge_db_path(config)?;
-    Oid4vpVerifierTransactionStore::open(path)?.register(&request, &transport.request_jwt)?;
+    register_oid4vp_request(
+        &SqlitePassportVerifierStore::open(path)?,
+        &request,
+        &transport.request_jwt,
+    )?;
     Ok(request.jti)
 }
 

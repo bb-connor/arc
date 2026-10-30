@@ -254,6 +254,30 @@ fn economic_state_cache_refuses_nul_padding() -> TestResult {
 }
 
 #[test]
+fn passport_verifier_refuses_nul_padding() -> TestResult {
+    let challenges = catalog(include_str!("passport_verifier_store/challenges.sql"))?;
+    assert_column_refuses_nul_padding(
+        &challenges,
+        "passport_verifier_challenges",
+        "challenge_hash",
+        Bound::ExactText(HEX64),
+    )?;
+    assert_column_refuses_nul_padding(
+        &challenges,
+        "passport_verifier_challenges",
+        "challenge_id",
+        Bound::Text("challenge"),
+    )?;
+    let requests = catalog(include_str!("passport_verifier_store/oid4vp_requests.sql"))?;
+    assert_column_refuses_nul_padding(
+        &requests,
+        "passport_oid4vp_transactions",
+        "request_hash",
+        Bound::ExactText(HEX64),
+    )
+}
+
+#[test]
 fn finding_challenge_refuses_nul_padding() -> TestResult {
     let catalog = catalog(include_str!("finding_challenge_store.sql"))?;
     assert_column_refuses_nul_padding(

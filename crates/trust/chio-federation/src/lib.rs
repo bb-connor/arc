@@ -30,6 +30,7 @@ pub mod revocation_gossip;
 pub mod treaty;
 pub mod trust_establishment;
 pub(crate) mod validation;
+pub mod verifier_ledger;
 
 mod input;
 

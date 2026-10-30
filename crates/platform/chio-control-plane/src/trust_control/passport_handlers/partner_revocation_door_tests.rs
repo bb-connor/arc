@@ -348,12 +348,11 @@ impl Door {
             },
         )
         .test_unwrap();
-        PassportVerifierChallengeStore::open(
+        let store = SqlitePassportVerifierStore::open(
             configured_verifier_challenge_db_path(&self.config).test_unwrap(),
         )
-        .test_unwrap()
-        .register(&challenge)
         .test_unwrap();
+        register_presentation_challenge(&store, &challenge).test_unwrap();
         challenge
     }
 
@@ -858,16 +857,16 @@ fn oid4vp_submission(door: &Door, passport: &AgentPassport) -> (Oid4vpRequestObj
 }
 
 fn oid4vp_request_status(door: &Door, request: &Oid4vpRequestObject) -> String {
-    Oid4vpVerifierTransactionStore::open(
+    let store = SqlitePassportVerifierStore::open(
         configured_verifier_challenge_db_path(&door.config).test_unwrap(),
     )
-    .test_unwrap()
-    .snapshot(&request.jti, BASE_UNIX_SECS)
-    .test_unwrap()
-    .transaction
-    .status
-    .label()
-    .to_owned()
+    .test_unwrap();
+    oid4vp_request_snapshot(&store, &request.jti, BASE_UNIX_SECS)
+        .test_unwrap()
+        .transaction
+        .status
+        .label()
+        .to_owned()
 }
 
 #[tokio::test]
@@ -1066,12 +1065,11 @@ fn import_parent(
 }
 
 fn active_challenge(door: &Door, challenge_id: &str) -> PassportPresentationChallenge {
-    PassportVerifierChallengeStore::open(
+    let store = SqlitePassportVerifierStore::open(
         configured_verifier_challenge_db_path(&door.config).test_unwrap(),
     )
-    .test_unwrap()
-    .fetch_active(challenge_id, BASE_UNIX_SECS)
-    .test_unwrap()
+    .test_unwrap();
+    fetch_active_presentation_challenge(&store, challenge_id, BASE_UNIX_SECS).test_unwrap()
 }
 
 #[tokio::test]

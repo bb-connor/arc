@@ -49,6 +49,7 @@ dudect = ["dep:dudect-bencher"]
 
 [dev-dependencies]
 chio-spec-validate = { workspace = true }
+chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 proptest = { workspace = true }
 
