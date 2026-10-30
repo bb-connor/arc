@@ -36,7 +36,7 @@ mod issuance;
 #[path = "validation/issuer_trust.rs"]
 mod issuer_trust;
 #[path = "validation/lineage.rs"]
-mod lineage;
+pub(crate) mod lineage;
 #[path = "validation/payment_amount.rs"]
 mod payment_amount;
 #[path = "validation/payment_outcome.rs"]
@@ -656,7 +656,7 @@ impl ChioKernel {
 
         let root_delegator = self
             .delegation_root_subject(cap)
-            .map_err(KernelError::DelegationInvalid)?
+            .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?
             .ok_or_else(|| {
                 KernelError::DelegationInvalid("delegation chain has no root link".to_string())
             })?;

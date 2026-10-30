@@ -2,6 +2,18 @@
 
 use super::*;
 
+/// Why the parent subject of a delegated capability's chain could not be
+/// resolved from the kernel's capability snapshots.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DelegationRootError {
+    #[error("delegation root lookup failed: {0}")]
+    LookupFailed(KernelError),
+    #[error("missing delegation root capability {capability_id}")]
+    Missing { capability_id: String },
+    #[error("delegation root subject is invalid: {0}")]
+    InvalidSubject(chio_core::Error),
+}
+
 impl ChioKernel {
     /// Revalidate an original signed capability snapshot against current kernel
     /// trust, crypto policy, time, subject and every delegation revocation.
@@ -78,25 +90,6 @@ impl ChioKernel {
     /// that still holds them denies those capabilities with "has no signed token
     /// evidence", which is distinct from the missing-row and tamper reasons.
     /// Backfill signed root snapshots before turning either feature on.
-    /// Subject of the parent capability a delegated token's chain starts
-    /// from, read from the kernel's own capability snapshot of that parent.
-    pub(crate) fn delegation_root_subject(
-        &self,
-        cap: &CapabilityToken,
-    ) -> Result<Option<chio_core::PublicKey>, String> {
-        let Some(link) = cap.delegation_chain.first() else {
-            return Ok(None);
-        };
-        let snapshot = self
-            .with_receipt_store(|store| Ok(store.get_capability_snapshot(&link.capability_id)?))
-            .map_err(|error| format!("delegation root lookup failed: {error}"))?
-            .flatten()
-            .ok_or_else(|| format!("missing delegation root capability {}", link.capability_id))?;
-        chio_core::PublicKey::from_hex(&snapshot.subject_key)
-            .map(Some)
-            .map_err(|error| format!("delegation root subject is invalid: {error}"))
-    }
-
     pub(crate) fn negotiated_capability_root(
         &self,
         cap: &CapabilityToken,
@@ -135,6 +128,27 @@ impl ChioKernel {
             ));
         }
         Ok(Some(signed_root))
+    }
+
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from, read from the kernel's own capability snapshot of that parent.
+    pub(crate) fn delegation_root_subject(
+        &self,
+        cap: &CapabilityToken,
+    ) -> Result<Option<chio_core::PublicKey>, DelegationRootError> {
+        let Some(link) = cap.delegation_chain.first() else {
+            return Ok(None);
+        };
+        let snapshot = self
+            .with_receipt_store(|store| Ok(store.get_capability_snapshot(&link.capability_id)?))
+            .map_err(DelegationRootError::LookupFailed)?
+            .flatten()
+            .ok_or_else(|| DelegationRootError::Missing {
+                capability_id: link.capability_id.clone(),
+            })?;
+        chio_core::PublicKey::from_hex(&snapshot.subject_key)
+            .map(Some)
+            .map_err(DelegationRootError::InvalidSubject)
     }
 
     /// Validate and retain a capability that will parent delegated work.

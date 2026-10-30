@@ -93,10 +93,10 @@ impl ChioKernel {
         };
         let root_delegator = match self.delegation_root_subject(capability) {
             Ok(root_delegator) => root_delegator,
-            Err(reason) => {
+            Err(error) => {
                 return chio_kernel_core::EvaluationVerdict {
                     verdict: chio_kernel_core::Verdict::Deny,
-                    reason: Some(reason),
+                    reason: Some(error.to_string()),
                     matched_grant_index: None,
                     verified: None,
                 };
