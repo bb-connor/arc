@@ -1168,5 +1168,6 @@ pub fn delegate(
         parent_capability_id: parent.id.clone(),
         aggregate_budget,
         cumulative_approval,
+        root_anchor: parent.root_anchor.clone(),
     })
 }

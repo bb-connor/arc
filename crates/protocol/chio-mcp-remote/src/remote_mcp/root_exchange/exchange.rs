@@ -98,16 +98,15 @@ pub struct ContextOpening {
     pub value: Value,
 }
 
-/// An anchored root ready to sign: the unsigned root body, its anchor, the
-/// delegation context it is bound to and the openings of every commitment.
+/// An anchored root ready to sign: the unsigned root body with its
+/// `root_anchor`, the delegation context it is bound to and the openings of
+/// every commitment.
 ///
-/// It is not a capability. Issuing it needs `root_anchor` as a signed member
-/// of the capability body, so the unsigned body never leaves this module;
+/// It is not a capability. The unsigned body never leaves this module;
 /// callers read its members only.
 #[derive(Debug, Clone)]
 pub struct PreparedAnchoredRoot {
     pub(super) body: CapabilityTokenBody,
-    anchor: RootAnchor,
     context: DelegationContext,
     openings: Vec<ContextOpening>,
     artifact_digest: Option<Sha256Digest>,
@@ -141,10 +140,6 @@ impl PreparedAnchoredRoot {
     #[must_use]
     pub fn expires_at(&self) -> u64 {
         self.body.expires_at
-    }
-    #[must_use]
-    pub fn anchor(&self) -> &RootAnchor {
-        &self.anchor
     }
     #[must_use]
     pub fn context(&self) -> &DelegationContext {
@@ -792,10 +787,10 @@ impl RootExchange {
             expires_at,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
+            root_anchor: Some(anchor),
         };
         Ok(PreparedAnchoredRoot {
             body,
-            anchor,
             context,
             openings,
             artifact_digest: evidence.artifact_digest,

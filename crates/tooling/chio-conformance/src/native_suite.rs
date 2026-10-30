@@ -878,6 +878,7 @@ fn capture_runtime_revocation_trace_with_store(
                 expires_at: now.saturating_add(120).min(parent.expires_at),
                 delegation_chain: vec![link],
                 aggregate_invocation_budget: None,
+                root_anchor: parent.root_anchor.clone(),
             },
             caveats: Vec::new(),
             scope_attenuations: Vec::new(),
