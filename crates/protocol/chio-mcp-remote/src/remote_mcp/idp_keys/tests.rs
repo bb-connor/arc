@@ -124,12 +124,12 @@ fn exchange_key() -> PublicKey {
     exchange_keypair().public_key()
 }
 
-fn signer_as(backend: Keypair, key: PublicKey) -> ExchangeSigner {
-    ExchangeSigner::seed_file_backend(Arc::new(Ed25519Backend::new(backend)), key)
+fn exchange_signer() -> ExchangeSigner {
+    ExchangeSigner::new(Arc::new(Ed25519Backend::new(exchange_keypair()))).unwrap()
 }
 
 fn harness_for(identity: &EnterpriseProviderIdentity) -> Result<Harness, IdpKeySourceError> {
-    harness_signed_by(identity, signer_as(exchange_keypair(), exchange_key()))
+    harness_signed_by(identity, exchange_signer())
 }
 
 fn harness_signed_by(
@@ -719,7 +719,12 @@ async fn recorded_snapshots_are_signed_by_the_exchange_key() {
 async fn unsignable_snapshot_keeps_the_new_set_out_of_use() {
     let harness = harness_signed_by(
         &identity(Some(JWKS_URL), None),
-        signer_as(Keypair::from_seed(&[43; 32]), exchange_key()),
+        ExchangeSigner::new(Arc::new(SwitchableBackend {
+            exchange: Ed25519Backend::new(exchange_keypair()),
+            other: Ed25519Backend::new(Keypair::from_seed(&[43; 32])),
+            fail: AtomicBool::new(true),
+        }))
+        .unwrap(),
     )
     .unwrap();
     harness.fetcher.push(Ok(jwks(&[rsa_key("k1", 2048)])));
@@ -792,7 +797,7 @@ fn sources_for(identities: &[EnterpriseProviderIdentity]) -> Result<Sources, Idp
     let sources = IdpKeySources::from_providers(
         identities,
         fetcher.clone(),
-        &signer_as(exchange_keypair(), exchange_key()),
+        &exchange_signer(),
         sink.clone(),
         RefreshPolicy::default(),
     )?;
@@ -991,7 +996,7 @@ async fn failed_refresh_refuses_known_keys_until_recovery(path: RefreshFailure) 
     });
     let harness = harness_signed_by(
         &identity(Some(JWKS_URL), None),
-        ExchangeSigner::seed_file_backend(backend.clone(), exchange_key()),
+        ExchangeSigner::new(backend.clone()).unwrap(),
     )
     .unwrap();
     harness.fetcher.push(Ok(jwks(&[rsa_key("k1", 2048)])));
