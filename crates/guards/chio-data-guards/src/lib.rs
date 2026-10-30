@@ -42,7 +42,7 @@ pub mod vector_guard;
 pub mod warehouse_cost_guard;
 
 pub use config::{SqlDialect, SqlGuardConfig, SqlOperation};
-pub use error::SqlGuardDenyReason;
+pub use error::{SqlGuardConfigError, SqlGuardDenyReason};
 pub use result_guard::{
     QueryResultGuard, QueryResultGuardConfig, QueryResultHook, DEFAULT_REDACTION_MARKER,
 };

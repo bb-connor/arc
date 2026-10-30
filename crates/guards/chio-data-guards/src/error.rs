@@ -8,6 +8,53 @@
 
 use thiserror::Error;
 
+/// Reason [`SqlQueryGuard::try_new`](crate::sql_guard::SqlQueryGuard::try_new)
+/// refuses a [`SqlGuardConfig`](crate::config::SqlGuardConfig).
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum SqlGuardConfigError {
+    /// Two `column_allowlist` keys name the same table ignoring case.
+    #[error("sql_query.column_allowlist names table `{table}` more than once (table names are case-insensitive)")]
+    DuplicateTable {
+        /// The second key that collided.
+        table: String,
+    },
+
+    /// More `denylisted_predicates` than the guard accepts.
+    #[error("sql_query.denylisted_predicates allows at most {max} patterns")]
+    TooManyPredicates {
+        /// The pattern limit.
+        max: usize,
+    },
+
+    /// A `denylisted_predicates` entry is empty after trimming.
+    #[error("sql_query.denylisted_predicates cannot contain empty patterns")]
+    EmptyPredicate,
+
+    /// A `denylisted_predicates` entry exceeds the length limit.
+    #[error("sql_query.denylisted_predicates entries must be at most {max} characters")]
+    PredicateTooLong {
+        /// The length limit in bytes.
+        max: usize,
+    },
+
+    /// A `denylisted_predicates` entry exceeds the complexity limit.
+    #[error("sql_query.denylisted_predicates entries must have complexity at most {max}")]
+    PredicateTooComplex {
+        /// The complexity limit.
+        max: usize,
+    },
+
+    /// A `denylisted_predicates` entry does not compile within the regex limits.
+    #[error("invalid sql_query.denylisted_predicates entry `{pattern}`: {source}")]
+    InvalidPredicate {
+        /// The trimmed pattern.
+        pattern: String,
+        /// The regex compiler's refusal.
+        #[source]
+        source: regex::Error,
+    },
+}
+
 /// Structured reason for a [`SqlQueryGuard`](crate::sql_guard::SqlQueryGuard)
 /// denial.
 ///

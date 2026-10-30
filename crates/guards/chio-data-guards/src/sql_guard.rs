@@ -24,7 +24,7 @@ use chio_guards::{extract_action_checked, ToolAction};
 use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::config::{SqlGuardConfig, SqlOperation};
-use crate::error::SqlGuardDenyReason;
+use crate::error::{SqlGuardConfigError, SqlGuardDenyReason};
 use crate::sql_parser::{self, SqlAnalysis};
 
 /// Built-in SQL query guard.
@@ -63,7 +63,7 @@ impl SqlQueryGuard {
     }
 
     /// Construct a new guard or reject invalid user-supplied regex patterns.
-    pub fn try_new(config: SqlGuardConfig) -> Result<Self, String> {
+    pub fn try_new(config: SqlGuardConfig) -> Result<Self, SqlGuardConfigError> {
         if config.allow_all {
             warn!(
                 target: "chio.data-guards.sql",
@@ -75,42 +75,43 @@ impl SqlQueryGuard {
             let mut tables = BTreeSet::new();
             for table in columns.keys() {
                 if !tables.insert(table.to_ascii_lowercase()) {
-                    return Err(format!(
-                        "sql_query.column_allowlist names table `{table}` more than once (table names are case-insensitive)"
-                    ));
+                    return Err(SqlGuardConfigError::DuplicateTable {
+                        table: table.clone(),
+                    });
                 }
             }
         }
 
         if config.denylisted_predicates.len() > MAX_DENYLISTED_PREDICATES {
-            return Err(format!(
-                "sql_query.denylisted_predicates allows at most {MAX_DENYLISTED_PREDICATES} patterns"
-            ));
+            return Err(SqlGuardConfigError::TooManyPredicates {
+                max: MAX_DENYLISTED_PREDICATES,
+            });
         }
         let mut denylist_regex = Vec::with_capacity(config.denylisted_predicates.len());
         for pattern in &config.denylisted_predicates {
             let trimmed = pattern.trim();
             if trimmed.is_empty() {
-                return Err("sql_query.denylisted_predicates cannot contain empty patterns".into());
+                return Err(SqlGuardConfigError::EmptyPredicate);
             }
             if trimmed.len() > MAX_DENYLISTED_PREDICATE_LEN {
-                return Err(format!(
-                    "sql_query.denylisted_predicates entries must be at most {MAX_DENYLISTED_PREDICATE_LEN} characters"
-                ));
+                return Err(SqlGuardConfigError::PredicateTooLong {
+                    max: MAX_DENYLISTED_PREDICATE_LEN,
+                });
             }
             let complexity = predicate_pattern_complexity(trimmed);
             if complexity > MAX_DENYLISTED_PREDICATE_COMPLEXITY {
-                return Err(format!(
-                    "sql_query.denylisted_predicates entries must have complexity at most {MAX_DENYLISTED_PREDICATE_COMPLEXITY}"
-                ));
+                return Err(SqlGuardConfigError::PredicateTooComplex {
+                    max: MAX_DENYLISTED_PREDICATE_COMPLEXITY,
+                });
             }
             let re = RegexBuilder::new(trimmed)
                 .case_insensitive(true)
                 .size_limit(DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT)
                 .dfa_size_limit(DENYLISTED_PREDICATE_DFA_SIZE_LIMIT)
                 .build()
-                .map_err(|error| {
-                    format!("invalid sql_query.denylisted_predicates entry `{trimmed}`: {error}")
+                .map_err(|source| SqlGuardConfigError::InvalidPredicate {
+                    pattern: trimmed.to_string(),
+                    source,
                 })?;
             denylist_regex.push((trimmed.to_string(), re));
         }

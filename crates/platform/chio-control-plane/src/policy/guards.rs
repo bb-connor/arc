@@ -146,7 +146,8 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
 
     if let Some(sql_query) = &config.sql_query {
         pipeline.add(Box::new(
-            SqlQueryGuard::try_new(sql_query.clone()).map_err(PolicyError::Invalid)?,
+            SqlQueryGuard::try_new(sql_query.clone())
+                .map_err(|error| PolicyError::Invalid(error.to_string()))?,
         ));
     }
 

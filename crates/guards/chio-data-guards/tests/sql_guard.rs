@@ -14,7 +14,9 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
-use chio_data_guards::{SqlDialect, SqlGuardConfig, SqlOperation, SqlQueryGuard};
+use chio_data_guards::{
+    SqlDialect, SqlGuardConfig, SqlGuardConfigError, SqlOperation, SqlQueryGuard,
+};
 use chio_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
 fn make_request(
@@ -294,10 +296,10 @@ fn denylisted_predicate_count_limit_fails_closed() {
         denylisted_predicates: (0..65).map(|idx| format!("pattern-{idx}")).collect(),
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("too many denylisted predicates should fail closed");
-    };
-    assert!(error.contains("allows at most 64 patterns"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::TooManyPredicates { max: 64 })
+    ));
 }
 
 #[test]
@@ -306,10 +308,10 @@ fn denylisted_predicate_length_limit_fails_closed() {
         denylisted_predicates: vec!["a".repeat(513)],
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("overlong denylisted predicate should fail closed");
-    };
-    assert!(error.contains("must be at most 512 characters"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::PredicateTooLong { max: 512 })
+    ));
 }
 
 #[test]
@@ -318,10 +320,10 @@ fn denylisted_predicate_complexity_limit_fails_closed() {
         denylisted_predicates: vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()],
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("over-complex denylisted predicate should fail closed");
-    };
-    assert!(error.contains("complexity at most"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::PredicateTooComplex { .. })
+    ));
 }
 
 #[test]
@@ -340,10 +342,10 @@ fn column_allowlist_case_colliding_tables_fail_closed() {
         ),
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("case-colliding column allowlist tables should fail closed");
-    };
-    assert!(error.contains("column_allowlist names table `orders` more than once"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::DuplicateTable { table }) if table == "orders"
+    ));
 }
 
 #[test]
