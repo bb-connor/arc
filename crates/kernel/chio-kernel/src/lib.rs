@@ -81,6 +81,7 @@ pub mod dpop;
 pub mod evidence_export;
 #[cfg(not(loom))]
 pub mod execution_nonce;
+pub mod io_fault;
 #[cfg(not(loom))]
 pub mod federation_artifact_store;
 #[cfg(not(loom))]
@@ -273,6 +274,7 @@ pub use authority::{
     CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, Clock, ClockError,
     GovernedCapabilityAuthority, LocalCapabilityAuthority, SystemClock,
 };
+pub use io_fault::IoFault;
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 #[cfg(not(loom))]
