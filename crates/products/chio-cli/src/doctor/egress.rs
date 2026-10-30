@@ -2,8 +2,10 @@
 //!
 //! A probe targets one user-configured URL. The contract admits exactly that
 //! authority, never follows redirects, ignores proxy variables, pins the
-//! resolved addresses and refuses link-local and unique-local answers. A
-//! non-loopback authority also refuses loopback answers.
+//! resolved addresses and refuses link-local answers. A non-loopback
+//! authority also refuses loopback answers. A private IPv4 or unique-local
+//! IPv6 literal is reachable through an allowance pinned to that address;
+//! a name never reaches private address space.
 
 use std::collections::BTreeSet;
 use std::net::IpAddr;
@@ -11,6 +13,7 @@ use std::time::Duration;
 
 use chio_egress_contract::{
     BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
+    PrivateNetworkAllowance,
 };
 use url::{Host, Url};
 
@@ -48,9 +51,12 @@ fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
         allowed_authority_set: BTreeSet::from([authority]),
         deny_loopback: !loopback,
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PROBE_BODY_BYTES,
+        private_network_allowances: PrivateNetworkAllowance::for_private_ipv4_literal(&parsed)
+            .or_else(|| PrivateNetworkAllowance::for_ipv6_ula_literal(&parsed))
+            .into_iter()
+            .collect(),
     })
 }
 
@@ -111,6 +117,7 @@ pub(crate) mod test_support {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::net::SocketAddr;
 
     #[test]
     fn link_local_target_is_refused_as_link_local() {
@@ -120,13 +127,70 @@ mod tests {
         ));
     }
 
+    fn resolved(
+        contract: &HttpEgressContract,
+        host: &str,
+        address: &str,
+        port: u16,
+    ) -> Result<(), HttpEgressError> {
+        contract.enforce_resolved_address(host, SocketAddr::new(address.parse().unwrap(), port))
+    }
+
     #[test]
-    fn private_network_target_is_refused_as_a_policy_refusal() {
-        for url in ["http://10.0.0.5:9100/metrics", "http://100.64.0.1/"] {
-            let error = probe_get(url).expect_err("private target");
+    fn a_configured_name_never_reaches_private_address_space() {
+        let contract = probe_contract("http://metrics.example.com:9100/metrics").unwrap();
+        assert!(contract.private_network_allowances.is_empty());
+        for address in ["10.1.2.3", "172.16.0.1", "192.168.1.1", "100.64.0.1"] {
+            let error = resolved(&contract, "metrics.example.com", address, 9100)
+                .expect_err("rebound name");
             assert!(matches!(error, HttpEgressError::PrivateNetworkDenied { .. }));
             assert!(is_policy_refusal(&error));
         }
+        assert!(resolved(&contract, "metrics.example.com", "93.184.216.34", 9100).is_ok());
+    }
+
+    #[test]
+    fn a_private_literal_is_reached_only_at_its_pinned_address() {
+        let contract = probe_contract("http://10.0.0.5:9100/metrics").unwrap();
+        assert_eq!(contract.private_network_allowances.len(), 1);
+        assert!(contract.enforce_url("http://10.0.0.5:9100/metrics", 0).is_ok());
+        assert!(resolved(&contract, "10.0.0.5", "10.0.0.5", 9100).is_ok());
+        for address in ["10.0.0.6", "10.1.2.3", "192.168.1.1", "93.184.216.34"] {
+            let error = resolved(&contract, "10.0.0.5", address, 9100).expect_err("off pin");
+            assert!(
+                matches!(
+                    error,
+                    HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
+                ),
+                "{address}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_unique_local_literal_is_pinned_and_other_private_space_stays_refused() {
+        let contract = probe_contract("http://[fd12:3456::7]:9100/metrics").unwrap();
+        assert_eq!(contract.private_network_allowances.len(), 1);
+        assert!(resolved(&contract, "fd12:3456::7", "fd12:3456::7", 9100).is_ok());
+        assert!(resolved(&contract, "fd12:3456::7", "fd12:3456::8", 9100).is_err());
+    }
+
+    #[test]
+    fn metadata_and_public_literals_get_no_allowance() {
+        for url in [
+            "http://169.254.169.254/latest/meta-data",
+            "http://100.100.100.200/",
+            "http://93.184.216.34/",
+        ] {
+            assert!(probe_contract(url)
+                .unwrap()
+                .private_network_allowances
+                .is_empty());
+        }
+        assert!(matches!(
+            probe_get("http://100.100.100.200/"),
+            Err(HttpEgressError::PrivateNetworkDenied { .. })
+        ));
     }
 
     #[test]
