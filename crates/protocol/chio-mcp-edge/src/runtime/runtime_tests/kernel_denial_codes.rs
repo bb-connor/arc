@@ -353,13 +353,15 @@ impl ToolServerConnection for IncompleteToolServer {
 
 /// A tool server whose call ends as a cancelled or an incomplete deny, with
 /// its server id, tool name, terminal state label and client code.
-fn terminal_denial_cases() -> Vec<(
+type TerminalDenialCase = (
     Box<dyn ToolServerConnection>,
     &'static str,
     &'static str,
     &'static str,
     chio_kernel::ClientDenialCode,
-)> {
+);
+
+fn terminal_denial_cases() -> Vec<TerminalDenialCase> {
     vec![
         (
             Box::new(CancelledServer),
