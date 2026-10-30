@@ -238,10 +238,15 @@ impl ChioKernel {
                 }
                 admitted
             });
+        let client_denial = (!response.cancelled).then(|| {
+            serde_json::json!({
+                "chio_kernel": { CLIENT_DENIAL_CODE_FIELD: response.denial.code().code() }
+            })
+        });
         let extra = merge_metadata_objects(
             admitted.map(serde_json::Value::Object),
             merge_metadata_objects(
-                response.metadata,
+                merge_metadata_objects(response.metadata, client_denial),
                 Some(serde_json::json!({ ADMISSION_RECEIPT_METADATA_KEY: metadata })),
             ),
         );
@@ -523,13 +528,24 @@ impl ChioKernel {
                 return Err(mismatch());
             }
         }
-        self.deliver_durable_refusal(
-            request,
-            refusal_response(request, receipt, ClientDenialCode::Denied)?,
-            None,
-        )
+        let signed_code = receipt
+            .metadata
+            .as_ref()
+            .and_then(|value| value.get("chio_kernel"))
+            .and_then(|kernel| kernel.get(CLIENT_DENIAL_CODE_FIELD));
+        let code = match (receipt.decision.as_ref(), signed_code) {
+            (Some(Decision::Deny { .. }), Some(code)) => code
+                .as_str()
+                .and_then(ClientDenialCode::from_code)
+                .ok_or_else(mismatch)?,
+            (Some(Decision::Cancelled { .. }), None) => ClientDenialCode::Denied,
+            _ => return Err(mismatch()),
+        };
+        self.deliver_durable_refusal(request, refusal_response(request, receipt, code)?, None)
     }
 }
+
+const CLIENT_DENIAL_CODE_FIELD: &str = "client_denial_code";
 
 fn refusal_response(
     request: &ToolCallRequest,

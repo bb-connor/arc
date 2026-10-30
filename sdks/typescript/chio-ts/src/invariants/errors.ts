@@ -7,7 +7,8 @@ export type ChioInvariantErrorCode =
   | "unregistered_schema_id"
   | "signature_algorithm_mismatch"
   | "unsupported_algorithm"
-  | "signature_rejected";
+  | "signature_rejected"
+  | "disclosure";
 
 export class ChioInvariantError extends Error {
   readonly code: ChioInvariantErrorCode;

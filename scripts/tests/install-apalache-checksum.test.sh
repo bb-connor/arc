@@ -46,9 +46,11 @@ prepare_case() {
     mkdir -p "$RUN_HOME"
 }
 
+# CI is cleared so local-trust cases hold under a CI runner; a case that
+# needs CI mode passes CI=true explicitly.
 invoke_installer() {
     RUN_STATUS=0
-    env HOME="$RUN_HOME" APALACHE_DOWNLOAD_URL="file://$fake_asset" "$@" \
+    env -u CI HOME="$RUN_HOME" APALACHE_DOWNLOAD_URL="file://$fake_asset" "$@" \
         bash "$INSTALLER" >"$RUN_OUT" 2>"$RUN_ERR" || RUN_STATUS=$?
 }
 

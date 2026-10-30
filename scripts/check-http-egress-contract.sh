@@ -24,6 +24,11 @@
 # - test files (`tests.rs`, `*-tests.rs`, files under `tests/` or
 #   `crates/*/tests/`), plus named `*_tests/` modules bound by `cfg(test)`.
 #
+# A CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: marker classifies a reviewed
+# non-substrate caller. It is honored only in a file listed for reqwest in
+# scripts/http-egress-marker-allowlist.tsv; http_egress_client_scan.py reports
+# a marker in any other file and a listed file that carries none.
+#
 # Fail-closed: ambiguous matches (e.g. unrecognized aliases) are reported
 # rather than silently skipped.
 #

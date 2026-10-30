@@ -56,6 +56,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - name: Model checker installer self-test
+        run: bash scripts/tests/install-apalache-checksum.test.sh
+
       - name: Install pinned model checker
         run: ./tools/install-apalache.sh
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8

@@ -101,7 +101,7 @@ EXPECTED_CA_PACKAGE_SHA256 = (
     "a8ad8f04dfba1a2897388c4b420b698bf1ecd870be10f0127134a567d5e59896"
 )
 EXPECTED_CARGO_LOCK_SHA256 = (
-    "366f6b03f9ea3e14f44b35e9b535cec9649cab6c576ca790ad9502efc18fb775"
+    "807dfe7cb871e630826489d649b2de351c3d54cf8a323b480ab5c03e03e88b6e"
 )
 EXPECTED_RUST_TOOLCHAIN_SHA256 = (
     "24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a"
@@ -147,6 +147,9 @@ EXPECTED_SUPPLY_CHAIN_GATE_SHA256 = (
     "ee8e1614707e35ab41a1ce6f7abab65b5d8beae3b813a9d191cf9840d7950bb4"
 )
 EXPECTED_TEMPORAL_STEP_SHELL = "/bin/bash --noprofile --norc -p -e {0}"
+EXPECTED_FORMAL_TRACEABILITY_RUN = (
+    "bash scripts/check-mapping.sh\n" "bash scripts/tests/check-mapping.test.sh\n"
+)
 EXPECTED_TEMPORAL_GATE_RUN = rf"""
 set -euo pipefail
 readonly temporal_runner="scripts/check-temporal-security.sh"
@@ -1207,7 +1210,7 @@ EXPECTED_CI_EVIDENCE_STEPS = (
         "python3 scripts/check-security-apk-sources.py\n"
         "python3 scripts/tests/check-security-apk-sources.test.py",
     ),
-    ("Formal traceability gate", "bash scripts/check-mapping.sh"),
+    ("Formal traceability gate", EXPECTED_FORMAL_TRACEABILITY_RUN),
     ("Temporal security gate", EXPECTED_TEMPORAL_GATE_RUN),
     ("Workspace format", "cargo fmt --all -- --check"),
     (
@@ -1586,7 +1589,7 @@ EXPECTED_APALACHE_VERDICT_NEEDS = {
 # Bind the durable trace generation/refusal/model checks and their required
 # aggregate verdict together; adding a needs edge alone cannot qualify a run.
 EXPECTED_APALACHE_LIFECYCLE_JOB_SHA256 = (
-    "c52bd5c6019884f8187bba3b1664cbde2a6b39a7655407db3e632882f64cd6ba"
+    "bae70ea795034c629a65c2ba05bf695f9204e33ab99e44cb4f959b77d3643609"
 )
 EXPECTED_APALACHE_VERDICT_JOB_SHA256 = (
     "56cc98fc6d735549e2f3709d2ac3abe94d4945930bb94b63106fe56871ba450f"
@@ -9249,7 +9252,7 @@ def validate(root: Path) -> None:
     ):
         raise ContractError("required CI revocation regression gate is not exact and adjacent")
     mapping = named_step(check_job, "Formal traceability gate")
-    if mapping.get("run") != "bash scripts/check-mapping.sh":
+    if mapping.get("run") != EXPECTED_FORMAL_TRACEABILITY_RUN:
         raise ContractError("required CI omits the exact formal traceability gate")
     if (
         step_position(check_job, "Formal traceability gate")

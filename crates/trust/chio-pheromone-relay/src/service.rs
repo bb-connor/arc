@@ -819,12 +819,13 @@ pub async fn deliver_due_batches(
     store: &(impl PheromoneRelayStore + ?Sized),
     directory: PeerDirectory,
     keypair: Keypair,
+    profile: RelayProfile,
     sender_kernel_id: &str,
     now_unix_ms: u64,
     max_batches: usize,
 ) -> Result<RelayTickReport, PheromoneRelayError> {
     let delivery_directory = directory.clone();
-    let client = PheromoneRelayClient::new(directory, keypair, now_unix_ms, 60_000)?;
+    let client = PheromoneRelayClient::new(directory, keypair, now_unix_ms, 60_000, profile);
     let due = store.lease_due_batches(now_unix_ms, max_batches)?;
     let mut report = RelayTickReport {
         schema: PHEROMONE_RELAY_TICK_REPORT_SCHEMA.to_string(),

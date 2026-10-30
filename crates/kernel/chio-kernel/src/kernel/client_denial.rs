@@ -99,6 +99,13 @@ impl ClientDenialCode {
     pub const fn text(self) -> &'static str {
         self.wire().1
     }
+
+    /// The code whose wire string is `code`, or `None` outside the closed set.
+    pub fn from_code(code: &str) -> Option<Self> {
+        CLIENT_DENIAL_CODES
+            .into_iter()
+            .find(|candidate| candidate.code() == code)
+    }
 }
 
 /// A kernel denial: the client code plus the detail signed into the receipt.
@@ -296,6 +303,16 @@ mod tests {
         assert_eq!(codes.len(), CLIENT_DENIAL_CODES.len());
         assert_eq!(texts.len(), CLIENT_DENIAL_CODES.len());
         assert_eq!(variants.len(), CLIENT_DENIAL_CODES.len());
+    }
+
+    #[test]
+    fn from_code_accepts_only_the_closed_wire_codes() {
+        for variant in CLIENT_DENIAL_CODES {
+            assert_eq!(ClientDenialCode::from_code(variant.code()), Some(variant));
+        }
+        for unknown in ["", "Denied", "guard_denied ", "Request denied", "unknown"] {
+            assert_eq!(ClientDenialCode::from_code(unknown), None, "{unknown:?}");
+        }
     }
 
     #[test]

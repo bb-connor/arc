@@ -710,7 +710,7 @@
       },
       "expected": {
         "content": "verified",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "rejected",
         "receipt_valid": true,
         "signature_valid": true
@@ -791,7 +791,7 @@
       },
       "expected": {
         "content": "rejected",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "verified",
         "receipt_valid": true,
         "signature_valid": true
@@ -864,7 +864,7 @@
       },
       "expected": {
         "content": "rejected",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "unverifiable",
         "receipt_valid": true,
         "signature_valid": true
@@ -945,7 +945,7 @@
       },
       "expected": {
         "content": "rejected",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "verified",
         "receipt_valid": true,
         "signature_valid": true
@@ -1163,6 +1163,87 @@
       }
     },
     {
+      "description": "The parameters opening carries a salt whose last character has nonzero trailing bits; exactly one string encodes each salt.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBB",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": false,
+        "parameters": "rejected",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "salt_noncanonical_tail",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
       "description": "The producer used one salt for both the parameters and the content commitment. A verifier rejects an opening document that repeats a salt across salt_refs, so every opened field is rejected and the receipt is marked as tampered disclosure.",
       "disclosure": {
         "openings": [
@@ -1315,7 +1396,7 @@
         "anchor_subject": "unverifiable",
         "anchor_tenant": "rejected",
         "content": "verified",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "verified",
         "receipt_valid": true,
         "signature_valid": true
@@ -1459,7 +1540,7 @@
         "anchor_subject": "verified",
         "anchor_tenant": "rejected",
         "content": "verified",
-        "disclosure_valid": true,
+        "disclosure_valid": false,
         "parameters": "verified",
         "receipt_valid": true,
         "signature_valid": true

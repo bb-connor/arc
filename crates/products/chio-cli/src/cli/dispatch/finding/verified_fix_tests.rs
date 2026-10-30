@@ -266,6 +266,39 @@ fn patch_output_runner_enforces_deadline_and_output_bound() {
     assert!(output.to_string().contains("output exceeded"));
 }
 
+/// A self-contained npm package (bundled dependencies) with an executable
+/// `bin/npm` entry, so the runtime selection never depends on the host npm.
+fn self_contained_npm_on_path() -> tempfile::TempDir {
+    let root = tempfile::tempdir().unwrap();
+    let package = root.path().join("lib/npm");
+    fs::create_dir_all(package.join("bin")).unwrap();
+    fs::create_dir_all(package.join("node_modules/fixture-dependency")).unwrap();
+    for script in ["bin/npm-cli.js", "bin/npx-cli.js"] {
+        fs::write(package.join(script), "#!/usr/bin/env node\n").unwrap();
+        fs::set_permissions(package.join(script), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    fs::write(
+        package.join("package.json"),
+        serde_json::to_vec(&serde_json::json!({
+            "name": "npm",
+            "version": "10.0.0",
+            "bin": {"npm": "bin/npm-cli.js", "npx": "bin/npx-cli.js"},
+            "dependencies": {"fixture-dependency": "1.0.0"},
+            "bundleDependencies": ["fixture-dependency"]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        package.join("node_modules/fixture-dependency/package.json"),
+        br#"{"name":"fixture-dependency","version":"1.0.0"}"#,
+    )
+    .unwrap();
+    fs::create_dir(root.path().join("bin")).unwrap();
+    std::os::unix::fs::symlink("../lib/npm/bin/npm-cli.js", root.path().join("bin/npm")).unwrap();
+    root
+}
+
 #[test]
 fn sandbox_mounts_only_explicit_runtime_components() {
     let root = tempfile::tempdir().unwrap();
@@ -277,8 +310,16 @@ fn sandbox_mounts_only_explicit_runtime_components() {
     ] {
         fs::create_dir_all(root.path().join(path)).unwrap();
     }
+    let npm = self_contained_npm_on_path();
+    let host_path = std::env::var_os("PATH").unwrap();
+    let search_path = std::env::join_paths(
+        std::iter::once(npm.path().join("bin")).chain(std::env::split_paths(&host_path)),
+    )
+    .unwrap();
+    let spec =
+        build_runtime_mount_spec(RuntimeMountProfile::SellerTest, Some(search_path)).unwrap();
     let mut command = Command::new("bwrap");
-    add_runtime_mounts(&mut command, RuntimeMountProfile::SellerTest).unwrap();
+    apply_runtime_mount_spec(&mut command, &spec);
     let arguments = command
         .get_args()
         .map(|argument| argument.to_string_lossy().into_owned())
@@ -306,6 +347,18 @@ fn sandbox_mounts_only_explicit_runtime_components() {
     assert!(arguments
         .iter()
         .all(|argument| !argument.contains(temporary_root.as_str())));
+
+    let npm_package = npm.path().join("lib/npm").canonicalize().unwrap();
+    let npm_mounts = arguments
+        .windows(3)
+        .filter(|window| window[0] == "--ro-bind" && window[2] == "/runtime/npm")
+        .map(|window| window[1].clone())
+        .collect::<Vec<_>>();
+    if find_executable("node", &host_path).is_some() {
+        assert_eq!(npm_mounts, [npm_package.to_string_lossy().into_owned()]);
+    } else {
+        assert!(npm_mounts.is_empty());
+    }
 }
 
 #[test]

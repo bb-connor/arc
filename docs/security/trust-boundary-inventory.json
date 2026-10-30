@@ -5645,6 +5645,11 @@
     "crates/core/chio-core-types/src/receipt/body.rs": [
       "typed_metadata::from_value"
     ],
+    "crates/core/chio-core-types/src/receipt/disclosure.rs": [
+      "required_nullable::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize"
+    ],
     "crates/core/chio-core-types/src/receipt/security_parts/definitions_and_projection.inc": [
       "from::custom_deserialize",
       "validate::custom_deserialize",
@@ -7026,6 +7031,23 @@
             "serde_json::from_value"
           ],
           "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/receipt/disclosure.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom field deserialization of the unsigned chio.receipt-disclosure.v1 document under the caller's outer original-byte reader, which bounds the input bytes. The document and each opening refuse unknown and duplicate members; schema must be the exact chio.receipt-disclosure.v1 string (a tagged or other form is refused); receipt_id must be 64 lowercase hex characters; openings must hold 1 to 64 entries; payload is required and may be null; salt_ref follows the bounded SaltRef grammar (at most 64 characters); a salt decodes only from the canonical b64u form of exactly 32 bytes (43 characters, no padding, zero trailing bits). The decoded document is not trusted: open_commitments recomputes every commitment over the caller's own preimages. Pinned by tests/receipt_disclosure.rs salt_wire_form_is_strict, padded_document_and_opening_fail_decoding and disclosure_schema_examples_decode_as_the_schema_says.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true,
+          "instances": 3
         }
       ]
     },

@@ -249,6 +249,9 @@ jobs:
             target/formal/coverage.json \
             target/release-qualification/formal/coverage.json
 
+      - name: Hosted web3 runtime qualification self-test
+        run: bash scripts/tests/qualify-web3-runtime-public-settlement.test.sh
+
       - name: Hosted web3 runtime qualification
         run: ./scripts/qualify-web3-runtime.sh
 

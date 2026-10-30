@@ -66,7 +66,7 @@ fn response_binding() -> Value {
         "action_id": "action-001",
         "trigger_finding_id": "finding-001",
         "trigger_finding_hash": digest(7),
-        "trigger_finding_receipt_id": "receipt-001",
+        "trigger_finding_receipt_id": "receipt-002",
         "affected_set_hash": digest(8),
         "plan_expires_at_unix_ms": OCCURRED_AT_UNIX_MS + 100_000
     })
@@ -300,7 +300,7 @@ fn fixture(kind: ActiveDefenseReceiptKind) -> Value {
         ActiveDefenseReceiptKind::SchedulerHealth => json!({
             "kind": "scheduler_health",
             "body": {
-                "header": header("transition-scheduler-health-001"),
+                "header": single_prior_header("transition-scheduler-health-001"),
                 "response": response_binding(),
                 "event_id": "scheduler-health-001",
                 "first_failure_at_unix_ms": OCCURRED_AT_UNIX_MS - 50,
@@ -732,7 +732,7 @@ fn response_plan_requires_canonical_effect_order_and_target_binding() {
 #[test]
 fn response_plan_requires_the_exact_trigger_finding_receipt_as_a_prior() {
     let mut missing = fixture(ActiveDefenseReceiptKind::ResponsePlan);
-    missing["body"]["header"]["prior_receipt_ids"] = json!(["receipt-002"]);
+    missing["body"]["header"]["prior_receipt_ids"] = json!(["receipt-001"]);
     assert_rejected(
         missing,
         "response plan receipt does not cite its trigger finding receipt",
@@ -1018,5 +1018,422 @@ fn health_receipts_reject_zero_or_future_operational_state() {
         let mut scheduler = fixture(ActiveDefenseReceiptKind::SchedulerHealth);
         scheduler["body"][field] = json!(0);
         assert_rejected(scheduler, expected);
+    }
+}
+
+#[cfg(feature = "tenant-index")]
+mod projection {
+    use super::*;
+    use std::cell::Cell;
+
+    use chio_core_types::receipt::metadata::MetadataOpenings;
+    use chio_core_types::rng::{Rng, RngError};
+    use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
+
+    struct CountingRng(Cell<u64>);
+
+    impl Rng for CountingRng {
+        fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+            let next = self.0.get().wrapping_add(1);
+            self.0.set(next);
+            for (index, byte) in dest.iter_mut().enumerate() {
+                let shift = (index % 8) * 8;
+                *byte = ((next >> shift) & 0xff) as u8 ^ (index as u8);
+            }
+            Ok(())
+        }
+    }
+
+    fn rng() -> CountingRng {
+        CountingRng(Cell::new(0))
+    }
+
+    fn key(fill: u8) -> TenantIndexKey {
+        TenantIndexKey::from_set_key(&[fill; 32])
+            .unwrap_or_else(|error| panic!("tenant index key: {error}"))
+    }
+
+    fn key_set(active: u8, retired: &[u8]) -> TenantIndexKeySet {
+        TenantIndexKeySet::new(key(active), retired.iter().map(|fill| key(*fill)).collect())
+            .unwrap_or_else(|error| panic!("tenant index key set: {error}"))
+    }
+
+    fn without_first(openings: &MetadataOpenings) -> MetadataOpenings {
+        let mut rest = MetadataOpenings::new();
+        for (salt_ref, opening) in openings.iter().skip(1) {
+            rest.insert(salt_ref.clone(), opening.clone())
+                .unwrap_or_else(|error| panic!("opening: {error}"));
+        }
+        rest
+    }
+
+    use chio_core_types::receipt::active_defense_projection::ActiveDefenseReceiptProjection;
+    use chio_core_types::receipt::metadata::MetadataValue;
+    use chio_core_types::root_authority::SaltRef;
+
+    /// Fields whose raw value the projection replaces with a keyed value or a commitment
+    /// and that no opening carries as plaintext JSON.
+    const HIDDEN_FIELDS: [&str; 5] = [
+        "transition_id",
+        "affected_set_hash",
+        "governed_intent_hash",
+        "policy_hash",
+        "trigger_finding_receipt_id",
+    ];
+
+    /// The field name and canonical JSON of every `HIDDEN_FIELDS` value in `fixture`.
+    fn hidden_values(fixture: &Value) -> Vec<(String, String)> {
+        fn collect(value: &Value, found: &mut Vec<(String, String)>) {
+            match value {
+                Value::Object(members) => {
+                    for (name, member) in members {
+                        if HIDDEN_FIELDS.contains(&name.as_str()) {
+                            found.push((
+                                name.clone(),
+                                serde_json::to_string(member)
+                                    .unwrap_or_else(|error| panic!("{name}: {error}")),
+                            ));
+                        } else {
+                            collect(member, found);
+                        }
+                    }
+                }
+                Value::Array(items) => {
+                    for item in items {
+                        collect(item, found);
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut found = Vec::new();
+        collect(fixture, &mut found);
+        found
+    }
+
+    /// The prior receipt ids a fixture keeps in plaintext by contract.
+    fn kept_prior_ids(fixture: &Value) -> Vec<String> {
+        fixture["body"]["header"]["prior_receipt_ids"]
+            .as_array()
+            .unwrap_or_else(|| panic!("fixture has prior receipt ids"))
+            .iter()
+            .map(|id| serde_json::to_string(id).unwrap_or_else(|error| panic!("prior id: {error}")))
+            .collect()
+    }
+
+    /// No hidden field and no opening's raw value appears in `encoded`. The one exemption:
+    /// a response plan cites its trigger finding receipt among its kept prior receipt ids,
+    /// so only that plan's `trigger_finding_receipt_id` may appear there.
+    fn assert_hidden(label: &str, fixture: &Value, encoded: &str, openings: &MetadataOpenings) {
+        let plan = fixture["kind"] == "response_plan";
+        let kept = kept_prior_ids(fixture);
+        for (name, raw) in hidden_values(fixture) {
+            if plan && name == "trigger_finding_receipt_id" && kept.contains(&raw) {
+                continue;
+            }
+            assert!(!encoded.contains(&raw), "{label} carries {name} {raw}");
+        }
+        for (salt_ref, opening) in openings.iter() {
+            let raw = String::from_utf8_lossy(opening.value.as_bytes()).into_owned();
+            if plan
+                && salt_ref.as_str() == "metadata.active_defense.finding_receipt"
+                && kept.contains(&raw)
+            {
+                continue;
+            }
+            assert!(!encoded.contains(&raw), "{label}: {salt_ref} leaks {raw}");
+        }
+    }
+
+    fn targeted_effect(effect_id: &str, ordinal: u16, kind: &str, target: Value) -> Value {
+        let mut value = effect(effect_id, ordinal, kind);
+        value["target"] = target;
+        value
+    }
+
+    fn governed_dispatch() -> Value {
+        let mut dispatch = execution_dispatch_binding();
+        dispatch["approval"] = json!({
+            "approval_mode": "governed",
+            "admission_operation_id": "admission-operation-001",
+            "admission_operation_version": 1,
+            "approval_set_hash": digest(45)
+        });
+        dispatch
+    }
+
+    /// Fixtures that reach the projection branches `fixture` leaves out: governed and
+    /// automatic execution dispatch with its authorization hash, lineage and capability-set
+    /// effect targets, and a contradictory detector watermark.
+    fn branch_fixtures() -> Vec<(&'static str, Value)> {
+        let mut out = Vec::new();
+        for (label, kind, dispatch) in [
+            (
+                "response_completion_governed",
+                ActiveDefenseReceiptKind::ResponseCompletion,
+                governed_dispatch(),
+            ),
+            (
+                "lift_rollback_completion_governed",
+                ActiveDefenseReceiptKind::LiftRollbackCompletion,
+                governed_dispatch(),
+            ),
+            (
+                "response_completion_automatic",
+                ActiveDefenseReceiptKind::ResponseCompletion,
+                execution_dispatch_binding(),
+            ),
+        ] {
+            let mut value = fixture(kind);
+            value["body"]["execution_dispatch"] = dispatch;
+            value["body"]["dispatch_authorization_hash"] = digest(43);
+            out.push((label, value));
+        }
+        let capability_set = targeted_effect(
+            "effect-003",
+            1,
+            "suspend_capability_set",
+            json!({"target_type": "capability_set", "affected_set_hash": digest(50)}),
+        );
+        let lineage = targeted_effect(
+            "effect-004",
+            2,
+            "freeze_issuance",
+            json!({"target_type": "lineage", "lineage_id": "lineage-target-001"}),
+        );
+        let mut plan = fixture(ActiveDefenseReceiptKind::ResponsePlan);
+        plan["body"]["effects"] = json!([
+            effect("effect-001", 0, "throttle_session"),
+            capability_set.clone(),
+            lineage.clone()
+        ]);
+        out.push(("response_plan_scoped_targets", plan));
+        for (label, target_effect) in [
+            ("effect_transition_capability_set", capability_set),
+            ("effect_transition_lineage", lineage),
+        ] {
+            let mut transition = fixture(ActiveDefenseReceiptKind::EffectTransition);
+            transition["body"]["effect"] = target_effect;
+            out.push((label, transition));
+        }
+        let mut detector = fixture(ActiveDefenseReceiptKind::DetectorHealth);
+        detector["body"]["health_kind"] = json!("corrupt_state");
+        detector["body"]["watermark"] = json!({
+            "kind": "contradictory",
+            "claimed_unix_ms": "9007199254740992"
+        });
+        out.push(("detector_health_contradictory", detector));
+        out
+    }
+
+    fn every_fixture() -> Vec<(String, Value)> {
+        all_kinds()
+            .into_iter()
+            .map(|kind| (format!("{kind:?}"), fixture(kind)))
+            .chain(
+                branch_fixtures()
+                    .into_iter()
+                    .map(|(label, value)| (label.to_owned(), value)),
+            )
+            .collect()
+    }
+
+    #[test]
+    fn every_kind_projects_without_raw_identifiers_and_matches_its_body() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        for (label, value) in every_fixture() {
+            let body = parse(value.clone());
+            let (projection, openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{label} projects: {error}"));
+            assert!(
+                body.matches_projection(&projection, &openings, &keys),
+                "{label}"
+            );
+            let encoded = canonical_json_string(&projection)
+                .unwrap_or_else(|error| panic!("{label} encodes: {error}"));
+            assert!(
+                !encoded.contains("tenant-a"),
+                "{label} carries the raw tenant"
+            );
+            assert_hidden(&label, &value, &encoded, &openings);
+            let decoded: ActiveDefenseReceiptProjection = serde_json::from_str(&encoded)
+                .unwrap_or_else(|error| panic!("{label} decodes: {error}"));
+            assert_eq!(decoded, projection, "{label}");
+        }
+    }
+
+    #[test]
+    fn branch_fixtures_reach_every_dispatch_target_and_watermark_projection() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        let mut encoded = String::new();
+        for (label, value) in branch_fixtures() {
+            let (projection, _) = parse(value)
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{label} projects: {error}"));
+            encoded.push_str(
+                &canonical_json_string(&projection)
+                    .unwrap_or_else(|error| panic!("{label} encodes: {error}")),
+            );
+        }
+        for salt_ref in [
+            "metadata.active_defense.dispatch_id",
+            "metadata.active_defense.dispatch_plan_hash",
+            "metadata.active_defense.dispatch_executor_authority",
+            "metadata.active_defense.dispatch_authorization_capability_hash",
+            "metadata.active_defense.dispatch_policy_decision_hash",
+            "metadata.active_defense.dispatch_admission_artifact_fingerprint",
+            "metadata.active_defense.dispatch_admission_operation",
+            "metadata.active_defense.dispatch_approval_set_hash",
+            "metadata.active_defense.dispatch_authorization_hash",
+            "metadata.active_defense.claimed_watermark",
+            "metadata.active_defense.finding_receipt",
+            "metadata.active_defense.policy_hash",
+        ] {
+            assert!(
+                encoded.contains(salt_ref),
+                "no projection commits {salt_ref}"
+            );
+        }
+        for target in [
+            "\"capability_set\"",
+            "\"lineage\"",
+            "\"governed\"",
+            "\"contradictory\"",
+        ] {
+            assert!(encoded.contains(target), "no projection reaches {target}");
+        }
+    }
+
+    #[test]
+    fn projection_commits_the_trigger_finding_receipt_in_every_response_variant() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        for kind in [
+            ActiveDefenseReceiptKind::ResponsePlan,
+            ActiveDefenseReceiptKind::ResponseStateTransition,
+            ActiveDefenseReceiptKind::EffectTransition,
+            ActiveDefenseReceiptKind::ResponseCompletion,
+            ActiveDefenseReceiptKind::LiftRollbackCompletion,
+            ActiveDefenseReceiptKind::SchedulerHealth,
+        ] {
+            let value = fixture(kind);
+            let (projection, openings) = parse(value.clone())
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            let finding_receipt = SaltRef::new("metadata.active_defense.finding_receipt")
+                .unwrap_or_else(|error| panic!("salt ref: {error}"));
+            assert!(openings.get(&finding_receipt).is_some(), "{kind:?}");
+            if kind != ActiveDefenseReceiptKind::ResponsePlan {
+                assert!(
+                    !kept_prior_ids(&value).contains(&"\"receipt-002\"".to_owned()),
+                    "{kind:?} fixture must cite a prior other than its trigger"
+                );
+                let encoded = canonical_json_string(&projection)
+                    .unwrap_or_else(|error| panic!("{kind:?} encodes: {error}"));
+                assert!(!encoded.contains("receipt-002"), "{kind:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn projection_refuses_openings_it_never_used() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        let unused = SaltRef::new("metadata.active_defense.effect_65535_id")
+            .unwrap_or_else(|error| panic!("salt ref: {error}"));
+        for (label, value) in every_fixture() {
+            let body = parse(value);
+            let (projection, openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{label} projects: {error}"));
+            let mut padded = openings.clone();
+            padded
+                .commit_value(
+                    unused.clone(),
+                    MetadataValue::from_json(&"unused")
+                        .unwrap_or_else(|error| panic!("value: {error}")),
+                    &rng,
+                )
+                .unwrap_or_else(|error| panic!("{label} pads: {error}"));
+            assert!(
+                body.matches_projection(&projection, &openings, &keys),
+                "{label}"
+            );
+            assert!(
+                !body.matches_projection(&projection, &padded, &keys),
+                "{label} matched with an unused opening"
+            );
+        }
+    }
+
+    #[test]
+    fn projection_refuses_missing_openings_other_bodies_and_unknown_generations() {
+        let keys = key_set(7, &[]);
+        let rng = rng();
+        for kind in all_kinds() {
+            let body = parse(fixture(kind));
+            let (projection, openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            if !openings.is_empty() {
+                assert!(
+                    !body.matches_projection(&projection, &without_first(&openings), &keys),
+                    "{kind:?} matched without an opening"
+                );
+            }
+            let (_, other_openings) = body
+                .project(&keys, &rng)
+                .unwrap_or_else(|error| panic!("{kind:?} projects: {error}"));
+            if !openings.is_empty() {
+                assert!(
+                    !body.matches_projection(&projection, &other_openings, &keys),
+                    "{kind:?} matched with another projection's openings"
+                );
+            }
+            let mut moved = fixture(kind);
+            moved["body"]["header"]["transition_id"] = json!("transition-moved-001");
+            assert!(
+                !parse(moved).matches_projection(&projection, &openings, &keys),
+                "{kind:?}"
+            );
+            assert!(
+                !body.matches_projection(&projection, &openings, &key_set(8, &[])),
+                "{kind:?} matched under an unknown generation"
+            );
+        }
+    }
+
+    #[test]
+    fn projection_signed_before_rotation_matches_under_the_retired_generation() {
+        let before = key_set(7, &[]);
+        let after = key_set(8, &[7]);
+        let body = parse(fixture(ActiveDefenseReceiptKind::ResponseCompletion));
+        let (projection, openings) = body
+            .project(&before, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert!(body.matches_projection(&projection, &openings, &after));
+        let (rotated, rotated_openings) = body
+            .project(&after, &rng())
+            .unwrap_or_else(|error| panic!("projects: {error}"));
+        assert_ne!(
+            rotated.header().transition_id,
+            projection.header().transition_id
+        );
+        assert!(!body.matches_projection(&rotated, &rotated_openings, &before));
+    }
+
+    #[test]
+    fn projection_salt_draw_failure_refuses() {
+        struct Offline;
+        impl Rng for Offline {
+            fn fill_bytes(&self, _dest: &mut [u8]) -> Result<(), RngError> {
+                Err(RngError("offline"))
+            }
+        }
+        let body = parse(fixture(ActiveDefenseReceiptKind::FlowDenial));
+        assert!(body.project(&key_set(7, &[]), &Offline).is_err());
     }
 }

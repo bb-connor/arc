@@ -74,6 +74,8 @@ WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 WRAPPER_LEN = 88
 MAX_SAFE_INTEGER = 2**53 - 1
 
+# Registry rows for unsigned documents, which never carry a wrapper.
+EXCLUDED_WRAPPER_IDS = frozenset({"chio.receipt-disclosure.v1"})
 
 SIGNATURE_SCHEMA_IDS = (
     "chio.receipt.v1",
@@ -123,7 +125,7 @@ COMMITMENT_DOMAINS = {
     "anchor.tenant": TENANT_DOMAIN,
 }
 
-SALT_PATTERN = re.compile(r"\Ab64u:[A-Za-z0-9_-]{43}\Z")
+SALT_PATTERN = re.compile(r"\Ab64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]\Z")
 FIXTURE_TIMESTAMP = 1792234800
 
 # Cases of tests/bindings/vectors/canonical/v1.json inside the restricted subset.
@@ -326,7 +328,7 @@ def verify_wrapped(
 
 def known_wrapper_ids() -> list[str]:
     registry = json.loads(REGISTRY_PATH.read_bytes())
-    return sorted({row["schema"] for row in registry["artifacts"]})
+    return sorted({row["schema"] for row in registry["artifacts"]} - EXCLUDED_WRAPPER_IDS)
 
 
 def dump(document: object) -> bytes:
@@ -748,7 +750,6 @@ def verify_committed_case(case: dict, known: frozenset[str]) -> dict:
             receipt["content_commitment"]["value"],
             bytes.fromhex(preimages["content_preimage_hex"]),
         ),
-        "disclosure_valid": disclosure_valid,
         "parameters": field(
             "params",
             receipt["action"]["parameter_commitment"]["value"],
@@ -762,6 +763,8 @@ def verify_committed_case(case: dict, known: frozenset[str]) -> dict:
             payload = by_ref.get(ref, (None, None))[1]
             preimage = payload.encode("utf-8") if isinstance(payload, str) else None
             result[key] = field(ref, context["anchor"][member]["commit"], preimage)
+    # A rejected field is tampered disclosure: the document is invalid as a whole.
+    result["disclosure_valid"] = disclosure_valid and "rejected" not in result.values()
     return result
 
 
@@ -915,7 +918,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         [opening("params", b64u(flip_low_bit(FIXTURE_SALTS["params"])), PARAMETERS), opening("content", s["content"], VALUE_OUTPUT)],
         params_canonical,
         value_preimage,
-        ok(parameters="rejected"),
+        ok(disclosure_valid=False, parameters="rejected"),
     )
 
     tampered_output = {"lines": 43, "text": "Roadmap"}
@@ -929,7 +932,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         [opening("params", s["params"], PARAMETERS), opening("content", s["content"], tampered_output)],
         params_canonical,
         tampered_preimage,
-        ok(content="rejected"),
+        ok(content="rejected", disclosure_valid=False),
     )
 
     add(
@@ -939,7 +942,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         [opening("content", s["params"], PARAMETERS)],
         params_canonical,
         params_canonical,
-        ok(content="rejected", parameters="unverifiable"),
+        ok(content="rejected", disclosure_valid=False, parameters="unverifiable"),
     )
 
     swapped_receipt = finalize_receipt(keys, base_body(keys, PARAMETERS, value_preimage, allow, content_domain=PARAMETERS_DOMAIN))
@@ -950,7 +953,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         [opening("params", s["params"], PARAMETERS), opening("content", s["content"], VALUE_OUTPUT)],
         params_canonical,
         value_preimage,
-        ok(content="rejected"),
+        ok(content="rejected", disclosure_valid=False),
     )
 
     add(
@@ -968,6 +971,19 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         "The parameters opening carries the right salt with base64url padding; the encoding is unpadded.",
         value_receipt,
         [opening("params", s["params"] + "=", PARAMETERS), opening("content", s["content"], VALUE_OUTPUT)],
+        params_canonical,
+        value_preimage,
+        ok(content="rejected", disclosure_valid=False, parameters="rejected"),
+    )
+
+    noncanonical_tail = s["params"][:-1] + "B"
+    if decode_salt(noncanonical_tail) is not None or noncanonical_tail == s["params"]:
+        raise AssertionError("the noncanonical tail salt must not decode")
+    add(
+        "salt_noncanonical_tail",
+        "The parameters opening carries a salt whose last character has nonzero trailing bits; exactly one string encodes each salt.",
+        value_receipt,
+        [opening("params", noncanonical_tail, PARAMETERS), opening("content", s["content"], VALUE_OUTPUT)],
         params_canonical,
         value_preimage,
         ok(content="rejected", disclosure_valid=False, parameters="rejected"),
@@ -991,7 +1007,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         value_openings + [opening("anchor.tenant", s["anchor.sub"], SUBJECT_VALUE)],
         params_canonical,
         value_preimage,
-        ok(anchor_subject="unverifiable", anchor_tenant="rejected"),
+        ok(anchor_subject="unverifiable", anchor_tenant="rejected", disclosure_valid=False),
         context,
     )
 
@@ -1006,7 +1022,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         ],
         params_canonical,
         value_preimage,
-        ok(anchor_subject="verified", anchor_tenant="rejected"),
+        ok(anchor_subject="verified", anchor_tenant="rejected", disclosure_valid=False),
         context,
     )
 

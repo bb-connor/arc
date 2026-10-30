@@ -2282,6 +2282,12 @@
       "schemaFile": "spec/schemas/chio-wire/v1/receipt/decision-model-witness.schema.json"
     },
     {
+      "schema": "chio.receipt-disclosure.v1",
+      "artifactKind": "receipt_disclosure",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/disclosure.schema.json"
+    },
+    {
       "schema": "chio.treaty-epoch.v1",
       "artifactKind": "treaty_epoch",
       "introducedBy": "treaty-epoch-commit-v1",

@@ -2,6 +2,7 @@ use rusqlite::{params, OptionalExtension, Transaction, TransactionBehavior};
 
 use super::{sqlite_error, sqlite_i64, sqlite_u64, SqliteRuntimeOrchestrationStore};
 use crate::admission::validate_runtime_trust_floor_transition;
+use crate::error::RuntimeAdmissionWrite;
 use crate::types::RuntimeTrustFloorEntry;
 use crate::ChioRuntimeError;
 
@@ -79,7 +80,7 @@ impl SqliteRuntimeOrchestrationStore {
                     entry.latest_revocation_checkpoint_sha256
                 ],
             )
-            .map_err(sqlite_error)?;
+            .map_err(RuntimeAdmissionWrite::TrustFloor.fault())?;
         Ok(())
     }
 
@@ -91,13 +92,14 @@ impl SqliteRuntimeOrchestrationStore {
         let mut connection = self.lock_connection()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(sqlite_error)?;
+            .map_err(RuntimeAdmissionWrite::TrustFloor.fault())?;
         Self::validate_and_store_runtime_trust_floor_in_transaction(
             &tx,
             entry,
             previous_hash_sha256,
         )?;
-        tx.commit().map_err(sqlite_error)
+        tx.commit()
+            .map_err(RuntimeAdmissionWrite::TrustFloor.fault())
     }
 
     pub(super) fn validate_and_store_runtime_trust_floor_in_transaction(
@@ -125,7 +127,7 @@ impl SqliteRuntimeOrchestrationStore {
                 },
             )
             .optional()
-            .map_err(sqlite_error)?;
+            .map_err(RuntimeAdmissionWrite::TrustFloor.fault())?;
         let existing = existing
             .map(
                 |(
@@ -169,7 +171,7 @@ impl SqliteRuntimeOrchestrationStore {
                 entry.latest_revocation_checkpoint_sha256
             ],
         )
-        .map_err(sqlite_error)?;
+        .map_err(RuntimeAdmissionWrite::TrustFloor.fault())?;
         Ok(())
     }
 }

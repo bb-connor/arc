@@ -243,6 +243,23 @@ pub struct ToolCallResponse {
     pub execution_nonce: Option<Box<SignedExecutionNonce>>,
 }
 
+impl ToolCallResponse {
+    /// The closed denial code a client observes for a completed deny.
+    pub fn client_denial(&self) -> Option<crate::ClientDenialCode> {
+        (self.verdict == Verdict::Deny && self.terminal_state.is_completed())
+            .then(|| self.denial_code.unwrap_or(crate::ClientDenialCode::Denied))
+    }
+
+    /// The reason a client may observe: the fixed text of the denial code for
+    /// a completed deny, and the response reason otherwise.
+    pub fn client_reason(&self) -> Option<String> {
+        match self.client_denial() {
+            Some(code) => Some(code.text().to_owned()),
+            None => self.reason.clone(),
+        }
+    }
+}
+
 /// Streamed tool output emitted before the final tool response frame.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolCallChunk {

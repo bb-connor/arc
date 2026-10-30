@@ -13,6 +13,7 @@ ChioInvariantErrorCode = Literal[
     "signature_algorithm_mismatch",
     "unsupported_algorithm",
     "signature_rejected",
+    "disclosure",
 ]
 
 

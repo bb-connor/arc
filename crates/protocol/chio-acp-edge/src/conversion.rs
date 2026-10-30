@@ -102,7 +102,7 @@ fn acp_invocation_result_from_orchestrated(
         None
     } else {
         response
-            .reason
+            .client_reason()
             .or_else(|| terminal_state_reason(&response.terminal_state))
     };
 

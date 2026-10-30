@@ -1879,7 +1879,7 @@ unsupported schema versions fail closed.
 | `memory_provenance` | Chio signer | unsafe |  | Memory write provenance. store and key are taken from the tool-call arguments. |
 | `post_invocation` | Chio signer | unsafe |  | Post-invocation guard results. escalations carry hook text that can describe the output. |
 | `execution_nonce` | Chio signer | committed-safe |  | Execution-nonce stage and cleanup flags on a preflight denial: closed codes read by the CLI response verifier. |
-| `chio_kernel` | Chio signer | unsafe |  | Kernel rejection code on a refusal receipt. No production reader. |
+| `chio_kernel` | Chio signer | unsafe |  | Kernel rejection code and client denial code on a refusal receipt. Durable refusal replay reads client_denial_code. |
 | `runtime_admission` | Chio signer | unsafe |  | The kernel's runtime-admission refusal record: hook name, acceptance flag and failure code. Never accepted from a hook. No production reader. |
 | `active_response_terminal_evidence` | Chio signer | committed-safe |  | Executor receipt id, hash and key behind an active-response terminal receipt, read back by the kernel's admission terminal receipt check. |
 | `chio_http_receipt_v1` | Chio signer | unsafe |  | Embedded HTTP receipt written by the HTTP receipt projection, with raw request and session ids and nested metadata. |
