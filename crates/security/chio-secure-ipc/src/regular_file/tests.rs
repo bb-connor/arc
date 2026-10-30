@@ -32,6 +32,9 @@ fn ownership_rules_by_policy() {
         (Private, 0, 0o100600, 1, Some(ForeignOwner { uid: 0 })),
         (Private, EUID, 0o100640, 1, Some(Exposed { mode: 0o640 })),
         (Private, EUID, 0o100604, 1, Some(Exposed { mode: 0o604 })),
+        (Private, EUID, 0o100700, 1, Some(Exposed { mode: 0o700 })),
+        (Private, EUID, 0o104600, 1, Some(Exposed { mode: 0o4600 })),
+        (Trusted, EUID, 0o100700, 1, None),
         (
             Private,
             EUID,
@@ -88,6 +91,37 @@ fn symlink_directory_and_missing_paths_are_refused_under_every_policy() -> TestR
 }
 
 #[test]
+fn an_owner_executable_secret_is_refused_as_private() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = private_file(directory.path(), b"{}")?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
+    assert_eq!(
+        read_regular_file(&path, LIMIT, Private),
+        Err(Exposed { mode: 0o700 })
+    );
+    Ok(())
+}
+
+fn streamed(bytes: &[u8]) -> std::io::Result<File> {
+    use std::io::Write;
+    let (reader, mut writer) = std::os::unix::net::UnixStream::pair()?;
+    writer.write_all(bytes)?;
+    Ok(File::from(std::os::fd::OwnedFd::from(reader)))
+}
+
+#[test]
+fn an_unsized_stream_grows_its_buffer_up_to_the_ceiling() -> TestResult {
+    assert_eq!(read_opened(streamed(&[b' '; LIMIT])?, LIMIT)?.len(), LIMIT);
+    for len in [LIMIT + 1, LIMIT * 3] {
+        assert_eq!(
+            read_opened(streamed(&vec![b' '; len])?, LIMIT),
+            Err(RegularFileError::TooLarge { max_bytes: LIMIT })
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn a_hard_linked_secret_is_refused_only_as_private() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let path = private_file(directory.path(), b"{}")?;
@@ -96,7 +130,7 @@ fn a_hard_linked_secret_is_refused_only_as_private() -> TestResult {
         read_regular_file(&path, LIMIT, Private),
         Err(MultiplyLinked { links: 2 })
     );
-    assert_eq!(read_regular_file(&path, LIMIT, Trusted)?, b"{}");
+    assert_eq!(read_regular_file(&path, LIMIT, Trusted)?.as_slice(), b"{}");
     Ok(())
 }
 

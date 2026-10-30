@@ -107,6 +107,6 @@ async fn read_pause_matches_a_canonical_read_after_install_through_a_directory_a
     assert!(!pause.is_finished());
     assert!(!read.is_finished());
     pause.release();
-    assert_eq!(tokio::time::timeout(bound, read).await???, b"{}");
+    assert_eq!(tokio::time::timeout(bound, read).await???.as_slice(), b"{}");
     Ok(())
 }
