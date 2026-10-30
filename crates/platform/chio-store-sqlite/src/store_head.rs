@@ -53,7 +53,7 @@ pub(crate) fn genesis_head_hex() -> String {
 }
 
 fn feed(hasher: &mut Sha256, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(u64::try_from(bytes.len()).unwrap_or(u64::MAX).to_be_bytes());
     hasher.update(bytes);
 }
 
@@ -131,13 +131,21 @@ fn table_signature(connection: &Connection) -> rusqlite::Result<String> {
     Ok(lines.join("\n"))
 }
 
+/// The change-log triggers with their definitions, so a trigger recreated
+/// under the same name with another body no longer matches.
 fn log_triggers(connection: &Connection) -> rusqlite::Result<Vec<String>> {
     let mut statement = connection.prepare(
-        "SELECT name FROM temp.sqlite_master WHERE type = 'trigger' \
+        "SELECT name, sql FROM temp.sqlite_master WHERE type = 'trigger' \
          AND name LIKE 'chio\\_tx\\_log\\_%' ESCAPE '\\' ORDER BY name",
     )?;
-    let names = statement.query_map([], |row| row.get::<_, String>(0))?;
-    names.collect()
+    let triggers = statement.query_map([], |row| {
+        Ok(format!(
+            "{}\u{1f}{}",
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?
+        ))
+    })?;
+    triggers.collect()
 }
 
 fn table_columns(connection: &Connection, table: &str) -> rusqlite::Result<Vec<String>> {
@@ -428,6 +436,22 @@ mod tests {
             tx.execute_batch("BEGIN").unwrap();
             begin_change_log(&tx, &NO_SKIP).unwrap();
         }
+    }
+
+    #[test]
+    fn a_log_trigger_recreated_with_another_body_refuses_the_head() {
+        let connection = connection();
+        let tx = connection.unchecked_transaction().unwrap();
+        begin_change_log(&tx, &NO_SKIP).unwrap();
+        tx.execute_batch(
+            "DROP TRIGGER temp.\"chio_tx_log_plain_i\"; \
+             CREATE TEMP TRIGGER \"chio_tx_log_plain_i\" AFTER INSERT ON main.\"plain\" \
+             BEGIN SELECT 1; END;",
+        )
+        .unwrap();
+        tx.execute_batch("INSERT INTO plain (body) VALUES ('x');")
+            .unwrap();
+        assert!(next_head_hex(&tx, &genesis_head_hex()).is_err());
     }
 
     #[test]

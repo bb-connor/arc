@@ -54,7 +54,7 @@ impl World {
     }
 
     fn open(&self) -> Result<SqliteReceiptStore, ReceiptStoreError> {
-        SqliteReceiptStore::open_for_finding_pool(&self.database(), self.anchors.path())
+        SqliteReceiptStore::open_for_finding_pool(self.database(), self.anchors.path())
     }
 
     fn checkpoint_wal(&self) -> Result<(), Box<dyn std::error::Error>> {
