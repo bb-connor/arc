@@ -112,7 +112,6 @@ pub(crate) fn dispatch_mcp(
             control_internal_url.as_deref(),
             control_token.as_deref(),
             egress,
-            egress,
         ),
         McpCommands::ServeHttp {
             transport,

@@ -55,6 +55,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::List {
                 certification_registry_file,
@@ -96,6 +97,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Search {
                 certification_discovery_file,
@@ -114,6 +116,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Transparency {
                 certification_discovery_file,
@@ -126,6 +129,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Consume {
                 tool_server_id,
@@ -142,6 +146,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Revoke {
                 artifact_id,
@@ -173,6 +178,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
     }
