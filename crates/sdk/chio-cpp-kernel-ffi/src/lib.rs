@@ -145,8 +145,10 @@ struct EvaluateRequestEnvelope {
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry here; absent issuers fail-closed.
@@ -170,8 +172,10 @@ struct VerifyCapabilityRequestEnvelope {
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     root_delegator: Option<PublicKey>,
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
@@ -661,6 +665,9 @@ fn verify_capability_with_parts(
         }
         CapabilityError::AttenuationViolation(message) => KernelFfiError::InvalidCapability(
             format!("capability rejected by chain binding: {message}"),
+        ),
+        CapabilityError::DelegationRootMismatch => KernelFfiError::InvalidCapability(
+            "capability rejected by chain binding: link 0 delegator does not match the parent capability subject".to_string(),
         ),
         CapabilityError::DelegationRootUnresolved => KernelFfiError::InvalidCapability(
             "capability delegation chain has no verifier-supplied root delegator".to_string(),

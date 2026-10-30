@@ -137,6 +137,9 @@ pub enum CapabilityError {
     /// A delegated token arrived without the subject of the parent
     /// capability its delegation chain starts from.
     DelegationRootUnresolved,
+    /// The first delegation link was not issued by the verifier-supplied
+    /// parent subject.
+    DelegationRootMismatch,
     /// An internal invariant was violated (e.g. canonical-JSON failure).
     Internal(String),
 }
@@ -652,7 +655,15 @@ fn map_optional_feature_error(error: CoreError) -> CapabilityError {
         CoreError::AttenuationViolation { reason }
         | CoreError::DelegationChainBroken { reason }
         | CoreError::ScopeMismatch { reason } => CapabilityError::AttenuationViolation(reason),
+        CoreError::DelegationRootMismatch => CapabilityError::DelegationRootMismatch,
         other => CapabilityError::Internal(other.to_string()),
+    }
+}
+
+fn map_delegation_chain_error(error: CoreError) -> CapabilityError {
+    match error {
+        CoreError::DelegationRootMismatch => CapabilityError::DelegationRootMismatch,
+        other => CapabilityError::AttenuationViolation(other.to_string()),
     }
 }
 
@@ -689,7 +700,7 @@ fn verify_delegation_chain_shape(
     }
     let root_delegator = root_delegator.ok_or(CapabilityError::DelegationRootUnresolved)?;
     validate_delegation_chain(&token.delegation_chain, root_delegator, None)
-        .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+        .map_err(map_delegation_chain_error)?;
     let Some(final_link) = token.delegation_chain.last() else {
         return Ok(());
     };
@@ -735,7 +746,7 @@ fn verify_chain_binding_with_resolver(
                 None,
                 &issuer_root,
             )
-            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+            .map_err(map_delegation_chain_error)?;
         }
         token
             .validate_chain_binding(&issuer_root)

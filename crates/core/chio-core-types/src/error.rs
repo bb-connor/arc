@@ -101,6 +101,12 @@ pub enum Error {
         error("delegation chain root delegator was not supplied by the verifier")
     )]
     DelegationRootUnresolved,
+
+    #[cfg_attr(
+        feature = "std",
+        error("link 0 delegator does not match the parent capability subject")
+    )]
+    DelegationRootMismatch,
 }
 
 // `From<serde_json::Error>` is emitted by `#[from]` under the `std` feature.
@@ -162,6 +168,10 @@ impl core::fmt::Display for Error {
             Error::DelegationRootUnresolved => write!(
                 f,
                 "delegation chain root delegator was not supplied by the verifier"
+            ),
+            Error::DelegationRootMismatch => write!(
+                f,
+                "link 0 delegator does not match the parent capability subject"
             ),
         }
     }

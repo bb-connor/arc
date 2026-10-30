@@ -210,6 +210,7 @@ fn build_request_json(
     serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": case.request_id,
             "tool_name": case.tool_name,
@@ -294,6 +295,7 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
         serde_json::json!({
             "token": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "now_secs": EVAL_TIME as i64,
             "peer_capabilities": aggregate_peer(),
             "direct_root_capability": direct_root_capability,
@@ -354,6 +356,7 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
     let evaluation_request = serde_json::json!({
         "capability": child,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-cross-ffi-aggregate",
             "tool_name": "echo",
@@ -387,6 +390,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         serde_json::json!({
             "token": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "now_secs": EVAL_TIME as i64,
             "peer_capabilities": cumulative_peer(),
             "direct_root_capability": direct_root_capability,
@@ -451,6 +455,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         let evaluation_request = serde_json::json!({
             "capability": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "request": {
                 "request_id": format!("req-cross-ffi-cumulative-{name}"),
                 "tool_name": "echo",

@@ -128,6 +128,7 @@ fn evaluate_envelope_at(
     let mut envelope = json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-1",
             "tool_name": tool_name,
@@ -376,6 +377,7 @@ fn verify_capability_context_refuses_delegated_token_without_root_delegator() {
     let envelope = json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "now_secs": ISSUED_AT as i64 + 1,
         "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")]
     });
@@ -421,6 +423,7 @@ fn verify_capability_context_rejects_malformed_trust_root_issuer() {
     let envelope = json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "now_secs": ISSUED_AT as i64 + 1,
         "capability_trust_roots": {
             "not-a-public-key": "scope-hash"
@@ -445,6 +448,7 @@ fn evaluate_rejects_empty_trust_root_scope_hash() {
     let envelope = json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-trust-root-empty",
             "tool_name": "echo",
@@ -683,6 +687,7 @@ fn entry_points_refuse_a_repeated_key_in_the_original_json() {
     let context = json!({
         "token": capability,
         "trusted_issuers": [authority],
+        "root_delegator": null,
         "now_secs": 0,
     })
     .to_string();
@@ -750,6 +755,7 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     let context = json!({
         "token": capability,
         "trusted_issuers": [authority],
+        "root_delegator": null,
         "now_secs": 5,
     })
     .to_string();

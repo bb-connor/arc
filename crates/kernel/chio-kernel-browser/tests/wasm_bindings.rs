@@ -85,6 +85,7 @@ fn evaluate_round_trip() {
         },
         "capability": capability,
         "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "clock_override_unix_secs": ISSUED_AT + 1,
     });
 
@@ -239,6 +240,7 @@ fn entry_points_refuse_a_repeated_key_in_the_original_json() {
         },
         "capability": capability,
         "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "clock_override_unix_secs": ISSUED_AT + 1,
     })
     .to_string();
@@ -259,6 +261,7 @@ fn entry_points_refuse_a_repeated_key_in_the_original_json() {
     let context = serde_json::json!({
         "token": capability,
         "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "clock_override_unix_secs": ISSUED_AT + 1,
     })
     .to_string();
@@ -291,6 +294,7 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
         },
         "capability": capability,
         "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "clock_override_unix_secs": ISSUED_AT + 1,
     })
     .to_string();
@@ -320,6 +324,7 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     let context = serde_json::json!({
         "token": capability,
         "trusted_issuers_hex": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "clock_override_unix_secs": ISSUED_AT + 1,
     })
     .to_string();

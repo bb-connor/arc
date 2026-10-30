@@ -18,6 +18,9 @@ struct EvaluateRequest {
   std::string request_json;
   std::string capability_json;
   std::vector<std::string> trusted_issuers_hex;
+  // Subject of the parent capability the delegation chain starts from;
+  // `std::nullopt` only for a capability without a delegation chain.
+  std::optional<std::string> root_delegator_hex;
   std::optional<std::uint64_t> now_secs;
 };
 

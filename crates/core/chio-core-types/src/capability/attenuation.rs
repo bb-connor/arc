@@ -281,10 +281,7 @@ pub fn validate_delegation_chain(
             }
             None => {
                 if link.delegator != *root_delegator {
-                    return Err(Error::DelegationChainBroken {
-                        reason: "link 0 delegator does not match the parent capability subject"
-                            .to_string(),
-                    });
+                    return Err(Error::DelegationRootMismatch);
                 }
                 root_delegator
             }

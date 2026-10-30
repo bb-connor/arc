@@ -170,8 +170,10 @@ struct EvaluateRequest {
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry; absent issuers fail-closed.
@@ -201,8 +203,10 @@ struct VerifyCapabilityRequest {
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex.
     #[serde(default)]
@@ -725,6 +729,10 @@ fn verify_capability_with_parts(
         },
         CapabilityError::AttenuationViolation(message) => ChioMobileError::InvalidCapability {
             message: format!("capability rejected by chain binding: {message}"),
+        },
+        CapabilityError::DelegationRootMismatch => ChioMobileError::InvalidCapability {
+            message: "capability rejected by chain binding: link 0 delegator does not match the parent capability subject"
+                .to_string(),
         },
         CapabilityError::DelegationRootUnresolved => ChioMobileError::InvalidCapability {
             message: "capability delegation chain has no verifier-supplied root delegator"

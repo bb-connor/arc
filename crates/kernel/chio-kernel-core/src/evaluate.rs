@@ -158,6 +158,10 @@ impl KernelCoreError {
                     out.push_str(msg);
                     out
                 }
+                CapabilityError::DelegationRootMismatch => {
+                    "capability rejected by chain binding: link 0 delegator does not match the parent capability subject"
+                        .to_string()
+                }
                 CapabilityError::DelegationRootUnresolved => {
                     "capability delegation chain has no verifier-supplied root delegator"
                         .to_string()

@@ -808,7 +808,7 @@ fn delegation_chain_refuses_a_root_link_from_another_delegator() {
     let link2 = make_signed_link("cap-b", &kp_b, &kp_c.public_key(), 200);
 
     let err = validate_delegation_chain(&[link1, link2], &kp_c.public_key(), None).unwrap_err();
-    assert!(matches!(err, Error::DelegationChainBroken { .. }));
+    assert!(matches!(err, Error::DelegationRootMismatch));
     assert!(err.to_string().contains("parent capability subject"));
 }
 

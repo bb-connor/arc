@@ -834,6 +834,29 @@ fn full_verifier_refuses_delegated_token_without_parent_subject() {
 }
 
 #[test]
+fn full_verifier_refuses_delegated_token_from_another_parent_subject() {
+    let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
+    let other = chio_core_types::crypto::Keypair::generate().public_key();
+
+    let err = verify_capability_full_with_root(
+        &token,
+        &[issuer.public_key()],
+        &crate::FixedClock::new(150),
+        CapabilityCryptoFloor::AllowClassical,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&other),
+        },
+        &trust_roots,
+        &mut budgets,
+    )
+    .expect_err("a chain that does not start at the supplied parent subject must be refused");
+
+    assert!(matches!(err, CapabilityError::DelegationRootMismatch));
+}
+
+#[test]
 fn full_verifier_refuses_a_parent_subject_that_did_not_sign_the_root_link() {
     let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
     let other = Keypair::generate().public_key();

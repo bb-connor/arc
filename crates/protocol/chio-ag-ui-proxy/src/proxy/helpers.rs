@@ -12,6 +12,7 @@ pub(super) fn capability_error_message(error: &CapabilityError) -> &'static str 
         CapabilityError::CryptoFloorRejected(_) => "capability crypto floor rejected",
         CapabilityError::AttenuationViolation(_) => "capability rejected by chain binding",
         CapabilityError::BudgetSplitRejected(_) => "capability rejected by sibling-sum budget",
+        CapabilityError::DelegationRootMismatch => "capability rejected by chain binding",
         CapabilityError::DelegationRootUnresolved => {
             "capability delegation chain has no verifier-supplied root delegator"
         }

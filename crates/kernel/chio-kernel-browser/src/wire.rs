@@ -84,8 +84,10 @@ pub struct EvaluateRequestJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     pub root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Tokens with
     /// attenuation, budget sharing, scope attenuation, or delegation require an
@@ -245,8 +247,10 @@ pub struct VerifyCapabilityRequestJson {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direct_root_capability: Option<CapabilityToken>,
     /// Subject of the parent capability a delegated token's chain starts
-    /// from. A delegated token without it or a direct root is refused.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
     pub root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry for their issuer; absent issuers

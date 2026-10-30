@@ -70,6 +70,7 @@ const FIXTURE_EVALUATE_REQUEST = {
   trusted_issuers_hex: [
     "0000000000000000000000000000000000000000000000000000000000000000",
   ],
+  root_delegator: null,
   clock_override_unix_secs: 1_700_000_500,
 };
 

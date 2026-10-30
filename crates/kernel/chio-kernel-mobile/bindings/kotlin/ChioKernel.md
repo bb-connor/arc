@@ -35,6 +35,7 @@ is a JSON string of shape:
 {
   "capability": <CapabilityToken JSON>,
   "trusted_issuers": ["<Ed25519 hex>"],
+  "root_delegator": null,
   "request": {
     "request_id": "req-1",
     "tool_name": "echo",

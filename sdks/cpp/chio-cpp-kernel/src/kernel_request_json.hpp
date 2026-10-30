@@ -37,6 +37,12 @@ inline std::string build_kernel_request_json(const KernelOptions& options,
     out << "\"" << detail::escape_json(request.trusted_issuers_hex[i]) << "\"";
   }
   out << "]";
+  if (request.root_delegator_hex.has_value()) {
+    out << ",\"root_delegator\":\"" << detail::escape_json(*request.root_delegator_hex)
+        << "\"";
+  } else {
+    out << ",\"root_delegator\":null";
+  }
   out << ",\"request\":" << request.request_json;
   if (now_secs.has_value()) {
     out << ",\"now_secs\":" << *now_secs;

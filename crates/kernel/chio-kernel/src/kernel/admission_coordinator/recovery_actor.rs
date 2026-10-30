@@ -36,6 +36,7 @@ fn capability_refusal(error: CapabilityPreAdmissionError) -> KernelError {
             | CapabilityError::NotYetValid
             | CapabilityError::Expired
             | CapabilityError::AttenuationViolation(_)
+            | CapabilityError::DelegationRootMismatch
             | CapabilityError::BudgetSplitRejected(
                 BudgetSplitError::ChildShareExceedsCap { .. }
                 | BudgetSplitError::OversubscribedSiblings { .. },
