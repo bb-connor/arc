@@ -309,24 +309,29 @@ type SignedArtifactSchemaSpec = (&'static str, Option<(&'static str, &'static st
 
 #[path = "signed_artifact/schema_specs.rs"]
 mod schema_specs;
-use schema_specs::SIGNED_ARTIFACT_SCHEMA_SPECS;
+use schema_specs::{SCHEMA_COUNT, SCHEMA_GROUPS};
 
 #[allow(
     clippy::indexing_slicing,
-    reason = "Both fixed arrays have SIGNED_ARTIFACT_SCHEMA_SPECS.len() elements and the loop checks the index against that length."
+    reason = "Each group index is bounded by its slice length; the output length is the sum of all group lengths."
 )]
-const fn known_signed_artifact_schemas() -> [&'static str; SIGNED_ARTIFACT_SCHEMA_SPECS.len()] {
-    let mut schemas = [""; SIGNED_ARTIFACT_SCHEMA_SPECS.len()];
-    let mut index = 0;
-    while index < SIGNED_ARTIFACT_SCHEMA_SPECS.len() {
-        schemas[index] = SIGNED_ARTIFACT_SCHEMA_SPECS[index].0;
-        index += 1;
+const fn known_signed_artifact_schemas() -> [&'static str; SCHEMA_COUNT] {
+    let mut schemas = [""; SCHEMA_COUNT];
+    let mut output = 0;
+    let mut group = 0;
+    while group < SCHEMA_GROUPS.len() {
+        let mut index = 0;
+        while index < SCHEMA_GROUPS[group].len() {
+            schemas[output] = SCHEMA_GROUPS[group][index].0;
+            output += 1;
+            index += 1;
+        }
+        group += 1;
     }
     schemas
 }
 
-const KNOWN_SIGNED_ARTIFACT_SCHEMA_LIST: [&str; SIGNED_ARTIFACT_SCHEMA_SPECS.len()] =
-    known_signed_artifact_schemas();
+const KNOWN_SIGNED_ARTIFACT_SCHEMA_LIST: [&str; SCHEMA_COUNT] = known_signed_artifact_schemas();
 
 /// Known signed artifacts accepted by core validation.
 pub const KNOWN_SIGNED_ARTIFACT_SCHEMAS: &[&str] = &KNOWN_SIGNED_ARTIFACT_SCHEMA_LIST;
@@ -366,8 +371,9 @@ pub fn validate_signed_artifact_schema(schema: &str) -> Result<()> {
 /// Built-in registry entries mirrored by `spec/schemas/registry.json`.
 #[must_use]
 pub fn built_in_signed_artifact_registry() -> Vec<SignedArtifactSchemaEntry> {
-    SIGNED_ARTIFACT_SCHEMA_SPECS
+    SCHEMA_GROUPS
         .iter()
+        .flat_map(|group| group.iter())
         .filter_map(|(schema, registry)| {
             registry.map(|(artifact_kind, introduced_by)| SignedArtifactSchemaEntry {
                 schema: schema.to_string(),

@@ -1845,8 +1845,9 @@ plus an optional re-derivation quote) land in four places:
    exact v1 shape without changing its fields or enums.
 2. A row in `spec/schemas/registry.json` (`{schema, artifactKind,
    introducedBy, schemaFile}`) plus `spec/schemas/MANIFEST.sha256`.
-3. A named schema constant and a `SIGNED_ARTIFACT_SCHEMA_SPECS` row in
-   `crates/core/chio-core-types/src/signed_artifact.rs` (the fail-closed
+3. A named schema constant in
+   `crates/core/chio-core-types/src/signed_artifact.rs` and a catalog row in
+   `signed_artifact/schema_specs/core_artifacts.rs` (the fail-closed
    accept-list for independently signed artifacts).
 4. A PROTOCOL.md section under 6.4.x describing the family.
 
@@ -1863,7 +1864,7 @@ proof verifier inputs are unsigned strict wire types. Their
 schemas live under
 `spec/schemas/chio-finding/v1/`, with registry and manifest rows, typed
 parser/validator tests, and PROTOCOL text. None enters
-`SIGNED_ARTIFACT_SCHEMA_SPECS`. Replay-recipe integrity comes from strict
+the signed-artifact catalog. Replay-recipe integrity comes from strict
 canonical bytes hashing to the signed Finding's `replay_recipe_sha256`;
 purchase-context integrity comes from verifying and cross-binding every
 enclosed signed artifact; status-proof integrity comes from its
@@ -1874,7 +1875,7 @@ strict-raw-first invariant before trusting them.
 The two receipt-metadata blocks are not independently signed artifacts.
 They are authenticated by the enclosing `ChioReceipt`, like
 `chio.admission-receipt.v1`, and therefore MUST NOT receive
-`SIGNED_ARTIFACT_SCHEMA_SPECS` rows unless a later design makes them
+signed-artifact catalog rows unless a later design makes them
 standalone signed envelopes. Their JSON schemas live under
 `spec/schemas/chio-wire/v1/receipt/`, with registry and manifest rows.
 Typed receipt structs, reserved metadata keys, enclosing-receipt

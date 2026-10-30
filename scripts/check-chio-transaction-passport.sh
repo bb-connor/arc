@@ -50,10 +50,17 @@ if not (root / schema_file).is_file():
     raise SystemExit(f"transaction-passport schema file is missing: {schema_file}")
 
 signed_artifact_root = root / "crates/core/chio-core-types/src"
+catalog_dir = signed_artifact_root / "signed_artifact/schema_specs"
+catalog_files = sorted(catalog_dir.rglob("*.rs")) if catalog_dir.is_dir() else []
+if not catalog_files:
+    raise SystemExit(f"signed artifact catalog has no modules under {catalog_dir.relative_to(root)}")
 signed_artifact = "".join(
-    (signed_artifact_root / relative).read_text(encoding="utf-8")
-    for relative in ("signed_artifact.rs", "signed_artifact/schema_specs.rs")
-    if (signed_artifact_root / relative).is_file()
+    path.read_text(encoding="utf-8")
+    for path in [
+        signed_artifact_root / "signed_artifact.rs",
+        signed_artifact_root / "signed_artifact/schema_specs.rs",
+        *catalog_files,
+    ]
 )
 if 'CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1"' not in signed_artifact:
     raise SystemExit("transaction-passport schema is not named by chio-core-types")
