@@ -348,6 +348,45 @@ fn exact_reference_boundary_preserves_bytes_without_a_false_reference() {
 }
 
 #[test]
+fn a_fault_response_projects_only_a_cancelled_fault_reason() {
+    let (_, fault, keypair) = fixture();
+    let receipt = ChioReceipt::sign(fault.body.clone(), &keypair).unwrap();
+    let response = fault_tool_call_response(receipt, "request-a");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(response.reason.as_deref(), Some("fault"));
+    assert_eq!(
+        response.terminal_state,
+        OperationTerminalState::Cancelled {
+            reason: "fault".into()
+        }
+    );
+    assert_eq!(response.denial_code, None);
+
+    for decision in [
+        Decision::Deny {
+            reason: "kernel deny detail".into(),
+            guard: "kernel".into(),
+        },
+        Decision::Incomplete {
+            reason: "incomplete detail".into(),
+        },
+        Decision::Allow,
+    ] {
+        let mut body = fault.body.clone();
+        body.decision = Some(decision);
+        let receipt = ChioReceipt::sign(body, &keypair).unwrap();
+        let response = fault_tool_call_response(receipt, "request-a");
+        assert_eq!(response.reason.as_deref(), Some(FAULT_REASON));
+        assert_eq!(
+            response.terminal_state,
+            OperationTerminalState::Cancelled {
+                reason: FAULT_REASON.into()
+            }
+        );
+    }
+}
+
+#[test]
 fn post_effect_ownership_has_no_copy_or_plain_result_escape() {
     trait AmbiguousIfClone<A> {
         fn marker() {}
