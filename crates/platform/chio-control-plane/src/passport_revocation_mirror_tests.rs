@@ -429,7 +429,7 @@ fn leaves_that_do_not_rebuild_the_signed_root_are_refused_and_recorded() -> Test
         })
     );
     assert_eq!(b.accepted()?, None);
-    assert_eq!(b.oracle.current_epoch_root()?.leaf_count, 0);
+    assert_eq!(b.store.view(&[])?.tree.leaf_count, 0);
     let conflicts = b.conflicts()?;
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].accepted_root, None);
@@ -610,7 +610,7 @@ fn a_page_whose_seq_skips_is_refused_and_the_mirror_is_unchanged() -> TestResult
         ))
     );
     assert_eq!(accepted(&b)?, before);
-    assert_eq!(b.oracle.current_epoch_root()?.leaf_count, 1);
+    assert_eq!(b.store.view(&[])?.tree.leaf_count, 1);
     assert_eq!(
         b.apply(
             &partner(),
