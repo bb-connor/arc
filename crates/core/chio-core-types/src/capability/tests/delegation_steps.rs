@@ -1,8 +1,30 @@
 use super::*;
 
+use crate::delegation_receipt::{DelegationReceipt, ScopeAttenuation};
+
+fn try_delegate(
+    parent: &CapabilityToken,
+    child_scope: &ChioScope,
+    delegator: &Keypair,
+    attenuation: ScopeAttenuation,
+    signed_at: u64,
+) -> Result<DelegationReceipt> {
+    delegate(
+        parent,
+        &parent.issuer,
+        child_scope,
+        delegator,
+        &Keypair::generate().public_key(),
+        attenuation,
+        DelegationStamp {
+            signed_at,
+            nonce: [0_u8; 16],
+        },
+    )
+}
+
 // ----- `delegate` mint helper -----------------------------------
 
-#[cfg(feature = "delegation")]
 fn delegate_parent_token(
     parent_kp: &Keypair,
     subject_kp: &Keypair,
@@ -23,14 +45,10 @@ fn delegate_parent_token(
     CapabilityToken::sign(body, parent_kp).unwrap()
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_mints_signed_link_for_subset_scope() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -39,17 +57,12 @@ fn delegate_mints_signed_link_for_subset_scope() {
     let parent = delegate_parent_token(&issuer, &subject, parent_scope.clone(), 1000, 2000);
     let child_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
 
-    let receipt = delegate(
+    let receipt = try_delegate(
         &parent,
-        &parent.issuer,
         &child_scope,
         &subject,
-        &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [7_u8; 16],
-        },
+        1500,
     )
     .unwrap();
 
@@ -60,14 +73,10 @@ fn delegate_mints_signed_link_for_subset_scope() {
     );
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_widening_scope() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -81,57 +90,33 @@ fn delegate_rejects_widening_scope() {
         vec![Operation::Invoke, Operation::ReadResult],
     )]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &widened,
-        &subject,
-        &delegatee.public_key(),
-        ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err =
+        try_delegate(&parent, &widened, &subject, ScopeAttenuation::empty(), 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_parent_without_delegate_operation() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
     let parent = delegate_parent_token(&issuer, &subject, parent_scope.clone(), 1000, 2000);
 
-    let err = delegate(
+    let err = try_delegate(
         &parent,
-        &parent.issuer,
         &parent_scope,
         &subject,
-        &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
+        1500,
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_extending_expiry() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -145,50 +130,29 @@ fn delegate_rejects_extending_expiry() {
         child_expires_at: Some(3000), // > parent.expires_at
         budget_share_bps: None,
     };
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 
     // sanity: at-or-below parent expiry is accepted.
-    let ok = delegate(
+    let ok = try_delegate(
         &parent,
-        &parent.issuer,
         &scope,
         &subject,
-        &delegatee.public_key(),
         ScopeAttenuation {
             steps: vec![],
             child_expires_at: Some(1800),
             budget_share_bps: None,
         },
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
+        1500,
     );
     assert!(ok.is_ok());
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_wrong_delegator_key() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let imposter = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -197,30 +161,15 @@ fn delegate_rejects_wrong_delegator_key() {
     let scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
     let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &scope,
-        &imposter, // not parent.subject
-        &delegatee.public_key(),
-        ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err =
+        try_delegate(&parent, &scope, &imposter, ScopeAttenuation::empty(), 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_tampered_parent_signature() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -230,31 +179,15 @@ fn delegate_rejects_tampered_parent_signature() {
     let mut parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
     parent.id = "cap-parent-tampered".to_string();
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &scope,
-        &subject,
-        &delegatee.public_key(),
-        ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &scope, &subject, ScopeAttenuation::empty(), 1500).unwrap_err();
 
     assert!(matches!(err, Error::SignatureVerificationFailed));
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_parent_before_issued_at() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -263,19 +196,7 @@ fn delegate_rejects_parent_before_issued_at() {
     let scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
     let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &scope,
-        &subject,
-        &delegatee.public_key(),
-        ScopeAttenuation::empty(),
-        DelegationStamp {
-            signed_at: 999,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &scope, &subject, ScopeAttenuation::empty(), 999).unwrap_err();
 
     assert!(matches!(
         err,
@@ -283,14 +204,10 @@ fn delegate_rejects_parent_before_issued_at() {
     ));
 }
 
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_signed_at_at_or_after_parent_expiry() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
         "tool-x",
@@ -299,17 +216,7 @@ fn delegate_rejects_signed_at_at_or_after_parent_expiry() {
     let scope = make_scope(vec![make_grant("srv-a", "tool-x", vec![Operation::Invoke])]);
     let parent = delegate_parent_token(&issuer, &subject, parent_scope, 1000, 2000);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &scope,
-        &subject,
-        &delegatee.public_key(),
-        ScopeAttenuation::empty(),
-        DelegationStamp { signed_at: 2000, nonce: // == parent.expires_at
-        [0_u8; 16] },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &scope, &subject, ScopeAttenuation::empty(), 2000).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
@@ -340,11 +247,8 @@ fn capped_grant(
 /// accepted and rides onto the signed link.
 #[test]
 fn delegate_accepts_valid_narrowing_step() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![capped_grant(
         "srv-a",
@@ -369,19 +273,7 @@ fn delegate_accepts_valid_narrowing_step() {
         max_invocations: 4,
     }]);
 
-    let receipt = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [9_u8; 16],
-        },
-    )
-    .unwrap();
+    let receipt = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
@@ -390,11 +282,8 @@ fn delegate_accepts_valid_narrowing_step() {
 /// fail-closed even though the child *scope* itself is a subset.
 #[test]
 fn delegate_rejects_widening_step() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![capped_grant(
         "srv-a",
@@ -420,30 +309,15 @@ fn delegate_rejects_widening_step() {
         max_invocations: 50, // > parent cap 10
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
 /// A step targeting a tool the parent never held is a widening and rejected.
 #[test]
 fn delegate_rejects_step_for_unknown_tool() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
@@ -459,19 +333,7 @@ fn delegate_rejects_step_for_unknown_tool() {
         constraint: Constraint::MaxLength(8),
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
@@ -479,11 +341,8 @@ fn delegate_rejects_step_for_unknown_tool() {
 /// rejected (same currency required for a meaningful narrowing comparison).
 #[test]
 fn delegate_rejects_cost_step_currency_switch() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![capped_grant(
         "srv-a",
@@ -517,19 +376,7 @@ fn delegate_rejects_cost_step_currency_switch() {
         },
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
@@ -537,11 +384,8 @@ fn delegate_rejects_cost_step_currency_switch() {
 /// exceeds the parent's share is rejected parent-relative.
 #[test]
 fn delegate_enforces_parent_relative_budget_share() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
@@ -576,19 +420,7 @@ fn delegate_enforces_parent_relative_budget_share() {
         child_expires_at: None,
         budget_share_bps: Some(5_000),
     };
-    let err = delegate(
-        &attenuated_parent,
-        &attenuated_parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        over,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&attenuated_parent, &child_scope, &subject, over, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 
     // A child claiming 20% is within the parent's 30% -> accept.
@@ -597,18 +429,7 @@ fn delegate_enforces_parent_relative_budget_share() {
         child_expires_at: None,
         budget_share_bps: Some(2_000),
     };
-    let ok = delegate(
-        &attenuated_parent,
-        &attenuated_parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        within,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [1_u8; 16],
-        },
-    );
+    let ok = try_delegate(&attenuated_parent, &child_scope, &subject, within, 1500);
     assert!(ok.is_ok());
 }
 
@@ -619,11 +440,8 @@ fn delegate_enforces_parent_relative_budget_share() {
 /// states an explicit share `<=` the parent's is accepted.
 #[test]
 fn delegate_requires_child_share_under_attenuated_parent() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
@@ -659,19 +477,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
         child_expires_at: None,
         budget_share_bps: None,
     };
-    let err = delegate(
-        &attenuated_parent,
-        &attenuated_parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        omitted,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&attenuated_parent, &child_scope, &subject, omitted, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 
     // Child states an explicit share within the parent's 30% -> accept.
@@ -680,18 +486,7 @@ fn delegate_requires_child_share_under_attenuated_parent() {
         child_expires_at: None,
         budget_share_bps: Some(2_500),
     };
-    let ok = delegate(
-        &attenuated_parent,
-        &attenuated_parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        within,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [2_u8; 16],
-        },
-    );
+    let ok = try_delegate(&attenuated_parent, &child_scope, &subject, within, 1500);
     assert!(ok.is_ok());
 }
 
@@ -701,11 +496,8 @@ fn delegate_requires_child_share_under_attenuated_parent() {
 /// than falsely rejected as targeting a tool outside the parent scope.
 #[test]
 fn delegate_honors_wildcard_parent_grant_in_step_validation() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     // Parent grants every server and tool via `*:*` and authorizes delegation.
     let parent_scope = make_scope(vec![make_grant(
@@ -735,19 +527,7 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
         constraint: Constraint::MaxLength(8),
     }]);
 
-    let receipt = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [3_u8; 16],
-        },
-    )
-    .unwrap();
+    let receipt = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
@@ -784,11 +564,8 @@ fn attenuated_share_parent(
 /// reduced share.
 #[test]
 fn delegate_allows_omitted_share_for_full_share_parent() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
@@ -807,18 +584,7 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
         child_expires_at: None,
         budget_share_bps: None,
     };
-    let ok = delegate(
-        &full_share_parent,
-        &full_share_parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        omitted,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [7_u8; 16],
-        },
-    );
+    let ok = try_delegate(&full_share_parent, &child_scope, &subject, omitted, 1500);
     assert!(ok.is_ok());
 }
 
@@ -829,11 +595,8 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
 /// `*:*` grant only holds `Invoke`.
 #[test]
 fn delegate_searches_all_matching_grants_for_step_narrowing() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     // Parent has a broad `*:*` grant (Invoke + Delegate only) FIRST, then a
     // concrete grant that additionally holds ReadResult. The step targets
@@ -861,19 +624,7 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
         operation: Operation::ReadResult,
     }]);
 
-    let receipt = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [8_u8; 16],
-        },
-    )
-    .unwrap();
+    let receipt = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
@@ -884,11 +635,8 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
 /// the step declares an added constraint the child grant does not carry.
 #[test]
 fn delegate_rejects_step_not_reflected_in_child() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "srv-a",
@@ -906,19 +654,7 @@ fn delegate_rejects_step_not_reflected_in_child() {
         constraint: Constraint::MaxLength(8),
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [0_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
@@ -934,11 +670,8 @@ fn delegate_rejects_step_not_reflected_in_child() {
 /// fail-closed.
 #[test]
 fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_child() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     // Parent grants every server and tool via `*:*` and authorizes delegation.
     let parent_scope = make_scope(vec![make_grant(
@@ -959,19 +692,7 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
         operation: Operation::Invoke,
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [9_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
 
@@ -983,11 +704,8 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
 /// wildcard-removal narrowings.
 #[test]
 fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "*",
@@ -1009,19 +727,7 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
         operation: Operation::ReadResult,
     }]);
 
-    let receipt = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [10_u8; 16],
-        },
-    )
-    .unwrap();
+    let receipt = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap();
     assert!(receipt.link.verify_integrity_embedded_key().unwrap());
     assert_eq!(receipt.link.attenuations.len(), 1);
 }
@@ -1043,11 +749,8 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
 /// covers the wildcard child grant and the link is rejected fail-closed.
 #[test]
 fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_child() {
-    use crate::delegation_receipt::ScopeAttenuation;
-
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
-    let delegatee = Keypair::generate();
 
     let parent_scope = make_scope(vec![make_grant(
         "*",
@@ -1071,18 +774,6 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
         operation: Operation::Invoke,
     }]);
 
-    let err = delegate(
-        &parent,
-        &parent.issuer,
-        &child_scope,
-        &subject,
-        &delegatee.public_key(),
-        attenuation,
-        DelegationStamp {
-            signed_at: 1500,
-            nonce: [11_u8; 16],
-        },
-    )
-    .unwrap_err();
+    let err = try_delegate(&parent, &child_scope, &subject, attenuation, 1500).unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));
 }
