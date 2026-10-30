@@ -105,7 +105,7 @@ The value is the full 32-byte HMAC output. Truncation would save 32 hex characte
 
 ### 4.4 Generation and rotation
 
-Each session has exactly one handle. The signer fixes it when the session first appears, and every later receipt of the session carries it, including receipts signed after a key rotation. The generation that keyed it stays loaded and still verifies it. Readers therefore join by `(key_id, value)` equality with no all-generation search.
+Each session has exactly one handle. The signer fixes it when the session first appears, and every later receipt of the session carries it, including receipts signed after a key rotation. It verifies under the generation that keyed it while that generation is loaded. Readers therefore join by `(key_id, value)` equality with no all-generation search.
 
 How a session's handle is fixed:
 
@@ -116,7 +116,7 @@ How a session's handle is fixed:
   - more than one pin, or any pin of that signer under a generation that is not loaded: refuse the restore or load with a typed error.
 - **Carrying the handle.** The kernel takes the outcome as `HandleGeneration::Active` or `HandleGeneration::Pinned(SessionHandle)` on `open_session_with_id`, re-derives the pinned handle under its `key_id`, and refuses an unloaded generation (`TenantIndexKeyUnknown`) or a mismatch. It holds the handle in session state, and `SessionAnchorSnapshot` exposes it. The ACP proxy keeps a bounded in-memory map from `sessionId` to handle, which `KernelReceiptSigner` and `KernelCapabilityChecker` share.
 
-A session never changes handle on restart, restore or rotation. A rotation that drops a generation still named by a pin makes every later resolution for that signer refuse until the generation is reloaded. Because pins are never pruned, a retired generation that keyed any session handle stays loaded for the life of the deployment, which extends the item 2 plan rule that retired keys stay loaded while stored values reference them.
+A session never changes handle on restart, restore or rotation. Unloading a retired generation makes every session pinned under it non-restorable: a continuing-session lookup for that signer refuses with the typed error `UnknownGeneration` (fail closed), and new sessions derive under the active generation. Keeping a retired generation loaded is an operator choice, made for as long as its sessions must stay restorable. It is not a requirement of this design.
 
 ### 4.5 Auditor correlation
 
@@ -154,7 +154,7 @@ pub trait SessionHandleResolver {
 - **Lookups.**
   - `pinned_handles` runs `WHERE signer = ?1 AND key_id = ?2 AND handle_value IN (...)`, or the equivalent per-generation seek, for each query. The candidates are one per loaded generation, and every query in a call is batched in one read transaction. Each lookup is a primary-key seek.
   - `pinned_generations` runs `SELECT key_id FROM session_handle_generations WHERE signer = ?1`, a primary-key prefix seek on that table. It reads neither the pins nor the receipts, and its result is bounded by the number of generations.
-  - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution. A session under that generation cannot be ruled out.
+  - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution, because a session under that generation cannot be ruled out. This applies to the restore, load and unseen-session ACP paths and to `chio cert generate`.
 - **Store files.** Both tables' DDL and each query are their own `.sql` files in a `session_handle_pins` module of the store, loaded through named consts.
 - **Batching.** `chio-mcp-remote` resolves every session it restores at startup in one call.
 - **One store.** The ACP proxy holds an `Arc<dyn SessionHandleResolver>` backed by the same `chio-store-sqlite` receipt store that its `KernelReceiptSigner` appends to. Its pins are written by that store's append transaction. There is no second store.
@@ -238,7 +238,7 @@ PR 4 (flip):
     - `pin_under_unloaded_generation_refuses`;
     - `two_pins_for_one_raw_id_refuse_as_ambiguous`;
     - `pinned_handles_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the pin lookup shows `SEARCH session_handle_pins USING PRIMARY KEY`, never `SCAN`;
-    - `pinned_generations_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the generation lookup shows `SEARCH session_handle_generations USING PRIMARY KEY`, never `SCAN`.
+    - `pinned_generations_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the generation lookup names `session_handle_generations` and shows `SEARCH session_handle_generations USING PRIMARY KEY`. The test asserts the table name, so a plan that reads `session_handle_pins` (including a per-signer prefix `SEARCH` over its primary key) fails, as does any `SCAN`.
 
 Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<raw>` changes to the handle in the same PR: `chio-core-types` `tests/receipt_metadata_blocks.rs`, `tests/security_receipts.rs`; `chio-kernel` `compliance_certificate/tests.rs`, `kernel/tests/{protocol_refusal,reserved_session_metadata,session,post_effect_receipts}.rs`, `kernel/tests/reserved_session_metadata/kernel_written.rs`, `kernel/tests/durable_admission/review_regressions.rs`, `admission_operation_tests/terminal_projection.rs`, `tests/compliance_certificate_hybrid.rs`; `chio-store-sqlite` `receipt_store/session_certificate_read/tests.rs`, `tests/session_certificate_read.rs`, `admission_operation_store_tests/authorization_consumption.rs`; `chio-cli` `cert/session_receipts_tests.rs`, `tests/session_certificate.rs`, `cli/session/tests/pending_approval.rs`; `chio-acp-proxy` `compliance/bundle_tests.rs`, `tests/attestation_{denials,signer,support,compliance,clock,telemetry_transport}.rs`; `chio-acp-edge` `tests/all.rs`; `chio-cross-protocol` `tests.rs`; `chio-mcp-edge` `runtime/nested_flow_tests.rs`, `runtime/source_receipt_tests.rs`, `runtime/runtime_tests/{execution_evidence,stateless_revision}.rs`; `chio-mcp-remote` `remote_mcp/hosted_tests/protocol_refusal.rs`, `remote_mcp/tests.rs`; `chio-http-core` `authority/tests.rs`; `chio-control-plane` `security/active_defense_host_tests/terminal_response_refusal.rs`.
 
