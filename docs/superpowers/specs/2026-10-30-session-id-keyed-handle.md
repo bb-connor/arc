@@ -105,7 +105,7 @@ The value is the full 32-byte HMAC output. Truncation would save 32 hex characte
 
 ### 4.4 Generation and rotation
 
-Each session has exactly one handle. The signer fixes it when the session first appears, and every later receipt of the session carries it, including receipts signed after a key rotation. It verifies under the generation that keyed it while that generation is loaded. Readers therefore join by `(key_id, value)` equality with no all-generation search.
+Each session has exactly one handle. The signer fixes it when the session first appears, and every later receipt of the session carries it, including receipts signed after a key rotation. It verifies under the generation that keyed it. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed). Readers therefore join by `(key_id, value)` equality with no all-generation search.
 
 How a session's handle is fixed:
 
@@ -116,7 +116,7 @@ How a session's handle is fixed:
   - more than one pin, or any pin of that signer under a generation that is not loaded: refuse the restore or load with a typed error.
 - **Carrying the handle.** The kernel takes the outcome as `HandleGeneration::Active` or `HandleGeneration::Pinned(SessionHandle)` on `open_session_with_id`, re-derives the pinned handle under its `key_id`, and refuses an unloaded generation (`TenantIndexKeyUnknown`) or a mismatch. It holds the handle in session state, and `SessionAnchorSnapshot` exposes it. The ACP proxy keeps a bounded in-memory map from `sessionId` to handle, which `KernelReceiptSigner` and `KernelCapabilityChecker` share.
 
-A session never changes handle on restart, restore or rotation. Unloading a retired generation makes every session pinned under it non-restorable: a continuing-session lookup for that signer refuses with the typed error `UnknownGeneration` (fail closed), and new sessions derive under the active generation. Keeping a retired generation loaded is an operator choice, made for as long as its sessions must stay restorable. It is not a requirement of this design.
+A session never changes handle on restart, restore or rotation. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed).
 
 ### 4.5 Auditor correlation
 
@@ -154,7 +154,7 @@ pub trait SessionHandleResolver {
 - **Lookups.**
   - `pinned_handles` runs `WHERE signer = ?1 AND key_id = ?2 AND handle_value IN (...)`, or the equivalent per-generation seek, for each query. The candidates are one per loaded generation, and every query in a call is batched in one read transaction. Each lookup is a primary-key seek.
   - `pinned_generations` runs `SELECT key_id FROM session_handle_generations WHERE signer = ?1`, a primary-key prefix seek on that table. It reads neither the pins nor the receipts, and its result is bounded by the number of generations.
-  - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution, because a session under that generation cannot be ruled out. This applies to the restore, load and unseen-session ACP paths and to `chio cert generate`.
+  - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution. A retired generation must stay loaded while any pin names it. Unloading it refuses all handle resolution for that signer (typed refusal, fail closed). This applies to the restore, load and unseen-session ACP paths and to `chio cert generate`.
 - **Store files.** Both tables' DDL and each query are their own `.sql` files in a `session_handle_pins` module of the store, loaded through named consts.
 - **Batching.** `chio-mcp-remote` resolves every session it restores at startup in one call.
 - **One store.** The ACP proxy holds an `Arc<dyn SessionHandleResolver>` backed by the same `chio-store-sqlite` receipt store that its `KernelReceiptSigner` appends to. Its pins are written by that store's append transaction. There is no second store.
@@ -270,6 +270,8 @@ Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<
 
 The handle separates sessions by origin, signer key and raw id. When several ACP proxies sign under one key and their agents pick the same `sessionId`, their receipts get one handle and join one session. The readers cannot tell them apart. Operators avoid this by giving each proxy its own signing key. Binding the authenticated agent subject would close the gap, but audit-only ACP entries carry no capability, so the subject would have to come from proxy configuration. That work is follow-up row SESSION-HANDLE-SHARED-SIGNER.
 
+**Handle key generation retirement.** Removing a handle key generation is not possible while pins reference it. Pins store handles only, so a refusal cannot be narrowed to the sessions under one generation. Explicit retirement is follow-up row SESSION-HANDLE-GENERATION-RETIRE.
+
 ### 9.3 Follow-up rows
 
 - **SESSION-HANDLE-SHARED-SIGNER.** Bind the authenticated agent subject into the ACP session handle, so that proxies sharing one signing key cannot merge sessions (section 9.2).
@@ -278,6 +280,7 @@ The handle separates sessions by origin, signer key and raw id. When several ACP
   - the request lineage `session_id` (`receipt/lineage.rs:35,54`).
 
   Also replace the unkeyed `restored_kernel_session_id` (`chio-mcp-remote` `http_service.rs:1178-1181`) with a keyed derivation.
+- **SESSION-HANDLE-GENERATION-RETIRE.** Explicit retirement of a handle key generation that pins still reference (section 9.2).
 - **SESSION-HANDLE-TELEMETRY.** OTel export carries the raw id (`telemetry.rs:383-384`, `cert.session_id`; `:435-436`, `chio.session_id`) and an unkeyed SHA-256 trace id (`derive_trace_id`, `:445-449`). This row moves export to the handle and derives the trace id from it.
 
 ## 10. Design charter compliance
