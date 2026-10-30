@@ -6,7 +6,6 @@
 use chio_attest_verify::VerifiedAttestation;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_core::receipt::crypto_floor::ReceiptCryptoFloor;
 use chio_core::receipt::metadata::{
     DecisionModelEvaluation, DecisionModelFallbackReason, DecisionModelOutcome,
     DECISION_MODEL_WITNESS_METADATA_KEY,
@@ -543,10 +542,7 @@ async fn an_allow_receipt_signs_the_guard_witness() {
     .unwrap();
     let (response, kernel_key) = dispatch(args).await;
     assert_eq!(response.verdict, Verdict::Allow);
-    assert!(response
-        .receipt
-        .verify_signature_with_floor(&kernel_key, ReceiptCryptoFloor::AllowClassical)
-        .unwrap());
+    assert!(response.receipt.verify_signature(&kernel_key).unwrap());
     let metadata = response.receipt.metadata.unwrap();
     assert_eq!(
         metadata[DECISION_MODEL_WITNESS_METADATA_KEY],
@@ -558,10 +554,7 @@ async fn an_allow_receipt_signs_the_guard_witness() {
 async fn a_deny_receipt_signs_the_guard_witness_and_only_the_fixed_evidence() {
     let (response, kernel_key) = dispatch(serde_json::json!({"path": "/etc"})).await;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .receipt
-        .verify_signature_with_floor(&kernel_key, ReceiptCryptoFloor::AllowClassical)
-        .unwrap());
+    assert!(response.receipt.verify_signature(&kernel_key).unwrap());
     let dag_evidence: Vec<_> = response
         .receipt
         .evidence
