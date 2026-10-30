@@ -44,6 +44,8 @@ pub mod declassification;
 pub mod delegation_receipt;
 pub mod economic_continuity;
 #[cfg(feature = "tenant-index")]
+pub mod enterprise_identity;
+#[cfg(feature = "tenant-index")]
 pub mod enterprise_subject;
 pub mod error;
 pub mod hashing;
