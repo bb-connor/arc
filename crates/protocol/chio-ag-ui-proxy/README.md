@@ -20,7 +20,7 @@ assert!(!proxy.config().allow_display_without_capability);
 
 ## Guarantees
 
-`AgUiProxy::evaluate` validates event identity fields, derives classification, blocks mismatches, and signs a receipt before updating transport counters. Capability-bearing events use `verify_capability_full_with_root` and event-bound scope matching.
+`AgUiProxy::evaluate` validates event identity fields, derives classification, blocks mismatches, and signs a receipt before updating transport counters. Capability-bearing events use `verify_capability_full` and event-bound scope matching.
 
 The host delivers an event only when the returned ProxyDecision is Forward.
 Transport counters update after the decision receipt has been built.

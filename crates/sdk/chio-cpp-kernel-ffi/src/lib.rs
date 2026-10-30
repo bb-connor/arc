@@ -20,9 +20,9 @@ use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_kernel_core::passport_verify::{verify_passport as core_verify_passport, VerifyError};
 use chio_kernel_core::{
-    evaluate_with_full_floor_and_root, sign_receipt as core_sign_receipt,
+    evaluate_with_full_floor, sign_receipt as core_sign_receipt,
     sign_receipt_relaying_trusted_body as core_relay_trusted_body,
-    verify_capability_full_with_root, BudgetRegistry, BudgetSplitError, CapabilityError,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, CapabilityError,
     CapabilityFeatureContext, Clock, EvaluateInput, FixedClock, Guard, InMemoryBudgetRegistry,
     PortableToolCallRequest, ReceiptSigningError, Verdict,
 };
@@ -446,7 +446,7 @@ fn evaluate_json_str(request_json: &str) -> Result<String, KernelFfiError> {
     // parent shares.
     let mut budgets = InMemoryBudgetRegistry::new();
     seed_budget_registry(&mut budgets, &parsed.parent_budget_snapshots)?;
-    let verdict = evaluate_with_full_floor_and_root(
+    let verdict = evaluate_with_full_floor(
         EvaluateInput {
             request: &portable_request,
             capability: &capability,
@@ -638,7 +638,7 @@ fn verify_capability_with_parts(
     };
     let mut budgets = InMemoryBudgetRegistry::new();
     seed_budget_registry(&mut budgets, parent_budget_snapshots)?;
-    let verified = verify_capability_full_with_root(
+    let verified = verify_capability_full(
         &token,
         &trusted,
         clock,

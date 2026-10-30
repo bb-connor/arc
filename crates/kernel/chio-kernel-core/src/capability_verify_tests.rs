@@ -15,6 +15,14 @@ use chio_core_types::crypto::Keypair;
 use chio_core_types::delegation_receipt::ScopeAttenuation;
 use core::cell::Cell;
 
+fn plain(peer: &CapabilityNegotiation) -> CapabilityFeatureContext<'_> {
+    CapabilityFeatureContext {
+        peer,
+        direct_root: None,
+        root_delegator: None,
+    }
+}
+
 #[test]
 fn aggregate_invocation_budget_rejects_until_negotiated() -> Result<(), CapabilityError> {
     let issuer = Keypair::generate();
@@ -140,7 +148,7 @@ fn aggregate_invocation_budget_accepts_only_when_negotiated() -> Result<(), Capa
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &aggregate_peer(),
+        plain(&aggregate_peer()),
         &resolver,
         &mut budgets,
     )?;
@@ -178,7 +186,7 @@ fn full_verifier_rejects_malformed_peer_before_feature_use() {
         &[issuer.public_key()],
         &crate::FixedClock::new(150),
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &resolver,
         &mut budgets,
     );
@@ -250,7 +258,7 @@ fn delegated_aggregate_mode_requires_root_and_detects_omission() -> Result<(), C
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &aggregate_peer(),
+        plain(&aggregate_peer()),
         &resolver,
         &mut budgets,
     );
@@ -260,7 +268,7 @@ fn delegated_aggregate_mode_requires_root_and_detects_omission() -> Result<(), C
             if message.contains("authenticated direct-root token")
     ));
 
-    let omission = verify_capability_full_with_root(
+    let omission = verify_capability_full(
         &child,
         &[issuer.public_key()],
         &clock,
@@ -332,7 +340,7 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
     let mut budgets = InMemoryBudgetRegistry::new();
     budgets.register_parent(root.id.clone(), crate::MAX_BUDGET_SHARE_BPS)?;
 
-    let verified = verify_capability_full_with_root(
+    let verified = verify_capability_full(
         &child,
         &[issuer.public_key()],
         &crate::FixedClock::new(150),
@@ -376,7 +384,7 @@ fn cumulative_approval_requires_negotiation() -> Result<(), CapabilityError> {
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &CapabilityNegotiation::v1_default(),
+        plain(&CapabilityNegotiation::v1_default()),
         &resolver,
         &mut budgets,
     );
@@ -391,7 +399,7 @@ fn cumulative_approval_requires_negotiation() -> Result<(), CapabilityError> {
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &cumulative_peer(),
+        plain(&cumulative_peer()),
         &resolver,
         &mut budgets,
     )?;
@@ -464,7 +472,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &cumulative_peer(),
+        plain(&cumulative_peer()),
         &resolver,
         &mut budgets,
     );
@@ -474,7 +482,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
             if message.contains("direct-root evidence")
     ));
 
-    let verified = verify_capability_full_with_root(
+    let verified = verify_capability_full(
         &child,
         &[issuer.public_key()],
         &clock,
@@ -649,7 +657,7 @@ fn full_verifier_rejects_attenuated_token_when_chain_binding_feature_is_disabled
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &trust_roots,
         &mut budgets,
     )
@@ -673,7 +681,7 @@ fn full_verifier_rejects_untrusted_attenuated_token_before_resolver_lookup() {
         &[],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &resolver,
         &mut budgets,
     )
@@ -699,7 +707,7 @@ fn full_verifier_rejects_tampered_attenuated_token_before_resolver_lookup() {
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &resolver,
         &mut budgets,
     )
@@ -724,7 +732,7 @@ fn full_verifier_rejects_expired_attenuated_token_before_resolver_lookup() {
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &resolver,
         &mut budgets,
     )
@@ -797,7 +805,7 @@ fn full_verifier_accepts_plain_pass_through_delegation_when_chain_binding_featur
     )
     .expect("register parent");
 
-    let verified = verify_capability_full_with_root(
+    let verified = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,
@@ -824,7 +832,7 @@ fn full_verifier_refuses_delegated_token_without_parent_subject() {
         &[issuer.public_key()],
         &crate::FixedClock::new(150),
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        plain(&peer),
         &trust_roots,
         &mut budgets,
     )
@@ -838,7 +846,7 @@ fn full_verifier_refuses_delegated_token_from_another_parent_subject() {
     let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
     let other = chio_core_types::crypto::Keypair::generate().public_key();
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer.public_key()],
         &crate::FixedClock::new(150),
@@ -861,7 +869,7 @@ fn full_verifier_refuses_a_parent_subject_that_did_not_sign_the_root_link() {
     let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
     let other = Keypair::generate().public_key();
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer.public_key()],
         &crate::FixedClock::new(150),
@@ -985,7 +993,7 @@ fn full_verifier_rejects_delegation_chain_with_wrong_final_delegatee() {
     };
     let mut budgets = InMemoryBudgetRegistry::new();
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,
@@ -1057,7 +1065,7 @@ fn full_verifier_rejects_tampered_delegation_link_payload() {
     };
     let mut budgets = InMemoryBudgetRegistry::new();
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,
@@ -1222,7 +1230,7 @@ fn full_verifier_rejects_delegated_attenuation_unbound_from_trust_root() {
     };
     let mut budgets = NoopBudgetRegistry;
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,
@@ -1338,7 +1346,7 @@ fn full_verifier_rejects_multi_hop_attenuation_without_child_scope_witnesses() {
     };
     let mut budgets = NoopBudgetRegistry;
 
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,

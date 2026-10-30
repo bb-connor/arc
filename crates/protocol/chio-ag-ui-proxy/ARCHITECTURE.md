@@ -44,7 +44,7 @@ budget registry.
 
 `AgUiProxy::evaluate` validates event identity fields, derives classification,
 blocks mismatches, and signs a receipt before updating transport counters.
-Capability-bearing events use `verify_capability_full_with_root` and event-bound
+Capability-bearing events use `verify_capability_full` and event-bound
 scope matching.
 
 The sibling budget registry persists for the proxy lifetime. A mutex serializes one

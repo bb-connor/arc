@@ -458,35 +458,10 @@ pub fn verify_capability_with_floor_and_resolver(
     Ok(verified)
 }
 
-/// Full verifier entry point for current capability semantics without signed
-/// optional-family root evidence.
+/// Full verifier entry point. `features` carries the peer profile and the
+/// verifier-supplied root evidence a delegated token requires; a delegated
+/// token without a resolvable root is refused.
 pub fn verify_capability_full(
-    token: &CapabilityToken,
-    trusted_issuers: &[PublicKey],
-    clock: &dyn Clock,
-    crypto_floor: CapabilityCryptoFloor,
-    peer: &CapabilityNegotiation,
-    trust_root: &dyn TrustRootResolver,
-    budgets: &mut dyn BudgetRegistry,
-) -> Result<VerifiedCapability, CapabilityError> {
-    verify_capability_full_with_root(
-        token,
-        trusted_issuers,
-        clock,
-        crypto_floor,
-        CapabilityFeatureContext {
-            peer,
-            direct_root: None,
-            root_delegator: None,
-        },
-        trust_root,
-        budgets,
-    )
-}
-
-/// Full verifier entry point with authenticated optional-family root evidence
-/// for delegated tokens.
-pub fn verify_capability_full_with_root(
     token: &CapabilityToken,
     trusted_issuers: &[PublicKey],
     clock: &dyn Clock,

@@ -62,7 +62,7 @@ and link the matching target library after checking the ABI version.
 
 ## Guarantees
 
-`chio_kernel_evaluate_json` uses `evaluate_with_full_floor_and_root` to check
+`chio_kernel_evaluate_json` uses `evaluate_with_full_floor` to check
 issuer trust, signature/time, negotiated capability features, chain binding,
 subject/request scope, and sibling-share admission against supplied snapshots.
 It uses `AllowClassical`, an empty guard list, and no session filesystem roots.

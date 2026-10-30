@@ -326,31 +326,11 @@ pub fn evaluate_with_crypto_floor_and_budgets(
     finish_verified_evaluation(input, verified, budgets)
 }
 
-/// Full current-semantics evaluation entry point.
-///
-/// Same five steps as [`evaluate_with_crypto_floor`] but uses
-/// [`crate::capability_verify::verify_capability_full`] for capability
-/// verification, which threads:
-///
-/// - the peer-negotiated feature profile, and
-/// - the per-issuer trust-root resolver
-///
-/// in addition to the crypto floor. Production kernels (`chio-kernel`,
-/// `chio-kernel-browser`, `chio-kernel-mobile`, `chio-cpp-kernel-ffi`,
-/// `chio-ag-ui-proxy`) call this path so chain-binding and feature validation
-/// are exercised on the hot path.
+/// Full evaluation: capability verification with the peer profile, the
+/// per-issuer trust-root resolver and the verifier-supplied root evidence a
+/// delegated token requires, then the same request checks as
+/// [`evaluate_with_crypto_floor`].
 pub fn evaluate_with_full_floor(
-    input: EvaluateInput<'_>,
-    crypto_floor: CapabilityCryptoFloor,
-    peer: &CapabilityNegotiation,
-    trust_root: &dyn TrustRootResolver,
-    budgets: &mut dyn BudgetRegistry,
-) -> EvaluationVerdict {
-    evaluate_with_full_floor_and_root(input, crypto_floor, peer, None, None, trust_root, budgets)
-}
-
-/// Full evaluation with authenticated optional-family root evidence.
-pub fn evaluate_with_full_floor_and_root(
     input: EvaluateInput<'_>,
     crypto_floor: CapabilityCryptoFloor,
     peer: &CapabilityNegotiation,
@@ -826,6 +806,8 @@ mod tests {
             },
             CapabilityCryptoFloor::AllowClassical,
             &peer,
+            None,
+            None,
             &trust_roots,
             &mut budgets,
         );
@@ -888,6 +870,8 @@ mod tests {
             },
             CapabilityCryptoFloor::AllowClassical,
             &peer,
+            None,
+            None,
             &trust_roots,
             &mut budgets,
         );

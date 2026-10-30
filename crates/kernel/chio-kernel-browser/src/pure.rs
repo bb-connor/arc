@@ -7,10 +7,10 @@ use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNe
 use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
 use chio_kernel_core::{
-    evaluate_with_full_floor_and_root as core_evaluate_with_full_floor,
+    evaluate_with_full_floor as core_evaluate_with_full_floor,
     sign_receipt as core_sign_receipt,
     sign_receipt_relaying_trusted_body as core_relay_trusted_body,
-    verify_capability_full_with_root, BudgetRegistry, BudgetSplitError, CapabilityFeatureContext,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, CapabilityFeatureContext,
     EvaluateInput, InMemoryBudgetRegistry, PortableToolCallRequest,
 };
 
@@ -238,7 +238,7 @@ pub fn verify_capability_pure(
     let result = match input.clock_override_unix_secs {
         Some(pinned) => {
             let fixed = chio_kernel_core::FixedClock::new(pinned);
-            verify_capability_full_with_root(
+            verify_capability_full(
                 &input.token,
                 &trusted,
                 &fixed,
@@ -252,7 +252,7 @@ pub fn verify_capability_pure(
                 &mut budgets,
             )
         }
-        None => verify_capability_full_with_root(
+        None => verify_capability_full(
             &input.token,
             &trusted,
             clock,
