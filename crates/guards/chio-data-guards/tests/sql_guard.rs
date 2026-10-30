@@ -7,7 +7,7 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use chio_core::capability::{
     scope::ChioScope,
@@ -236,7 +236,7 @@ fn parses_sqlite_dialect() {
 
 #[test]
 fn column_allowlist_end_to_end() {
-    let mut map = HashMap::new();
+    let mut map = BTreeMap::new();
     map.insert(
         "orders".to_string(),
         vec!["id".to_string(), "total".to_string()],

@@ -15,6 +15,8 @@
 //! - the guard passes non-`DatabaseQuery` actions through with
 //!   `Verdict::Allow` (guards are additive).
 
+use std::collections::BTreeSet;
+
 use regex::{Regex, RegexBuilder};
 use tracing::warn;
 
@@ -67,6 +69,17 @@ impl SqlQueryGuard {
                 target: "chio.data-guards.sql",
                 "sql-query-guard constructed with allow_all=true; fail-closed default disabled"
             );
+        }
+
+        if let Some(columns) = &config.column_allowlist {
+            let mut tables = BTreeSet::new();
+            for table in columns.keys() {
+                if !tables.insert(table.to_ascii_lowercase()) {
+                    return Err(format!(
+                        "sql_query.column_allowlist names table `{table}` more than once (table names are case-insensitive)"
+                    ));
+                }
+            }
         }
 
         if config.denylisted_predicates.len() > MAX_DENYLISTED_PREDICATES {
@@ -342,7 +355,7 @@ impl chio_kernel::Guard for SqlQueryGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use chio_core::capability::{
         scope::ChioScope,
@@ -488,7 +501,7 @@ mod tests {
 
     #[test]
     fn column_allowlist_denies_unlisted_column() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert(
             "orders".to_string(),
             vec!["id".to_string(), "total".to_string()],
@@ -509,7 +522,7 @@ mod tests {
 
     #[test]
     fn select_star_denied_when_column_allowlist_active() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("orders".to_string(), vec!["id".to_string()]);
         let cfg = SqlGuardConfig {
             operation_allowlist: vec![SqlOperation::Select],

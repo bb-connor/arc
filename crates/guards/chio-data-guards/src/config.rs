@@ -13,7 +13,7 @@
 //! Operators can opt into an open configuration via [`SqlGuardConfig::allow_all`],
 //! which the guard logs as a warning on construction.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -104,9 +104,10 @@ pub struct SqlGuardConfig {
     /// column projected in a `SELECT` on the table must appear here.  A
     /// table that does not appear as a key is treated as having no column
     /// restriction.  `SELECT *` is denied whenever the referenced table has
-    /// a column allowlist entry.
+    /// a column allowlist entry.  Table keys are case-insensitive, so two keys
+    /// that differ only in case are rejected at load.
     #[serde(default)]
-    pub column_allowlist: Option<HashMap<String, Vec<String>>>,
+    pub column_allowlist: Option<BTreeMap<String, Vec<String>>>,
 
     /// Regex patterns matched against the canonicalized WHERE clause text
     /// of each query.  A match denies the query.
@@ -226,7 +227,7 @@ mod tests {
 
     #[test]
     fn column_allowlist_hit_and_miss() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("orders".to_string(), vec!["id".to_string(), "total".into()]);
         let cfg = SqlGuardConfig {
             column_allowlist: Some(map),
@@ -240,7 +241,7 @@ mod tests {
 
     #[test]
     fn wildcard_column_allows_everything_on_that_table() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("orders".to_string(), vec!["*".to_string()]);
         let cfg = SqlGuardConfig {
             column_allowlist: Some(map),
@@ -251,7 +252,7 @@ mod tests {
 
     #[test]
     fn table_has_column_allowlist_checks_keys() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("Orders".to_string(), vec!["id".into()]);
         let cfg = SqlGuardConfig {
             column_allowlist: Some(map),
