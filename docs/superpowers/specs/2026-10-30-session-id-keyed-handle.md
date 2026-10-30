@@ -1,6 +1,6 @@
 # Session-id keyed handle
 
-Status: design for backlog row SESSION-ID-KEYED-HANDLE. Implementation not started. Base `936ecc1e1f7c0393cfc6c4febeebb294186f244f`. Line numbers below are from that base.
+Status: design for backlog row SESSION-ID-KEYED-HANDLE. arc-63 ruled on D1-D8 on 2026-10-30 (section 9). Implementation not started. Base `936ecc1e1f7c0393cfc6c4febeebb294186f244f`. Line numbers below are from that base.
 
 ## 1. Intent
 
@@ -16,7 +16,7 @@ The raw identifier is a poor join key for signed, exportable evidence.
 - **Attacker-chosen value.** ACP session ids are minted by the ACP agent. Kernel session ids are random (`session_ops.rs:51-61`) except where a host opens a session with a chosen id: `open_session_with_id` (`session_ops.rs:108`), called from `chio-mcp-edge` `runtime.rs:358` and `runtime/requests.rs:174`, and the remote restore path, which derives `sess-restore-` plus 16 hex characters of an unkeyed SHA-256 of the client's session header (`chio-mcp-remote` `http_service.rs:1178-1181`). A chosen value can be low-entropy and guessable, so a receipt holder can confirm a guessed id.
 - **Cross-signer linkage and collision.** Both readers already refuse a session whose receipts come from more than one signer (`compliance/bundle.rs:238`, `session_certificate_read.rs:295`). A raw id still links sessions across signers for any receipt holder, and two agents behind signers that share a key and pick the same id (`session-1`) land in one session.
 
-A handle closes the first two because a holder without the key set cannot compute or test it. Binding the signer into the preimage (section 4.3) removes cross-signer linkage. Same-key collisions are decision D3.
+A handle closes the first two because a holder without the key set cannot compute or test it. Binding the signer into the preimage (section 4.3) removes cross-signer linkage. Same-key collisions are a known limit (section 9.2).
 
 ## 3. Current producers and readers
 
@@ -57,7 +57,7 @@ These carry the same value on the ACP authorization path. They are in scope beca
 | `chio cert generate` and `chio cert verify` | `chio-cli` `cert.rs:25,73-99,171-173,234`; `cert/session_receipts.rs:12,22,52`; argument `cli/types.rs:1163-1167` | passes the operator's raw id to the reader; prints it |
 | ACP signer authorization check | `kernel_signer.rs:290-296` | compares the authorization receipt's `action.parameters.session_id` with the audit entry |
 | Durable admission authorization projection | `admission_operation/projection/authorization.rs:101-104,121` | compares `action.parameters.session_id` with the consumption row |
-| OTel export | `chio-acp-proxy` `telemetry.rs:383-384` (`cert.session_id`), `:418-436` (`chio.session_id` span attribute), `:445-449` (`derive_trace_id`, unkeyed SHA-256 of the raw id) | outside receipts; see decision D7 |
+| OTel export | `chio-acp-proxy` `telemetry.rs:383-384` (`cert.session_id`), `:418-436` (`chio.session_id` span attribute), `:445-449` (`derive_trace_id`, unkeyed SHA-256 of the raw id) | outside receipts; follow-up row SESSION-HANDLE-TELEMETRY (section 9.3) |
 
 ### 3.4 SDKs, spec and wire schemas
 
@@ -87,7 +87,7 @@ The value is the full 32-byte HMAC output. Truncation would save 32 hex characte
 
 - **Purpose.** A separate HKDF subkey means a session handle never verifies as an enterprise subject, tenant binding, tag or active-defense digest, and the reverse, whatever the preimages.
 - **Origin.** A kernel session and an ACP session that share a raw string get distinct handles.
-- **Signer.** Two signers that see the same raw id get distinct handles. Both readers already fix the signer: the retained reader pins one trusted kernel key (`session_certificate_read.rs:244-247,295`), and the compliance bundle requires one `kernel_key` across its receipts (`compliance/bundle.rs:238`) from the trusted set (`compliance.rs:409-415`). Section 9 D3 covers signers that share one key.
+- **Signer.** Two signers that see the same raw id get distinct handles. Both readers already fix the signer: the retained reader pins one trusted kernel key (`session_certificate_read.rs:244-247,295`), and the compliance bundle requires one `kernel_key` across its receipts (`compliance/bundle.rs:238`) from the trusted set (`compliance.rs:409-415`). Signers that share one key are a known limit (section 9.2).
 - **Tenant.** The tenant is left out of the preimage. ACP receipts in one session can carry different tenant scope: audit-only entries sign `tenant_id: None` while enforced entries carry the authorization receipt's tenant (`kernel_signer.rs:544-546`). Tenant scoping stays with `tenant_id` and `tenant_binding`.
 
 ### 4.4 Generation and rotation
@@ -111,7 +111,7 @@ A holder of the key set and a raw session id (from the agent's own records) corr
 - **F23 and ITEM4-PG-SUBJECT-KEY-UNIFY.** That row replaces the two unkeyed `derive_enterprise_subject_key` copies (`chio-mcp-remote` `session_identity.rs:473`, `chio-control-plane` `scim_lifecycle.rs:454`) with the keyed `EnterpriseSubject` in `chio-core-types`. This design adds a sibling purpose to the same set and shares that row's field encoder. The only shared file is `enterprise_subject.rs` (encoder extraction in PR 1), so PR 1 rebases on whichever lands second.
 - **Receipt metadata registry.** `key_registry.rs` keeps one row per block. PR 4 rewrites the `protocol_refusal`, `receipt_context` and `acp` descriptions: the session member becomes a keyed session handle that confirms no guessed id without the tenant index key set. The rows stay `Unsafe` because other members are still unsalted or caller-chosen; the session member stops being one of the reasons. PROTOCOL 6.4 regenerates from the registry.
 - **PD2 committed metadata (`MetadataCommitter`, `MetadataOpenings`, acpcopy's PD2-F).** The handle is a deterministic keyed value. A salted `MetadataCommitment` would force both readers to hold openings to join, and erasing openings would drop a receipt from its session. It goes through `MetadataProjector::keyed`, so a block built by a projector commits its other members and carries the handle in one pass. PR 1 changes `AcpReceiptFields.session_id` to `session_handle: &SessionHandle` and `AcpReceiptProjection.session_id: String` to `session_handle: SessionHandle`. The projection has no wired writer yet, so this changes no signed bytes. The PD2-F writer flip then writes the handle from its first commit. The `metadata.acp.*` and `metadata.receipt_context.*` salt refs are unchanged; the handle has no salt ref.
-- **Tenant index key provisioning (item 2 F Task 6).** The plan provisions `--tenant-index-keys <dir>` to trust-control and the kernel-hosting processes, but no process loads the set on main yet (only `tenant_index/load.rs:125` exists). PR 2 below wires it to the processes this design needs. Decisions D5 and D8.
+- **Tenant index key provisioning (item 2 F Task 6).** The plan provisions `--tenant-index-keys <dir>` to trust-control and the kernel-hosting processes, but no process loads the set on main yet (only `tenant_index/load.rs:125` exists). PR 2 below wires it to the processes this design needs. Rulings D5 and D8.
 
 ## 6. Changes
 
@@ -158,21 +158,36 @@ Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<
 ## 8. PR slicing
 
 1. **Primitive** (`chio-core-types` only, no signed bytes). `IndexPurpose::SessionHandle`, `IndexDomain::SessionHandle`, shared field encoder, `SessionHandle`, `session_membership`, the `AcpReceiptProjection` type change and the protocol-refusal schema constant. Tests 1-6. Lands first so PD2-F writes the handle directly.
-2. **Key-set wiring** (no signed bytes). The file loader moves out of `chio-core-types` (section 10.2). `Arc<TenantIndexKeySet>` becomes a required argument of `KernelReceiptSigner::new` (`kernel_signer.rs:70`), `KernelCapabilityChecker::new` (`kernel_checker.rs:149`) and the kernel configuration that `open_session_with_id` reads. The `chio mcp` hosts and `chio cert` take `--tenant-index-keys <dir>` and refuse to start without it. Test 7. Shared with F Task 6 if that lands first (D5).
+2. **Key-set wiring** (no signed bytes; after #1996). The directory reader in `tenant_index/load.rs` moves to `chio-secure-ipc` as a module beside `seed_custody`, reusing its owner, mode and no-follow file checks. It returns the 32-byte set keys of the active and retired generations, zeroized on drop, and the host builds `TenantIndexKeySet::new` from them, so `chio-secure-ipc` takes no dependency on `chio-core-types`. The core copy, its `std`-gated module and its `TenantIndexKeyLoadError` are deleted, and the loader tests in `chio-core-types` `tests/tenant_index.rs:363-395` move with it. `Arc<TenantIndexKeySet>` becomes a required argument of `KernelReceiptSigner::new` (`kernel_signer.rs:70`), `KernelCapabilityChecker::new` (`kernel_checker.rs:149`) and the kernel configuration that `open_session_with_id` reads. The `chio mcp` hosts and `chio cert` take `--tenant-index-keys <dir>` and refuse to start without it, local dev flows included. `chio init` and the dev quickstart provision a key set explicitly through `chio keys tenant-index generate`. The kernel never generates one itself. Test 7.
 3. **Retained-session statements** (no behaviour change). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3). The existing reader tests stay green unchanged.
 4. **Flip** (signed bytes, one PR). All three writers, both readers through `session_membership`, the authorization-path carriers in 3.2, both certificate bodies, schemas, signed-artifact examples, generated SDK types, `wire-schemas.lock`, registry descriptions, PROTOCOL 6.4, `spec/COMPLIANCE-CERTIFICATE.md`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` and the CLI. Writers and readers move together because the reader compares across members and receipts; a split leaves a window where the readers join raw ids against handles. Tests 8-14 and every fixture in section 7. `docs/formal/COVERAGE.md` regenerates last if the proof-coverage check asks for it.
-5. **Telemetry** (optional, D7). `telemetry.rs` exports the handle and derives the trace id from it.
 
-## 9. Open decisions for arc-63
+## 9. Decisions
 
-- **D1. Member names.** Rename to `sessionHandle` and `session_handle` (recommended: the type change is visible on the wire and a raw-id payload fails parsing), or keep the names with handle values.
-- **D2. Purpose.** A new `session-handle` purpose with its own subkey and `sh1` prefix (recommended, per the item 2 plan rule that every purpose gets its own label), or a `SessionHandle` domain under the `enterprise-subject` subkey.
-- **D3. Signer binding scope.** Bind the receipt signer key (recommended). Open point: whether a deployment that runs several ACP proxies under one signing key must also bind the proxy's authenticated agent subject. Audit-only ACP entries have no capability, so that subject would come from proxy configuration.
-- **D4. Generation pinning.** Fix the handle at session open (recommended, single-handle join), or derive per receipt under the active generation and join across generations from the raw id.
-- **D5. Key-set provisioning.** PR 2 adds `--tenant-index-keys` to the hosts this design needs, or this design waits for F Task 6 to wire the flag. Also: whether the local single-user flows (`chio init`, dev `chio mcp serve`) provision a key set automatically or refuse until the operator runs `chio keys tenant-index generate`.
-- **D6. Adjacent kernel-session carriers.** The session anchor (`chio.session_anchor.v1`, `session/anchor.rs:82,97,151`, schema `kernel/session-anchor.schema.json:191`) and request lineage (`receipt/lineage.rs:35,54`) also carry the kernel `SessionId`. Kernel ids are random except on the `open_session_with_id` and restore paths. Proposed: a follow-up row that moves them to the handle and replaces the unkeyed `restored_kernel_session_id` (`http_service.rs:1178-1181`) with a keyed derivation.
-- **D7. Telemetry.** OTel spans export the raw id and an unkeyed SHA-256 trace id (`telemetry.rs:383,435,445`). They are outside receipts. PR 5 is proposed; the alternative is a separate row.
-- **D8. Key-set loader location.** `TenantIndexKeySet` file loading (`tenant_index/load.rs`, 264 lines of `std::fs` under the `std` feature) sits in a core crate, against the charter. Proposed: PR 2 moves it to the host-side key custody crate that R10-COOP-KEYREF-SYSTEMD-CREDENTIAL (b1982) establishes, changes every caller and deletes the core copy. The alternative is a separate row ahead of PR 2.
+### 9.1 arc-63 rulings (2026-10-30)
+
+- **D1. Member names.** The members are renamed to `sessionHandle` and `session_handle`. The old names are removed.
+- **D2. Purpose.** The handle gets a new `session-handle` purpose with its own subkey and the `sh1` prefix.
+- **D3. Signer binding.** The preimage binds the receipt signer key. In v1 it does not also bind the agent subject (section 9.2).
+- **D4. Generation.** The handle is fixed at session open (section 4.4).
+- **D5. Provisioning.** PR 2 provisions the key set. Every flow without a configured key set fails closed, local dev included. `chio init` and the dev quickstart provision a set explicitly, and the kernel never provisions one.
+- **D6. Kernel-session carriers.** These are handled by follow-up row SESSION-HANDLE-KERNEL-CARRIERS (section 9.3).
+- **D7. Telemetry.** This is handled by follow-up row SESSION-HANDLE-TELEMETRY (section 9.3), outside this PR sequence.
+- **D8. Loader location.** PR 2 moves the key-set directory reader from `chio-core-types` into `chio-secure-ipc` beside `seed_custody` (#1996), changes every caller and deletes the core copy. PR 2 starts after #1996 lands.
+
+### 9.2 Known limit: signers that share a key
+
+The handle separates sessions by origin, signer key and raw id. When several ACP proxies sign under one key and their agents pick the same `sessionId`, their receipts get one handle and join one session. The readers cannot tell them apart. Operators avoid this by giving each proxy its own signing key. Binding the authenticated agent subject would close the gap, but audit-only ACP entries carry no capability, so the subject would have to come from proxy configuration. That work is follow-up row SESSION-HANDLE-SHARED-SIGNER.
+
+### 9.3 Follow-up rows
+
+- **SESSION-HANDLE-SHARED-SIGNER.** Bind the authenticated agent subject into the ACP session handle, so that proxies sharing one signing key cannot merge sessions (section 9.2).
+- **SESSION-HANDLE-KERNEL-CARRIERS.** Move these to the handle:
+  - the session anchor `sessionId` (`chio.session_anchor.v1`, `session/anchor.rs:82,97,151`, schema `kernel/session-anchor.schema.json:191`);
+  - the request lineage `session_id` (`receipt/lineage.rs:35,54`).
+
+  Also replace the unkeyed `restored_kernel_session_id` (`chio-mcp-remote` `http_service.rs:1178-1181`) with a keyed derivation.
+- **SESSION-HANDLE-TELEMETRY.** OTel export carries the raw id (`telemetry.rs:383-384`, `cert.session_id`; `:435-436`, `chio.session_id`) and an unkeyed SHA-256 trace id (`derive_trace_id`, `:445-449`). This row moves export to the handle and derives the trace id from it.
 
 ## 10. Design charter compliance
 
@@ -196,10 +211,11 @@ The design persists no handle and no key.
 | `chio-acp-proxy` | signer, checker, compliance verifier, bounded handle map | no storage or SQL added |
 | `chio-cross-protocol` | carries the handle in place of the raw id | no storage |
 | `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership` | persistence stays in the store crate |
+| `chio-secure-ipc` | key-set directory reader moved from `chio-core-types` (PR 2) | custody IO stays in the security crate; no dependency on `chio-core-types` |
 | `chio-cli` | `--tenant-index-keys`, `chio cert` input and output | host crate; no SQL |
 | `chio-control-plane` | none | none |
 
-`tenant_index/load.rs` is existing file IO inside `chio-core-types`. The design adds none, and D8 moves it out.
+`tenant_index/load.rs` is existing file IO inside `chio-core-types`. The design adds none, and PR 2 moves it to `chio-secure-ipc` (D8).
 
 ### 10.3 Queries (R4)
 
