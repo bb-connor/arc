@@ -780,6 +780,7 @@ fn aggregate_invocation_plain_body_signature_is_refused() -> TestResult {
         expires_at: body.expires_at,
         delegation_chain: body.delegation_chain,
         aggregate_invocation_budget: body.aggregate_invocation_budget,
+        root_anchor: body.root_anchor,
         caveats: vec![],
         scope_attenuations: None,
         attenuation_proof: None,

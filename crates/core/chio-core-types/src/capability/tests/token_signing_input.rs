@@ -65,6 +65,7 @@ fn plain_body_signature_is_refused() -> Result<()> {
         attenuation_proof: None,
         budget_share_bps: None,
         aggregate_invocation_budget: None,
+        root_anchor: body.root_anchor,
         signature,
     };
 
