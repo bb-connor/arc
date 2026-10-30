@@ -13,29 +13,15 @@ use serde_json::{json, Value};
 #[path = "mcp_serve/sampling_progress.rs"]
 mod sampling_progress;
 
+#[path = "support/closed_denial.rs"]
+mod closed_denial;
+use closed_denial::assert_closed_denial;
 #[path = "support/mcp_security.rs"]
 mod mcp_security;
 
 #[path = "mcp_serve/test_directory.rs"]
 mod test_directory;
 use test_directory::unique_test_dir;
-
-/// A kernel denial reaches the client as its closed code and fixed text only;
-/// the detail stays in the signed receipt.
-fn assert_closed_denial(result: &Value, code: &str) {
-    let denial = chio_kernel::ClientDenialCode::from_code(code).expect("closed denial code");
-    assert_eq!(result["isError"], true, "{result:#}");
-    assert_eq!(
-        result["structuredContent"]["code"].as_str(),
-        Some(code),
-        "{result:#}"
-    );
-    assert_eq!(
-        result["content"][0]["text"].as_str(),
-        Some(denial.text()),
-        "{result:#}"
-    );
-}
 
 fn write_mock_server_script(dir: &Path) -> PathBuf {
     let script = concat!(

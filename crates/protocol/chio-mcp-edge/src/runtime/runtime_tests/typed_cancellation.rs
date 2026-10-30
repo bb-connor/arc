@@ -45,17 +45,7 @@ fn upstream_cancellation_text_does_not_cancel_an_allowed_call() {
 #[test]
 fn request_cancelled_errors_record_cancelled_task_terminal_state() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let (session_id, context, operation) = edge
         .prepare_tool_call_request(

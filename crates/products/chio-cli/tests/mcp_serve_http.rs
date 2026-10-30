@@ -22,6 +22,9 @@ use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde_json::{json, Value};
 
+#[path = "support/closed_denial.rs"]
+mod closed_denial;
+use closed_denial::assert_closed_denial;
 #[path = "support/mcp_security.rs"]
 mod mcp_security;
 #[path = "mcp_serve_http/security.rs"]
@@ -115,23 +118,6 @@ impl StartupError {
             Self::Timeout(message) => format!("{label} {message}"),
         }
     }
-}
-
-/// A kernel denial reaches the client as its closed code and fixed text only;
-/// the detail stays in the signed receipt.
-fn assert_closed_denial(result: &Value, code: &str) {
-    let denial = chio_kernel::ClientDenialCode::from_code(code).expect("closed denial code");
-    assert_eq!(result["isError"], true, "{result:#}");
-    assert_eq!(
-        result["structuredContent"]["code"].as_str(),
-        Some(code),
-        "{result:#}"
-    );
-    assert_eq!(
-        result["content"][0]["text"].as_str(),
-        Some(denial.text()),
-        "{result:#}"
-    );
 }
 
 fn is_bind_collision(stderr: &str) -> bool {

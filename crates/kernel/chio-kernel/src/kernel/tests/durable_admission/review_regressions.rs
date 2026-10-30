@@ -208,18 +208,12 @@ fn durable_tool_reported_cancellation_signs_a_kernel_reason() {
             .and_then(|metadata| metadata.pointer("/chio_kernel/client_denial_code")),
         Some(&serde_json::json!("request_cancelled"))
     );
-    assert_unknown_replay(
-        kernel.evaluate_tool_call_blocking(&request),
-        &retained,
-        &store,
-    );
-    let replay = kernel
-        .evaluate_tool_call_blocking(&request)
-        .expect("the retained cancellation replays");
+    let replay = kernel.evaluate_tool_call_blocking(&request);
     assert_eq!(
-        replay.denial_code,
-        Some(crate::ClientDenialCode::RequestCancelled)
+        replay.as_ref().map(|response| response.denial_code).ok(),
+        Some(Some(crate::ClientDenialCode::RequestCancelled))
     );
+    assert_unknown_replay(replay, &retained, &store);
     let receipt = store
         .state
         .lock()
