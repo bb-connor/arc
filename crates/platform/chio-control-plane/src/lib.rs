@@ -475,8 +475,7 @@ mod signing_custody;
 pub(crate) use signing_custody::write_authority_seed_file;
 pub use signing_custody::{
     authority_public_key_from_seed_file, load_existing_authority_keypair,
-    load_or_create_authority_keypair, rotate_authority_keypair,
-    writable_authority_seed_file,
+    load_or_create_authority_keypair, rotate_authority_keypair, writable_authority_seed_file,
 };
 
 pub fn issue_default_capabilities(
