@@ -271,11 +271,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "receipt retention regression suite; capped to current size until split",
         max_lines=4_416,
     ),
-    "crates/trust/chio-federation-transport-iroh/src/lanes/pheromone.rs": allow(
-        "2026-12-31",
-        "iroh pheromone lane; capped to current size until split",
-        max_lines=2_818,
-    ),
     "crates/platform/chio-control-plane/src/trust_control/cluster_and_reports.rs": allow(
         "2026-12-31",
         "trust-control cluster and reports surface with mixed-version revocation cursor coverage; capped to current size until split",
