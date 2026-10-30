@@ -1097,8 +1097,11 @@ fn current_manifest_consumer_corpus_preserves_wire_and_registered_signature() {
                 .unwrap_or_else(|error| panic!("canonical round trip: {error}"));
             assert_eq!(source, encoded);
             assert_eq!(
-                chio_core::sha256_hex(&encoded),
-                "b3387974261d22131bee3b2d2113e761db60bf610921e96955a76b349ac60bc2"
+                encoded,
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../../tests/bindings/vectors/security/cage/positive/signed-tool-manifest-v1.json"
+                ))
             );
         }
     }
