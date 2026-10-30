@@ -151,14 +151,11 @@ fn operator_request_under_another_schema_id_refuses() {
 
 #[test]
 fn operator_request_altered_after_signing_refuses() {
-    let edits: [(&str, fn(&mut Value)); 7] = [
+    let edits: [(&str, fn(&mut Value)); 6] = [
         ("request_id", |wire| wire["request_id"] = json!("req-2")),
         ("principal", |wire| wire["principal"] = json!("ops:mallory")),
         ("tenant_value", |wire| {
             wire["tenant_value"] = json!("globex")
-        }),
-        ("tenant_value removed", |wire| {
-            wire.as_object_mut().unwrap().remove("tenant_value");
         }),
         ("scope", |wire| {
             wire["scope"] = json!({ "grants": [grant("delete")] });
@@ -182,13 +179,26 @@ fn operator_request_altered_after_signing_refuses() {
 }
 
 #[test]
-fn operator_request_sign_without_tenant_refuses() {
-    let without_tenant = request(|request| {
-        request.as_object_mut().unwrap().remove("tenant_value");
-    });
-    let error = SignedOperatorRootRequest::sign(without_tenant, &operator()).unwrap_err();
+fn operator_request_without_tenant_refuses_at_parse() {
+    let mut unsigned = request_value(|_| {});
+    unsigned.as_object_mut().unwrap().remove("tenant_value");
+    let error = OperatorRootRequest::parse(&serde_json::to_vec(&unsigned).unwrap()).unwrap_err();
     assert_eq!(error, RootExchangeError::OperatorRootRequestMissingTenant);
     assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidRequest);
+
+    let mut signed = signed_wire(&operator());
+    signed.as_object_mut().unwrap().remove("tenant_value");
+    assert_eq!(
+        parse_value(&signed).unwrap_err(),
+        RootExchangeError::OperatorRootRequestMissingTenant
+    );
+
+    let mut null_tenant = signed_wire(&operator());
+    null_tenant["tenant_value"] = Value::Null;
+    assert_eq!(
+        parse_value(&null_tenant).unwrap_err(),
+        RootExchangeError::OperatorRootRequestMalformed("body does not have the request shape")
+    );
 }
 
 #[test]
