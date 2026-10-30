@@ -521,6 +521,7 @@ Wrapper schema ids, one per signed artifact type:
 | Identity-provider key snapshot | `chio.idp-key-snapshot.v1` |
 | Settlement closure | `chio.settlement-closure.v1` |
 | Caller revocation request | `chio.revocation-request.v1` |
+| Operator root request | `chio.operator-root-request.v1` |
 | Evidence export commitment (`SignedExportEnvelope` payload) | `chio.evidence_export_commitment.v1` |
 | Aggregate budget root binding | `chio.aggregate-budget-root.v1` |
 | Cumulative approval root binding | `chio.cumulative-approval-root.v1` |
@@ -3524,6 +3525,52 @@ kernel-domain `urn` identifies the refusal: `stop-bad-request`,
 respectively. Store failure details remain in operator diagnostic logs. A tool call
 denied by a stop carries `chio_runtime.identity_disposition = "reusable"` and
 `chio_runtime.retryable_after_resume = true` in its signed receipt metadata.
+
+### 8.3.1 Operator Root Requests (`chio.operator-root-request.v1`)
+
+An operator root request asks an edge to mint one anchored root of kind
+`chio_operator_key`. The operator signs it with an Ed25519 key that the edge
+pins as its operator key; the request carries no key of its own.
+
+A signed request is one JSON object with exactly these members:
+
+- `schema`: the string `chio.operator-root-request.v1`.
+- `request_id`: an identifier (1 to 128 characters, no NUL), the request's
+  replay key. An operator root request is single use.
+- `principal`: the identifier of the principal the root is issued for.
+- `tenant_value`: the identifier of the tenant the root is committed to.
+  It is required. A request without it refuses with the typed refusal
+  `OperatorRootRequestMissingTenant`, before its signature is checked.
+- `scope`: the requested capability scope, which must lie within the
+  ceiling scope of the matched root policy rule.
+- `holder`: the holder class, `edge_session` or `caller`.
+- `expires_at`: Unix seconds. The root expires no later than this.
+- `signature`: the canonical hex Ed25519 signature.
+
+The signature covers the canonical JSON (Section 4.1) of every member
+except `signature`, under the signing wrapper (Section 4.5) with the schema
+id `chio.operator-root-request.v1`. A verifier:
+
+1. refuses a body over 64 KiB, a body that is not duplicate-free UTF-8
+   JSON, a `schema` member other than the id, a `signature` that is missing
+   or not canonical hex, an absent `tenant_value`, and any member not listed
+   above;
+2. verifies the signature through the wrapper against the pinned operator
+   key and the schema id, and refuses a signature that does not verify,
+   including one made under any other schema id;
+3. records the request digest as SHA-256 of the canonical JSON that was
+   signed.
+
+Each refusal answers `invalid_request` and names its reason. The minted
+root's issuer string is `urn:chio:operator-key`, and its tenant and
+principal reach the delegation context only as salted commitments.
+
+`chio mcp root-request sign --operator-seed-file <path>` is the operator-side
+signer. It reads the unsigned request (every member above except `schema`
+and `signature`) on standard input and writes the signed request as
+canonical JSON. The seed file must already exist as a regular, singly
+linked file owned by the invoking user with mode 0600 or stricter; it is
+never created or repaired.
 
 ### 8.4 HTTP egress contract enforcement (W2.2)
 
