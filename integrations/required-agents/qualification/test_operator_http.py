@@ -56,17 +56,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
         capability = query.get("capability_id", ["cap-test"])[0]
         if self.command == "POST" and route == "/admin/revocations":
-            capability = json.loads(body)["capability_id"]
-            result = {"capabilityId": capability, "revoked": True, "newlyRevoked": True}
+            request = json.loads(body)
+            capability = request["target"]["capability_id"]
+            result = {
+                "reason_conflict": False,
+                "entry": {
+                    "schema": "chio.revocation-entry.v1",
+                    "entry_id": "rev-test",
+                    "target_kind": request["target"]["kind"],
+                    "target_value": capability,
+                    "revoked_at": 1,
+                    "reason": request["reason"],
+                },
+                "newly_revoked": True,
+                "roots_matched": 1,
+                "roots_revoked": 1,
+            }
         elif route == "/admin/revocations":
             result = {
-                "configured": True,
-                "capabilityId": capability,
+                "capability_id": capability,
                 "revoked": owner.revoked,
-                "count": int(owner.revoked),
-                "revocations": (
-                    [{"capabilityId": capability, "revokedAt": 1}] if owner.revoked else []
-                ),
+                "entry_id": "rev-test" if owner.revoked else None,
             }
         elif route == "/admin/budgets":
             result = {
@@ -219,7 +229,10 @@ class OperatorCommandsTest(unittest.TestCase):
         revoked = self.command("revoke")
         self.assertEqual(revoked.returncode, 0)
         self.assertTrue(self.server.revoked)
-        self.assertTrue(json.loads(self.command().stdout)["result"]["revoked"])
+        self.assertEqual(json.loads(revoked.stdout)["result"]["entryId"], "rev-test")
+        after = json.loads(self.command().stdout)["result"]
+        self.assertTrue(after["revoked"])
+        self.assertEqual(after["entryId"], "rev-test")
         budget = json.loads(self.command("budget").stdout)["result"]
         self.assertEqual(budget["usages"][0]["invocationCount"], 3)
         self.assertEqual(budget["usages"][0]["totalExposureCharged"], 7)
@@ -227,7 +240,13 @@ class OperatorCommandsTest(unittest.TestCase):
         for request in self.server.requests:
             self.assertTrue(request["authorization"] == "Bearer " + self.token)
             if request["method"] == "POST":
-                self.assertEqual(json.loads(request["body"]), {"capability_id": "cap-test"})
+                self.assertEqual(
+                    json.loads(request["body"]),
+                    {
+                        "target": {"kind": "capability_id", "capability_id": "cap-test"},
+                        "reason": "operator_request",
+                    },
+                )
             else:
                 self.assertEqual(
                     urllib.parse.parse_qs(urllib.parse.urlsplit(request["path"]).query)[
@@ -466,25 +485,13 @@ class OperatorCommandsTest(unittest.TestCase):
                         self.assertTrue(self.token not in self.output.read_text())
                         self.output.unlink()
 
-    def test_mismatched_or_unconfigured_capability_response_rejected(self):
+    def test_mismatched_or_inconsistent_status_response_rejected(self):
         for response in (
-            {"capabilityId": self.token},
-            {"capabilityId": "other"},
-            {"capabilityId": "cap-test", "configured": False},
-            {
-                "capabilityId": "cap-test",
-                "configured": True,
-                "count": 1,
-                "revoked": False,
-                "revocations": [{"capabilityId": "other"}],
-            },
-            {
-                "capabilityId": "cap-test",
-                "configured": True,
-                "count": 0,
-                "revoked": self.token,
-                "revocations": [],
-            },
+            {"capability_id": self.token, "revoked": False, "entry_id": None},
+            {"capability_id": "other", "revoked": False, "entry_id": None},
+            {"capability_id": "cap-test", "revoked": self.token, "entry_id": None},
+            {"capability_id": "cap-test", "revoked": True, "entry_id": None},
+            {"capability_id": "cap-test", "revoked": False, "entry_id": "rev-test"},
         ):
             self.server.payload = json.dumps(response).encode()
             self.assertEqual(self.command().returncode, 1)
@@ -492,11 +499,9 @@ class OperatorCommandsTest(unittest.TestCase):
     def test_response_extensions_are_not_echoed(self):
         self.server.payload = json.dumps(
             {
-                "capabilityId": "cap-test",
-                "configured": True,
-                "count": 0,
-                "revocations": [],
+                "capability_id": "cap-test",
                 "revoked": False,
+                "entry_id": None,
                 "diagnostic": self.token,
             }
         ).encode()

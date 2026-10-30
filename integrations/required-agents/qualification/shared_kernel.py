@@ -337,8 +337,13 @@ def basic_cases(runtime):
     assert runtime.observe("useful.txt")["content"] == "independent-sentinel"
     trust = runtime.http(f"/admin/sessions/{runtime.session}/trust", token=runtime.admin_token)[2]
     capability_id = trust["capabilities"][0]["capabilityId"]
-    revoked = runtime.http("/admin/revocations", {"capability_id": capability_id}, token=runtime.admin_token)
+    revoked = runtime.http(
+        "/admin/revocations",
+        {"target": {"kind": "capability_id", "capability_id": capability_id}, "reason": "operator_request"},
+        token=runtime.admin_token,
+    )
     assert revoked[0] == 200, revoked
+    assert revoked[2]["entry"]["target_value"] == capability_id, revoked
     blocked = runtime.write("revoked.txt", "must-not-write", "revoked-operation")
     assert blocked.get("error") or blocked.get("result", {}).get("isError"), blocked
     assert runtime.observe("revoked.txt")["exists"] is False

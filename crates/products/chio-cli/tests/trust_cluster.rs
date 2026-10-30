@@ -421,7 +421,7 @@ fn node_diagnostics(client: &Client, base_url: &str, token: &str, capability_id:
         ),
         "budgets": try_get_json(
             client,
-            &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
+            &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
             token,
         ),
     })
@@ -900,7 +900,7 @@ fn assert_budget_invocation_count(
 ) {
     let budgets = get_json(
         client,
-        &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
+        &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
         token,
     );
     let usage = budgets["usages"]
@@ -923,7 +923,7 @@ fn assert_budget_totals(
 ) {
     let budgets = get_json(
         client,
-        &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
+        &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
         token,
     );
     let usage = budgets["usages"]
@@ -1392,7 +1392,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{follower_url}/v1/budgets?capability_id=cap-shared"),
+                &format!("{follower_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
                 service_token,
             ) else {
                 return false;
@@ -1496,7 +1496,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
 
     let budgets = get_json(
         &client,
-        &format!("{survivor_url}/v1/budgets?capability_id=cap-shared"),
+        &format!("{survivor_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
         service_token,
     );
     assert_eq!(budgets["count"].as_u64(), Some(1));
@@ -1975,7 +1975,7 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{isolated_url}/v1/budgets?capability_id=cap-quorum-heal"),
+                &format!("{isolated_url}/v1/budgets?capabilityId=cap-quorum-heal&limit=10"),
                 service_token,
             ) else {
                 return false;
@@ -2330,7 +2330,9 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{expected_leader_url}/v1/budgets?capability_id=cap-stalled-commit"),
+                &format!(
+                    "{expected_leader_url}/v1/budgets?capabilityId=cap-stalled-commit&limit=10"
+                ),
                 service_token,
             ) else {
                 return false;
@@ -2885,7 +2887,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             };
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{late_url}/v1/budgets?capability_id=cap-snapshot-hold"),
+                &format!("{late_url}/v1/budgets?capabilityId=cap-snapshot-hold&limit=10"),
                 service_token,
             ) else {
                 return false;

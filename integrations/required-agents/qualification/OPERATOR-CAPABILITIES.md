@@ -20,16 +20,21 @@ python3 operator_capability.py revoke \
   --capability-id cap-EXACT-RETAINED-ID
 ```
 
-- `status` queries `/admin/revocations` with exactly one `capability_id`. A false
-  revocation result does not prove that the capability exists, is unexpired or
-  otherwise authorizes an action.
+- `status` queries `/admin/revocations` with exactly one `capability_id` and
+  reports `revoked` and, when revoked, the `entryId` of the revocation entry. A
+  false revocation result does not prove that the capability exists, is
+  unexpired or otherwise authorizes an action.
 - `budget` queries `/admin/budgets` for that capability's per-grant usage. It does
   not change budgets or infer remaining authority from usage alone. At the
   current 200-row admin limit, `mayBeTruncated` is true; do not treat that result
   as a complete grant inventory. Optional cost counters from trust-control
   backed kernels are retained when returned.
-- `revoke` posts only `{"capability_id":"..."}` to `/admin/revocations`. It does
-  not revoke all capabilities, replace sessions, clear fences or redispatch work.
+- `revoke` posts only
+  `{"target":{"kind":"capability_id","capability_id":"..."},"reason":"..."}` to
+  `/admin/revocations`, with `--reason` (default `operator_request`) from the
+  closed revocation reason set, and confirms the stored entry names that
+  capability. It does not revoke all capabilities, replace sessions, clear fences
+  or redispatch work.
 
 The private operator JSON requires a nonempty `adminToken` distinct from any
 agent token and an integer `port` in 1-65535 for the default literal loopback
