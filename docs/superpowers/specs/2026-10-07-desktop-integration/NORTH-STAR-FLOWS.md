@@ -113,7 +113,7 @@ exist.
 
 | Unit | Definition | Status and owner |
 | --- | --- | --- |
-| **Organization principal** | A `did:chio` Ed25519 key. It signs passports, verifier policies and federated delegation policies. | Shipped (T: `chio-did`, `chio-credentials`, `chio passport`, `chio trust federated-delegation-policy-create`) |
+| **Organization principal** | A `did:chio` Ed25519 key. It signs passports and verifier policies; the verifying organization's principal also signs the federated delegation policies it issues under. | Shipped (T: `chio-did`, `chio-credentials`, `chio passport`, `chio trust federated-delegation-policy-create`) |
 | **Domain** | One install of Chio's services. Today that is `chio trust serve`: capability authority, challenge store and passport lifecycle status. Later it also covers the F process host and broker. | Shipped as `chio trust serve` (T: `crates/products/chio-cli/src/cli/types/trust.rs`) |
 | **Agent subject** | Each harness session or worker has its own key. The organization issues it a passport. A domain issues it capabilities. | Shipped |
 | **Operator** | The human who approves issuance and co-signs agreements. | K S8 S28 roster and a production passkey verifier; both are owner gaps |
@@ -172,10 +172,12 @@ behind `chio api protect`. There are two machines, two human operators and
 no shared keys. Every command below exists today (T:
 `docs/reference/AGENT_PASSPORT_GUIDE.md`, sections Federated Issuance, Holder
 Transport and Remote Verifier Surface), but the sequence does not yet run end
-to end: on T, federated issue rejects A's signed ceiling (its signer is not a
-B authority key) and consumes a challenge already consumed at verification
-(`trust_control/passport_handlers.rs`). The roadmap's COOP-1 re-cut fixes this:
-B owns the ceiling, steps 3 and 4 use an issuance inbox with holder pickup,
+to end: on T, federated issue consumes a challenge already consumed at
+verification (`trust_control/passport_handlers.rs`). B's authority owns the
+ceiling: federated issue refuses a delegation policy whose signer is not a key
+B's own capability authority trusts (T: `trust_control/passport_handlers.rs`,
+`partner_revocation_door_tests.rs`), so A never signs the ceiling. The roadmap's
+COOP-1 re-cut fixes the rest: steps 3 and 4 use an issuance inbox with holder pickup,
 step 6 exports the door's receipts, step 7 verifies against a pinned partner
 card, and step 4 approval can come from the CLI. Until then the table is the
 target, not a runnable script.
@@ -183,10 +185,10 @@ target, not a runnable script.
 | Step | Who | Action | `boundary_class` |
 | --- | --- | --- | --- |
 | 0 | Both | Native host services: `chio trust serve --advertise-url`, plus, on B, the governed tool behind `chio api protect` with `CHIO_TRUSTED_ISSUER_KEY` set to B's trust-control authority key. Both run as user-session units (section 6), with keys in OS custody (section 2). | n/a |
-| 1 | A | `chio passport create` for the agent subject, then `chio passport status publish`. Optionally `chio trust federated-delegation-policy-create` to cap scope and TTL. | Sets A's ceiling |
-| 2 | B | `chio passport policy create`, which allowlists A's DID and sets receipt thresholds. Then `chio passport challenge create`, which returns public challenge and submit URLs. | n/a |
+| 1 | A | `chio passport create` for the agent subject, then `chio passport status publish`. | n/a |
+| 2 | B | `chio passport policy create`, which allowlists A's DID and sets receipt thresholds. Optionally `chio trust federated-delegation-policy-create`, signed with B's authority seed, to cap A's scope and TTL. Then `chio passport challenge create`, which returns public challenge and submit URLs. | Sets B's ceiling |
 | 3 | A's agent | `chio passport challenge respond --challenge-url`, then `chio passport challenge submit`. | n/a |
-| 4 | **B's operator** | Reviews and approves on the desktop. Then `chio trust federated-issue` mints a **B-local** capability bound to A's ceiling. | n/a |
+| 4 | **B's operator** | Reviews and approves on the desktop. Then `chio trust federated-issue` mints a **B-local** capability bound to B's ceiling. | n/a |
 | 5 | A's agent | Calls B's tool. **B's kernel admits or denies at B's door** and signs receipts, deny receipts included. | `prevent`, at B only |
 | 6 | B | `chio evidence export`, and the package goes to A. | n/a |
 | 7 | A | `chio evidence verify` offline, then `chio evidence import`, then `chio reputation compare`. Imported trust is shown separately and weighted down. | `detect_only` for A; reputation `advisory_only` |
@@ -204,7 +206,7 @@ ones.
 
 - **Issuance review (step 4).** B's operator sees A's DID against the
   allowlist, the passport's lifecycle status and receipt history, the requested
-  scope as a difference from policy, the TTL and A's ceiling. Approval uses a
+  scope as a difference from policy, the TTL and B's ceiling. Approval uses a
   passkey. Until S28 lands, the approval record is labelled `SharedCredential`.
 - **Evidence check (step 7).** A's operator sees B's verified receipts,
   including denials, and imported reputation labelled advisory.
@@ -446,7 +448,7 @@ reports the public copy that the U3 items still have to fix):
   - an out-of-scope call;
   - a replayed or stale challenge;
   - a wrong verifier;
-  - a request beyond A's delegation ceiling;
+  - a request beyond B's delegation ceiling;
   - a revoked passport status;
   - a key missing from custody.
 - **Evidence.** A verifies B's evidence offline with signatures checked, then

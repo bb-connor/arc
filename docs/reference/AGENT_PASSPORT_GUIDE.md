@@ -481,6 +481,11 @@ chio \
   --upstream-capability-id cap-upstream
 ```
 
+The delegation policy is signed by a key the issuing service's own capability
+authority trusts (`--signing-seed-file` is that authority's seed). Federated
+issue refuses a policy signed by any other key, including the passport's
+issuing partner, with 403 and leaves the challenge unconsumed.
+
 This lane now supports verified bilateral evidence consumption plus a real
 multi-hop continuation step. `chio evidence import` verifies the upstream
 package before it is indexed locally, the delegation policy binds to an exact

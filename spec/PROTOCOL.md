@@ -5441,6 +5441,12 @@ the operator configures a partner registry:
   partner sync plus the `cache_ttl_secs` of the credential's signed status
   reference, and a reference without a TTL is refused
 
+Federated issuance with a `delegationPolicy` requires the policy's
+`signerPublicKey` to be one of the keys the issuing service's own capability
+authority trusts; a policy signed by any other key, including the partner that
+issued the passport, is refused with 403 before the challenge is consumed. The
+issuing service's authority therefore owns the delegation ceiling.
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 

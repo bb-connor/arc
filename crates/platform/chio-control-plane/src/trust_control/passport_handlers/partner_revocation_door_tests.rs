@@ -986,12 +986,20 @@ fn delegation_policy(
     expires_at: u64,
     parent_capability_id: Option<String>,
 ) -> FederatedDelegationPolicyDocument {
+    delegation_policy_signed_by(&door.authority, expires_at, parent_capability_id)
+}
+
+fn delegation_policy_signed_by(
+    signer: &Keypair,
+    expires_at: u64,
+    parent_capability_id: Option<String>,
+) -> FederatedDelegationPolicyDocument {
     let body = FederatedDelegationPolicyBody {
         schema: FEDERATED_DELEGATION_POLICY_SCHEMA.to_owned(),
         issuer: ADVERTISE_URL.to_owned(),
         partner: PARTNER.to_owned(),
         verifier: ADVERTISE_URL.to_owned(),
-        signer_public_key: door.authority.public_key(),
+        signer_public_key: signer.public_key(),
         created_at: BASE_UNIX_SECS - 10,
         expires_at,
         ttl_seconds: 60,
@@ -999,8 +1007,7 @@ fn delegation_policy(
         purpose: None,
         parent_capability_id,
     };
-    let signature = door
-        .authority
+    let signature = signer
         .sign_wrapped(
             FEDERATED_DELEGATION_POLICY_SCHEMA,
             &chio_core::canonical::CanonicalBytes::from_serializable(&body).test_unwrap(),
@@ -1093,6 +1100,94 @@ async fn a_live_delegation_policy_issues_through_the_partner_door() {
         State(receipts_state(&door, &store)),
         service_headers(),
         Json(request),
+    )
+    .await;
+    assert_admitted(response).await;
+}
+
+#[tokio::test]
+async fn a_delegation_ceiling_signed_by_the_issuing_partner_is_refused_and_does_not_consume_the_challenge()
+ {
+    let mut door = Door::new(0);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let challenge = door.challenge(Some("delegation-partner-signed"), VALID_FROM, VALID_UNTIL);
+    let partner_signer = Keypair::generate();
+    let request = federated_request(
+        &door,
+        &passport,
+        &challenge,
+        5,
+        Some(delegation_policy_signed_by(
+            &partner_signer,
+            BASE_UNIX_SECS + 10,
+            None,
+        )),
+        None,
+    );
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(),
+        Json(request),
+    )
+    .await;
+    assert_refused(
+        response,
+        serde_json::json!({
+            "error": "federated delegation policy signer is not trusted by the local capability authority"
+        }),
+    )
+    .await;
+    assert_eq!(
+        active_challenge(&door, "delegation-partner-signed"),
+        challenge
+    );
+}
+
+#[tokio::test]
+async fn a_delegation_ceiling_signed_by_the_local_authority_issues_after_a_partner_signed_one_is_refused()
+ {
+    let mut door = Door::new(0);
+    let store = with_receipts(&mut door);
+    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+    let passport = door.passport(&[&door.authority]);
+    let challenge = door.challenge(Some("delegation-retry"), VALID_FROM, VALID_UNTIL);
+    let partner_signer = Keypair::generate();
+    let refused = federated_request(
+        &door,
+        &passport,
+        &challenge,
+        5,
+        Some(delegation_policy_signed_by(
+            &partner_signer,
+            BASE_UNIX_SECS + 10,
+            None,
+        )),
+        None,
+    );
+    let (status, _) = response_parts(
+        handle_federated_issue(
+            State(receipts_state(&door, &store)),
+            service_headers(),
+            Json(refused),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    let accepted = federated_request(
+        &door,
+        &passport,
+        &challenge,
+        5,
+        Some(delegation_policy(&door, BASE_UNIX_SECS + 10, None)),
+        None,
+    );
+    let response = handle_federated_issue(
+        State(receipts_state(&door, &store)),
+        service_headers(),
+        Json(accepted),
     )
     .await;
     assert_admitted(response).await;
