@@ -16,6 +16,7 @@ use chio_credentials::{
     WalletExchangeTransactionStatus, CHIO_PASSPORT_JWT_VC_JSON_FORMAT,
     CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
 };
+use chio_secure_ipc::regular_file::RegularFileError;
 use chrono::DateTime;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -114,8 +115,8 @@ impl VerifierPolicyRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -379,8 +380,8 @@ impl PassportStatusRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 
@@ -651,8 +652,8 @@ impl PassportIssuanceOfferRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 

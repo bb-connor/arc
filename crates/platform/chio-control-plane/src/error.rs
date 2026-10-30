@@ -84,6 +84,9 @@ pub enum CliError {
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
+    #[error("file refused: {0}")]
+    File(#[from] chio_secure_ipc::regular_file::RegularFileError),
+
     /// The replacement file is in place and readable, but syncing its parent
     /// directory failed, so the rename may not survive a crash.
     #[error("registry file was replaced but its durability sync failed: {0}")]
@@ -360,6 +363,11 @@ impl CliError {
                 self.report_with_context(spec.string_code, context, spec.help)
             }
             Self::Io(error) => self.report_with_context(
+                "CHIO-CLI-IO",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check file paths, permissions, and parent directories before retrying.",
+            ),
+            Self::File(error) => self.report_with_context(
                 "CHIO-CLI-IO",
                 serde_json::json!({ "source": error.to_string() }),
                 "Check file paths, permissions, and parent directories before retrying.",

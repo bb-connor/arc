@@ -12,13 +12,6 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const REGISTRY_LIMIT: usize = 64 * 1024 * 1024;
 
-fn refusal(error: &CliError) -> Option<&RegularFileError> {
-    let CliError::Io(io) = error else {
-        return None;
-    };
-    io.get_ref()?.downcast_ref()
-}
-
 macro_rules! registry_reader_tests {
     ($module:ident, $registry:ty) => {
         mod $module {
@@ -71,8 +64,8 @@ macro_rules! registry_reader_tests {
                     .ok_or("oversized file accepted")?;
                 assert!(
                     matches!(
-                        refusal(&error),
-                        Some(RegularFileError::TooLarge {
+                        error,
+                        CliError::File(RegularFileError::TooLarge {
                             max_bytes: REGISTRY_LIMIT
                         })
                     ),
@@ -115,7 +108,7 @@ macro_rules! registry_reader_tests {
                 std::os::unix::fs::symlink(&path, &link)?;
                 let error = Registry::load(&link).err().ok_or("symlink followed")?;
                 assert!(
-                    matches!(refusal(&error), Some(RegularFileError::SymbolicLink)),
+                    matches!(error, CliError::File(RegularFileError::SymbolicLink)),
                     "{error:?}"
                 );
                 assert_eq!(std::fs::read(path)?, bytes);
@@ -129,7 +122,7 @@ macro_rules! registry_reader_tests {
                     .err()
                     .ok_or("directory accepted")?;
                 assert!(
-                    matches!(refusal(&error), Some(RegularFileError::NotRegular)),
+                    matches!(error, CliError::File(RegularFileError::NotRegular)),
                     "{error:?}"
                 );
                 Ok(())
@@ -152,7 +145,7 @@ macro_rules! registry_reader_tests {
                 reader.join().map_err(|_| "registry reader panicked")?;
                 let error = result.err().ok_or("FIFO accepted")?;
                 assert!(
-                    matches!(refusal(&error), Some(RegularFileError::NotRegular)),
+                    matches!(error, CliError::File(RegularFileError::NotRegular)),
                     "{error:?}"
                 );
                 Ok(())
