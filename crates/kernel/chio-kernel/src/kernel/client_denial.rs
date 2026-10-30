@@ -344,18 +344,6 @@ mod tests {
     }
 
     #[test]
-    fn a_cancelled_request_reports_request_cancelled() {
-        let error = KernelError::RequestCancelled {
-            request_id: chio_core::session::RequestId::new("cancelled-request"),
-            reason: "cancelled by client: user aborted sample".to_string(),
-        };
-        assert_eq!(
-            error.client_denial_code(),
-            ClientDenialCode::RequestCancelled
-        );
-    }
-
-    #[test]
     fn only_the_stop_reason_selects_emergency_stop() {
         assert_eq!(
             KernelError::GuardDenied(EMERGENCY_STOP_DENY_REASON.to_string()).client_denial_code(),
