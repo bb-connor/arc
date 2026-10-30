@@ -1476,6 +1476,7 @@ pub(crate) fn remote_mcp_auth_egress_contract(
         deny_ipv6_ula,
         max_redirect_chain: 3,
         max_response_bytes: 1024 * 1024,
+        private_network_allowances: Default::default(),
     };
     contract.validate().map_err(|error| {
         CliError::cli_other_error(format!(

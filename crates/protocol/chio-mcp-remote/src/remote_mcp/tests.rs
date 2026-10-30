@@ -1655,6 +1655,7 @@ async fn oidc_fetch_rejects_special_use_address_contract() {
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024,
+        private_network_allowances: Default::default(),
     };
 
     let error = fetch_identity_provider_json::<Value>(&url, "test OIDC discovery", Some(&contract))

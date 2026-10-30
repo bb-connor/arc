@@ -7802,6 +7802,10 @@
     ],
     "crates/core/chio-core-types/src/receipt/metadata/session_anchor.rs": [
       "from_receipt_metadata::from_value"
+    ],
+    "crates/protocol/chio-egress-contract/src/allowance.rs": [
+      "for_endpoint::custom_deserialize",
+      "serialize::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -13341,6 +13345,23 @@
             "serde_json::from_value"
           ],
           "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-egress-contract/src/allowance.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom field deserialization of operator egress allowances inside an outer configuration reader. A CIDR must be canonical text (host bits zero, no IPv4-mapped form, no leading zeros) and an allowance set document refuses unknown fields and validates every entry (breadth bound, private ranges only, no link-local or metadata range, no duplicate host:port) before it is usable.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true,
+          "instances": 2
         }
       ]
     }

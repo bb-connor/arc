@@ -651,6 +651,10 @@ struct RecordingPaymentAdapter {
 }
 
 impl chio_kernel::PaymentAdapter for RecordingPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         request: &chio_kernel::PaymentAuthorizeRequest,

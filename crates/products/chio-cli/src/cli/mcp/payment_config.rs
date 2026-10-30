@@ -91,9 +91,14 @@ impl PaymentAdapterConfig {
                     clock.clone(),
                 )
                 .map_err(|error| format!("CHIO_PAYMENT_X402_REPLAY_DB: {error}"))?;
-                let mut adapter =
-                    X402PaymentAdapter::new(base_url, rail, clock, Arc::new(replay))
-                        .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
+                let mut adapter = X402PaymentAdapter::new(
+                    base_url,
+                    rail,
+                    &chio_egress_contract::EgressAllowanceSet::default(),
+                    clock,
+                    Arc::new(replay),
+                )
+                .map_err(|error| format!("CHIO_PAYMENT_BASE_URL: {error}"))?;
                 if let Some(token) = bearer_token {
                     adapter = adapter.with_bearer_token(token);
                 }
@@ -232,6 +237,7 @@ mod tests {
             adapter: X402PaymentAdapter::new(
                 "https://facilitator.example",
                 rail,
+                &chio_egress_contract::EgressAllowanceSet::default(),
                 crate::input::time::clock(),
                 Arc::new(chio_kernel::InMemoryExecutionNonceStore::default()),
             )
@@ -318,7 +324,9 @@ mod tests {
                     "CHIO_PAYMENT_X402_ASSET" => Some("0x036cbd53842c5426634e7929541ec2318f3dcf7e"),
                     "CHIO_PAYMENT_X402_TOKEN_SYMBOL" => Some("USDC"),
                     "CHIO_PAYMENT_X402_TOKEN_DECIMALS" => Some("6"),
-                    "CHIO_PAYMENT_X402_PAY_TO" => Some("0x2000000000000000000000000000000000000002"),
+                    "CHIO_PAYMENT_X402_PAY_TO" => {
+                        Some("0x2000000000000000000000000000000000000002")
+                    }
                     "CHIO_PAYMENT_X402_REPLAY_DB" => Some(replay_db),
                     _ => None,
                 }

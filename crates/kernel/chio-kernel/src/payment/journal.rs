@@ -146,6 +146,8 @@ pub struct PaymentJournalRecord {
     pub hold_id: Option<String>,
     pub rail: String,
     pub rail_mode: PaymentRailMode,
+    /// Digest of the private network allowances the rail was dialed under.
+    pub rail_egress_allowance_digest: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -189,6 +191,7 @@ impl PaymentJournalRecord {
             && self.hold_id == proposed.hold_id
             && self.rail == proposed.rail
             && self.rail_mode == proposed.rail_mode
+            && self.rail_egress_allowance_digest == proposed.rail_egress_allowance_digest
             && self.amount_units == proposed.amount_units
             && self.authorized_amount_units == proposed.authorized_amount_units
             && self.currency == proposed.currency
@@ -210,6 +213,10 @@ impl PaymentJournalRecord {
             .ok_or_else(|| PaymentJournalError("hold_id is required".to_owned()))?;
         validate_payment_text("hold_id", hold_id)?;
         validate_payment_text("rail", &self.rail)?;
+        validate_payment_digest(
+            "rail_egress_allowance_digest",
+            &self.rail_egress_allowance_digest,
+        )?;
         if self.rail == "unspecified" {
             return Err(PaymentJournalError(
                 "rail must identify a recoverable payment adapter".to_owned(),

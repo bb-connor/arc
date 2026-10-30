@@ -38,6 +38,10 @@ impl PriceOracle for MovingRate {
 
 pub(super) struct TracedCapture(pub(super) Arc<PricingFacts>);
 impl PaymentAdapter for TracedCapture {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "sqlite-test-reversible"
     }

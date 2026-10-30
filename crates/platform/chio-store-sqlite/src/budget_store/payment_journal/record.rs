@@ -48,6 +48,7 @@ pub(super) fn payment_journal_from_row(
         hold_id: Some(row.get(5)?),
         rail: row.get(6)?,
         rail_mode: payment_rail_mode(&row.get::<_, String>(7)?)?,
+        rail_egress_allowance_digest: row.get(23)?,
         authorization_id: row.get(8)?,
         transaction_id: row.get(9)?,
         amount_units: payment_u64_from_i64(row.get(10)?, "amount_units")?,

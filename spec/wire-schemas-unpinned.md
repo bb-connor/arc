@@ -98,8 +98,8 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/recovery_gate.rs:34` `FINDING_RECOVERY_REQUEST_BINDING_SCHEMA` = `chio.finding.recovery-request-binding.v1`
 - `crates/kernel/chio-kernel/src/memory_provenance.rs:46` `MEMORY_PROVENANCE_ENTRY_SCHEMA` = `chio.memory_provenance_entry.v1`
 - `crates/kernel/chio-kernel/src/operator_report/constants.rs:23` `ECONOMIC_COMPLETION_FLOW_SCHEMA` = `chio.economic-completion-flow.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:446` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
-- `crates/kernel/chio-kernel/src/payment.rs:447` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:477` `ACP_SETTLEMENT_STATE_REQUEST_SCHEMA` = `chio.payment.acp-settlement-state-request.v1`
+- `crates/kernel/chio-kernel/src/payment.rs:478` `ACP_SETTLEMENT_STATE_RESPONSE_SCHEMA` = `chio.payment.acp-settlement-state-response.v1`
 - `crates/kernel/chio-kernel/src/receipt_store.rs:1112` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`

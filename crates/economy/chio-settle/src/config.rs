@@ -378,6 +378,7 @@ fn devnet_rpc_egress_contract_for_url(
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 64 * 1024 * 1024,
+        private_network_allowances: Default::default(),
     };
     contract
         .validate_dispatchable_with_pinned_dns()

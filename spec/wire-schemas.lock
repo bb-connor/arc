@@ -1500,6 +1500,11 @@ files = ["crates/tooling/chio-conformance/src/econsim.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.egress.private-network-allowance.v1"
+files = ["crates/protocol/chio-egress-contract/src/allowance.rs"]
+first_seen = "2fdd920e95"
+
+[[schema]]
 value = "chio.enterprise-identity-index.v1"
 files = ["crates/platform/chio-control-plane/src/enterprise_identity_index.rs"]
 first_seen = "16e1c87bbd"

@@ -168,6 +168,7 @@ fn registry_contract(endpoint: &str) -> Result<HttpEgressContract, HttpEgressErr
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PUBLIC_REGISTRY_RESPONSE_BYTES,
+        private_network_allowances: Default::default(),
     };
     contract.enforce_url(endpoint, 0)?;
     Ok(contract)

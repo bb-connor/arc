@@ -34,6 +34,7 @@ pub(crate) fn strict_https_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes,
+        private_network_allowances: Default::default(),
     };
     contract
         .validate_dispatchable_with_pinned_dns()

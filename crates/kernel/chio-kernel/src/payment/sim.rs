@@ -115,6 +115,10 @@ impl SimPaymentAdapter {
 }
 
 impl PaymentAdapter for SimPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "sim"
     }

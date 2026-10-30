@@ -18,6 +18,7 @@ let contract = HttpEgressContract {
     deny_ipv6_ula: true,
     max_redirect_chain: 2,
     max_response_bytes: 4096,
+    private_network_allowances: Default::default(),
 };
 let target = contract.enforce_url("https://api.example/items", 0)?;
 assert_eq!(target.authority, "api.example");
@@ -39,6 +40,12 @@ This example validates a URL without DNS or network access. DNS checks require
 - `HttpEgressContract::prepare` validates shape and captures an immutable snapshot.
 - `enforce_url` checks schemes, normalized authorities, address literals, userinfo,
   and redirect count. It does not resolve domain names.
+- `private_network_allowances` is the only way to reach a private IPv4 address: each
+  entry pins one `host:port` and scheme (https by default) to a CIDR every
+  resolved address must fall inside.
+  Link-local and cloud metadata addresses are never reachable. Both the reqwest
+  client and the blocking ureq agent check every resolved address with the
+  request's port.
 - `enforce_url_with_dns` checks every resolved address. Response-size enforcement
   requires an observed byte count or the feature-gated dispatch helper.
 

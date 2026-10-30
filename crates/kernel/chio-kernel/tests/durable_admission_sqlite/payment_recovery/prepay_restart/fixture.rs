@@ -13,6 +13,10 @@ pub(super) struct PrepayFacts {
 
 pub(super) struct ExactPrepayRail(pub(super) Arc<PrepayFacts>);
 impl PaymentAdapter for ExactPrepayRail {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "sqlite-test-prepaid-final"
     }

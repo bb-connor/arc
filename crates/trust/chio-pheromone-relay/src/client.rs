@@ -128,6 +128,7 @@ fn peer_egress_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: u64::try_from(crate::input::MAX_DOCUMENT_BYTES).unwrap_or(u64::MAX),
+        private_network_allowances: BTreeSet::new(),
     })
 }
 

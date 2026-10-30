@@ -1332,6 +1332,9 @@ impl ChioKernel {
                                 hold_id: Some(budget_hold_id.clone()),
                                 rail: adapter.rail_id().to_owned(),
                                 rail_mode,
+                                rail_egress_allowance_digest: adapter
+                                    .egress_allowance_digest()
+                                    .to_owned(),
                                 authorization_id: None,
                                 transaction_id: None,
                                 amount_units: cost_units,

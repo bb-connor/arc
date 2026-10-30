@@ -583,6 +583,7 @@ pub fn build_default_egress_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 1,
         max_response_bytes: 1 << 22,
+        private_network_allowances: Default::default(),
     };
     if contract.validate_dispatchable_with_pinned_dns().is_ok() {
         contract
@@ -608,6 +609,7 @@ fn fail_closed_default_egress_contract(
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1,
+        private_network_allowances: Default::default(),
     }
 }
 

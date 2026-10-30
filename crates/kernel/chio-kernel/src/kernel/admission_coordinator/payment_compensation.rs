@@ -224,7 +224,10 @@ impl ChioKernel {
                 "pre-dispatch payment adapter is unavailable",
             )
         })?;
-        if adapter.rail_id() != journal.rail || adapter.rail_mode() != Some(journal.rail_mode) {
+        if adapter.rail_id() != journal.rail
+            || adapter.rail_mode() != Some(journal.rail_mode)
+            || adapter.egress_allowance_digest() != journal.rail_egress_allowance_digest
+        {
             return Err(item_failure(
                 FailureKind::ContractChanged,
                 "pre-dispatch payment adapter changed its original rail profile",

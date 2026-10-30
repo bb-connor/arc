@@ -1,6 +1,6 @@
 use super::{EndpointSource, HttpEgressContract, HttpEgressError};
 use std::collections::BTreeSet;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 fn strict_contract(authority: &str) -> HttpEgressContract {
     let mut allowed_schemes = BTreeSet::new();
@@ -16,6 +16,7 @@ fn strict_contract(authority: &str) -> HttpEgressContract {
         deny_ipv6_ula: true,
         max_redirect_chain: 3,
         max_response_bytes: 1024,
+        private_network_allowances: Default::default(),
     }
 }
 
@@ -321,13 +322,19 @@ fn no_port_url_matches_explicit_default_port_allowlist_entry() {
 fn resolved_loopback_respects_loopback_allowance() {
     let contract = HttpEgressContract::permissive_for_tests("localhost:80");
     contract
-        .enforce_resolved_ip("localhost", IpAddr::V4(Ipv4Addr::LOCALHOST))
+        .enforce_resolved_address(
+            "localhost",
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 443),
+        )
         .expect("loopback may be explicitly allowed for local test contracts");
 
     let mut denied = contract;
     denied.deny_loopback = true;
     let error = denied
-        .enforce_resolved_ip("localhost", IpAddr::V4(Ipv4Addr::LOCALHOST))
+        .enforce_resolved_address(
+            "localhost",
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 443),
+        )
         .expect_err("loopback should fail when the flag is enabled");
     assert!(matches!(error, HttpEgressError::LoopbackDenied { .. }));
 }
@@ -336,13 +343,19 @@ fn resolved_loopback_respects_loopback_allowance() {
 fn resolved_ipv6_ula_respects_ula_allowance() {
     let contract = HttpEgressContract::permissive_for_tests("[fc00::1]:80");
     contract
-        .enforce_resolved_ip("ula.test", IpAddr::V6("fc00::1".parse().unwrap()))
+        .enforce_resolved_address(
+            "ula.test",
+            SocketAddr::new(IpAddr::V6("fc00::1".parse().unwrap()), 443),
+        )
         .expect("ULA may be explicitly allowed for local test contracts");
 
     let mut denied = contract;
     denied.deny_ipv6_ula = true;
     let error = denied
-        .enforce_resolved_ip("ula.test", IpAddr::V6("fc00::1".parse().unwrap()))
+        .enforce_resolved_address(
+            "ula.test",
+            SocketAddr::new(IpAddr::V6("fc00::1".parse().unwrap()), 443),
+        )
         .expect_err("ULA should fail when the flag is enabled");
     assert!(matches!(error, HttpEgressError::Ipv6UlaDenied { .. }));
 }
@@ -350,9 +363,12 @@ fn resolved_ipv6_ula_respects_ula_allowance() {
 #[test]
 fn resolved_public_ip_is_allowed() {
     strict_contract("example.com")
-        .enforce_resolved_ip(
+        .enforce_resolved_address(
             "example.com",
-            IpAddr::V6(Ipv6Addr::new(0x2606, 0x2800, 0x220, 0x1, 0, 0, 0, 0)),
+            SocketAddr::new(
+                IpAddr::V6(Ipv6Addr::new(0x2606, 0x2800, 0x220, 0x1, 0, 0, 0, 0)),
+                443,
+            ),
         )
         .expect("global resolved addresses remain allowed");
 }
@@ -397,8 +413,10 @@ fn ipv6_forms_embedding_an_ipv4_destination_fail_closed() {
     ] {
         let address: Ipv6Addr = literal.parse().expect("IPv6 literal");
         assert_eq!(
-            strict_contract("rail.example")
-                .enforce_resolved_ip("rail.example", IpAddr::V6(address)),
+            strict_contract("rail.example").enforce_resolved_address(
+                "rail.example",
+                SocketAddr::new(IpAddr::V6(address), 443)
+            ),
             Err(HttpEgressError::PrivateNetworkDenied {
                 host: format!("rail.example resolved to {address}")
             }),
@@ -424,7 +442,7 @@ fn ipv6_neighbours_of_the_embedding_prefixes_stay_global() {
     for literal in ["2001:4860::8888", "64:ff9b:2::1", "2003::1"] {
         let address: Ipv6Addr = literal.parse().expect("IPv6 literal");
         contract
-            .enforce_resolved_ip("rail.example", IpAddr::V6(address))
+            .enforce_resolved_address("rail.example", SocketAddr::new(IpAddr::V6(address), 443))
             .expect(literal);
     }
 }
@@ -593,7 +611,7 @@ fn a_localhost_name_admits_only_loopback_answers() {
         IpAddr::V6(Ipv4Addr::LOCALHOST.to_ipv6_mapped()),
     ] {
         contract
-            .enforce_resolved_ip("localhost", address)
+            .enforce_resolved_address("localhost", SocketAddr::new(address, 9))
             .expect("loopback answer");
     }
     for address in [
@@ -603,7 +621,7 @@ fn a_localhost_name_admits_only_loopback_answers() {
     ] {
         for host in ["localhost", "localhost.localdomain", "LocalHost."] {
             assert_eq!(
-                contract.enforce_resolved_ip(host, address),
+                contract.enforce_resolved_address(host, SocketAddr::new(address, 9)),
                 Err(HttpEgressError::LoopbackNameResolvedOffHost {
                     host: format!("{host} resolved to {address}")
                         .replace("::ffff:93.184.216.34", "93.184.216.34"),
@@ -1003,7 +1021,10 @@ mod reqwest_egress_tests {
         contract.deny_ipv6_ula = true;
 
         let error = contract
-            .enforce_resolved_ip("rebind.test", IpAddr::V4(Ipv4Addr::new(10, 0, 0, 8)))
+            .enforce_resolved_address(
+                "rebind.test",
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 8)), 443),
+            )
             .expect_err("private DNS answers must fail closed");
         assert!(matches!(
             error,
@@ -1036,7 +1057,7 @@ mod reqwest_egress_tests {
             ),
         ] {
             let error = contract
-                .enforce_resolved_ip("rebind.test", address)
+                .enforce_resolved_address("rebind.test", SocketAddr::new(address, 443))
                 .expect_err("special-use DNS answers must fail closed");
             assert!(
                 matches!(

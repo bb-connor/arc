@@ -66,6 +66,10 @@ struct RailTrace {
 struct PendingRail(Arc<RailTrace>);
 
 impl PaymentAdapter for PendingRail {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "api-protect-owned-retry-rail"
     }

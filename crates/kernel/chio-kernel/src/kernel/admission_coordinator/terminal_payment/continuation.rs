@@ -47,7 +47,10 @@ impl ChioKernel {
                 "durable payment adapter disappeared during settlement",
             )
         })?;
-        if adapter.rail_id() != journal.rail || adapter.rail_mode() != Some(journal.rail_mode) {
+        if adapter.rail_id() != journal.rail
+            || adapter.rail_mode() != Some(journal.rail_mode)
+            || adapter.egress_allowance_digest() != journal.rail_egress_allowance_digest
+        {
             return Err(item_failure(
                 FailureKind::ContractChanged,
                 "durable payment adapter changed before settlement",

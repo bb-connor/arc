@@ -67,6 +67,8 @@ fn initial() -> PaymentJournalRecord {
         hold_id: Some("physical-payment-hold".into()),
         rail: "test-reversible-rail".into(),
         rail_mode: PaymentRailMode::ReversibleHold,
+        rail_egress_allowance_digest: chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+            .to_owned(),
         authorization_id: None,
         transaction_id: None,
         amount_units: 10,

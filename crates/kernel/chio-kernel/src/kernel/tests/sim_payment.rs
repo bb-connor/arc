@@ -824,6 +824,10 @@ struct UncapturablePaymentAdapter {
 }
 
 impl PaymentAdapter for UncapturablePaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -889,6 +893,10 @@ struct SettledAtAuthorizeTrackingAdapter {
 }
 
 impl PaymentAdapter for SettledAtAuthorizeTrackingAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -1292,6 +1300,10 @@ fn reserving_authorization_leaves_non_mustprepay_path_unchanged() {
 struct DistinctCapturePaymentAdapter;
 
 impl PaymentAdapter for DistinctCapturePaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -1418,6 +1430,10 @@ struct AmountRecordingPaymentAdapter {
 }
 
 impl PaymentAdapter for AmountRecordingPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,

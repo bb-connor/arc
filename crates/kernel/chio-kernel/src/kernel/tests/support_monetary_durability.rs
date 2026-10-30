@@ -240,6 +240,10 @@ struct FailingAuthorizationPaymentAdapter {
 }
 
 impl PaymentAdapter for FailingAuthorizationPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -321,6 +325,10 @@ impl BlockingAuthorizationPaymentAdapter {
 }
 
 impl PaymentAdapter for BlockingAuthorizationPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -402,6 +410,10 @@ struct NonceCleanupPaymentAdapter {
 }
 
 impl PaymentAdapter for NonceCleanupPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
