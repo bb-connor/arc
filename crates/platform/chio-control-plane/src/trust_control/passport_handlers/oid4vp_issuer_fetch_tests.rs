@@ -116,7 +116,9 @@ fn answer(stream: &mut TcpStream, body: &str) {
 }
 
 pub(super) fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustServiceState {
+    let verifier_ledger = crate::trust_control::verifier_ledger_fixture::open(&config);
     TrustServiceState {
+        verifier_ledger,
         finding_challenge_clock: clock,
         config,
         authority_keyring: None,
@@ -183,7 +185,9 @@ pub(super) fn config_with(
         federation_policies_file: None,
         scim_lifecycle_file: None,
         verifier_policies_file: None,
-        verifier_challenge_db_path: Some(db_path.to_path_buf()),
+        verifier_ledger: Some(crate::trust_control::verifier_ledger_fixture::source(
+            db_path.to_path_buf(),
+        )),
         passport_statuses_file: None,
         revocation_partners_file: None,
         passport_issuance_offers_file: None,
@@ -258,9 +262,8 @@ pub(super) fn register_request(
     let signing_key = resolve_oid4vp_verifier_signing_key(config).test_unwrap();
     let transport =
         chio_credentials::build_oid4vp_request_transport(&request, &signing_key).test_unwrap();
-    let db_path = configured_verifier_challenge_db_path(config).test_unwrap();
-    let store = SqlitePassportVerifierStore::open(db_path).test_unwrap();
-    register_oid4vp_request(&store, &request, &transport.request_jwt).test_unwrap();
+    let store = crate::trust_control::verifier_ledger_fixture::open(config).test_unwrap();
+    register_oid4vp_request(store.as_ref(), &request, &transport.request_jwt).test_unwrap();
     request
 }
 
@@ -407,11 +410,8 @@ async fn public_direct_post_refuses_acceptance_past_request_expiry() {
     );
     assert!(body.contains("expired"), "refusal must cite expiry: {body}");
 
-    let store = SqlitePassportVerifierStore::open(
-        configured_verifier_challenge_db_path(&state.config).test_unwrap(),
-    )
-    .test_unwrap();
-    let snapshot = oid4vp_request_snapshot(&store, &request.jti, base).test_unwrap();
+    let store = configured_verifier_ledger(&state).test_unwrap();
+    let snapshot = oid4vp_request_snapshot(store, &request.jti, base).test_unwrap();
     assert_ne!(
         snapshot.transaction.status.label(),
         "consumed",
@@ -468,11 +468,8 @@ async fn public_direct_post_refuses_credential_expired_during_the_wait() {
         "a credential that expired during the wait must be refused, body: {body}"
     );
 
-    let store = SqlitePassportVerifierStore::open(
-        configured_verifier_challenge_db_path(&state.config).test_unwrap(),
-    )
-    .test_unwrap();
-    let snapshot = oid4vp_request_snapshot(&store, &request.jti, base).test_unwrap();
+    let store = configured_verifier_ledger(&state).test_unwrap();
+    let snapshot = oid4vp_request_snapshot(store, &request.jti, base).test_unwrap();
     assert_ne!(
         snapshot.transaction.status.label(),
         "consumed",

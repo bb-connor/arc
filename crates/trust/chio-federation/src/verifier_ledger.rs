@@ -48,6 +48,30 @@ macro_rules! ledger_text {
 pub mod oid4vp_requests;
 pub mod presentation_challenges;
 
+/// Why a ledger backend could not complete an operation. Backend causes stay in
+/// the backend; a port caller sees only this closed set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum LedgerFault {
+    #[error("verifier ledger already holds this identifier")]
+    Duplicate,
+    #[error("verifier ledger cannot store this value")]
+    Unrepresentable,
+    #[error("verifier ledger is unavailable")]
+    Unavailable,
+    #[error("verifier ledger holds a row or schema that fails its integrity checks")]
+    IntegrityFailure,
+}
+
+/// One backend serving both single-use ledgers of a verifier, shared by every
+/// request of the process that opened it.
+pub trait VerifierLedger:
+    presentation_challenges::PresentationChallengeLedger<Error = LedgerFault>
+    + oid4vp_requests::Oid4vpRequestLedger<Error = LedgerFault>
+    + Send
+    + Sync
+{
+}
+
 #[cfg(test)]
 mod tests {
     use super::oid4vp_requests::Oid4vpRequestHash;

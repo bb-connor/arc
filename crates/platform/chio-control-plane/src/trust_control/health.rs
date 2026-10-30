@@ -117,7 +117,7 @@ fn trust_store_health_snapshot(config: &TrustServiceConfig) -> Value {
         "receiptsConfigured": config.receipt_db_path.is_some(),
         "revocationsConfigured": config.revocation_db_path.is_some(),
         "budgetsConfigured": config.budget_db_path.is_some(),
-        "verifierChallengesConfigured": config.verifier_challenge_db_path.is_some(),
+        "verifierChallengesConfigured": config.verifier_ledger.is_some(),
     })
 }
 

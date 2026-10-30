@@ -64,6 +64,15 @@ impl TrustFiscalRuntimeConfig {
     }
 }
 
+/// The verifier ledger database and the backend that opens it. The composition
+/// root chooses the backend; the service opens it once, after validating the
+/// configuration, and shares the handle with every request.
+#[derive(Clone)]
+pub struct VerifierLedgerSource {
+    pub database: PathBuf,
+    pub open: fn(&Path) -> Result<Arc<dyn VerifierLedger>, CliError>,
+}
+
 #[derive(Clone)]
 pub struct TrustServiceConfig {
     pub listen: SocketAddr,
@@ -93,7 +102,7 @@ pub struct TrustServiceConfig {
     pub federation_policies_file: Option<PathBuf>,
     pub scim_lifecycle_file: Option<PathBuf>,
     pub verifier_policies_file: Option<PathBuf>,
-    pub verifier_challenge_db_path: Option<PathBuf>,
+    pub verifier_ledger: Option<VerifierLedgerSource>,
     pub passport_statuses_file: Option<PathBuf>,
     /// Revocation partner registry. Every passport door re-reads it, and the
     /// mirror of each partner's revocation feed sits beside it.
@@ -298,7 +307,9 @@ impl TrustServiceConfig {
             ),
             (
                 "verifier challenge database",
-                self.verifier_challenge_db_path.as_deref(),
+                self.verifier_ledger
+                    .as_ref()
+                    .map(|source| source.database.as_path()),
             ),
         ] {
             if let Some(path) = path {
@@ -359,7 +370,7 @@ mod service_config_tests {
             federation_policies_file: None,
             scim_lifecycle_file: None,
             verifier_policies_file: None,
-            verifier_challenge_db_path: None,
+            verifier_ledger: None,
             passport_statuses_file: None,
             revocation_partners_file: None,
             passport_issuance_offers_file: None,

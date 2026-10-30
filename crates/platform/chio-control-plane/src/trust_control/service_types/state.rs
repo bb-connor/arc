@@ -23,6 +23,9 @@ pub(crate) struct TrustServiceState {
     /// opened before serving. The public revocation feed reads through it.
     pub(crate) passport_revocation_oracle:
         Option<Arc<chio_revocation_oracle::SqliteRevocationOracle>>,
+    /// The verifier challenge and OID4VP ledgers, opened once before serving
+    /// from `config.verifier_ledger`.
+    pub(crate) verifier_ledger: Option<Arc<dyn VerifierLedger>>,
     /// The partner mirror handles every passport door prepares and admits
     /// through.
     pub(crate) partner_revocation_door: Arc<crate::trust_control::PartnerRevocationDoor>,

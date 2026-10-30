@@ -111,6 +111,7 @@ mod cluster_and_reports_tests {
             budget_store,
             revocation_store,
             passport_revocation_oracle: None,
+            verifier_ledger: None,
             partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
             receipt_store,
             receipt_query_snapshots: None,

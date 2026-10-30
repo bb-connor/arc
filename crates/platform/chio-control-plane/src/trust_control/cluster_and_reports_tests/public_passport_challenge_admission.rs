@@ -53,7 +53,7 @@ impl HolderSubmissions {
         let challenge_db = directory.path().join("verifier-challenges.sqlite3");
         let mut state = state_with_cluster(SELF_URL, &[], None, None, None);
         assert!(state.cluster.is_none());
-        state.config.verifier_challenge_db_path = Some(challenge_db.clone());
+        crate::trust_control::verifier_ledger_fixture::attach(&mut state, challenge_db.clone());
         state.config.passport_statuses_file = Some(directory.path().join("passport-statuses"));
         let now = unix_timestamp_now().test_unwrap();
         let holder = Keypair::from_seed(&[61; 32]);

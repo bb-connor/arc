@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-use chio_federation::verifier_ledger::LedgerFieldError;
+use chio_federation::verifier_ledger::{LedgerFault, LedgerFieldError, VerifierLedger};
 
 use crate::integer::IntegerRangeError;
 use crate::store_connection::StoreConnection;
@@ -90,6 +90,33 @@ impl SqlitePassportVerifierStore {
         self.connection
             .lock()
             .map_err(|fenced| PassportVerifierStoreError::Unavailable(fenced.to_string()))
+    }
+}
+
+impl VerifierLedger for SqlitePassportVerifierStore {}
+
+/// The port-level fault for a store error. Damaged rows, schema and file
+/// contents are integrity failures; transient engine and file errors are
+/// unavailability.
+fn ledger_fault(error: PassportVerifierStoreError) -> LedgerFault {
+    match error {
+        PassportVerifierStoreError::Duplicate(_) => LedgerFault::Duplicate,
+        PassportVerifierStoreError::IntegerRange(_) => LedgerFault::Unrepresentable,
+        PassportVerifierStoreError::InvalidRow
+        | PassportVerifierStoreError::InvalidField(_)
+        | PassportVerifierStoreError::Schema(_) => LedgerFault::IntegrityFailure,
+        PassportVerifierStoreError::Sqlite(rusqlite::Error::SqliteFailure(failure, _))
+            if matches!(
+                failure.code,
+                rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase
+            ) =>
+        {
+            LedgerFault::IntegrityFailure
+        }
+        PassportVerifierStoreError::Sqlite(_)
+        | PassportVerifierStoreError::Io(_)
+        | PassportVerifierStoreError::Unavailable(_)
+        | PassportVerifierStoreError::InvalidPath => LedgerFault::Unavailable,
     }
 }
 

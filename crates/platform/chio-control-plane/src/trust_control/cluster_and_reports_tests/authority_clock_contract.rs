@@ -217,14 +217,13 @@ async fn final_f11_failed_snapshot_fetch_invalidates_authority_confirmation() {
 
 fn register_public_request(state: &mut TrustServiceState, signer: &Keypair, now: u64) -> String {
     state.config.advertise_url = Some("https://trust.example.com".into());
-    state.config.verifier_challenge_db_path = Some(
-        state
-            .config
-            .authority_db_path
-            .as_ref()
-            .test_unwrap()
-            .with_file_name("oid4vp.sqlite3"),
-    );
+    let database = state
+        .config
+        .authority_db_path
+        .as_ref()
+        .test_unwrap()
+        .with_file_name("oid4vp.sqlite3");
+    let store = crate::trust_control::verifier_ledger_fixture::attach(state, database);
     let request = build_oid4vp_request_for_service(
         &state.config,
         &CreateOid4vpRequest {
@@ -238,11 +237,7 @@ fn register_public_request(state: &mut TrustServiceState, signer: &Keypair, now:
     .test_unwrap();
     let transport =
         chio_credentials::build_oid4vp_request_transport(&request, signer).test_unwrap();
-    let store = SqlitePassportVerifierStore::open(
-        configured_verifier_challenge_db_path(&state.config).test_unwrap(),
-    )
-    .test_unwrap();
-    register_oid4vp_request(&store, &request, &transport.request_jwt).test_unwrap();
+    register_oid4vp_request(store.as_ref(), &request, &transport.request_jwt).test_unwrap();
     request.jti
 }
 

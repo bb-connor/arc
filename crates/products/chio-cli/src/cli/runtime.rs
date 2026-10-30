@@ -1394,6 +1394,15 @@ pub(crate) fn cmd_mcp_serve_http(
     })
 }
 
+/// The SQLite verifier ledger the trust-control service shares across requests.
+pub(crate) fn open_verifier_ledger(
+    database: &Path,
+) -> Result<Arc<dyn chio_federation::verifier_ledger::VerifierLedger>, CliError> {
+    Ok(Arc::new(
+        chio_store_sqlite::SqlitePassportVerifierStore::open(database)?,
+    ))
+}
+
 pub(crate) fn optional_secret_with_env_fallback(
     value: Option<&str>,
     fallback_env: &str,
@@ -1569,7 +1578,12 @@ pub(crate) fn cmd_trust_serve(
         federation_policies_file: federation_policies_file.map(Path::to_path_buf),
         scim_lifecycle_file: scim_lifecycle_file.map(Path::to_path_buf),
         verifier_policies_file: verifier_policies_file.map(Path::to_path_buf),
-        verifier_challenge_db_path: verifier_challenge_db.map(Path::to_path_buf),
+        verifier_ledger: verifier_challenge_db.map(|database| {
+            trust_control::VerifierLedgerSource {
+                database: database.to_path_buf(),
+                open: open_verifier_ledger,
+            }
+        }),
         passport_statuses_file: passport_statuses_file.map(Path::to_path_buf),
         revocation_partners_file: revocation_partners_file.map(Path::to_path_buf),
         passport_issuance_offers_file: passport_issuance_offers_file.map(Path::to_path_buf),
@@ -1675,6 +1689,19 @@ pub(crate) fn cmd_trust_status(
 #[cfg(test)]
 mod runtime_local_error_domain_tests {
     use super::*;
+
+    #[test]
+    fn trust_service_verifier_ledger_refuses_an_in_memory_database() {
+        let error = match open_verifier_ledger(Path::new(":memory:")) {
+            Ok(_) => panic!("an in-memory verifier ledger opened"),
+            Err(CliError::Chio(error)) => error,
+            Err(error) => panic!("unexpected verifier ledger refusal: {error}"),
+        };
+        assert_eq!(
+            error.message(),
+            "passport verifier store requires a durable file path"
+        );
+    }
 
     fn must_err<T: std::fmt::Debug>(result: Result<T, CliError>, context: &str) -> CliError {
         match result {

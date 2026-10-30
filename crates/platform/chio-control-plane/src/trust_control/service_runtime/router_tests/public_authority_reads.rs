@@ -70,8 +70,10 @@ impl PublicAuthorityFixture {
         let mut state = metrics_state("service-secret");
         state.finding_challenge_clock = chio_test_support::clock::clock();
         state.config.advertise_url = Some(ADVERTISE_URL.to_string());
-        state.config.verifier_challenge_db_path =
-            Some(directory.path().join("verifier-challenges.sqlite3"));
+        crate::trust_control::verifier_ledger_fixture::attach(
+            &mut state,
+            directory.path().join("verifier-challenges.sqlite3"),
+        );
         state.config.passport_issuance_offers_file =
             Some(directory.path().join("issuance-offers.json"));
         configure(&mut state.config);
@@ -168,12 +170,9 @@ fn register_oid4vp_request(
         chio_test_support::clock::unix_seconds(),
     )?;
     let transport = build_oid4vp_request_transport(&request, signer)?;
-    let path = configured_verifier_challenge_db_path(config)?;
-    register_oid4vp_request(
-        &SqlitePassportVerifierStore::open(path)?,
-        &request,
-        &transport.request_jwt,
-    )?;
+    let store = crate::trust_control::verifier_ledger_fixture::open(config)
+        .ok_or("verifier ledger is not configured")?;
+    register_oid4vp_request(store.as_ref(), &request, &transport.request_jwt)?;
     Ok(request.jti)
 }
 

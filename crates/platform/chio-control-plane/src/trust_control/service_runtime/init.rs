@@ -202,6 +202,11 @@ async fn serve_async_inner(
         .map(crate::passport_revocation::open_passport_revocation_oracle)
         .transpose()?
         .map(Arc::new);
+    let verifier_ledger = config
+        .verifier_ledger
+        .as_ref()
+        .map(|source| (source.open)(&source.database))
+        .transpose()?;
     let finding_challenge_clock: Arc<dyn chio_security_types::clock::Clock> =
         Arc::new(chio_security_types::clock::SystemClock);
     provision_service_authority(&config, finding_challenge_clock.clone())?;
@@ -267,6 +272,7 @@ async fn serve_async_inner(
         budget_store,
         revocation_store,
         passport_revocation_oracle,
+        verifier_ledger,
         partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
         receipt_store,
         receipt_query_snapshots,
@@ -599,7 +605,7 @@ mod windows_authority_tests {
             federation_policies_file: None,
             scim_lifecycle_file: None,
             verifier_policies_file: None,
-            verifier_challenge_db_path: None,
+            verifier_ledger: None,
             passport_statuses_file: None,
             revocation_partners_file: None,
             passport_issuance_offers_file: None,

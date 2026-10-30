@@ -70,7 +70,7 @@ fn empty_config() -> TrustServiceConfig {
         federation_policies_file: None,
         scim_lifecycle_file: None,
         verifier_policies_file: None,
-        verifier_challenge_db_path: None,
+        verifier_ledger: None,
         passport_statuses_file: None,
         revocation_partners_file: None,
         passport_issuance_offers_file: None,

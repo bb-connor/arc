@@ -5,8 +5,11 @@ use chio_federation::verifier_ledger::oid4vp_requests::{
 use rusqlite::{params, OptionalExtension, Row};
 
 use super::{
-    duplicate_or, stored_u64, PassportVerifierStoreError, Result, SqlitePassportVerifierStore,
+    duplicate_or, ledger_fault, stored_u64, LedgerFault, PassportVerifierStoreError, Result,
+    SqlitePassportVerifierStore,
 };
+
+type PortResult<T> = std::result::Result<T, LedgerFault>;
 use crate::integer::checked;
 
 pub(super) const SCHEMA: &str = include_str!("oid4vp_requests.sql");
@@ -29,10 +32,8 @@ pub(super) const CONSUME: &str = "UPDATE passport_oid4vp_transactions
      SET status = 'consumed', consumed_at = ?2
      WHERE request_id = ?1 AND status = 'issued'";
 
-impl Oid4vpRequestLedger for SqlitePassportVerifierStore {
-    type Error = PassportVerifierStoreError;
-
-    fn insert(&self, record: &Oid4vpRequestRecord) -> Result<()> {
+impl SqlitePassportVerifierStore {
+    fn insert_request(&self, record: &Oid4vpRequestRecord) -> Result<()> {
         let issued_at: i64 = checked(record.issued_at)?;
         let expires_at: i64 = checked(record.expires_at)?;
         self.transact(|transaction| {
@@ -53,7 +54,7 @@ impl Oid4vpRequestLedger for SqlitePassportVerifierStore {
         })
     }
 
-    fn get(&self, request_id: &Oid4vpRequestId) -> Result<Option<StoredOid4vpRequest>> {
+    fn get_request(&self, request_id: &Oid4vpRequestId) -> Result<Option<StoredOid4vpRequest>> {
         self.read(|connection| {
             connection
                 .query_row(SELECT, [request_id.as_str()], |row| Ok(stored(row)))
@@ -62,15 +63,35 @@ impl Oid4vpRequestLedger for SqlitePassportVerifierStore {
         })
     }
 
-    fn expire(&self, request_id: &Oid4vpRequestId) -> Result<bool> {
+    fn expire_request(&self, request_id: &Oid4vpRequestId) -> Result<bool> {
         self.transact(|transaction| Ok(transaction.execute(EXPIRE, [request_id.as_str()])? == 1))
     }
 
-    fn consume(&self, request_id: &Oid4vpRequestId, at: u64) -> Result<bool> {
+    fn consume_request(&self, request_id: &Oid4vpRequestId, at: u64) -> Result<bool> {
         let at: i64 = checked(at)?;
         self.transact(|transaction| {
             Ok(transaction.execute(CONSUME, params![request_id.as_str(), at])? == 1)
         })
+    }
+}
+
+impl Oid4vpRequestLedger for SqlitePassportVerifierStore {
+    type Error = LedgerFault;
+
+    fn insert(&self, record: &Oid4vpRequestRecord) -> PortResult<()> {
+        self.insert_request(record).map_err(ledger_fault)
+    }
+
+    fn get(&self, request_id: &Oid4vpRequestId) -> PortResult<Option<StoredOid4vpRequest>> {
+        self.get_request(request_id).map_err(ledger_fault)
+    }
+
+    fn expire(&self, request_id: &Oid4vpRequestId) -> PortResult<bool> {
+        self.expire_request(request_id).map_err(ledger_fault)
+    }
+
+    fn consume(&self, request_id: &Oid4vpRequestId, at: u64) -> PortResult<bool> {
+        self.consume_request(request_id, at).map_err(ledger_fault)
     }
 }
 

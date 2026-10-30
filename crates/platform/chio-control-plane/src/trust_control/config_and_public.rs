@@ -418,15 +418,20 @@ fn configured_verifier_policy_registry_path(
     })
 }
 
-pub(crate) fn configured_verifier_challenge_db_path(
-    config: &TrustServiceConfig,
-) -> Result<&Path, CliError> {
-    config.verifier_challenge_db_path.as_deref().ok_or_else(|| {
-        CliError::cli_other_error(
-            "remote verifier challenge flows require --verifier-challenge-db on the trust-control service"
-                .to_string(),
-        )
-    })
+fn verifier_ledger_unconfigured() -> CliError {
+    CliError::cli_other_error(
+        "remote verifier challenge flows require --verifier-challenge-db on the trust-control service"
+            .to_string(),
+    )
+}
+
+pub(crate) fn configured_verifier_ledger(
+    state: &TrustServiceState,
+) -> Result<&dyn VerifierLedger, CliError> {
+    state
+        .verifier_ledger
+        .as_deref()
+        .ok_or_else(verifier_ledger_unconfigured)
 }
 
 fn configured_passport_status_registry_path(
@@ -772,13 +777,13 @@ pub(crate) fn passport_presentation_transport_for_service(
 }
 
 pub(crate) fn consume_challenge_if_configured(
-    config: &TrustServiceConfig,
+    ledger: Option<&dyn VerifierLedger>,
     challenge: &PassportPresentationChallenge,
     presentation: &PassportPresentationResponse,
     consumer: ChallengeConsumer,
     now: u64,
 ) -> Result<Option<String>, CliError> {
-    let Some(path) = config.verifier_challenge_db_path.as_deref() else {
+    let Some(ledger) = ledger else {
         if challenge.policy_ref.is_some() {
             return Err(CliError::cli_other_error(
                 "stored verifier challenges require --verifier-challenge-db on the trust-control service"
@@ -787,8 +792,7 @@ pub(crate) fn consume_challenge_if_configured(
         }
         return Ok(None);
     };
-    let store = SqlitePassportVerifierStore::open(path)?;
-    consume_presentation_challenge(&store, challenge, presentation, consumer, now)?;
+    consume_presentation_challenge(ledger, challenge, presentation, consumer, now)?;
     Ok(Some("consumed".to_string()))
 }
 
@@ -1200,7 +1204,9 @@ pub(crate) fn build_oid4vp_request_for_service(
                 .to_string(),
         )
     })?;
-    let _ = configured_verifier_challenge_db_path(config)?;
+    if config.verifier_ledger.is_none() {
+        return Err(verifier_ledger_unconfigured());
+    }
     let ttl_seconds = payload.ttl_seconds.unwrap_or(300).clamp(30, 600);
     let entropy = Keypair::generate().public_key().to_hex();
     let request_id = generate_oid4vp_token(
@@ -1631,7 +1637,7 @@ mod config_and_public_tests {
             federation_policies_file: None,
             scim_lifecycle_file: None,
             verifier_policies_file: None,
-            verifier_challenge_db_path: None,
+            verifier_ledger: None,
             passport_statuses_file: None,
             revocation_partners_file: None,
             passport_issuance_offers_file: None,

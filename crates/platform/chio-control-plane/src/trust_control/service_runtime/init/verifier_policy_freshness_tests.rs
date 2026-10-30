@@ -217,7 +217,9 @@ fn service_config(
         federation_policies_file: None,
         scim_lifecycle_file: None,
         verifier_policies_file: Some(verifier_policies_file),
-        verifier_challenge_db_path: Some(verifier_challenge_db_path),
+        verifier_ledger: Some(crate::trust_control::verifier_ledger_fixture::source(
+            verifier_challenge_db_path,
+        )),
         passport_statuses_file: None,
         revocation_partners_file: None,
         passport_issuance_offers_file: None,

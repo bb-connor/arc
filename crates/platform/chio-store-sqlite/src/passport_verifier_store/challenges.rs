@@ -6,8 +6,11 @@ use chio_federation::verifier_ledger::presentation_challenges::{
 use rusqlite::{params, OptionalExtension, Row};
 
 use super::{
-    duplicate_or, stored_u64, PassportVerifierStoreError, Result, SqlitePassportVerifierStore,
+    duplicate_or, ledger_fault, stored_u64, LedgerFault, PassportVerifierStoreError, Result,
+    SqlitePassportVerifierStore,
 };
+
+type PortResult<T> = std::result::Result<T, LedgerFault>;
 use crate::integer::checked;
 
 pub(super) const SCHEMA: &str = include_str!("challenges.sql");
@@ -29,10 +32,8 @@ pub(super) const CONSUME: &str = "UPDATE passport_verifier_challenges
      SET status = ?3, consumed_at = ?4, presentation_hash = ?5
      WHERE challenge_id = ?1 AND status = ?2";
 
-impl PresentationChallengeLedger for SqlitePassportVerifierStore {
-    type Error = PassportVerifierStoreError;
-
-    fn insert(&self, record: &PresentationChallengeRecord) -> Result<()> {
+impl SqlitePassportVerifierStore {
+    fn insert_challenge(&self, record: &PresentationChallengeRecord) -> Result<()> {
         let issued_at: i64 = checked(record.issued_at)?;
         let expires_at: i64 = checked(record.expires_at)?;
         self.transact(|transaction| {
@@ -52,7 +53,7 @@ impl PresentationChallengeLedger for SqlitePassportVerifierStore {
         })
     }
 
-    fn get(
+    fn get_challenge(
         &self,
         challenge_id: &PresentationChallengeId,
     ) -> Result<Option<StoredPresentationChallenge>> {
@@ -64,7 +65,7 @@ impl PresentationChallengeLedger for SqlitePassportVerifierStore {
         })
     }
 
-    fn expire(
+    fn expire_challenge(
         &self,
         challenge_id: &PresentationChallengeId,
         from: LiveChallengeStatus,
@@ -75,7 +76,7 @@ impl PresentationChallengeLedger for SqlitePassportVerifierStore {
         })
     }
 
-    fn consume(
+    fn consume_challenge(
         &self,
         challenge_id: &PresentationChallengeId,
         transition: ChallengeTransition,
@@ -96,6 +97,41 @@ impl PresentationChallengeLedger for SqlitePassportVerifierStore {
             )?;
             Ok(updated == 1)
         })
+    }
+}
+
+impl PresentationChallengeLedger for SqlitePassportVerifierStore {
+    type Error = LedgerFault;
+
+    fn insert(&self, record: &PresentationChallengeRecord) -> PortResult<()> {
+        self.insert_challenge(record).map_err(ledger_fault)
+    }
+
+    fn get(
+        &self,
+        challenge_id: &PresentationChallengeId,
+    ) -> PortResult<Option<StoredPresentationChallenge>> {
+        self.get_challenge(challenge_id).map_err(ledger_fault)
+    }
+
+    fn expire(
+        &self,
+        challenge_id: &PresentationChallengeId,
+        from: LiveChallengeStatus,
+    ) -> PortResult<bool> {
+        self.expire_challenge(challenge_id, from)
+            .map_err(ledger_fault)
+    }
+
+    fn consume(
+        &self,
+        challenge_id: &PresentationChallengeId,
+        transition: ChallengeTransition,
+        at: u64,
+        presentation_hash: &PresentationHash,
+    ) -> PortResult<bool> {
+        self.consume_challenge(challenge_id, transition, at, presentation_hash)
+            .map_err(ledger_fault)
     }
 }
 

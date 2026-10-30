@@ -100,6 +100,7 @@ use chio_credentials::{
     OID4VP_VERIFIER_METADATA_PATH,
 };
 use chio_did::DidChio;
+use chio_federation::verifier_ledger::VerifierLedger;
 use chio_kernel::budget_store::{
     ApprovalRequiredBudgetHold, BudgetAdmissionBinding, BudgetAuthorizationOutcome,
     BudgetAuthorizeCumulativeApprovalRequest, BudgetAuthorizeHoldDecision,
@@ -245,8 +246,8 @@ use chio_store_sqlite::budget_store::{
     BudgetSnapshotAnchorProvenance, BudgetStoreSnapshot,
 };
 use chio_store_sqlite::{
-    SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority,
-    SqlitePassportVerifierStore, SqliteReceiptStore, SqliteRevocationStore,
+    SqliteAuthorityStore, SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore,
+    SqliteRevocationStore,
 };
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -389,6 +390,9 @@ mod service_types;
 mod stop_routes;
 #[path = "trust_control/underwriting_and_support.rs"]
 mod underwriting_and_support;
+#[cfg(test)]
+#[path = "trust_control/verifier_ledger_fixture.rs"]
+pub(crate) mod verifier_ledger_fixture;
 
 // Re-export stable high-level trust-control types and configuration helpers.
 // Runtime client and remote adapter entrypoints live under named
