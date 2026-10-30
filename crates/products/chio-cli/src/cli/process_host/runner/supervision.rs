@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_process::run_journal::{ChildSettlement, WorkerState};
 use serde::Serialize;
 
 use super::super::state::error;
@@ -25,11 +26,11 @@ pub(super) fn evaluate(
     snapshots: &[Snapshot],
     declared: &[Worker],
     parents: &BTreeMap<String, String>,
-    settlements: &[(String, String, String)],
+    settlements: &[ChildSettlement],
 ) -> Result<Completion, CliError> {
     let states: BTreeMap<_, _> = snapshots
         .iter()
-        .map(|s| (s.process.as_str(), s.state.as_str()))
+        .map(|s| (s.process.as_str(), s.state))
         .collect();
     let declared: BTreeSet<_> = declared.iter().map(|w| w.process.as_str()).collect();
     if states.len() != snapshots.len()
@@ -54,13 +55,18 @@ pub(super) fn evaluate(
         }
     }
     let mut observed = BTreeMap::new();
-    for (parent, child, request) in settlements {
+    for ChildSettlement {
+        parent,
+        child,
+        request_id,
+    } in settlements
+    {
         if parents.get(child) != Some(parent)
-            || states.get(child.as_str()) != Some(&"failed")
+            || states.get(child.as_str()) != Some(&WorkerState::Failed)
             || !states.contains_key(parent.as_str())
-            || request.is_empty()
+            || request_id.is_empty()
             || observed
-                .insert((parent.as_str(), child.as_str()), request.as_str())
+                .insert((parent.as_str(), child.as_str()), request_id.as_str())
                 .is_some()
         {
             return Err(error("invalid recorded child failure settlement"));
@@ -68,11 +74,11 @@ pub(super) fn evaluate(
     }
     let mut handled_failures = Vec::new();
     let mut unhandled_failures = Vec::new();
-    for snapshot in snapshots.iter().filter(|s| s.state == "failed") {
+    for snapshot in snapshots.iter().filter(|s| s.state == WorkerState::Failed) {
         let mut current = snapshot.process.as_str();
         let mut handled = None;
         while let Some(parent) = parents.get(current) {
-            if states.get(parent.as_str()) == Some(&"completed") {
+            if states.get(parent.as_str()) == Some(&WorkerState::Completed) {
                 if let Some(request) = observed.get(&(parent.as_str(), current)) {
                     handled = Some(HandledFailure {
                         process: snapshot.process.clone(),
@@ -93,12 +99,10 @@ pub(super) fn evaluate(
     }
     Ok(Completion {
         complete: unhandled_failures.is_empty()
-            && snapshots
-                .iter()
-                .all(|s| matches!(s.state.as_str(), "completed" | "failed"))
+            && snapshots.iter().all(|s| s.state.is_terminal())
             && declared
                 .iter()
-                .all(|id| states.get(id) == Some(&"completed")),
+                .all(|id| states.get(id) == Some(&WorkerState::Completed)),
         handled_failures,
         unhandled_failures,
     })

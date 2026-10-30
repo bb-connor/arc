@@ -75,6 +75,8 @@ pub mod encrypted_blob;
 pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
+mod export_checkpoint;
+pub use export_checkpoint::{checkpoint_for_export, CheckpointError};
 pub mod finding_challenge_store;
 pub mod finding_market_store;
 pub mod finding_operator_bundle_store;
@@ -102,6 +104,8 @@ pub mod receipt_query;
 pub mod receipt_query_snapshot;
 // Linux snapshots own a private file and recheck custody on every connection borrow.
 mod catalog_memo;
+#[cfg(feature = "process-run-journal")]
+pub mod process_run_store;
 #[cfg(target_os = "linux")]
 mod receipt_query_snapshot_backing;
 pub mod receipt_store;

@@ -13,6 +13,8 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::process::{ChildStderr, ChildStdin, ChildStdout};
 use tokio::task::JoinSet;
 
+use chio_process::run_journal::ResourceUsage;
+
 use super::plan::{Ceiling, Worker};
 
 const LOG_BYTES: usize = 65_536;
@@ -22,19 +24,11 @@ const LOG_BYTES: usize = 65_536;
 const RESIDENT_SAMPLE_INTERVAL: Duration = Duration::from_millis(50);
 type Capture = Arc<Mutex<Vec<u8>>>;
 
-/// Resource use of one reaped attempt from the kernel's process accounting:
-/// the worker process and the descendants it waited for.
-#[derive(Clone, Copy, Default)]
-pub(super) struct Usage {
-    pub peak_resident_bytes: u64,
-    pub cpu_ms: u64,
-}
-
 #[derive(Clone)]
 pub(super) struct Outcome {
     pub success: bool,
     pub reason: String,
-    pub usage: Usage,
+    pub usage: ResourceUsage,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub diagnostic: Option<String>,
@@ -336,7 +330,7 @@ fn start(mut command: Command, resources: Option<super::plan::Resources>) -> io:
 }
 
 /// Reap the worker and read the kernel's accounting of the attempt.
-fn reap(pid: libc::pid_t) -> io::Result<(ExitStatus, Usage)> {
+fn reap(pid: libc::pid_t) -> io::Result<(ExitStatus, ResourceUsage)> {
     let mut status = 0;
     // SAFETY: rusage is plain data that wait4 fills in completely.
     let mut usage: libc::rusage = unsafe { std::mem::zeroed() };
@@ -360,7 +354,7 @@ fn reap(pid: libc::pid_t) -> io::Result<(ExitStatus, Usage)> {
     let cpu_ms = millis(usage.ru_utime).saturating_add(millis(usage.ru_stime));
     Ok((
         ExitStatus::from_raw(status),
-        Usage {
+        ResourceUsage {
             peak_resident_bytes,
             cpu_ms,
         },
@@ -414,7 +408,7 @@ enum End {
 
 fn execution(
     status: ExitStatus,
-    usage: Usage,
+    usage: ResourceUsage,
     mut end: End,
     resident_ceiling: Option<u64>,
 ) -> Outcome {

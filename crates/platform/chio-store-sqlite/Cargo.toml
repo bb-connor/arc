@@ -13,6 +13,7 @@ name = "chio_store_sqlite"
 
 [features]
 default = []
+process-run-journal = ["dep:chio-process"]
 receipt-query-test-support = []
 pq = ["chio-core/pq", "chio-kernel/pq"]
 # Lineage: gates the recursive-CTE query helpers and the lineage
@@ -30,6 +31,9 @@ admission-test-support = []
 # Exposes the standalone security admission operation store to tests and
 # benches. Default-off; production builds neither compile nor export it.
 security-admission-test-support = []
+# Typed tamper and observation helpers for cross-crate tests. Default-off;
+# no SQL text crosses the API and production builds never compile it.
+tamper-test-support = []
 # Deterministic fault-injection hooks used only by the separate-process chaos
 # harness. Default-off so production store builds expose no environment-driven
 # pause points.
@@ -49,6 +53,7 @@ chio-finding = { workspace = true }
 chio-fiscal = { workspace = true }
 chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
+chio-process = { workspace = true, optional = true }
 chio-security-types = { workspace = true, features = ["std"] }
 chio-semantic-contracts = { workspace = true }
 chio-settle = { workspace = true }
@@ -83,7 +88,7 @@ chio-quarantine = { workspace = true }
 # Benches and integration tests link the regular (non-`cfg(test)`) library;
 # this self edge enables the security admission store under `cargo test` and
 # `cargo bench` only.
-chio-store-sqlite = { workspace = true, features = ["admission-test-support", "security-admission-test-support"] }
+chio-store-sqlite = { workspace = true, features = ["admission-test-support", "security-admission-test-support", "process-run-journal"] }
 chio-test-support = { workspace = true }
 chio-open-market = { workspace = true }
 criterion = { workspace = true }

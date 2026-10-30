@@ -86,7 +86,7 @@ chio-security-kernel = { workspace = true }
 chio-flow = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["native-mcp"] }
 chio-secure-ipc = { workspace = true }
-chio-store-sqlite = { workspace = true }
+chio-store-sqlite = { workspace = true, features = ["process-run-journal"] }
 chio-tee-frame = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 chio-trace-validate = { workspace = true }
@@ -140,6 +140,7 @@ chio-file-custody = { workspace = true }
 [dev-dependencies]
 chio-credit = { workspace = true }
 chio-open-market = { workspace = true }
+chio-store-sqlite = { workspace = true, features = ["process-run-journal", "tamper-test-support"] }
 chio-test-support = { workspace = true }
 insta = { version = "1.42", features = ["json", "redactions"] }
 jsonschema = { workspace = true }
