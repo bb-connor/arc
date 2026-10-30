@@ -1881,6 +1881,10 @@ pub(super) const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("revocation_request", "root-authority-v1")),
     ),
     (
+        "chio.operator-root-request.v1",
+        Some(("operator_root_request", "root-authority-v1")),
+    ),
+    (
         "chio.settlement-closure.v1",
         Some(("settlement_closure", "root-authority-v1")),
     ),

@@ -1429,14 +1429,11 @@ fn local_issue_refusals() {
 #[test]
 fn operator_request_refusals() {
     let exchange = every_kind();
-    let error = operator_key::verify(
-        &operator_request(|request| {
-            request.as_object_mut().unwrap().remove("tenant_value");
-        }),
-        NOW,
-    )
+    let error = OperatorRootRequest::parse(&operator_body(|request| {
+        request.as_object_mut().unwrap().remove("tenant_value");
+    }))
     .unwrap_err();
-    assert_eq!(error, RootExchangeError::OperatorRequestTenantMissing);
+    assert_eq!(error, RootExchangeError::OperatorRootRequestMissingTenant);
     refusal_code(&error, OAuthErrorCode::InvalidRequest);
 
     let mut repeated = operator_body(|_| {});
@@ -1454,7 +1451,10 @@ fn operator_request_refusals() {
         (oversized, "body exceeds the size bound"),
     ] {
         let error = OperatorRootRequest::parse(&body).unwrap_err();
-        assert_eq!(error, RootExchangeError::OperatorRequestMalformed(reason));
+        assert_eq!(
+            error,
+            RootExchangeError::OperatorRootRequestMalformed(reason)
+        );
         refusal_code(&error, OAuthErrorCode::InvalidRequest);
     }
 

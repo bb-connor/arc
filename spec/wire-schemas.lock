@@ -3690,6 +3690,11 @@ files = ["crates/kernel/chio-kernel/src/admission_operation/execution_nonce/prof
 first_seen = "68d72d43cd"
 
 [[schema]]
+value = "chio.operator-root-request.v1"
+files = ["crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs"]
+first_seen = "afb43c91bf"
+
+[[schema]]
 value = "chio.oracle-conversion-evidence.v1"
 files = ["crates/core/chio-core-types/src/oracle.rs", "crates/economy/chio-web3/src/anchors.rs"]
 first_seen = "11e573d2d7"

@@ -92,6 +92,9 @@ fn decode_example(path: &Path) -> Result<(), String> {
         "revocation-request" => {
             decode::<root_authority_revocation_request::ChioRevocationRequest>(&text)
         }
+        "operator-root-request" => {
+            decode::<root_authority_operator_root_request::ChioOperatorRootRequest>(&text)
+        }
         "presentation" => decode::<capability_presentation::ChioCapabilityPresentation>(&text),
         "disclosure" => decode::<receipt_disclosure::ChioReceiptDisclosure>(&text),
         "settlement-closure" => decode::<receipt_settlement_closure::ChioSettlementClosure>(&text),

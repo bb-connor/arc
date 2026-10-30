@@ -295,6 +295,7 @@ Signed-artifact bodies generated from recorded examples by
 - `chio.mcp.session-credential.v1`: `mcp/session-credential.schema.json`
 - `chio.obligation.status-proof.v1`: `economy/obligation-status-proof-body.schema.json`
 - `chio.operation_execution_nonce.v1`: `kernel/operation-execution-nonce-body.schema.json`
+- `chio.operator-root-request.v1`: `root_authority/operator-root-request-body.schema.json`
 - `chio.outcome.contractual-zero.v1`: `outcome/outcome-contractual-zero-body.schema.json`
 - `chio.outcome.delivery-acknowledgement.v1`: `outcome/outcome-delivery-acknowledgement-body.schema.json`
 - `chio.outcome.delivery-checkpoint.v1`: `outcome/outcome-delivery-checkpoint-body.schema.json`

@@ -325,6 +325,29 @@ fn write_cli_error_emits_human_report() {
 }
 
 #[test]
+fn mcp_root_request_sign_parses() {
+    let cli = parse_cli([
+        "chio",
+        "mcp",
+        "root-request",
+        "sign",
+        "--operator-seed-file",
+        "operator.seed",
+    ])
+    .unwrap();
+
+    match cli.command {
+        Commands::Mcp {
+            command:
+                McpCommands::RootRequest {
+                    command: McpRootRequestCommands::Sign { operator_seed_file },
+                },
+        } => assert_eq!(operator_seed_file, PathBuf::from("operator.seed")),
+        _ => panic!("expected mcp root-request sign subcommand"),
+    }
+}
+
+#[test]
 fn mcp_wrap_subcommand_parses() {
     let cli = parse_cli([
         "chio",

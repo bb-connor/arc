@@ -578,7 +578,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/FdEntryBase"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfvpubzkgiaxfx"
+    ///      "$ref": "#/$defs/Sharedwvqrlutymeiwz"
     ///    }
     ///  ]
     ///}
@@ -3277,7 +3277,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/Sharedcvytbwsszjctq"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedcfwtcvcwfohjj"
+    ///      "$ref": "#/$defs/Sharedrlirfogqmqpes"
     ///    }
     ///  ],
     ///  "required": [
@@ -7049,13 +7049,13 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedzfsltldpxxman"
+    ///      "$ref": "#/$defs/Sharedsyrwytpyqtsiv"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedpfdszvixwoerg"
+    ///      "$ref": "#/$defs/Sharedugmaawnbdtbmj"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedvwgockvumgeqz"
+    ///      "$ref": "#/$defs/Sharedlfnivqbwpckdr"
     ///    }
     ///  ]
     ///}
@@ -7064,23 +7064,18 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum CompletionOutcome {
-        Sharedzfsltldpxxman(Sharedzfsltldpxxman),
-        Sharedpfdszvixwoerg(Sharedpfdszvixwoerg),
-        Sharedvwgockvumgeqz(Sharedvwgockvumgeqz),
+        Sharedsyrwytpyqtsiv(Sharedsyrwytpyqtsiv),
+        Sharedugmaawnbdtbmj(Sharedugmaawnbdtbmj),
+        Sharedlfnivqbwpckdr(Sharedlfnivqbwpckdr),
     }
     impl ::std::convert::From<&Self> for CompletionOutcome {
         fn from(value: &CompletionOutcome) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedpfdszvixwoerg> for CompletionOutcome {
-        fn from(value: Sharedpfdszvixwoerg) -> Self {
-            Self::Sharedpfdszvixwoerg(value)
-        }
-    }
-    impl ::std::convert::From<Sharedvwgockvumgeqz> for CompletionOutcome {
-        fn from(value: Sharedvwgockvumgeqz) -> Self {
-            Self::Sharedvwgockvumgeqz(value)
+    impl ::std::convert::From<Sharedlfnivqbwpckdr> for CompletionOutcome {
+        fn from(value: Sharedlfnivqbwpckdr) -> Self {
+            Self::Sharedlfnivqbwpckdr(value)
         }
     }
     ///`ConfinedReturnEvidenceV1`
@@ -8344,7 +8339,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/FileIdentity"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedqcfwqtmgiqfbj"
+    ///      "$ref": "#/$defs/Sharedndmmuepokdqnd"
     ///    }
     ///  ]
     ///}
@@ -8445,10 +8440,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedzmovubekpcfbr"
+    ///      "$ref": "#/$defs/Sharedjmpkcvhxxdctx"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedxsavzbnmltfsa"
+    ///      "$ref": "#/$defs/Sharedhctlbiqrxctxf"
     ///    }
     ///  ]
     ///}
@@ -8457,22 +8452,22 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum DispatchApproval {
-        Sharedzmovubekpcfbr(Sharedzmovubekpcfbr),
-        Sharedxsavzbnmltfsa(Sharedxsavzbnmltfsa),
+        Sharedjmpkcvhxxdctx(Sharedjmpkcvhxxdctx),
+        Sharedhctlbiqrxctxf(Sharedhctlbiqrxctxf),
     }
     impl ::std::convert::From<&Self> for DispatchApproval {
         fn from(value: &DispatchApproval) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedzmovubekpcfbr> for DispatchApproval {
-        fn from(value: Sharedzmovubekpcfbr) -> Self {
-            Self::Sharedzmovubekpcfbr(value)
+    impl ::std::convert::From<Sharedjmpkcvhxxdctx> for DispatchApproval {
+        fn from(value: Sharedjmpkcvhxxdctx) -> Self {
+            Self::Sharedjmpkcvhxxdctx(value)
         }
     }
-    impl ::std::convert::From<Sharedxsavzbnmltfsa> for DispatchApproval {
-        fn from(value: Sharedxsavzbnmltfsa) -> Self {
-            Self::Sharedxsavzbnmltfsa(value)
+    impl ::std::convert::From<Sharedhctlbiqrxctxf> for DispatchApproval {
+        fn from(value: Sharedhctlbiqrxctxf) -> Self {
+            Self::Sharedhctlbiqrxctxf(value)
         }
     }
     ///`DraftRef`
@@ -9209,34 +9204,34 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedasfatqikxdxpe"
+    ///      "$ref": "#/$defs/Shareduwqaaxbjwisck"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedguhkcnsdbwsbo"
+    ///      "$ref": "#/$defs/Sharedvfwymamjffpyj"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkcorjzvdfhmxu"
+    ///      "$ref": "#/$defs/Shareduviizzftilhmy"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedajvfycgctjqrm"
+    ///      "$ref": "#/$defs/Shareddsxzbhbwshdtb"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfgyvxbybijpjb"
+    ///      "$ref": "#/$defs/Sharedfejfngezibinq"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedjznqmdtvbyqgw"
+    ///      "$ref": "#/$defs/Shareductopsyealeny"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedotkkfoznnkzyy"
+    ///      "$ref": "#/$defs/Sharedfkzdtetvymstc"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedhedorjnhbehtr"
+    ///      "$ref": "#/$defs/Sharedsdddafazmcagi"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Shareduzznfucfppoxy"
+    ///      "$ref": "#/$defs/Sharedepuxyxrvrdehd"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharediewobwzufkivr"
+    ///      "$ref": "#/$defs/Shareduejzfrnwnaemo"
     ///    }
     ///  ]
     ///}
@@ -9245,70 +9240,70 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum FdEntry {
-        Sharedasfatqikxdxpe(Sharedasfatqikxdxpe),
-        Sharedguhkcnsdbwsbo(Sharedguhkcnsdbwsbo),
-        Sharedkcorjzvdfhmxu(Sharedkcorjzvdfhmxu),
-        Sharedajvfycgctjqrm(Sharedajvfycgctjqrm),
-        Sharedfgyvxbybijpjb(Sharedfgyvxbybijpjb),
-        Sharedjznqmdtvbyqgw(Sharedjznqmdtvbyqgw),
-        Sharedotkkfoznnkzyy(Sharedotkkfoznnkzyy),
-        Sharedhedorjnhbehtr(Sharedhedorjnhbehtr),
-        Shareduzznfucfppoxy(Shareduzznfucfppoxy),
-        Sharediewobwzufkivr(Sharediewobwzufkivr),
+        Shareduwqaaxbjwisck(Shareduwqaaxbjwisck),
+        Sharedvfwymamjffpyj(Sharedvfwymamjffpyj),
+        Shareduviizzftilhmy(Shareduviizzftilhmy),
+        Shareddsxzbhbwshdtb(Shareddsxzbhbwshdtb),
+        Sharedfejfngezibinq(Sharedfejfngezibinq),
+        Shareductopsyealeny(Shareductopsyealeny),
+        Sharedfkzdtetvymstc(Sharedfkzdtetvymstc),
+        Sharedsdddafazmcagi(Sharedsdddafazmcagi),
+        Sharedepuxyxrvrdehd(Sharedepuxyxrvrdehd),
+        Shareduejzfrnwnaemo(Shareduejzfrnwnaemo),
     }
     impl ::std::convert::From<&Self> for FdEntry {
         fn from(value: &FdEntry) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedasfatqikxdxpe> for FdEntry {
-        fn from(value: Sharedasfatqikxdxpe) -> Self {
-            Self::Sharedasfatqikxdxpe(value)
+    impl ::std::convert::From<Shareduwqaaxbjwisck> for FdEntry {
+        fn from(value: Shareduwqaaxbjwisck) -> Self {
+            Self::Shareduwqaaxbjwisck(value)
         }
     }
-    impl ::std::convert::From<Sharedguhkcnsdbwsbo> for FdEntry {
-        fn from(value: Sharedguhkcnsdbwsbo) -> Self {
-            Self::Sharedguhkcnsdbwsbo(value)
+    impl ::std::convert::From<Sharedvfwymamjffpyj> for FdEntry {
+        fn from(value: Sharedvfwymamjffpyj) -> Self {
+            Self::Sharedvfwymamjffpyj(value)
         }
     }
-    impl ::std::convert::From<Sharedkcorjzvdfhmxu> for FdEntry {
-        fn from(value: Sharedkcorjzvdfhmxu) -> Self {
-            Self::Sharedkcorjzvdfhmxu(value)
+    impl ::std::convert::From<Shareduviizzftilhmy> for FdEntry {
+        fn from(value: Shareduviizzftilhmy) -> Self {
+            Self::Shareduviizzftilhmy(value)
         }
     }
-    impl ::std::convert::From<Sharedajvfycgctjqrm> for FdEntry {
-        fn from(value: Sharedajvfycgctjqrm) -> Self {
-            Self::Sharedajvfycgctjqrm(value)
+    impl ::std::convert::From<Shareddsxzbhbwshdtb> for FdEntry {
+        fn from(value: Shareddsxzbhbwshdtb) -> Self {
+            Self::Shareddsxzbhbwshdtb(value)
         }
     }
-    impl ::std::convert::From<Sharedfgyvxbybijpjb> for FdEntry {
-        fn from(value: Sharedfgyvxbybijpjb) -> Self {
-            Self::Sharedfgyvxbybijpjb(value)
+    impl ::std::convert::From<Sharedfejfngezibinq> for FdEntry {
+        fn from(value: Sharedfejfngezibinq) -> Self {
+            Self::Sharedfejfngezibinq(value)
         }
     }
-    impl ::std::convert::From<Sharedjznqmdtvbyqgw> for FdEntry {
-        fn from(value: Sharedjznqmdtvbyqgw) -> Self {
-            Self::Sharedjznqmdtvbyqgw(value)
+    impl ::std::convert::From<Shareductopsyealeny> for FdEntry {
+        fn from(value: Shareductopsyealeny) -> Self {
+            Self::Shareductopsyealeny(value)
         }
     }
-    impl ::std::convert::From<Sharedotkkfoznnkzyy> for FdEntry {
-        fn from(value: Sharedotkkfoznnkzyy) -> Self {
-            Self::Sharedotkkfoznnkzyy(value)
+    impl ::std::convert::From<Sharedfkzdtetvymstc> for FdEntry {
+        fn from(value: Sharedfkzdtetvymstc) -> Self {
+            Self::Sharedfkzdtetvymstc(value)
         }
     }
-    impl ::std::convert::From<Sharedhedorjnhbehtr> for FdEntry {
-        fn from(value: Sharedhedorjnhbehtr) -> Self {
-            Self::Sharedhedorjnhbehtr(value)
+    impl ::std::convert::From<Sharedsdddafazmcagi> for FdEntry {
+        fn from(value: Sharedsdddafazmcagi) -> Self {
+            Self::Sharedsdddafazmcagi(value)
         }
     }
-    impl ::std::convert::From<Shareduzznfucfppoxy> for FdEntry {
-        fn from(value: Shareduzznfucfppoxy) -> Self {
-            Self::Shareduzznfucfppoxy(value)
+    impl ::std::convert::From<Sharedepuxyxrvrdehd> for FdEntry {
+        fn from(value: Sharedepuxyxrvrdehd) -> Self {
+            Self::Sharedepuxyxrvrdehd(value)
         }
     }
-    impl ::std::convert::From<Sharediewobwzufkivr> for FdEntry {
-        fn from(value: Sharediewobwzufkivr) -> Self {
-            Self::Sharediewobwzufkivr(value)
+    impl ::std::convert::From<Shareduejzfrnwnaemo> for FdEntry {
+        fn from(value: Shareduejzfrnwnaemo) -> Self {
+            Self::Shareduejzfrnwnaemo(value)
         }
     }
     ///`FdEntryBase`
@@ -9402,7 +9397,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedhaqwwggmrtego"
+    ///        "$ref": "#/$defs/Sharedtvorivueixfcb"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -9410,7 +9405,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedvfpssqqyrbdqt"
+    ///        "$ref": "#/$defs/Sharedrjpahbtwyuxxd"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -9418,7 +9413,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedxkfcdploafeyk"
+    ///        "$ref": "#/$defs/Sharedpqzeadofkkfxo"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -9426,7 +9421,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedlfpnpwnkslqby"
+    ///        "$ref": "#/$defs/Sharedhzzyttgcytoqr"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -9434,7 +9429,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedoyrvibakwfslu"
+    ///        "$ref": "#/$defs/Sharedatqbolgpvxrxe"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -9442,7 +9437,7 @@ pub mod shared {
     ///    {
     ///      "type": "array",
     ///      "contains": {
-    ///        "$ref": "#/$defs/Sharedyajtruonwdzlj"
+    ///        "$ref": "#/$defs/Sharedbfyntskbxpams"
     ///      },
     ///      "maxContains": 1,
     ///      "minContains": 1
@@ -10865,22 +10860,22 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedggfztevbgtdus"
+    ///      "$ref": "#/$defs/Sharedbzqfzvbucrloj"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedpfdszvixwoerg"
+    ///      "$ref": "#/$defs/Sharedugmaawnbdtbmj"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedvwgockvumgeqz"
+    ///      "$ref": "#/$defs/Sharedlfnivqbwpckdr"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedsoluiirwbunlw"
+    ///      "$ref": "#/$defs/Sharedgobeavlbgaxvo"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Shareduamknehceghqq"
+    ///      "$ref": "#/$defs/Sharedcvissskaxukzg"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedzbsdrkzmhovbs"
+    ///      "$ref": "#/$defs/Sharedwoqvjvjqyszcm"
     ///    }
     ///  ]
     ///}
@@ -10889,36 +10884,36 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum Outcome {
-        Sharedggfztevbgtdus(Sharedggfztevbgtdus),
-        Sharedpfdszvixwoerg(Sharedpfdszvixwoerg),
-        Sharedvwgockvumgeqz(Sharedvwgockvumgeqz),
-        Sharedsoluiirwbunlw(Sharedsoluiirwbunlw),
-        Shareduamknehceghqq(Shareduamknehceghqq),
-        Sharedzbsdrkzmhovbs(Sharedzbsdrkzmhovbs),
+        Sharedbzqfzvbucrloj(Sharedbzqfzvbucrloj),
+        Sharedugmaawnbdtbmj(Sharedugmaawnbdtbmj),
+        Sharedlfnivqbwpckdr(Sharedlfnivqbwpckdr),
+        Sharedgobeavlbgaxvo(Sharedgobeavlbgaxvo),
+        Sharedcvissskaxukzg(Sharedcvissskaxukzg),
+        Sharedwoqvjvjqyszcm(Sharedwoqvjvjqyszcm),
     }
     impl ::std::convert::From<&Self> for Outcome {
         fn from(value: &Outcome) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedggfztevbgtdus> for Outcome {
-        fn from(value: Sharedggfztevbgtdus) -> Self {
-            Self::Sharedggfztevbgtdus(value)
+    impl ::std::convert::From<Sharedbzqfzvbucrloj> for Outcome {
+        fn from(value: Sharedbzqfzvbucrloj) -> Self {
+            Self::Sharedbzqfzvbucrloj(value)
         }
     }
-    impl ::std::convert::From<Sharedpfdszvixwoerg> for Outcome {
-        fn from(value: Sharedpfdszvixwoerg) -> Self {
-            Self::Sharedpfdszvixwoerg(value)
+    impl ::std::convert::From<Sharedlfnivqbwpckdr> for Outcome {
+        fn from(value: Sharedlfnivqbwpckdr) -> Self {
+            Self::Sharedlfnivqbwpckdr(value)
         }
     }
-    impl ::std::convert::From<Sharedvwgockvumgeqz> for Outcome {
-        fn from(value: Sharedvwgockvumgeqz) -> Self {
-            Self::Sharedvwgockvumgeqz(value)
+    impl ::std::convert::From<Sharedcvissskaxukzg> for Outcome {
+        fn from(value: Sharedcvissskaxukzg) -> Self {
+            Self::Sharedcvissskaxukzg(value)
         }
     }
-    impl ::std::convert::From<Sharedzbsdrkzmhovbs> for Outcome {
-        fn from(value: Sharedzbsdrkzmhovbs) -> Self {
-            Self::Sharedzbsdrkzmhovbs(value)
+    impl ::std::convert::From<Sharedwoqvjvjqyszcm> for Outcome {
+        fn from(value: Sharedwoqvjvjqyszcm) -> Self {
+            Self::Sharedwoqvjvjqyszcm(value)
         }
     }
     ///`OwnerOperationRef`
@@ -10966,7 +10961,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/FileIdentity"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedrxqfqubpziirb"
+    ///      "$ref": "#/$defs/Shareddasnbscqxsivd"
     ///    }
     ///  ]
     ///}
@@ -11001,7 +10996,7 @@ pub mod shared {
     ///  ],
     ///  "properties": {
     ///    "policy_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "policy_version": {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
@@ -11014,7 +11009,7 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct Policy {
-        pub policy_hash: Sharedyvgkacammyqwe,
+        pub policy_hash: Shareddryivgjqboxzc,
         pub policy_version: Sharedynmdycziscbfr,
     }
     impl ::std::convert::From<&Policy> for Policy {
@@ -12380,7 +12375,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/FileIdentity"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedizxzzqqgapofd"
+    ///      "$ref": "#/$defs/Sharedgepxuexwercpj"
     ///    }
     ///  ]
     ///}
@@ -12747,7 +12742,7 @@ pub mod shared {
     ///    "headers": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedpoihurpvxjyhd"
+    ///        "$ref": "#/$defs/Sharedqkxprwpwwnhus"
     ///      },
     ///      "maxItems": 64
     ///    },
@@ -12766,7 +12761,7 @@ pub mod shared {
         pub approved_preview_sha256: DigestOrNull,
         pub body: ::std::vec::Vec<u8>,
         pub destination: Destination,
-        pub headers: ::std::vec::Vec<Sharedpoihurpvxjyhd>,
+        pub headers: ::std::vec::Vec<Sharedqkxprwpwwnhus>,
         pub options: Options,
     }
     impl ::std::convert::From<&Request> for Request {
@@ -13069,19 +13064,19 @@ pub mod shared {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
     ///    },
     ///    "affected_set_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "plan_expires_at_unix_ms": {
     ///      "$ref": "#/$defs/Sharedqtpzcpreelrid"
     ///    },
     ///    "plan_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "policy": {
     ///      "$ref": "#/$defs/Policy"
     ///    },
     ///    "trigger_finding_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "trigger_finding_id": {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
@@ -13098,11 +13093,11 @@ pub mod shared {
     #[serde(deny_unknown_fields)]
     pub struct Response {
         pub action_id: Sharedynmdycziscbfr,
-        pub affected_set_hash: Sharedyvgkacammyqwe,
+        pub affected_set_hash: Shareddryivgjqboxzc,
         pub plan_expires_at_unix_ms: Sharedqtpzcpreelrid,
-        pub plan_hash: Sharedyvgkacammyqwe,
+        pub plan_hash: Shareddryivgjqboxzc,
         pub policy: Policy,
-        pub trigger_finding_hash: Sharedyvgkacammyqwe,
+        pub trigger_finding_hash: Shareddryivgjqboxzc,
         pub trigger_finding_id: Sharedynmdycziscbfr,
         pub trigger_finding_receipt_id: Sharedynmdycziscbfr,
     }
@@ -13624,150 +13619,6 @@ pub mod shared {
             Self::Sharedmleojxyvjpenm(value)
         }
     }
-    ///`Sharedaabxtfzttepza`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "allOf": [
-    ///    {
-    ///      "not": {
-    ///        "type": "string",
-    ///        "pattern": "^(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_)"
-    ///      }
-    ///    },
-    ///    {
-    ///      "not": {
-    ///        "type": "string",
-    ///        "pattern": "^(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$"
-    ///      }
-    ///    },
-    ///    {
-    ///      "not": {
-    ///        "type": "string",
-    ///        "pattern": "(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN])"
-    ///      }
-    ///    }
-    ///  ],
-    ///  "maxLength": 128,
-    ///  "minLength": 1,
-    ///  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct Sharedaabxtfzttepza(::std::string::String);
-    impl ::std::ops::Deref for Sharedaabxtfzttepza {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<Sharedaabxtfzttepza> for ::std::string::String {
-        fn from(value: Sharedaabxtfzttepza) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&Sharedaabxtfzttepza> for Sharedaabxtfzttepza {
-        fn from(value: &Sharedaabxtfzttepza) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for Sharedaabxtfzttepza {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 128usize {
-                return Err("longer than 128 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[A-Za-z_][A-Za-z0-9_]*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[A-Za-z_][A-Za-z0-9_]*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for Sharedaabxtfzttepza {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for Sharedaabxtfzttepza {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for Sharedaabxtfzttepza {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for Sharedaabxtfzttepza {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`Sharedadjkvcssxiavo`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "deny_ratio",
-    ///    "policies_observed",
-    ///    "receipts_observed"
-    ///  ],
-    ///  "properties": {
-    ///    "deny_ratio": {
-    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
-    ///    },
-    ///    "policies_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "receipts_observed": {
-    ///      "type": "integer"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedadjkvcssxiavo {
-        pub deny_ratio: Sharedtbbrqbdncsldx,
-        pub policies_observed: i64,
-        pub receipts_observed: i64,
-    }
-    impl ::std::convert::From<&Sharedadjkvcssxiavo> for Sharedadjkvcssxiavo {
-        fn from(value: &Sharedadjkvcssxiavo) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedaezjycvaseqlo`
     ///
     /// <details><summary>JSON schema</summary>
@@ -13807,234 +13658,6 @@ pub mod shared {
     {
         fn from(value: ::serde_json::Map<::std::string::String, ::serde_json::Value>) -> Self {
             Self(value)
-        }
-    }
-    ///`Sharedajvfycgctjqrm`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/StdioEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedkxnitrlgobldl"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedajvfycgctjqrm {
-        pub binding_digest: (),
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedajvfycgctjqrmIdentity,
-        pub path: (),
-        pub purpose: PurposeTargetStdin,
-        pub slot: SharedajvfycgctjqrmSlot,
-    }
-    impl ::std::convert::From<&Sharedajvfycgctjqrm> for Sharedajvfycgctjqrm {
-        fn from(value: &Sharedajvfycgctjqrm) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedajvfycgctjqrmIdentity`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "device",
-    ///    "gid",
-    ///    "inode",
-    ///    "kind",
-    ///    "mode",
-    ///    "mount_id",
-    ///    "uid"
-    ///  ],
-    ///  "properties": {
-    ///    "device": {
-    ///      "type": "integer",
-    ///      "maximum": 1.8446744073709552e+19,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "gid": {
-    ///      "type": "integer",
-    ///      "maximum": 4294967295.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "inode": {
-    ///      "type": "integer",
-    ///      "maximum": 1.8446744073709552e+19,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "kind": {
-    ///      "enum": [
-    ///        "unix_socket"
-    ///      ]
-    ///    },
-    ///    "mode": {
-    ///      "type": "integer",
-    ///      "maximum": 4294967295.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "mount_id": {
-    ///      "type": "integer",
-    ///      "maximum": 1.8446744073709552e+19,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "uid": {
-    ///      "type": "integer",
-    ///      "maximum": 4294967295.0,
-    ///      "minimum": 0.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct SharedajvfycgctjqrmIdentity {
-        pub device: u64,
-        pub gid: u32,
-        pub inode: u64,
-        pub kind: SharedajvfycgctjqrmIdentityKind,
-        pub mode: u32,
-        pub mount_id: u64,
-        pub uid: u32,
-    }
-    impl ::std::convert::From<&SharedajvfycgctjqrmIdentity> for SharedajvfycgctjqrmIdentity {
-        fn from(value: &SharedajvfycgctjqrmIdentity) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedajvfycgctjqrmIdentityKind`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "unix_socket"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum SharedajvfycgctjqrmIdentityKind {
-        #[serde(rename = "unix_socket")]
-        UnixSocket,
-    }
-    impl ::std::convert::From<&Self> for SharedajvfycgctjqrmIdentityKind {
-        fn from(value: &SharedajvfycgctjqrmIdentityKind) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for SharedajvfycgctjqrmIdentityKind {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::UnixSocket => f.write_str("unix_socket"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SharedajvfycgctjqrmIdentityKind {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "unix_socket" => Ok(Self::UnixSocket),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedajvfycgctjqrmIdentityKind {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedajvfycgctjqrmIdentityKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedajvfycgctjqrmIdentityKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///`SharedajvfycgctjqrmSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    7
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedajvfycgctjqrmSlot(i64);
-    impl ::std::ops::Deref for SharedajvfycgctjqrmSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedajvfycgctjqrmSlot> for i64 {
-        fn from(value: SharedajvfycgctjqrmSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedajvfycgctjqrmSlot> for SharedajvfycgctjqrmSlot {
-        fn from(value: &SharedajvfycgctjqrmSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedajvfycgctjqrmSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![7_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedajvfycgctjqrmSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`Sharedaknuqncnxamsn`
@@ -14295,135 +13918,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedanevyvtlvughs`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "lineage_id",
-    ///    "target_type"
-    ///  ],
-    ///  "properties": {
-    ///    "lineage_id": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "target_type": {
-    ///      "const": "lineage"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedanevyvtlvughs {
-        pub lineage_id: SharedanevyvtlvughsLineageId,
-        pub target_type: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedanevyvtlvughs> for Sharedanevyvtlvughs {
-        fn from(value: &Sharedanevyvtlvughs) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedanevyvtlvughsLineageId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedanevyvtlvughsLineageId(::std::string::String);
-    impl ::std::ops::Deref for SharedanevyvtlvughsLineageId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedanevyvtlvughsLineageId> for ::std::string::String {
-        fn from(value: SharedanevyvtlvughsLineageId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedanevyvtlvughsLineageId> for SharedanevyvtlvughsLineageId {
-        fn from(value: &SharedanevyvtlvughsLineageId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedanevyvtlvughsLineageId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedanevyvtlvughsLineageId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedanevyvtlvughsLineageId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedanevyvtlvughsLineageId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedanevyvtlvughsLineageId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
     ///`Sharedaqcqdhiehyesx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -14539,90 +14033,36 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedasfatqikxdxpe`
+    ///`Sharedatqbolgpvxrxe`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/ArtifactEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Shareddbjrwnfvyvuod"
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/PurposeTargetStdout"
     ///    }
-    ///  ]
+    ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedasfatqikxdxpe {
-        pub binding_digest: Sharedesyhjtalzyipv,
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedasfatqikxdxpeIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: PurposeCageInitHelper,
-        pub slot: SharedasfatqikxdxpeSlot,
+    pub struct Sharedatqbolgpvxrxe {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<PurposeTargetStdout>,
     }
-    impl ::std::convert::From<&Sharedasfatqikxdxpe> for Sharedasfatqikxdxpe {
-        fn from(value: &Sharedasfatqikxdxpe) -> Self {
+    impl ::std::convert::From<&Sharedatqbolgpvxrxe> for Sharedatqbolgpvxrxe {
+        fn from(value: &Sharedatqbolgpvxrxe) -> Self {
             value.clone()
         }
     }
-    pub type SharedasfatqikxdxpeIdentity = RegularFileIdentity;
-    pub type SharedasfatqikxdxpeIdentityKind = RegularFileIdentityKind;
-    ///`SharedasfatqikxdxpeSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    5
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedasfatqikxdxpeSlot(i64);
-    impl ::std::ops::Deref for SharedasfatqikxdxpeSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedasfatqikxdxpeSlot> for i64 {
-        fn from(value: SharedasfatqikxdxpeSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedasfatqikxdxpeSlot> for SharedasfatqikxdxpeSlot {
-        fn from(value: &SharedasfatqikxdxpeSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedasfatqikxdxpeSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![5_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
+    impl ::std::default::Default for Sharedatqbolgpvxrxe {
+        fn default() -> Self {
+            Self {
+                purpose: Default::default(),
             }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedasfatqikxdxpeSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`Sharedauwahqidecsyw`
@@ -14936,38 +14376,6 @@ pub mod shared {
             value.parse()
         }
     }
-    ///`Sharedbbgufznwlzbbl`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "runtime_file"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedbbgufznwlzbbl {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub kind: ::std::option::Option<::serde_json::Value>,
-    }
-    impl ::std::convert::From<&Sharedbbgufznwlzbbl> for Sharedbbgufznwlzbbl {
-        fn from(value: &Sharedbbgufznwlzbbl) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedbbgufznwlzbbl {
-        fn default() -> Self {
-            Self {
-                kind: Default::default(),
-            }
-        }
-    }
     ///`Sharedbcgvrkkonfbog`
     ///
     /// <details><summary>JSON schema</summary>
@@ -15137,7 +14545,79 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedbennvijadmpsh`
+    ///`Sharedbeqduukaguseh`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "certificate",
+    ///    "signature"
+    ///  ],
+    ///  "properties": {
+    ///    "certificate": {
+    ///      "$ref": "#/$defs/Sharedjbodgwfjxcywu"
+    ///    },
+    ///    "signature": {
+    ///      "type": "string"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedbeqduukaguseh {
+        pub certificate: Sharedjbodgwfjxcywu,
+        pub signature: ::std::string::String,
+    }
+    impl ::std::convert::From<&Sharedbeqduukaguseh> for Sharedbeqduukaguseh {
+        fn from(value: &Sharedbeqduukaguseh) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedbeqqgntporcom`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "keyId",
+    ///    "maximumExecutions"
+    ///  ],
+    ///  "properties": {
+    ///    "keyId": {
+    ///      "$ref": "#/$defs/Sharedrelunorbfjlte"
+    ///    },
+    ///    "maximumExecutions": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedbeqqgntporcom {
+        #[serde(rename = "keyId")]
+        pub key_id: Sharedrelunorbfjlte,
+        #[serde(rename = "maximumExecutions")]
+        pub maximum_executions: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Sharedbeqqgntporcom> for Sharedbeqqgntporcom {
+        fn from(value: &Sharedbeqqgntporcom) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedbffibejkehwkl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -15145,68 +14625,43 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "properties": {
-    ///    "binding_digest": {
-    ///      "type": "null"
-    ///    },
-    ///    "broker_peer_identity": {
-    ///      "type": "null"
-    ///    },
-    ///    "close_on_exec": {
-    ///      "const": true
-    ///    },
     ///    "identity": {
-    ///      "$ref": "#/$defs/RegularFileIdentity"
-    ///    },
-    ///    "path": {
-    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
+    ///      "$ref": "#/$defs/DirectoryIdentity"
     ///    },
     ///    "purpose": {
-    ///      "$ref": "#/$defs/Sharedhyjwtfhxeikeq"
+    ///      "$ref": "#/$defs/PurposeWorkingDirectory"
     ///    },
     ///    "slot": {
-    ///      "type": "integer",
-    ///      "maximum": 191.0,
-    ///      "minimum": 128.0
+    ///      "const": 6
     ///    }
     ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedbennvijadmpsh {
-        #[serde(default)]
-        pub binding_digest: (),
-        #[serde(default)]
-        pub broker_peer_identity: (),
+    pub struct Sharedbffibejkehwkl {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
+        pub identity: ::std::option::Option<DirectoryIdentity>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<RegularFileIdentity>,
+        pub purpose: ::std::option::Option<PurposeWorkingDirectory>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<Sharedhyjwtfhxeikeq>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<i64>,
+        pub slot: ::std::option::Option<::serde_json::Value>,
     }
-    impl ::std::convert::From<&Sharedbennvijadmpsh> for Sharedbennvijadmpsh {
-        fn from(value: &Sharedbennvijadmpsh) -> Self {
+    impl ::std::convert::From<&Sharedbffibejkehwkl> for Sharedbffibejkehwkl {
+        fn from(value: &Sharedbffibejkehwkl) -> Self {
             value.clone()
         }
     }
-    impl ::std::default::Default for Sharedbennvijadmpsh {
+    impl ::std::default::Default for Sharedbffibejkehwkl {
         fn default() -> Self {
             Self {
-                binding_digest: Default::default(),
-                broker_peer_identity: Default::default(),
-                close_on_exec: Default::default(),
                 identity: Default::default(),
-                path: Default::default(),
                 purpose: Default::default(),
                 slot: Default::default(),
             }
         }
     }
+    pub type Sharedbfyntskbxpams = Sharedatqbolgpvxrxe;
     ///`Sharedbgcdwhdgtanoa`
     ///
     /// <details><summary>JSON schema</summary>
@@ -15859,6 +15314,45 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedbolveaqnlubyo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "deny_ratio",
+    ///    "policies_observed",
+    ///    "receipts_observed"
+    ///  ],
+    ///  "properties": {
+    ///    "deny_ratio": {
+    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///    },
+    ///    "policies_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "receipts_observed": {
+    ///      "type": "integer"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedbolveaqnlubyo {
+        pub deny_ratio: Sharedtbbrqbdncsldx,
+        pub policies_observed: i64,
+        pub receipts_observed: i64,
+    }
+    impl ::std::convert::From<&Sharedbolveaqnlubyo> for Sharedbolveaqnlubyo {
+        fn from(value: &Sharedbolveaqnlubyo) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedbpnuwzixbmupd`
     ///
     /// <details><summary>JSON schema</summary>
@@ -16249,6 +15743,103 @@ pub mod shared {
         }
     }
     pub type Sharedbyzfibinqxeaw = Sharedbaquzcikfuabs;
+    ///`Sharedbzqfzvbucrloj`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "state": {
+    ///      "const": "requested"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedbzqfzvbucrloj {
+        pub state: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedbzqfzvbucrloj> for Sharedbzqfzvbucrloj {
+        fn from(value: &Sharedbzqfzvbucrloj) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedcbeckyvbkzsyi`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "binding_digest": {
+    ///      "$ref": "#/$defs/Sharedesyhjtalzyipv"
+    ///    },
+    ///    "broker_peer_identity": {
+    ///      "$ref": "#/$defs/BrokerPeerIdentity"
+    ///    },
+    ///    "close_on_exec": {
+    ///      "const": false
+    ///    },
+    ///    "identity": {
+    ///      "$ref": "#/$defs/SocketIdentity"
+    ///    },
+    ///    "path": {
+    ///      "type": "null"
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/PurposeBrokerIpc"
+    ///    },
+    ///    "slot": {
+    ///      "const": 8
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedcbeckyvbkzsyi {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub binding_digest: ::std::option::Option<Sharedesyhjtalzyipv>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub broker_peer_identity: ::std::option::Option<BrokerPeerIdentity>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<SocketIdentity>,
+        #[serde(default)]
+        pub path: (),
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<PurposeBrokerIpc>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<::serde_json::Value>,
+    }
+    impl ::std::convert::From<&Sharedcbeckyvbkzsyi> for Sharedcbeckyvbkzsyi {
+        fn from(value: &Sharedcbeckyvbkzsyi) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedcbeckyvbkzsyi {
+        fn default() -> Self {
+            Self {
+                binding_digest: Default::default(),
+                broker_peer_identity: Default::default(),
+                close_on_exec: Default::default(),
+                identity: Default::default(),
+                path: Default::default(),
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
+        }
+    }
     ///`Sharedccsyijvzxerah`
     ///
     /// <details><summary>JSON schema</summary>
@@ -16344,6 +15935,132 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedcevujorekhnax`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "auditPath",
+    ///    "leafIndex",
+    ///    "treeSize"
+    ///  ],
+    ///  "properties": {
+    ///    "auditPath": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "pattern": "^[0-9a-f]{64}$"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "leafIndex": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "treeSize": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedcevujorekhnax {
+        #[serde(rename = "auditPath")]
+        pub audit_path: ::std::vec::Vec<SharedcevujorekhnaxAuditPathItem>,
+        #[serde(rename = "leafIndex")]
+        pub leaf_index: i64,
+        #[serde(rename = "treeSize")]
+        pub tree_size: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Sharedcevujorekhnax> for Sharedcevujorekhnax {
+        fn from(value: &Sharedcevujorekhnax) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedcevujorekhnaxAuditPathItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedcevujorekhnaxAuditPathItem(::std::string::String);
+    impl ::std::ops::Deref for SharedcevujorekhnaxAuditPathItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedcevujorekhnaxAuditPathItem> for ::std::string::String {
+        fn from(value: SharedcevujorekhnaxAuditPathItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedcevujorekhnaxAuditPathItem> for SharedcevujorekhnaxAuditPathItem {
+        fn from(value: &SharedcevujorekhnaxAuditPathItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedcevujorekhnaxAuditPathItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedcevujorekhnaxAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedcevujorekhnaxAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedcevujorekhnaxAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedcevujorekhnaxAuditPathItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`Sharedcewermwaixvqz`
     ///
     /// <details><summary>JSON schema</summary>
@@ -16400,46 +16117,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedcfwtcvcwfohjj`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "exit_code": {
-    ///      "type": "null"
-    ///    },
-    ///    "signal": {
-    ///      "type": "integer",
-    ///      "maximum": 64.0,
-    ///      "minimum": 1.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedcfwtcvcwfohjj {
-        #[serde(default)]
-        pub exit_code: (),
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub signal: ::std::option::Option<::std::num::NonZeroU64>,
-    }
-    impl ::std::convert::From<&Sharedcfwtcvcwfohjj> for Sharedcfwtcvcwfohjj {
-        fn from(value: &Sharedcfwtcvcwfohjj) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedcfwtcvcwfohjj {
-        fn default() -> Self {
-            Self {
-                exit_code: Default::default(),
-                signal: Default::default(),
-            }
-        }
-    }
     ///`Sharedcgxmgaolxsizp`
     ///
     /// <details><summary>JSON schema</summary>
@@ -16469,82 +16146,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedcgxmgaolxsizp> for Sharedcgxmgaolxsizp {
         fn from(value: &Sharedcgxmgaolxsizp) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedcmekxqajovrce`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/PurposeTargetStdout"
-    ///    },
-    ///    "slot": {
-    ///      "const": 9
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedcmekxqajovrce {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<PurposeTargetStdout>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<::serde_json::Value>,
-    }
-    impl ::std::convert::From<&Sharedcmekxqajovrce> for Sharedcmekxqajovrce {
-        fn from(value: &Sharedcmekxqajovrce) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedcmekxqajovrce {
-        fn default() -> Self {
-            Self {
-                purpose: Default::default(),
-                slot: Default::default(),
-            }
-        }
-    }
-    ///`Sharedcmfuycanzgddx`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "keyId",
-    ///    "maximumExecutions"
-    ///  ],
-    ///  "properties": {
-    ///    "keyId": {
-    ///      "$ref": "#/$defs/Sharedrelunorbfjlte"
-    ///    },
-    ///    "maximumExecutions": {
-    ///      "type": "integer",
-    ///      "maximum": 4294967295.0,
-    ///      "minimum": 1.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedcmfuycanzgddx {
-        #[serde(rename = "keyId")]
-        pub key_id: Sharedrelunorbfjlte,
-        #[serde(rename = "maximumExecutions")]
-        pub maximum_executions: ::std::num::NonZeroU64,
-    }
-    impl ::std::convert::From<&Sharedcmfuycanzgddx> for Sharedcmfuycanzgddx {
-        fn from(value: &Sharedcmfuycanzgddx) -> Self {
             value.clone()
         }
     }
@@ -16614,6 +16215,45 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedcmqunyzxrwlei> for Sharedcmqunyzxrwlei {
         fn from(value: &Sharedcmqunyzxrwlei) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedcpowhbxchjzra`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "average_utilization",
+    ///    "capped_grants_observed",
+    ///    "fit_score"
+    ///  ],
+    ///  "properties": {
+    ///    "average_utilization": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    },
+    ///    "capped_grants_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "fit_score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedcpowhbxchjzra {
+        pub average_utilization: Sharedkabadvinoybei,
+        pub capped_grants_observed: i64,
+        pub fit_score: Sharedkabadvinoybei,
+    }
+    impl ::std::convert::From<&Sharedcpowhbxchjzra> for Sharedcpowhbxchjzra {
+        fn from(value: &Sharedcpowhbxchjzra) -> Self {
             value.clone()
         }
     }
@@ -16797,6 +16437,83 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedcvissskaxukzg`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "resulting_version_hash",
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "resulting_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "state": {
+    ///      "const": "restored"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedcvissskaxukzg {
+        pub resulting_version_hash: [u8; 32usize],
+        pub state: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedcvissskaxukzg> for Sharedcvissskaxukzg {
+        fn from(value: &Sharedcvissskaxukzg) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedcvytbwsszjctq`
     ///
     /// <details><summary>JSON schema</summary>
@@ -16837,48 +16554,65 @@ pub mod shared {
             }
         }
     }
-    ///`Shareddbjrwnfvyvuod`
+    ///`Sharedcwjmdddgfdkde`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
     ///  "type": "object",
+    ///  "required": [
+    ///    "distinct_tools",
+    ///    "score"
+    ///  ],
     ///  "properties": {
-    ///    "identity": {
-    ///      "$ref": "#/$defs/RegularFileIdentity"
+    ///    "distinct_tools": {
+    ///      "type": "integer"
     ///    },
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/PurposeCageInitHelper"
-    ///    },
-    ///    "slot": {
-    ///      "const": 5
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedcwjmdddgfdkde {
+        pub distinct_tools: i64,
+        pub score: Sharedtbbrqbdncsldx,
+    }
+    impl ::std::convert::From<&Sharedcwjmdddgfdkde> for Sharedcwjmdddgfdkde {
+        fn from(value: &Sharedcwjmdddgfdkde) -> Self {
+            value.clone()
+        }
+    }
+    ///`Shareddasnbscqxsivd`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "$ref": "#/$defs/Sharedkjrdynzbyzhsi"
     ///    }
     ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Shareddbjrwnfvyvuod {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<RegularFileIdentity>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<PurposeCageInitHelper>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<::serde_json::Value>,
+    pub struct Shareddasnbscqxsivd {
+        pub kind: Sharedkjrdynzbyzhsi,
     }
-    impl ::std::convert::From<&Shareddbjrwnfvyvuod> for Shareddbjrwnfvyvuod {
-        fn from(value: &Shareddbjrwnfvyvuod) -> Self {
+    impl ::std::convert::From<&Shareddasnbscqxsivd> for Shareddasnbscqxsivd {
+        fn from(value: &Shareddasnbscqxsivd) -> Self {
             value.clone()
-        }
-    }
-    impl ::std::default::Default for Shareddbjrwnfvyvuod {
-        fn default() -> Self {
-            Self {
-                identity: Default::default(),
-                purpose: Default::default(),
-                slot: Default::default(),
-            }
         }
     }
     ///Signed semantic class for this v1 receipt.
@@ -17382,6 +17116,346 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Shareddocagwcrrzsis`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "indexProof",
+    ///    "leaf"
+    ///  ],
+    ///  "properties": {
+    ///    "indexProof": {
+    ///      "$ref": "#/$defs/Sharedhwnprdapsmyww"
+    ///    },
+    ///    "leaf": {
+    ///      "$ref": "#/$defs/Sharedyhnjsbnbshiho"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareddocagwcrrzsis {
+        #[serde(rename = "indexProof")]
+        pub index_proof: Sharedhwnprdapsmyww,
+        pub leaf: Sharedyhnjsbnbshiho,
+    }
+    impl ::std::convert::From<&Shareddocagwcrrzsis> for Shareddocagwcrrzsis {
+        fn from(value: &Shareddocagwcrrzsis) -> Self {
+            value.clone()
+        }
+    }
+    ///`Shareddryivgjqboxzc`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "array",
+    ///  "not": {
+    ///    "const": [
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0,
+    ///      0
+    ///    ]
+    ///  },
+    ///  "items": {
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Shareddryivgjqboxzc(pub [u8; 32usize]);
+    impl ::std::ops::Deref for Shareddryivgjqboxzc {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Shareddryivgjqboxzc> for [u8; 32usize] {
+        fn from(value: Shareddryivgjqboxzc) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Shareddryivgjqboxzc> for Shareddryivgjqboxzc {
+        fn from(value: &Shareddryivgjqboxzc) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for Shareddryivgjqboxzc {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Shareddsxzbhbwshdtb`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/StdioEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedzsqurhwsarwum"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareddsxzbhbwshdtb {
+        pub binding_digest: (),
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: ShareddsxzbhbwshdtbIdentity,
+        pub path: (),
+        pub purpose: PurposeTargetStdin,
+        pub slot: ShareddsxzbhbwshdtbSlot,
+    }
+    impl ::std::convert::From<&Shareddsxzbhbwshdtb> for Shareddsxzbhbwshdtb {
+        fn from(value: &Shareddsxzbhbwshdtb) -> Self {
+            value.clone()
+        }
+    }
+    ///`ShareddsxzbhbwshdtbIdentity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "device",
+    ///    "gid",
+    ///    "inode",
+    ///    "kind",
+    ///    "mode",
+    ///    "mount_id",
+    ///    "uid"
+    ///  ],
+    ///  "properties": {
+    ///    "device": {
+    ///      "type": "integer",
+    ///      "maximum": 1.8446744073709552e+19,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "gid": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "inode": {
+    ///      "type": "integer",
+    ///      "maximum": 1.8446744073709552e+19,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "kind": {
+    ///      "enum": [
+    ///        "unix_socket"
+    ///      ]
+    ///    },
+    ///    "mode": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "mount_id": {
+    ///      "type": "integer",
+    ///      "maximum": 1.8446744073709552e+19,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "uid": {
+    ///      "type": "integer",
+    ///      "maximum": 4294967295.0,
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ShareddsxzbhbwshdtbIdentity {
+        pub device: u64,
+        pub gid: u32,
+        pub inode: u64,
+        pub kind: ShareddsxzbhbwshdtbIdentityKind,
+        pub mode: u32,
+        pub mount_id: u64,
+        pub uid: u32,
+    }
+    impl ::std::convert::From<&ShareddsxzbhbwshdtbIdentity> for ShareddsxzbhbwshdtbIdentity {
+        fn from(value: &ShareddsxzbhbwshdtbIdentity) -> Self {
+            value.clone()
+        }
+    }
+    ///`ShareddsxzbhbwshdtbIdentityKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "unix_socket"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ShareddsxzbhbwshdtbIdentityKind {
+        #[serde(rename = "unix_socket")]
+        UnixSocket,
+    }
+    impl ::std::convert::From<&Self> for ShareddsxzbhbwshdtbIdentityKind {
+        fn from(value: &ShareddsxzbhbwshdtbIdentityKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ShareddsxzbhbwshdtbIdentityKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::UnixSocket => f.write_str("unix_socket"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ShareddsxzbhbwshdtbIdentityKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "unix_socket" => Ok(Self::UnixSocket),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ShareddsxzbhbwshdtbIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ShareddsxzbhbwshdtbIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ShareddsxzbhbwshdtbIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ShareddsxzbhbwshdtbSlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    7
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ShareddsxzbhbwshdtbSlot(i64);
+    impl ::std::ops::Deref for ShareddsxzbhbwshdtbSlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareddsxzbhbwshdtbSlot> for i64 {
+        fn from(value: ShareddsxzbhbwshdtbSlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareddsxzbhbwshdtbSlot> for ShareddsxzbhbwshdtbSlot {
+        fn from(value: &ShareddsxzbhbwshdtbSlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ShareddsxzbhbwshdtbSlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![7_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareddsxzbhbwshdtbSlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`Shareddtflmkvvaugtr`
     ///
     /// <details><summary>JSON schema</summary>
@@ -17750,40 +17824,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Shareddyiwligforbxn> for Shareddyiwligforbxn {
         fn from(value: &Shareddyiwligforbxn) -> Self {
-            value.clone()
-        }
-    }
-    ///`Shareddynzqgtbmfpwp`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "capabilities_observed",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "capabilities_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Shareddynzqgtbmfpwp {
-        pub capabilities_observed: i64,
-        pub score: Sharedkabadvinoybei,
-    }
-    impl ::std::convert::From<&Shareddynzqgtbmfpwp> for Shareddynzqgtbmfpwp {
-        fn from(value: &Shareddynzqgtbmfpwp) -> Self {
             value.clone()
         }
     }
@@ -18407,7 +18447,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedepmaukfcelnfz`
+    ///`Sharedepuxyxrvrdehd`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -18415,37 +18455,140 @@ pub mod shared {
     ///{
     ///  "allOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedfbbqaberromye"
+    ///      "$ref": "#/$defs/FdEntryBase"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedhaycefmgrjxfm"
+    ///      "$ref": "#/$defs/Sharedwpwjqdkevwpnl"
     ///    }
     ///  ]
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct Sharedepmaukfcelnfz(pub Sharedfbbqaberromye);
-    impl ::std::ops::Deref for Sharedepmaukfcelnfz {
-        type Target = Sharedfbbqaberromye;
-        fn deref(&self) -> &Sharedfbbqaberromye {
-            &self.0
-        }
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedepuxyxrvrdehd {
+        pub binding_digest: (),
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: SharedepuxyxrvrdehdIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: SharedepuxyxrvrdehdPurpose,
+        pub slot: i64,
     }
-    impl ::std::convert::From<Sharedepmaukfcelnfz> for Sharedfbbqaberromye {
-        fn from(value: Sharedepmaukfcelnfz) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&Sharedepmaukfcelnfz> for Sharedepmaukfcelnfz {
-        fn from(value: &Sharedepmaukfcelnfz) -> Self {
+    impl ::std::convert::From<&Sharedepuxyxrvrdehd> for Sharedepuxyxrvrdehd {
+        fn from(value: &Sharedepuxyxrvrdehd) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfbbqaberromye> for Sharedepmaukfcelnfz {
-        fn from(value: Sharedfbbqaberromye) -> Self {
-            Self(value)
+    pub type SharedepuxyxrvrdehdIdentity = RegularFileIdentity;
+    pub type SharedepuxyxrvrdehdIdentityKind = RegularFileIdentityKind;
+    ///`SharedepuxyxrvrdehdPurpose`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "index",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "index": {
+    ///      "type": "integer",
+    ///      "maximum": 63.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "kind": {
+    ///      "enum": [
+    ///        "write_grant"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SharedepuxyxrvrdehdPurpose {
+        pub index: i64,
+        pub kind: SharedepuxyxrvrdehdPurposeKind,
+    }
+    impl ::std::convert::From<&SharedepuxyxrvrdehdPurpose> for SharedepuxyxrvrdehdPurpose {
+        fn from(value: &SharedepuxyxrvrdehdPurpose) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedepuxyxrvrdehdPurposeKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "write_grant"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SharedepuxyxrvrdehdPurposeKind {
+        #[serde(rename = "write_grant")]
+        WriteGrant,
+    }
+    impl ::std::convert::From<&Self> for SharedepuxyxrvrdehdPurposeKind {
+        fn from(value: &SharedepuxyxrvrdehdPurposeKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SharedepuxyxrvrdehdPurposeKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::WriteGrant => f.write_str("write_grant"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for SharedepuxyxrvrdehdPurposeKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "write_grant" => Ok(Self::WriteGrant),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedepuxyxrvrdehdPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedepuxyxrvrdehdPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedepuxyxrvrdehdPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
         }
     }
     ///`Sharedepvbmjdxlugvx`
@@ -18723,6 +18866,44 @@ pub mod shared {
                 })
         }
     }
+    ///`Sharedetylgdbigvkzy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/PurposeTargetStdout"
+    ///    },
+    ///    "slot": {
+    ///      "const": 9
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedetylgdbigvkzy {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<PurposeTargetStdout>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<::serde_json::Value>,
+    }
+    impl ::std::convert::From<&Sharedetylgdbigvkzy> for Sharedetylgdbigvkzy {
+        fn from(value: &Sharedetylgdbigvkzy) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedetylgdbigvkzy {
+        fn default() -> Self {
+            Self {
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
+        }
+    }
     ///`Sharedewyivyngodbtv`
     ///
     /// <details><summary>JSON schema</summary>
@@ -18789,6 +18970,45 @@ pub mod shared {
             self.0.fmt(f)
         }
     }
+    ///`Sharedexncdkrxvoiqs`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "deny_ratio",
+    ///    "policies_observed",
+    ///    "receipts_observed"
+    ///  ],
+    ///  "properties": {
+    ///    "deny_ratio": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    },
+    ///    "policies_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "receipts_observed": {
+    ///      "type": "integer"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedexncdkrxvoiqs {
+        pub deny_ratio: Sharedkabadvinoybei,
+        pub policies_observed: i64,
+        pub receipts_observed: i64,
+    }
+    impl ::std::convert::From<&Sharedexncdkrxvoiqs> for Sharedexncdkrxvoiqs {
+        fn from(value: &Sharedexncdkrxvoiqs) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedezhiztfprtras`
     ///
     /// <details><summary>JSON schema</summary>
@@ -18818,83 +19038,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedezhiztfprtras> for Sharedezhiztfprtras {
         fn from(value: &Sharedezhiztfprtras) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedfawmctzwnxgtj`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "checkpointRoots",
-    ///    "lineageRecords",
-    ///    "query",
-    ///    "receiptCount",
-    ///    "receiptIds",
-    ///    "uncheckpointedReceipts"
-    ///  ],
-    ///  "properties": {
-    ///    "checkpointRoots": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    },
-    ///    "lineageRecords": {
-    ///      "type": "integer"
-    ///    },
-    ///    "query": {
-    ///      "$ref": "#/$defs/Sharedvvkulvjbmfskp"
-    ///    },
-    ///    "receiptCount": {
-    ///      "type": "integer"
-    ///    },
-    ///    "receiptIds": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    },
-    ///    "receiptLogUrls": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    },
-    ///    "uncheckpointedReceipts": {
-    ///      "type": "integer"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedfawmctzwnxgtj {
-        #[serde(rename = "checkpointRoots")]
-        pub checkpoint_roots: ::std::vec::Vec<::std::string::String>,
-        #[serde(rename = "lineageRecords")]
-        pub lineage_records: i64,
-        pub query: Sharedvvkulvjbmfskp,
-        #[serde(rename = "receiptCount")]
-        pub receipt_count: i64,
-        #[serde(rename = "receiptIds")]
-        pub receipt_ids: ::std::vec::Vec<::std::string::String>,
-        #[serde(
-            rename = "receiptLogUrls",
-            default,
-            skip_serializing_if = "::std::vec::Vec::is_empty"
-        )]
-        pub receipt_log_urls: ::std::vec::Vec<::std::string::String>,
-        #[serde(rename = "uncheckpointedReceipts")]
-        pub uncheckpointed_receipts: i64,
-    }
-    impl ::std::convert::From<&Sharedfawmctzwnxgtj> for Sharedfawmctzwnxgtj {
-        fn from(value: &Sharedfawmctzwnxgtj) -> Self {
             value.clone()
         }
     }
@@ -18949,61 +19092,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedfbbqaberromye`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "occurred_at_unix_ms",
-    ///    "prior_receipt_ids",
-    ///    "schema_version",
-    ///    "tenant_id",
-    ///    "transition_id"
-    ///  ],
-    ///  "properties": {
-    ///    "occurred_at_unix_ms": {
-    ///      "$ref": "#/$defs/Sharedqtpzcpreelrid"
-    ///    },
-    ///    "prior_receipt_ids": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/$defs/Sharedynmdycziscbfr"
-    ///      },
-    ///      "maxItems": 64,
-    ///      "minItems": 1,
-    ///      "uniqueItems": true
-    ///    },
-    ///    "schema_version": {
-    ///      "const": 1
-    ///    },
-    ///    "tenant_id": {
-    ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
-    ///    },
-    ///    "transition_id": {
-    ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedfbbqaberromye {
-        pub occurred_at_unix_ms: Sharedqtpzcpreelrid,
-        pub prior_receipt_ids: Vec<Sharedynmdycziscbfr>,
-        pub schema_version: ::serde_json::Value,
-        pub tenant_id: Sharedynmdycziscbfr,
-        pub transition_id: Sharedynmdycziscbfr,
-    }
-    impl ::std::convert::From<&Sharedfbbqaberromye> for Sharedfbbqaberromye {
-        fn from(value: &Sharedfbbqaberromye) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedfbldasznwkhoo`
     ///
     /// <details><summary>JSON schema</summary>
@@ -19043,6 +19131,60 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedfbldasznwkhoo> for Sharedfbldasznwkhoo {
         fn from(value: &Sharedfbldasznwkhoo) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedfcdilqajxmwqm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "occurred_at_unix_ms",
+    ///    "prior_receipt_ids",
+    ///    "schema_version",
+    ///    "tenant_id",
+    ///    "transition_id"
+    ///  ],
+    ///  "properties": {
+    ///    "occurred_at_unix_ms": {
+    ///      "$ref": "#/$defs/Sharedqtpzcpreelrid"
+    ///    },
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Sharedynmdycziscbfr"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema_version": {
+    ///      "const": 1
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
+    ///    },
+    ///    "transition_id": {
+    ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedfcdilqajxmwqm {
+        pub occurred_at_unix_ms: Sharedqtpzcpreelrid,
+        pub prior_receipt_ids: Vec<Sharedynmdycziscbfr>,
+        pub schema_version: ::serde_json::Value,
+        pub tenant_id: Sharedynmdycziscbfr,
+        pub transition_id: Sharedynmdycziscbfr,
+    }
+    impl ::std::convert::From<&Sharedfcdilqajxmwqm> for Sharedfcdilqajxmwqm {
+        fn from(value: &Sharedfcdilqajxmwqm) -> Self {
             value.clone()
         }
     }
@@ -19140,6 +19282,92 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedfejfngezibinq`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/StdioEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedetylgdbigvkzy"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedfejfngezibinq {
+        pub binding_digest: (),
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: SharedfejfngezibinqIdentity,
+        pub path: (),
+        pub purpose: PurposeTargetStdout,
+        pub slot: SharedfejfngezibinqSlot,
+    }
+    impl ::std::convert::From<&Sharedfejfngezibinq> for Sharedfejfngezibinq {
+        fn from(value: &Sharedfejfngezibinq) -> Self {
+            value.clone()
+        }
+    }
+    pub type SharedfejfngezibinqIdentity = ShareddsxzbhbwshdtbIdentity;
+    pub type SharedfejfngezibinqIdentityKind = ShareddsxzbhbwshdtbIdentityKind;
+    ///`SharedfejfngezibinqSlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    9
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SharedfejfngezibinqSlot(i64);
+    impl ::std::ops::Deref for SharedfejfngezibinqSlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedfejfngezibinqSlot> for i64 {
+        fn from(value: SharedfejfngezibinqSlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedfejfngezibinqSlot> for SharedfejfngezibinqSlot {
+        fn from(value: &SharedfejfngezibinqSlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for SharedfejfngezibinqSlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![9_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedfejfngezibinqSlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`Sharedfgaxfvcmejxeu`
     ///
     /// <details><summary>JSON schema</summary>
@@ -19188,93 +19416,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedfgyvxbybijpjb`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/StdioEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedcmekxqajovrce"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedfgyvxbybijpjb {
-        pub binding_digest: (),
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedfgyvxbybijpjbIdentity,
-        pub path: (),
-        pub purpose: PurposeTargetStdout,
-        pub slot: SharedfgyvxbybijpjbSlot,
-    }
-    impl ::std::convert::From<&Sharedfgyvxbybijpjb> for Sharedfgyvxbybijpjb {
-        fn from(value: &Sharedfgyvxbybijpjb) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedfgyvxbybijpjbIdentity = SharedajvfycgctjqrmIdentity;
-    pub type SharedfgyvxbybijpjbIdentityKind = SharedajvfycgctjqrmIdentityKind;
-    ///`SharedfgyvxbybijpjbSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    9
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedfgyvxbybijpjbSlot(i64);
-    impl ::std::ops::Deref for SharedfgyvxbybijpjbSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedfgyvxbybijpjbSlot> for i64 {
-        fn from(value: SharedfgyvxbybijpjbSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedfgyvxbybijpjbSlot> for SharedfgyvxbybijpjbSlot {
-        fn from(value: &SharedfgyvxbybijpjbSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedfgyvxbybijpjbSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![9_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedfgyvxbybijpjbSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
-        }
-    }
-    ///`Sharedfiqxiscbjfqsx`
+    ///`Sharedfhdrkybnekqgj`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -19282,15 +19424,39 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "kind",
-    ///    "owner_ref"
+    ///    "allocation_hash",
+    ///    "arguments_hash",
+    ///    "contract_hash",
+    ///    "effect",
+    ///    "expires_at",
+    ///    "price_units",
+    ///    "receiver",
+    ///    "slot_id"
     ///  ],
     ///  "properties": {
-    ///    "kind": {
-    ///      "const": "pending"
+    ///    "allocation_hash": {
+    ///      "type": "string"
     ///    },
-    ///    "owner_ref": {
-    ///      "$ref": "#/$defs/OwnerOperationRef"
+    ///    "arguments_hash": {
+    ///      "type": "string"
+    ///    },
+    ///    "contract_hash": {
+    ///      "type": "string"
+    ///    },
+    ///    "effect": {
+    ///      "$ref": "#/$defs/Sharedthbwqidmekyep"
+    ///    },
+    ///    "expires_at": {
+    ///      "type": "integer"
+    ///    },
+    ///    "price_units": {
+    ///      "type": "integer"
+    ///    },
+    ///    "receiver": {
+    ///      "type": "string"
+    ///    },
+    ///    "slot_id": {
+    ///      "type": "string"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -19299,12 +19465,18 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedfiqxiscbjfqsx {
-        pub kind: ::serde_json::Value,
-        pub owner_ref: OwnerOperationRef,
+    pub struct Sharedfhdrkybnekqgj {
+        pub allocation_hash: ::std::string::String,
+        pub arguments_hash: ::std::string::String,
+        pub contract_hash: ::std::string::String,
+        pub effect: Sharedthbwqidmekyep,
+        pub expires_at: i64,
+        pub price_units: i64,
+        pub receiver: ::std::string::String,
+        pub slot_id: ::std::string::String,
     }
-    impl ::std::convert::From<&Sharedfiqxiscbjfqsx> for Sharedfiqxiscbjfqsx {
-        fn from(value: &Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<&Sharedfhdrkybnekqgj> for Sharedfhdrkybnekqgj {
+        fn from(value: &Sharedfhdrkybnekqgj) -> Self {
             value.clone()
         }
     }
@@ -19356,7 +19528,150 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedfjamsmgmqgyin = Shareddbjrwnfvyvuod;
+    ///`Sharedfkzdtetvymstc`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/ArtifactEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedhmqewrmabnpht"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedfkzdtetvymstc {
+        pub binding_digest: Sharedesyhjtalzyipv,
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: SharedfkzdtetvymstcIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: SharedfkzdtetvymstcPurpose,
+        pub slot: i64,
+    }
+    impl ::std::convert::From<&Sharedfkzdtetvymstc> for Sharedfkzdtetvymstc {
+        fn from(value: &Sharedfkzdtetvymstc) -> Self {
+            value.clone()
+        }
+    }
+    pub type SharedfkzdtetvymstcIdentity = RegularFileIdentity;
+    pub type SharedfkzdtetvymstcIdentityKind = RegularFileIdentityKind;
+    ///`SharedfkzdtetvymstcPurpose`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "index",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "index": {
+    ///      "type": "integer",
+    ///      "maximum": 63.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "kind": {
+    ///      "enum": [
+    ///        "runtime_file"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SharedfkzdtetvymstcPurpose {
+        pub index: i64,
+        pub kind: SharedfkzdtetvymstcPurposeKind,
+    }
+    impl ::std::convert::From<&SharedfkzdtetvymstcPurpose> for SharedfkzdtetvymstcPurpose {
+        fn from(value: &SharedfkzdtetvymstcPurpose) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedfkzdtetvymstcPurposeKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "runtime_file"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SharedfkzdtetvymstcPurposeKind {
+        #[serde(rename = "runtime_file")]
+        RuntimeFile,
+    }
+    impl ::std::convert::From<&Self> for SharedfkzdtetvymstcPurposeKind {
+        fn from(value: &SharedfkzdtetvymstcPurposeKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SharedfkzdtetvymstcPurposeKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::RuntimeFile => f.write_str("runtime_file"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for SharedfkzdtetvymstcPurposeKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "runtime_file" => Ok(Self::RuntimeFile),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedfkzdtetvymstcPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedfkzdtetvymstcPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedfkzdtetvymstcPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
     ///`Sharedflachmqlctnyh`
     ///
     /// <details><summary>JSON schema</summary>
@@ -19397,105 +19712,6 @@ pub mod shared {
     impl ::std::convert::From<&Sharedflachmqlctnyh> for Sharedflachmqlctnyh {
         fn from(value: &Sharedflachmqlctnyh) -> Self {
             value.clone()
-        }
-    }
-    ///`Sharedfmthhrrpvmzdw`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/PurposeIndexedResource"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedbbgufznwlzbbl"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedfmthhrrpvmzdw {
-        pub index: i64,
-        pub kind: SharedfmthhrrpvmzdwKind,
-    }
-    impl ::std::convert::From<&Sharedfmthhrrpvmzdw> for Sharedfmthhrrpvmzdw {
-        fn from(value: &Sharedfmthhrrpvmzdw) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedfmthhrrpvmzdwKind`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "runtime_file"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum SharedfmthhrrpvmzdwKind {
-        #[serde(rename = "runtime_file")]
-        RuntimeFile,
-    }
-    impl ::std::convert::From<&Self> for SharedfmthhrrpvmzdwKind {
-        fn from(value: &SharedfmthhrrpvmzdwKind) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for SharedfmthhrrpvmzdwKind {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::RuntimeFile => f.write_str("runtime_file"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SharedfmthhrrpvmzdwKind {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "runtime_file" => Ok(Self::RuntimeFile),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedfmthhrrpvmzdwKind {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedfmthhrrpvmzdwKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedfmthhrrpvmzdwKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
         }
     }
     ///The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
@@ -19681,56 +19897,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedfvpubzkgiaxfx`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "binding_digest": {
-    ///      "$ref": "#/$defs/Sharedesyhjtalzyipv"
-    ///    },
-    ///    "broker_peer_identity": {
-    ///      "type": "null"
-    ///    },
-    ///    "close_on_exec": {
-    ///      "const": true
-    ///    },
-    ///    "path": {
-    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedfvpubzkgiaxfx {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub binding_digest: ::std::option::Option<Sharedesyhjtalzyipv>,
-        #[serde(default)]
-        pub broker_peer_identity: (),
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
-    }
-    impl ::std::convert::From<&Sharedfvpubzkgiaxfx> for Sharedfvpubzkgiaxfx {
-        fn from(value: &Sharedfvpubzkgiaxfx) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedfvpubzkgiaxfx {
-        fn default() -> Self {
-            Self {
-                binding_digest: Default::default(),
-                broker_peer_identity: Default::default(),
-                close_on_exec: Default::default(),
-                path: Default::default(),
-            }
-        }
-    }
     ///`Sharedfweofbfirjvuh`
     ///
     /// <details><summary>JSON schema</summary>
@@ -19757,40 +19923,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedfweofbfirjvuh> for Sharedfweofbfirjvuh {
         fn from(value: &Sharedfweofbfirjvuh) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedfwripvhtwpwyb`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "distinct_tools",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "distinct_tools": {
-    ///      "type": "integer"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedfwripvhtwpwyb {
-        pub distinct_tools: i64,
-        pub score: Sharedkabadvinoybei,
-    }
-    impl ::std::convert::From<&Sharedfwripvhtwpwyb> for Sharedfwripvhtwpwyb {
-        fn from(value: &Sharedfwripvhtwpwyb) -> Self {
             value.clone()
         }
     }
@@ -19868,6 +20000,38 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedgbvliubwibnhm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "read_grant"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedgbvliubwibnhm {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub kind: ::std::option::Option<::serde_json::Value>,
+    }
+    impl ::std::convert::From<&Sharedgbvliubwibnhm> for Sharedgbvliubwibnhm {
+        fn from(value: &Sharedgbvliubwibnhm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedgbvliubwibnhm {
+        fn default() -> Self {
+            Self {
+                kind: Default::default(),
+            }
+        }
+    }
     ///`Sharedgduarozznwtal`
     ///
     /// <details><summary>JSON schema</summary>
@@ -19901,6 +20065,33 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedgduarozznwtal> for Sharedgduarozznwtal {
         fn from(value: &Sharedgduarozznwtal) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedgepxuexwercpj`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "regular_file"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedgepxuexwercpj {
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedgepxuexwercpj> for Sharedgepxuexwercpj {
+        fn from(value: &Sharedgepxuexwercpj) -> Self {
             value.clone()
         }
     }
@@ -20019,35 +20210,6 @@ pub mod shared {
                 })
         }
     }
-    ///`Sharedggfztevbgtdus`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "state"
-    ///  ],
-    ///  "properties": {
-    ///    "state": {
-    ///      "const": "requested"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedggfztevbgtdus {
-        pub state: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedggfztevbgtdus> for Sharedggfztevbgtdus {
-        fn from(value: &Sharedggfztevbgtdus) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedggsbqkmltmvwx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -20080,45 +20242,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedggsbqkmltmvwx> for Sharedggsbqkmltmvwx {
         fn from(value: &Sharedggsbqkmltmvwx) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedggshnwchjkxva`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "deny_ratio",
-    ///    "policies_observed",
-    ///    "receipts_observed"
-    ///  ],
-    ///  "properties": {
-    ///    "deny_ratio": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    },
-    ///    "policies_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "receipts_observed": {
-    ///      "type": "integer"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedggshnwchjkxva {
-        pub deny_ratio: Sharedkabadvinoybei,
-        pub policies_observed: i64,
-        pub receipts_observed: i64,
-    }
-    impl ::std::convert::From<&Sharedggshnwchjkxva> for Sharedggshnwchjkxva {
-        fn from(value: &Sharedggshnwchjkxva) -> Self {
             value.clone()
         }
     }
@@ -20159,6 +20282,40 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedghkhqgckwmtay> for Sharedghkhqgckwmtay {
         fn from(value: &Sharedghkhqgckwmtay) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedgiexwpnnrjkyw`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capabilities_observed",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "capabilities_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedgiexwpnnrjkyw {
+        pub capabilities_observed: i64,
+        pub score: Sharedtbbrqbdncsldx,
+    }
+    impl ::std::convert::From<&Sharedgiexwpnnrjkyw> for Sharedgiexwpnnrjkyw {
+        fn from(value: &Sharedgiexwpnnrjkyw) -> Self {
             value.clone()
         }
     }
@@ -20389,7 +20546,59 @@ pub mod shared {
             value.parse()
         }
     }
-    pub type Sharedgpvzrlukbydql = Sharedbbgufznwlzbbl;
+    pub type Sharedgobeavlbgaxvo = Sharedbzqfzvbucrloj;
+    ///`Sharedgojdpyqtzuhqy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effectiveTier",
+    ///    "reasonCodes",
+    ///    "reasons",
+    ///    "verdict"
+    ///  ],
+    ///  "properties": {
+    ///    "effectiveTier": {
+    ///      "type": "string"
+    ///    },
+    ///    "reasonCodes": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
+    ///    },
+    ///    "reasons": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Sharednkxqpsndfzhhk"
+    ///      }
+    ///    },
+    ///    "verdict": {
+    ///      "type": "string"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedgojdpyqtzuhqy {
+        #[serde(rename = "effectiveTier")]
+        pub effective_tier: ::std::string::String,
+        #[serde(rename = "reasonCodes")]
+        pub reason_codes: ::std::vec::Vec<::std::string::String>,
+        pub reasons: ::std::vec::Vec<Sharednkxqpsndfzhhk>,
+        pub verdict: ::std::string::String,
+    }
+    impl ::std::convert::From<&Sharedgojdpyqtzuhqy> for Sharedgojdpyqtzuhqy {
+        fn from(value: &Sharedgojdpyqtzuhqy) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedgqzobexecjhuf`
     ///
     /// <details><summary>JSON schema</summary>
@@ -20676,92 +20885,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedguhkcnsdbwsbo`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/ArtifactEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedfjamsmgmqgyin"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedguhkcnsdbwsbo {
-        pub binding_digest: Sharedesyhjtalzyipv,
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedguhkcnsdbwsboIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: PurposeTargetExecutable,
-        pub slot: SharedguhkcnsdbwsboSlot,
-    }
-    impl ::std::convert::From<&Sharedguhkcnsdbwsbo> for Sharedguhkcnsdbwsbo {
-        fn from(value: &Sharedguhkcnsdbwsbo) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedguhkcnsdbwsboIdentity = RegularFileIdentity;
-    pub type SharedguhkcnsdbwsboIdentityKind = RegularFileIdentityKind;
-    ///`SharedguhkcnsdbwsboSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    255
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedguhkcnsdbwsboSlot(i64);
-    impl ::std::ops::Deref for SharedguhkcnsdbwsboSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedguhkcnsdbwsboSlot> for i64 {
-        fn from(value: SharedguhkcnsdbwsboSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedguhkcnsdbwsboSlot> for SharedguhkcnsdbwsboSlot {
-        fn from(value: &SharedguhkcnsdbwsboSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedguhkcnsdbwsboSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![255_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedguhkcnsdbwsboSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
-        }
-    }
     ///`Sharedgvjazdiwwfidb`
     ///
     /// <details><summary>JSON schema</summary>
@@ -21037,71 +21160,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedhaqwwggmrtego`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/PurposeCageInitHelper"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedhaqwwggmrtego {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<PurposeCageInitHelper>,
-    }
-    impl ::std::convert::From<&Sharedhaqwwggmrtego> for Sharedhaqwwggmrtego {
-        fn from(value: &Sharedhaqwwggmrtego) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedhaqwwggmrtego {
-        fn default() -> Self {
-            Self {
-                purpose: Default::default(),
-            }
-        }
-    }
-    ///`Sharedhaycefmgrjxfm`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "prior_receipt_ids": {
-    ///      "type": "array",
-    ///      "maxItems": 1
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedhaycefmgrjxfm {
-        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
-        pub prior_receipt_ids: ::std::vec::Vec<::serde_json::Value>,
-    }
-    impl ::std::convert::From<&Sharedhaycefmgrjxfm> for Sharedhaycefmgrjxfm {
-        fn from(value: &Sharedhaycefmgrjxfm) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedhaycefmgrjxfm {
-        fn default() -> Self {
-            Self {
-                prior_receipt_ids: Default::default(),
-            }
-        }
-    }
     ///`Sharedhbaucvhmatfnc`
     ///
     /// <details><summary>JSON schema</summary>
@@ -21233,6 +21291,192 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedhctlbiqrxctxf`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "admission_operation_id",
+    ///    "admission_operation_version",
+    ///    "approval_mode",
+    ///    "approval_set_hash"
+    ///  ],
+    ///  "properties": {
+    ///    "admission_operation_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "admission_operation_version": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "approval_mode": {
+    ///      "const": "governed"
+    ///    },
+    ///    "approval_set_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedhctlbiqrxctxf {
+        pub admission_operation_id: SharedhctlbiqrxctxfAdmissionOperationId,
+        pub admission_operation_version: ::std::num::NonZeroU64,
+        pub approval_mode: ::serde_json::Value,
+        pub approval_set_hash: [u8; 32usize],
+    }
+    impl ::std::convert::From<&Sharedhctlbiqrxctxf> for Sharedhctlbiqrxctxf {
+        fn from(value: &Sharedhctlbiqrxctxf) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedhctlbiqrxctxfAdmissionOperationId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedhctlbiqrxctxfAdmissionOperationId(::std::string::String);
+    impl ::std::ops::Deref for SharedhctlbiqrxctxfAdmissionOperationId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedhctlbiqrxctxfAdmissionOperationId> for ::std::string::String {
+        fn from(value: SharedhctlbiqrxctxfAdmissionOperationId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedhctlbiqrxctxfAdmissionOperationId>
+        for SharedhctlbiqrxctxfAdmissionOperationId
+    {
+        fn from(value: &SharedhctlbiqrxctxfAdmissionOperationId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedhctlbiqrxctxfAdmissionOperationId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedhctlbiqrxctxfAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedhctlbiqrxctxfAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedhctlbiqrxctxfAdmissionOperationId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedhctlbiqrxctxfAdmissionOperationId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`Sharedhdevymfzkepdo`
     ///
     /// <details><summary>JSON schema</summary>
@@ -21262,41 +21506,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedhedorjnhbehtr`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/FdEntryBase"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedsgvcqetdxqytk"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedhedorjnhbehtr {
-        pub binding_digest: (),
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedhedorjnhbehtrIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: SharedhedorjnhbehtrPurpose,
-        pub slot: i64,
-    }
-    impl ::std::convert::From<&Sharedhedorjnhbehtr> for Sharedhedorjnhbehtr {
-        fn from(value: &Sharedhedorjnhbehtr) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedhedorjnhbehtrIdentity = PathIdentity;
-    ///`SharedhedorjnhbehtrPurpose`
+    ///`Sharedhdydasjmmzhcv`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -21304,19 +21514,15 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "index",
-    ///    "kind"
+    ///    "kind",
+    ///    "leafProof"
     ///  ],
     ///  "properties": {
-    ///    "index": {
-    ///      "type": "integer",
-    ///      "maximum": 63.0,
-    ///      "minimum": 0.0
-    ///    },
     ///    "kind": {
-    ///      "enum": [
-    ///        "read_grant"
-    ///      ]
+    ///      "const": "adjacent"
+    ///    },
+    ///    "leafProof": {
+    ///      "$ref": "#/$defs/Sharedulbmauygvafiw"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -21325,84 +21531,14 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct SharedhedorjnhbehtrPurpose {
-        pub index: i64,
-        pub kind: SharedhedorjnhbehtrPurposeKind,
+    pub struct Sharedhdydasjmmzhcv {
+        pub kind: ::serde_json::Value,
+        #[serde(rename = "leafProof")]
+        pub leaf_proof: Sharedulbmauygvafiw,
     }
-    impl ::std::convert::From<&SharedhedorjnhbehtrPurpose> for SharedhedorjnhbehtrPurpose {
-        fn from(value: &SharedhedorjnhbehtrPurpose) -> Self {
+    impl ::std::convert::From<&Sharedhdydasjmmzhcv> for Sharedhdydasjmmzhcv {
+        fn from(value: &Sharedhdydasjmmzhcv) -> Self {
             value.clone()
-        }
-    }
-    ///`SharedhedorjnhbehtrPurposeKind`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "read_grant"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum SharedhedorjnhbehtrPurposeKind {
-        #[serde(rename = "read_grant")]
-        ReadGrant,
-    }
-    impl ::std::convert::From<&Self> for SharedhedorjnhbehtrPurposeKind {
-        fn from(value: &SharedhedorjnhbehtrPurposeKind) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for SharedhedorjnhbehtrPurposeKind {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::ReadGrant => f.write_str("read_grant"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SharedhedorjnhbehtrPurposeKind {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "read_grant" => Ok(Self::ReadGrant),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedhedorjnhbehtrPurposeKind {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedhedorjnhbehtrPurposeKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedhedorjnhbehtrPurposeKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
         }
     }
     ///`Sharedhfikipnqnjhuh`
@@ -21738,6 +21874,52 @@ pub mod shared {
     impl ::std::convert::From<&Sharedhmaquqexkjwqa> for Sharedhmaquqexkjwqa {
         fn from(value: &Sharedhmaquqexkjwqa) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharedhmqewrmabnpht`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "identity": {
+    ///      "$ref": "#/$defs/RegularFileIdentity"
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/Sharedwbsxksqqfcnfj"
+    ///    },
+    ///    "slot": {
+    ///      "type": "integer",
+    ///      "maximum": 63.0,
+    ///      "minimum": 16.0
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedhmqewrmabnpht {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<RegularFileIdentity>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<Sharedwbsxksqqfcnfj>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<i64>,
+    }
+    impl ::std::convert::From<&Sharedhmqewrmabnpht> for Sharedhmqewrmabnpht {
+        fn from(value: &Sharedhmqewrmabnpht) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedhmqewrmabnpht {
+        fn default() -> Self {
+            Self {
+                identity: Default::default(),
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
         }
     }
     ///`Sharedhppmpdxnwolpd`
@@ -22081,7 +22263,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedhtxmywhrdflwr`
+    ///`Sharedhrszehbsozypg`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -22089,55 +22271,43 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "boundary_pressure",
-    ///    "composite_score",
-    ///    "computed_at",
-    ///    "delegation_hygiene",
-    ///    "effective_weight_sum",
-    ///    "history_depth",
-    ///    "incident_correlation",
-    ///    "least_privilege",
-    ///    "reliability",
-    ///    "resource_stewardship",
-    ///    "specialization",
-    ///    "subject_key"
+    ///    "checkpointRoots",
+    ///    "lineageRecords",
+    ///    "query",
+    ///    "receiptCount",
+    ///    "receiptIds",
+    ///    "uncheckpointedReceipts"
     ///  ],
     ///  "properties": {
-    ///    "boundary_pressure": {
-    ///      "$ref": "#/$defs/Sharedggshnwchjkxva"
+    ///    "checkpointRoots": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
     ///    },
-    ///    "composite_score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    },
-    ///    "computed_at": {
+    ///    "lineageRecords": {
     ///      "type": "integer"
     ///    },
-    ///    "delegation_hygiene": {
-    ///      "$ref": "#/$defs/Sharedyldgrjcdpkdrm"
+    ///    "query": {
+    ///      "$ref": "#/$defs/Sharedvvkulvjbmfskp"
     ///    },
-    ///    "effective_weight_sum": {
-    ///      "type": "number"
+    ///    "receiptCount": {
+    ///      "type": "integer"
     ///    },
-    ///    "history_depth": {
-    ///      "$ref": "#/$defs/Sharedqbknxjknsyzed"
+    ///    "receiptIds": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
     ///    },
-    ///    "incident_correlation": {
-    ///      "$ref": "#/$defs/Sharedxnncuitzdkwoe"
+    ///    "receiptLogUrls": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string"
+    ///      }
     ///    },
-    ///    "least_privilege": {
-    ///      "$ref": "#/$defs/Shareddynzqgtbmfpwp"
-    ///    },
-    ///    "reliability": {
-    ///      "$ref": "#/$defs/Sharedoprbschryubmh"
-    ///    },
-    ///    "resource_stewardship": {
-    ///      "$ref": "#/$defs/Sharedobcjdfgyxzmlg"
-    ///    },
-    ///    "specialization": {
-    ///      "$ref": "#/$defs/Sharedfwripvhtwpwyb"
-    ///    },
-    ///    "subject_key": {
-    ///      "type": "string"
+    ///    "uncheckpointedReceipts": {
+    ///      "type": "integer"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -22146,22 +22316,27 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedhtxmywhrdflwr {
-        pub boundary_pressure: Sharedggshnwchjkxva,
-        pub composite_score: Sharedkabadvinoybei,
-        pub computed_at: i64,
-        pub delegation_hygiene: Sharedyldgrjcdpkdrm,
-        pub effective_weight_sum: f64,
-        pub history_depth: Sharedqbknxjknsyzed,
-        pub incident_correlation: Sharedxnncuitzdkwoe,
-        pub least_privilege: Shareddynzqgtbmfpwp,
-        pub reliability: Sharedoprbschryubmh,
-        pub resource_stewardship: Sharedobcjdfgyxzmlg,
-        pub specialization: Sharedfwripvhtwpwyb,
-        pub subject_key: ::std::string::String,
+    pub struct Sharedhrszehbsozypg {
+        #[serde(rename = "checkpointRoots")]
+        pub checkpoint_roots: ::std::vec::Vec<::std::string::String>,
+        #[serde(rename = "lineageRecords")]
+        pub lineage_records: i64,
+        pub query: Sharedvvkulvjbmfskp,
+        #[serde(rename = "receiptCount")]
+        pub receipt_count: i64,
+        #[serde(rename = "receiptIds")]
+        pub receipt_ids: ::std::vec::Vec<::std::string::String>,
+        #[serde(
+            rename = "receiptLogUrls",
+            default,
+            skip_serializing_if = "::std::vec::Vec::is_empty"
+        )]
+        pub receipt_log_urls: ::std::vec::Vec<::std::string::String>,
+        #[serde(rename = "uncheckpointedReceipts")]
+        pub uncheckpointed_receipts: i64,
     }
-    impl ::std::convert::From<&Sharedhtxmywhrdflwr> for Sharedhtxmywhrdflwr {
-        fn from(value: &Sharedhtxmywhrdflwr) -> Self {
+    impl ::std::convert::From<&Sharedhrszehbsozypg> for Sharedhrszehbsozypg {
+        fn from(value: &Sharedhrszehbsozypg) -> Self {
             value.clone()
         }
     }
@@ -22376,6 +22551,128 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedhwnprdapsmyww`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "auditPath",
+    ///    "leafIndex",
+    ///    "treeSize"
+    ///  ],
+    ///  "properties": {
+    ///    "auditPath": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "pattern": "^[0-9a-f]{64}$"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "leafIndex": {
+    ///      "type": "integer"
+    ///    },
+    ///    "treeSize": {
+    ///      "type": "integer"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedhwnprdapsmyww {
+        #[serde(rename = "auditPath")]
+        pub audit_path: ::std::vec::Vec<SharedhwnprdapsmywwAuditPathItem>,
+        #[serde(rename = "leafIndex")]
+        pub leaf_index: i64,
+        #[serde(rename = "treeSize")]
+        pub tree_size: i64,
+    }
+    impl ::std::convert::From<&Sharedhwnprdapsmyww> for Sharedhwnprdapsmyww {
+        fn from(value: &Sharedhwnprdapsmyww) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedhwnprdapsmywwAuditPathItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedhwnprdapsmywwAuditPathItem(::std::string::String);
+    impl ::std::ops::Deref for SharedhwnprdapsmywwAuditPathItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedhwnprdapsmywwAuditPathItem> for ::std::string::String {
+        fn from(value: SharedhwnprdapsmywwAuditPathItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedhwnprdapsmywwAuditPathItem> for SharedhwnprdapsmywwAuditPathItem {
+        fn from(value: &SharedhwnprdapsmywwAuditPathItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedhwnprdapsmywwAuditPathItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedhwnprdapsmywwAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedhwnprdapsmywwAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedhwnprdapsmywwAuditPathItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedhwnprdapsmywwAuditPathItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`Sharedhwrecqyporlpn`
     ///
     /// <details><summary>JSON schema</summary>
@@ -22485,106 +22782,7 @@ pub mod shared {
                 })
         }
     }
-    ///`Sharedhyjwtfhxeikeq`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/PurposeIndexedResource"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedxdsiuszidhoha"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedhyjwtfhxeikeq {
-        pub index: i64,
-        pub kind: SharedhyjwtfhxeikeqKind,
-    }
-    impl ::std::convert::From<&Sharedhyjwtfhxeikeq> for Sharedhyjwtfhxeikeq {
-        fn from(value: &Sharedhyjwtfhxeikeq) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedhyjwtfhxeikeqKind`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "enum": [
-    ///    "write_grant"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum SharedhyjwtfhxeikeqKind {
-        #[serde(rename = "write_grant")]
-        WriteGrant,
-    }
-    impl ::std::convert::From<&Self> for SharedhyjwtfhxeikeqKind {
-        fn from(value: &SharedhyjwtfhxeikeqKind) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for SharedhyjwtfhxeikeqKind {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::WriteGrant => f.write_str("write_grant"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for SharedhyjwtfhxeikeqKind {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "write_grant" => Ok(Self::WriteGrant),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedhyjwtfhxeikeqKind {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedhyjwtfhxeikeqKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedhyjwtfhxeikeqKind {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///`Sharedhyqlrnbtggeal`
+    ///`Sharedhzujcfuxwisin`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -22592,58 +22790,15 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "affected_set_hash",
-    ///    "target_type"
+    ///    "kind",
+    ///    "owner_ref"
     ///  ],
     ///  "properties": {
-    ///    "affected_set_hash": {
-    ///      "type": "array",
-    ///      "not": {
-    ///        "const": [
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0
-    ///        ]
-    ///      },
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
+    ///    "kind": {
+    ///      "const": "pending"
     ///    },
-    ///    "target_type": {
-    ///      "const": "capability_set"
+    ///    "owner_ref": {
+    ///      "$ref": "#/$defs/OwnerOperationRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -22652,15 +22807,16 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedhyqlrnbtggeal {
-        pub affected_set_hash: [u8; 32usize],
-        pub target_type: ::serde_json::Value,
+    pub struct Sharedhzujcfuxwisin {
+        pub kind: ::serde_json::Value,
+        pub owner_ref: OwnerOperationRef,
     }
-    impl ::std::convert::From<&Sharedhyqlrnbtggeal> for Sharedhyqlrnbtggeal {
-        fn from(value: &Sharedhyqlrnbtggeal) -> Self {
+    impl ::std::convert::From<&Sharedhzujcfuxwisin> for Sharedhzujcfuxwisin {
+        fn from(value: &Sharedhzujcfuxwisin) -> Self {
             value.clone()
         }
     }
+    pub type Sharedhzzyttgcytoqr = Sharedatqbolgpvxrxe;
     ///`Sharedidzwwmjxqsbpx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -22709,90 +22865,48 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharediewobwzufkivr`
+    ///`Sharedifdpexmgznpbc`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/FdEntryBase"
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capability_hash",
+    ///    "expected_revision",
+    ///    "offer",
+    ///    "request_id"
+    ///  ],
+    ///  "properties": {
+    ///    "capability_hash": {
+    ///      "type": "string"
     ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedwteixowzuenrq"
+    ///    "expected_revision": {
+    ///      "type": "integer"
+    ///    },
+    ///    "offer": {
+    ///      "$ref": "#/$defs/Sharedubwrawdycayzr"
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string"
     ///    }
-    ///  ]
+    ///  },
+    ///  "additionalProperties": false
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharediewobwzufkivr {
-        pub binding_digest: Sharedesyhjtalzyipv,
-        pub broker_peer_identity: BrokerPeerIdentity,
-        pub close_on_exec: bool,
-        pub identity: SharediewobwzufkivrIdentity,
-        pub path: (),
-        pub purpose: PurposeBrokerIpc,
-        pub slot: SharediewobwzufkivrSlot,
+    pub struct Sharedifdpexmgznpbc {
+        pub capability_hash: ::std::string::String,
+        pub expected_revision: i64,
+        pub offer: Sharedubwrawdycayzr,
+        pub request_id: ::std::string::String,
     }
-    impl ::std::convert::From<&Sharediewobwzufkivr> for Sharediewobwzufkivr {
-        fn from(value: &Sharediewobwzufkivr) -> Self {
+    impl ::std::convert::From<&Sharedifdpexmgznpbc> for Sharedifdpexmgznpbc {
+        fn from(value: &Sharedifdpexmgznpbc) -> Self {
             value.clone()
-        }
-    }
-    pub type SharediewobwzufkivrIdentity = SharedajvfycgctjqrmIdentity;
-    pub type SharediewobwzufkivrIdentityKind = SharedajvfycgctjqrmIdentityKind;
-    ///`SharediewobwzufkivrSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    8
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharediewobwzufkivrSlot(i64);
-    impl ::std::ops::Deref for SharediewobwzufkivrSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharediewobwzufkivrSlot> for i64 {
-        fn from(value: SharediewobwzufkivrSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharediewobwzufkivrSlot> for SharediewobwzufkivrSlot {
-        fn from(value: &SharediewobwzufkivrSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharediewobwzufkivrSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![8_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharediewobwzufkivrSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`Sharedigqhwkusdldki`
@@ -23400,33 +23514,6 @@ pub mod shared {
             value.parse()
         }
     }
-    ///`Sharedizxzzqqgapofd`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "regular_file"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedizxzzqqgapofd {
-        pub kind: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedizxzzqqgapofd> for Sharedizxzzqqgapofd {
-        fn from(value: &Sharedizxzzqqgapofd) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedjbodgwfjxcywu`
     ///
     /// <details><summary>JSON schema</summary>
@@ -23580,6 +23667,50 @@ pub mod shared {
     impl ::std::convert::From<&Sharedjbswloqsllfwm> for Sharedjbswloqsllfwm {
         fn from(value: &Sharedjbswloqsllfwm) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharedjcqposdexfwuo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "identity": {
+    ///      "$ref": "#/$defs/RegularFileIdentity"
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/PurposeCageInitHelper"
+    ///    },
+    ///    "slot": {
+    ///      "const": 5
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedjcqposdexfwuo {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<RegularFileIdentity>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<PurposeCageInitHelper>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<::serde_json::Value>,
+    }
+    impl ::std::convert::From<&Sharedjcqposdexfwuo> for Sharedjcqposdexfwuo {
+        fn from(value: &Sharedjcqposdexfwuo) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedjcqposdexfwuo {
+        fn default() -> Self {
+            Self {
+                identity: Default::default(),
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
         }
     }
     ///Request correlation id. Chio adapters originate monotonic integer ids; relayed peer ids may be strings. Null is permitted per JSON-RPC 2.0 but discouraged for new requests because it is indistinguishable from a server-side parse failure response.
@@ -23816,7 +23947,7 @@ pub mod shared {
         }
     }
     pub type Sharedjlfrinzwcdodq = PurposeBrokerIpc;
-    ///`Sharedjllhhrihbhbgt`
+    ///`Sharedjmpkcvhxxdctx`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -23824,19 +23955,11 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "index",
-    ///    "queryKey",
-    ///    "sourceArtifactDigest"
+    ///    "approval_mode"
     ///  ],
     ///  "properties": {
-    ///    "index": {
-    ///      "type": "integer"
-    ///    },
-    ///    "queryKey": {
-    ///      "$ref": "#/$defs/Sharedotnkyixkoqqft"
-    ///    },
-    ///    "sourceArtifactDigest": {
-    ///      "type": "string"
+    ///    "approval_mode": {
+    ///      "const": "automatic"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -23845,15 +23968,11 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedjllhhrihbhbgt {
-        pub index: i64,
-        #[serde(rename = "queryKey")]
-        pub query_key: Sharedotnkyixkoqqft,
-        #[serde(rename = "sourceArtifactDigest")]
-        pub source_artifact_digest: ::std::string::String,
+    pub struct Sharedjmpkcvhxxdctx {
+        pub approval_mode: ::serde_json::Value,
     }
-    impl ::std::convert::From<&Sharedjllhhrihbhbgt> for Sharedjllhhrihbhbgt {
-        fn from(value: &Sharedjllhhrihbhbgt) -> Self {
+    impl ::std::convert::From<&Sharedjmpkcvhxxdctx> for Sharedjmpkcvhxxdctx {
+        fn from(value: &Sharedjmpkcvhxxdctx) -> Self {
             value.clone()
         }
     }
@@ -23891,127 +24010,8 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedjurqgoqrtcvgo`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "index",
-    ///    "queryKey",
-    ///    "sourceArtifactDigest"
-    ///  ],
-    ///  "properties": {
-    ///    "index": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "queryKey": {
-    ///      "$ref": "#/$defs/Sharedxrhdfvyjqpfcp"
-    ///    },
-    ///    "sourceArtifactDigest": {
-    ///      "type": "string",
-    ///      "pattern": "^[0-9a-f]{64}$"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedjurqgoqrtcvgo {
-        pub index: i64,
-        #[serde(rename = "queryKey")]
-        pub query_key: Sharedxrhdfvyjqpfcp,
-        #[serde(rename = "sourceArtifactDigest")]
-        pub source_artifact_digest: SharedjurqgoqrtcvgoSourceArtifactDigest,
-    }
-    impl ::std::convert::From<&Sharedjurqgoqrtcvgo> for Sharedjurqgoqrtcvgo {
-        fn from(value: &Sharedjurqgoqrtcvgo) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedjurqgoqrtcvgoSourceArtifactDigest`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[0-9a-f]{64}$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedjurqgoqrtcvgoSourceArtifactDigest(::std::string::String);
-    impl ::std::ops::Deref for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedjurqgoqrtcvgoSourceArtifactDigest> for ::std::string::String {
-        fn from(value: SharedjurqgoqrtcvgoSourceArtifactDigest) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedjurqgoqrtcvgoSourceArtifactDigest>
-        for SharedjurqgoqrtcvgoSourceArtifactDigest
-    {
-        fn from(value: &SharedjurqgoqrtcvgoSourceArtifactDigest) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedjurqgoqrtcvgoSourceArtifactDigest {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
+    pub type Sharedjtrmcgqeqybii = SharedepuxyxrvrdehdPurpose;
+    pub type SharedjtrmcgqeqybiiKind = SharedepuxyxrvrdehdPurposeKind;
     ///`Sharedjuspfdnuecgom`
     ///
     /// <details><summary>JSON schema</summary>
@@ -24138,92 +24138,6 @@ pub mod shared {
     impl ::std::convert::From<&Sharedjyeitrldnbptb> for Sharedjyeitrldnbptb {
         fn from(value: &Sharedjyeitrldnbptb) -> Self {
             value.clone()
-        }
-    }
-    ///`Sharedjznqmdtvbyqgw`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/StdioEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedoeveiwjlsttyv"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedjznqmdtvbyqgw {
-        pub binding_digest: (),
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedjznqmdtvbyqgwIdentity,
-        pub path: (),
-        pub purpose: PurposeTargetStderr,
-        pub slot: SharedjznqmdtvbyqgwSlot,
-    }
-    impl ::std::convert::From<&Sharedjznqmdtvbyqgw> for Sharedjznqmdtvbyqgw {
-        fn from(value: &Sharedjznqmdtvbyqgw) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedjznqmdtvbyqgwIdentity = SharedajvfycgctjqrmIdentity;
-    pub type SharedjznqmdtvbyqgwIdentityKind = SharedajvfycgctjqrmIdentityKind;
-    ///`SharedjznqmdtvbyqgwSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    10
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedjznqmdtvbyqgwSlot(i64);
-    impl ::std::ops::Deref for SharedjznqmdtvbyqgwSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedjznqmdtvbyqgwSlot> for i64 {
-        fn from(value: SharedjznqmdtvbyqgwSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedjznqmdtvbyqgwSlot> for SharedjznqmdtvbyqgwSlot {
-        fn from(value: &SharedjznqmdtvbyqgwSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedjznqmdtvbyqgwSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![10_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedjznqmdtvbyqgwSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
         }
     }
     ///`Sharedkabadvinoybei`
@@ -24369,92 +24283,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedkcorjzvdfhmxu`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/ArtifactEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedktjfulmovwuiq"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedkcorjzvdfhmxu {
-        pub binding_digest: Sharedesyhjtalzyipv,
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedkcorjzvdfhmxuIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: PurposeWorkingDirectory,
-        pub slot: SharedkcorjzvdfhmxuSlot,
-    }
-    impl ::std::convert::From<&Sharedkcorjzvdfhmxu> for Sharedkcorjzvdfhmxu {
-        fn from(value: &Sharedkcorjzvdfhmxu) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedkcorjzvdfhmxuIdentity = DirectoryIdentity;
-    pub type SharedkcorjzvdfhmxuIdentityKind = DirectoryIdentityKind;
-    ///`SharedkcorjzvdfhmxuSlot`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "enum": [
-    ///    6
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SharedkcorjzvdfhmxuSlot(i64);
-    impl ::std::ops::Deref for SharedkcorjzvdfhmxuSlot {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedkcorjzvdfhmxuSlot> for i64 {
-        fn from(value: SharedkcorjzvdfhmxuSlot) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedkcorjzvdfhmxuSlot> for SharedkcorjzvdfhmxuSlot {
-        fn from(value: &SharedkcorjzvdfhmxuSlot) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::TryFrom<i64> for SharedkcorjzvdfhmxuSlot {
-        type Error = self::error::ConversionError;
-        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if ![6_i64].contains(&value) {
-                Err("invalid value".into())
-            } else {
-                Ok(Self(value))
-            }
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedkcorjzvdfhmxuSlot {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            Self::try_from(<i64>::deserialize(deserializer)?)
-                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
-        }
-    }
     ///`Sharedkflncbvzgnice`
     ///
     /// <details><summary>JSON schema</summary>
@@ -24565,40 +24393,6 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
-        }
-    }
-    ///`Sharedkgfhylpijihsb`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "code",
-    ///    "kind"
-    ///  ],
-    ///  "properties": {
-    ///    "code": {
-    ///      "$ref": "#/$defs/RejectionCode"
-    ///    },
-    ///    "kind": {
-    ///      "const": "unavailable"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedkgfhylpijihsb {
-        pub code: RejectionCode,
-        pub kind: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedkgfhylpijihsb> for Sharedkgfhylpijihsb {
-        fn from(value: &Sharedkgfhylpijihsb) -> Self {
-            value.clone()
         }
     }
     ///`Sharedkhslnpxxyjere`
@@ -24720,6 +24514,135 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///`Sharedkigxtqqenwrao`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "lineage_id",
+    ///    "target_type"
+    ///  ],
+    ///  "properties": {
+    ///    "lineage_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "target_type": {
+    ///      "const": "lineage"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedkigxtqqenwrao {
+        pub lineage_id: SharedkigxtqqenwraoLineageId,
+        pub target_type: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedkigxtqqenwrao> for Sharedkigxtqqenwrao {
+        fn from(value: &Sharedkigxtqqenwrao) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedkigxtqqenwraoLineageId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedkigxtqqenwraoLineageId(::std::string::String);
+    impl ::std::ops::Deref for SharedkigxtqqenwraoLineageId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedkigxtqqenwraoLineageId> for ::std::string::String {
+        fn from(value: SharedkigxtqqenwraoLineageId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedkigxtqqenwraoLineageId> for SharedkigxtqqenwraoLineageId {
+        fn from(value: &SharedkigxtqqenwraoLineageId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedkigxtqqenwraoLineageId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedkigxtqqenwraoLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedkigxtqqenwraoLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedkigxtqqenwraoLineageId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedkigxtqqenwraoLineageId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedkjrdynzbyzhsi`
@@ -25080,50 +25003,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedktjfulmovwuiq`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "identity": {
-    ///      "$ref": "#/$defs/DirectoryIdentity"
-    ///    },
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/PurposeWorkingDirectory"
-    ///    },
-    ///    "slot": {
-    ///      "const": 6
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedktjfulmovwuiq {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<DirectoryIdentity>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<PurposeWorkingDirectory>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<::serde_json::Value>,
-    }
-    impl ::std::convert::From<&Sharedktjfulmovwuiq> for Sharedktjfulmovwuiq {
-        fn from(value: &Sharedktjfulmovwuiq) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedktjfulmovwuiq {
-        fn default() -> Self {
-            Self {
-                identity: Default::default(),
-                purpose: Default::default(),
-                slot: Default::default(),
-            }
-        }
-    }
     ///`Sharedkudyekpkhjlyh`
     ///
     /// <details><summary>JSON schema</summary>
@@ -25246,7 +25125,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedkxnitrlgobldl = Sharedcmekxqajovrce;
     ///`Sharedkzdsjbgevzyvl`
     ///
     /// <details><summary>JSON schema</summary>
@@ -25570,6 +25448,135 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedlfnivqbwpckdr`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "error_code",
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "error_code": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "state": {
+    ///      "const": "apply_failed"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedlfnivqbwpckdr {
+        pub error_code: SharedlfnivqbwpckdrErrorCode,
+        pub state: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedlfnivqbwpckdr> for Sharedlfnivqbwpckdr {
+        fn from(value: &Sharedlfnivqbwpckdr) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedlfnivqbwpckdrErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedlfnivqbwpckdrErrorCode(::std::string::String);
+    impl ::std::ops::Deref for SharedlfnivqbwpckdrErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedlfnivqbwpckdrErrorCode> for ::std::string::String {
+        fn from(value: SharedlfnivqbwpckdrErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedlfnivqbwpckdrErrorCode> for SharedlfnivqbwpckdrErrorCode {
+        fn from(value: &SharedlfnivqbwpckdrErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedlfnivqbwpckdrErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedlfnivqbwpckdrErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedlfnivqbwpckdrErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedlfnivqbwpckdrErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedlfnivqbwpckdrErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`Sharedlfnlkhpuostlg`
     ///
     /// <details><summary>JSON schema</summary>
@@ -25606,7 +25613,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedlfpnpwnkslqby = Sharedhaqwwggmrtego;
     ///`Sharedlftbnytavqtdf`
     ///
     /// <details><summary>JSON schema</summary>
@@ -25977,7 +25983,7 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedlvzndcpmrrmjz = Sharedizxzzqqgapofd;
+    pub type Sharedlvzndcpmrrmjz = Sharedgepxuexwercpj;
     ///`Sharedlzqspqlvwztlj`
     ///
     /// <details><summary>JSON schema</summary>
@@ -26245,128 +26251,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedmikrfkewgnjaa`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "auditPath",
-    ///    "leafIndex",
-    ///    "treeSize"
-    ///  ],
-    ///  "properties": {
-    ///    "auditPath": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string",
-    ///        "pattern": "^[0-9a-f]{64}$"
-    ///      },
-    ///      "maxItems": 64
-    ///    },
-    ///    "leafIndex": {
-    ///      "type": "integer"
-    ///    },
-    ///    "treeSize": {
-    ///      "type": "integer"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedmikrfkewgnjaa {
-        #[serde(rename = "auditPath")]
-        pub audit_path: ::std::vec::Vec<SharedmikrfkewgnjaaAuditPathItem>,
-        #[serde(rename = "leafIndex")]
-        pub leaf_index: i64,
-        #[serde(rename = "treeSize")]
-        pub tree_size: i64,
-    }
-    impl ::std::convert::From<&Sharedmikrfkewgnjaa> for Sharedmikrfkewgnjaa {
-        fn from(value: &Sharedmikrfkewgnjaa) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedmikrfkewgnjaaAuditPathItem`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[0-9a-f]{64}$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedmikrfkewgnjaaAuditPathItem(::std::string::String);
-    impl ::std::ops::Deref for SharedmikrfkewgnjaaAuditPathItem {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedmikrfkewgnjaaAuditPathItem> for ::std::string::String {
-        fn from(value: SharedmikrfkewgnjaaAuditPathItem) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedmikrfkewgnjaaAuditPathItem> for SharedmikrfkewgnjaaAuditPathItem {
-        fn from(value: &SharedmikrfkewgnjaaAuditPathItem) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedmikrfkewgnjaaAuditPathItem {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedmikrfkewgnjaaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedmikrfkewgnjaaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedmikrfkewgnjaaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedmikrfkewgnjaaAuditPathItem {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
     ///`Sharedmkacjwkxhqszs`
     ///
     /// <details><summary>JSON schema</summary>
@@ -26411,6 +26295,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedmkqnxgynxhvod = Sharedetylgdbigvkzy;
     ///`Sharedmleojxyvjpenm`
     ///
     /// <details><summary>JSON schema</summary>
@@ -26442,6 +26327,40 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedmleojxyvjpenm> for Sharedmleojxyvjpenm {
         fn from(value: &Sharedmleojxyvjpenm) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedmlfzmfuljzmzo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "result"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "command"
+    ///    },
+    ///    "result": {
+    ///      "$ref": "#/$defs/CommandResult"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedmlfzmfuljzmzo {
+        pub kind: ::serde_json::Value,
+        pub result: CommandResult,
+    }
+    impl ::std::convert::From<&Sharedmlfzmfuljzmzo> for Sharedmlfzmfuljzmzo {
+        fn from(value: &Sharedmlfzmfuljzmzo) -> Self {
             value.clone()
         }
     }
@@ -26657,6 +26576,45 @@ pub mod shared {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`Sharedmoemhxjilmjwp`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "average_utilization",
+    ///    "capped_grants_observed",
+    ///    "fit_score"
+    ///  ],
+    ///  "properties": {
+    ///    "average_utilization": {
+    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///    },
+    ///    "capped_grants_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "fit_score": {
+    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedmoemhxjilmjwp {
+        pub average_utilization: Sharedtbbrqbdncsldx,
+        pub capped_grants_observed: i64,
+        pub fit_score: Sharedtbbrqbdncsldx,
+    }
+    impl ::std::convert::From<&Sharedmoemhxjilmjwp> for Sharedmoemhxjilmjwp {
+        fn from(value: &Sharedmoemhxjilmjwp) -> Self {
+            value.clone()
         }
     }
     ///`Sharedmqqihavhaujtp`
@@ -27398,6 +27356,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedndmmuepokdqnd = Sharedgepxuexwercpj;
     ///`Sharednerzlxanmgskz`
     ///
     /// <details><summary>JSON schema</summary>
@@ -27584,40 +27543,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedngebneprfjpsi`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "distinct_tools",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "distinct_tools": {
-    ///      "type": "integer"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedngebneprfjpsi {
-        pub distinct_tools: i64,
-        pub score: Sharedtbbrqbdncsldx,
-    }
-    impl ::std::convert::From<&Sharedngebneprfjpsi> for Sharedngebneprfjpsi {
-        fn from(value: &Sharedngebneprfjpsi) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharednhheufhpfjnrn`
     ///
     /// <details><summary>JSON schema</summary>
@@ -27712,6 +27637,111 @@ pub mod shared {
     impl ::std::convert::From<&Sharednhheufhpfjnrn> for Sharednhheufhpfjnrn {
         fn from(value: &Sharednhheufhpfjnrn) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharednhkonyekmyqqv`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "allOf": [
+    ///    {
+    ///      "not": {
+    ///        "type": "string",
+    ///        "pattern": "^(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_)"
+    ///      }
+    ///    },
+    ///    {
+    ///      "not": {
+    ///        "type": "string",
+    ///        "pattern": "^(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$"
+    ///      }
+    ///    },
+    ///    {
+    ///      "not": {
+    ///        "type": "string",
+    ///        "pattern": "(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN])"
+    ///      }
+    ///    }
+    ///  ],
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Sharednhkonyekmyqqv(::std::string::String);
+    impl ::std::ops::Deref for Sharednhkonyekmyqqv {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Sharednhkonyekmyqqv> for ::std::string::String {
+        fn from(value: Sharednhkonyekmyqqv) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Sharednhkonyekmyqqv> for Sharednhkonyekmyqqv {
+        fn from(value: &Sharednhkonyekmyqqv) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Sharednhkonyekmyqqv {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z_][A-Za-z0-9_]*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z_][A-Za-z0-9_]*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Sharednhkonyekmyqqv {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Sharednhkonyekmyqqv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Sharednhkonyekmyqqv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Sharednhkonyekmyqqv {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharednhwkooszfzbqf`
@@ -28245,58 +28275,6 @@ pub mod shared {
             self.0.fmt(f)
         }
     }
-    ///`Sharednotnujzvmqpjg`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "effectiveTier",
-    ///    "reasonCodes",
-    ///    "reasons",
-    ///    "verdict"
-    ///  ],
-    ///  "properties": {
-    ///    "effectiveTier": {
-    ///      "type": "string"
-    ///    },
-    ///    "reasonCodes": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string"
-    ///      }
-    ///    },
-    ///    "reasons": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "$ref": "#/$defs/Sharednkxqpsndfzhhk"
-    ///      }
-    ///    },
-    ///    "verdict": {
-    ///      "type": "string"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharednotnujzvmqpjg {
-        #[serde(rename = "effectiveTier")]
-        pub effective_tier: ::std::string::String,
-        #[serde(rename = "reasonCodes")]
-        pub reason_codes: ::std::vec::Vec<::std::string::String>,
-        pub reasons: ::std::vec::Vec<Sharednkxqpsndfzhhk>,
-        pub verdict: ::std::string::String,
-    }
-    impl ::std::convert::From<&Sharednotnujzvmqpjg> for Sharednotnujzvmqpjg {
-        fn from(value: &Sharednotnujzvmqpjg) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharednrgnkslwwahke`
     ///
     /// <details><summary>JSON schema</summary>
@@ -28351,6 +28329,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharednrmmflmdomhqm = Sharedgbvliubwibnhm;
     ///`Sharednrzmxdhkicdgl`
     ///
     /// <details><summary>JSON schema</summary>
@@ -28409,7 +28388,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharednthbffqqcqdjp`
+    ///`Sharednsgqiylcebjig`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -28417,15 +28396,15 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "capabilities_observed",
+    ///    "distinct_tools",
     ///    "score"
     ///  ],
     ///  "properties": {
-    ///    "capabilities_observed": {
+    ///    "distinct_tools": {
     ///      "type": "integer"
     ///    },
     ///    "score": {
-    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -28434,142 +28413,13 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharednthbffqqcqdjp {
-        pub capabilities_observed: i64,
-        pub score: Sharedtbbrqbdncsldx,
+    pub struct Sharednsgqiylcebjig {
+        pub distinct_tools: i64,
+        pub score: Sharedkabadvinoybei,
     }
-    impl ::std::convert::From<&Sharednthbffqqcqdjp> for Sharednthbffqqcqdjp {
-        fn from(value: &Sharednthbffqqcqdjp) -> Self {
+    impl ::std::convert::From<&Sharednsgqiylcebjig> for Sharednsgqiylcebjig {
+        fn from(value: &Sharednsgqiylcebjig) -> Self {
             value.clone()
-        }
-    }
-    ///`Sharednuokzvtyoqvst`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "session_id",
-    ///    "target_type"
-    ///  ],
-    ///  "properties": {
-    ///    "session_id": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "target_type": {
-    ///      "const": "session"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharednuokzvtyoqvst {
-        pub session_id: SharednuokzvtyoqvstSessionId,
-        pub target_type: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharednuokzvtyoqvst> for Sharednuokzvtyoqvst {
-        fn from(value: &Sharednuokzvtyoqvst) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharednuokzvtyoqvstSessionId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharednuokzvtyoqvstSessionId(::std::string::String);
-    impl ::std::ops::Deref for SharednuokzvtyoqvstSessionId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharednuokzvtyoqvstSessionId> for ::std::string::String {
-        fn from(value: SharednuokzvtyoqvstSessionId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharednuokzvtyoqvstSessionId> for SharednuokzvtyoqvstSessionId {
-        fn from(value: &SharednuokzvtyoqvstSessionId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharednuokzvtyoqvstSessionId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharednuokzvtyoqvstSessionId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharednuokzvtyoqvstSessionId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharednuokzvtyoqvstSessionId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharednuokzvtyoqvstSessionId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///`Sharednwbwrjmychiqv`
@@ -28647,7 +28497,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedobcjdfgyxzmlg`
+    ///`Sharednyumowxicpnlg`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -28655,19 +28505,28 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "average_utilization",
-    ///    "capped_grants_observed",
-    ///    "fit_score"
+    ///    "artifactId",
+    ///    "occurredAt",
+    ///    "sourceFamily",
+    ///    "subject"
     ///  ],
     ///  "properties": {
-    ///    "average_utilization": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    "artifactId": {
+    ///      "type": "string",
+    ///      "maxLength": 512,
+    ///      "minLength": 1
     ///    },
-    ///    "capped_grants_observed": {
-    ///      "type": "integer"
+    ///    "occurredAt": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
     ///    },
-    ///    "fit_score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    "sourceFamily": {
+    ///      "$ref": "#/$defs/Sharedyhfqgvrnetzqi"
+    ///    },
+    ///    "subject": {
+    ///      "type": "string",
+    ///      "pattern": "^did:chio:[0-9a-f]{64}$"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -28676,14 +28535,172 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedobcjdfgyxzmlg {
-        pub average_utilization: Sharedkabadvinoybei,
-        pub capped_grants_observed: i64,
-        pub fit_score: Sharedkabadvinoybei,
+    pub struct Sharednyumowxicpnlg {
+        #[serde(rename = "artifactId")]
+        pub artifact_id: SharednyumowxicpnlgArtifactId,
+        #[serde(rename = "occurredAt")]
+        pub occurred_at: i64,
+        #[serde(rename = "sourceFamily")]
+        pub source_family: Sharedyhfqgvrnetzqi,
+        pub subject: SharednyumowxicpnlgSubject,
     }
-    impl ::std::convert::From<&Sharedobcjdfgyxzmlg> for Sharedobcjdfgyxzmlg {
-        fn from(value: &Sharedobcjdfgyxzmlg) -> Self {
+    impl ::std::convert::From<&Sharednyumowxicpnlg> for Sharednyumowxicpnlg {
+        fn from(value: &Sharednyumowxicpnlg) -> Self {
             value.clone()
+        }
+    }
+    ///`SharednyumowxicpnlgArtifactId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 512,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharednyumowxicpnlgArtifactId(::std::string::String);
+    impl ::std::ops::Deref for SharednyumowxicpnlgArtifactId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharednyumowxicpnlgArtifactId> for ::std::string::String {
+        fn from(value: SharednyumowxicpnlgArtifactId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharednyumowxicpnlgArtifactId> for SharednyumowxicpnlgArtifactId {
+        fn from(value: &SharednyumowxicpnlgArtifactId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharednyumowxicpnlgArtifactId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 512usize {
+                return Err("longer than 512 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharednyumowxicpnlgArtifactId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharednyumowxicpnlgArtifactId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharednyumowxicpnlgArtifactId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharednyumowxicpnlgArtifactId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SharednyumowxicpnlgSubject`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^did:chio:[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharednyumowxicpnlgSubject(::std::string::String);
+    impl ::std::ops::Deref for SharednyumowxicpnlgSubject {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharednyumowxicpnlgSubject> for ::std::string::String {
+        fn from(value: SharednyumowxicpnlgSubject) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharednyumowxicpnlgSubject> for SharednyumowxicpnlgSubject {
+        fn from(value: &SharednyumowxicpnlgSubject) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharednyumowxicpnlgSubject {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^did:chio:[0-9a-f]{64}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^did:chio:[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharednyumowxicpnlgSubject {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharednyumowxicpnlgSubject {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharednyumowxicpnlgSubject {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharednyumowxicpnlgSubject {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedoeubkrfypkiwh`
@@ -28781,46 +28798,6 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
-        }
-    }
-    pub type Sharedoeveiwjlsttyv = Sharedcmekxqajovrce;
-    ///`Sharedofggprubcfrwn`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "average_utilization",
-    ///    "capped_grants_observed",
-    ///    "fit_score"
-    ///  ],
-    ///  "properties": {
-    ///    "average_utilization": {
-    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
-    ///    },
-    ///    "capped_grants_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "fit_score": {
-    ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedofggprubcfrwn {
-        pub average_utilization: Sharedtbbrqbdncsldx,
-        pub capped_grants_observed: i64,
-        pub fit_score: Sharedtbbrqbdncsldx,
-    }
-    impl ::std::convert::From<&Sharedofggprubcfrwn> for Sharedofggprubcfrwn {
-        fn from(value: &Sharedofggprubcfrwn) -> Self {
-            value.clone()
         }
     }
     ///`Sharedoixbqowtpaiid`
@@ -29095,90 +29072,6 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedomtfufemvbxhu> for Sharedomtfufemvbxhu {
         fn from(value: &Sharedomtfufemvbxhu) -> Self {
-            value.clone()
-        }
-    }
-    pub type Sharedonntafywgonhp = Sharedizxzzqqgapofd;
-    ///`Sharedoprbschryubmh`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "cancellation_rate",
-    ///    "completion_rate",
-    ///    "incompletion_rate",
-    ///    "receipts_observed",
-    ///    "score"
-    ///  ],
-    ///  "properties": {
-    ///    "cancellation_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "completion_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "incompletion_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "receipts_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedoprbschryubmh {
-        pub cancellation_rate: Sharedrfivzwmnschjj,
-        pub completion_rate: Sharedrfivzwmnschjj,
-        pub incompletion_rate: Sharedrfivzwmnschjj,
-        pub receipts_observed: i64,
-        pub score: Sharedkabadvinoybei,
-    }
-    impl ::std::convert::From<&Sharedoprbschryubmh> for Sharedoprbschryubmh {
-        fn from(value: &Sharedoprbschryubmh) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedoqizillyhlexe`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "certificate",
-    ///    "signature"
-    ///  ],
-    ///  "properties": {
-    ///    "certificate": {
-    ///      "$ref": "#/$defs/Sharedjbodgwfjxcywu"
-    ///    },
-    ///    "signature": {
-    ///      "type": "string"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedoqizillyhlexe {
-        pub certificate: Sharedjbodgwfjxcywu,
-        pub signature: ::std::string::String,
-    }
-    impl ::std::convert::From<&Sharedoqizillyhlexe> for Sharedoqizillyhlexe {
-        fn from(value: &Sharedoqizillyhlexe) -> Self {
             value.clone()
         }
     }
@@ -29627,44 +29520,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedotjuvhdhzjjva = PurposeBrokerIpc;
-    ///`Sharedotkkfoznnkzyy`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/ArtifactEntry"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedvtclsjwmkdead"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedotkkfoznnkzyy {
-        pub binding_digest: Sharedesyhjtalzyipv,
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: SharedotkkfoznnkzyyIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: SharedotkkfoznnkzyyPurpose,
-        pub slot: i64,
-    }
-    impl ::std::convert::From<&Sharedotkkfoznnkzyy> for Sharedotkkfoznnkzyy {
-        fn from(value: &Sharedotkkfoznnkzyy) -> Self {
-            value.clone()
-        }
-    }
-    pub type SharedotkkfoznnkzyyIdentity = RegularFileIdentity;
-    pub type SharedotkkfoznnkzyyIdentityKind = RegularFileIdentityKind;
-    pub type SharedotkkfoznnkzyyPurpose = Sharedfmthhrrpvmzdw;
-    pub type SharedotkkfoznnkzyyPurposeKind = SharedfmthhrrpvmzdwKind;
     ///`Sharedotnkyixkoqqft`
     ///
     /// <details><summary>JSON schema</summary>
@@ -29710,307 +29565,6 @@ pub mod shared {
     impl ::std::convert::From<&Sharedotnkyixkoqqft> for Sharedotnkyixkoqqft {
         fn from(value: &Sharedotnkyixkoqqft) -> Self {
             value.clone()
-        }
-    }
-    ///`Sharedotxzgfojhsred`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "allocation_hash",
-    ///    "arguments_hash",
-    ///    "contract_hash",
-    ///    "effect",
-    ///    "expires_at",
-    ///    "price_units",
-    ///    "receiver",
-    ///    "slot_id"
-    ///  ],
-    ///  "properties": {
-    ///    "allocation_hash": {
-    ///      "type": "string"
-    ///    },
-    ///    "arguments_hash": {
-    ///      "type": "string"
-    ///    },
-    ///    "contract_hash": {
-    ///      "type": "string"
-    ///    },
-    ///    "effect": {
-    ///      "$ref": "#/$defs/Sharedthbwqidmekyep"
-    ///    },
-    ///    "expires_at": {
-    ///      "type": "integer"
-    ///    },
-    ///    "price_units": {
-    ///      "type": "integer"
-    ///    },
-    ///    "receiver": {
-    ///      "type": "string"
-    ///    },
-    ///    "slot_id": {
-    ///      "type": "string"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedotxzgfojhsred {
-        pub allocation_hash: ::std::string::String,
-        pub arguments_hash: ::std::string::String,
-        pub contract_hash: ::std::string::String,
-        pub effect: Sharedthbwqidmekyep,
-        pub expires_at: i64,
-        pub price_units: i64,
-        pub receiver: ::std::string::String,
-        pub slot_id: ::std::string::String,
-    }
-    impl ::std::convert::From<&Sharedotxzgfojhsred> for Sharedotxzgfojhsred {
-        fn from(value: &Sharedotxzgfojhsred) -> Self {
-            value.clone()
-        }
-    }
-    ///`Sharedourymuifaarhj`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "contribution_hash",
-    ///    "effect_id",
-    ///    "kind",
-    ///    "observed_base_version_hash",
-    ///    "ordinal",
-    ///    "target"
-    ///  ],
-    ///  "properties": {
-    ///    "contribution_hash": {
-    ///      "type": "array",
-    ///      "not": {
-    ///        "const": [
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0
-    ///        ]
-    ///      },
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
-    ///    },
-    ///    "effect_id": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "kind": {
-    ///      "$ref": "#/$defs/Kind"
-    ///    },
-    ///    "observed_base_version_hash": {
-    ///      "type": "array",
-    ///      "not": {
-    ///        "const": [
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0
-    ///        ]
-    ///      },
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
-    ///    },
-    ///    "ordinal": {
-    ///      "type": "integer",
-    ///      "maximum": 65535.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "target": {
-    ///      "$ref": "#/$defs/Target"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedourymuifaarhj {
-        pub contribution_hash: [u8; 32usize],
-        pub effect_id: SharedourymuifaarhjEffectId,
-        pub kind: Kind,
-        pub observed_base_version_hash: [u8; 32usize],
-        pub ordinal: u16,
-        pub target: Target,
-    }
-    impl ::std::convert::From<&Sharedourymuifaarhj> for Sharedourymuifaarhj {
-        fn from(value: &Sharedourymuifaarhj) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedourymuifaarhjEffectId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedourymuifaarhjEffectId(::std::string::String);
-    impl ::std::ops::Deref for SharedourymuifaarhjEffectId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedourymuifaarhjEffectId> for ::std::string::String {
-        fn from(value: SharedourymuifaarhjEffectId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedourymuifaarhjEffectId> for SharedourymuifaarhjEffectId {
-        fn from(value: &SharedourymuifaarhjEffectId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedourymuifaarhjEffectId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedourymuifaarhjEffectId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedourymuifaarhjEffectId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedourymuifaarhjEffectId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedourymuifaarhjEffectId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
@@ -30689,7 +30243,6 @@ pub mod shared {
                 })
         }
     }
-    pub type Sharedoyrvibakwfslu = Sharedhaqwwggmrtego;
     ///`Sharedozbcqnwcbhgcg`
     ///
     /// <details><summary>JSON schema</summary>
@@ -30836,6 +30389,39 @@ pub mod shared {
                 })
         }
     }
+    ///`Sharedpcqpibqgjaidr`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "prior_receipt_ids": {
+    ///      "type": "array",
+    ///      "maxItems": 1
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedpcqpibqgjaidr {
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub prior_receipt_ids: ::std::vec::Vec<::serde_json::Value>,
+    }
+    impl ::std::convert::From<&Sharedpcqpibqgjaidr> for Sharedpcqpibqgjaidr {
+        fn from(value: &Sharedpcqpibqgjaidr) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedpcqpibqgjaidr {
+        fn default() -> Self {
+            Self {
+                prior_receipt_ids: Default::default(),
+            }
+        }
+    }
     ///`Sharedpdseopxvlxygd`
     ///
     /// <details><summary>JSON schema</summary>
@@ -30877,83 +30463,6 @@ pub mod shared {
     impl ::std::convert::From<[u8; 32usize]> for Sharedpdseopxvlxygd {
         fn from(value: [u8; 32usize]) -> Self {
             Self(value)
-        }
-    }
-    ///`Sharedpfdszvixwoerg`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "resulting_version_hash",
-    ///    "state"
-    ///  ],
-    ///  "properties": {
-    ///    "resulting_version_hash": {
-    ///      "type": "array",
-    ///      "not": {
-    ///        "const": [
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0
-    ///        ]
-    ///      },
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
-    ///    },
-    ///    "state": {
-    ///      "const": "applied"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedpfdszvixwoerg {
-        pub resulting_version_hash: [u8; 32usize],
-        pub state: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedpfdszvixwoerg> for Sharedpfdszvixwoerg {
-        fn from(value: &Sharedpfdszvixwoerg) -> Self {
-            value.clone()
         }
     }
     ///`Sharedpfzqxraudukav`
@@ -31791,132 +31300,6 @@ pub mod shared {
             value.parse()
         }
     }
-    ///`Sharedpoihurpvxjyhd`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "name",
-    ///    "value"
-    ///  ],
-    ///  "properties": {
-    ///    "name": {
-    ///      "type": "string",
-    ///      "maxLength": 128,
-    ///      "minLength": 1,
-    ///      "pattern": "^[a-z0-9-]+$"
-    ///    },
-    ///    "value": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 8192
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedpoihurpvxjyhd {
-        pub name: SharedpoihurpvxjyhdName,
-        pub value: ::std::vec::Vec<u8>,
-    }
-    impl ::std::convert::From<&Sharedpoihurpvxjyhd> for Sharedpoihurpvxjyhd {
-        fn from(value: &Sharedpoihurpvxjyhd) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedpoihurpvxjyhdName`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 128,
-    ///  "minLength": 1,
-    ///  "pattern": "^[a-z0-9-]+$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedpoihurpvxjyhdName(::std::string::String);
-    impl ::std::ops::Deref for SharedpoihurpvxjyhdName {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedpoihurpvxjyhdName> for ::std::string::String {
-        fn from(value: SharedpoihurpvxjyhdName) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedpoihurpvxjyhdName> for SharedpoihurpvxjyhdName {
-        fn from(value: &SharedpoihurpvxjyhdName) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedpoihurpvxjyhdName {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 128usize {
-                return Err("longer than 128 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z0-9-]+$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z0-9-]+$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedpoihurpvxjyhdName {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedpoihurpvxjyhdName {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedpoihurpvxjyhdName {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedpoihurpvxjyhdName {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
     ///Normalized assurance tier resolved from the evidence. Mirrors `RuntimeAssuranceTier` in `crates/core/chio-core-types`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -32005,6 +31388,7 @@ pub mod shared {
             value.parse()
         }
     }
+    pub type Sharedpqzeadofkkfxo = Sharedatqbolgpvxrxe;
     pub type Sharedprbdgeqgxgtjb = Sharedjjdipbsdwqedk;
     ///`Sharedprxaravpzucms`
     ///
@@ -32734,72 +32118,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedqbknxjknsyzed`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "active_days",
-    ///    "activity_ratio",
-    ///    "first_seen",
-    ///    "last_seen",
-    ///    "receipt_count",
-    ///    "score",
-    ///    "span_days"
-    ///  ],
-    ///  "properties": {
-    ///    "active_days": {
-    ///      "type": "integer"
-    ///    },
-    ///    "activity_ratio": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "first_seen": {
-    ///      "type": [
-    ///        "integer",
-    ///        "null"
-    ///      ]
-    ///    },
-    ///    "last_seen": {
-    ///      "type": [
-    ///        "integer",
-    ///        "null"
-    ///      ]
-    ///    },
-    ///    "receipt_count": {
-    ///      "type": "integer"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    },
-    ///    "span_days": {
-    ///      "type": "integer"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedqbknxjknsyzed {
-        pub active_days: i64,
-        pub activity_ratio: Sharedrfivzwmnschjj,
-        pub first_seen: ::std::option::Option<i64>,
-        pub last_seen: ::std::option::Option<i64>,
-        pub receipt_count: i64,
-        pub score: Sharedkabadvinoybei,
-        pub span_days: i64,
-    }
-    impl ::std::convert::From<&Sharedqbknxjknsyzed> for Sharedqbknxjknsyzed {
-        fn from(value: &Sharedqbknxjknsyzed) -> Self {
-            value.clone()
-        }
-    }
-    pub type Sharedqcfwqtmgiqfbj = Sharedizxzzqqgapofd;
     ///`Sharedqdrwjdxjnwxks`
     ///
     /// <details><summary>JSON schema</summary>
@@ -32926,41 +32244,6 @@ pub mod shared {
         }
     }
     pub type Sharedqhpvvdciwlacj = PurposeBrokerIpc;
-    ///`Sharedqhuwxdssnbbpi`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "indexProof",
-    ///    "leaf"
-    ///  ],
-    ///  "properties": {
-    ///    "indexProof": {
-    ///      "$ref": "#/$defs/Sharedmikrfkewgnjaa"
-    ///    },
-    ///    "leaf": {
-    ///      "$ref": "#/$defs/Sharedjllhhrihbhbgt"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedqhuwxdssnbbpi {
-        #[serde(rename = "indexProof")]
-        pub index_proof: Sharedmikrfkewgnjaa,
-        pub leaf: Sharedjllhhrihbhbgt,
-    }
-    impl ::std::convert::From<&Sharedqhuwxdssnbbpi> for Sharedqhuwxdssnbbpi {
-        fn from(value: &Sharedqhuwxdssnbbpi) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedqidbsgxavfwrj`
     ///
     /// <details><summary>JSON schema</summary>
@@ -33107,6 +32390,132 @@ pub mod shared {
     impl ::std::convert::From<&Sharedqidbsgxavfwrj> for Sharedqidbsgxavfwrj {
         fn from(value: &Sharedqidbsgxavfwrj) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharedqkxprwpwwnhus`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "name",
+    ///    "value"
+    ///  ],
+    ///  "properties": {
+    ///    "name": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[a-z0-9-]+$"
+    ///    },
+    ///    "value": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 8192
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedqkxprwpwwnhus {
+        pub name: SharedqkxprwpwwnhusName,
+        pub value: ::std::vec::Vec<u8>,
+    }
+    impl ::std::convert::From<&Sharedqkxprwpwwnhus> for Sharedqkxprwpwwnhus {
+        fn from(value: &Sharedqkxprwpwwnhus) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedqkxprwpwwnhusName`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[a-z0-9-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedqkxprwpwwnhusName(::std::string::String);
+    impl ::std::ops::Deref for SharedqkxprwpwwnhusName {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedqkxprwpwwnhusName> for ::std::string::String {
+        fn from(value: SharedqkxprwpwwnhusName) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedqkxprwpwwnhusName> for SharedqkxprwpwwnhusName {
+        fn from(value: &SharedqkxprwpwwnhusName) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedqkxprwpwwnhusName {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[a-z0-9-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z0-9-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedqkxprwpwwnhusName {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedqkxprwpwwnhusName {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedqkxprwpwwnhusName {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedqkxprwpwwnhusName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedqmnfttrefxhle`
@@ -33398,6 +32807,135 @@ pub mod shared {
     impl ::std::fmt::Display for Sharedqtpzcpreelrid {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             self.0.fmt(f)
+        }
+    }
+    ///`Sharedquncmbescxusf`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "session_id",
+    ///    "target_type"
+    ///  ],
+    ///  "properties": {
+    ///    "session_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "target_type": {
+    ///      "const": "session"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedquncmbescxusf {
+        pub session_id: SharedquncmbescxusfSessionId,
+        pub target_type: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedquncmbescxusf> for Sharedquncmbescxusf {
+        fn from(value: &Sharedquncmbescxusf) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedquncmbescxusfSessionId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedquncmbescxusfSessionId(::std::string::String);
+    impl ::std::ops::Deref for SharedquncmbescxusfSessionId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedquncmbescxusfSessionId> for ::std::string::String {
+        fn from(value: SharedquncmbescxusfSessionId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedquncmbescxusfSessionId> for SharedquncmbescxusfSessionId {
+        fn from(value: &SharedquncmbescxusfSessionId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedquncmbescxusfSessionId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedquncmbescxusfSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedquncmbescxusfSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedquncmbescxusfSessionId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedquncmbescxusfSessionId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedqusbrjkkimaje`
@@ -33769,6 +33307,37 @@ pub mod shared {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`Sharedqxneyjggyjkqp`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Sharedtefafqstlyqow"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedpcqpibqgjaidr"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct Sharedqxneyjggyjkqp(pub Sharedtefafqstlyqow);
+    impl ::std::ops::Deref for Sharedqxneyjggyjkqp {
+        type Target = Sharedtefafqstlyqow;
+        fn deref(&self) -> &Sharedtefafqstlyqow {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<&Sharedqxneyjggyjkqp> for Sharedqxneyjggyjkqp {
+        fn from(value: &Sharedqxneyjggyjkqp) -> Self {
+            value.clone()
         }
     }
     ///Credential family that authenticated the workload. Mirrors `WorkloadCredentialKind` in `crates/core/chio-core-types` which uses `serde(rename_all = snake_case)`.
@@ -34182,135 +33751,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedrisfwckdxekao`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "target_type",
-    ///    "tenant_id"
-    ///  ],
-    ///  "properties": {
-    ///    "target_type": {
-    ///      "const": "tenant"
-    ///    },
-    ///    "tenant_id": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedrisfwckdxekao {
-        pub target_type: ::serde_json::Value,
-        pub tenant_id: SharedrisfwckdxekaoTenantId,
-    }
-    impl ::std::convert::From<&Sharedrisfwckdxekao> for Sharedrisfwckdxekao {
-        fn from(value: &Sharedrisfwckdxekao) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedrisfwckdxekaoTenantId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedrisfwckdxekaoTenantId(::std::string::String);
-    impl ::std::ops::Deref for SharedrisfwckdxekaoTenantId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedrisfwckdxekaoTenantId> for ::std::string::String {
-        fn from(value: SharedrisfwckdxekaoTenantId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedrisfwckdxekaoTenantId> for SharedrisfwckdxekaoTenantId {
-        fn from(value: &SharedrisfwckdxekaoTenantId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedrisfwckdxekaoTenantId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedrisfwckdxekaoTenantId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedrisfwckdxekaoTenantId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedrisfwckdxekaoTenantId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedrisfwckdxekaoTenantId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
+    pub type Sharedrjpahbtwyuxxd = Sharedatqbolgpvxrxe;
     pub type Sharedrjyedbwxuwwve = Sharedfctomejzkerpq;
     ///`Sharedrjyhxibukcgox`
     ///
@@ -34383,6 +33824,46 @@ pub mod shared {
     impl ::std::convert::From<&Sharedrjyhxibukcgox> for Sharedrjyhxibukcgox {
         fn from(value: &Sharedrjyhxibukcgox) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharedrlirfogqmqpes`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "exit_code": {
+    ///      "type": "null"
+    ///    },
+    ///    "signal": {
+    ///      "type": "integer",
+    ///      "maximum": 64.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedrlirfogqmqpes {
+        #[serde(default)]
+        pub exit_code: (),
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub signal: ::std::option::Option<::std::num::NonZeroU64>,
+    }
+    impl ::std::convert::From<&Sharedrlirfogqmqpes> for Sharedrlirfogqmqpes {
+        fn from(value: &Sharedrlirfogqmqpes) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedrlirfogqmqpes {
+        fn default() -> Self {
+            Self {
+                exit_code: Default::default(),
+                signal: Default::default(),
+            }
         }
     }
     ///Signed runtime boundary class. `cannot_see` is planning metadata only and is not valid on signed runtime receipts.
@@ -34540,6 +34021,90 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedrooupeyowqnch`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "boundary_pressure",
+    ///    "composite_score",
+    ///    "computed_at",
+    ///    "delegation_hygiene",
+    ///    "effective_weight_sum",
+    ///    "history_depth",
+    ///    "incident_correlation",
+    ///    "least_privilege",
+    ///    "reliability",
+    ///    "resource_stewardship",
+    ///    "specialization",
+    ///    "subject_key"
+    ///  ],
+    ///  "properties": {
+    ///    "boundary_pressure": {
+    ///      "$ref": "#/$defs/Sharedexncdkrxvoiqs"
+    ///    },
+    ///    "composite_score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    },
+    ///    "computed_at": {
+    ///      "type": "integer"
+    ///    },
+    ///    "delegation_hygiene": {
+    ///      "$ref": "#/$defs/Sharedyzyqysvpshubo"
+    ///    },
+    ///    "effective_weight_sum": {
+    ///      "type": "number"
+    ///    },
+    ///    "history_depth": {
+    ///      "$ref": "#/$defs/Sharedsqkwlvrjtyysr"
+    ///    },
+    ///    "incident_correlation": {
+    ///      "$ref": "#/$defs/Sharedxnncuitzdkwoe"
+    ///    },
+    ///    "least_privilege": {
+    ///      "$ref": "#/$defs/Sharedznuythodbpuka"
+    ///    },
+    ///    "reliability": {
+    ///      "$ref": "#/$defs/Sharedsdokuyccqolcn"
+    ///    },
+    ///    "resource_stewardship": {
+    ///      "$ref": "#/$defs/Sharedcpowhbxchjzra"
+    ///    },
+    ///    "specialization": {
+    ///      "$ref": "#/$defs/Sharednsgqiylcebjig"
+    ///    },
+    ///    "subject_key": {
+    ///      "type": "string"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedrooupeyowqnch {
+        pub boundary_pressure: Sharedexncdkrxvoiqs,
+        pub composite_score: Sharedkabadvinoybei,
+        pub computed_at: i64,
+        pub delegation_hygiene: Sharedyzyqysvpshubo,
+        pub effective_weight_sum: f64,
+        pub history_depth: Sharedsqkwlvrjtyysr,
+        pub incident_correlation: Sharedxnncuitzdkwoe,
+        pub least_privilege: Sharedznuythodbpuka,
+        pub reliability: Sharedsdokuyccqolcn,
+        pub resource_stewardship: Sharedcpowhbxchjzra,
+        pub specialization: Sharednsgqiylcebjig,
+        pub subject_key: ::std::string::String,
+    }
+    impl ::std::convert::From<&Sharedrooupeyowqnch> for Sharedrooupeyowqnch {
+        fn from(value: &Sharedrooupeyowqnch) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedroxgdkhghpbry`
     ///
     /// <details><summary>JSON schema</summary>
@@ -34632,45 +34197,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedrtnddtqmpwwes`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "body",
-    ///    "signature",
-    ///    "signer"
-    ///  ],
-    ///  "properties": {
-    ///    "body": {
-    ///      "$ref": "#/$defs/Sharedotxzgfojhsred"
-    ///    },
-    ///    "signature": {
-    ///      "type": "string"
-    ///    },
-    ///    "signer": {
-    ///      "type": "string"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedrtnddtqmpwwes {
-        pub body: Sharedotxzgfojhsred,
-        pub signature: ::std::string::String,
-        pub signer: ::std::string::String,
-    }
-    impl ::std::convert::From<&Sharedrtnddtqmpwwes> for Sharedrtnddtqmpwwes {
-        fn from(value: &Sharedrtnddtqmpwwes) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedrxamvqilzyhcw`
     ///
     /// <details><summary>JSON schema</summary>
@@ -34705,34 +34231,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedrxqfqubpziirb`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "$ref": "#/$defs/Sharedkjrdynzbyzhsi"
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedrxqfqubpziirb {
-        pub kind: Sharedkjrdynzbyzhsi,
-    }
-    impl ::std::convert::From<&Sharedrxqfqubpziirb> for Sharedrxqfqubpziirb {
-        fn from(value: &Sharedrxqfqubpziirb) -> Self {
-            value.clone()
-        }
-    }
-    pub type Sharedryulsweubgqew = PurposeBrokerIpc;
     ///`Sharedrzrchitxulsxn`
     ///
     /// <details><summary>JSON schema</summary>
@@ -34926,6 +34424,198 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedsdddafazmcagi`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/FdEntryBase"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedzfzagkfloqwsk"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedsdddafazmcagi {
+        pub binding_digest: (),
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: SharedsdddafazmcagiIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: SharedsdddafazmcagiPurpose,
+        pub slot: i64,
+    }
+    impl ::std::convert::From<&Sharedsdddafazmcagi> for Sharedsdddafazmcagi {
+        fn from(value: &Sharedsdddafazmcagi) -> Self {
+            value.clone()
+        }
+    }
+    pub type SharedsdddafazmcagiIdentity = PathIdentity;
+    ///`SharedsdddafazmcagiPurpose`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "index",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "index": {
+    ///      "type": "integer",
+    ///      "maximum": 63.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "kind": {
+    ///      "enum": [
+    ///        "read_grant"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SharedsdddafazmcagiPurpose {
+        pub index: i64,
+        pub kind: SharedsdddafazmcagiPurposeKind,
+    }
+    impl ::std::convert::From<&SharedsdddafazmcagiPurpose> for SharedsdddafazmcagiPurpose {
+        fn from(value: &SharedsdddafazmcagiPurpose) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedsdddafazmcagiPurposeKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "enum": [
+    ///    "read_grant"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SharedsdddafazmcagiPurposeKind {
+        #[serde(rename = "read_grant")]
+        ReadGrant,
+    }
+    impl ::std::convert::From<&Self> for SharedsdddafazmcagiPurposeKind {
+        fn from(value: &SharedsdddafazmcagiPurposeKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SharedsdddafazmcagiPurposeKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ReadGrant => f.write_str("read_grant"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for SharedsdddafazmcagiPurposeKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "read_grant" => Ok(Self::ReadGrant),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedsdddafazmcagiPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedsdddafazmcagiPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedsdddafazmcagiPurposeKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Sharedsdokuyccqolcn`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "cancellation_rate",
+    ///    "completion_rate",
+    ///    "incompletion_rate",
+    ///    "receipts_observed",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "cancellation_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "completion_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "incompletion_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "receipts_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedsdokuyccqolcn {
+        pub cancellation_rate: Sharedrfivzwmnschjj,
+        pub completion_rate: Sharedrfivzwmnschjj,
+        pub incompletion_rate: Sharedrfivzwmnschjj,
+        pub receipts_observed: i64,
+        pub score: Sharedkabadvinoybei,
+    }
+    impl ::std::convert::From<&Sharedsdokuyccqolcn> for Sharedsdokuyccqolcn {
+        fn from(value: &Sharedsdokuyccqolcn) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedsfmbvxhujxamd`
     ///
     /// <details><summary>JSON schema</summary>
@@ -35004,76 +34694,6 @@ pub mod shared {
     impl ::std::convert::From<&Sharedsglfauxpmdaqm> for Sharedsglfauxpmdaqm {
         fn from(value: &Sharedsglfauxpmdaqm) -> Self {
             value.clone()
-        }
-    }
-    ///`Sharedsgvcqetdxqytk`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "binding_digest": {
-    ///      "type": "null"
-    ///    },
-    ///    "broker_peer_identity": {
-    ///      "type": "null"
-    ///    },
-    ///    "close_on_exec": {
-    ///      "const": true
-    ///    },
-    ///    "identity": {
-    ///      "$ref": "#/$defs/PathIdentity"
-    ///    },
-    ///    "path": {
-    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
-    ///    },
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/Sharedwmihrjpupxzaf"
-    ///    },
-    ///    "slot": {
-    ///      "type": "integer",
-    ///      "maximum": 127.0,
-    ///      "minimum": 64.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedsgvcqetdxqytk {
-        #[serde(default)]
-        pub binding_digest: (),
-        #[serde(default)]
-        pub broker_peer_identity: (),
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<PathIdentity>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<Sharedwmihrjpupxzaf>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<i64>,
-    }
-    impl ::std::convert::From<&Sharedsgvcqetdxqytk> for Sharedsgvcqetdxqytk {
-        fn from(value: &Sharedsgvcqetdxqytk) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedsgvcqetdxqytk {
-        fn default() -> Self {
-            Self {
-                binding_digest: Default::default(),
-                broker_peer_identity: Default::default(),
-                close_on_exec: Default::default(),
-                identity: Default::default(),
-                path: Default::default(),
-                purpose: Default::default(),
-                slot: Default::default(),
-            }
         }
     }
     ///`Sharedshdkbopqclqvi`
@@ -35319,40 +34939,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedsolfsletikcvj`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "oneOf": [
-    ///    {
-    ///      "$ref": "#/$defs/Sharedotjuvhdhzjjva"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedtxhqfhojwyxow"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(untagged)]
-    pub enum Sharedsolfsletikcvj {
-        Sharedotjuvhdhzjjva(Sharedotjuvhdhzjjva),
-        Sharedtxhqfhojwyxow(Sharedtxhqfhojwyxow),
-    }
-    impl ::std::convert::From<&Self> for Sharedsolfsletikcvj {
-        fn from(value: &Sharedsolfsletikcvj) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::From<Sharedtxhqfhojwyxow> for Sharedsolfsletikcvj {
-        fn from(value: Sharedtxhqfhojwyxow) -> Self {
-            Self::Sharedtxhqfhojwyxow(value)
-        }
-    }
-    pub type Sharedsoluiirwbunlw = Sharedggfztevbgtdus;
     ///`Sharedspdmldvzqbvmj`
     ///
     /// <details><summary>JSON schema</summary>
@@ -35385,6 +34971,200 @@ pub mod shared {
     impl ::std::convert::From<&Sharedspdmldvzqbvmj> for Sharedspdmldvzqbvmj {
         fn from(value: &Sharedspdmldvzqbvmj) -> Self {
             value.clone()
+        }
+    }
+    ///`Sharedsqkwlvrjtyysr`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "active_days",
+    ///    "activity_ratio",
+    ///    "first_seen",
+    ///    "last_seen",
+    ///    "receipt_count",
+    ///    "score",
+    ///    "span_days"
+    ///  ],
+    ///  "properties": {
+    ///    "active_days": {
+    ///      "type": "integer"
+    ///    },
+    ///    "activity_ratio": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "first_seen": {
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ]
+    ///    },
+    ///    "last_seen": {
+    ///      "type": [
+    ///        "integer",
+    ///        "null"
+    ///      ]
+    ///    },
+    ///    "receipt_count": {
+    ///      "type": "integer"
+    ///    },
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    },
+    ///    "span_days": {
+    ///      "type": "integer"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedsqkwlvrjtyysr {
+        pub active_days: i64,
+        pub activity_ratio: Sharedrfivzwmnschjj,
+        pub first_seen: ::std::option::Option<i64>,
+        pub last_seen: ::std::option::Option<i64>,
+        pub receipt_count: i64,
+        pub score: Sharedkabadvinoybei,
+        pub span_days: i64,
+    }
+    impl ::std::convert::From<&Sharedsqkwlvrjtyysr> for Sharedsqkwlvrjtyysr {
+        fn from(value: &Sharedsqkwlvrjtyysr) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedsqropixyyrabx`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "target_type",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "target_type": {
+    ///      "const": "tenant"
+    ///    },
+    ///    "tenant_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedsqropixyyrabx {
+        pub target_type: ::serde_json::Value,
+        pub tenant_id: SharedsqropixyyrabxTenantId,
+    }
+    impl ::std::convert::From<&Sharedsqropixyyrabx> for Sharedsqropixyyrabx {
+        fn from(value: &Sharedsqropixyyrabx) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedsqropixyyrabxTenantId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedsqropixyyrabxTenantId(::std::string::String);
+    impl ::std::ops::Deref for SharedsqropixyyrabxTenantId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedsqropixyyrabxTenantId> for ::std::string::String {
+        fn from(value: SharedsqropixyyrabxTenantId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedsqropixyyrabxTenantId> for SharedsqropixyyrabxTenantId {
+        fn from(value: &SharedsqropixyyrabxTenantId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedsqropixyyrabxTenantId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedsqropixyyrabxTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedsqropixyyrabxTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedsqropixyyrabxTenantId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedsqropixyyrabxTenantId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedssfaiijfdkufw`
@@ -35509,6 +35289,39 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedswzjddpjajhmh`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Sharedysmskmyqxqerk"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedhdydasjmmzhcv"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum Sharedswzjddpjajhmh {
+        Sharedysmskmyqxqerk(Sharedysmskmyqxqerk),
+        Sharedhdydasjmmzhcv(Sharedhdydasjmmzhcv),
+    }
+    impl ::std::convert::From<&Self> for Sharedswzjddpjajhmh {
+        fn from(value: &Sharedswzjddpjajhmh) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Sharedhdydasjmmzhcv> for Sharedswzjddpjajhmh {
+        fn from(value: Sharedhdydasjmmzhcv) -> Self {
+            Self::Sharedhdydasjmmzhcv(value)
+        }
+    }
     ///`Sharedsymnrryulordc`
     ///
     /// <details><summary>JSON schema</summary>
@@ -35616,6 +35429,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedsyrwytpyqtsiv = Sharedbzqfzvbucrloj;
     ///`Sharedtbbrqbdncsldx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36043,40 +35857,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedtdufblmkggwms`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "id",
-    ///    "metrics"
-    ///  ],
-    ///  "properties": {
-    ///    "id": {
-    ///      "type": "string"
-    ///    },
-    ///    "metrics": {
-    ///      "$ref": "#/$defs/Sharedhtxmywhrdflwr"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedtdufblmkggwms {
-        pub id: ::std::string::String,
-        pub metrics: Sharedhtxmywhrdflwr,
-    }
-    impl ::std::convert::From<&Sharedtdufblmkggwms> for Sharedtdufblmkggwms {
-        fn from(value: &Sharedtdufblmkggwms) -> Self {
-            value.clone()
-        }
-    }
+    pub type Sharedtefafqstlyqow = Sharedfcdilqajxmwqm;
     ///`Sharedtesqrforhwlnb`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36208,6 +35989,7 @@ pub mod shared {
                 })
         }
     }
+    pub type Sharedteuluygyzdzpv = Sharedgepxuexwercpj;
     ///`Sharedtfcumlajehevl`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36413,6 +36195,40 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedthdbxesgpsbep`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "id",
+    ///    "metrics"
+    ///  ],
+    ///  "properties": {
+    ///    "id": {
+    ///      "type": "string"
+    ///    },
+    ///    "metrics": {
+    ///      "$ref": "#/$defs/Sharedrooupeyowqnch"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedthdbxesgpsbep {
+        pub id: ::std::string::String,
+        pub metrics: Sharedrooupeyowqnch,
+    }
+    impl ::std::convert::From<&Sharedthdbxesgpsbep> for Sharedthdbxesgpsbep {
+        fn from(value: &Sharedthdbxesgpsbep) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedtlunutwpgzqel`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36447,7 +36263,83 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedtmyydecuckoxh = Sharedfbbqaberromye;
+    ///`Sharedtoutfcqigqrze`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "affected_set_hash",
+    ///    "target_type"
+    ///  ],
+    ///  "properties": {
+    ///    "affected_set_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "target_type": {
+    ///      "const": "capability_set"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedtoutfcqigqrze {
+        pub affected_set_hash: [u8; 32usize],
+        pub target_type: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedtoutfcqigqrze> for Sharedtoutfcqigqrze {
+        fn from(value: &Sharedtoutfcqigqrze) -> Self {
+            value.clone()
+        }
+    }
     ///`Sharedtrgkbdbvrobmx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36688,6 +36580,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedtvorivueixfcb = Sharedatqbolgpvxrxe;
     ///`Sharedtvylsspnayiut`
     ///
     /// <details><summary>JSON schema</summary>
@@ -36842,7 +36735,8 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedtxhqfhojwyxow`
+    pub type Sharedtzaflttnccbqm = PurposeBrokerIpc;
+    ///`Sharedubwrawdycayzr`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -36850,15 +36744,19 @@ pub mod shared {
     ///{
     ///  "type": "object",
     ///  "required": [
-    ///    "kind",
-    ///    "leafProof"
+    ///    "body",
+    ///    "signature",
+    ///    "signer"
     ///  ],
     ///  "properties": {
-    ///    "kind": {
-    ///      "const": "adjacent"
+    ///    "body": {
+    ///      "$ref": "#/$defs/Sharedfhdrkybnekqgj"
     ///    },
-    ///    "leafProof": {
-    ///      "$ref": "#/$defs/Sharedxjzfgzjqqkgqi"
+    ///    "signature": {
+    ///      "type": "string"
+    ///    },
+    ///    "signer": {
+    ///      "type": "string"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -36867,18 +36765,188 @@ pub mod shared {
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
-    pub struct Sharedtxhqfhojwyxow {
-        pub kind: ::serde_json::Value,
-        #[serde(rename = "leafProof")]
-        pub leaf_proof: Sharedxjzfgzjqqkgqi,
+    pub struct Sharedubwrawdycayzr {
+        pub body: Sharedfhdrkybnekqgj,
+        pub signature: ::std::string::String,
+        pub signer: ::std::string::String,
     }
-    impl ::std::convert::From<&Sharedtxhqfhojwyxow> for Sharedtxhqfhojwyxow {
-        fn from(value: &Sharedtxhqfhojwyxow) -> Self {
+    impl ::std::convert::From<&Sharedubwrawdycayzr> for Sharedubwrawdycayzr {
+        fn from(value: &Sharedubwrawdycayzr) -> Self {
             value.clone()
         }
     }
-    pub type Sharedtzaflttnccbqm = PurposeBrokerIpc;
-    pub type Shareduamknehceghqq = Sharedpfdszvixwoerg;
+    ///`Shareductopsyealeny`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/StdioEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedmkqnxgynxhvod"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareductopsyealeny {
+        pub binding_digest: (),
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: ShareductopsyealenyIdentity,
+        pub path: (),
+        pub purpose: PurposeTargetStderr,
+        pub slot: ShareductopsyealenySlot,
+    }
+    impl ::std::convert::From<&Shareductopsyealeny> for Shareductopsyealeny {
+        fn from(value: &Shareductopsyealeny) -> Self {
+            value.clone()
+        }
+    }
+    pub type ShareductopsyealenyIdentity = ShareddsxzbhbwshdtbIdentity;
+    pub type ShareductopsyealenyIdentityKind = ShareddsxzbhbwshdtbIdentityKind;
+    ///`ShareductopsyealenySlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    10
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ShareductopsyealenySlot(i64);
+    impl ::std::ops::Deref for ShareductopsyealenySlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareductopsyealenySlot> for i64 {
+        fn from(value: ShareductopsyealenySlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareductopsyealenySlot> for ShareductopsyealenySlot {
+        fn from(value: &ShareductopsyealenySlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ShareductopsyealenySlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![10_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareductopsyealenySlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
+    ///`Shareduejzfrnwnaemo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/FdEntryBase"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedcbeckyvbkzsyi"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareduejzfrnwnaemo {
+        pub binding_digest: Sharedesyhjtalzyipv,
+        pub broker_peer_identity: BrokerPeerIdentity,
+        pub close_on_exec: bool,
+        pub identity: ShareduejzfrnwnaemoIdentity,
+        pub path: (),
+        pub purpose: PurposeBrokerIpc,
+        pub slot: ShareduejzfrnwnaemoSlot,
+    }
+    impl ::std::convert::From<&Shareduejzfrnwnaemo> for Shareduejzfrnwnaemo {
+        fn from(value: &Shareduejzfrnwnaemo) -> Self {
+            value.clone()
+        }
+    }
+    pub type ShareduejzfrnwnaemoIdentity = ShareddsxzbhbwshdtbIdentity;
+    pub type ShareduejzfrnwnaemoIdentityKind = ShareddsxzbhbwshdtbIdentityKind;
+    ///`ShareduejzfrnwnaemoSlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    8
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ShareduejzfrnwnaemoSlot(i64);
+    impl ::std::ops::Deref for ShareduejzfrnwnaemoSlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareduejzfrnwnaemoSlot> for i64 {
+        fn from(value: ShareduejzfrnwnaemoSlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareduejzfrnwnaemoSlot> for ShareduejzfrnwnaemoSlot {
+        fn from(value: &ShareduejzfrnwnaemoSlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ShareduejzfrnwnaemoSlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![8_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareduejzfrnwnaemoSlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`Sharedufdvztjtfmubf`
     ///
     /// <details><summary>JSON schema</summary>
@@ -37085,6 +37153,7 @@ pub mod shared {
             value.parse()
         }
     }
+    pub type Sharedugmaawnbdtbmj = Sharedcvissskaxukzg;
     ///`Sharedugumblftlmovj`
     ///
     /// <details><summary>JSON schema</summary>
@@ -37129,6 +37198,97 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedugumblftlmovj> for Sharedugumblftlmovj {
         fn from(value: &Sharedugumblftlmovj) -> Self {
+            value.clone()
+        }
+    }
+    ///`Shareduhzqynfzztdac`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "binding_digest": {
+    ///      "type": "null"
+    ///    },
+    ///    "broker_peer_identity": {
+    ///      "type": "null"
+    ///    },
+    ///    "close_on_exec": {
+    ///      "const": true
+    ///    },
+    ///    "identity": {
+    ///      "$ref": "#/$defs/SocketIdentity"
+    ///    },
+    ///    "path": {
+    ///      "type": "null"
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Shareduhzqynfzztdac {
+        #[serde(default)]
+        pub binding_digest: (),
+        #[serde(default)]
+        pub broker_peer_identity: (),
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<SocketIdentity>,
+        #[serde(default)]
+        pub path: (),
+    }
+    impl ::std::convert::From<&Shareduhzqynfzztdac> for Shareduhzqynfzztdac {
+        fn from(value: &Shareduhzqynfzztdac) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Shareduhzqynfzztdac {
+        fn default() -> Self {
+            Self {
+                binding_digest: Default::default(),
+                broker_peer_identity: Default::default(),
+                close_on_exec: Default::default(),
+                identity: Default::default(),
+                path: Default::default(),
+            }
+        }
+    }
+    ///`Sharedulbmauygvafiw`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "indexProof",
+    ///    "leaf"
+    ///  ],
+    ///  "properties": {
+    ///    "indexProof": {
+    ///      "$ref": "#/$defs/Sharedcevujorekhnax"
+    ///    },
+    ///    "leaf": {
+    ///      "$ref": "#/$defs/Sharedwdcmjzidayzal"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedulbmauygvafiw {
+        #[serde(rename = "indexProof")]
+        pub index_proof: Sharedcevujorekhnax,
+        pub leaf: Sharedwdcmjzidayzal,
+    }
+    impl ::std::convert::From<&Sharedulbmauygvafiw> for Sharedulbmauygvafiw {
+        fn from(value: &Sharedulbmauygvafiw) -> Self {
             value.clone()
         }
     }
@@ -37540,6 +37700,92 @@ pub mod shared {
         }
     }
     pub type Sharedutnxwesqtmgti = Sharedojsixvyvqlbld;
+    ///`Shareduviizzftilhmy`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/ArtifactEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedbffibejkehwkl"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareduviizzftilhmy {
+        pub binding_digest: Sharedesyhjtalzyipv,
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: ShareduviizzftilhmyIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: PurposeWorkingDirectory,
+        pub slot: ShareduviizzftilhmySlot,
+    }
+    impl ::std::convert::From<&Shareduviizzftilhmy> for Shareduviizzftilhmy {
+        fn from(value: &Shareduviizzftilhmy) -> Self {
+            value.clone()
+        }
+    }
+    pub type ShareduviizzftilhmyIdentity = DirectoryIdentity;
+    pub type ShareduviizzftilhmyIdentityKind = DirectoryIdentityKind;
+    ///`ShareduviizzftilhmySlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    6
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ShareduviizzftilhmySlot(i64);
+    impl ::std::ops::Deref for ShareduviizzftilhmySlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareduviizzftilhmySlot> for i64 {
+        fn from(value: ShareduviizzftilhmySlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareduviizzftilhmySlot> for ShareduviizzftilhmySlot {
+        fn from(value: &ShareduviizzftilhmySlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ShareduviizzftilhmySlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![6_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareduviizzftilhmySlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`Shareduwatppwnmfwtw`
     ///
     /// <details><summary>JSON schema</summary>
@@ -37582,6 +37828,329 @@ pub mod shared {
     impl ::std::convert::From<&Shareduwatppwnmfwtw> for Shareduwatppwnmfwtw {
         fn from(value: &Shareduwatppwnmfwtw) -> Self {
             value.clone()
+        }
+    }
+    ///`Shareduwqaaxbjwisck`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/ArtifactEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedjcqposdexfwuo"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareduwqaaxbjwisck {
+        pub binding_digest: Sharedesyhjtalzyipv,
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: ShareduwqaaxbjwisckIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: PurposeCageInitHelper,
+        pub slot: ShareduwqaaxbjwisckSlot,
+    }
+    impl ::std::convert::From<&Shareduwqaaxbjwisck> for Shareduwqaaxbjwisck {
+        fn from(value: &Shareduwqaaxbjwisck) -> Self {
+            value.clone()
+        }
+    }
+    pub type ShareduwqaaxbjwisckIdentity = RegularFileIdentity;
+    pub type ShareduwqaaxbjwisckIdentityKind = RegularFileIdentityKind;
+    ///`ShareduwqaaxbjwisckSlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    5
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ShareduwqaaxbjwisckSlot(i64);
+    impl ::std::ops::Deref for ShareduwqaaxbjwisckSlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareduwqaaxbjwisckSlot> for i64 {
+        fn from(value: ShareduwqaaxbjwisckSlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareduwqaaxbjwisckSlot> for ShareduwqaaxbjwisckSlot {
+        fn from(value: &ShareduwqaaxbjwisckSlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ShareduwqaaxbjwisckSlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![5_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareduwqaaxbjwisckSlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
+    ///`Shareduxsmqqqmzxvfd`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "contribution_hash",
+    ///    "effect_id",
+    ///    "kind",
+    ///    "observed_base_version_hash",
+    ///    "ordinal",
+    ///    "target"
+    ///  ],
+    ///  "properties": {
+    ///    "contribution_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "effect_id": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "kind": {
+    ///      "$ref": "#/$defs/Kind"
+    ///    },
+    ///    "observed_base_version_hash": {
+    ///      "type": "array",
+    ///      "not": {
+    ///        "const": [
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0,
+    ///          0
+    ///        ]
+    ///      },
+    ///      "items": {
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "ordinal": {
+    ///      "type": "integer",
+    ///      "maximum": 65535.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "target": {
+    ///      "$ref": "#/$defs/Target"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Shareduxsmqqqmzxvfd {
+        pub contribution_hash: [u8; 32usize],
+        pub effect_id: ShareduxsmqqqmzxvfdEffectId,
+        pub kind: Kind,
+        pub observed_base_version_hash: [u8; 32usize],
+        pub ordinal: u16,
+        pub target: Target,
+    }
+    impl ::std::convert::From<&Shareduxsmqqqmzxvfd> for Shareduxsmqqqmzxvfd {
+        fn from(value: &Shareduxsmqqqmzxvfd) -> Self {
+            value.clone()
+        }
+    }
+    ///`ShareduxsmqqqmzxvfdEffectId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ShareduxsmqqqmzxvfdEffectId(::std::string::String);
+    impl ::std::ops::Deref for ShareduxsmqqqmzxvfdEffectId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ShareduxsmqqqmzxvfdEffectId> for ::std::string::String {
+        fn from(value: ShareduxsmqqqmzxvfdEffectId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ShareduxsmqqqmzxvfdEffectId> for ShareduxsmqqqmzxvfdEffectId {
+        fn from(value: &ShareduxsmqqqmzxvfdEffectId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ShareduxsmqqqmzxvfdEffectId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ShareduxsmqqqmzxvfdEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ShareduxsmqqqmzxvfdEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ShareduxsmqqqmzxvfdEffectId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ShareduxsmqqqmzxvfdEffectId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Shareduxyeamadytvft`
@@ -37761,43 +38330,6 @@ pub mod shared {
                 })
         }
     }
-    ///`Shareduzznfucfppoxy`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "allOf": [
-    ///    {
-    ///      "$ref": "#/$defs/FdEntryBase"
-    ///    },
-    ///    {
-    ///      "$ref": "#/$defs/Sharedbennvijadmpsh"
-    ///    }
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Shareduzznfucfppoxy {
-        pub binding_digest: (),
-        pub broker_peer_identity: (),
-        pub close_on_exec: bool,
-        pub identity: ShareduzznfucfppoxyIdentity,
-        pub path: AbsoluteCanonicalPath,
-        pub purpose: ShareduzznfucfppoxyPurpose,
-        pub slot: i64,
-    }
-    impl ::std::convert::From<&Shareduzznfucfppoxy> for Shareduzznfucfppoxy {
-        fn from(value: &Shareduzznfucfppoxy) -> Self {
-            value.clone()
-        }
-    }
-    pub type ShareduzznfucfppoxyIdentity = RegularFileIdentity;
-    pub type ShareduzznfucfppoxyIdentityKind = RegularFileIdentityKind;
-    pub type ShareduzznfucfppoxyPurpose = Sharedhyjwtfhxeikeq;
-    pub type ShareduzznfucfppoxyPurposeKind = SharedhyjwtfhxeikeqKind;
     ///`Sharedvagvkztojopym`
     ///
     /// <details><summary>JSON schema</summary>
@@ -37937,7 +38469,92 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedvfpssqqyrbdqt = Sharedhaqwwggmrtego;
+    ///`Sharedvfwymamjffpyj`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "allOf": [
+    ///    {
+    ///      "$ref": "#/$defs/ArtifactEntry"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Sharedycwdvealkuwvh"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedvfwymamjffpyj {
+        pub binding_digest: Sharedesyhjtalzyipv,
+        pub broker_peer_identity: (),
+        pub close_on_exec: bool,
+        pub identity: SharedvfwymamjffpyjIdentity,
+        pub path: AbsoluteCanonicalPath,
+        pub purpose: PurposeTargetExecutable,
+        pub slot: SharedvfwymamjffpyjSlot,
+    }
+    impl ::std::convert::From<&Sharedvfwymamjffpyj> for Sharedvfwymamjffpyj {
+        fn from(value: &Sharedvfwymamjffpyj) -> Self {
+            value.clone()
+        }
+    }
+    pub type SharedvfwymamjffpyjIdentity = RegularFileIdentity;
+    pub type SharedvfwymamjffpyjIdentityKind = RegularFileIdentityKind;
+    ///`SharedvfwymamjffpyjSlot`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    255
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SharedvfwymamjffpyjSlot(i64);
+    impl ::std::ops::Deref for SharedvfwymamjffpyjSlot {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedvfwymamjffpyjSlot> for i64 {
+        fn from(value: SharedvfwymamjffpyjSlot) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedvfwymamjffpyjSlot> for SharedvfwymamjffpyjSlot {
+        fn from(value: &SharedvfwymamjffpyjSlot) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for SharedvfwymamjffpyjSlot {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![255_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedvfwymamjffpyjSlot {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
     ///`Sharedvgiitbpcsyquo`
     ///
     /// <details><summary>JSON schema</summary>
@@ -38319,6 +38936,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedvomubzxegopty = Sharedgbvliubwibnhm;
     ///`Sharedvqsoftoihrdng`
     ///
     /// <details><summary>JSON schema</summary>
@@ -38415,52 +39033,8 @@ pub mod shared {
             value.parse()
         }
     }
-    ///`Sharedvtclsjwmkdead`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "properties": {
-    ///    "identity": {
-    ///      "$ref": "#/$defs/RegularFileIdentity"
-    ///    },
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/Sharedfmthhrrpvmzdw"
-    ///    },
-    ///    "slot": {
-    ///      "type": "integer",
-    ///      "maximum": 63.0,
-    ///      "minimum": 16.0
-    ///    }
-    ///  }
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedvtclsjwmkdead {
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<RegularFileIdentity>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<Sharedfmthhrrpvmzdw>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<i64>,
-    }
-    impl ::std::convert::From<&Sharedvtclsjwmkdead> for Sharedvtclsjwmkdead {
-        fn from(value: &Sharedvtclsjwmkdead) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::default::Default for Sharedvtclsjwmkdead {
-        fn default() -> Self {
-            Self {
-                identity: Default::default(),
-                purpose: Default::default(),
-                slot: Default::default(),
-            }
-        }
-    }
+    pub type Sharedvskhprgalrvbj = SharedsdddafazmcagiPurpose;
+    pub type SharedvskhprgalrvbjKind = SharedsdddafazmcagiPurposeKind;
     ///`Sharedvteivwcsmclgq`
     ///
     /// <details><summary>JSON schema</summary>
@@ -38623,135 +39197,6 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
-        }
-    }
-    ///`Sharedvwgockvumgeqz`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "error_code",
-    ///    "state"
-    ///  ],
-    ///  "properties": {
-    ///    "error_code": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "state": {
-    ///      "const": "apply_failed"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedvwgockvumgeqz {
-        pub error_code: SharedvwgockvumgeqzErrorCode,
-        pub state: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedvwgockvumgeqz> for Sharedvwgockvumgeqz {
-        fn from(value: &Sharedvwgockvumgeqz) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedvwgockvumgeqzErrorCode`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedvwgockvumgeqzErrorCode(::std::string::String);
-    impl ::std::ops::Deref for SharedvwgockvumgeqzErrorCode {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedvwgockvumgeqzErrorCode> for ::std::string::String {
-        fn from(value: SharedvwgockvumgeqzErrorCode) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedvwgockvumgeqzErrorCode> for SharedvwgockvumgeqzErrorCode {
-        fn from(value: &SharedvwgockvumgeqzErrorCode) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedvwgockvumgeqzErrorCode {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedvwgockvumgeqzErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedvwgockvumgeqzErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedvwgockvumgeqzErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedvwgockvumgeqzErrorCode {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///`Sharedvxxkgknzdhnfk`
@@ -39004,60 +39449,127 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedwatxndqlwdewn`
+    pub type Sharedwbsxksqqfcnfj = SharedfkzdtetvymstcPurpose;
+    pub type SharedwbsxksqqfcnfjKind = SharedfkzdtetvymstcPurposeKind;
+    ///`Sharedwdcmjzidayzal`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
     ///  "type": "object",
+    ///  "required": [
+    ///    "index",
+    ///    "queryKey",
+    ///    "sourceArtifactDigest"
+    ///  ],
     ///  "properties": {
-    ///    "binding_digest": {
-    ///      "type": "null"
+    ///    "index": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
     ///    },
-    ///    "broker_peer_identity": {
-    ///      "type": "null"
+    ///    "queryKey": {
+    ///      "$ref": "#/$defs/Sharednyumowxicpnlg"
     ///    },
-    ///    "close_on_exec": {
-    ///      "const": true
-    ///    },
-    ///    "identity": {
-    ///      "$ref": "#/$defs/SocketIdentity"
-    ///    },
-    ///    "path": {
-    ///      "type": "null"
+    ///    "sourceArtifactDigest": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
     ///    }
-    ///  }
+    ///  },
+    ///  "additionalProperties": false
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedwatxndqlwdewn {
-        #[serde(default)]
-        pub binding_digest: (),
-        #[serde(default)]
-        pub broker_peer_identity: (),
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<SocketIdentity>,
-        #[serde(default)]
-        pub path: (),
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedwdcmjzidayzal {
+        pub index: i64,
+        #[serde(rename = "queryKey")]
+        pub query_key: Sharednyumowxicpnlg,
+        #[serde(rename = "sourceArtifactDigest")]
+        pub source_artifact_digest: SharedwdcmjzidayzalSourceArtifactDigest,
     }
-    impl ::std::convert::From<&Sharedwatxndqlwdewn> for Sharedwatxndqlwdewn {
-        fn from(value: &Sharedwatxndqlwdewn) -> Self {
+    impl ::std::convert::From<&Sharedwdcmjzidayzal> for Sharedwdcmjzidayzal {
+        fn from(value: &Sharedwdcmjzidayzal) -> Self {
             value.clone()
         }
     }
-    impl ::std::default::Default for Sharedwatxndqlwdewn {
-        fn default() -> Self {
-            Self {
-                binding_digest: Default::default(),
-                broker_peer_identity: Default::default(),
-                close_on_exec: Default::default(),
-                identity: Default::default(),
-                path: Default::default(),
+    ///`SharedwdcmjzidayzalSourceArtifactDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedwdcmjzidayzalSourceArtifactDigest(::std::string::String);
+    impl ::std::ops::Deref for SharedwdcmjzidayzalSourceArtifactDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedwdcmjzidayzalSourceArtifactDigest> for ::std::string::String {
+        fn from(value: SharedwdcmjzidayzalSourceArtifactDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedwdcmjzidayzalSourceArtifactDigest>
+        for SharedwdcmjzidayzalSourceArtifactDigest
+    {
+        fn from(value: &SharedwdcmjzidayzalSourceArtifactDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedwdcmjzidayzalSourceArtifactDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
             }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedwdcmjzidayzalSourceArtifactDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedwdcmjzidayzalSourceArtifactDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedwdcmjzidayzalSourceArtifactDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedwdcmjzidayzalSourceArtifactDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///`Sharedwfsabrfzlkehj`
@@ -39485,8 +39997,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedwmihrjpupxzaf = SharedhedorjnhbehtrPurpose;
-    pub type SharedwmihrjpupxzafKind = SharedhedorjnhbehtrPurposeKind;
     ///`Sharedwnchngeetqzzf`
     ///
     /// <details><summary>JSON schema</summary>
@@ -39633,6 +40143,135 @@ pub mod shared {
             value.clone()
         }
     }
+    ///`Sharedwoqvjvjqyszcm`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "error_code",
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "error_code": {
+    ///      "type": "string",
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///    },
+    ///    "state": {
+    ///      "const": "rollback_failed"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedwoqvjvjqyszcm {
+        pub error_code: SharedwoqvjvjqyszcmErrorCode,
+        pub state: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedwoqvjvjqyszcm> for Sharedwoqvjvjqyszcm {
+        fn from(value: &Sharedwoqvjvjqyszcm) -> Self {
+            value.clone()
+        }
+    }
+    ///`SharedwoqvjvjqyszcmErrorCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SharedwoqvjvjqyszcmErrorCode(::std::string::String);
+    impl ::std::ops::Deref for SharedwoqvjvjqyszcmErrorCode {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SharedwoqvjvjqyszcmErrorCode> for ::std::string::String {
+        fn from(value: SharedwoqvjvjqyszcmErrorCode) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SharedwoqvjvjqyszcmErrorCode> for SharedwoqvjvjqyszcmErrorCode {
+        fn from(value: &SharedwoqvjvjqyszcmErrorCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SharedwoqvjvjqyszcmErrorCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SharedwoqvjvjqyszcmErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SharedwoqvjvjqyszcmErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SharedwoqvjvjqyszcmErrorCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SharedwoqvjvjqyszcmErrorCode {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`Sharedwpbcxrylwgekq`
     ///
     /// <details><summary>JSON schema</summary>
@@ -39687,38 +40326,74 @@ pub mod shared {
         }
     }
     pub type Sharedwprilkqilkzjf = PurposeBrokerIpc;
-    ///`Sharedwqiiniwjblyic`
+    ///`Sharedwpwjqdkevwpnl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
     ///  "type": "object",
-    ///  "required": [
-    ///    "kind",
-    ///    "result"
-    ///  ],
     ///  "properties": {
-    ///    "kind": {
-    ///      "const": "command"
+    ///    "binding_digest": {
+    ///      "type": "null"
     ///    },
-    ///    "result": {
-    ///      "$ref": "#/$defs/CommandResult"
+    ///    "broker_peer_identity": {
+    ///      "type": "null"
+    ///    },
+    ///    "close_on_exec": {
+    ///      "const": true
+    ///    },
+    ///    "identity": {
+    ///      "$ref": "#/$defs/RegularFileIdentity"
+    ///    },
+    ///    "path": {
+    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/Sharedjtrmcgqeqybii"
+    ///    },
+    ///    "slot": {
+    ///      "type": "integer",
+    ///      "maximum": 191.0,
+    ///      "minimum": 128.0
     ///    }
-    ///  },
-    ///  "additionalProperties": false
+    ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedwqiiniwjblyic {
-        pub kind: ::serde_json::Value,
-        pub result: CommandResult,
+    pub struct Sharedwpwjqdkevwpnl {
+        #[serde(default)]
+        pub binding_digest: (),
+        #[serde(default)]
+        pub broker_peer_identity: (),
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<RegularFileIdentity>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<Sharedjtrmcgqeqybii>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<i64>,
     }
-    impl ::std::convert::From<&Sharedwqiiniwjblyic> for Sharedwqiiniwjblyic {
-        fn from(value: &Sharedwqiiniwjblyic) -> Self {
+    impl ::std::convert::From<&Sharedwpwjqdkevwpnl> for Sharedwpwjqdkevwpnl {
+        fn from(value: &Sharedwpwjqdkevwpnl) -> Self {
             value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedwpwjqdkevwpnl {
+        fn default() -> Self {
+            Self {
+                binding_digest: Default::default(),
+                broker_peer_identity: Default::default(),
+                close_on_exec: Default::default(),
+                identity: Default::default(),
+                path: Default::default(),
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
         }
     }
     ///`Sharedwsoynvslqbasr`
@@ -39797,7 +40472,42 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedwteixowzuenrq`
+    ///`Sharedwsunwunvsvcju`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "code",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "code": {
+    ///      "$ref": "#/$defs/RejectionCode"
+    ///    },
+    ///    "kind": {
+    ///      "const": "unavailable"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedwsunwunvsvcju {
+        pub code: RejectionCode,
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&Sharedwsunwunvsvcju> for Sharedwsunwunvsvcju {
+        fn from(value: &Sharedwsunwunvsvcju) -> Self {
+            value.clone()
+        }
+    }
+    pub type Sharedwvbfutnexlcba = PurposeBrokerIpc;
+    ///`Sharedwvqrlutymeiwz`
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -39809,59 +40519,41 @@ pub mod shared {
     ///      "$ref": "#/$defs/Sharedesyhjtalzyipv"
     ///    },
     ///    "broker_peer_identity": {
-    ///      "$ref": "#/$defs/BrokerPeerIdentity"
-    ///    },
-    ///    "close_on_exec": {
-    ///      "const": false
-    ///    },
-    ///    "identity": {
-    ///      "$ref": "#/$defs/SocketIdentity"
-    ///    },
-    ///    "path": {
     ///      "type": "null"
     ///    },
-    ///    "purpose": {
-    ///      "$ref": "#/$defs/PurposeBrokerIpc"
+    ///    "close_on_exec": {
+    ///      "const": true
     ///    },
-    ///    "slot": {
-    ///      "const": 8
+    ///    "path": {
+    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
     ///    }
     ///  }
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    pub struct Sharedwteixowzuenrq {
+    pub struct Sharedwvqrlutymeiwz {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub binding_digest: ::std::option::Option<Sharedesyhjtalzyipv>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub broker_peer_identity: ::std::option::Option<BrokerPeerIdentity>,
+        #[serde(default)]
+        pub broker_peer_identity: (),
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub close_on_exec: ::std::option::Option<::serde_json::Value>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub identity: ::std::option::Option<SocketIdentity>,
-        #[serde(default)]
-        pub path: (),
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub purpose: ::std::option::Option<PurposeBrokerIpc>,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub slot: ::std::option::Option<::serde_json::Value>,
+        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
     }
-    impl ::std::convert::From<&Sharedwteixowzuenrq> for Sharedwteixowzuenrq {
-        fn from(value: &Sharedwteixowzuenrq) -> Self {
+    impl ::std::convert::From<&Sharedwvqrlutymeiwz> for Sharedwvqrlutymeiwz {
+        fn from(value: &Sharedwvqrlutymeiwz) -> Self {
             value.clone()
         }
     }
-    impl ::std::default::Default for Sharedwteixowzuenrq {
+    impl ::std::default::Default for Sharedwvqrlutymeiwz {
         fn default() -> Self {
             Self {
                 binding_digest: Default::default(),
                 broker_peer_identity: Default::default(),
                 close_on_exec: Default::default(),
-                identity: Default::default(),
                 path: Default::default(),
-                purpose: Default::default(),
-                slot: Default::default(),
             }
         }
     }
@@ -40167,43 +40859,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedxdsiuszidhoha = Sharedbbgufznwlzbbl;
-    ///`Sharedxjzfgzjqqkgqi`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "indexProof",
-    ///    "leaf"
-    ///  ],
-    ///  "properties": {
-    ///    "indexProof": {
-    ///      "$ref": "#/$defs/Sharedzcngotjkdydya"
-    ///    },
-    ///    "leaf": {
-    ///      "$ref": "#/$defs/Sharedjurqgoqrtcvgo"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedxjzfgzjqqkgqi {
-        #[serde(rename = "indexProof")]
-        pub index_proof: Sharedzcngotjkdydya,
-        pub leaf: Sharedjurqgoqrtcvgo,
-    }
-    impl ::std::convert::From<&Sharedxjzfgzjqqkgqi> for Sharedxjzfgzjqqkgqi {
-        fn from(value: &Sharedxjzfgzjqqkgqi) -> Self {
-            value.clone()
-        }
-    }
-    pub type Sharedxkfcdploafeyk = Sharedhaqwwggmrtego;
     ///`Sharedxkifaleemtmui`
     ///
     /// <details><summary>JSON schema</summary>
@@ -40782,398 +41437,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedxrhdfvyjqpfcp`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "artifactId",
-    ///    "occurredAt",
-    ///    "sourceFamily",
-    ///    "subject"
-    ///  ],
-    ///  "properties": {
-    ///    "artifactId": {
-    ///      "type": "string",
-    ///      "maxLength": 512,
-    ///      "minLength": 1
-    ///    },
-    ///    "occurredAt": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "sourceFamily": {
-    ///      "$ref": "#/$defs/Sharedyhfqgvrnetzqi"
-    ///    },
-    ///    "subject": {
-    ///      "type": "string",
-    ///      "pattern": "^did:chio:[0-9a-f]{64}$"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedxrhdfvyjqpfcp {
-        #[serde(rename = "artifactId")]
-        pub artifact_id: SharedxrhdfvyjqpfcpArtifactId,
-        #[serde(rename = "occurredAt")]
-        pub occurred_at: i64,
-        #[serde(rename = "sourceFamily")]
-        pub source_family: Sharedyhfqgvrnetzqi,
-        pub subject: SharedxrhdfvyjqpfcpSubject,
-    }
-    impl ::std::convert::From<&Sharedxrhdfvyjqpfcp> for Sharedxrhdfvyjqpfcp {
-        fn from(value: &Sharedxrhdfvyjqpfcp) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedxrhdfvyjqpfcpArtifactId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 512,
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedxrhdfvyjqpfcpArtifactId(::std::string::String);
-    impl ::std::ops::Deref for SharedxrhdfvyjqpfcpArtifactId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedxrhdfvyjqpfcpArtifactId> for ::std::string::String {
-        fn from(value: SharedxrhdfvyjqpfcpArtifactId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedxrhdfvyjqpfcpArtifactId> for SharedxrhdfvyjqpfcpArtifactId {
-        fn from(value: &SharedxrhdfvyjqpfcpArtifactId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedxrhdfvyjqpfcpArtifactId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 512usize {
-                return Err("longer than 512 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedxrhdfvyjqpfcpArtifactId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedxrhdfvyjqpfcpArtifactId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedxrhdfvyjqpfcpArtifactId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedxrhdfvyjqpfcpArtifactId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`SharedxrhdfvyjqpfcpSubject`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^did:chio:[0-9a-f]{64}$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedxrhdfvyjqpfcpSubject(::std::string::String);
-    impl ::std::ops::Deref for SharedxrhdfvyjqpfcpSubject {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedxrhdfvyjqpfcpSubject> for ::std::string::String {
-        fn from(value: SharedxrhdfvyjqpfcpSubject) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedxrhdfvyjqpfcpSubject> for SharedxrhdfvyjqpfcpSubject {
-        fn from(value: &SharedxrhdfvyjqpfcpSubject) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedxrhdfvyjqpfcpSubject {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^did:chio:[0-9a-f]{64}$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^did:chio:[0-9a-f]{64}$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedxrhdfvyjqpfcpSubject {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedxrhdfvyjqpfcpSubject {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedxrhdfvyjqpfcpSubject {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedxrhdfvyjqpfcpSubject {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`Sharedxsavzbnmltfsa`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "admission_operation_id",
-    ///    "admission_operation_version",
-    ///    "approval_mode",
-    ///    "approval_set_hash"
-    ///  ],
-    ///  "properties": {
-    ///    "admission_operation_id": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "admission_operation_version": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 1.0
-    ///    },
-    ///    "approval_mode": {
-    ///      "const": "governed"
-    ///    },
-    ///    "approval_set_hash": {
-    ///      "type": "array",
-    ///      "not": {
-    ///        "const": [
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0,
-    ///          0
-    ///        ]
-    ///      },
-    ///      "items": {
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedxsavzbnmltfsa {
-        pub admission_operation_id: SharedxsavzbnmltfsaAdmissionOperationId,
-        pub admission_operation_version: ::std::num::NonZeroU64,
-        pub approval_mode: ::serde_json::Value,
-        pub approval_set_hash: [u8; 32usize],
-    }
-    impl ::std::convert::From<&Sharedxsavzbnmltfsa> for Sharedxsavzbnmltfsa {
-        fn from(value: &Sharedxsavzbnmltfsa) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedxsavzbnmltfsaAdmissionOperationId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedxsavzbnmltfsaAdmissionOperationId(::std::string::String);
-    impl ::std::ops::Deref for SharedxsavzbnmltfsaAdmissionOperationId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedxsavzbnmltfsaAdmissionOperationId> for ::std::string::String {
-        fn from(value: SharedxsavzbnmltfsaAdmissionOperationId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedxsavzbnmltfsaAdmissionOperationId>
-        for SharedxsavzbnmltfsaAdmissionOperationId
-    {
-        fn from(value: &SharedxsavzbnmltfsaAdmissionOperationId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedxsavzbnmltfsaAdmissionOperationId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedxsavzbnmltfsaAdmissionOperationId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedxsavzbnmltfsaAdmissionOperationId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedxsavzbnmltfsaAdmissionOperationId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedxsavzbnmltfsaAdmissionOperationId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
     ///`Sharedxtglmqlpehgeg`
     ///
     /// <details><summary>JSON schema</summary>
@@ -41468,7 +41731,6 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedyajtruonwdzlj = Sharedhaqwwggmrtego;
     ///`Sharedyaveptndioywo`
     ///
     /// <details><summary>JSON schema</summary>
@@ -41546,6 +41808,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedycwdvealkuwvh = Sharedjcqposdexfwuo;
     ///`Sharedyhfqgvrnetzqi`
     ///
     /// <details><summary>JSON schema</summary>
@@ -41635,6 +41898,47 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///`Sharedyhnjsbnbshiho`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "index",
+    ///    "queryKey",
+    ///    "sourceArtifactDigest"
+    ///  ],
+    ///  "properties": {
+    ///    "index": {
+    ///      "type": "integer"
+    ///    },
+    ///    "queryKey": {
+    ///      "$ref": "#/$defs/Sharedotnkyixkoqqft"
+    ///    },
+    ///    "sourceArtifactDigest": {
+    ///      "type": "string"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedyhnjsbnbshiho {
+        pub index: i64,
+        #[serde(rename = "queryKey")]
+        pub query_key: Sharedotnkyixkoqqft,
+        #[serde(rename = "sourceArtifactDigest")]
+        pub source_artifact_digest: ::std::string::String,
+    }
+    impl ::std::convert::From<&Sharedyhnjsbnbshiho> for Sharedyhnjsbnbshiho {
+        fn from(value: &Sharedyhnjsbnbshiho) -> Self {
+            value.clone()
         }
     }
     ///`Sharedyifycktpuquig`
@@ -41756,55 +42060,6 @@ pub mod shared {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
-        }
-    }
-    ///`Sharedyldgrjcdpkdrm`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "budget_reduction_rate",
-    ///    "delegations_observed",
-    ///    "scope_reduction_rate",
-    ///    "score",
-    ///    "ttl_reduction_rate"
-    ///  ],
-    ///  "properties": {
-    ///    "budget_reduction_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "delegations_observed": {
-    ///      "type": "integer"
-    ///    },
-    ///    "scope_reduction_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    },
-    ///    "score": {
-    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
-    ///    },
-    ///    "ttl_reduction_rate": {
-    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedyldgrjcdpkdrm {
-        pub budget_reduction_rate: Sharedrfivzwmnschjj,
-        pub delegations_observed: i64,
-        pub scope_reduction_rate: Sharedrfivzwmnschjj,
-        pub score: Sharedkabadvinoybei,
-        pub ttl_reduction_rate: Sharedrfivzwmnschjj,
-    }
-    impl ::std::convert::From<&Sharedyldgrjcdpkdrm> for Sharedyldgrjcdpkdrm {
-        fn from(value: &Sharedyldgrjcdpkdrm) -> Self {
-            value.clone()
         }
     }
     ///`Sharedynmdycziscbfr`
@@ -41987,50 +42242,7 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedyttsdpwydmheg`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "capability_hash",
-    ///    "expected_revision",
-    ///    "offer",
-    ///    "request_id"
-    ///  ],
-    ///  "properties": {
-    ///    "capability_hash": {
-    ///      "type": "string"
-    ///    },
-    ///    "expected_revision": {
-    ///      "type": "integer"
-    ///    },
-    ///    "offer": {
-    ///      "$ref": "#/$defs/Sharedrtnddtqmpwwes"
-    ///    },
-    ///    "request_id": {
-    ///      "type": "string"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedyttsdpwydmheg {
-        pub capability_hash: ::std::string::String,
-        pub expected_revision: i64,
-        pub offer: Sharedrtnddtqmpwwes,
-        pub request_id: ::std::string::String,
-    }
-    impl ::std::convert::From<&Sharedyttsdpwydmheg> for Sharedyttsdpwydmheg {
-        fn from(value: &Sharedyttsdpwydmheg) -> Self {
-            value.clone()
-        }
-    }
+    pub type Sharedysmskmyqxqerk = PurposeBrokerIpc;
     ///`Sharedyuhgkmuvzifpw`
     ///
     /// <details><summary>JSON schema</summary>
@@ -42369,83 +42581,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedyvgkacammyqwe`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "array",
-    ///  "not": {
-    ///    "const": [
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0,
-    ///      0
-    ///    ]
-    ///  },
-    ///  "items": {
-    ///    "type": "integer",
-    ///    "maximum": 255.0,
-    ///    "minimum": 0.0
-    ///  },
-    ///  "maxItems": 32,
-    ///  "minItems": 32
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct Sharedyvgkacammyqwe(pub [u8; 32usize]);
-    impl ::std::ops::Deref for Sharedyvgkacammyqwe {
-        type Target = [u8; 32usize];
-        fn deref(&self) -> &[u8; 32usize] {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<Sharedyvgkacammyqwe> for [u8; 32usize] {
-        fn from(value: Sharedyvgkacammyqwe) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&Sharedyvgkacammyqwe> for Sharedyvgkacammyqwe {
-        fn from(value: &Sharedyvgkacammyqwe) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::From<[u8; 32usize]> for Sharedyvgkacammyqwe {
-        fn from(value: [u8; 32usize]) -> Self {
-            Self(value)
-        }
-    }
     ///`Sharedyxnhdewkzhovi`
     ///
     /// <details><summary>JSON schema</summary>
@@ -42520,6 +42655,55 @@ pub mod shared {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///`Sharedyzyqysvpshubo`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "budget_reduction_rate",
+    ///    "delegations_observed",
+    ///    "scope_reduction_rate",
+    ///    "score",
+    ///    "ttl_reduction_rate"
+    ///  ],
+    ///  "properties": {
+    ///    "budget_reduction_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "delegations_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "scope_reduction_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    },
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    },
+    ///    "ttl_reduction_rate": {
+    ///      "$ref": "#/$defs/Sharedrfivzwmnschjj"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedyzyqysvpshubo {
+        pub budget_reduction_rate: Sharedrfivzwmnschjj,
+        pub delegations_observed: i64,
+        pub scope_reduction_rate: Sharedrfivzwmnschjj,
+        pub score: Sharedkabadvinoybei,
+        pub ttl_reduction_rate: Sharedrfivzwmnschjj,
+    }
+    impl ::std::convert::From<&Sharedyzyqysvpshubo> for Sharedyzyqysvpshubo {
+        fn from(value: &Sharedyzyqysvpshubo) -> Self {
+            value.clone()
         }
     }
     ///`Sharedzavkwixrogetl`
@@ -42738,261 +42922,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedzbsdrkzmhovbs`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "error_code",
-    ///    "state"
-    ///  ],
-    ///  "properties": {
-    ///    "error_code": {
-    ///      "type": "string",
-    ///      "maxLength": 256,
-    ///      "minLength": 1,
-    ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///    },
-    ///    "state": {
-    ///      "const": "rollback_failed"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedzbsdrkzmhovbs {
-        pub error_code: SharedzbsdrkzmhovbsErrorCode,
-        pub state: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedzbsdrkzmhovbs> for Sharedzbsdrkzmhovbs {
-        fn from(value: &Sharedzbsdrkzmhovbs) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedzbsdrkzmhovbsErrorCode`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "maxLength": 256,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedzbsdrkzmhovbsErrorCode(::std::string::String);
-    impl ::std::ops::Deref for SharedzbsdrkzmhovbsErrorCode {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedzbsdrkzmhovbsErrorCode> for ::std::string::String {
-        fn from(value: SharedzbsdrkzmhovbsErrorCode) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedzbsdrkzmhovbsErrorCode> for SharedzbsdrkzmhovbsErrorCode {
-        fn from(value: &SharedzbsdrkzmhovbsErrorCode) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedzbsdrkzmhovbsErrorCode {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 256usize {
-                return Err("longer than 256 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
-                || {
-                    ::regress::Regex::new(
-                        "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$",
-                    )
-                    .unwrap()
-                },
-            );
-            if PATTERN.find(value).is_none() {
-                return Err(
-                    "doesn't match pattern \"^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$\""
-                        .into(),
-                );
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedzbsdrkzmhovbsErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedzbsdrkzmhovbsErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedzbsdrkzmhovbsErrorCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedzbsdrkzmhovbsErrorCode {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`Sharedzcngotjkdydya`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "auditPath",
-    ///    "leafIndex",
-    ///    "treeSize"
-    ///  ],
-    ///  "properties": {
-    ///    "auditPath": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string",
-    ///        "pattern": "^[0-9a-f]{64}$"
-    ///      },
-    ///      "maxItems": 64
-    ///    },
-    ///    "leafIndex": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 0.0
-    ///    },
-    ///    "treeSize": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 1.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedzcngotjkdydya {
-        #[serde(rename = "auditPath")]
-        pub audit_path: ::std::vec::Vec<SharedzcngotjkdydyaAuditPathItem>,
-        #[serde(rename = "leafIndex")]
-        pub leaf_index: i64,
-        #[serde(rename = "treeSize")]
-        pub tree_size: ::std::num::NonZeroU64,
-    }
-    impl ::std::convert::From<&Sharedzcngotjkdydya> for Sharedzcngotjkdydya {
-        fn from(value: &Sharedzcngotjkdydya) -> Self {
-            value.clone()
-        }
-    }
-    ///`SharedzcngotjkdydyaAuditPathItem`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[0-9a-f]{64}$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct SharedzcngotjkdydyaAuditPathItem(::std::string::String);
-    impl ::std::ops::Deref for SharedzcngotjkdydyaAuditPathItem {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SharedzcngotjkdydyaAuditPathItem> for ::std::string::String {
-        fn from(value: SharedzcngotjkdydyaAuditPathItem) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SharedzcngotjkdydyaAuditPathItem> for SharedzcngotjkdydyaAuditPathItem {
-        fn from(value: &SharedzcngotjkdydyaAuditPathItem) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for SharedzcngotjkdydyaAuditPathItem {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SharedzcngotjkdydyaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for SharedzcngotjkdydyaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for SharedzcngotjkdydyaAuditPathItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for SharedzcngotjkdydyaAuditPathItem {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
     ///`Sharedzdqawtlupnpgd`
     ///
     /// <details><summary>JSON schema</summary>
@@ -43139,7 +43068,76 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type Sharedzfsltldpxxman = Sharedggfztevbgtdus;
+    ///`Sharedzfzagkfloqwsk`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "binding_digest": {
+    ///      "type": "null"
+    ///    },
+    ///    "broker_peer_identity": {
+    ///      "type": "null"
+    ///    },
+    ///    "close_on_exec": {
+    ///      "const": true
+    ///    },
+    ///    "identity": {
+    ///      "$ref": "#/$defs/PathIdentity"
+    ///    },
+    ///    "path": {
+    ///      "$ref": "#/$defs/AbsoluteCanonicalPath"
+    ///    },
+    ///    "purpose": {
+    ///      "$ref": "#/$defs/Sharedvskhprgalrvbj"
+    ///    },
+    ///    "slot": {
+    ///      "type": "integer",
+    ///      "maximum": 127.0,
+    ///      "minimum": 64.0
+    ///    }
+    ///  }
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    pub struct Sharedzfzagkfloqwsk {
+        #[serde(default)]
+        pub binding_digest: (),
+        #[serde(default)]
+        pub broker_peer_identity: (),
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub close_on_exec: ::std::option::Option<::serde_json::Value>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub identity: ::std::option::Option<PathIdentity>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub path: ::std::option::Option<AbsoluteCanonicalPath>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub purpose: ::std::option::Option<Sharedvskhprgalrvbj>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub slot: ::std::option::Option<i64>,
+    }
+    impl ::std::convert::From<&Sharedzfzagkfloqwsk> for Sharedzfzagkfloqwsk {
+        fn from(value: &Sharedzfzagkfloqwsk) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for Sharedzfzagkfloqwsk {
+        fn default() -> Self {
+            Self {
+                binding_digest: Default::default(),
+                broker_peer_identity: Default::default(),
+                close_on_exec: Default::default(),
+                identity: Default::default(),
+                path: Default::default(),
+                purpose: Default::default(),
+                slot: Default::default(),
+            }
+        }
+    }
     ///`Sharedzhfccafwateng`
     ///
     /// <details><summary>JSON schema</summary>
@@ -43439,35 +43437,6 @@ pub mod shared {
             value.clone()
         }
     }
-    ///`Sharedzmovubekpcfbr`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "approval_mode"
-    ///  ],
-    ///  "properties": {
-    ///    "approval_mode": {
-    ///      "const": "automatic"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Sharedzmovubekpcfbr {
-        pub approval_mode: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&Sharedzmovubekpcfbr> for Sharedzmovubekpcfbr {
-        fn from(value: &Sharedzmovubekpcfbr) -> Self {
-            value.clone()
-        }
-    }
     ///`Sharedznasozmapybxh`
     ///
     /// <details><summary>JSON schema</summary>
@@ -43530,6 +43499,40 @@ pub mod shared {
     }
     impl ::std::convert::From<&Sharedznasozmapybxh> for Sharedznasozmapybxh {
         fn from(value: &Sharedznasozmapybxh) -> Self {
+            value.clone()
+        }
+    }
+    ///`Sharedznuythodbpuka`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "capabilities_observed",
+    ///    "score"
+    ///  ],
+    ///  "properties": {
+    ///    "capabilities_observed": {
+    ///      "type": "integer"
+    ///    },
+    ///    "score": {
+    ///      "$ref": "#/$defs/Sharedkabadvinoybei"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Sharedznuythodbpuka {
+        pub capabilities_observed: i64,
+        pub score: Sharedkabadvinoybei,
+    }
+    impl ::std::convert::From<&Sharedznuythodbpuka> for Sharedznuythodbpuka {
+        fn from(value: &Sharedznuythodbpuka) -> Self {
             value.clone()
         }
     }
@@ -43686,6 +43689,7 @@ pub mod shared {
             value.clone()
         }
     }
+    pub type Sharedzsqurhwsarwum = Sharedetylgdbigvkzy;
     ///`Sharedztqqbazdokntx`
     ///
     /// <details><summary>JSON schema</summary>
@@ -43796,8 +43800,8 @@ pub mod shared {
         }
     }
     pub type Sharedzwvsymufmfvgw = Sharedbmpbjotjgkelh;
-    pub type SocketIdentity = SharedajvfycgctjqrmIdentity;
-    pub type SocketIdentityKind = SharedajvfycgctjqrmIdentityKind;
+    pub type SocketIdentity = ShareddsxzbhbwshdtbIdentity;
+    pub type SocketIdentityKind = ShareddsxzbhbwshdtbIdentityKind;
     ///`State`
     ///
     /// <details><summary>JSON schema</summary>
@@ -43935,7 +43939,7 @@ pub mod shared {
     ///      "$ref": "#/$defs/FdEntryBase"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedwatxndqlwdewn"
+    ///      "$ref": "#/$defs/Shareduhzqynfzztdac"
     ///    }
     ///  ]
     ///}
@@ -43957,8 +43961,8 @@ pub mod shared {
             value.clone()
         }
     }
-    pub type StdioEntryIdentity = SharedajvfycgctjqrmIdentity;
-    pub type StdioEntryIdentityKind = SharedajvfycgctjqrmIdentityKind;
+    pub type StdioEntryIdentity = ShareddsxzbhbwshdtbIdentity;
+    pub type StdioEntryIdentityKind = ShareddsxzbhbwshdtbIdentityKind;
     ///`StoreFence`
     ///
     /// <details><summary>JSON schema</summary>
@@ -44049,16 +44053,16 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedrisfwckdxekao"
+    ///      "$ref": "#/$defs/Sharedsqropixyyrabx"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharednuokzvtyoqvst"
+    ///      "$ref": "#/$defs/Sharedquncmbescxusf"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedanevyvtlvughs"
+    ///      "$ref": "#/$defs/Sharedkigxtqqenwrao"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedhyqlrnbtggeal"
+    ///      "$ref": "#/$defs/Sharedtoutfcqigqrze"
     ///    }
     ///  ]
     ///}
@@ -44067,34 +44071,34 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged)]
     pub enum Target {
-        Sharedrisfwckdxekao(Sharedrisfwckdxekao),
-        Sharednuokzvtyoqvst(Sharednuokzvtyoqvst),
-        Sharedanevyvtlvughs(Sharedanevyvtlvughs),
-        Sharedhyqlrnbtggeal(Sharedhyqlrnbtggeal),
+        Sharedsqropixyyrabx(Sharedsqropixyyrabx),
+        Sharedquncmbescxusf(Sharedquncmbescxusf),
+        Sharedkigxtqqenwrao(Sharedkigxtqqenwrao),
+        Sharedtoutfcqigqrze(Sharedtoutfcqigqrze),
     }
     impl ::std::convert::From<&Self> for Target {
         fn from(value: &Target) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedrisfwckdxekao> for Target {
-        fn from(value: Sharedrisfwckdxekao) -> Self {
-            Self::Sharedrisfwckdxekao(value)
+    impl ::std::convert::From<Sharedsqropixyyrabx> for Target {
+        fn from(value: Sharedsqropixyyrabx) -> Self {
+            Self::Sharedsqropixyyrabx(value)
         }
     }
-    impl ::std::convert::From<Sharednuokzvtyoqvst> for Target {
-        fn from(value: Sharednuokzvtyoqvst) -> Self {
-            Self::Sharednuokzvtyoqvst(value)
+    impl ::std::convert::From<Sharedquncmbescxusf> for Target {
+        fn from(value: Sharedquncmbescxusf) -> Self {
+            Self::Sharedquncmbescxusf(value)
         }
     }
-    impl ::std::convert::From<Sharedanevyvtlvughs> for Target {
-        fn from(value: Sharedanevyvtlvughs) -> Self {
-            Self::Sharedanevyvtlvughs(value)
+    impl ::std::convert::From<Sharedkigxtqqenwrao> for Target {
+        fn from(value: Sharedkigxtqqenwrao) -> Self {
+            Self::Sharedkigxtqqenwrao(value)
         }
     }
-    impl ::std::convert::From<Sharedhyqlrnbtggeal> for Target {
-        fn from(value: Sharedhyqlrnbtggeal) -> Self {
-            Self::Sharedhyqlrnbtggeal(value)
+    impl ::std::convert::From<Sharedtoutfcqigqrze> for Target {
+        fn from(value: Sharedtoutfcqigqrze) -> Self {
+            Self::Sharedtoutfcqigqrze(value)
         }
     }
     ///A bounded NUL-free string.
@@ -44621,10 +44625,10 @@ pub mod shared {
     ///    "acceptance": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44655,17 +44659,17 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    },
     ///    "bilateral_delivery": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44713,17 +44717,17 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    },
     ///    "execution": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44754,7 +44758,7 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    },
@@ -44764,10 +44768,10 @@ pub mod shared {
     ///    "recovery": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44798,17 +44802,17 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    },
     ///    "result_reference": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44852,17 +44856,17 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    },
     ///    "settlement": {
     ///      "oneOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///          "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///          "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///        },
     ///        {
     ///          "type": "object",
@@ -44906,7 +44910,7 @@ pub mod shared {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///          "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///        }
     ///      ]
     ///    }
@@ -44939,10 +44943,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -44973,7 +44977,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -44982,8 +44986,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewAcceptance {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -44991,20 +44995,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: Acceptance,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewAcceptance {
         fn from(value: &ViewAcceptance) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewAcceptance {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewAcceptance {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewAcceptance {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewAcceptance {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -45016,10 +45020,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -45067,7 +45071,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -45076,8 +45080,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewBilateralDelivery {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -45085,20 +45089,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: ViewBilateralDeliveryVariant2Value,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewBilateralDelivery {
         fn from(value: &ViewBilateralDelivery) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewBilateralDelivery {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewBilateralDelivery {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewBilateralDelivery {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewBilateralDelivery {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -45227,10 +45231,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -45261,7 +45265,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -45270,8 +45274,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewExecution {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -45279,20 +45283,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: Sharedutmetqljttuxo,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewExecution {
         fn from(value: &ViewExecution) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewExecution {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewExecution {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewExecution {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewExecution {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -45304,10 +45308,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -45338,7 +45342,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -45347,8 +45351,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewRecovery {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -45356,20 +45360,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: RecoveryLink,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewRecovery {
         fn from(value: &ViewRecovery) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewRecovery {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewRecovery {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewRecovery {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewRecovery {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -45381,10 +45385,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -45428,7 +45432,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -45437,8 +45441,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewResultReference {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -45446,20 +45450,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: ViewResultReferenceVariant2Value,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewResultReference {
         fn from(value: &ViewResultReference) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewResultReference {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewResultReference {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewResultReference {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewResultReference {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -45505,10 +45509,10 @@ pub mod shared {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedryulsweubgqew"
+    ///      "$ref": "#/$defs/Sharedwvbfutnexlcba"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedfiqxiscbjfqsx"
+    ///      "$ref": "#/$defs/Sharedhzujcfuxwisin"
     ///    },
     ///    {
     ///      "type": "object",
@@ -45552,7 +45556,7 @@ pub mod shared {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -45561,8 +45565,8 @@ pub mod shared {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum ViewSettlement {
-        Variant0(Sharedryulsweubgqew),
-        Variant1(Sharedfiqxiscbjfqsx),
+        Variant0(Sharedwvbfutnexlcba),
+        Variant1(Sharedhzujcfuxwisin),
         Variant2 {
             kind: ::serde_json::Value,
             observed_at: Sharednmslfatfbsbjp,
@@ -45570,20 +45574,20 @@ pub mod shared {
             source: Sharedaknuqncnxamsn,
             value: ViewSettlementVariant2Value,
         },
-        Variant3(Sharedkgfhylpijihsb),
+        Variant3(Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for ViewSettlement {
         fn from(value: &ViewSettlement) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<Sharedfiqxiscbjfqsx> for ViewSettlement {
-        fn from(value: Sharedfiqxiscbjfqsx) -> Self {
+    impl ::std::convert::From<Sharedhzujcfuxwisin> for ViewSettlement {
+        fn from(value: Sharedhzujcfuxwisin) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<Sharedkgfhylpijihsb> for ViewSettlement {
-        fn from(value: Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<Sharedwsunwunvsvcju> for ViewSettlement {
+        fn from(value: Sharedwsunwunvsvcju) -> Self {
             Self::Variant3(value)
         }
     }
@@ -181568,6 +181572,797 @@ pub mod root_authority_idp_key_snapshot {
         }
     }
 }
+pub mod root_authority_operator_root_request_body {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ChioOperatorRootRequestV1SignedBody`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/operator-root-request-body.schema.json",
+    ///  "title": "chio.operator-root-request.v1 signed body",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "expires_at",
+    ///    "holder",
+    ///    "principal",
+    ///    "request_id",
+    ///    "schema",
+    ///    "scope",
+    ///    "tenant_value"
+    ///  ],
+    ///  "properties": {
+    ///    "expires_at": {
+    ///      "type": "integer"
+    ///    },
+    ///    "holder": {
+    ///      "type": "string"
+    ///    },
+    ///    "principal": {
+    ///      "type": "string"
+    ///    },
+    ///    "request_id": {
+    ///      "type": "string"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.operator-root-request.v1"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/Sharedezhiztfprtras"
+    ///    },
+    ///    "tenant_value": {
+    ///      "type": "string"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioOperatorRootRequestV1SignedBody {
+        pub expires_at: i64,
+        pub holder: ::std::string::String,
+        pub principal: ::std::string::String,
+        pub request_id: ::std::string::String,
+        pub schema: ::serde_json::Value,
+        pub scope: super::shared::Sharedezhiztfprtras,
+        pub tenant_value: ::std::string::String,
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequestV1SignedBody>
+        for ChioOperatorRootRequestV1SignedBody
+    {
+        fn from(value: &ChioOperatorRootRequestV1SignedBody) -> Self {
+            value.clone()
+        }
+    }
+}
+pub mod root_authority_operator_root_request {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`chio.operator-root-request.v1`, signed by the operator key the edge pins. The operator asks the edge for one `chio_operator_key` anchored root for `principal` in `tenant_value`. The signature covers the canonical JSON of every member except `signature`, and `request_id` is the replay key.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/operator-root-request.schema.json",
+    ///  "title": "Chio Operator Root Request",
+    ///  "description": "`chio.operator-root-request.v1`, signed by the operator key the edge pins. The operator asks the edge for one `chio_operator_key` anchored root for `principal` in `tenant_value`. The signature covers the canonical JSON of every member except `signature`, and `request_id` is the replay key.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "expires_at",
+    ///    "holder",
+    ///    "principal",
+    ///    "request_id",
+    ///    "schema",
+    ///    "scope",
+    ///    "signature",
+    ///    "tenant_value"
+    ///  ],
+    ///  "properties": {
+    ///    "expires_at": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    },
+    ///    "holder": {
+    ///      "$ref": "#/$defs/Shareduqewxmivnmrlv"
+    ///    },
+    ///    "principal": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "request_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "schema": {
+    ///      "type": "string",
+    ///      "const": "chio.operator-root-request.v1"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ChioScope"
+    ///    },
+    ///    "signature": {
+    ///      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "tenant_value": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioOperatorRootRequest {
+        pub expires_at: u64,
+        pub holder: super::shared::Shareduqewxmivnmrlv,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub principal: ChioOperatorRootRequestPrincipal,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub request_id: ChioOperatorRootRequestRequestId,
+        pub schema: ::std::string::String,
+        pub scope: super::shared::ChioScope,
+        ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+        pub signature: ChioOperatorRootRequestSignature,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub tenant_value: ChioOperatorRootRequestTenantValue,
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequest> for ChioOperatorRootRequest {
+        fn from(value: &ChioOperatorRootRequest) -> Self {
+            value.clone()
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioOperatorRootRequestPrincipal(::std::string::String);
+    impl ::std::ops::Deref for ChioOperatorRootRequestPrincipal {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioOperatorRootRequestPrincipal> for ::std::string::String {
+        fn from(value: ChioOperatorRootRequestPrincipal) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequestPrincipal> for ChioOperatorRootRequestPrincipal {
+        fn from(value: &ChioOperatorRootRequestPrincipal) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioOperatorRootRequestPrincipal {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioOperatorRootRequestPrincipal {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioOperatorRootRequestPrincipal {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioOperatorRootRequestPrincipal {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioOperatorRootRequestPrincipal {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioOperatorRootRequestRequestId(::std::string::String);
+    impl ::std::ops::Deref for ChioOperatorRootRequestRequestId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioOperatorRootRequestRequestId> for ::std::string::String {
+        fn from(value: ChioOperatorRootRequestRequestId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequestRequestId> for ChioOperatorRootRequestRequestId {
+        fn from(value: &ChioOperatorRootRequestRequestId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioOperatorRootRequestRequestId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioOperatorRootRequestRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioOperatorRootRequestRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioOperatorRootRequestRequestId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioOperatorRootRequestRequestId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioOperatorRootRequestSignature(::std::string::String);
+    impl ::std::ops::Deref for ChioOperatorRootRequestSignature {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioOperatorRootRequestSignature> for ::std::string::String {
+        fn from(value: ChioOperatorRootRequestSignature) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequestSignature> for ChioOperatorRootRequestSignature {
+        fn from(value: &ChioOperatorRootRequestSignature) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioOperatorRootRequestSignature {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioOperatorRootRequestSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioOperatorRootRequestSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioOperatorRootRequestSignature {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioOperatorRootRequestSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioOperatorRootRequestTenantValue(::std::string::String);
+    impl ::std::ops::Deref for ChioOperatorRootRequestTenantValue {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioOperatorRootRequestTenantValue> for ::std::string::String {
+        fn from(value: ChioOperatorRootRequestTenantValue) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioOperatorRootRequestTenantValue>
+        for ChioOperatorRootRequestTenantValue
+    {
+        fn from(value: &ChioOperatorRootRequestTenantValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioOperatorRootRequestTenantValue {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioOperatorRootRequestTenantValue {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioOperatorRootRequestTenantValue {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioOperatorRootRequestTenantValue {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioOperatorRootRequestTenantValue {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`HttpsUrl`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).",
+    ///  "type": "string",
+    ///  "pattern": "^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Salt(::std::string::String);
+    impl ::std::ops::Deref for Salt {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Salt> for ::std::string::String {
+        fn from(value: Salt) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Salt> for Salt {
+        fn from(value: &Salt) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Salt {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$\"".into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Salt {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SignatureHex(::std::string::String);
+    impl ::std::ops::Deref for SignatureHex {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SignatureHex> for ::std::string::String {
+        fn from(value: SignatureHex) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SignatureHex> for SignatureHex {
+        fn from(value: &SignatureHex) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SignatureHex {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod root_authority_revocation_request_body {
     /// Error types.
     pub mod error {
@@ -190872,7 +191667,7 @@ pub mod runtime_attestation_appraisal_report {
     ///              "$ref": "#/$defs/Sharedhmaquqexkjwqa"
     ///            },
     ///            "policy": {
-    ///              "$ref": "#/$defs/Sharednotnujzvmqpjg"
+    ///              "$ref": "#/$defs/Sharedgojdpyqtzuhqy"
     ///            },
     ///            "schema": {
     ///              "type": "string"
@@ -191039,7 +191834,7 @@ pub mod runtime_attestation_appraisal_report {
     ///          "$ref": "#/$defs/Sharedhmaquqexkjwqa"
     ///        },
     ///        "policy": {
-    ///          "$ref": "#/$defs/Sharednotnujzvmqpjg"
+    ///          "$ref": "#/$defs/Sharedgojdpyqtzuhqy"
     ///        },
     ///        "schema": {
     ///          "type": "string"
@@ -191165,7 +191960,7 @@ pub mod runtime_attestation_appraisal_report {
     ///      "$ref": "#/$defs/Sharedhmaquqexkjwqa"
     ///    },
     ///    "policy": {
-    ///      "$ref": "#/$defs/Sharednotnujzvmqpjg"
+    ///      "$ref": "#/$defs/Sharedgojdpyqtzuhqy"
     ///    },
     ///    "schema": {
     ///      "type": "string"
@@ -191183,7 +191978,7 @@ pub mod runtime_attestation_appraisal_report {
     pub struct ChioRuntimeAttestationAppraisalReportSignedBodyAppraisalArtifact {
         pub claims: ChioRuntimeAttestationAppraisalReportSignedBodyAppraisalArtifactClaims,
         pub evidence: super::shared::Sharedhmaquqexkjwqa,
-        pub policy: super::shared::Sharednotnujzvmqpjg,
+        pub policy: super::shared::Sharedgojdpyqtzuhqy,
         pub schema: ::std::string::String,
         pub verifier: super::shared::Sharedzkcqqvzeeoyev,
     }
@@ -191423,7 +192218,7 @@ pub mod runtime_attestation_appraisal_result {
     ///          "$ref": "#/$defs/Sharedhmaquqexkjwqa"
     ///        },
     ///        "policy": {
-    ///          "$ref": "#/$defs/Sharednotnujzvmqpjg"
+    ///          "$ref": "#/$defs/Sharedgojdpyqtzuhqy"
     ///        },
     ///        "schema": {
     ///          "type": "string"
@@ -191602,7 +192397,7 @@ pub mod runtime_attestation_appraisal_result {
     ///      "$ref": "#/$defs/Sharedhmaquqexkjwqa"
     ///    },
     ///    "policy": {
-    ///      "$ref": "#/$defs/Sharednotnujzvmqpjg"
+    ///      "$ref": "#/$defs/Sharedgojdpyqtzuhqy"
     ///    },
     ///    "schema": {
     ///      "type": "string"
@@ -191623,7 +192418,7 @@ pub mod runtime_attestation_appraisal_result {
     pub struct ChioRuntimeAttestationAppraisalResultSignedBodyAppraisal {
         pub claims: ChioRuntimeAttestationAppraisalResultSignedBodyAppraisalClaims,
         pub evidence: super::shared::Sharedhmaquqexkjwqa,
-        pub policy: super::shared::Sharednotnujzvmqpjg,
+        pub policy: super::shared::Sharedgojdpyqtzuhqy,
         pub schema: ::std::string::String,
         pub verifier: super::shared::Sharedzkcqqvzeeoyev,
         #[serde(
@@ -195204,7 +195999,7 @@ pub mod security_broker_execute_response_v1 {
     ///    "headers": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedpoihurpvxjyhd"
+    ///        "$ref": "#/$defs/Sharedqkxprwpwwnhus"
     ///      },
     ///      "maxItems": 64
     ///    },
@@ -195372,7 +196167,7 @@ pub mod security_broker_execute_response_v1 {
     pub struct ChioBrokerExecuteResponseV1 {
         pub body: ::std::vec::Vec<u8>,
         pub evidence: super::shared::ChioBrokerExecutionEvidenceV1,
-        pub headers: ::std::vec::Vec<super::shared::Sharedpoihurpvxjyhd>,
+        pub headers: ::std::vec::Vec<super::shared::Sharedqkxprwpwwnhus>,
         pub receipt: ChioSignedBrokerExecutionReceiptV1,
         #[serde(rename = "receiptReference")]
         pub receipt_reference: ChioBrokerExecuteResponseV1ReceiptReference,
@@ -196518,7 +197313,7 @@ pub mod security_broker_privileged_audit_evidence_v1 {
     ///    "quotas": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedcmfuycanzgddx"
+    ///        "$ref": "#/$defs/Sharedbeqqgntporcom"
     ///      },
     ///      "maxItems": 8,
     ///      "minItems": 1
@@ -196545,7 +197340,7 @@ pub mod security_broker_privileged_audit_evidence_v1 {
         pub operation_id: super::shared::Sharedrelunorbfjlte,
         #[serde(rename = "parentCapabilityId")]
         pub parent_capability_id: super::shared::Sharedrelunorbfjlte,
-        pub quotas: ::std::vec::Vec<super::shared::Sharedcmfuycanzgddx>,
+        pub quotas: ::std::vec::Vec<super::shared::Sharedbeqqgntporcom>,
     }
     impl ::std::convert::From<&AuthorizeHoldRequest> for AuthorizeHoldRequest {
         fn from(value: &AuthorizeHoldRequest) -> Self {
@@ -198765,7 +199560,7 @@ pub mod security_broker_privileged_audit_evidence_v1 {
     ///    "quotas": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedcmfuycanzgddx"
+    ///        "$ref": "#/$defs/Sharedbeqqgntporcom"
     ///      },
     ///      "maxItems": 8,
     ///      "minItems": 1
@@ -198795,7 +199590,7 @@ pub mod security_broker_privileged_audit_evidence_v1 {
         pub authority_metadata_digest: super::shared::Sharedesyhjtalzyipv,
         #[serde(rename = "preparedDispatchId")]
         pub prepared_dispatch_id: super::shared::Sharedrelunorbfjlte,
-        pub quotas: ::std::vec::Vec<super::shared::Sharedcmfuycanzgddx>,
+        pub quotas: ::std::vec::Vec<super::shared::Sharedbeqqgntporcom>,
         #[serde(rename = "revocationAuthorityDomain")]
         pub revocation_authority_domain: super::shared::Sharedrelunorbfjlte,
         #[serde(rename = "sourceReceiptIds")]
@@ -199855,7 +200650,7 @@ pub mod security_cage_init_plan_v1 {
     ///    "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"
     ///  },
     ///  "propertyNames": {
-    ///    "$ref": "#/$defs/Sharedaabxtfzttepza"
+    ///    "$ref": "#/$defs/Sharednhkonyekmyqqv"
     ///  }
     ///}
     /// ```
@@ -199863,20 +200658,20 @@ pub mod security_cage_init_plan_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(transparent)]
     pub struct Environment(
-        pub ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+        pub ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
     );
     impl ::std::ops::Deref for Environment {
         type Target =
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>;
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>;
         fn deref(
             &self,
-        ) -> &::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        ) -> &::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
         {
             &self.0
         }
     }
     impl ::std::convert::From<Environment>
-        for ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        for ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
     {
         fn from(value: Environment) -> Self {
             value.0
@@ -199889,12 +200684,12 @@ pub mod security_cage_init_plan_v1 {
     }
     impl
         ::std::convert::From<
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
         > for Environment
     {
         fn from(
             value: ::std::collections::HashMap<
-                super::shared::Sharedaabxtfzttepza,
+                super::shared::Sharednhkonyekmyqqv,
                 EnvironmentValue,
             >,
         ) -> Self {
@@ -201052,7 +201847,7 @@ pub mod security_cage_receipt_metadata_v1 {
     ///    "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"
     ///  },
     ///  "propertyNames": {
-    ///    "$ref": "#/$defs/Sharedaabxtfzttepza"
+    ///    "$ref": "#/$defs/Sharednhkonyekmyqqv"
     ///  }
     ///}
     /// ```
@@ -201060,20 +201855,20 @@ pub mod security_cage_receipt_metadata_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(transparent)]
     pub struct Environment(
-        pub ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+        pub ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
     );
     impl ::std::ops::Deref for Environment {
         type Target =
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>;
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>;
         fn deref(
             &self,
-        ) -> &::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        ) -> &::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
         {
             &self.0
         }
     }
     impl ::std::convert::From<Environment>
-        for ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        for ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
     {
         fn from(value: Environment) -> Self {
             value.0
@@ -201086,12 +201881,12 @@ pub mod security_cage_receipt_metadata_v1 {
     }
     impl
         ::std::convert::From<
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
         > for Environment
     {
         fn from(
             value: ::std::collections::HashMap<
-                super::shared::Sharedaabxtfzttepza,
+                super::shared::Sharednhkonyekmyqqv,
                 EnvironmentValue,
             >,
         ) -> Self {
@@ -201466,7 +202261,7 @@ pub mod security_correlated_finding_receipt_body_v1 {
     ///      "minItems": 32
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedfbbqaberromye"
+    ///      "$ref": "#/$defs/Sharedtefafqstlyqow"
     ///    },
     ///    "last_event_time_unix_ms": {
     ///      "type": "integer",
@@ -201620,7 +202415,7 @@ pub mod security_correlated_finding_receipt_body_v1 {
         pub finding_id: ChioCorrelatedFindingReceiptBodyV1FindingId,
         pub first_event_time_unix_ms: ::std::num::NonZeroU64,
         pub group_key_hash: [u8; 32usize],
-        pub header: super::shared::Sharedfbbqaberromye,
+        pub header: super::shared::Sharedtefafqstlyqow,
         pub last_event_time_unix_ms: ::std::num::NonZeroU64,
         pub lineage_seed: ChioCorrelatedFindingReceiptBodyV1LineageSeed,
         pub ordered_event_ids: Vec<ChioCorrelatedFindingReceiptBodyV1OrderedEventIdsItem>,
@@ -202396,7 +203191,7 @@ pub mod security_declassification_consumption_receipt_body_v1 {
     ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedtmyydecuckoxh"
+    ///      "$ref": "#/$defs/Sharedfcdilqajxmwqm"
     ///    },
     ///    "policy": {
     ///      "$ref": "#/$defs/Policy"
@@ -202461,7 +203256,7 @@ pub mod security_declassification_consumption_receipt_body_v1 {
         pub event_id: ChioDeclassificationConsumptionReceiptBodyV1EventId,
         pub grant_hash: [u8; 32usize],
         pub grant_id: ChioDeclassificationConsumptionReceiptBodyV1GrantId,
-        pub header: super::shared::Sharedtmyydecuckoxh,
+        pub header: super::shared::Sharedfcdilqajxmwqm,
         pub policy: super::shared::Policy,
         pub request_hash: [u8; 32usize],
         pub state: ::serde_json::Value,
@@ -203048,7 +203843,7 @@ pub mod security_declassification_outcome_receipt_body_v1 {
     ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedtmyydecuckoxh"
+    ///      "$ref": "#/$defs/Sharedfcdilqajxmwqm"
     ///    },
     ///    "policy": {
     ///      "$ref": "#/$defs/Policy"
@@ -203118,7 +203913,7 @@ pub mod security_declassification_outcome_receipt_body_v1 {
         pub from_state: ::serde_json::Value,
         pub grant_hash: [u8; 32usize],
         pub grant_id: ChioDeclassificationOutcomeReceiptBodyV1GrantId,
-        pub header: super::shared::Sharedtmyydecuckoxh,
+        pub header: super::shared::Sharedfcdilqajxmwqm,
         pub policy: super::shared::Policy,
         pub request_hash: [u8; 32usize],
         pub to_state: ChioDeclassificationOutcomeReceiptBodyV1ToState,
@@ -203468,13 +204263,13 @@ pub mod security_detector_health_receipt_body_v1 {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
     ///    },
     ///    "evidence_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "group_binding": {
     ///      "$ref": "#/$defs/group_binding"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedtmyydecuckoxh"
+    ///      "$ref": "#/$defs/Sharedfcdilqajxmwqm"
     ///    },
     ///    "health_kind": {
     ///      "enum": [
@@ -203493,7 +204288,7 @@ pub mod security_detector_health_receipt_body_v1 {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
     ///    },
     ///    "rule_version_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "watermark": {
     ///      "$ref": "#/$defs/watermark"
@@ -203507,13 +204302,13 @@ pub mod security_detector_health_receipt_body_v1 {
     #[serde(deny_unknown_fields)]
     pub struct ChioDetectorHealthReceiptBodyV1 {
         pub event_id: super::shared::Sharedynmdycziscbfr,
-        pub evidence_hash: super::shared::Sharedyvgkacammyqwe,
+        pub evidence_hash: super::shared::Shareddryivgjqboxzc,
         pub group_binding: GroupBinding,
-        pub header: super::shared::Sharedtmyydecuckoxh,
+        pub header: super::shared::Sharedfcdilqajxmwqm,
         pub health_kind: ChioDetectorHealthReceiptBodyV1HealthKind,
         pub policy: super::shared::Policy,
         pub rule_id: super::shared::Sharedynmdycziscbfr,
-        pub rule_version_hash: super::shared::Sharedyvgkacammyqwe,
+        pub rule_version_hash: super::shared::Shareddryivgjqboxzc,
         pub watermark: Watermark,
     }
     impl ::std::convert::From<&ChioDetectorHealthReceiptBodyV1> for ChioDetectorHealthReceiptBodyV1 {
@@ -203644,7 +204439,7 @@ pub mod security_detector_health_receipt_body_v1 {
     ///      ],
     ///      "properties": {
     ///        "group_key_hash": {
-    ///          "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///          "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///        },
     ///        "kind": {
     ///          "const": "resolved"
@@ -203662,15 +204457,15 @@ pub mod security_detector_health_receipt_body_v1 {
         #[serde(rename = "unresolved")]
         Unresolved,
         #[serde(rename = "resolved")]
-        Resolved(super::shared::Sharedyvgkacammyqwe),
+        Resolved(super::shared::Shareddryivgjqboxzc),
     }
     impl ::std::convert::From<&Self> for GroupBinding {
         fn from(value: &GroupBinding) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<super::shared::Sharedyvgkacammyqwe> for GroupBinding {
-        fn from(value: super::shared::Sharedyvgkacammyqwe) -> Self {
+    impl ::std::convert::From<super::shared::Shareddryivgjqboxzc> for GroupBinding {
+        fn from(value: super::shared::Shareddryivgjqboxzc) -> Self {
             Self::Resolved(value)
         }
     }
@@ -203876,13 +204671,13 @@ pub mod security_effect_transition_receipt_body_v1 {
     ///  ],
     ///  "properties": {
     ///    "effect": {
-    ///      "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///      "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///    },
     ///    "generation": {
     ///      "$ref": "#/$defs/Sharedqtpzcpreelrid"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedepmaukfcelnfz"
+    ///      "$ref": "#/$defs/Sharedqxneyjggyjkqp"
     ///    },
     ///    "outcome": {
     ///      "$ref": "#/$defs/Outcome"
@@ -203914,9 +204709,9 @@ pub mod security_effect_transition_receipt_body_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioEffectTransitionReceiptBodyV1 {
-        pub effect: super::shared::Sharedourymuifaarhj,
+        pub effect: super::shared::Shareduxsmqqqmzxvfd,
         pub generation: super::shared::Sharedqtpzcpreelrid,
-        pub header: super::shared::Sharedepmaukfcelnfz,
+        pub header: super::shared::Sharedqxneyjggyjkqp,
         pub outcome: super::shared::Outcome,
         pub response: super::shared::Response,
         pub scheduler_fencing_token: super::shared::Sharedqtpzcpreelrid,
@@ -204083,25 +204878,25 @@ pub mod security_flow_denial_receipt_body_v1 {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
     ///    },
     ///    "destination_label_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "event_id": {
     ///      "$ref": "#/$defs/Sharedynmdycziscbfr"
     ///    },
     ///    "guard_evidence_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedtmyydecuckoxh"
+    ///      "$ref": "#/$defs/Sharedfcdilqajxmwqm"
     ///    },
     ///    "policy": {
     ///      "$ref": "#/$defs/Policy"
     ///    },
     ///    "request_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    },
     ///    "source_label_hash": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -204112,13 +204907,13 @@ pub mod security_flow_denial_receipt_body_v1 {
     #[serde(deny_unknown_fields)]
     pub struct ChioFlowDenialReceiptBodyV1 {
         pub denial_code: super::shared::Sharedynmdycziscbfr,
-        pub destination_label_hash: super::shared::Sharedyvgkacammyqwe,
+        pub destination_label_hash: super::shared::Shareddryivgjqboxzc,
         pub event_id: super::shared::Sharedynmdycziscbfr,
-        pub guard_evidence_hash: super::shared::Sharedyvgkacammyqwe,
-        pub header: super::shared::Sharedtmyydecuckoxh,
+        pub guard_evidence_hash: super::shared::Shareddryivgjqboxzc,
+        pub header: super::shared::Sharedfcdilqajxmwqm,
         pub policy: super::shared::Policy,
-        pub request_hash: super::shared::Sharedyvgkacammyqwe,
-        pub source_label_hash: super::shared::Sharedyvgkacammyqwe,
+        pub request_hash: super::shared::Shareddryivgjqboxzc,
+        pub source_label_hash: super::shared::Shareddryivgjqboxzc,
     }
     impl ::std::convert::From<&ChioFlowDenialReceiptBodyV1> for ChioFlowDenialReceiptBodyV1 {
         fn from(value: &ChioFlowDenialReceiptBodyV1) -> Self {
@@ -209456,7 +210251,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     ///        ],
     ///        "properties": {
     ///          "effect": {
-    ///            "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///            "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///          },
     ///          "outcome": {
     ///            "$ref": "#/$defs/lift_outcome"
@@ -209484,7 +210279,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     ///      ]
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedepmaukfcelnfz"
+    ///      "$ref": "#/$defs/Sharedqxneyjggyjkqp"
     ///    },
     ///    "response": {
     ///      "$ref": "#/$defs/Response"
@@ -209552,7 +210347,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
         pub effects: ::std::vec::Vec<ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem>,
         pub execution_dispatch: ::std::option::Option<super::shared::ExecutionDispatch>,
         pub final_state: ChioLiftOrRollbackCompletionReceiptBodyV1FinalState,
-        pub header: super::shared::Sharedepmaukfcelnfz,
+        pub header: super::shared::Sharedqxneyjggyjkqp,
         pub response: super::shared::Response,
         pub response_body_hash: [u8; 32usize],
         pub response_generation: ::std::num::NonZeroU64,
@@ -209577,7 +210372,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     ///  ],
     ///  "properties": {
     ///    "effect": {
-    ///      "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///      "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///    },
     ///    "outcome": {
     ///      "$ref": "#/$defs/lift_outcome"
@@ -209590,7 +210385,7 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem {
-        pub effect: super::shared::Sharedourymuifaarhj,
+        pub effect: super::shared::Shareduxsmqqqmzxvfd,
         pub outcome: LiftOutcome,
     }
     impl ::std::convert::From<&ChioLiftOrRollbackCompletionReceiptBodyV1EffectsItem>
@@ -209688,16 +210483,16 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     ///{
     ///  "oneOf": [
     ///    {
-    ///      "$ref": "#/$defs/Sharedzfsltldpxxman"
+    ///      "$ref": "#/$defs/Sharedsyrwytpyqtsiv"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedvwgockvumgeqz"
+    ///      "$ref": "#/$defs/Sharedlfnivqbwpckdr"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Shareduamknehceghqq"
+    ///      "$ref": "#/$defs/Sharedcvissskaxukzg"
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedzbsdrkzmhovbs"
+    ///      "$ref": "#/$defs/Sharedwoqvjvjqyszcm"
     ///    },
     ///    {
     ///      "type": "object",
@@ -209718,10 +210513,10 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(untagged, deny_unknown_fields)]
     pub enum LiftOutcome {
-        Variant0(super::shared::Sharedzfsltldpxxman),
-        Variant1(super::shared::Sharedvwgockvumgeqz),
-        Variant2(super::shared::Shareduamknehceghqq),
-        Variant3(super::shared::Sharedzbsdrkzmhovbs),
+        Variant0(super::shared::Sharedsyrwytpyqtsiv),
+        Variant1(super::shared::Sharedlfnivqbwpckdr),
+        Variant2(super::shared::Sharedcvissskaxukzg),
+        Variant3(super::shared::Sharedwoqvjvjqyszcm),
         Variant4 { state: ::serde_json::Value },
     }
     impl ::std::convert::From<&Self> for LiftOutcome {
@@ -209729,23 +210524,23 @@ pub mod security_lift_rollback_completion_receipt_body_v1 {
             value.clone()
         }
     }
-    impl ::std::convert::From<super::shared::Sharedzfsltldpxxman> for LiftOutcome {
-        fn from(value: super::shared::Sharedzfsltldpxxman) -> Self {
+    impl ::std::convert::From<super::shared::Sharedsyrwytpyqtsiv> for LiftOutcome {
+        fn from(value: super::shared::Sharedsyrwytpyqtsiv) -> Self {
             Self::Variant0(value)
         }
     }
-    impl ::std::convert::From<super::shared::Sharedvwgockvumgeqz> for LiftOutcome {
-        fn from(value: super::shared::Sharedvwgockvumgeqz) -> Self {
+    impl ::std::convert::From<super::shared::Sharedlfnivqbwpckdr> for LiftOutcome {
+        fn from(value: super::shared::Sharedlfnivqbwpckdr) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<super::shared::Shareduamknehceghqq> for LiftOutcome {
-        fn from(value: super::shared::Shareduamknehceghqq) -> Self {
+    impl ::std::convert::From<super::shared::Sharedcvissskaxukzg> for LiftOutcome {
+        fn from(value: super::shared::Sharedcvissskaxukzg) -> Self {
             Self::Variant2(value)
         }
     }
-    impl ::std::convert::From<super::shared::Sharedzbsdrkzmhovbs> for LiftOutcome {
-        fn from(value: super::shared::Sharedzbsdrkzmhovbs) -> Self {
+    impl ::std::convert::From<super::shared::Sharedwoqvjvjqyszcm> for LiftOutcome {
+        fn from(value: super::shared::Sharedwoqvjvjqyszcm) -> Self {
             Self::Variant3(value)
         }
     }
@@ -212437,7 +213232,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///    "pattern": "^[^\\u0000-\\u001F\\u007F-\\u009F]*$"
     ///  },
     ///  "propertyNames": {
-    ///    "$ref": "#/$defs/Sharedaabxtfzttepza"
+    ///    "$ref": "#/$defs/Sharednhkonyekmyqqv"
     ///  }
     ///}
     /// ```
@@ -212445,20 +213240,20 @@ pub mod security_mcp_cage_launch_policy_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(transparent)]
     pub struct Environment(
-        pub ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+        pub ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
     );
     impl ::std::ops::Deref for Environment {
         type Target =
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>;
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>;
         fn deref(
             &self,
-        ) -> &::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        ) -> &::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
         {
             &self.0
         }
     }
     impl ::std::convert::From<Environment>
-        for ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>
+        for ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>
     {
         fn from(value: Environment) -> Self {
             value.0
@@ -212471,12 +213266,12 @@ pub mod security_mcp_cage_launch_policy_v1 {
     }
     impl
         ::std::convert::From<
-            ::std::collections::HashMap<super::shared::Sharedaabxtfzttepza, EnvironmentValue>,
+            ::std::collections::HashMap<super::shared::Sharednhkonyekmyqqv, EnvironmentValue>,
         > for Environment
     {
         fn from(
             value: ::std::collections::HashMap<
-                super::shared::Sharedaabxtfzttepza,
+                super::shared::Sharednhkonyekmyqqv,
                 EnvironmentValue,
             >,
         ) -> Self {
@@ -212773,7 +213568,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     ///      "$ref": "#/$defs/migrationKey"
     ///    },
     ///    "transition_digest": {
-    ///      "$ref": "#/$defs/Sharedyvgkacammyqwe"
+    ///      "$ref": "#/$defs/Shareddryivgjqboxzc"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -212784,7 +213579,7 @@ pub mod security_mcp_cage_launch_policy_v1 {
     #[serde(deny_unknown_fields)]
     pub struct MigrationHead {
         pub key: MigrationKey,
-        pub transition_digest: super::shared::Sharedyvgkacammyqwe,
+        pub transition_digest: super::shared::Shareddryivgjqboxzc,
     }
     impl ::std::convert::From<&MigrationHead> for MigrationHead {
         fn from(value: &MigrationHead) -> Self {
@@ -214472,7 +215267,7 @@ pub mod security_response_completion_receipt_body_v1 {
     ///        ],
     ///        "properties": {
     ///          "effect": {
-    ///            "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///            "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///          },
     ///          "outcome": {
     ///            "$ref": "#/$defs/CompletionOutcome"
@@ -214514,7 +215309,7 @@ pub mod security_response_completion_receipt_body_v1 {
     ///      ]
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedepmaukfcelnfz"
+    ///      "$ref": "#/$defs/Sharedqxneyjggyjkqp"
     ///    },
     ///    "response": {
     ///      "$ref": "#/$defs/Response"
@@ -214583,7 +215378,7 @@ pub mod security_response_completion_receipt_body_v1 {
         pub error_code: ::std::option::Option<ChioResponseCompletionReceiptBodyV1ErrorCode>,
         pub execution_dispatch: ::std::option::Option<super::shared::ExecutionDispatch>,
         pub final_state: ChioResponseCompletionReceiptBodyV1FinalState,
-        pub header: super::shared::Sharedepmaukfcelnfz,
+        pub header: super::shared::Sharedqxneyjggyjkqp,
         pub response: super::shared::Response,
         pub response_body_hash: [u8; 32usize],
         pub response_generation: ::std::num::NonZeroU64,
@@ -214608,7 +215403,7 @@ pub mod security_response_completion_receipt_body_v1 {
     ///  ],
     ///  "properties": {
     ///    "effect": {
-    ///      "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///      "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///    },
     ///    "outcome": {
     ///      "$ref": "#/$defs/CompletionOutcome"
@@ -214621,7 +215416,7 @@ pub mod security_response_completion_receipt_body_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioResponseCompletionReceiptBodyV1EffectsItem {
-        pub effect: super::shared::Sharedourymuifaarhj,
+        pub effect: super::shared::Shareduxsmqqqmzxvfd,
         pub outcome: super::shared::CompletionOutcome,
     }
     impl ::std::convert::From<&ChioResponseCompletionReceiptBodyV1EffectsItem>
@@ -214861,13 +215656,13 @@ pub mod security_response_plan_receipt_body_v1 {
     ///    "effects": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedourymuifaarhj"
+    ///        "$ref": "#/$defs/Shareduxsmqqqmzxvfd"
     ///      },
     ///      "maxItems": 64,
     ///      "minItems": 1
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedfbbqaberromye"
+    ///      "$ref": "#/$defs/Sharedtefafqstlyqow"
     ///    },
     ///    "plan_created_at_unix_ms": {
     ///      "type": "integer",
@@ -214885,8 +215680,8 @@ pub mod security_response_plan_receipt_body_v1 {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioResponsePlanReceiptBodyV1 {
-        pub effects: ::std::vec::Vec<super::shared::Sharedourymuifaarhj>,
-        pub header: super::shared::Sharedfbbqaberromye,
+        pub effects: ::std::vec::Vec<super::shared::Shareduxsmqqqmzxvfd>,
+        pub header: super::shared::Sharedtefafqstlyqow,
         pub plan_created_at_unix_ms: ::std::num::NonZeroU64,
         pub response: super::shared::Response,
     }
@@ -215630,10 +216425,10 @@ pub mod security_response_state_transition_receipt_body_v1 {
     ///    "header": {
     ///      "allOf": [
     ///        {
-    ///          "$ref": "#/$defs/Sharedfbbqaberromye"
+    ///          "$ref": "#/$defs/Sharedtefafqstlyqow"
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedhaycefmgrjxfm"
+    ///          "$ref": "#/$defs/Sharedpcqpibqgjaidr"
     ///        }
     ///      ]
     ///    },
@@ -215679,7 +216474,7 @@ pub mod security_response_state_transition_receipt_body_v1 {
         pub error_code: ::std::option::Option<super::shared::Sharedynmdycziscbfr>,
         pub from_state: super::shared::State,
         pub generation: ::std::num::NonZeroU64,
-        pub header: super::shared::Sharedfbbqaberromye,
+        pub header: super::shared::Sharedtefafqstlyqow,
         pub response: super::shared::Response,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub scheduler_fencing_token: ::std::option::Option<::std::num::NonZeroU64>,
@@ -215946,7 +216741,7 @@ pub mod security_scheduler_health_receipt_body_v1 {
     ///      "minimum": 1.0
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedfbbqaberromye"
+    ///      "$ref": "#/$defs/Sharedtefafqstlyqow"
     ///    },
     ///    "response": {
     ///      "$ref": "#/$defs/Response"
@@ -215969,7 +216764,7 @@ pub mod security_scheduler_health_receipt_body_v1 {
         pub event_id: ChioSchedulerHealthReceiptBodyV1EventId,
         pub evidence_hash: [u8; 32usize],
         pub first_failure_at_unix_ms: ::std::num::NonZeroU64,
-        pub header: super::shared::Sharedfbbqaberromye,
+        pub header: super::shared::Sharedtefafqstlyqow,
         pub response: super::shared::Response,
         pub scheduler_fencing_token: ::std::num::NonZeroU64,
     }
@@ -216917,7 +217712,7 @@ pub mod security_tripwire_observation_receipt_body_v1 {
     ///      "pattern": "^[^\\s\\u0000-\\u001F\\u007F-\\u009F](?:[^\\u0000-\\u001F\\u007F-\\u009F]*[^\\s\\u0000-\\u001F\\u007F-\\u009F])?$"
     ///    },
     ///    "header": {
-    ///      "$ref": "#/$defs/Sharedtmyydecuckoxh"
+    ///      "$ref": "#/$defs/Sharedfcdilqajxmwqm"
     ///    },
     ///    "observation_hash": {
     ///      "type": "array",
@@ -217045,7 +217840,7 @@ pub mod security_tripwire_observation_receipt_body_v1 {
         pub artifact_id_hash: [u8; 32usize],
         pub artifact_version_hash: [u8; 32usize],
         pub event_id: ChioTripwireObservationReceiptBodyV1EventId,
-        pub header: super::shared::Sharedtmyydecuckoxh,
+        pub header: super::shared::Sharedfcdilqajxmwqm,
         pub observation_hash: [u8; 32usize],
         pub policy: super::shared::Policy,
         pub request_hash: [u8; 32usize],
@@ -219474,10 +220269,10 @@ pub mod trust_agent_passport_presentation_response {
     ///                }
     ///              },
     ///              "credentialSubject": {
-    ///                "$ref": "#/$defs/Sharedtdufblmkggwms"
+    ///                "$ref": "#/$defs/Sharedthdbxesgpsbep"
     ///              },
     ///              "evidence": {
-    ///                "$ref": "#/$defs/Sharedfawmctzwnxgtj"
+    ///                "$ref": "#/$defs/Sharedhrszehbsozypg"
     ///              },
     ///              "expirationDate": {
     ///                "type": "string"
@@ -219848,10 +220643,10 @@ pub mod trust_agent_passport_presentation_response {
     ///            }
     ///          },
     ///          "credentialSubject": {
-    ///            "$ref": "#/$defs/Sharedtdufblmkggwms"
+    ///            "$ref": "#/$defs/Sharedthdbxesgpsbep"
     ///          },
     ///          "evidence": {
-    ///            "$ref": "#/$defs/Sharedfawmctzwnxgtj"
+    ///            "$ref": "#/$defs/Sharedhrszehbsozypg"
     ///          },
     ///          "expirationDate": {
     ///            "type": "string"
@@ -219944,10 +220739,10 @@ pub mod trust_agent_passport_presentation_response {
     ///      }
     ///    },
     ///    "credentialSubject": {
-    ///      "$ref": "#/$defs/Sharedtdufblmkggwms"
+    ///      "$ref": "#/$defs/Sharedthdbxesgpsbep"
     ///    },
     ///    "evidence": {
-    ///      "$ref": "#/$defs/Sharedfawmctzwnxgtj"
+    ///      "$ref": "#/$defs/Sharedhrszehbsozypg"
     ///    },
     ///    "expirationDate": {
     ///      "type": "string"
@@ -219978,8 +220773,8 @@ pub mod trust_agent_passport_presentation_response {
         #[serde(rename = "@context")]
         pub context: ::std::vec::Vec<::std::string::String>,
         #[serde(rename = "credentialSubject")]
-        pub credential_subject: super::shared::Sharedtdufblmkggwms,
-        pub evidence: super::shared::Sharedfawmctzwnxgtj,
+        pub credential_subject: super::shared::Sharedthdbxesgpsbep,
+        pub evidence: super::shared::Sharedhrszehbsozypg,
         #[serde(rename = "expirationDate")]
         pub expiration_date: ::std::string::String,
         #[serde(rename = "issuanceDate")]
@@ -220296,7 +221091,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                        ],
     ///                        "properties": {
     ///                          "boundary_pressure": {
-    ///                            "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///                            "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///                          },
     ///                          "composite_score": {
     ///                            "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -220375,7 +221170,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                            "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///                          },
     ///                          "least_privilege": {
-    ///                            "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///                            "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///                          },
     ///                          "reliability": {
     ///                            "type": "object",
@@ -220406,10 +221201,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                            "additionalProperties": false
     ///                          },
     ///                          "resource_stewardship": {
-    ///                            "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///                            "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///                          },
     ///                          "specialization": {
-    ///                            "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///                            "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///                          },
     ///                          "subject_key": {
     ///                            "type": "string"
@@ -220883,7 +221678,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                    ],
     ///                    "properties": {
     ///                      "boundary_pressure": {
-    ///                        "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///                        "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///                      },
     ///                      "composite_score": {
     ///                        "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -220962,7 +221757,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                        "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///                      },
     ///                      "least_privilege": {
-    ///                        "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///                        "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///                      },
     ///                      "reliability": {
     ///                        "type": "object",
@@ -220993,10 +221788,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                        "additionalProperties": false
     ///                      },
     ///                      "resource_stewardship": {
-    ///                        "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///                        "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///                      },
     ///                      "specialization": {
-    ///                        "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///                        "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///                      },
     ///                      "subject_key": {
     ///                        "type": "string"
@@ -221283,7 +222078,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///              ],
     ///              "properties": {
     ///                "boundary_pressure": {
-    ///                  "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///                  "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///                },
     ///                "composite_score": {
     ///                  "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -221362,7 +222157,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                  "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///                },
     ///                "least_privilege": {
-    ///                  "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///                  "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///                },
     ///                "reliability": {
     ///                  "type": "object",
@@ -221393,10 +222188,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///                  "additionalProperties": false
     ///                },
     ///                "resource_stewardship": {
-    ///                  "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///                  "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///                },
     ///                "specialization": {
-    ///                  "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///                  "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///                },
     ///                "subject_key": {
     ///                  "type": "string"
@@ -221556,7 +222351,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///          ],
     ///          "properties": {
     ///            "boundary_pressure": {
-    ///              "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///              "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///            },
     ///            "composite_score": {
     ///              "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -221635,7 +222430,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///              "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///            },
     ///            "least_privilege": {
-    ///              "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///              "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///            },
     ///            "reliability": {
     ///              "type": "object",
@@ -221666,10 +222461,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///              "additionalProperties": false
     ///            },
     ///            "resource_stewardship": {
-    ///              "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///              "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///            },
     ///            "specialization": {
-    ///              "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///              "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///            },
     ///            "subject_key": {
     ///              "type": "string"
@@ -221814,7 +222609,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///      ],
     ///      "properties": {
     ///        "boundary_pressure": {
-    ///          "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///          "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///        },
     ///        "composite_score": {
     ///          "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -221893,7 +222688,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///          "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///        },
     ///        "least_privilege": {
-    ///          "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///          "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///        },
     ///        "reliability": {
     ///          "type": "object",
@@ -221924,10 +222719,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///          "additionalProperties": false
     ///        },
     ///        "resource_stewardship": {
-    ///          "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///          "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///        },
     ///        "specialization": {
-    ///          "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///          "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///        },
     ///        "subject_key": {
     ///          "type": "string"
@@ -221979,7 +222774,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///  ],
     ///  "properties": {
     ///    "boundary_pressure": {
-    ///      "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///      "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///    },
     ///    "composite_score": {
     ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -222058,7 +222853,7 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///      "$ref": "#/$defs/Sharedxnncuitzdkwoe"
     ///    },
     ///    "least_privilege": {
-    ///      "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///      "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///    },
     ///    "reliability": {
     ///      "type": "object",
@@ -222089,10 +222884,10 @@ pub mod trust_financial_agent_passport_presentation_response {
     ///      "additionalProperties": false
     ///    },
     ///    "resource_stewardship": {
-    ///      "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///      "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///    },
     ///    "specialization": {
-    ///      "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///      "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///    },
     ///    "subject_key": {
     ///      "type": "string"
@@ -222105,17 +222900,17 @@ pub mod trust_financial_agent_passport_presentation_response {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioFinancialAgentPassportPresentationResponseSignedBodyPresentationCredentialsItemCredentialCredentialSubjectMetrics {
-        pub boundary_pressure: super::shared::Sharedadjkvcssxiavo,
+        pub boundary_pressure: super::shared::Sharedbolveaqnlubyo,
         pub composite_score: super::shared::Sharedtbbrqbdncsldx,
         pub computed_at: i64,
         pub delegation_hygiene: ChioFinancialAgentPassportPresentationResponseSignedBodyPresentationCredentialsItemCredentialCredentialSubjectMetricsDelegationHygiene,
         pub effective_weight_sum: f64,
         pub history_depth: ChioFinancialAgentPassportPresentationResponseSignedBodyPresentationCredentialsItemCredentialCredentialSubjectMetricsHistoryDepth,
         pub incident_correlation: super::shared::Sharedxnncuitzdkwoe,
-        pub least_privilege: super::shared::Sharednthbffqqcqdjp,
+        pub least_privilege: super::shared::Sharedgiexwpnnrjkyw,
         pub reliability: ChioFinancialAgentPassportPresentationResponseSignedBodyPresentationCredentialsItemCredentialCredentialSubjectMetricsReliability,
-        pub resource_stewardship: super::shared::Sharedofggprubcfrwn,
-        pub specialization: super::shared::Sharedngebneprfjpsi,
+        pub resource_stewardship: super::shared::Sharedmoemhxjilmjwp,
+        pub specialization: super::shared::Sharedcwjmdddgfdkde,
         pub subject_key: ::std::string::String,
     }
     impl ::std::convert::From<
@@ -222977,7 +223772,7 @@ pub mod trust_fincred_premium_history_body {
     ///                  "committedLeaves": {
     ///                    "type": "array",
     ///                    "items": {
-    ///                      "$ref": "#/$defs/Sharedqhuwxdssnbbpi"
+    ///                      "$ref": "#/$defs/Shareddocagwcrrzsis"
     ///                    }
     ///                  },
     ///                  "cutoff": {
@@ -223332,7 +224127,7 @@ pub mod trust_fincred_premium_history_body {
     ///              "committedLeaves": {
     ///                "type": "array",
     ///                "items": {
-    ///                  "$ref": "#/$defs/Sharedqhuwxdssnbbpi"
+    ///                  "$ref": "#/$defs/Shareddocagwcrrzsis"
     ///                }
     ///              },
     ///              "cutoff": {
@@ -223527,7 +224322,7 @@ pub mod trust_fincred_premium_history_body {
     ///        "committedLeaves": {
     ///          "type": "array",
     ///          "items": {
-    ///            "$ref": "#/$defs/Sharedqhuwxdssnbbpi"
+    ///            "$ref": "#/$defs/Shareddocagwcrrzsis"
     ///          }
     ///        },
     ///        "cutoff": {
@@ -223669,7 +224464,7 @@ pub mod trust_fincred_premium_history_body {
     ///    "committedLeaves": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedqhuwxdssnbbpi"
+    ///        "$ref": "#/$defs/Shareddocagwcrrzsis"
     ///      }
     ///    },
     ///    "cutoff": {
@@ -223745,7 +224540,7 @@ pub mod trust_fincred_premium_history_body {
         #[serde(rename = "checkpointSequence")]
         pub checkpoint_sequence: i64,
         #[serde(rename = "committedLeaves")]
-        pub committed_leaves: ::std::vec::Vec<super::shared::Sharedqhuwxdssnbbpi>,
+        pub committed_leaves: ::std::vec::Vec<super::shared::Shareddocagwcrrzsis>,
         pub cutoff: i64,
         #[serde(rename = "disclosureDigest")]
         pub disclosure_digest: ::std::string::String,
@@ -224074,7 +224869,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///                  "committedLeaves": {
     ///                    "type": "array",
     ///                    "items": {
-    ///                      "$ref": "#/$defs/Sharedxjzfgzjqqkgqi"
+    ///                      "$ref": "#/$defs/Sharedulbmauygvafiw"
     ///                    },
     ///                    "maxItems": 256,
     ///                    "minItems": 1
@@ -224103,7 +224898,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///                    "minimum": 0.0
     ///                  },
     ///                  "lowerBoundary": {
-    ///                    "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///                    "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///                  },
     ///                  "rangeRoot": {
     ///                    "type": "string",
@@ -224151,7 +224946,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///                    "pattern": "^did:chio:[0-9a-f]{64}$"
     ///                  },
     ///                  "upperBoundary": {
-    ///                    "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///                    "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///                  },
     ///                  "window": {
     ///                    "type": "object",
@@ -224497,7 +225292,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///              "committedLeaves": {
     ///                "type": "array",
     ///                "items": {
-    ///                  "$ref": "#/$defs/Sharedxjzfgzjqqkgqi"
+    ///                  "$ref": "#/$defs/Sharedulbmauygvafiw"
     ///                },
     ///                "maxItems": 256,
     ///                "minItems": 1
@@ -224526,7 +225321,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///                "minimum": 0.0
     ///              },
     ///              "lowerBoundary": {
-    ///                "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///                "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///              },
     ///              "rangeRoot": {
     ///                "type": "string",
@@ -224574,7 +225369,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///                "pattern": "^did:chio:[0-9a-f]{64}$"
     ///              },
     ///              "upperBoundary": {
-    ///                "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///                "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///              },
     ///              "window": {
     ///                "type": "object",
@@ -224754,7 +225549,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///        "committedLeaves": {
     ///          "type": "array",
     ///          "items": {
-    ///            "$ref": "#/$defs/Sharedxjzfgzjqqkgqi"
+    ///            "$ref": "#/$defs/Sharedulbmauygvafiw"
     ///          },
     ///          "maxItems": 256,
     ///          "minItems": 1
@@ -224783,7 +225578,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///          "minimum": 0.0
     ///        },
     ///        "lowerBoundary": {
-    ///          "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///          "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///        },
     ///        "rangeRoot": {
     ///          "type": "string",
@@ -224831,7 +225626,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///          "pattern": "^did:chio:[0-9a-f]{64}$"
     ///        },
     ///        "upperBoundary": {
-    ///          "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///          "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///        },
     ///        "window": {
     ///          "type": "object",
@@ -224948,7 +225743,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///    "committedLeaves": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedxjzfgzjqqkgqi"
+    ///        "$ref": "#/$defs/Sharedulbmauygvafiw"
     ///      },
     ///      "maxItems": 256,
     ///      "minItems": 1
@@ -224977,7 +225772,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///      "minimum": 0.0
     ///    },
     ///    "lowerBoundary": {
-    ///      "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///      "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///    },
     ///    "rangeRoot": {
     ///      "type": "string",
@@ -225025,7 +225820,7 @@ pub mod trust_fincred_settlement_reliability_body {
     ///      "pattern": "^did:chio:[0-9a-f]{64}$"
     ///    },
     ///    "upperBoundary": {
-    ///      "$ref": "#/$defs/Sharedsolfsletikcvj"
+    ///      "$ref": "#/$defs/Sharedswzjddpjajhmh"
     ///    },
     ///    "window": {
     ///      "type": "object",
@@ -225066,7 +225861,7 @@ pub mod trust_fincred_settlement_reliability_body {
         #[serde(rename = "checkpointSequence")]
         pub checkpoint_sequence: ::std::num::NonZeroU64,
         #[serde(rename = "committedLeaves")]
-        pub committed_leaves: ::std::vec::Vec<super::shared::Sharedxjzfgzjqqkgqi>,
+        pub committed_leaves: ::std::vec::Vec<super::shared::Sharedulbmauygvafiw>,
         pub cutoff: i64,
         #[serde(rename = "disclosureDigest")]
         pub disclosure_digest: ChioFincredSettlementReliabilityV1SignedBodyEvidenceSourceCompletenessAttestationsItemBodyDisclosureDigest,
@@ -225077,7 +225872,7 @@ pub mod trust_fincred_settlement_reliability_body {
         #[serde(rename = "issuedAt")]
         pub issued_at: i64,
         #[serde(rename = "lowerBoundary")]
-        pub lower_boundary: super::shared::Sharedsolfsletikcvj,
+        pub lower_boundary: super::shared::Sharedswzjddpjajhmh,
         #[serde(rename = "rangeRoot")]
         pub range_root: ChioFincredSettlementReliabilityV1SignedBodyEvidenceSourceCompletenessAttestationsItemBodyRangeRoot,
         pub schema: ::serde_json::Value,
@@ -225097,7 +225892,7 @@ pub mod trust_fincred_settlement_reliability_body {
         pub store_generation: ::std::num::NonZeroU64,
         pub subject: ChioFincredSettlementReliabilityV1SignedBodyEvidenceSourceCompletenessAttestationsItemBodySubject,
         #[serde(rename = "upperBoundary")]
-        pub upper_boundary: super::shared::Sharedsolfsletikcvj,
+        pub upper_boundary: super::shared::Sharedswzjddpjajhmh,
         pub window: ChioFincredSettlementReliabilityV1SignedBodyEvidenceSourceCompletenessAttestationsItemBodyWindow,
     }
     impl ::std::convert::From<
@@ -227010,7 +227805,7 @@ pub mod trust_fincred_source_completeness_attestation_body {
     ///    "committedLeaves": {
     ///      "type": "array",
     ///      "items": {
-    ///        "$ref": "#/$defs/Sharedqhuwxdssnbbpi"
+    ///        "$ref": "#/$defs/Shareddocagwcrrzsis"
     ///      }
     ///    },
     ///    "cutoff": {
@@ -227086,7 +227881,7 @@ pub mod trust_fincred_source_completeness_attestation_body {
         #[serde(rename = "checkpointSequence")]
         pub checkpoint_sequence: i64,
         #[serde(rename = "committedLeaves")]
-        pub committed_leaves: ::std::vec::Vec<super::shared::Sharedqhuwxdssnbbpi>,
+        pub committed_leaves: ::std::vec::Vec<super::shared::Shareddocagwcrrzsis>,
         pub cutoff: i64,
         #[serde(rename = "disclosureDigest")]
         pub disclosure_digest: ::std::string::String,
@@ -227951,7 +228746,7 @@ pub mod trust_portable_reputation_summary {
     ///      ],
     ///      "properties": {
     ///        "boundary_pressure": {
-    ///          "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///          "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///        },
     ///        "composite_score": {
     ///          "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -228043,7 +228838,7 @@ pub mod trust_portable_reputation_summary {
     ///          "additionalProperties": false
     ///        },
     ///        "least_privilege": {
-    ///          "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///          "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///        },
     ///        "reliability": {
     ///          "type": "object",
@@ -228074,10 +228869,10 @@ pub mod trust_portable_reputation_summary {
     ///          "additionalProperties": false
     ///        },
     ///        "resource_stewardship": {
-    ///          "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///          "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///        },
     ///        "specialization": {
-    ///          "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///          "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///        },
     ///        "subject_key": {
     ///          "type": "string"
@@ -228153,7 +228948,7 @@ pub mod trust_portable_reputation_summary {
     ///  ],
     ///  "properties": {
     ///    "boundary_pressure": {
-    ///      "$ref": "#/$defs/Sharedadjkvcssxiavo"
+    ///      "$ref": "#/$defs/Sharedbolveaqnlubyo"
     ///    },
     ///    "composite_score": {
     ///      "$ref": "#/$defs/Sharedtbbrqbdncsldx"
@@ -228245,7 +229040,7 @@ pub mod trust_portable_reputation_summary {
     ///      "additionalProperties": false
     ///    },
     ///    "least_privilege": {
-    ///      "$ref": "#/$defs/Sharednthbffqqcqdjp"
+    ///      "$ref": "#/$defs/Sharedgiexwpnnrjkyw"
     ///    },
     ///    "reliability": {
     ///      "type": "object",
@@ -228276,10 +229071,10 @@ pub mod trust_portable_reputation_summary {
     ///      "additionalProperties": false
     ///    },
     ///    "resource_stewardship": {
-    ///      "$ref": "#/$defs/Sharedofggprubcfrwn"
+    ///      "$ref": "#/$defs/Sharedmoemhxjilmjwp"
     ///    },
     ///    "specialization": {
-    ///      "$ref": "#/$defs/Sharedngebneprfjpsi"
+    ///      "$ref": "#/$defs/Sharedcwjmdddgfdkde"
     ///    },
     ///    "subject_key": {
     ///      "type": "string"
@@ -228292,7 +229087,7 @@ pub mod trust_portable_reputation_summary {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioPortableReputationSummarySignedBodyScorecard {
-        pub boundary_pressure: super::shared::Sharedadjkvcssxiavo,
+        pub boundary_pressure: super::shared::Sharedbolveaqnlubyo,
         pub composite_score: super::shared::Sharedtbbrqbdncsldx,
         pub computed_at: i64,
         pub delegation_hygiene: ChioPortableReputationSummarySignedBodyScorecardDelegationHygiene,
@@ -228300,10 +229095,10 @@ pub mod trust_portable_reputation_summary {
         pub history_depth: ChioPortableReputationSummarySignedBodyScorecardHistoryDepth,
         pub incident_correlation:
             ChioPortableReputationSummarySignedBodyScorecardIncidentCorrelation,
-        pub least_privilege: super::shared::Sharednthbffqqcqdjp,
+        pub least_privilege: super::shared::Sharedgiexwpnnrjkyw,
         pub reliability: ChioPortableReputationSummarySignedBodyScorecardReliability,
-        pub resource_stewardship: super::shared::Sharedofggprubcfrwn,
-        pub specialization: super::shared::Sharedngebneprfjpsi,
+        pub resource_stewardship: super::shared::Sharedmoemhxjilmjwp,
+        pub specialization: super::shared::Sharedcwjmdddgfdkde,
         pub subject_key: ::std::string::String,
     }
     impl ::std::convert::From<&ChioPortableReputationSummarySignedBodyScorecard>
@@ -229087,7 +229882,7 @@ pub mod trust_reputation_credential {
     ///      }
     ///    },
     ///    "credentialSubject": {
-    ///      "$ref": "#/$defs/Sharedtdufblmkggwms"
+    ///      "$ref": "#/$defs/Sharedthdbxesgpsbep"
     ///    },
     ///    "enterpriseIdentityProvenance": {
     ///      "type": "object",
@@ -229181,7 +229976,7 @@ pub mod trust_reputation_credential {
     ///      "additionalProperties": false
     ///    },
     ///    "evidence": {
-    ///      "$ref": "#/$defs/Sharedfawmctzwnxgtj"
+    ///      "$ref": "#/$defs/Sharedhrszehbsozypg"
     ///    },
     ///    "expirationDate": {
     ///      "type": "string"
@@ -229209,7 +230004,7 @@ pub mod trust_reputation_credential {
         #[serde(rename = "@context")]
         pub context: ::std::vec::Vec<::std::string::String>,
         #[serde(rename = "credentialSubject")]
-        pub credential_subject: super::shared::Sharedtdufblmkggwms,
+        pub credential_subject: super::shared::Sharedthdbxesgpsbep,
         #[serde(
             rename = "enterpriseIdentityProvenance",
             default,
@@ -229217,7 +230012,7 @@ pub mod trust_reputation_credential {
         )]
         pub enterprise_identity_provenance:
             ::std::option::Option<ChioReputationCredentialSignedBodyEnterpriseIdentityProvenance>,
-        pub evidence: super::shared::Sharedfawmctzwnxgtj,
+        pub evidence: super::shared::Sharedhrszehbsozypg,
         #[serde(rename = "expirationDate")]
         pub expiration_date: ::std::string::String,
         #[serde(rename = "issuanceDate")]
@@ -233587,7 +234382,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     ///      ],
     ///      "properties": {
     ///        "beneficiary_identity_binding": {
-    ///          "$ref": "#/$defs/Sharedoqizillyhlexe"
+    ///          "$ref": "#/$defs/Sharedbeqduukaguseh"
     ///        },
     ///        "block": {
     ///          "$ref": "#/$defs/Sharedxtglmqlpehgeg"
@@ -234600,7 +235395,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     ///              "additionalProperties": false
     ///            },
     ///            "key_binding_certificate": {
-    ///              "$ref": "#/$defs/Sharedoqizillyhlexe"
+    ///              "$ref": "#/$defs/Sharedbeqduukaguseh"
     ///            },
     ///            "receipt": {
     ///              "type": "object",
@@ -234971,7 +235766,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     ///  ],
     ///  "properties": {
     ///    "beneficiary_identity_binding": {
-    ///      "$ref": "#/$defs/Sharedoqizillyhlexe"
+    ///      "$ref": "#/$defs/Sharedbeqduukaguseh"
     ///    },
     ///    "block": {
     ///      "$ref": "#/$defs/Sharedxtglmqlpehgeg"
@@ -235138,7 +235933,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioWeb3SettlementProofBundleV1SignedBodyChainSnapshot {
-        pub beneficiary_identity_binding: super::shared::Sharedoqizillyhlexe,
+        pub beneficiary_identity_binding: super::shared::Sharedbeqduukaguseh,
         pub block: super::shared::Sharedxtglmqlpehgeg,
         pub bond: ChioWeb3SettlementProofBundleV1SignedBodyChainSnapshotBond,
         pub chain_id: ::std::string::String,
@@ -236420,7 +237215,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     ///          "additionalProperties": false
     ///        },
     ///        "key_binding_certificate": {
-    ///          "$ref": "#/$defs/Sharedoqizillyhlexe"
+    ///          "$ref": "#/$defs/Sharedbeqduukaguseh"
     ///        },
     ///        "receipt": {
     ///          "type": "object",
@@ -238077,7 +238872,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     ///      "additionalProperties": false
     ///    },
     ///    "key_binding_certificate": {
-    ///      "$ref": "#/$defs/Sharedoqizillyhlexe"
+    ///      "$ref": "#/$defs/Sharedbeqduukaguseh"
     ///    },
     ///    "receipt": {
     ///      "type": "object",
@@ -238367,7 +239162,7 @@ pub mod web3_web3_settlement_proof_bundle_body {
     pub struct ChioWeb3SettlementProofBundleV1SignedBodySettlementReceiptReconciledAnchorProof {
         pub chain_anchor: ChioWeb3SettlementProofBundleV1SignedBodySettlementReceiptReconciledAnchorProofChainAnchor,
         pub checkpoint_statement: ChioWeb3SettlementProofBundleV1SignedBodySettlementReceiptReconciledAnchorProofCheckpointStatement,
-        pub key_binding_certificate: super::shared::Sharedoqizillyhlexe,
+        pub key_binding_certificate: super::shared::Sharedbeqduukaguseh,
         pub receipt: ChioWeb3SettlementProofBundleV1SignedBodySettlementReceiptReconciledAnchorProofReceipt,
         pub receipt_inclusion: ChioWeb3SettlementProofBundleV1SignedBodySettlementReceiptReconciledAnchorProofReceiptInclusion,
         pub schema: ::std::string::String,
@@ -242666,7 +243461,7 @@ pub mod work_response {
     ///          "additionalProperties": false
     ///        },
     ///        {
-    ///          "$ref": "#/$defs/Sharedwqiiniwjblyic"
+    ///          "$ref": "#/$defs/Sharedmlfzmfuljzmzo"
     ///        },
     ///        {
     ///          "type": "object",
@@ -242697,7 +243492,7 @@ pub mod work_response {
     ///                  "additionalProperties": false
     ///                },
     ///                {
-    ///                  "$ref": "#/$defs/Sharedwqiiniwjblyic"
+    ///                  "$ref": "#/$defs/Sharedmlfzmfuljzmzo"
     ///                },
     ///                {
     ///                  "type": "object",
@@ -242748,7 +243543,7 @@ pub mod work_response {
     ///                  "additionalProperties": false
     ///                },
     ///                {
-    ///                  "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///                  "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///                }
     ///              ]
     ///            }
@@ -242804,7 +243599,7 @@ pub mod work_response {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedwqiiniwjblyic"
+    ///      "$ref": "#/$defs/Sharedmlfzmfuljzmzo"
     ///    },
     ///    {
     ///      "type": "object",
@@ -242835,7 +243630,7 @@ pub mod work_response {
     ///              "additionalProperties": false
     ///            },
     ///            {
-    ///              "$ref": "#/$defs/Sharedwqiiniwjblyic"
+    ///              "$ref": "#/$defs/Sharedmlfzmfuljzmzo"
     ///            },
     ///            {
     ///              "type": "object",
@@ -242886,7 +243681,7 @@ pub mod work_response {
     ///              "additionalProperties": false
     ///            },
     ///            {
-    ///              "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///              "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///            }
     ///          ]
     ///        }
@@ -242904,7 +243699,7 @@ pub mod work_response {
             kind: ::serde_json::Value,
             prepared: Prepared,
         },
-        Variant1(super::shared::Sharedwqiiniwjblyic),
+        Variant1(super::shared::Sharedmlfzmfuljzmzo),
         Variant2 {
             kind: ::serde_json::Value,
             result: WorkResponseV1BodyVariant2Result,
@@ -242915,8 +243710,8 @@ pub mod work_response {
             value.clone()
         }
     }
-    impl ::std::convert::From<super::shared::Sharedwqiiniwjblyic> for WorkResponseV1Body {
-        fn from(value: super::shared::Sharedwqiiniwjblyic) -> Self {
+    impl ::std::convert::From<super::shared::Sharedmlfzmfuljzmzo> for WorkResponseV1Body {
+        fn from(value: super::shared::Sharedmlfzmfuljzmzo) -> Self {
             Self::Variant1(value)
         }
     }
@@ -242944,7 +243739,7 @@ pub mod work_response {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedwqiiniwjblyic"
+    ///      "$ref": "#/$defs/Sharedmlfzmfuljzmzo"
     ///    },
     ///    {
     ///      "type": "object",
@@ -242995,7 +243790,7 @@ pub mod work_response {
     ///      "additionalProperties": false
     ///    },
     ///    {
-    ///      "$ref": "#/$defs/Sharedkgfhylpijihsb"
+    ///      "$ref": "#/$defs/Sharedwsunwunvsvcju"
     ///    }
     ///  ]
     ///}
@@ -243008,7 +243803,7 @@ pub mod work_response {
             kind: ::serde_json::Value,
             view: super::shared::View,
         },
-        Variant1(super::shared::Sharedwqiiniwjblyic),
+        Variant1(super::shared::Sharedmlfzmfuljzmzo),
         Variant2 {
             kind: ::serde_json::Value,
             prepared: Prepared,
@@ -243021,20 +243816,20 @@ pub mod work_response {
             kind: ::serde_json::Value,
             profile: Profile,
         },
-        Variant5(super::shared::Sharedkgfhylpijihsb),
+        Variant5(super::shared::Sharedwsunwunvsvcju),
     }
     impl ::std::convert::From<&Self> for WorkResponseV1BodyVariant2Result {
         fn from(value: &WorkResponseV1BodyVariant2Result) -> Self {
             value.clone()
         }
     }
-    impl ::std::convert::From<super::shared::Sharedwqiiniwjblyic> for WorkResponseV1BodyVariant2Result {
-        fn from(value: super::shared::Sharedwqiiniwjblyic) -> Self {
+    impl ::std::convert::From<super::shared::Sharedmlfzmfuljzmzo> for WorkResponseV1BodyVariant2Result {
+        fn from(value: super::shared::Sharedmlfzmfuljzmzo) -> Self {
             Self::Variant1(value)
         }
     }
-    impl ::std::convert::From<super::shared::Sharedkgfhylpijihsb> for WorkResponseV1BodyVariant2Result {
-        fn from(value: super::shared::Sharedkgfhylpijihsb) -> Self {
+    impl ::std::convert::From<super::shared::Sharedwsunwunvsvcju> for WorkResponseV1BodyVariant2Result {
+        fn from(value: super::shared::Sharedwsunwunvsvcju) -> Self {
             Self::Variant5(value)
         }
     }
@@ -243108,7 +243903,7 @@ pub mod work_work_dispatch_permit {
     ///          ],
     ///          "properties": {
     ///            "body": {
-    ///              "$ref": "#/$defs/Sharedyttsdpwydmheg"
+    ///              "$ref": "#/$defs/Sharedifdpexmgznpbc"
     ///            },
     ///            "signature": {
     ///              "type": "string"
@@ -243266,7 +244061,7 @@ pub mod work_work_dispatch_permit {
     ///      ],
     ///      "properties": {
     ///        "body": {
-    ///          "$ref": "#/$defs/Sharedyttsdpwydmheg"
+    ///          "$ref": "#/$defs/Sharedifdpexmgznpbc"
     ///        },
     ///        "signature": {
     ///          "type": "string"
@@ -243404,7 +244199,7 @@ pub mod work_work_dispatch_permit {
     ///  ],
     ///  "properties": {
     ///    "body": {
-    ///      "$ref": "#/$defs/Sharedyttsdpwydmheg"
+    ///      "$ref": "#/$defs/Sharedifdpexmgznpbc"
     ///    },
     ///    "signature": {
     ///      "type": "string"
@@ -243420,7 +244215,7 @@ pub mod work_work_dispatch_permit {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioWorkDispatchPermitSignedBodyBodySelection {
-        pub body: super::shared::Sharedyttsdpwydmheg,
+        pub body: super::shared::Sharedifdpexmgznpbc,
         pub signature: ::std::string::String,
         pub signer: ::std::string::String,
     }
@@ -243792,7 +244587,7 @@ pub mod work_work_offer {
     ///  ],
     ///  "properties": {
     ///    "body": {
-    ///      "$ref": "#/$defs/Sharedotxzgfojhsred"
+    ///      "$ref": "#/$defs/Sharedfhdrkybnekqgj"
     ///    },
     ///    "signer": {
     ///      "type": "string"
@@ -243805,7 +244600,7 @@ pub mod work_work_offer {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioWorkOfferSignedBody {
-        pub body: super::shared::Sharedotxzgfojhsred,
+        pub body: super::shared::Sharedfhdrkybnekqgj,
         pub signer: ::std::string::String,
     }
     impl ::std::convert::From<&ChioWorkOfferSignedBody> for ChioWorkOfferSignedBody {
@@ -243856,7 +244651,7 @@ pub mod work_work_selection {
     ///  ],
     ///  "properties": {
     ///    "body": {
-    ///      "$ref": "#/$defs/Sharedyttsdpwydmheg"
+    ///      "$ref": "#/$defs/Sharedifdpexmgznpbc"
     ///    },
     ///    "signer": {
     ///      "type": "string"
@@ -243869,7 +244664,7 @@ pub mod work_work_selection {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioWorkSelectionSignedBody {
-        pub body: super::shared::Sharedyttsdpwydmheg,
+        pub body: super::shared::Sharedifdpexmgznpbc,
         pub signer: ::std::string::String,
     }
     impl ::std::convert::From<&ChioWorkSelectionSignedBody> for ChioWorkSelectionSignedBody {

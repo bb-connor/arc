@@ -17,6 +17,7 @@ mod policy_analysis;
 mod proof;
 mod receipt_evidence;
 mod reputation_guard;
+mod root_request;
 mod runtime;
 mod settle_arena;
 #[path = "trust.rs"]
@@ -41,6 +42,7 @@ use policy_analysis::dispatch_policy;
 use proof::{dispatch_commerce, dispatch_proof};
 use receipt_evidence::{dispatch_evidence, dispatch_receipt};
 use reputation_guard::{dispatch_conformance, dispatch_guard, dispatch_reputation};
+use root_request::dispatch_root_request;
 use settle_arena::{dispatch_arena, dispatch_settle};
 use trust_cmd::dispatch_trust;
 use workflow::dispatch_workflow;

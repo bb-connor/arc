@@ -4,6 +4,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 mod kinds;
+mod operator_request;
+mod signer;
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};

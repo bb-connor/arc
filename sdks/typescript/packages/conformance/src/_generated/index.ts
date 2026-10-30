@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 3e8e51422168badb635820e4894962c4ca99733a4e9e31eede7818a2f0ec0ba3
+// Schema SHA: 21f130613e7e6cfba8d3217019cf256e540ae56db80b1c6d6458379aa59ce9d5
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -66020,6 +66020,176 @@ export namespace RootAuthority_IdpKeySnapshot {
      * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
      */
     signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/operator-root-request-body.schema.json
+export namespace RootAuthority_OperatorRootRequestBody {
+  export interface ChioOperatorRootRequestV1SignedBody {
+    expires_at: number;
+    holder: string;
+    principal: string;
+    request_id: string;
+    schema: "chio.operator-root-request.v1";
+    scope: {
+      grants: {
+        operations: string[];
+        server_id: string;
+        tool_name: string;
+      }[];
+    };
+    tenant_value: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/operator-root-request.schema.json
+export namespace RootAuthority_OperatorRootRequest {
+  /**
+   * `chio.operator-root-request.v1`, signed by the operator key the edge pins. The operator asks the edge for one `chio_operator_key` anchored root for `principal` in `tenant_value`. The signature covers the canonical JSON of every member except `signature`, and `request_id` is the replay key.
+   */
+  export interface ChioOperatorRootRequest {
+    schema: "chio.operator-root-request.v1";
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    request_id: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    principal: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    tenant_value: string;
+    scope: ChioScope;
+    /**
+     * Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+     */
+    holder: "edge_session" | "caller";
+    expires_at: number;
+    /**
+     * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+     */
+    signature: string;
+  }
+  /**
+   * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+   */
+  export interface ChioScope {
+    grants?: ToolGrant[];
+    resource_grants?: ResourceGrant[];
+    prompt_grants?: PromptGrant[];
+  }
+  /**
+   * Authorization to invoke a single tool. Mirrors `ToolGrant`.
+   */
+  export interface ToolGrant {
+    server_id: string;
+    tool_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+    constraints?: (
+      | GenericConstraint
+      | RequireApprovalAboveConstraint
+      | CumulativeApprovalDirectConstraint
+      | CumulativeApprovalDelegableConstraint
+    )[];
+    max_invocations?: number;
+    max_cost_per_invocation?: MonetaryAmount;
+    max_total_cost?: MonetaryAmount;
+    dpop_required?: boolean;
+  }
+  /**
+   * Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+   */
+  export interface GenericConstraint {
+    type: string;
+    value?: unknown;
+  }
+  export interface RequireApprovalAboveConstraint {
+    type: "require_approval_above";
+    value: {
+      threshold_units: number;
+    };
+  }
+  export interface CumulativeApprovalDirectConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding?: never;
+    };
+  }
+  /**
+   * A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
+   */
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface CumulativeApprovalDelegableConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding: ChioCumulativeApprovalRootBinding;
+    };
+  }
+  export interface ChioCumulativeApprovalRootBinding {
+    body: {
+      schema: "chio.cumulative-approval-root.v1";
+      signer_key_epoch: number;
+      root_capability_id: string;
+      root_capability_hash: string;
+      root_issuer: string;
+      root_subject: string;
+      root_scope_hash: string;
+      root_grant_hash: string;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      threshold: CumulativeRootMonetaryAmount;
+      root_expires_at: number;
+    };
+    signature: string;
+  }
+  export interface CumulativeRootMonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  /**
+   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+   */
+  export interface ResourceGrant {
+    uri_pattern: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+  }
+  /**
+   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+   */
+  export interface PromptGrant {
+    prompt_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
   }
 }
 

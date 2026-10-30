@@ -928,6 +928,24 @@ pub(crate) enum McpCommands {
         #[arg(trailing_var_arg = true, required = true)]
         command: Vec<String>,
     },
+
+    /// Operator root requests for `chio_operator_key` anchored roots.
+    RootRequest {
+        #[command(subcommand)]
+        command: McpRootRequestCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum McpRootRequestCommands {
+    /// Sign the operator root request JSON read on stdin and write the
+    /// signed `chio.operator-root-request.v1` to stdout.
+    Sign {
+        /// The operator's Ed25519 seed file (hex, mode 0600 or stricter,
+        /// owned by this user). Its public key is the edge's `--operator-key`.
+        #[arg(long)]
+        operator_seed_file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

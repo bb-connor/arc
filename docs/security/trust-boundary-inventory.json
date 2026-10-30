@@ -2265,6 +2265,13 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -5608,6 +5615,13 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -6748,6 +6762,9 @@
     ],
     "crates/security/chio-cage/src/receipt/projection.rs": [
       "open_raw::from_slice"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
+      "from_members::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -6768,7 +6785,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 577
+          "instances": 584
         }
       ]
     },
@@ -12334,6 +12351,22 @@
           ],
           "apis": [
             "MetadataCommitter::open+matches_with"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts the JSON object that the bounded, duplicate-refusing input reader admitted, with the schema and signature members removed from a signed request, after the required tenant_value is found present. A signed request's signature over the converted request is verified against the operator key the caller pins, so this site establishes no authority.",
+      "readers": [
+        {
+          "reader": "from_members",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
           ],
           "checked": true
         }
@@ -22283,7 +22316,9 @@
       "verify::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs": [
-      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document"
+      "decode_document::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::document",
+      "parse#1::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs::decode_document",
+      "parse#2::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs::decode_document"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_core/factory.rs": [
       "bind_approval_intent::shared-reader::crates/platform/chio-control-plane/src/policy/loader.rs::load_policy",
