@@ -3,6 +3,9 @@
 //! enterprise-provider records, and federation admission policies.
 
 use super::cluster::respond_after_leader_visible_write;
+use super::registry_write_lane::{
+    configured_registry_file, run_registry_transaction, RegistryOperationError,
+};
 use super::report_rendering::{
     forward_authority_post_to_leader, forward_post_to_leader, forward_scim_delete_to_leader,
     forward_scim_post_to_leader,
@@ -351,9 +354,6 @@ pub(crate) async fn handle_upsert_enterprise_provider(
     if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
-    use super::registry_write_lane::{
-        configured_registry_file, run_registry_transaction, RegistryOperationError,
-    };
     let path = match configured_registry_file(
         state.config.enterprise_providers_file.as_deref(),
         "--enterprise-providers-file",
@@ -380,9 +380,6 @@ pub(crate) async fn handle_delete_enterprise_provider(
     if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
-    use super::registry_write_lane::{
-        configured_registry_file, run_registry_transaction, RegistryOperationError,
-    };
     let path = match configured_registry_file(
         state.config.enterprise_providers_file.as_deref(),
         "--enterprise-providers-file",
@@ -412,7 +409,7 @@ pub(crate) async fn handle_list_federation_policies(
         return response;
     }
     match load_federation_policy_registry_for_admin(&state.config) {
-        Ok((_, registry)) => Json(FederationAdmissionPolicyListResponse {
+        Ok(registry) => Json(FederationAdmissionPolicyListResponse {
             configured: true,
             count: registry.policies.len(),
             policies: registry.policies.into_values().collect(),
@@ -431,7 +428,7 @@ pub(crate) async fn handle_get_federation_policy(
         return response;
     }
     let registry = match load_federation_policy_registry_for_admin(&state.config) {
-        Ok((_, registry)) => registry,
+        Ok(registry) => registry,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
     match registry.get(&policy_id) {
@@ -458,23 +455,20 @@ pub(crate) async fn handle_upsert_federation_policy(
             "federation policy path id must match the signed policy body policy_id",
         );
     }
-    let (path, mut registry) = match load_federation_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
+    let path = match configured_federation_policy_registry_path(&state.config) {
+        Ok(path) => path.to_path_buf(),
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    if let Err(error) = registry.upsert(record.clone()) {
-        return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
-    }
-    let Some(saved) = registry.get(&policy_id).cloned() else {
-        return plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "federation policy upsert did not persist the requested record",
-        );
-    };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(saved).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        FederationAdmissionPolicyRegistry::update(&path, |registry| {
+            registry
+                .upsert(record.clone())
+                .map_err(RegistryOperationError::bad_request)?;
+            Ok(record)
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_delete_federation_policy(
@@ -485,15 +479,21 @@ pub(crate) async fn handle_delete_federation_policy(
     if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
-    let (path, mut registry) = match load_federation_policy_registry_for_admin(&state.config) {
-        Ok(values) => values,
+    let path = match configured_federation_policy_registry_path(&state.config) {
+        Ok(path) => path.to_path_buf(),
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
-    let deleted = registry.remove(&policy_id);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(FederationAdmissionPolicyDeleteResponse { policy_id, deleted }).into_response()
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        FederationAdmissionPolicyRegistry::update(&path, |registry| {
+            let deleted = registry.remove(&policy_id);
+            Ok::<_, RegistryOperationError>(FederationAdmissionPolicyDeleteResponse {
+                policy_id,
+                deleted,
+            })
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_evaluate_federation_policy(

@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use chio_core::federation::open_admission::{
@@ -10,6 +9,7 @@ use chio_core::listing::GenericTrustAdmissionClass;
 use chio_core::sha256_hex;
 use serde::{Deserialize, Serialize};
 
+use crate::passport_verifier::RegistryTransactionError;
 use crate::CliError;
 
 const MAX_REGISTRY_BYTES: usize = 64 * 1024 * 1024;
@@ -153,12 +153,14 @@ impl FederationAdmissionPolicyRegistry {
         }
     }
 
-    pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, serde_json::to_vec_pretty(self)?)?;
-        Ok(())
+    /// Applies `change` to the registry loaded under its writer lock and
+    /// persists the result atomically before the lock is released. A missing
+    /// file starts empty.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(path, Self::load, MAX_REGISTRY_BYTES, change)
     }
 
     pub fn get(&self, policy_id: &str) -> Option<&FederationAdmissionPolicyRecord> {
@@ -345,16 +347,6 @@ mod federation_policy_error_tests {
         }
     }
 
-    fn temp_registry_path() -> std::path::PathBuf {
-        let nonce = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .test_unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!(
-            "chio-federation-admission-policy-registry-{nonce}.json"
-        ))
-    }
-
     #[test]
     fn invalid_record_schema_uses_cli_registry_domain() {
         let mut record = signed_record();
@@ -386,17 +378,55 @@ mod federation_policy_error_tests {
     }
 
     #[test]
+    fn update_persists_and_a_refused_change_writes_nothing() {
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("policies.json");
+        let mut invalid = signed_record();
+        invalid.schema = "unsupported".to_string();
+
+        let refused = FederationAdmissionPolicyRegistry::update(&path, |r| r.upsert(invalid));
+        assert!(matches!(refused, Err(RegistryTransactionError::Refused(_))));
+        assert!(!path.exists());
+
+        FederationAdmissionPolicyRegistry::update(&path, |r| r.upsert(signed_record()))
+            .test_unwrap();
+        let loaded = FederationAdmissionPolicyRegistry::load(&path).test_unwrap();
+        assert_eq!(loaded.policies.len(), 1);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn update_refuses_a_symlinked_registry_and_leaves_its_target_unchanged() {
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let target = directory.path().join("target.json");
+        std::fs::write(&target, b"{}").test_unwrap();
+        let link = directory.path().join("policies.json");
+        std::os::unix::fs::symlink(&target, &link).test_unwrap();
+
+        let result = FederationAdmissionPolicyRegistry::update(&link, |registry| {
+            registry.upsert(signed_record())
+        });
+
+        assert!(matches!(
+            result,
+            Err(RegistryTransactionError::Registry(
+                crate::passport_verifier::RegistryUpdateError::Load(_)
+            ))
+        ));
+        assert_eq!(std::fs::read(&target).test_unwrap(), b"{}");
+    }
+
+    #[test]
     fn load_rejects_policy_map_key_that_differs_from_signed_policy_id() {
-        let path = temp_registry_path();
+        let directory = chio_test_support::private_tempdir().test_unwrap();
+        let path = directory.path().join("policies.json");
         let mut registry = FederationAdmissionPolicyRegistry::default();
         registry
             .policies
             .insert("open-admission-alias".to_string(), signed_record());
-        fs::write(&path, serde_json::to_vec_pretty(&registry).test_unwrap()).test_unwrap();
+        std::fs::write(&path, serde_json::to_vec_pretty(&registry).test_unwrap()).test_unwrap();
 
-        let result = FederationAdmissionPolicyRegistry::load(&path);
-        let _ = fs::remove_file(&path);
-        let error = result.test_unwrap_err();
+        let error = FederationAdmissionPolicyRegistry::load(&path).test_unwrap_err();
 
         assert_cli_other_error(
             error,
