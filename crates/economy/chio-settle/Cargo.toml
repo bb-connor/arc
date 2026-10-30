@@ -18,6 +18,7 @@ web3 = [
     "dep:alloy-sol-types",
     "dep:chio-egress-contract",
     "dep:chio-core",
+    "chio-core/web3",
     "dep:chio-credit",
     "dep:chio-federation",
     "dep:chio-finding",

@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::capability::{runtime_attestation::RuntimeAssuranceTier, scope::MonetaryAmount};
 use crate::market::LiabilityCoverageClass;
 use crate::receipt::lineage::SignedExportEnvelope;
+#[cfg(feature = "web3")]
 use crate::web3::settlement::Web3SettlementLifecycleState;
 
 pub const CHIO_AUTONOMOUS_PRICING_INPUT_SCHEMA: &str = "chio.autonomous-pricing-input.v1";
@@ -240,6 +241,7 @@ pub struct AutonomousPricingInputArtifact {
     pub pending_loss_units: u64,
     pub settled_loss_units: u64,
     pub available_capital_units: u64,
+    #[cfg(feature = "web3")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_web3_settlement_state: Option<Web3SettlementLifecycleState>,
     pub evidence_refs: Vec<AutonomousEvidenceReference>,

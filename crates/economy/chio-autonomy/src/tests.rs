@@ -2,6 +2,7 @@ use super::*;
 use crate::capability::{runtime_attestation::RuntimeAssuranceTier, scope::MonetaryAmount};
 use crate::market::LiabilityCoverageClass;
 use crate::validation::{ensure_unique_strings, money_currency_matches_declared};
+#[cfg(feature = "web3")]
 use crate::web3::settlement::Web3SettlementLifecycleState;
 
 fn parse_fixture<T>(fixture: &'static str, body: &str) -> T
@@ -38,6 +39,7 @@ fn sample_input() -> AutonomousPricingInputArtifact {
         pending_loss_units: 0,
         settled_loss_units: 2_500,
         available_capital_units: 600_000,
+        #[cfg(feature = "web3")]
         latest_web3_settlement_state: Some(Web3SettlementLifecycleState::Settled),
         evidence_refs: vec![
             AutonomousEvidenceReference {
@@ -437,10 +439,6 @@ fn reference_artifacts_parse_and_validate() {
         "CHIO_AUTONOMOUS_PRICING_AUTHORITY_ENVELOPE",
         include_str!("../../../../docs/standards/CHIO_AUTONOMOUS_PRICING_AUTHORITY_ENVELOPE.json"),
     );
-    let decision: AutonomousPricingDecisionArtifact = parse_fixture(
-        "CHIO_AUTONOMOUS_PRICING_DECISION_EXAMPLE",
-        include_str!("../../../../docs/standards/CHIO_AUTONOMOUS_PRICING_DECISION_EXAMPLE.json"),
-    );
     let optimization: CapitalPoolOptimizationArtifact = parse_fixture(
         "CHIO_CAPITAL_POOL_OPTIMIZATION_EXAMPLE",
         include_str!("../../../../docs/standards/CHIO_CAPITAL_POOL_OPTIMIZATION_EXAMPLE.json"),
@@ -471,10 +469,6 @@ fn reference_artifacts_parse_and_validate() {
         "autonomous pricing authority envelope",
     );
     require_valid(
-        validate_autonomous_pricing_decision(&decision),
-        "autonomous pricing decision",
-    );
-    require_valid(
         validate_capital_pool_optimization(&optimization),
         "capital pool optimization",
     );
@@ -500,6 +494,38 @@ fn reference_artifacts_parse_and_validate() {
     );
 }
 
+const PRICING_DECISION_EXAMPLE: &str =
+    include_str!("../../../../docs/standards/CHIO_AUTONOMOUS_PRICING_DECISION_EXAMPLE.json");
+
+#[cfg(feature = "web3")]
+#[test]
+fn reference_pricing_decision_parses_and_validates() {
+    let decision: AutonomousPricingDecisionArtifact = parse_fixture(
+        "CHIO_AUTONOMOUS_PRICING_DECISION_EXAMPLE",
+        PRICING_DECISION_EXAMPLE,
+    );
+    require_valid(
+        validate_autonomous_pricing_decision(&decision),
+        "autonomous pricing decision",
+    );
+}
+
+#[cfg(not(feature = "web3"))]
+#[test]
+fn reference_pricing_decision_with_web3_settlement_state_is_refused_without_web3() {
+    let error =
+        match serde_json::from_str::<AutonomousPricingDecisionArtifact>(PRICING_DECISION_EXAMPLE) {
+            Ok(_) => panic!("pricing input carrying latest_web3_settlement_state must not parse"),
+            Err(error) => error,
+        };
+    assert!(
+        error
+            .to_string()
+            .contains("unknown field `latest_web3_settlement_state`"),
+        "{error}"
+    );
+}
+
 #[test]
 fn pricing_input_requires_capital_book_evidence() {
     let mut input = sample_input();
@@ -512,6 +538,7 @@ fn pricing_input_requires_capital_book_evidence() {
     ));
 }
 
+#[cfg(feature = "web3")]
 #[test]
 fn pricing_input_requires_web3_evidence_when_settlement_state_present() {
     let mut input = sample_input();

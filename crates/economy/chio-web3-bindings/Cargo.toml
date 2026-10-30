@@ -20,7 +20,7 @@ alloy = { version = "1.8.3", default-features = false, features = ["json", "json
 serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
-chio-core = { workspace = true }
+chio-core = { workspace = true, features = ["web3"] }
 chio-link = { workspace = true }
 chio-web3 = { workspace = true }
 
