@@ -651,6 +651,21 @@ fn retired_standalone_runtime_commands_refuse() {
     }
 }
 
+#[cfg(not(feature = "finding-market"))]
+#[test]
+fn finding_commands_are_absent_without_finding_market_support() {
+    for arguments in [
+        vec!["chio", "finding", "search"],
+        vec!["chio", "finding", "operator", "tick", "--profile", "p.json"],
+    ] {
+        let error = match parse_cli(arguments) {
+            Err(error) => error,
+            Ok(_) => panic!("finding commands must not parse without finding-market"),
+        };
+        assert_eq!(error.kind(), clap::error::ErrorKind::InvalidSubcommand);
+    }
+}
+
 #[test]
 fn chio_pheromone_core_relay_dispatch_uses_chio_handlers() {
     let pheromone_dispatch = include_str!("cli/dispatch/pheromone.rs");

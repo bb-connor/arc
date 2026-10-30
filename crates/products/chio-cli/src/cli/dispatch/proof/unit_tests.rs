@@ -137,6 +137,7 @@ fn proof_test_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -
     }
 }
 
+#[cfg(feature = "finding-market")]
 fn verifier_profile_fixture() -> (
     std::path::PathBuf,
     chio_finding::SignedFindingChallengeVerifierProfile,
@@ -156,6 +157,7 @@ fn verifier_profile_fixture() -> (
     (path, profile, digest)
 }
 
+#[cfg(feature = "finding-market")]
 fn verifier_authority_status_fixture(
     directory: &std::path::Path,
     profile: &chio_finding::SignedFindingChallengeVerifierProfile,
@@ -296,6 +298,7 @@ fn verifier_authority_status_fixture(
     )
 }
 
+#[cfg(feature = "finding-market")]
 fn status_operator_authority_status_fixture(
     directory: &std::path::Path,
     authorization: &chio_finding::FindingStatusOperatorAuthorization,
@@ -331,6 +334,7 @@ fn status_operator_authority_status_fixture(
     path
 }
 
+#[cfg(feature = "finding-market")]
 #[test]
 fn only_verified_finding_claim_set_rows_force_cognition_market_routing() {
     let transaction_claim_set = serde_json::to_vec(&serde_json::json!({
@@ -386,6 +390,7 @@ fn only_verified_finding_claim_set_rows_force_cognition_market_routing() {
     }
 }
 
+#[cfg(feature = "finding-market")]
 #[test]
 fn cognition_market_trust_skips_status_configuration_for_non_status_claims() {
     let _env_lock = match AGENT_WEB_ENV_LOCK.lock() {
@@ -521,6 +526,7 @@ fn cognition_market_trust_skips_status_configuration_for_non_status_claims() {
     );
 }
 
+#[cfg(feature = "finding-market")]
 #[test]
 fn cognition_market_trust_loads_status_for_profile_liveness_floor() {
     let _env_lock = match AGENT_WEB_ENV_LOCK.lock() {
@@ -739,6 +745,7 @@ fn runtime_artifact_loader_includes_policy_activation_receipt() {
     assert!(is_runtime_artifact_role("policy-activation-receipt"));
 }
 
+#[cfg(feature = "finding-market")]
 #[test]
 fn proof_verify_routes_finding_claims_through_the_cognition_verifier() {
     let _env_lock = match AGENT_WEB_ENV_LOCK.lock() {
@@ -1038,6 +1045,30 @@ fn proof_verify_routes_finding_claims_through_the_cognition_verifier() {
             "CHIO_FINDING_STATUS_NOW_UNIX_SECONDS must equal CHIO_FINDING_VERIFIER_AUTHORITY_STATUS_CHECKED_AT"
         ),
         "unexpected status-clock error: {error}"
+    );
+}
+
+#[cfg(not(feature = "finding-market"))]
+#[test]
+fn proof_verify_refuses_finding_claims_without_finding_market_support() {
+    let _env_lock = match AGENT_WEB_ENV_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let _env = TestEnvGuard::set(&[(
+        "CHIO_TRANSACTION_TRUSTED_ROOT_KEYS",
+        std::ffi::OsStr::new("ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"),
+    )]);
+    let passport_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join("fixtures/proof-room/finding/cognition-market-qualified-profile")
+        .join("transaction-passport.json");
+    let error = proof_test_rejection(verify_transaction_passport_file(&passport_path));
+    assert_eq!(error.report().message, FINDING_MARKET_NOT_COMPILED);
+    assert_proof_rejection(
+        error,
+        &chio_errors::_generated::error_codes::TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
+        50,
     );
 }
 

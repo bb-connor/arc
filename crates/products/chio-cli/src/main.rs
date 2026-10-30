@@ -117,6 +117,7 @@ pub(crate) use types_cli::{
     TrustUnderwritingAppealCommands, TrustUnderwritingDecisionCommands,
     TrustUnderwritingInputCommands, WorkflowCommands,
 };
+#[cfg(feature = "finding-market")]
 pub(crate) use types_cli::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
 };
