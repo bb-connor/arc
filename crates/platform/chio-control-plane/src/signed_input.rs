@@ -4,6 +4,7 @@ use std::path::Path;
 
 use chio_core::canonical::UntrustedJsonText;
 use chio_secure_ipc::registry_file::{RegistryFile, RegistryFileError};
+use chio_secure_ipc::regular_file::{read_regular, FilePolicy, RegularFileError};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -17,11 +18,29 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) mod read_pause;
 
 pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
-    chio_secure_ipc::regular_file::read_regular_file(
-        path,
-        chio_secure_ipc::regular_file::OpenPolicy::Authenticated,
-        MAX_SIGNED_FILE_BYTES,
-    )
+    read_bounded_with_limit(path, MAX_SIGNED_FILE_BYTES)
+}
+
+/// Reads an operator file of at most `max_bytes` bytes. Operator files grant
+/// authority, so they are read under the trusted owner and mode policy. A
+/// refusal keeps its [`RegularFileError`] as the error's inner value.
+pub(crate) fn read_bounded_with_limit(
+    path: &Path,
+    max_bytes: usize,
+) -> Result<Vec<u8>, std::io::Error> {
+    read_regular(path, FilePolicy::Trusted, max_bytes).map_err(|error| {
+        let kind = match error {
+            RegularFileError::Io(kind) => return std::io::Error::from(kind),
+            RegularFileError::Symlink
+            | RegularFileError::NotRegular
+            | RegularFileError::Replaced => std::io::ErrorKind::InvalidInput,
+            RegularFileError::ForeignOwner
+            | RegularFileError::Writable
+            | RegularFileError::Exposed => std::io::ErrorKind::PermissionDenied,
+            RegularFileError::TooLarge { .. } => std::io::ErrorKind::InvalidData,
+        };
+        std::io::Error::new(kind, error)
+    })
 }
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
