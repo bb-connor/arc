@@ -417,3 +417,254 @@ fn a_tampered_broker_vector_body_is_rejected() {
     )
     .is_err());
 }
+
+fn load_broker_files() -> BTreeMap<String, Value> {
+    let mut names: Vec<String> = fs::read_dir(repository_root().join(BROKER_DIRECTORY))
+        .test_unwrap()
+        .map(|entry| entry.test_unwrap().file_name().into_string().test_unwrap())
+        .filter(|name| name.starts_with("broker-") && name.ends_with(".json"))
+        .collect();
+    names.sort();
+    names
+        .into_iter()
+        .map(|name| {
+            let value = read(BROKER_DIRECTORY, &name);
+            (name, value)
+        })
+        .collect()
+}
+
+fn expect_equal(mismatches: &mut Vec<String>, label: &str, left: &Value, right: &Value) {
+    if left != right {
+        mismatches.push(format!("{label}: {left} != {right}"));
+    }
+}
+
+fn cross_file_mismatches(files: &BTreeMap<String, Value>) -> Vec<String> {
+    let file = |name: &str| &files[name];
+    let mut mismatches = Vec::new();
+
+    let execute_request = file("broker-execute-request-v1.json");
+    let request: BrokerExecuteRequest =
+        serde_json::from_value(execute_request.clone()).test_unwrap();
+    let capability_sha256 = Value::String(capability_digest(&request.capability).test_unwrap());
+
+    expect_equal(
+        &mut mismatches,
+        "execute request capability",
+        &execute_request["capability"],
+        file("broker-capability-envelope-v1.json"),
+    );
+    expect_equal(
+        &mut mismatches,
+        "execute request proof",
+        &execute_request["proof"],
+        file("broker-request-proof-envelope-v1.json"),
+    );
+    let open = file("broker-privileged-audit-open-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "audit open capability",
+        &open["request"]["capability"],
+        file("broker-capability-envelope-v1.json"),
+    );
+    expect_equal(
+        &mut mismatches,
+        "audit open proof",
+        &open["request"]["proof"],
+        file("broker-request-proof-envelope-v1.json"),
+    );
+
+    let evidence_source = file("broker-execution-evidence-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "execution evidence capability digest",
+        &evidence_source["capabilityDigest"],
+        &capability_sha256,
+    );
+    expect_equal(
+        &mut mismatches,
+        "execution receipt body evidence",
+        &file("broker-execution-receipt-body-v1.json")["evidence"],
+        evidence_source,
+    );
+    let failure_body = file("broker-execution-failure-receipt-body-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "failure body capability digest",
+        &failure_body["capabilityDigest"],
+        &capability_sha256,
+    );
+    let failure_receipt = file("broker-execution-failure-receipt-envelope-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "failure receipt body",
+        &failure_receipt["body"],
+        failure_body,
+    );
+    let execute_failure = file("broker-execute-failure-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "execute failure receipt",
+        &execute_failure["receipt"],
+        failure_receipt,
+    );
+    expect_equal(
+        &mut mismatches,
+        "execute failure receipt reference",
+        &execute_failure["receiptReference"],
+        &Value::String(format!(
+            "broker-failure-receipt-sha256-{}",
+            digest_of(failure_receipt)
+        )),
+    );
+
+    let registration = file("broker-attempt-registration-v1.json");
+    let registration_typed: AttemptRegistration =
+        serde_json::from_value(registration.clone()).test_unwrap();
+    expect_equal(
+        &mut mismatches,
+        "registration request digest",
+        &registration["requestCanonicalDigest"],
+        &Value::String(broker_execute_request_registration_digest(&request).test_unwrap()),
+    );
+    expect_equal(
+        &mut mismatches,
+        "registration proof digest",
+        &registration["proofDigest"],
+        &Value::String(proof_digest(&request.proof).test_unwrap()),
+    );
+    let registration_sha256 = match attempt_registration_digest(&registration_typed) {
+        Ok(digest) => Value::String(digest),
+        Err(error) => {
+            mismatches.push(format!("registration digest: {error}"));
+            Value::Null
+        }
+    };
+    expect_equal(
+        &mut mismatches,
+        "authorization envelope registration digest",
+        &file("broker-register-attempt-authorization-envelope-v1.json")["body"]
+            ["registrationDigest"],
+        &registration_sha256,
+    );
+    expect_equal(
+        &mut mismatches,
+        "authorization body registration digest",
+        &file("broker-register-attempt-authorization-body-v1.json")["registrationDigest"],
+        &registration_sha256,
+    );
+    match prepared_dispatch_id(&registration_typed, &request) {
+        Ok(id) => expect_equal(
+            &mut mismatches,
+            "prepared dispatch id",
+            &file("broker-prepare-dispatch-acknowledgement-v1.json")["preparedDispatchId"],
+            &Value::String(id),
+        ),
+        Err(error) => mismatches.push(format!("prepared dispatch id: {error}")),
+    }
+
+    let evidence = file("broker-privileged-audit-evidence-v1.json");
+    expect_equal(
+        &mut mismatches,
+        "audit challenge",
+        &evidence["challenge"],
+        file("broker-privileged-audit-challenge-v1.json"),
+    );
+    expect_equal(
+        &mut mismatches,
+        "audit commit runner authorization",
+        &file("broker-privileged-audit-commit-v1.json")["runnerAuthorization"],
+        &evidence["runnerAuthorization"],
+    );
+    let runner: SignedBrokerAuditRunnerAuthorization =
+        serde_json::from_value(evidence["runnerAuthorization"].clone()).test_unwrap();
+    let runner_sha256 = runner_authorization_digest(&runner).test_unwrap();
+    expect_equal(
+        &mut mismatches,
+        "comparison runner authorization digest",
+        &evidence["comparison"]["body"]["runnerAuthorizationSha256"],
+        &Value::String(runner_sha256.clone()),
+    );
+    expect_equal(
+        &mut mismatches,
+        "comparison governed intent digest",
+        &evidence["comparison"]["body"]["governedAuditIntentSha256"],
+        &Value::String(
+            broker_audit_governed_intent_digest(&runner.body, &runner_sha256).test_unwrap(),
+        ),
+    );
+    for name in ["livenessAuthorityExchange", "revocationAuthorityExchange"] {
+        let exchange = &evidence[name];
+        let signed_request: SignedAuthorityRequest =
+            serde_json::from_value(exchange["request"].clone()).test_unwrap();
+        let request_digest = Value::String(signed_request_digest(&signed_request).test_unwrap());
+        expect_equal(
+            &mut mismatches,
+            &format!("{name} request digest"),
+            &exchange["requestSha256"],
+            &request_digest,
+        );
+        expect_equal(
+            &mut mismatches,
+            &format!("{name} response request digest"),
+            &exchange["response"]["body"]["requestDigest"],
+            &request_digest,
+        );
+        expect_equal(
+            &mut mismatches,
+            &format!("{name} response digest"),
+            &exchange["responseSha256"],
+            &Value::String(digest_of(&exchange["response"])),
+        );
+    }
+    mismatches
+}
+
+#[test]
+fn committed_broker_vector_digests_agree_across_files() {
+    let mismatches = cross_file_mismatches(&load_broker_files());
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
+}
+
+#[test]
+fn a_cross_file_digest_drift_is_reported() {
+    let tampers: [(&str, &[&str]); 6] = [
+        (
+            "broker-execute-request-v1.json",
+            &["capability", "body", "maximumExecutions"],
+        ),
+        ("broker-execution-evidence-v1.json", &["capabilityDigest"]),
+        ("broker-attempt-registration-v1.json", &["proofDigest"]),
+        (
+            "broker-register-attempt-authorization-body-v1.json",
+            &["registrationDigest"],
+        ),
+        (
+            "broker-prepare-dispatch-acknowledgement-v1.json",
+            &["preparedDispatchId"],
+        ),
+        (
+            "broker-privileged-audit-evidence-v1.json",
+            &["livenessAuthorityExchange", "requestSha256"],
+        ),
+    ];
+    for (name, path) in tampers {
+        let mut files = load_broker_files();
+        let mut slot = files.get_mut(name).test_unwrap();
+        for key in path {
+            slot = &mut slot[*key];
+        }
+        *slot = match slot.clone() {
+            Value::Number(number) => json!(number.as_u64().test_unwrap() + 1),
+            Value::String(text) => Value::String(format!("{text}0")),
+            other => {
+                panic!("tamper target {name} at {path:?} is neither a number nor a string: {other}")
+            }
+        };
+        assert!(
+            !cross_file_mismatches(&files).is_empty(),
+            "tampering {name} at {path:?} was not reported"
+        );
+    }
+}
