@@ -436,6 +436,13 @@ fn reserved_receipt_metadata_keys_are_pinned_exactly() {
             "agent_web_receipt_ref",
             "parent_receipt_ids",
             "batch_witness",
+            "active_defense",
+            "response_simulation",
+            "security_event",
+            "cage_receipt",
+            "guard_error",
+            "refusal",
+            "cancellation",
         ]
     );
     for key in reserved {
