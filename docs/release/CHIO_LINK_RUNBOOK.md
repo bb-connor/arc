@@ -23,7 +23,7 @@ Before enabling cross-currency enforcement for an operator deployment:
 3. Confirm every pair you expect to charge across currencies is pinned and has
    the intended fallback policy.
 4. Run the local qualification commands:
-   - `CARGO_TARGET_DIR=target/chio-link-check CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-link -- --test-threads=1`
+   - `CARGO_TARGET_DIR=target/chio-link-check CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-link --features web3 -- --test-threads=1`
    - `CARGO_TARGET_DIR=target/chio-kernel-check CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p chio-kernel cross_currency -- --test-threads=1`
 
 ## Failure Drills
