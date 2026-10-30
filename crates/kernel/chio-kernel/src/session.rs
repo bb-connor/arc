@@ -614,6 +614,9 @@ pub enum SessionError {
     #[error("request {request_id} is not in flight")]
     RequestNotInflight { request_id: RequestId },
 
+    #[error("session authorization changed before request {request_id} could dispatch")]
+    RequestAnchorChanged { request_id: RequestId },
+
     #[error(
         "execution nonce retry for request {request_id} does not match a pending session preflight"
     )]

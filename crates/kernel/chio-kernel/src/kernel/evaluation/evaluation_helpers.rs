@@ -855,7 +855,7 @@ impl ChioKernel {
             PreDispatchCleanupOutcome::Cancelled => self
                 .build_cancelled_response_with_metadata_and_payee_binding(
                     request,
-                    denial.detail(),
+                    denial,
                     timestamp,
                     matched_grant_index,
                     metadata,
