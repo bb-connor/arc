@@ -1,14 +1,14 @@
 //! `chio trust emergency`: the operator stop on a trust-control node.
 
-use std::io::Read;
-
-use chio_kernel::stop::{ResumeRequestBody, StopEpochId, StopRequestBody, StopStatus};
+use chio_kernel::stop::{
+    ResumeRequestBody, StopEpochId, StopReadiness, StopRequestBody, StopStatus,
+};
 use zeroize::Zeroizing;
 
 use super::*;
 
 const CONTROL_TOKEN_ENV: &str = "CHIO_CONTROL_TOKEN";
-const MAX_TOKEN_FILE_BYTES: u64 = 4096;
+const MAX_TOKEN_FILE_BYTES: usize = 4096;
 
 pub(crate) fn cmd_trust_emergency(
     command: TrustEmergencyCommands,
@@ -71,16 +71,10 @@ fn admin_token(
     }
 }
 
+/// The token file is custody: a singly linked regular file owned by this user
+/// with mode 0600 or stricter, opened without following links.
 fn read_token_file(path: &Path) -> Result<Zeroizing<String>, CliError> {
-    let file = std::fs::File::open(path)?;
-    let mut bytes = Zeroizing::new(Vec::new());
-    file.take(MAX_TOKEN_FILE_BYTES + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_TOKEN_FILE_BYTES {
-        return Err(CliError::cli_other_error(format!(
-            "admin token file exceeds {MAX_TOKEN_FILE_BYTES} bytes"
-        )));
-    }
+    let bytes = chio_control_plane::read_private_signing_custody(path, MAX_TOKEN_FILE_BYTES)?;
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| CliError::cli_other_error("admin token file is not UTF-8".to_string()))?;
     let token = text.trim_end_matches(['\r', '\n']);
@@ -97,18 +91,17 @@ fn print_status(status: &StopStatus, json_output: bool) -> Result<(), CliError> 
         println!("{}", serde_json::to_string_pretty(status)?);
         return Ok(());
     }
-    let readiness = serde_json::to_value(&status.readiness)?;
     println!("stopped:     {}", status.stopped);
     println!("durability:  {}", status.durability);
-    println!(
-        "readiness:   {}",
-        readiness["state"].as_str().unwrap_or("unknown")
-    );
+    match &status.readiness {
+        StopReadiness::Ready => println!("readiness:   ready"),
+        StopReadiness::ReadyStopped => println!("readiness:   ready_stopped"),
+        StopReadiness::NotReady { reason } => println!("readiness:   not_ready ({reason})"),
+    }
     if let Some(head) = &status.head {
-        let head = serde_json::to_value(head)?;
         println!(
             "head:        generation {} epoch {}",
-            head["chain_generation"], head["epoch"]
+            head.chain_generation, head.epoch
         );
     }
     if let Some(withheld) = status.withheld_operations {

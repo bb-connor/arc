@@ -348,11 +348,16 @@ impl CliError {
             ),
             Self::ControlPlane(error) => {
                 let spec = error.spec();
-                self.report_with_context(
-                    spec.string_code,
-                    serde_json::json!({ "urn": spec.urn }),
-                    spec.help,
-                )
+                let context = match error {
+                    ControlPlaneError::Unauthorized { status, body }
+                    | ControlPlaneError::Rejected { status, body } => {
+                        serde_json::json!({ "urn": spec.urn, "status": status, "body": body })
+                    }
+                    ControlPlaneError::Unreachable(detail) => {
+                        serde_json::json!({ "urn": spec.urn, "detail": detail })
+                    }
+                };
+                self.report_with_context(spec.string_code, context, spec.help)
             }
             Self::Io(error) => self.report_with_context(
                 "CHIO-CLI-IO",
