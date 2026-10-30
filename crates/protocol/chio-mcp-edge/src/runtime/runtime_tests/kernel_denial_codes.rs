@@ -352,12 +352,13 @@ impl ToolServerConnection for IncompleteToolServer {
 }
 
 /// A tool server whose call ends as a cancelled or an incomplete deny, with
-/// its server id, tool name and terminal state label.
+/// its server id, tool name, terminal state label and client code.
 fn terminal_denial_cases() -> Vec<(
     Box<dyn ToolServerConnection>,
     &'static str,
     &'static str,
     &'static str,
+    chio_kernel::ClientDenialCode,
 )> {
     vec![
         (
@@ -365,12 +366,14 @@ fn terminal_denial_cases() -> Vec<(
             "cancel-srv",
             "cancel",
             "cancelled",
+            chio_kernel::ClientDenialCode::RequestCancelled,
         ),
         (
             Box::new(IncompleteToolServer),
             "incomplete-srv",
             "incomplete",
             "incomplete",
+            chio_kernel::ClientDenialCode::Denied,
         ),
     ]
 }
@@ -390,19 +393,28 @@ fn terminal_denial_edge(kernel: ChioKernel, request: &BridgeMcpToolCallRequest) 
     .unwrap()
 }
 
-fn assert_generic_terminal_denial(result: &Value, raw_reasons: &[&str]) {
+fn assert_closed_terminal_denial(
+    result: &Value,
+    code: chio_kernel::ClientDenialCode,
+    raw_reasons: &[&str],
+) {
     assert_eq!(result["isError"], true, "result: {result}");
     assert_eq!(
+        result["structuredContent"],
+        json!({"code": code.code()}),
+        "result: {result}"
+    );
+    assert_eq!(
         result["content"],
-        json!([{"type": "text", "text": "Request denied"}]),
+        json!([{"type": "text", "text": code.text()}]),
         "result: {result}"
     );
     assert_no_detail_outside_receipts(result, raw_reasons);
 }
 
 #[test]
-fn bridge_terminal_denials_project_the_generic_denial_without_their_reason() {
-    for (server, server_id, tool_name, state) in terminal_denial_cases() {
+fn bridge_terminal_denials_project_their_closed_code_without_their_reason() {
+    for (server, server_id, tool_name, state, code) in terminal_denial_cases() {
         let _metrics_guard = metrics_test_guard();
         let (kernel, request) = make_kernel_error_bridge_fixture(
             server,
@@ -426,20 +438,16 @@ fn bridge_terminal_denials_project_the_generic_denial_without_their_reason() {
             (other, _) => panic!("expected a {state} deny, got {other:?}"),
         };
         assert_eq!(
-            bridge.mcp_result["structuredContent"],
-            json!({"code": "denied"})
-        );
-        assert_eq!(
             bridge.mcp_result["_meta"]["chio"]["terminalState"]["reason"],
-            "Request denied"
+            code.text()
         );
-        assert_generic_terminal_denial(&bridge.mcp_result, &[&raw, PRIVATE_DETAIL]);
+        assert_closed_terminal_denial(&bridge.mcp_result, code, &[&raw, PRIVATE_DETAIL]);
     }
 }
 
 #[test]
-fn edge_terminal_denials_project_the_generic_denial_without_their_reason() {
-    for (server, server_id, tool_name, state) in terminal_denial_cases() {
+fn edge_terminal_denials_project_their_closed_code_without_their_reason() {
+    for (server, server_id, tool_name, state, code) in terminal_denial_cases() {
         let _metrics_guard = metrics_test_guard();
         let (kernel, request) = make_kernel_error_bridge_fixture(
             server,
@@ -459,8 +467,9 @@ fn edge_terminal_denials_project_the_generic_denial_without_their_reason() {
             }))
             .unwrap();
 
-        assert_generic_terminal_denial(
+        assert_closed_terminal_denial(
             &response["result"],
+            code,
             &[
                 PRIVATE_DETAIL,
                 "tool server reported cancellation after dispatch; outcome is unknown",
