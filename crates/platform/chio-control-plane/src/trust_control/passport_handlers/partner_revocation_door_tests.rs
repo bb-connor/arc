@@ -1106,46 +1106,6 @@ async fn a_live_delegation_policy_issues_through_the_partner_door() {
 }
 
 #[tokio::test]
-async fn a_delegation_ceiling_signed_by_the_issuing_partner_is_refused_and_does_not_consume_the_challenge(
-) {
-    let mut door = Door::new(0);
-    let store = with_receipts(&mut door);
-    door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
-    let passport = door.passport(&[&door.authority]);
-    let challenge = door.challenge(Some("delegation-partner-signed"), VALID_FROM, VALID_UNTIL);
-    let partner_signer = Keypair::generate();
-    let request = federated_request(
-        &door,
-        &passport,
-        &challenge,
-        5,
-        Some(delegation_policy_signed_by(
-            &partner_signer,
-            BASE_UNIX_SECS + 10,
-            None,
-        )),
-        None,
-    );
-    let response = handle_federated_issue(
-        State(receipts_state(&door, &store)),
-        service_headers(),
-        Json(request),
-    )
-    .await;
-    assert_refused(
-        response,
-        serde_json::json!({
-            "error": "federated delegation policy signer is not trusted by the local capability authority"
-        }),
-    )
-    .await;
-    assert_eq!(
-        active_challenge(&door, "delegation-partner-signed"),
-        challenge
-    );
-}
-
-#[tokio::test]
 async fn a_delegation_ceiling_signed_by_the_local_authority_issues_after_a_partner_signed_one_is_refused(
 ) {
     let mut door = Door::new(0);
@@ -1166,16 +1126,19 @@ async fn a_delegation_ceiling_signed_by_the_local_authority_issues_after_a_partn
         )),
         None,
     );
-    let (status, _) = response_parts(
+    assert_refused(
         handle_federated_issue(
             State(receipts_state(&door, &store)),
             service_headers(),
             Json(refused),
         )
         .await,
+        serde_json::json!({
+            "error": "federated delegation policy signer is not trusted by the local capability authority"
+        }),
     )
     .await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(active_challenge(&door, "delegation-retry"), challenge);
     let accepted = federated_request(
         &door,
         &passport,

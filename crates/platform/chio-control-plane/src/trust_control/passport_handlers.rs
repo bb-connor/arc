@@ -1417,13 +1417,11 @@ pub(crate) async fn handle_federated_issue(
 }
 
 /// The delegation ceiling belongs to the issuing service: its policy signer
-/// must be a key the local capability authority trusts. Checked before the
-/// challenge is consumed so a refused ceiling leaves the challenge usable.
+/// must be a key the issuing capability authority trusts.
 fn ensure_delegation_policy_signer_trusted(
-    state: &TrustServiceState,
+    authority: &dyn CapabilityAuthority,
     policy: &FederatedDelegationPolicyDocument,
 ) -> Result<(), Response> {
-    let authority = load_capability_authority_with_deferred_lineage(state)?;
     if authority
         .trusted_public_keys()
         .iter()
@@ -1464,11 +1462,21 @@ pub(crate) async fn execute_federated_issue(
         Ok(door) => door,
         Err(response) => return Err(response),
     };
+    // A delegated issuance checks its ceiling and issues on one authority
+    // snapshot, loaded before the acceptance instant is sampled.
+    let delegated_authority = match payload.delegation_policy {
+        Some(_) => Some(load_capability_authority_with_deferred_lineage(state)?),
+        None => None,
+    };
     let (now, accept_unix_ms) = match acceptance_instant(state) {
         Ok(instant) => instant,
         Err(response) => return Err(response),
     };
-    if let Some(policy) = payload.delegation_policy.as_ref() {
+    if let Some((policy, authority)) = payload
+        .delegation_policy
+        .as_ref()
+        .zip(delegated_authority.as_deref())
+    {
         if let Err(error) = verify_federated_delegation_policy(policy)
             .and_then(|_| ensure_federated_delegation_policy_active(policy, now))
         {
@@ -1496,7 +1504,7 @@ pub(crate) async fn execute_federated_issue(
         {
             return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
         }
-        ensure_delegation_policy_signer_trusted(state, policy)?;
+        ensure_delegation_policy_signer_trusted(authority, policy)?;
     }
     if let Some(upstream_capability_id) = payload.upstream_capability_id.as_deref() {
         match payload
@@ -1800,10 +1808,9 @@ pub(crate) async fn execute_federated_issue(
         }
         enterprise_audit = Some(audit);
     }
-    let authority = if payload.delegation_policy.is_some() {
-        load_capability_authority_with_deferred_lineage(state)
-    } else {
-        load_capability_authority(state)
+    let authority = match delegated_authority {
+        Some(authority) => Ok(authority),
+        None => load_capability_authority(state),
     };
     match authority {
         Ok(authority) => {

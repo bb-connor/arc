@@ -176,10 +176,10 @@ to end: on T, federated issue consumes a challenge already consumed at
 verification (`trust_control/passport_handlers.rs`). B's authority owns the
 ceiling: federated issue refuses a delegation policy whose signer is not a key
 B's own capability authority trusts (T: `trust_control/passport_handlers.rs`,
-`partner_revocation_door_tests.rs`), so A never signs the ceiling. The roadmap's
-COOP-1 re-cut fixes the rest: steps 3 and 4 use an issuance inbox with holder pickup,
-step 6 exports the door's receipts, step 7 verifies against a pinned partner
-card, and step 4 approval can come from the CLI. Until then the table is the
+`partner_revocation_door_tests.rs`), so A never signs the ceiling. The
+roadmap's COOP-1 re-cut fixes the rest: steps 3 and 4 use an issuance inbox
+with holder pickup, step 6 exports the door's receipts, step 7 verifies against
+a pinned partner card, and step 4 approval can come from the CLI. Until then the table is the
 target, not a runnable script.
 
 | Step | Who | Action | `boundary_class` |
