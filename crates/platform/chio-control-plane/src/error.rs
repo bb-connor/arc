@@ -5,7 +5,8 @@ use chio_errors::_generated::error_codes::{
     CLI_JSON, CLI_OTHER, CLI_YAML, GUARD_DENIED, GUARD_WASM_TRAP, MANIFEST_SCHEMA_INVALID,
     MANIFEST_SIGNATURE_INVALID, POLICY_CONSTRAINT_INVALID, POLICY_DECISION_DENIED,
     PROVIDER_TOOL_SERVER_ERROR, REPLAY_DETERMINISTIC_MISMATCH, REPLAY_FIXTURE_DRIFT,
-    REPLAY_TRACE_NOT_FOUND, TRANSPORT_HTTP_FAILED, TRANSPORT_INVALID_REQUEST_SHAPE,
+    REPLAY_TRACE_NOT_FOUND, TRANSPORT_AUTH_MISSING_OR_INVALID, TRANSPORT_HTTP_FAILED,
+    TRANSPORT_INVALID_REQUEST_SHAPE,
 };
 use chio_errors::{ChioError, ErrorCodeSpec};
 use chio_kernel::transport::TransportError;
@@ -77,6 +78,9 @@ pub enum CliError {
     #[error("transport error: {0}")]
     Transport(#[from] TransportError),
 
+    #[error(transparent)]
+    ControlPlane(#[from] ControlPlaneError),
+
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -98,7 +102,49 @@ pub enum CliError {
     Other(String),
 }
 
+/// A trust-control request that did not succeed, classified by whether the
+/// service refused the credential, answered with another refusal, or never
+/// answered at all.
+#[derive(Debug, thiserror::Error)]
+pub enum ControlPlaneError {
+    #[error("trust control service request failed with {status}: {body}")]
+    Unauthorized { status: u16, body: String },
+    #[error("trust control service request failed with {status}: {body}")]
+    Rejected { status: u16, body: String },
+    #[error("trust control service transport failed: {0}")]
+    Unreachable(String),
+}
+
+impl ControlPlaneError {
+    /// The service's answer to a request it refused.
+    pub fn from_status(status: u16, body: String) -> Self {
+        match status {
+            401 | 403 => Self::Unauthorized { status, body },
+            _ => Self::Rejected { status, body },
+        }
+    }
+
+    fn spec(&self) -> &'static ErrorCodeSpec {
+        match self {
+            Self::Unauthorized { .. } => &TRANSPORT_AUTH_MISSING_OR_INVALID,
+            Self::Rejected { .. } => &CLI_OTHER,
+            Self::Unreachable(_) => &TRANSPORT_HTTP_FAILED,
+        }
+    }
+}
+
 impl CliError {
+    /// Process exit code for this error. A trust-control credential refusal
+    /// and an unreachable trust-control service have their own classes so
+    /// operator tooling can tell them apart; every other error exits 1.
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::ControlPlane(ControlPlaneError::Unauthorized { .. }) => 77,
+            Self::ControlPlane(ControlPlaneError::Unreachable(_)) => 69,
+            _ => 1,
+        }
+    }
+
     /// Preserve an inspected local cause while projecting only the registry diagnostic.
     pub fn with_source(
         spec: &'static ErrorCodeSpec,
@@ -300,6 +346,19 @@ impl CliError {
                 serde_json::json!({ "source": error.to_string() }),
                 "Verify the remote endpoint or subprocess transport is reachable and speaking the expected protocol.",
             ),
+            Self::ControlPlane(error) => {
+                let spec = error.spec();
+                let context = match error {
+                    ControlPlaneError::Unauthorized { status, body }
+                    | ControlPlaneError::Rejected { status, body } => {
+                        serde_json::json!({ "urn": spec.urn, "status": status, "body": body })
+                    }
+                    ControlPlaneError::Unreachable(detail) => {
+                        serde_json::json!({ "urn": spec.urn, "detail": detail })
+                    }
+                };
+                self.report_with_context(spec.string_code, context, spec.help)
+            }
             Self::Io(error) => self.report_with_context(
                 "CHIO-CLI-IO",
                 serde_json::json!({ "source": error.to_string() }),

@@ -21,6 +21,7 @@ mod runtime;
 mod settle_arena;
 #[path = "trust.rs"]
 mod trust_cmd;
+mod trust_emergency;
 mod workflow;
 
 #[cfg(test)]
@@ -436,7 +437,7 @@ pub(crate) fn run() {
     if let Err(e) = result {
         let mut stderr = std::io::stderr();
         let _ = write_cli_error(&mut stderr, &e, json_output);
-        std::process::exit(1);
+        std::process::exit(e.exit_code());
     }
 }
 

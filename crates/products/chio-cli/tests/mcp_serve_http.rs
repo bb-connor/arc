@@ -6072,3 +6072,5 @@ mod confinement;
 mod durable_stop;
 #[path = "mcp_serve_http/kernel_host_preset.rs"]
 mod kernel_host_preset;
+#[path = "mcp_serve_http/trust_emergency_cli.rs"]
+mod trust_emergency_cli;

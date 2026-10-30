@@ -1,5 +1,6 @@
 use super::super::*;
 use super::should_retry_status;
+use crate::ControlPlaneError;
 
 impl TrustControlClient {
     pub(super) fn get_internal_json<T: for<'de> Deserialize<'de>>(
@@ -290,7 +291,8 @@ impl TrustControlClient {
         F: Fn(&Agent, &str, &str) -> Result<ureq::Response, ureq::Error>,
     {
         let endpoint_order = self.endpoint_order();
-        let mut last_error = None;
+        let mut answered = None;
+        let mut unreachable = None;
         for index in endpoint_order {
             let url = format!(
                 "{}{}",
@@ -306,30 +308,31 @@ impl TrustControlClient {
                     self.mark_preferred(index);
                     return read_capped_json(response.into_reader(), response_limit);
                 }
-                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
-                }
                 Err(ureq::Error::Status(status, response)) => {
-                    return Err(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
+                    let refusal = ControlPlaneError::from_status(
+                        status,
+                        response.into_string().unwrap_or_default(),
+                    );
+                    if !should_retry_status(status) {
+                        return Err(refusal.into());
+                    }
+                    answered = Some(refusal);
                 }
                 Err(ureq::Error::Transport(error)) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service transport failed: {error}"
-                    )));
+                    unreachable = Some(ControlPlaneError::Unreachable(error.to_string()));
                 }
             }
         }
-        Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error(
-                "trust control service request failed with no endpoints".to_string(),
-            )
-        }))
+        // An endpoint that answered outranks one that never did: the service
+        // was reached and refused.
+        Err(answered
+            .or(unreachable)
+            .map(CliError::from)
+            .unwrap_or_else(|| {
+                CliError::cli_other_error(
+                    "trust control service request failed with no endpoints".to_string(),
+                )
+            }))
     }
 
     fn request_json_without_service_auth<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
