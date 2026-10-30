@@ -25,14 +25,14 @@
 //!   [`ContentReviewConfig::default_rules`];
 //! - invalid user-supplied regex patterns cause
 //!   [`ContentReviewGuard::with_config`] to return
-//!   [`ContentReviewError::InvalidPattern`];
+//!   [`ContentReviewError::Pattern`];
 //! - messages that trip both PII and profanity return a single `Deny`
 //!   outcome but log both categories as evidence.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -42,21 +42,15 @@ use chio_kernel::{
 };
 
 use crate::action::{extract_action_checked, ToolAction};
+use crate::bounded_pattern::{compile_bounded_patterns, PatternCase, PatternError};
 
 /// Errors produced when building a [`ContentReviewGuard`].
 #[derive(Debug, thiserror::Error)]
 pub enum ContentReviewError {
-    /// A user-supplied regex pattern failed to compile.
-    #[error("invalid review pattern `{pattern}`: {source}")]
-    InvalidPattern {
-        pattern: String,
-        #[source]
-        source: regex::Error,
-    },
-
-    /// A user-supplied regex pattern exceeded policy-load safety limits.
-    #[error("{0}")]
-    UnsafePattern(String),
+    /// A user-supplied regex pattern failed to compile or exceeded the
+    /// policy-load bounds.
+    #[error(transparent)]
+    Pattern(#[from] PatternError),
 }
 
 /// Per-service review rules.  Missing fields fall back to defaults.
@@ -134,48 +128,16 @@ struct CompiledRules {
     max_scan_bytes: usize,
 }
 
-const MAX_EXTRA_PATTERNS: usize = 64;
-const MAX_EXTRA_PATTERN_LEN: usize = 512;
-const MAX_EXTRA_PATTERN_COMPLEXITY: usize = 96;
-const EXTRA_PATTERN_REGEX_SIZE_LIMIT: usize = 1 << 20;
-const EXTRA_PATTERN_DFA_SIZE_LIMIT: usize = 1 << 20;
-
 impl CompiledRules {
     fn compile(rules: &ContentReviewRules) -> Result<Self, ContentReviewError> {
-        if rules.extra_patterns.len() > MAX_EXTRA_PATTERNS {
-            return Err(ContentReviewError::UnsafePattern(format!(
-                "content_review.extra_patterns allows at most {MAX_EXTRA_PATTERNS} patterns"
-            )));
-        }
-        let mut extra_patterns = Vec::with_capacity(rules.extra_patterns.len());
-        for pat in &rules.extra_patterns {
-            let trimmed = pat.trim();
-            if trimmed.is_empty() {
-                return Err(ContentReviewError::UnsafePattern(
-                    "content_review.extra_patterns cannot contain empty patterns".to_string(),
-                ));
-            }
-            if trimmed.len() > MAX_EXTRA_PATTERN_LEN {
-                return Err(ContentReviewError::UnsafePattern(format!(
-                    "content_review.extra_patterns entries must be at most {MAX_EXTRA_PATTERN_LEN} characters"
-                )));
-            }
-            let complexity = review_pattern_complexity(trimmed);
-            if complexity > MAX_EXTRA_PATTERN_COMPLEXITY {
-                return Err(ContentReviewError::UnsafePattern(format!(
-                    "content_review.extra_patterns entries must have complexity at most {MAX_EXTRA_PATTERN_COMPLEXITY}"
-                )));
-            }
-            let re = RegexBuilder::new(trimmed)
-                .size_limit(EXTRA_PATTERN_REGEX_SIZE_LIMIT)
-                .dfa_size_limit(EXTRA_PATTERN_DFA_SIZE_LIMIT)
-                .build()
-                .map_err(|e| ContentReviewError::InvalidPattern {
-                    pattern: trimmed.to_string(),
-                    source: e,
-                })?;
-            extra_patterns.push(re);
-        }
+        let extra_patterns = compile_bounded_patterns(
+            "content_review.extra_patterns",
+            &rules.extra_patterns,
+            PatternCase::Sensitive,
+        )?
+        .into_iter()
+        .map(|(_, regex)| regex)
+        .collect();
         let banned_words = rules
             .banned_words
             .iter()
@@ -189,24 +151,6 @@ impl CompiledRules {
             max_scan_bytes: rules.max_scan_bytes.max(1),
         })
     }
-}
-
-fn review_pattern_complexity(pattern: &str) -> usize {
-    let mut score = 0usize;
-    let mut escaped = false;
-    for ch in pattern.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' => escaped = true,
-            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
-            '{' | '[' | '(' => score = score.saturating_add(2),
-            _ => {}
-        }
-    }
-    score
 }
 
 /// Guard that runs content review on outbound SaaS / payment / comms

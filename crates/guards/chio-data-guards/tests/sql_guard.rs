@@ -7,14 +7,17 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use chio_core::capability::{
     scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
-use chio_data_guards::{SqlDialect, SqlGuardConfig, SqlOperation, SqlQueryGuard};
+use chio_data_guards::{
+    SqlDialect, SqlGuardConfig, SqlGuardConfigError, SqlOperation, SqlQueryGuard,
+};
+use chio_guards::PatternError;
 use chio_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
 fn make_request(
@@ -236,7 +239,7 @@ fn parses_sqlite_dialect() {
 
 #[test]
 fn column_allowlist_end_to_end() {
-    let mut map = HashMap::new();
+    let mut map = BTreeMap::new();
     map.insert(
         "orders".to_string(),
         vec!["id".to_string(), "total".to_string()],
@@ -294,10 +297,10 @@ fn denylisted_predicate_count_limit_fails_closed() {
         denylisted_predicates: (0..65).map(|idx| format!("pattern-{idx}")).collect(),
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("too many denylisted predicates should fail closed");
-    };
-    assert!(error.contains("allows at most 64 patterns"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::Predicate(PatternError::TooMany { .. }))
+    ));
 }
 
 #[test]
@@ -306,10 +309,10 @@ fn denylisted_predicate_length_limit_fails_closed() {
         denylisted_predicates: vec!["a".repeat(513)],
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("overlong denylisted predicate should fail closed");
-    };
-    assert!(error.contains("must be at most 512 characters"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::Predicate(PatternError::TooLong { .. }))
+    ));
 }
 
 #[test]
@@ -318,10 +321,34 @@ fn denylisted_predicate_complexity_limit_fails_closed() {
         denylisted_predicates: vec!["(a|b|c|d|e|f|g|h|i|j|k|l|m|n|o|p|q|r|s|t|u|v|w|x|y|z)+".into()],
         ..base_cfg()
     });
-    let Err(error) = result else {
-        panic!("over-complex denylisted predicate should fail closed");
-    };
-    assert!(error.contains("complexity at most"));
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::Predicate(
+            PatternError::TooComplex { .. }
+        ))
+    ));
+}
+
+#[test]
+fn column_allowlist_case_colliding_tables_fail_closed() {
+    let result = SqlQueryGuard::try_new(SqlGuardConfig {
+        column_allowlist: Some(
+            [
+                ("Orders".to_string(), vec!["id".to_string()]),
+                (
+                    "orders".to_string(),
+                    vec!["id".to_string(), "card_number".to_string()],
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ),
+        ..base_cfg()
+    });
+    assert!(matches!(
+        result,
+        Err(SqlGuardConfigError::DuplicateTable { table }) if table == "orders"
+    ));
 }
 
 #[test]

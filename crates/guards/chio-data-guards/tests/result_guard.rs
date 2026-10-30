@@ -20,6 +20,7 @@ use chio_data_guards::{QueryResultGuard, QueryResultGuardConfig};
 use chio_guards::post_invocation::{
     PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
 };
+use chio_guards::PatternError;
 
 fn grant(constraints: Vec<Constraint>) -> ToolGrant {
     ToolGrant {
@@ -152,7 +153,7 @@ fn pii_pattern_count_limit_fails_closed() {
         ..Default::default()
     })
     .expect_err("too many PII patterns should fail closed");
-    assert!(error.contains("allows at most 64 patterns"));
+    assert!(matches!(error, PatternError::TooMany { .. }));
 }
 
 #[test]
@@ -162,7 +163,7 @@ fn pii_pattern_length_limit_fails_closed() {
         ..Default::default()
     })
     .expect_err("overlong PII pattern should fail closed");
-    assert!(error.contains("must be at most 512 characters"));
+    assert!(matches!(error, PatternError::TooLong { .. }));
 }
 
 #[test]
@@ -172,7 +173,7 @@ fn pii_pattern_complexity_limit_fails_closed() {
         ..Default::default()
     })
     .expect_err("over-complex PII pattern should fail closed");
-    assert!(error.contains("complexity at most"));
+    assert!(matches!(error, PatternError::TooComplex { .. }));
 }
 
 #[test]

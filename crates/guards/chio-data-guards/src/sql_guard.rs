@@ -15,14 +15,16 @@
 //! - the guard passes non-`DatabaseQuery` actions through with
 //!   `Verdict::Allow` (guards are additive).
 
-use regex::{Regex, RegexBuilder};
+use std::collections::BTreeSet;
+
+use regex::Regex;
 use tracing::warn;
 
-use chio_guards::{extract_action_checked, ToolAction};
+use chio_guards::{compile_bounded_patterns, extract_action_checked, PatternCase, ToolAction};
 use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::config::{SqlGuardConfig, SqlOperation};
-use crate::error::SqlGuardDenyReason;
+use crate::error::{SqlGuardConfigError, SqlGuardDenyReason};
 use crate::sql_parser::{self, SqlAnalysis};
 
 /// Built-in SQL query guard.
@@ -30,12 +32,6 @@ pub struct SqlQueryGuard {
     config: SqlGuardConfig,
     denylist_regex: Vec<(String, Regex)>,
 }
-
-const MAX_DENYLISTED_PREDICATES: usize = 64;
-const MAX_DENYLISTED_PREDICATE_LEN: usize = 512;
-const MAX_DENYLISTED_PREDICATE_COMPLEXITY: usize = 96;
-const DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT: usize = 1 << 20;
-const DENYLISTED_PREDICATE_DFA_SIZE_LIMIT: usize = 1 << 20;
 
 impl SqlQueryGuard {
     /// Construct a new guard with the given configuration.
@@ -61,7 +57,7 @@ impl SqlQueryGuard {
     }
 
     /// Construct a new guard or reject invalid user-supplied regex patterns.
-    pub fn try_new(config: SqlGuardConfig) -> Result<Self, String> {
+    pub fn try_new(config: SqlGuardConfig) -> Result<Self, SqlGuardConfigError> {
         if config.allow_all {
             warn!(
                 target: "chio.data-guards.sql",
@@ -69,39 +65,22 @@ impl SqlQueryGuard {
             );
         }
 
-        if config.denylisted_predicates.len() > MAX_DENYLISTED_PREDICATES {
-            return Err(format!(
-                "sql_query.denylisted_predicates allows at most {MAX_DENYLISTED_PREDICATES} patterns"
-            ));
-        }
-        let mut denylist_regex = Vec::with_capacity(config.denylisted_predicates.len());
-        for pattern in &config.denylisted_predicates {
-            let trimmed = pattern.trim();
-            if trimmed.is_empty() {
-                return Err("sql_query.denylisted_predicates cannot contain empty patterns".into());
+        if let Some(columns) = &config.column_allowlist {
+            let mut tables = BTreeSet::new();
+            for table in columns.keys() {
+                if !tables.insert(table.to_ascii_lowercase()) {
+                    return Err(SqlGuardConfigError::DuplicateTable {
+                        table: table.clone(),
+                    });
+                }
             }
-            if trimmed.len() > MAX_DENYLISTED_PREDICATE_LEN {
-                return Err(format!(
-                    "sql_query.denylisted_predicates entries must be at most {MAX_DENYLISTED_PREDICATE_LEN} characters"
-                ));
-            }
-            let complexity = predicate_pattern_complexity(trimmed);
-            if complexity > MAX_DENYLISTED_PREDICATE_COMPLEXITY {
-                return Err(format!(
-                    "sql_query.denylisted_predicates entries must have complexity at most {MAX_DENYLISTED_PREDICATE_COMPLEXITY}"
-                ));
-            }
-            let re = RegexBuilder::new(trimmed)
-                .case_insensitive(true)
-                .size_limit(DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT)
-                .dfa_size_limit(DENYLISTED_PREDICATE_DFA_SIZE_LIMIT)
-                .build()
-                .map_err(|error| {
-                    format!("invalid sql_query.denylisted_predicates entry `{trimmed}`: {error}")
-                })?;
-            denylist_regex.push((trimmed.to_string(), re));
         }
 
+        let denylist_regex = compile_bounded_patterns(
+            "sql_query.denylisted_predicates",
+            &config.denylisted_predicates,
+            PatternCase::Insensitive,
+        )?;
         Ok(Self {
             config,
             denylist_regex,
@@ -278,24 +257,6 @@ impl SqlQueryGuard {
     }
 }
 
-fn predicate_pattern_complexity(pattern: &str) -> usize {
-    let mut score = 0usize;
-    let mut escaped = false;
-    for ch in pattern.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' => escaped = true,
-            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
-            '{' | '[' | '(' => score = score.saturating_add(2),
-            _ => {}
-        }
-    }
-    score
-}
-
 impl chio_kernel::Guard for SqlQueryGuard {
     fn name(&self) -> &str {
         "sql-query"
@@ -342,7 +303,7 @@ impl chio_kernel::Guard for SqlQueryGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use chio_core::capability::{
         scope::ChioScope,
@@ -488,7 +449,7 @@ mod tests {
 
     #[test]
     fn column_allowlist_denies_unlisted_column() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert(
             "orders".to_string(),
             vec!["id".to_string(), "total".to_string()],
@@ -509,7 +470,7 @@ mod tests {
 
     #[test]
     fn select_star_denied_when_column_allowlist_active() {
-        let mut map = HashMap::new();
+        let mut map = BTreeMap::new();
         map.insert("orders".to_string(), vec!["id".to_string()]);
         let cfg = SqlGuardConfig {
             operation_allowlist: vec![SqlOperation::Select],

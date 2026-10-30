@@ -49,6 +49,7 @@ pub mod advisory;
 pub mod agent_velocity;
 pub mod behavioral_profile;
 pub mod behavioral_sequence;
+pub mod bounded_pattern;
 pub mod data_flow;
 mod egress_allowlist;
 mod forbidden_path;
@@ -93,6 +94,7 @@ pub use behavioral_profile::{
     DEFAULT_SIGMA_THRESHOLD, DEFAULT_WINDOW_SECS,
 };
 pub use behavioral_sequence::{BehavioralSequenceGuard, SequencePolicy};
+pub use bounded_pattern::{compile_bounded_patterns, PatternCase, PatternError};
 pub use data_flow::{DataFlowConfig, DataFlowGuard};
 pub use egress_allowlist::EgressAllowlistGuard;
 pub use forbidden_path::{ForbiddenPathConfigError, ForbiddenPathGuard};

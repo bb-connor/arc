@@ -146,7 +146,8 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
 
     if let Some(sql_query) = &config.sql_query {
         pipeline.add(Box::new(
-            SqlQueryGuard::try_new(sql_query.clone()).map_err(PolicyError::Invalid)?,
+            SqlQueryGuard::try_new(sql_query.clone())
+                .map_err(|error| PolicyError::Invalid(error.to_string()))?,
         ));
     }
 
@@ -392,7 +393,8 @@ pub fn build_post_invocation_pipeline(
     let mut pipeline = PostInvocationPipeline::new();
 
     if let Some(query_result) = &config.query_result {
-        let guard = QueryResultGuard::new(query_result.clone()).map_err(PolicyError::Invalid)?;
+        let guard = QueryResultGuard::new(query_result.clone())
+            .map_err(|error| PolicyError::Invalid(error.to_string()))?;
         pipeline.add(Box::new(guard.into_owned_hook(ChioScope::default())));
     }
 

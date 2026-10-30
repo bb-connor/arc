@@ -6,7 +6,24 @@
 //! receipt builder or a policy test harness) can match on them structurally
 //! rather than string-parsing log lines.
 
+use chio_guards::PatternError;
 use thiserror::Error;
+
+/// Reason [`SqlQueryGuard::try_new`](crate::sql_guard::SqlQueryGuard::try_new)
+/// refuses a [`SqlGuardConfig`](crate::config::SqlGuardConfig).
+#[derive(Clone, Debug, Error, PartialEq)]
+pub enum SqlGuardConfigError {
+    /// Two `column_allowlist` keys name the same table ignoring case.
+    #[error("sql_query.column_allowlist names table `{table}` more than once (table names are case-insensitive)")]
+    DuplicateTable {
+        /// The second key that collided.
+        table: String,
+    },
+
+    /// A `denylisted_predicates` entry was refused.
+    #[error(transparent)]
+    Predicate(#[from] PatternError),
+}
 
 /// Structured reason for a [`SqlQueryGuard`](crate::sql_guard::SqlQueryGuard)
 /// denial.
