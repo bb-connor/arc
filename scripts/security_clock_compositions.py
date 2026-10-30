@@ -48,7 +48,7 @@ COMPOSITION_CONTRACTS = {
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::inspect_local_reputation_with_read_context::native-adapter": "4981059f1cf5eef7d129bc8c641c02c11b273228095c8010c4e96b5413b52a6b",
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::build_local_reputation_corpus_with_read_context::native-adapter": "6a76fbe1c1e7f0b45c8601d993e127938d7cddb0bd0b662440705308897cf354",
     "sdks/lambda/chio-lambda-extension/src/main.rs::native_clock::native-adapter": "a17ac0fd6005e451665b025912248d79d3b1e8a58b4daa37eeb27308451967e6",
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str::native-adapter": "e0f55f18d646bd482226a0a6d51cc9894ee54fb7946b0ac8c020cc2ad68c7d10",
-    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_parts::native-adapter": "abdd812c51c215e7ef325feacfdc4044d7b6a54459c668eff334a5564a7c2912",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str::native-adapter": "8a67878c7698e8bc6eb7a7d9d21a6e82a83939d7a9671d2c432053caeac70717",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_parts::native-adapter": "e5c6571e5186c01f34d240c4218d1d3ea0718b2827f351f1421aa9ad05b8b849",
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str::native-adapter": "d3dafc6c54517c912439c99150df3d2458f8f06a3ac8b76c4a330139ea5ad7d0",
 }
