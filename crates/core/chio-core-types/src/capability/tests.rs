@@ -2349,6 +2349,7 @@ fn bac573_continuation_token_verify_at_bad_signature_fails_first() {
     assert!(!token.verify_integrity_embedded_key_at(9999).unwrap());
 }
 
+#[cfg(feature = "delegation")]
 mod delegation_steps;
 
 mod authority_readers;
