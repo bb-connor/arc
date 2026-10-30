@@ -2,13 +2,15 @@
 //! conflicts, per-origin watermarks and the store's own erasure origin identity.
 
 use chio_core::receipt::commitment::{Salt, SALT_LEN};
+use chio_core::receipt::disclosure::MAX_DISCLOSURE_OPENINGS;
 use chio_core::rng::Rng;
 use chio_core::root_authority::SaltRef;
 use chio_kernel::receipt_store::{
     OpenedSalts, OpeningReadScope, OpeningState, OpeningStatus, ReceiptStoreError,
 };
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use std::collections::BTreeMap;
+use zeroize::Zeroizing;
 
 /// Fresh-only v1 layout. Catalog validation compares a store against this exact text.
 pub(crate) const RECEIPT_OPENINGS_SCHEMA: &str = r#"
@@ -131,7 +133,9 @@ pub(crate) fn seed_receipt_store_identity(
 ) -> Result<StoreId, ReceiptStoreError> {
     let mut bytes = [0_u8; 16];
     rng.fill_bytes(&mut bytes).map_err(|error| {
-        ReceiptStoreError::Conflict(format!("receipt store identity draw failed: {error}"))
+        ReceiptStoreError::Io(std::io::Error::other(format!(
+            "receipt store identity draw failed: {error}"
+        )))
     })?;
     let store_id = StoreId(hex::encode(bytes));
     transaction.execute(
@@ -219,6 +223,7 @@ struct OpeningRow {
     salt: Option<Salt>,
 }
 
+/// At most `MAX_DISCLOSURE_OPENINGS` rows; one more is read so an overflow is refused.
 fn opening_rows(
     connection: &Connection,
     receipt_id: &str,
@@ -226,23 +231,32 @@ fn opening_rows(
     let corrupt = || ReceiptStoreError::CorruptOpeningRow(receipt_id.to_owned());
     let mut statement = connection.prepare(
         "SELECT salt_ref, state, salt FROM receipt_openings WHERE receipt_id = ?1 \
-         ORDER BY salt_ref",
+         ORDER BY salt_ref LIMIT ?2",
     )?;
+    let row_limit = i64::try_from(MAX_DISCLOSURE_OPENINGS + 1).map_err(|_| {
+        ReceiptStoreError::Conflict("opening row limit exceeds the SQLite integer range".to_owned())
+    })?;
     let raw = statement
-        .query_map([receipt_id], |row| {
+        .query_map(params![receipt_id, row_limit], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
-                row.get::<_, Option<Vec<u8>>>(2)?,
+                row.get::<_, Option<Vec<u8>>>(2)?.map(Zeroizing::new),
             ))
         })?
         .collect::<Result<Vec<_>, _>>()?;
+    if raw.len() > MAX_DISCLOSURE_OPENINGS {
+        return Err(ReceiptStoreError::CorruptOpeningRow(format!(
+            "{receipt_id} holds more than {MAX_DISCLOSURE_OPENINGS} openings"
+        )));
+    }
     raw.into_iter()
         .map(|(salt_ref, state, salt)| {
             let salt_ref = SaltRef::new(salt_ref).map_err(|_| corrupt())?;
             let salt = match (state.as_str(), salt) {
                 ("present", Some(bytes)) => {
-                    let bytes: [u8; SALT_LEN] = bytes.try_into().map_err(|_| corrupt())?;
+                    let bytes: [u8; SALT_LEN] =
+                        bytes.as_slice().try_into().map_err(|_| corrupt())?;
                     Some(Salt::from_bytes(bytes))
                 }
                 ("erased", None) => None,
@@ -253,27 +267,39 @@ fn opening_rows(
         .collect()
 }
 
-pub(crate) fn opening_status(
+/// The erasure fact and the opening rows, read in one deferred transaction so an erase that
+/// commits between the two statements cannot be seen half applied.
+fn load_openings(
     connection: &Connection,
     receipt_id: &str,
-) -> Result<OpeningStatus, ReceiptStoreError> {
-    if let Some(erased_at) = erased_at(connection, receipt_id)? {
-        return Ok(OpeningStatus::Erased { erased_at });
+) -> Result<(OpeningStatus, Vec<OpeningRow>), ReceiptStoreError> {
+    let transaction = Transaction::new_unchecked(connection, TransactionBehavior::Deferred)?;
+    if let Some(erased_at) = erased_at(&transaction, receipt_id)? {
+        return Ok((OpeningStatus::Erased { erased_at }, Vec::new()));
     }
-    let rows = opening_rows(connection, receipt_id)?;
+    let rows = opening_rows(&transaction, receipt_id)?;
+    transaction.finish()?;
     if rows.is_empty() {
-        return Ok(OpeningStatus::Unknown);
+        return Ok((OpeningStatus::Unknown, rows));
     }
     if rows.iter().any(|row| row.salt.is_none()) {
         return Err(ReceiptStoreError::CorruptOpeningRow(format!(
             "{receipt_id} has an erased opening without an erasure fact"
         )));
     }
-    Ok(OpeningStatus::Present)
+    Ok((OpeningStatus::Present, rows))
+}
+
+pub(crate) fn opening_status(
+    connection: &Connection,
+    receipt_id: &str,
+) -> Result<OpeningStatus, ReceiptStoreError> {
+    load_openings(connection, receipt_id).map(|(status, _)| status)
 }
 
 /// Salts for exactly the requested refs. A requested ref the store does not hold reads as
-/// `Unknown`, never as a partial answer.
+/// `Unknown`, never as a partial answer. A scope names between one and
+/// `MAX_DISCLOSURE_OPENINGS` refs.
 pub(crate) fn read_openings(
     connection: &Connection,
     receipt_id: &str,
@@ -284,12 +310,18 @@ pub(crate) fn read_openings(
             "tenant-scoped opening reads require the committed receipt tenant binding".to_owned(),
         ));
     }
-    match opening_status(connection, receipt_id)? {
-        OpeningStatus::Erased { erased_at } => return Ok(OpeningState::Erased { erased_at }),
-        OpeningStatus::Unknown => return Ok(OpeningState::Unknown),
-        OpeningStatus::Present => {}
+    if scope.salt_refs.is_empty() || scope.salt_refs.len() > MAX_DISCLOSURE_OPENINGS {
+        return Err(ReceiptStoreError::ReadBoundary(format!(
+            "an opening read names between 1 and {MAX_DISCLOSURE_OPENINGS} salt_refs, not {}",
+            scope.salt_refs.len()
+        )));
     }
-    let mut held: BTreeMap<SaltRef, Salt> = opening_rows(connection, receipt_id)?
+    let rows = match load_openings(connection, receipt_id)? {
+        (OpeningStatus::Erased { erased_at }, _) => return Ok(OpeningState::Erased { erased_at }),
+        (OpeningStatus::Unknown, _) => return Ok(OpeningState::Unknown),
+        (OpeningStatus::Present, rows) => rows,
+    };
+    let mut held: BTreeMap<SaltRef, Salt> = rows
         .into_iter()
         .filter_map(|row| row.salt.map(|salt| (row.salt_ref, salt)))
         .collect();
