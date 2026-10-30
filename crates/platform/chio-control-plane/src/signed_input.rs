@@ -17,22 +17,17 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 #[path = "signed_input/read_pause.rs"]
 pub(crate) mod read_pause;
 
-pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
+pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, RegularFileError> {
     read_bounded_with_limit(path, MAX_SIGNED_FILE_BYTES)
 }
 
 /// Reads an operator file of at most `max_bytes` bytes. Its content is
-/// verified after the read, so any owner and mode is accepted. A refusal
-/// keeps its [`RegularFileError`] as the error's inner value.
+/// verified after the read, so any owner and mode is accepted.
 pub(crate) fn read_bounded_with_limit(
     path: &Path,
     max_bytes: usize,
-) -> Result<Vec<u8>, std::io::Error> {
-    read_regular_file(path, max_bytes, OpenPolicy::Authenticated).map_err(|error| match error {
-        RegularFileError::Io(kind) => kind.into(),
-        RegularFileError::Missing => std::io::ErrorKind::NotFound.into(),
-        refusal => std::io::Error::new(std::io::ErrorKind::InvalidData, refusal),
-    })
+) -> Result<Vec<u8>, RegularFileError> {
+    read_regular_file(path, max_bytes, OpenPolicy::Authenticated)
 }
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
@@ -238,8 +233,8 @@ pub(crate) fn write_reserving_registry<T: RevocationReserve>(
 fn reserved_size_on_disk<T: RevocationReserve>(path: &Path) -> Result<Option<usize>, CliError> {
     let bytes = match read_bounded(path) {
         Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(CliError::Io(error)),
+        Err(RegularFileError::Missing) => return Ok(None),
+        Err(error) => return Err(error.into()),
     };
     let replaced: T = decode(&bytes)?;
     Ok(Some(

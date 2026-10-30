@@ -509,10 +509,10 @@ fn load<'k>(
             let document: IndexDocument = signed_input::decode(&bytes).map_err(loading)?;
             EnterpriseIdentityIndex::verified(document, keys)
         }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+        Err(chio_secure_ipc::regular_file::RegularFileError::Missing) => {
             Ok(EnterpriseIdentityIndex::empty(keys))
         }
-        Err(error) => Err(loading(CliError::Io(error))),
+        Err(error) => Err(loading(error.into())),
     }
 }
 
