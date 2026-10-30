@@ -1,5 +1,8 @@
 use super::*;
 
+/// The status text a client sees while a task waits for approval.
+const PENDING_APPROVAL_STATUS: &str = "Approval required";
+
 // Message/argument conversion helpers and Chio metadata envelope builders
 // for kernel-mediated requests.
 
@@ -101,7 +104,7 @@ pub(super) fn task_response_from_orchestrated(
         KernelVerdict::PendingApproval => TaskResponse {
             id: task_id,
             status: TaskStatus::Working,
-            status_message: response.reason,
+            status_message: Some(PENDING_APPROVAL_STATUS.to_owned()),
             message: chio_cross_protocol::execution::pending_approval_result(
                 response.verdict,
                 response.output.as_ref(),

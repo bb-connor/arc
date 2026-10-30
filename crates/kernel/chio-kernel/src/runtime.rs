@@ -225,8 +225,8 @@ pub struct ToolCallResponse {
     pub output: Option<ToolCallOutput>,
     /// Denial reason (populated when verdict is Deny).
     pub reason: Option<String>,
-    /// Client-safe denial family for a completed deny. Never signed or
-    /// persisted; the receipt carries the denial detail.
+    /// Client-safe denial family for a deny. Never signed or persisted; the
+    /// receipt carries the denial detail.
     pub denial_code: Option<crate::ClientDenialCode>,
     /// Explicit terminal lifecycle state for this request.
     pub terminal_state: OperationTerminalState,
@@ -244,18 +244,37 @@ pub struct ToolCallResponse {
 }
 
 impl ToolCallResponse {
-    /// The closed denial code a client observes for a completed deny.
+    /// The closed denial code a client observes for a deny, whatever its
+    /// terminal state. A deny without a family code observes `Denied`.
     pub fn client_denial(&self) -> Option<crate::ClientDenialCode> {
-        (self.verdict == Verdict::Deny && self.terminal_state.is_completed())
+        (self.verdict == Verdict::Deny)
             .then(|| self.denial_code.unwrap_or(crate::ClientDenialCode::Denied))
     }
 
     /// The reason a client may observe: the fixed text of the denial code for
-    /// a completed deny, and the response reason otherwise.
+    /// a deny, and the response reason otherwise.
     pub fn client_reason(&self) -> Option<String> {
         match self.client_denial() {
             Some(code) => Some(code.text().to_owned()),
             None => self.reason.clone(),
+        }
+    }
+
+    /// The terminal state a client may observe: a cancelled or incomplete
+    /// deny carries the fixed text of its denial code as its reason.
+    pub fn client_terminal_state(&self) -> OperationTerminalState {
+        match (self.client_denial(), &self.terminal_state) {
+            (Some(code), OperationTerminalState::Cancelled { .. }) => {
+                OperationTerminalState::Cancelled {
+                    reason: code.text().to_owned(),
+                }
+            }
+            (Some(code), OperationTerminalState::Incomplete { .. }) => {
+                OperationTerminalState::Incomplete {
+                    reason: code.text().to_owned(),
+                }
+            }
+            (_, state) => state.clone(),
         }
     }
 }
