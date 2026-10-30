@@ -8,6 +8,7 @@
 # Globs are workspace-rooted because cargo-mutants resolves paths with slashes
 # against the source-tree root even when this file is loaded explicitly.
 
+features = ["web3"]
 timeout_multiplier = 3.0
 minimum_test_timeout = 60
 

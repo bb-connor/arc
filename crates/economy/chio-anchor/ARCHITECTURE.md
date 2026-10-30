@@ -88,7 +88,8 @@ metric names and support. `arbitrary` is enabled only by `fuzz`.
 
 ## Verification
 
-Use `cargo test -p chio-anchor` with default `web3` enabled.
+Use `cargo test -p chio-anchor --features web3`; the default build compiles an
+empty crate.
 `batch` tests cover round trips and forged roots; `witness` tests cover pending,
 self-asserted witnessed states, stale cache binding, and policy routing.
 Rekor tests cover signed-entry tampering and malformed inclusion paths.

@@ -60,15 +60,15 @@ run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_J
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   cargo test -p chio-control-plane web3_evidence -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
-  cargo test -p chio-link -- --test-threads=1
+  cargo test -p chio-link --features web3 -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   cargo test -p chio-kernel web3_evidence -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   cargo test -p chio-kernel cross_currency -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
-  cargo test -p chio-anchor evidence_bundle -- --test-threads=1
+  cargo test -p chio-anchor --features web3 evidence_bundle -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
-  cargo test -p chio-anchor -- --test-threads=1
+  cargo test -p chio-anchor --features web3 -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \
   cargo test -p chio-settle evidence_substrate -- --test-threads=1
 run env CARGO_TARGET_DIR="${cargo_target_dir}" CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 \

@@ -42,8 +42,8 @@ separately. The example observation has no external authenticity claim.
 
 | Feature | Default | Effect |
 | --- | --- | --- |
-| `default` | Yes | Enables `web3`. |
-| `web3` | Yes | Enables Alloy Chainlink RPC and sequencer reads. Pyth, cache, conversion, and runtime types remain available when disabled; Chainlink requests return `UnsupportedBackend`. |
+| `default` | Yes | Enables nothing. |
+| `web3` | No | Enables Alloy Chainlink RPC and sequencer reads. Pyth, cache, conversion, and runtime types remain available when disabled; Chainlink requests return `UnsupportedBackend`. |
 
 ## Guarantees
 

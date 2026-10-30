@@ -29,6 +29,7 @@ additional_cargo_test_args = [
     "--skip",
     "evm::tests::validate_rpc_egress_contract_accepts_hostname_rpc",
 ]
+features = ["web3"]
 timeout_multiplier = 3.0
 minimum_test_timeout = 60
 

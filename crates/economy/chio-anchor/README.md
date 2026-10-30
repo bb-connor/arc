@@ -43,8 +43,8 @@ requires the asynchronous policy verifier and a trusted lane client.
 
 | Feature | Default | Effect |
 | --- | --- | --- |
-| `default` | Yes | Enables `web3`. |
-| `web3` | Yes | Enables the entire crate API and its cryptographic, HTTP, kernel, and contract-binding dependencies. Disabling it leaves no public items. |
+| `default` | Yes | Enables nothing. |
+| `web3` | No | Enables the entire crate API and its cryptographic, HTTP, kernel, and contract-binding dependencies. Disabling it leaves no public items. |
 | `fuzz` | No | Enables `web3`, `arbitrary`, and the public verifier fuzz entry point. |
 | `kani` | No | Enables `web3`; harness code additionally requires the Kani toolchain's `cfg(kani)`. |
 

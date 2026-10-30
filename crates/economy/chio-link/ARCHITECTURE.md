@@ -80,7 +80,7 @@ artifacts and decode feed data; `thiserror` defines typed oracle failures.
 
 ## Verification
 
-Use `cargo test -p chio-link` and `cargo test -p chio-link --no-default-features`.
+Use `cargo test -p chio-link --features web3` and `cargo test -p chio-link`.
 Runtime tests inject backends to check pair/freshness mismatch, divergence,
 pauses, fallback controls, and degraded mode. Cache tests check rolling
 observations and averaging; conversion tests check scales, margin, and ceiling
