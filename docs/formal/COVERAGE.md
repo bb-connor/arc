@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `3ad5d7e83a9c01df6ed9322731045472dc029d9d7ec66fef7bed6cb62475181a`
+- Input digest: `62e837382992da91e38e09875e89f3faeea9acfaea19bdb0ef71648b0fd76cce`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1361,8 +1361,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `4540aa9758a2dea287313ec647df75010ad4aa13544c495e8a90f879f41712fa`
 - `.loom/harnesses.toml`: `f743ba9cada9ec9e51f74c1a1c22cad0bcb8dd25430db58553368920ac335b07`
-- `Cargo.lock`: `edd22ecdcb29fa6aa03eb39caaaa183316c4e189692570f9e51cf9a010407133`
-- `Cargo.toml`: `5cb15257f02234382bc42f1e332fe71b0fe9226e0cfe60c7fccf1f48f30582eb`
+- `Cargo.lock`: `23f8813b4e7afc95ea23afdd2f293b6cc7d6e058204b074b0c4d0d999877f202`
+- `Cargo.toml`: `d6f182afea1b9f41c63ce43977fa6c1f466beecd41b57f6a2b46334a53d3d12f`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
 - `audits/mutation/per-crate-configs/chio-attest-verify.toml`: `28f31f18a2676af227db8d66b6812c2517bdc49a965ac0524c6d50cce0695475`
@@ -1518,7 +1518,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/economy/chio-open-market/src/kani_public_harnesses.rs`: `33edb04ba22bf6f233d3238fd6f17c3f094e7bbf2eed71d1ac274bccb2df050b`
 - `crates/economy/chio-web3/src/kani_public_harnesses.rs`: `5406b789197a0fe44d05b4fcc681b7634992be6296d1d3e2e6dd29ac57e9e6ad`
 - `crates/guards/chio-predicate-dag/src/kani_public_harnesses.rs`: `effb35c592a22c72d6b24de846d0af9fbbce54626300a8fbfdb1e8799cf57aaa`
-- `crates/kernel/chio-kernel-core/Cargo.toml`: `fa82089212ed8b184d3f2cf63583179f287ab39bbe31a2aaf2e6572eb75fe9cf`
+- `crates/kernel/chio-kernel-core/Cargo.toml`: `1f4fdb0c7e1e1b2ec2338d6ee89bc71b3ebb61c9e29d08824ae72c42bd385ab0`
 - `crates/kernel/chio-kernel-core/src/accounting.rs`: `12e866077b1230efe845abc2c4f828b73283d32f9d344893250a502126981870`
 - `crates/kernel/chio-kernel-core/src/accounting/kani.rs`: `2c4edd2abf974ff73ce8db1c04708729ee689c51ed44d7af37bd75d55166a80e`
 - `crates/kernel/chio-kernel-core/src/accounting/tests.rs`: `8927b16cc871ce24cc66432ddf2acc4df88add6253d3293919576c7321fbdae6`
