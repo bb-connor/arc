@@ -200,11 +200,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "existing oversized CLI federated issue integration suite; capped to current size until split",
         max_lines=2_271,
     ),
-    "crates/core/chio-core-types/src/capability/tests.rs": allow(
-        "2026-12-31",
-        "existing oversized capability type test suite; capped to current size until split; covers time-checked verification, attenuation narrowing, and wildcard/concrete reflection regressions",
-        max_lines=3_147,
-    ),
     "crates/kernel/chio-runtime-core/tests/runtime_buyer_review.rs": allow(
         "2026-11-30",
         "existing oversized runtime buyer review integration suite; capped to current size until split",
