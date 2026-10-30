@@ -47,6 +47,7 @@ cargo fmt --all -- --check
 
 ## Conventions
 
+- **Design rules**: every PR follows [`docs/DESIGN-RULES.md`](docs/DESIGN-RULES.md) (crate boundaries, abstractions, idiomatic Rust, file size, testing) and carries its R1-R15 review checklist, filled by a reviewer other than the author.
 - **Fail-closed**: errors during evaluation deny access. Invalid policies reject at load time.
 - **Clippy**: `unwrap_used = "deny"`, `expect_used = "deny"` in all crates.
 - **Serialization**: canonical JSON (RFC 8785) for all signed payloads.
