@@ -290,16 +290,32 @@ impl GovernedUpstreamCallChainProof {
         })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.signer, pinned)?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(
-            &self.signer,
+            pinned,
             GOVERNED_UPSTREAM_CALL_CHAIN_PROOF_SCHEMA,
             &body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.signer)
+    }
+
+    /// Verify the signature under `pinned` and enforce the validity window.
+    pub fn verify_signature_at(&self, pinned: &PublicKey, now: u64) -> Result<bool> {
+        if !self.verify_signature(pinned)? {
+            return Ok(false);
+        }
+        self.validate_time(now)?;
+        Ok(true)
     }
 
     /// Verify the signature AND enforce the validity window in one pass.
@@ -317,11 +333,7 @@ impl GovernedUpstreamCallChainProof {
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_integrity_embedded_key()? {
-            return Ok(false);
-        }
-        self.validate_time(now)?;
-        Ok(true)
+        self.verify_signature_at(&self.signer, now)
     }
 
     #[must_use]
@@ -494,9 +506,10 @@ impl CallChainContinuationToken {
         })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.signer, pinned)?;
         ensure_schema_matches(
             &self.schema,
             CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
@@ -504,11 +517,26 @@ impl CallChainContinuationToken {
         )?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(
-            &self.signer,
+            pinned,
             CHIO_CALL_CHAIN_CONTINUATION_SCHEMA,
             &body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.signer)
+    }
+
+    /// Verify the signature under `pinned` and enforce the validity window.
+    pub fn verify_signature_at(&self, pinned: &PublicKey, now: u64) -> Result<bool> {
+        if !self.verify_signature(pinned)? {
+            return Ok(false);
+        }
+        self.validate_time(now)?;
+        Ok(true)
     }
 
     /// Verify the signature AND enforce the validity window in one pass.
@@ -526,11 +554,7 @@ impl CallChainContinuationToken {
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_integrity_embedded_key()? {
-            return Ok(false);
-        }
-        self.validate_time(now)?;
-        Ok(true)
+        self.verify_signature_at(&self.signer, now)
     }
 
     #[must_use]
@@ -1506,16 +1530,23 @@ impl GovernedApprovalToken {
         })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.approver, pinned)?;
         let body = self.body();
         wrapped_verdict(verify_wrapped(
-            &self.approver,
+            pinned,
             GOVERNED_APPROVAL_TOKEN_SCHEMA,
             &body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.approver)
     }
 
     pub fn artifact_digest(&self) -> Result<String> {
@@ -1525,6 +1556,15 @@ impl GovernedApprovalToken {
         preimage.extend_from_slice(GOVERNED_APPROVAL_TOKEN_DIGEST_DOMAIN);
         preimage.extend_from_slice(&canonical);
         Ok(sha256_hex(&preimage))
+    }
+
+    /// Verify the signature under `pinned` and enforce the validity window.
+    pub fn verify_signature_at(&self, pinned: &PublicKey, now: u64) -> Result<bool> {
+        if !self.verify_signature(pinned)? {
+            return Ok(false);
+        }
+        self.validate_time(now)?;
+        Ok(true)
     }
 
     /// Verify the signature AND enforce the approval-token validity window in
@@ -1544,11 +1584,7 @@ impl GovernedApprovalToken {
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key_at(&self, now: u64) -> Result<bool> {
-        if !self.verify_integrity_embedded_key()? {
-            return Ok(false);
-        }
-        self.validate_time(now)?;
-        Ok(true)
+        self.verify_signature_at(&self.approver, now)
     }
 
     #[must_use]
@@ -1793,16 +1829,23 @@ impl ThresholdApprovalProposal {
         })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.body.policy_authority, pinned)?;
         self.body.validate()?;
         wrapped_verdict(verify_wrapped(
-            &self.body.policy_authority,
+            pinned,
             THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
             &self.body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.body.policy_authority)
     }
 
     pub fn validate_at(&self, now: u64) -> Result<()> {

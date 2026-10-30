@@ -3069,3 +3069,35 @@ fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_chi
 }
 
 mod authority_readers;
+
+#[test]
+fn capability_token_pinned_verify_refuses_another_issuer_key() {
+    let (kp, token) = bac573_capability_token(1000, 2000);
+    let other = Keypair::from_seed(&[0x5a; 32]).public_key();
+    let floor = CapabilityCryptoFloor::AllowClassical;
+
+    assert!(matches!(
+        token.verify_signature(&other),
+        Err(Error::SignerKeyMismatch)
+    ));
+    assert!(matches!(
+        token.verify_signature_at(&other, 1500),
+        Err(Error::SignerKeyMismatch)
+    ));
+    assert!(matches!(
+        token.verify_signature_with_floor(&other, floor),
+        Err(CapabilityFloorVerifyError::Crypto(Error::SignerKeyMismatch))
+    ));
+    assert!(matches!(
+        token.verify_signature_with_floor_at(&other, floor, 1500),
+        Err(CapabilityFloorVerifyError::Crypto(Error::SignerKeyMismatch))
+    ));
+
+    let issuer = kp.public_key();
+    assert!(token.verify_signature(&issuer).unwrap());
+    assert!(token.verify_signature_at(&issuer, 1500).unwrap());
+    assert!(token.verify_signature_with_floor(&issuer, floor).unwrap());
+    assert!(token
+        .verify_signature_with_floor_at(&issuer, floor, 1500)
+        .unwrap());
+}

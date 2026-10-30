@@ -52,6 +52,7 @@ pub const CHIO_FFI_ERROR_UNTRUSTED_INPUT: i32 = 29;
 pub const CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID: i32 = 30;
 pub const CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH: i32 = 31;
 pub const CHIO_FFI_ERROR_SIGNATURE_REJECTED: i32 = 32;
+pub const CHIO_FFI_ERROR_SIGNER_KEY_MISMATCH: i32 = 33;
 pub const CHIO_FFI_ERROR_INTERNAL: i32 = 255;
 
 #[repr(C)]
@@ -147,6 +148,7 @@ fn ffi_error_code_from_helper_code(code: ErrorCode) -> i32 {
         ErrorCode::UnregisteredSchemaId => CHIO_FFI_ERROR_UNREGISTERED_SCHEMA_ID,
         ErrorCode::SignatureAlgorithmMismatch => CHIO_FFI_ERROR_SIGNATURE_ALGORITHM_MISMATCH,
         ErrorCode::SignatureRejected => CHIO_FFI_ERROR_SIGNATURE_REJECTED,
+        ErrorCode::SignerKeyMismatch => CHIO_FFI_ERROR_SIGNER_KEY_MISMATCH,
         ErrorCode::EmptyManifest => CHIO_FFI_ERROR_EMPTY_MANIFEST,
         ErrorCode::DuplicateToolName => CHIO_FFI_ERROR_DUPLICATE_TOOL_NAME,
         ErrorCode::InvalidToolName => CHIO_FFI_ERROR_INVALID_TOOL_NAME,

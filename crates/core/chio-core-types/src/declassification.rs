@@ -50,18 +50,25 @@ impl SignedDeclassificationGrant {
         })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.authority_key, pinned)?;
         self.body
             .validate()
             .map_err(|error| Error::InvalidSignature(error.to_string()))?;
         wrapped_verdict(verify_wrapped(
-            &self.authority_key,
+            pinned,
             CHIO_DECLASSIFICATION_GRANT_SCHEMA,
             &self.body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.authority_key)
     }
 
     #[must_use]

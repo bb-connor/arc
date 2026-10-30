@@ -485,12 +485,19 @@ impl ChioReceipt {
         }
     }
 
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)?;
+        self.verify_signature_against(pinned)
+    }
+
     /// Verify the receipt signature against the embedded kernel key.
     ///
     /// Verifies integrity under the embedded key; the caller must bind that key
     /// to a trusted source before acting on the result.
     pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
-        self.verify_signature_against(&self.kernel_key)
+        self.verify_signature(&self.kernel_key)
     }
 
     fn verify_signature_against(&self, key: &PublicKey) -> Result<bool> {
@@ -545,6 +552,8 @@ impl ChioReceipt {
         pinned: &PublicKey,
         floor: ReceiptCryptoFloor,
     ) -> core::result::Result<bool, ReceiptFloorVerifyError> {
+        crate::crypto::ensure_pinned_signer(&self.kernel_key, pinned)
+            .map_err(ReceiptFloorVerifyError::Crypto)?;
         ensure_receipt_signature_algorithm_allowed(
             pinned.algorithm(),
             self.signature.algorithm(),

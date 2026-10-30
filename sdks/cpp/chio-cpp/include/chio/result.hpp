@@ -41,6 +41,7 @@ enum class ErrorCode {
   UnregisteredSchemaId = 30,
   SignatureAlgorithmMismatch = 31,
   SignatureRejected = 32,
+  SignerKeyMismatch = 33,
   Transport = 200,
   Protocol = 201,
   Internal = 255,

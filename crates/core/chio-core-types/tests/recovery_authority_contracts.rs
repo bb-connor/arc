@@ -182,6 +182,13 @@ fn disclosure_grants_select_their_shape_by_kind() -> Result {
     let proof: SignedAuthorityCoverageAttestationV1 =
         serde_json::from_value(positive["coverage"][0].clone())?;
     assert!(proof.verify_integrity_embedded_key()?);
+    assert!(proof.verify_signature(proof.authority_key())?);
+    assert!(matches!(
+        proof.verify_signature(
+            &chio_core_types::crypto::Keypair::from_seed(&[0x5a; 32]).public_key()
+        ),
+        Err(chio_core_types::Error::SignerKeyMismatch)
+    ));
     assert!(matches!(
         chio_core_types::crypto::verify_wrapped(
             proof.authority_key(),

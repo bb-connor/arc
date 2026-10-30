@@ -1563,7 +1563,7 @@ fn schema_tagged_verifiers_reject_supported_key_with_unsupported_schema() {
         &keypair,
     );
     let anchor = session_anchor_from_body(anchor_body, anchor_signature);
-    assert!(anchor.verify_integrity_embedded_key().is_err());
+    assert!(anchor.verify_signature(&keypair.public_key()).is_err());
 
     let mut lineage_body = receipt_lineage_body(&keypair);
     lineage_body.schema = UNSUPPORTED_SCHEMA.to_string();

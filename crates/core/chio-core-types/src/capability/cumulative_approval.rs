@@ -144,9 +144,10 @@ impl CumulativeApprovalRootBinding {
         Ok(Self { body, signature })
     }
 
-    /// Verifies integrity under the embedded key; the caller must bind that key
-    /// to a trusted source before acting on the result.
-    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+    /// Verify the signature under `pinned`, a key the caller trusts. A carried
+    /// signer key that differs from `pinned` is refused before the signature check.
+    pub fn verify_signature(&self, pinned: &PublicKey) -> Result<bool> {
+        crate::crypto::ensure_pinned_signer(&self.body.root_issuer, pinned)?;
         if self.body.schema != CUMULATIVE_APPROVAL_ROOT_SCHEMA {
             return Err(violation(format!(
                 "unsupported cumulative approval root schema {}",
@@ -154,11 +155,17 @@ impl CumulativeApprovalRootBinding {
             )));
         }
         wrapped_verdict(verify_wrapped(
-            &self.body.root_issuer,
+            pinned,
             CUMULATIVE_APPROVAL_ROOT_SCHEMA,
             &self.body,
             &self.signature,
         ))
+    }
+
+    /// Verifies integrity under the embedded key; the caller must bind that key
+    /// to a trusted source before acting on the result.
+    pub fn verify_integrity_embedded_key(&self) -> Result<bool> {
+        self.verify_signature(&self.body.root_issuer)
     }
 
     pub fn digest(&self) -> Result<String> {
@@ -398,12 +405,12 @@ pub fn verify_cumulative_approval_constraints(
     trusted_issuers: &[PublicKey],
     direct_root: Option<&CapabilityToken>,
 ) -> Result<Vec<VerifiedCumulativeApprovalConstraint>> {
-    if !trusted_issuers.contains(&token.issuer) {
+    let Some(issuer) = trusted_issuers.iter().find(|key| **key == token.issuer) else {
         return Err(violation(
             "cumulative approval capability issuer is not trusted",
         ));
-    }
-    if !token.verify_integrity_embedded_key()? {
+    };
+    if !token.verify_signature(issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     if token.delegation_chain.is_empty() {
@@ -492,7 +499,10 @@ fn verified_descendant(
             "cumulative approval root evidence is not a direct token",
         ));
     }
-    if !root.verify_integrity_embedded_key()? {
+    let Some(root_issuer) = trusted_issuers.iter().find(|key| **key == root.issuer) else {
+        return Err(violation("cumulative approval root issuer is not trusted"));
+    };
+    if !root.verify_signature(root_issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     let first = token
@@ -648,7 +658,7 @@ fn verify_binding_matches_root(
     approval_budget_id: &str,
     approval_budget_epoch: u64,
 ) -> Result<()> {
-    if !binding.verify_integrity_embedded_key()? {
+    if !binding.verify_signature(&root.issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     let expected_scope_hash = unbound_scope_hash(&root.scope)?;

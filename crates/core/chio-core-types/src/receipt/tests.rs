@@ -1412,3 +1412,22 @@ fn receipt_signs_and_verifies_under_p256_backend() {
     let restored: ChioReceipt = serde_json::from_str(&wire).unwrap();
     assert!(restored.verify_integrity_embedded_key().unwrap());
 }
+
+#[test]
+fn receipt_pinned_verify_refuses_another_kernel_key() {
+    let kp = Keypair::generate();
+    let receipt = ChioReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+    let other = Keypair::from_seed(&[0x5a; 32]).public_key();
+
+    assert!(matches!(
+        receipt.verify_signature(&other),
+        Err(crate::Error::SignerKeyMismatch)
+    ));
+    assert!(matches!(
+        receipt.verify_signature_with_floor(&other, ReceiptCryptoFloor::AllowClassical),
+        Err(super::crypto_floor::ReceiptFloorVerifyError::Crypto(
+            crate::Error::SignerKeyMismatch
+        ))
+    ));
+    assert!(receipt.verify_signature(&kp.public_key()).unwrap());
+}

@@ -663,12 +663,12 @@ fn cumulative_approval_rejects_every_root_binding_field_mutation() -> TestResult
         })?,
         ROOT_MISMATCH,
     );
-    assert_violation(
-        &mutation_rejected(&root, &issuer, &other, |body| {
+    assert!(matches!(
+        mutation_rejected(&root, &issuer, &other, |body| {
             body.root_issuer = other.public_key();
         })?,
-        ROOT_MISMATCH,
-    );
+        Error::SignerKeyMismatch
+    ));
     assert_violation(
         &mutation_rejected(&root, &issuer, &issuer, |body| {
             body.root_subject = Keypair::generate().public_key();
