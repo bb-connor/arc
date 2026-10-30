@@ -1809,7 +1809,7 @@ Test `intent_hash_has_no_public_alias`: two intents equal except `purpose` (and,
 | `proposal_hash` | domain digest over the proposal, including the policy-authority signature (`governance.rs:1712-1714`) | none | **Commitment** | no reader; the full proposal is the response output, covered by the content commitment |
 | `proposal_deadline` | time (`cumulative.rs:176-182`) | none | **Commitment** | no reader |
 
-**`finding_delivery` and `finding_recovery`** stay registered `CommittedSafe` in P-d part 2. Their finding and listing ids have the same provenance as the snapshot members committed above; Open question 13 holds their decision.
+**`finding_delivery` and `finding_recovery`** carry the same provider-derived ids as the snapshots, so P-d part 2 registers both `Unsafe` with form `Projection`: `finding_id` (an unsalted SHA-256 of the provider's finding body) and `listing_id` (provider-assigned) in `finding_delivery`, and `finding_id` and `original_capability_id` (the issuer's token id) in `finding_recovery`, become commitments. The keyed reservation, intent, payment-operation, recovery and purchase ids, the signed-envelope digests, the original delivery receipt id and the closed comparison results stay plaintext for open-market recovery, the remote admission projection and the kernel recovery gate, which read the committed ids from the values rows. Each flips back to `CommittedSafe` in the F commit that lands its writer.
 
 **`chio_http_receipt_v1`, `delivery_contract`, `active_defense_evidence_id`**: already planned (deleted with `HttpReceipt`, Task 12; split, OQ12; keyed, r5).
 
@@ -1962,7 +1962,6 @@ Each needs an owner decision. The plan is written against the recommended defaul
 10. **`/v1/evaluate` openings.** **Default:** none in M1 (spec 7.7 and the 13.1 caller-copy cut); mediated mode persists them, sidecar mode without a store drops them.
 11. **Signed tenant binding beyond the security producers.** The keyed `tenant_binding` member is an addition to spec 7.6, which today allows only a plaintext `tenant_id` or, with `authority`, no signed tenant at all. **Default:** add it to spec 7.6 in F's PROTOCOL commit for the native evidence, response simulation and cage producers only; every other producer keeps `tenant_id` until a later item decides whether all tenant-scoped receipts move to the binding.
 12. **Plaintext `delivery_contract` digests for finding-delivery grants.** The kernel decides that a grant is a finding-delivery grant from the grant's signed constraint set (a `FindingDelivery` constraint on the capability), never from an argument or caller-supplied marker, so a caller cannot select the plaintext form. **Default:** keep them plaintext, because they equal the finding's `payload_sha256`, which the listing publishes, and the finding verifier holds only that digest; every other `OutputDigestSha256` grant's `observed_digest` becomes a salted commitment. The entropy argument is the listing's: no new value is disclosed. The alternative commits the finding-delivery digests too and moves the finding verifier to an opening the listing would have to carry.
-13. **Finding and listing ids in `finding_delivery` and `finding_recovery`.** Both rows are registered `CommittedSafe` and keep the finding and listing ids plaintext as public ids, but `finding_id` is an unsalted SHA-256 of the provider's finding body and `listing_id` is provider-assigned (P-d part 2 member audits), the members committed in the two replay snapshots. **Default:** register both rows `Unsafe` with form `Projection` before F, as for the snapshots; F commits both ids and moves open-market recovery, the remote admission projection and the kernel recovery paths to the values rows.
 
 ## Unresolved in this revision
 
@@ -1972,7 +1971,6 @@ Each needs an owner decision. The plan is written against the recommended defaul
 - P-e's owner is open: it may land from the fwdcompat lane or from this lane; it precedes F either way.
 - Open question 11 (the signed tenant binding as a spec 7.6 addition) needs an owner decision.
 - Open question 12 (plaintext finding-delivery `delivery_contract` digests) needs an owner decision.
-- Open question 13 (finding and listing ids in `finding_delivery` and `finding_recovery`) needs an owner decision.
 - P-f changes every deployment's trust-control configuration (caller credentials replace `service_token` and `tenant_read_tokens`; internal routes move to a second listener); the mapping of today's routes to scopes is fixed in P-f's PR and reviewed by Root-2 before it opens.
 - P-e is lead-owned in the fwdcompat lane.
 - The per-peer cluster credential (Ed25519 key per node) is new cluster configuration; operators of existing clusters provision it before F.
