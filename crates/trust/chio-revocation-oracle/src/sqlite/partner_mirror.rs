@@ -42,11 +42,11 @@ const MAX_STORED_ROOT_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PartnerMirrorError {
-    #[error("partner revocation mirror belongs to `{found}`, not `{expected}`")]
+    #[error("revocation mirror belongs to partner `{found}`, not `{expected}`")]
     PartnerMismatch { expected: String, found: String },
     #[error(transparent)]
     Refused(#[from] PartnerMirrorRefusal),
-    #[error("{0} exceeds the stored time range")]
+    #[error("time {0} exceeds the stored time range")]
     TimeOutOfRange(u64),
     #[error(transparent)]
     Store(#[from] SqliteRevocationOracleError),

@@ -18,10 +18,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use chio_revocation_oracle::{
-    verify_fresh_epoch_root, ConflictRecord, EpochRoot, FreshnessConfig, PartnerMirrorConflict,
-    PartnerMirrorError, PartnerMirrorRefusal, PassportRevocationLeaf, RevocationKey,
-    SignedEpochRoot, SqlitePartnerMirror, SqliteRevocationOracleError,
-    MAX_RECORDED_PARTNER_CONFLICTS, MAX_REVOCATION_SUBJECT_BYTES,
+    verify_fresh_epoch_root, ConflictRecord, EpochRoot, FreshnessConfig, PartnerMirrorError,
+    PartnerMirrorRefusal, PassportRevocationLeaf, RevocationKey, SignedEpochRoot,
+    SqlitePartnerMirror, MAX_RECORDED_PARTNER_CONFLICTS, MAX_REVOCATION_SUBJECT_BYTES,
 };
 use chio_security_types::clock::Clock;
 
@@ -44,8 +43,6 @@ pub const MAX_PARTNER_ROOT_FUTURE_SKEW_MS: u64 = 5_000;
 pub enum PartnerRevocationError {
     #[error("partner `{0}` revocation mirror unavailable: {1}")]
     MirrorUnavailable(String, String),
-    #[error("partner revocation mirror belongs to `{found}`, not `{expected}`")]
-    PartnerMismatch { expected: String, found: String },
     #[error("partner `{0}` revocation mirror holds no verified root")]
     NoVerifiedRoot(String),
     #[error(
@@ -65,22 +62,11 @@ pub enum PartnerRevocationError {
         now_unix_ms: u64,
         ttl_ms: u64,
     },
-    #[error("partner `{partner_id}` revocation root epoch {offered} rolls back accepted epoch {accepted}")]
-    Rollback {
+    #[error("partner `{partner_id}` {error}")]
+    Mirror {
         partner_id: String,
-        accepted: u64,
-        offered: u64,
+        error: PartnerMirrorError,
     },
-    #[error("partner `{partner_id}` revocation root issued at {offered} predates the accepted root issued at {accepted}")]
-    AttestationRollback {
-        partner_id: String,
-        accepted: u64,
-        offered: u64,
-    },
-    #[error("partner `{partner_id}` signed two different revocation roots for epoch {epoch}")]
-    Equivocation { partner_id: String, epoch: u64 },
-    #[error("partner `{partner_id}` revocation leaves rebuild a root that differs from the signed root at epoch {epoch}")]
-    RootMismatch { partner_id: String, epoch: u64 },
     #[error("partner `{partner_id}` is {behind} revocation leaves ahead, beyond the {MAX_PARTNER_SYNC_LEAVES}-leaf sync bound")]
     TooFarBehind { partner_id: String, behind: u64 },
     #[error("partner `{0}` revocation root document is malformed: {1}")]
@@ -89,8 +75,6 @@ pub enum PartnerRevocationError {
     MalformedPage(String, String),
     #[error("partner `{0}` revocation leaves ended before the signed root's leaf count")]
     TruncatedLeaves(String),
-    #[error("partner `{partner_id}` revocation leaf {seq} repeats a revoked key")]
-    DuplicateLeaf { partner_id: String, seq: u64 },
     #[error("partner `{0}` revocation feed fetch failed: {1}")]
     Fetch(String, String),
     #[error("revocation clock unavailable: {0}")]
@@ -150,14 +134,8 @@ impl PartnerRevocationMirror {
     /// Opens (creating if absent) the mirror of `partner_id` at `path`. A
     /// mirror stamped for another partner is refused.
     pub fn open(path: &Path, partner_id: &str) -> Result<Self, PartnerRevocationError> {
-        let store = SqlitePartnerMirror::open(path, partner_id).map_err(|error| match error {
-            PartnerMirrorError::PartnerMismatch { expected, found } => {
-                PartnerRevocationError::PartnerMismatch { expected, found }
-            }
-            other => {
-                PartnerRevocationError::MirrorUnavailable(partner_id.to_owned(), other.to_string())
-            }
-        })?;
+        let store = SqlitePartnerMirror::open(path, partner_id)
+            .map_err(|error| mirror_error(partner_id, error))?;
         Ok(Self { store })
     }
 
@@ -170,14 +148,7 @@ impl PartnerRevocationMirror {
     pub fn accepted(&self) -> Result<Option<SignedEpochRoot>, PartnerRevocationError> {
         self.store
             .accepted()
-            .map_err(mirror_unavailable(self.partner_id()))
-    }
-
-    /// Every recorded conflict, oldest first.
-    pub fn conflicts(&self) -> Result<Vec<PartnerMirrorConflict>, PartnerRevocationError> {
-        self.store
-            .conflicts()
-            .map_err(mirror_unavailable(self.partner_id()))
+            .map_err(|error| mirror_error(self.partner_id(), error))
     }
 
     /// Refuses unless the accepted root verifies against `partner`'s pinned
@@ -205,7 +176,7 @@ impl PartnerRevocationMirror {
         let view = self
             .store
             .view(subjects)
-            .map_err(mirror_unavailable(self.partner_id()))?;
+            .map_err(|error| mirror_error(self.partner_id(), error))?;
         let accepted = view
             .accepted
             .ok_or_else(|| PartnerRevocationError::NoVerifiedRoot(self.partner_id().to_owned()))?;
@@ -222,7 +193,10 @@ impl PartnerRevocationMirror {
             },
         )?;
         if !view.tree.same_tree(root) {
-            return Err(diverged(self.partner_id()));
+            return Err(mirror_error(
+                self.partner_id(),
+                PartnerMirrorRefusal::Diverged,
+            ));
         }
         Ok((accepted, view.revoked))
     }
@@ -315,13 +289,14 @@ impl PartnerRevocationMirror {
     ) -> Result<EpochRoot, PartnerRevocationError> {
         verify_signature(partner, offered)?;
         check_not_future(partner, &offered.root, now_unix_ms)?;
-        let refusal = match self.store.apply(offered, leaves, now_unix_ms) {
+        let error = match self.store.apply(offered, leaves, now_unix_ms) {
             Ok(root) => return Ok(root),
-            Err(PartnerMirrorError::Refused(refusal)) => refusal,
-            Err(error) => return Err(self.store_failure(error)),
+            Err(error) => error,
         };
-        let error = refused(&partner.partner_id, &refusal);
-        if refusal.is_conflict() {
+        let conflict =
+            matches!(&error, PartnerMirrorError::Refused(refusal) if refusal.is_conflict());
+        let error = mirror_error(self.partner_id(), error);
+        if conflict {
             self.record_conflict(&error, offered, now_unix_ms)?;
         }
         Err(error)
@@ -343,20 +318,7 @@ impl PartnerRevocationMirror {
             Ok(ConflictRecord::LogFull) => Err(PartnerRevocationError::ConflictLogFull(
                 self.partner_id().to_owned(),
             )),
-            Err(error) => Err(self.store_failure(error)),
-        }
-    }
-
-    fn store_failure(&self, error: PartnerMirrorError) -> PartnerRevocationError {
-        match error {
-            PartnerMirrorError::TimeOutOfRange(now) => {
-                PartnerRevocationError::Clock(format!("{now} exceeds the stored time range"))
-            }
-            PartnerMirrorError::Refused(refusal) => refused(self.partner_id(), &refusal),
-            other => PartnerRevocationError::MirrorUnavailable(
-                self.partner_id().to_owned(),
-                other.to_string(),
-            ),
+            Err(error) => Err(mirror_error(self.partner_id(), error)),
         }
     }
 }
@@ -428,49 +390,10 @@ impl PartnerMirrorCache {
     }
 }
 
-fn mirror_unavailable(
-    partner_id: &str,
-) -> impl Fn(SqliteRevocationOracleError) -> PartnerRevocationError + '_ {
-    move |error| PartnerRevocationError::MirrorUnavailable(partner_id.to_owned(), error.to_string())
-}
-
-fn diverged(partner_id: &str) -> PartnerRevocationError {
-    refused(partner_id, &PartnerMirrorRefusal::Diverged)
-}
-
-fn refused(partner_id: &str, refusal: &PartnerMirrorRefusal) -> PartnerRevocationError {
-    let partner_id = partner_id.to_owned();
-    match refusal {
-        PartnerMirrorRefusal::Diverged => {
-            PartnerRevocationError::MirrorUnavailable(partner_id, refusal.to_string())
-        }
-        PartnerMirrorRefusal::Rollback { accepted, offered } => PartnerRevocationError::Rollback {
-            partner_id,
-            accepted: *accepted,
-            offered: *offered,
-        },
-        PartnerMirrorRefusal::AttestationRollback { accepted, offered } => {
-            PartnerRevocationError::AttestationRollback {
-                partner_id,
-                accepted: *accepted,
-                offered: *offered,
-            }
-        }
-        PartnerMirrorRefusal::Equivocation { epoch } => PartnerRevocationError::Equivocation {
-            partner_id,
-            epoch: *epoch,
-        },
-        PartnerMirrorRefusal::OutOfSequence { .. } | PartnerMirrorRefusal::InvalidLeaf { .. } => {
-            PartnerRevocationError::MalformedPage(partner_id, refusal.to_string())
-        }
-        PartnerMirrorRefusal::DuplicateLeaf { seq } => PartnerRevocationError::DuplicateLeaf {
-            partner_id,
-            seq: *seq,
-        },
-        PartnerMirrorRefusal::RootMismatch { epoch } => PartnerRevocationError::RootMismatch {
-            partner_id,
-            epoch: *epoch,
-        },
+fn mirror_error(partner_id: &str, error: impl Into<PartnerMirrorError>) -> PartnerRevocationError {
+    PartnerRevocationError::Mirror {
+        partner_id: partner_id.to_owned(),
+        error: error.into(),
     }
 }
 

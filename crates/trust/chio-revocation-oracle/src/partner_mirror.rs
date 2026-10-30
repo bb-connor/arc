@@ -14,19 +14,19 @@ pub const MAX_RECORDED_PARTNER_CONFLICTS: u64 = 256;
 /// mirror unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PartnerMirrorRefusal {
-    #[error("mirror tree does not match its accepted root")]
+    #[error("revocation mirror tree does not match its accepted root")]
     Diverged,
     #[error("revocation root epoch {offered} rolls back accepted epoch {accepted}")]
     Rollback { accepted: u64, offered: u64 },
     #[error("revocation root issued at {offered} predates the accepted root issued at {accepted}")]
     AttestationRollback { accepted: u64, offered: u64 },
-    #[error("two different revocation roots are signed for epoch {epoch}")]
+    #[error("signed two different revocation roots for epoch {epoch}")]
     Equivocation { epoch: u64 },
-    #[error("leaf {seq} does not follow mirror leaf {have}")]
+    #[error("revocation leaf {seq} does not follow mirror leaf {have}")]
     OutOfSequence { seq: u64, have: u64 },
-    #[error("leaf {seq} is not a valid revocation key: {reason}")]
+    #[error("revocation leaf {seq} is not a valid revocation key: {reason}")]
     InvalidLeaf { seq: u64, reason: String },
-    #[error("leaf {seq} repeats a revoked key")]
+    #[error("revocation leaf {seq} repeats a revoked key")]
     DuplicateLeaf { seq: u64 },
     #[error("revocation leaves rebuild a root that differs from the signed root at epoch {epoch}")]
     RootMismatch { epoch: u64 },
