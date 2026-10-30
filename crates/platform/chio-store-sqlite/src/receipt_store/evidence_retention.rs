@@ -594,7 +594,7 @@ pub(super) fn rotate_on_writer_connection(
     connection: &mut rusqlite::Connection,
     config: &RetentionConfig,
     verified_checkpoint_ceiling: Option<u64>,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
     if config.tenant_id.is_some() {
@@ -624,7 +624,7 @@ fn archive_range(
     cutoff_unix_secs: u64,
     archive_path: &str,
     verified_checkpoint_ceiling: Option<u64>,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<u64, ReceiptStoreError> {
     // Eligibility is not monotone: a later checkpoint may contain both ends of
@@ -1080,7 +1080,7 @@ pub(super) fn delete_archived_prefix_in_tx(
     w: i64,
     cutoff_unix_secs: u64,
     archive_path: &str,
-    rollback_anchor: Option<&crate::rollback_generation::RollbackGenerationAnchor>,
+    rollback_anchor: Option<&chio_rollback_anchor::RollbackGenerationAnchor>,
     clock: &crate::store_clock::StoreClock,
 ) -> Result<(), ReceiptStoreError> {
     let now = clock.unix_millis()?.as_secs();

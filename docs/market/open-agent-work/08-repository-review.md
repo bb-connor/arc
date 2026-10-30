@@ -81,7 +81,7 @@ authenticates the exact pool, purchaser, currency, amount and concrete ledger.
 [Existing tests](../../../crates/platform/chio-store-sqlite/tests/finding_pool_ledger.rs)
 cover domain exclusion, different-store rejection, SQLite clone rejection,
 restart and key-rotation behavior. The
-[rollback anchor](../../../crates/platform/chio-store-sqlite/src/rollback_generation.rs)
+[rollback anchor](../../../crates/platform/chio-rollback-anchor/src/lib.rs)
 requires a different filesystem device from the protected database. These are
 real defenses that the first plan's toy double-pledge model does not exercise.
 

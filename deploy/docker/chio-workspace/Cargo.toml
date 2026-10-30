@@ -341,6 +341,7 @@ chio-replay-corpus = { version = "=0.1.0", path = "crates/trust/chio-replay-corp
 chio-reputation = { version = "=0.1.0", path = "crates/trust/chio-reputation" }
 chio-revocation-oracle = { version = "=0.1.0", path = "crates/trust/chio-revocation-oracle" }
 chio-risk-comptroller = { version = "=0.1.0", path = "crates/platform/chio-risk-comptroller" }
+chio-rollback-anchor = { version = "=0.1.0", path = "crates/platform/chio-rollback-anchor" }
 chio-runtime = { version = "=0.1.0", path = "crates/kernel/chio-runtime" }
 chio-runtime-core = { version = "=0.1.0", path = "crates/kernel/chio-runtime-core" }
 chio-runtime-harness = { version = "=0.1.0", path = "crates/kernel/chio-runtime-harness" }
