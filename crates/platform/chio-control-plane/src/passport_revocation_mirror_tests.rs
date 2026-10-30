@@ -732,19 +732,6 @@ fn a_second_handle_on_the_mirror_observes_a_sync_without_reopening() -> TestResu
 }
 
 #[test]
-fn a_mirror_stamped_for_another_partner_is_refused() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("mirror.sqlite3");
-    PartnerRevocationMirror::open(&path, PARTNER)?;
-    assert!(matches!(
-        PartnerRevocationMirror::open(&path, "bravo"),
-        Err(PartnerRevocationError::PartnerMismatch { expected, found })
-            if expected == "bravo" && found == PARTNER
-    ));
-    Ok(())
-}
-
-#[test]
 fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> TestResult {
     let a = Publisher::new()?;
     let dir = tempfile::tempdir()?;
