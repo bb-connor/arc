@@ -106,7 +106,8 @@ pub trait RuntimeAdmissionHook: Send + Sync {
 
     /// Select operation-owned replay custody from trusted hook configuration.
     /// The kernel independently requires durable activation of this generation.
-    /// A configured hook never falls back to the legacy evaluate/release path.
+    /// A configured hook never falls back to the evaluate-only path
+    /// (`evaluate` / `release_reserved`).
     fn runtime_participant_binding(
         &self,
     ) -> Option<
@@ -196,7 +197,7 @@ pub trait RuntimeAdmissionHook: Send + Sync {
     }
 
     /// Revalidate an operation-owned plan against the durable activation's
-    /// expected physical source. A legacy implementation cannot satisfy this
+    /// expected physical source. An evaluate-only implementation cannot satisfy this
     /// contract by accepting request metadata or by skipping source verification.
     fn revalidate_operation_owned_before_dispatch(
         &self,
