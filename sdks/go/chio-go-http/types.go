@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 6a4f02054dab3f55b85533fd4f33677ec67db525b20471b63cbd2ab1264c0d90
+// Schema content SHA-256: 999289656a2443b60c6ed04b94ccf802cb45fccc8e14e96be1ea1a63081d4fbf
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -4156,6 +4156,16 @@ const (
 // Defines values for RootAuthorityIdpKeySnapshotBodySchema.
 const (
 	RootAuthorityIdpKeySnapshotBodySchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotBodySchema = "chio.idp-key-snapshot.v1"
+)
+
+// Defines values for RootAuthorityOperatorRootRequestSchema.
+const (
+	RootAuthorityOperatorRootRequestSchemaChioOperatorRootRequestV1 RootAuthorityOperatorRootRequestSchema = "chio.operator-root-request.v1"
+)
+
+// Defines values for RootAuthorityOperatorRootRequestBodySchema.
+const (
+	RootAuthorityOperatorRootRequestBodySchemaChioOperatorRootRequestV1 RootAuthorityOperatorRootRequestBodySchema = "chio.operator-root-request.v1"
 )
 
 // Defines values for RootAuthorityRevocationRequestSchema.
@@ -32900,6 +32910,53 @@ type RootAuthorityIdpKeySnapshotBody struct {
 
 // RootAuthorityIdpKeySnapshotBodySchema defines model for RootAuthorityIdpKeySnapshotBody.Schema.
 type RootAuthorityIdpKeySnapshotBodySchema string
+
+// RootAuthorityOperatorRootRequest `chio.operator-root-request.v1`, signed by the operator key the edge pins. The operator asks the edge for one `chio_operator_key` anchored root for `principal` in `tenant_value`. The signature covers the canonical JSON of every member except `signature`, and `request_id` is the replay key.
+type RootAuthorityOperatorRootRequest struct {
+	ExpiresAt int64 `json:"expires_at"`
+
+	// Holder Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+	Holder RootAuthorityRootAnchorHolderClass `json:"holder"`
+
+	// Principal A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	Principal RootAuthorityRootAnchorIdentifier `json:"principal"`
+
+	// RequestId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	RequestId RootAuthorityRootAnchorIdentifier      `json:"request_id"`
+	Schema    RootAuthorityOperatorRootRequestSchema `json:"schema"`
+
+	// Scope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+	Scope CapabilityTokenChioScope `json:"scope"`
+
+	// Signature Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+	Signature RootAuthorityRootAnchorSignatureHex `json:"signature"`
+
+	// TenantValue A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	TenantValue RootAuthorityRootAnchorIdentifier `json:"tenant_value"`
+}
+
+// RootAuthorityOperatorRootRequestSchema defines model for RootAuthorityOperatorRootRequest.Schema.
+type RootAuthorityOperatorRootRequestSchema string
+
+// RootAuthorityOperatorRootRequestBody defines model for RootAuthorityOperatorRootRequestBody.
+type RootAuthorityOperatorRootRequestBody struct {
+	ExpiresAt int64                                      `json:"expires_at"`
+	Holder    string                                     `json:"holder"`
+	Principal string                                     `json:"principal"`
+	RequestId string                                     `json:"request_id"`
+	Schema    RootAuthorityOperatorRootRequestBodySchema `json:"schema"`
+	Scope     struct {
+		Grants []struct {
+			Operations []string `json:"operations"`
+			ServerId   string   `json:"server_id"`
+			ToolName   string   `json:"tool_name"`
+		} `json:"grants"`
+	} `json:"scope"`
+	TenantValue string `json:"tenant_value"`
+}
+
+// RootAuthorityOperatorRootRequestBodySchema defines model for RootAuthorityOperatorRootRequestBody.Schema.
+type RootAuthorityOperatorRootRequestBodySchema string
 
 // RootAuthorityRevocationRequest `chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
 type RootAuthorityRevocationRequest struct {

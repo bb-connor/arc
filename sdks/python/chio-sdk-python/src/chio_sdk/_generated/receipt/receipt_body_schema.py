@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
+# Schema sha256: b6f1812f92935a14019f86d41be473435cc0ec402c6c70767457f18fc119ce8a
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -178,7 +178,7 @@ class DelegationChainItem2(BaseModel):
     timestamp: int
 
 
-class Scope20(BaseModel):
+class Scope21(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -198,7 +198,7 @@ class Bob(BaseModel):
     issued_at: int
     issuer: str
     schema_: str = Field(..., alias="schema")
-    scope: Scope20
+    scope: Scope21
     signature: str
     subject: str
 
@@ -252,7 +252,7 @@ class DelegationChainItem3(BaseModel):
     timestamp: int
 
 
-class Scope21(BaseModel):
+class Scope22(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -272,7 +272,7 @@ class Carol(BaseModel):
     issued_at: int
     issuer: str
     schema_: str = Field(..., alias="schema")
-    scope: Scope21
+    scope: Scope22
     signature: str
     subject: str
 
@@ -326,7 +326,7 @@ class DelegationChainItem4(BaseModel):
     timestamp: int
 
 
-class Scope22(BaseModel):
+class Scope23(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -346,7 +346,7 @@ class Dave(BaseModel):
     issued_at: int
     issuer: str
     schema_: str = Field(..., alias="schema")
-    scope: Scope22
+    scope: Scope23
     signature: str
     subject: str
 
@@ -368,7 +368,7 @@ class AggregateInvocationBudget5(BaseModel):
     scope: str
 
 
-class Scope23(BaseModel):
+class Scope24(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -385,7 +385,7 @@ class Root(BaseModel):
     issued_at: int
     issuer: str
     schema_: str = Field(..., alias="schema")
-    scope: Scope23
+    scope: Scope24
     signature: str
     subject: str
 
