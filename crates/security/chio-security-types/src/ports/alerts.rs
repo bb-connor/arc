@@ -2,9 +2,9 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use super::identifiers::MAX_ID_BYTES;
-use super::{Deserialize, Digest32, RecordId, Serialize, TenantId};
+use super::{fmt, Deserialize, Digest32, RecordId, Serialize, String, TenantId};
 #[cfg(feature = "std")]
-use super::{PortResult, String, Vec};
+use super::{PortResult, Vec};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -50,6 +50,57 @@ pub enum AlertDeliveryStatus {
     /// and stays parked until an operator resolves it.
     Parked { attempts: u32 },
 }
+
+/// Name of one alert backend as the outbox records it: not empty, without
+/// surrounding whitespace and without NUL.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct BackendName(String);
+
+/// Why a string is not a [`BackendName`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BackendNameError {
+    Empty,
+    Untrimmed,
+    ContainsNul,
+}
+
+impl BackendName {
+    pub fn new(name: &str) -> Result<Self, BackendNameError> {
+        if name.is_empty() {
+            return Err(BackendNameError::Empty);
+        }
+        if name.trim() != name {
+            return Err(BackendNameError::Untrimmed);
+        }
+        if name.contains('\0') {
+            return Err(BackendNameError::ContainsNul);
+        }
+        Ok(Self(name.into()))
+    }
+
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl core::borrow::Borrow<str> for BackendName {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for BackendNameError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Empty => "alert backend name is empty",
+            Self::Untrimmed => "alert backend name has surrounding whitespace",
+            Self::ContainsNul => "alert backend name contains NUL",
+        })
+    }
+}
+
+impl core::error::Error for BackendNameError {}
 
 /// Outcome of one dispatch of a paged alert to one backend.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -107,15 +158,15 @@ pub trait SecurityAlertOutboxStore: Send + Sync {
     fn load_backend_deliveries(
         &self,
         alert: &SecurityAlert,
-    ) -> PortResult<Option<BTreeMap<String, AlertDeliveryStatus>>>;
+    ) -> PortResult<Option<BTreeMap<BackendName, AlertDeliveryStatus>>>;
     fn backlog(&self) -> PortResult<SecurityAlertOutboxBacklog>;
     /// Up to `limit` pending rows due at `now_unix_ms`, earliest first.
     fn load_due(&self, now_unix_ms: u64, limit: usize) -> PortResult<Vec<DueSecurityAlert>>;
-    fn confirmed_backends(&self, row: &DueSecurityAlert) -> PortResult<BTreeSet<String>>;
+    fn confirmed_backends(&self, row: &DueSecurityAlert) -> PortResult<BTreeSet<BackendName>>;
     fn record_backend_outcome(
         &self,
         row: &DueSecurityAlert,
-        backend: &str,
+        backend: &BackendName,
         outcome: AlertBackendOutcome,
         now_unix_ms: u64,
     ) -> PortResult<()>;
@@ -131,7 +182,7 @@ pub trait SecurityAlertOutboxStore: Send + Sync {
     fn record_delivery(
         &self,
         row: &DueSecurityAlert,
-        backends: &[&str],
+        backends: &[BackendName],
         now_unix_ms: u64,
     ) -> PortResult<()>;
     /// Moves the pending row to [`AlertDeliveryStatus::Parked`] with

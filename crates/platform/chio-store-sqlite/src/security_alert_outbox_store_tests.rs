@@ -67,6 +67,10 @@ fn record(value: &str) -> RecordId {
     RecordId::new(value).test_unwrap()
 }
 
+fn name(value: &str) -> BackendName {
+    BackendName::new(value).test_unwrap()
+}
+
 fn alert(index: u8) -> SecurityAlert {
     SecurityAlert {
         tenant_id: TenantId::new("tenant-alert-outbox").test_unwrap(),
@@ -167,17 +171,17 @@ fn delivery_completes_only_after_every_backend_confirms() {
     assert_eq!(row.attempts, 0);
 
     store
-        .record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS)
         .test_unwrap();
     store
-        .record_backend_outcome(&row, OPSGENIE, REFUSED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(OPSGENIE), REFUSED, DUE_AT_UNIX_MS)
         .test_unwrap();
     assert_eq!(
         store.confirmed_backends(&row).test_unwrap(),
-        BTreeSet::from([PAGERDUTY.to_owned()])
+        BTreeSet::from([name(PAGERDUTY)])
     );
-    integrity(store.record_delivery(&row, &[PAGERDUTY, OPSGENIE], DUE_AT_UNIX_MS));
-    integrity(store.record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS));
+    integrity(store.record_delivery(&row, &[name(PAGERDUTY), name(OPSGENIE)], DUE_AT_UNIX_MS));
+    integrity(store.record_backend_outcome(&row, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS));
 
     store.record_failure(&row, RETRY_AT_UNIX_MS).test_unwrap();
     assert_eq!(
@@ -194,10 +198,10 @@ fn delivery_completes_only_after_every_backend_confirms() {
         .test_expect("the alert is due again");
     assert_eq!(retry.attempts, 1);
     store
-        .record_backend_outcome(&retry, OPSGENIE, CONFIRMED, RETRY_AT_UNIX_MS)
+        .record_backend_outcome(&retry, &name(OPSGENIE), CONFIRMED, RETRY_AT_UNIX_MS)
         .test_unwrap();
     store
-        .record_delivery(&retry, &[PAGERDUTY, OPSGENIE], RETRY_AT_UNIX_MS)
+        .record_delivery(&retry, &[name(PAGERDUTY), name(OPSGENIE)], RETRY_AT_UNIX_MS)
         .test_unwrap();
     assert_eq!(
         store.load_status(&first).test_unwrap(),
@@ -206,8 +210,8 @@ fn delivery_completes_only_after_every_backend_confirms() {
     assert_eq!(
         store.load_backend_deliveries(&first).test_unwrap(),
         Some(BTreeMap::from([
-            (OPSGENIE.to_owned(), delivered(2, RETRY_AT_UNIX_MS)),
-            (PAGERDUTY.to_owned(), delivered(1, DUE_AT_UNIX_MS)),
+            (name(OPSGENIE), delivered(2, RETRY_AT_UNIX_MS)),
+            (name(PAGERDUTY), delivered(1, DUE_AT_UNIX_MS)),
         ]))
     );
 }
@@ -222,7 +226,7 @@ fn a_parked_row_is_counted_and_never_due_again() {
     let due = store.load_due(DUE_AT_UNIX_MS, 10).test_unwrap();
     assert_eq!(due.len(), 3);
     store
-        .record_backend_outcome(&due[0], OPSGENIE, REFUSED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&due[0], &name(OPSGENIE), REFUSED, DUE_AT_UNIX_MS)
         .test_unwrap();
     assert_eq!(
         kind(store.record_parked(&due[0], 2)),
@@ -240,7 +244,7 @@ fn a_parked_row_is_counted_and_never_due_again() {
     assert_eq!(
         store.load_backend_deliveries(&due[0].alert).test_unwrap(),
         Some(BTreeMap::from([(
-            OPSGENIE.to_owned(),
+            name(OPSGENIE),
             AlertDeliveryStatus::Parked { attempts: 1 }
         )]))
     );
@@ -280,7 +284,7 @@ fn writes_from_a_stale_due_row_refuse() {
     store.record_failure(&stale, DUE_AT_UNIX_MS).test_unwrap();
 
     integrity(store.record_failure(&stale, RETRY_AT_UNIX_MS));
-    integrity(store.record_backend_outcome(&stale, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS));
+    integrity(store.record_backend_outcome(&stale, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS));
     integrity(store.record_delivery(&stale, &[], DUE_AT_UNIX_MS));
     integrity(store.record_parked(&stale, 1));
     assert_eq!(
@@ -330,7 +334,7 @@ fn a_tampered_row_status_fails_every_read_path_as_an_integrity_failure() {
     store.admit(&first).test_unwrap();
     let row = fixture.due_row(&first);
     store
-        .record_backend_outcome(&row, PAGERDUTY, REFUSED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(PAGERDUTY), REFUSED, DUE_AT_UNIX_MS)
         .test_unwrap();
     let database = fixture.database();
     database
@@ -363,7 +367,7 @@ fn a_stored_backend_name_that_is_not_a_backend_name_fails_every_read_path() {
     store.admit(&first).test_unwrap();
     let row = fixture.due_row(&first);
     store
-        .record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS)
         .test_unwrap();
     let changed = fixture
         .database()
@@ -416,7 +420,7 @@ fn a_backend_outcome_bound_to_another_command_fails_closed() {
     store.admit(&first).test_unwrap();
     let row = fixture.due_row(&first);
     store
-        .record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS)
         .test_unwrap();
     let changed = fixture
         .database()
@@ -430,7 +434,7 @@ fn a_backend_outcome_bound_to_another_command_fails_closed() {
 
     integrity(store.confirmed_backends(&row));
     integrity(store.load_backend_deliveries(&first));
-    integrity(store.record_delivery(&row, &[PAGERDUTY], DUE_AT_UNIX_MS));
+    integrity(store.record_delivery(&row, &[name(PAGERDUTY)], DUE_AT_UNIX_MS));
     assert_eq!(
         store.load_status(&first).test_unwrap(),
         Some(pending(0, DUE_AT_UNIX_MS))
@@ -476,7 +480,7 @@ fn duplicate_backend_records_never_confirm_a_row() {
         }
 
         integrity(store.confirmed_backends(&row));
-        integrity(store.record_delivery(&row, &[PAGERDUTY], DUE_AT_UNIX_MS));
+        integrity(store.record_delivery(&row, &[name(PAGERDUTY)], DUE_AT_UNIX_MS));
         integrity(store.load_backend_deliveries(&first));
         integrity(store.ensure_ready());
         assert_eq!(
@@ -533,7 +537,7 @@ fn reopening_keeps_the_declared_schema_and_its_records() {
     store.admit(&first).test_unwrap();
     let row = fixture.due_row(&first);
     store
-        .record_backend_outcome(&row, PAGERDUTY, CONFIRMED, DUE_AT_UNIX_MS)
+        .record_backend_outcome(&row, &name(PAGERDUTY), CONFIRMED, DUE_AT_UNIX_MS)
         .test_unwrap();
     let before = schema_snapshot(&fixture.database());
 
@@ -542,7 +546,7 @@ fn reopening_keeps_the_declared_schema_and_its_records() {
     assert_eq!(schema_snapshot(&fixture.database()), before);
     assert_eq!(
         reopened.confirmed_backends(&row).test_unwrap(),
-        BTreeSet::from([PAGERDUTY.to_owned()])
+        BTreeSet::from([name(PAGERDUTY)])
     );
 }
 

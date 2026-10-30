@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use chio_core::canonical::{canonical_json_bytes, UntrustedJsonText};
 use chio_security_types::ports::{
-    AlertBackendOutcome, AlertDeliveryStatus, Digest32, DueSecurityAlert, PortError, PortErrorKind,
-    PortResult, RecordId, SecurityAlert, SecurityAlertOutboxBacklog, SecurityAlertOutboxStore,
-    SECURITY_ALERT_MAX_CANONICAL_BYTES,
+    AlertBackendOutcome, AlertDeliveryStatus, BackendName, Digest32, DueSecurityAlert, PortError,
+    PortErrorKind, PortResult, RecordId, SecurityAlert, SecurityAlertOutboxBacklog,
+    SecurityAlertOutboxStore, SECURITY_ALERT_MAX_CANONICAL_BYTES,
 };
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
@@ -169,7 +169,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
     fn load_backend_deliveries(
         &self,
         alert: &SecurityAlert,
-    ) -> PortResult<Option<BTreeMap<String, AlertDeliveryStatus>>> {
+    ) -> PortResult<Option<BTreeMap<BackendName, AlertDeliveryStatus>>> {
         let canonical = canonical_json_bytes(alert).map_err(|_| PortError::invalid_data())?;
         let command_hash = chio_core::sha256(&canonical);
         let key = alert.idempotency_key.as_str();
@@ -242,7 +242,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
         Ok(due)
     }
 
-    fn confirmed_backends(&self, row: &DueSecurityAlert) -> PortResult<BTreeSet<String>> {
+    fn confirmed_backends(&self, row: &DueSecurityAlert) -> PortResult<BTreeSet<BackendName>> {
         let connection = self.connection()?;
         let records = load_backend_records(
             &connection,
@@ -258,7 +258,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
     fn record_backend_outcome(
         &self,
         row: &DueSecurityAlert,
-        backend: &str,
+        backend: &BackendName,
         outcome: AlertBackendOutcome,
         now_unix_ms: u64,
     ) -> PortResult<()> {
@@ -284,11 +284,11 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
             return Err(PortError::integrity_failure());
         }
         let records = load_backend_records(&transaction, key, command_hash)?;
-        let changed = match records.get(backend) {
+        let changed = match records.get(backend.as_str()) {
             None => transaction
                 .execute(
                     INSERT_BACKEND_OUTCOME,
-                    params![key, backend, command_hash, status, delivered_at],
+                    params![key, backend.as_str(), command_hash, status, delivered_at],
                 )
                 .map_err(sqlite_fault)?,
             Some(previous) if previous.delivered_at_unix_ms.is_none() => {
@@ -304,7 +304,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
                             i64::from(attempts),
                             delivered_at,
                             key,
-                            backend,
+                            backend.as_str(),
                             command_hash,
                             i64::from(previous.attempts)
                         ],
@@ -343,7 +343,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
     fn record_delivery(
         &self,
         row: &DueSecurityAlert,
-        backends: &[&str],
+        backends: &[BackendName],
         now_unix_ms: u64,
     ) -> PortResult<()> {
         let attempts = row
@@ -358,7 +358,7 @@ impl SecurityAlertOutboxStore for SqliteSecurityAlertOutboxStore {
         let records = load_backend_records(&transaction, key, row.command_hash.as_bytes())?;
         let unconfirmed = backends.iter().any(|backend| {
             records
-                .get(*backend)
+                .get(backend.as_str())
                 .is_none_or(|record| record.delivered_at_unix_ms.is_none())
         });
         if unconfirmed {
@@ -488,7 +488,7 @@ fn load_backend_records(
     connection: &Connection,
     idempotency_key: &str,
     command_hash: &[u8],
-) -> PortResult<BTreeMap<String, BackendRecord>> {
+) -> PortResult<BTreeMap<BackendName, BackendRecord>> {
     let mut statement = connection
         .prepare(SELECT_BACKEND_RECORDS)
         .map_err(sqlite_fault)?;
@@ -496,6 +496,7 @@ fn load_backend_records(
     let mut records = BTreeMap::new();
     while let Some(row) = rows.next().map_err(sqlite_fault)? {
         let backend: String = stored(row, 0)?;
+        let backend = BackendName::new(&backend).map_err(|_| PortError::integrity_failure())?;
         let stored_hash: Vec<u8> = stored(row, 1)?;
         let status: String = stored(row, 2)?;
         let attempts: i64 = stored(row, 3)?;

@@ -16,15 +16,15 @@ use chio_kernel::{
 };
 use chio_quarantine::decode_response_record;
 use chio_security_types::ports::{
-    AlertDeliveryQuery, AlertDeliveryStatus, Digest32, ExactReceiptRecord,
-    ExactSecurityReceiptSink, OpaqueReceiptRef, PortError, PortResult, ReceiptAppendRequest,
-    RecordId, ResponsePlanKey, ResponseStore, SchedulerHealthPageRequest, SchedulerHealthPort,
-    SecurityAlert, SecurityAlertOutboxBacklog, SecurityAlertOutboxStore, SecurityAlertPort,
-    SecurityReceiptSink, TenantId,
+    AlertDeliveryQuery, AlertDeliveryStatus, BackendName, BackendNameError, Digest32,
+    ExactReceiptRecord, ExactSecurityReceiptSink, OpaqueReceiptRef, PortError, PortResult,
+    ReceiptAppendRequest, RecordId, ResponsePlanKey, ResponseStore, SchedulerHealthPageRequest,
+    SchedulerHealthPort, SecurityAlert, SecurityAlertOutboxBacklog, SecurityAlertOutboxStore,
+    SecurityAlertPort, SecurityReceiptSink, TenantId,
 };
 use chio_siem::{Alert, AlertBackend, AlertSeverity};
 use serde_json::json;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use tokio::sync::Mutex as AsyncMutex;
 
@@ -725,6 +725,8 @@ pub struct AlertDispatchReport {
 pub struct SecurityAlertOutbox {
     store: Arc<dyn SecurityAlertOutboxStore>,
     backends: Vec<Arc<dyn AlertBackend>>,
+    /// The name of each backend in `backends`, validated once at construction.
+    backend_names: Arc<[BackendName]>,
     config: AlertOutboxConfig,
     delivery_lock: Arc<AsyncMutex<()>>,
 }
@@ -736,17 +738,17 @@ impl SecurityAlertOutbox {
         config: AlertOutboxConfig,
     ) -> PortResult<Self> {
         let config = config.validate()?;
-        validate_backends(&backends)?;
+        let backend_names = backend_names(&backends)?;
         Ok(Self {
             store,
             backends,
+            backend_names,
             config,
             delivery_lock: Arc::new(AsyncMutex::new(())),
         })
     }
 
     fn ensure_ready(&self) -> PortResult<()> {
-        validate_backends(&self.backends)?;
         self.store.ensure_ready()
     }
 
@@ -788,7 +790,7 @@ impl SecurityAlertOutbox {
     pub fn load_backend_deliveries(
         &self,
         query: &AlertDeliveryQuery,
-    ) -> PortResult<Option<BTreeMap<String, AlertDeliveryStatus>>> {
+    ) -> PortResult<Option<BTreeMap<BackendName, AlertDeliveryStatus>>> {
         validate_alert(&query.alert)?;
         self.store.load_backend_deliveries(&query.alert)
     }
@@ -845,18 +847,24 @@ fn increment(counter: &mut usize) -> PortResult<()> {
     Ok(())
 }
 
-fn validate_backends(backends: &[Arc<dyn AlertBackend>]) -> PortResult<()> {
+/// The distinct name of every backend, in dispatch order.
+fn backend_names(backends: &[Arc<dyn AlertBackend>]) -> PortResult<Arc<[BackendName]>> {
     if backends.is_empty() {
         return Err(PortError::unavailable());
     }
-    let mut names = BTreeSet::new();
+    let mut names: Vec<BackendName> = Vec::with_capacity(backends.len());
     for backend in backends {
-        let name = backend.name();
-        if name.is_empty() || name.trim() != name || !names.insert(name.to_owned()) {
+        let name = BackendName::new(backend.name()).map_err(|error| match error {
+            BackendNameError::Empty
+            | BackendNameError::Untrimmed
+            | BackendNameError::ContainsNul => PortError::invalid_data(),
+        })?;
+        if names.contains(&name) {
             return Err(PortError::invalid_data());
         }
+        names.push(name);
     }
-    Ok(())
+    Ok(names.into())
 }
 
 fn validate_alert(alert: &SecurityAlert) -> PortResult<()> {

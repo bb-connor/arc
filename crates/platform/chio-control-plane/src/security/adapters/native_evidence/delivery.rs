@@ -6,10 +6,7 @@ use chio_security_types::ports::{
     SecurityAlertOutboxStore,
 };
 
-use super::{
-    backend_alert, increment, retry_delay, validate_backends, AlertDispatchReport,
-    SecurityAlertOutbox,
-};
+use super::{backend_alert, increment, retry_delay, AlertDispatchReport, SecurityAlertOutbox};
 
 #[cfg(test)]
 mod tests;
@@ -31,7 +28,6 @@ impl SecurityAlertOutbox {
         if limit == 0 {
             return Err(PortError::invalid_data());
         }
-        validate_backends(&self.backends)?;
         let guard = Arc::clone(&self.delivery_lock).lock_owned().await;
         let config = self.config;
         let (due, mut guard) = self
@@ -40,12 +36,6 @@ impl SecurityAlertOutbox {
                 store.load_due(now_unix_ms, limit)
             })
             .await?;
-        let backend_names: Arc<Vec<String>> = Arc::new(
-            self.backends
-                .iter()
-                .map(|backend| backend.name().to_owned())
-                .collect(),
-        );
         let mut report = AlertDispatchReport::default();
         for row in due {
             if row.attempts >= config.max_attempts {
@@ -63,8 +53,8 @@ impl SecurityAlertOutbox {
                 .await?;
             guard = returned_guard;
             let mut delivery_failed = false;
-            for backend in &self.backends {
-                if confirmed.contains(backend.name()) {
+            for (backend, name) in self.backends.iter().zip(self.backend_names.iter()) {
+                if confirmed.contains(name) {
                     continue;
                 }
                 increment(&mut report.backend_dispatches)?;
@@ -72,7 +62,7 @@ impl SecurityAlertOutbox {
                     Ok(_) => AlertBackendOutcome::Confirmed,
                     Err(_) => AlertBackendOutcome::Refused,
                 };
-                let name = backend.name().to_owned();
+                let name = name.clone();
                 let stored = Arc::clone(&row);
                 let ((), returned_guard) = self
                     .with_store(guard, move |store| {
@@ -107,10 +97,9 @@ impl SecurityAlertOutbox {
                 guard = returned_guard;
                 increment(&mut report.failed)?;
             } else {
-                let names = Arc::clone(&backend_names);
+                let names = Arc::clone(&self.backend_names);
                 let ((), returned_guard) = self
                     .with_store(guard, move |store| {
-                        let names: Vec<&str> = names.iter().map(String::as_str).collect();
                         store.record_delivery(&row, &names, now_unix_ms)
                     })
                     .await?;

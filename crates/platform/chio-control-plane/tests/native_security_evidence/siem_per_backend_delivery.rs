@@ -1,6 +1,6 @@
 use super::*;
 
-use chio_security_types::ports::{PortError, PortResult};
+use chio_security_types::ports::{BackendName, PortError, PortResult};
 
 const DUE_AT_UNIX_MS: u64 = 1_000;
 const FIRST_RETRY_AT_UNIX_MS: u64 = 1_010;
@@ -140,7 +140,7 @@ impl Fixture {
     fn backend_outcomes(
         &self,
         alert: &SecurityAlert,
-    ) -> Option<BTreeMap<String, AlertDeliveryStatus>> {
+    ) -> Option<BTreeMap<BackendName, AlertDeliveryStatus>> {
         self.outbox
             .load_backend_deliveries(&AlertDeliveryQuery {
                 alert: alert.clone(),
@@ -239,11 +239,15 @@ fn parked(attempts: u32) -> AlertDeliveryStatus {
 
 fn outcomes(
     entries: [(&str, AlertDeliveryStatus); 2],
-) -> Option<BTreeMap<String, AlertDeliveryStatus>> {
+) -> Option<BTreeMap<BackendName, AlertDeliveryStatus>> {
     Some(
         entries
             .into_iter()
-            .map(|(backend, status)| (backend.to_owned(), status))
+            .map(|(backend, status)| {
+                let name = BackendName::new(backend)
+                    .unwrap_or_else(|error| panic!("backend name: {error}"));
+                (name, status)
+            })
             .collect(),
     )
 }
