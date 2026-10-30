@@ -1106,8 +1106,8 @@ async fn a_live_delegation_policy_issues_through_the_partner_door() {
 }
 
 #[tokio::test]
-async fn a_delegation_ceiling_signed_by_the_issuing_partner_is_refused_and_does_not_consume_the_challenge()
- {
+async fn a_delegation_ceiling_signed_by_the_issuing_partner_is_refused_and_does_not_consume_the_challenge(
+) {
     let mut door = Door::new(0);
     let store = with_receipts(&mut door);
     door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
@@ -1146,8 +1146,8 @@ async fn a_delegation_ceiling_signed_by_the_issuing_partner_is_refused_and_does_
 }
 
 #[tokio::test]
-async fn a_delegation_ceiling_signed_by_the_local_authority_issues_after_a_partner_signed_one_is_refused()
- {
+async fn a_delegation_ceiling_signed_by_the_local_authority_issues_after_a_partner_signed_one_is_refused(
+) {
     let mut door = Door::new(0);
     let store = with_receipts(&mut door);
     door.sync.publish(PARTNER, door.feed.publish(NOW_MS));

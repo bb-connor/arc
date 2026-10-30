@@ -1416,6 +1416,28 @@ pub(crate) async fn handle_federated_issue(
     }
 }
 
+/// The delegation ceiling belongs to the issuing service: its policy signer
+/// must be a key the local capability authority trusts. Checked before the
+/// challenge is consumed so a refused ceiling leaves the challenge usable.
+fn ensure_delegation_policy_signer_trusted(
+    state: &TrustServiceState,
+    policy: &FederatedDelegationPolicyDocument,
+) -> Result<(), Response> {
+    let authority = load_capability_authority_with_deferred_lineage(state)?;
+    if authority
+        .trusted_public_keys()
+        .iter()
+        .any(|key| key == &policy.body.signer_public_key)
+    {
+        Ok(())
+    } else {
+        Err(plain_http_error(
+            StatusCode::FORBIDDEN,
+            "federated delegation policy signer is not trusted by the local capability authority",
+        ))
+    }
+}
+
 pub(crate) async fn execute_federated_issue(
     state: &TrustServiceState,
     payload: &FederatedIssueRequest,
@@ -1474,6 +1496,7 @@ pub(crate) async fn execute_federated_issue(
         {
             return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
         }
+        ensure_delegation_policy_signer_trusted(state, policy)?;
     }
     if let Some(upstream_capability_id) = payload.upstream_capability_id.as_deref() {
         match payload
@@ -1784,18 +1807,6 @@ pub(crate) async fn execute_federated_issue(
     };
     match authority {
         Ok(authority) => {
-            if let Some(policy) = payload.delegation_policy.as_ref() {
-                if !authority
-                    .trusted_public_keys()
-                    .iter()
-                    .any(|key| key == &policy.body.signer_public_key)
-                {
-                    return Err(plain_http_error(
-                        StatusCode::FORBIDDEN,
-                        "federated delegation policy signer is not trusted by the local capability authority",
-                    ));
-                }
-            }
             match authority.issue_capability(
                 subject_public_key,
                 payload.capability.scope.clone(),
