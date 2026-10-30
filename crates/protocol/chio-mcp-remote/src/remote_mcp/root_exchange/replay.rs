@@ -57,16 +57,25 @@ impl ReplayKeyError {
 }
 
 impl ReplayKey {
-    /// The key of `id` from `issuer` within `namespace`.
+    /// The key of `id` from `issuer` within `namespace`. A NUL in either
+    /// part refuses.
     pub fn new(
         namespace: ReplayNamespace,
         issuer: impl Into<String>,
         id: impl Into<String>,
     ) -> Result<Self, ReplayKeyError> {
+        let issuer = issuer.into();
+        if issuer.contains('\0') {
+            return Err(ReplayKeyError::IssuerContainsNul(namespace));
+        }
+        let id = id.into();
+        if id.contains('\0') {
+            return Err(ReplayKeyError::IdContainsNul(namespace));
+        }
         Ok(Self {
             namespace,
-            issuer: issuer.into(),
-            id: id.into(),
+            issuer,
+            id,
         })
     }
 
