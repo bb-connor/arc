@@ -1922,4 +1922,17 @@ pub(crate) mod tests {
         assert!(rendered.contains("[REDACTED]"), "{rendered}");
         assert!(rendered.contains(&handoff.key_id), "{rendered}");
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn authority_seed_read_refuses_a_setuid_mode_bit() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().test_unwrap();
+        let path = directory.path().join("authority.seed");
+        write_authority_seed_file_bound(&path, &Keypair::from_seed(&[0x11; 32]), None)
+            .test_unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o4600)).test_unwrap();
+        assert!(load_existing_authority_keypair_with_identity(&path).is_err());
+    }
 }
