@@ -4,7 +4,6 @@ use super::*;
 // Attenuation-step narrowing + parent-relative budget_share_bps.
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "delegation")]
 fn capped_grant(
     server: &str,
     tool: &str,
@@ -26,7 +25,6 @@ fn capped_grant(
 
 /// A valid narrowing step (reduce max_invocations below the parent cap) is
 /// accepted and rides onto the signed link.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_accepts_valid_narrowing_step() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -77,7 +75,6 @@ fn delegate_accepts_valid_narrowing_step() {
 
 /// A widening step (raise max_invocations above the parent cap) is rejected
 /// fail-closed even though the child *scope* itself is a subset.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_widening_step() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -127,7 +124,6 @@ fn delegate_rejects_widening_step() {
 }
 
 /// A step targeting a tool the parent never held is a widening and rejected.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_step_for_unknown_tool() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -168,7 +164,6 @@ fn delegate_rejects_step_for_unknown_tool() {
 
 /// A monetary cost step in a different currency than the parent's cap is
 /// rejected (same currency required for a meaningful narrowing comparison).
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_cost_step_currency_switch() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -227,7 +222,6 @@ fn delegate_rejects_cost_step_currency_switch() {
 
 /// A child budget_share_bps within the parent's share is accepted; one that
 /// exceeds the parent's share is rejected parent-relative.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_enforces_parent_relative_budget_share() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -310,7 +304,6 @@ fn delegate_enforces_parent_relative_budget_share() {
 /// downstream admission treats a missing child share as the full 100% ceiling,
 /// so omission would silently widen the parent's reduced share. A child that
 /// states an explicit share `<=` the parent's is accepted.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_requires_child_share_under_attenuated_parent() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -393,7 +386,6 @@ fn delegate_requires_child_share_under_attenuated_parent() {
 /// validation honors wildcard parent grants the same way scope subset
 /// validation does, so a legitimate concrete-child step is accepted rather
 /// than falsely rejected as targeting a tool outside the parent scope.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_honors_wildcard_parent_grant_in_step_validation() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -449,7 +441,6 @@ fn delegate_honors_wildcard_parent_grant_in_step_validation() {
 
 /// Re-sign a plain token as an attenuated token carrying an explicit
 /// `budget_share_bps`, so the share is covered by the signature.
-#[cfg(feature = "delegation")]
 fn attenuated_share_parent(
     issuer: &Keypair,
     plain: &CapabilityToken,
@@ -478,7 +469,6 @@ fn attenuated_share_parent(
 /// admission treats a missing share as the same full ceiling). Such a
 /// delegation must be ACCEPTED rather than rejected as if the parent held a
 /// reduced share.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_allows_omitted_share_for_full_share_parent() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -524,7 +514,6 @@ fn delegate_allows_omitted_share_for_full_share_parent() {
 /// it. A `RemoveOperation(ReadResult)` step is a valid narrowing because the
 /// concrete `srv-a:tool-x` grant holds `ReadResult`, even though the leading
 /// `*:*` grant only holds `Invoke`.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_searches_all_matching_grants_for_step_narrowing() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -580,7 +569,6 @@ fn delegate_searches_all_matching_grants_for_step_narrowing() {
 /// the child scope is rejected at mint time, so the helper never emits a receipt
 /// that chio-kernel's declared-attenuation validation would later reject. Here
 /// the step declares an added constraint the child grant does not carry.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_step_not_reflected_in_child() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -631,7 +619,6 @@ fn delegate_rejects_step_not_reflected_in_child() {
 /// removal is NOT truly reflected. The child-side matcher lets the wildcard
 /// step target cover the concrete child grant, so the link is rejected
 /// fail-closed.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_child() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -681,7 +668,6 @@ fn delegate_rejects_wildcard_remove_operation_step_not_reflected_in_concrete_chi
 /// child drops `ReadResult` (keeps Invoke), so the removal is genuinely
 /// reflected. This proves the child-side matcher does not over-reject valid
 /// wildcard-removal narrowings.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child() {
     use crate::delegation_receipt::ScopeAttenuation;
@@ -742,7 +728,6 @@ fn delegate_accepts_wildcard_remove_operation_step_reflected_in_concrete_child()
 /// declared-attenuation check would then reject the minted token (mint and
 /// kernel disagree). With the bidirectional matcher the concrete step target
 /// covers the wildcard child grant and the link is rejected fail-closed.
-#[cfg(feature = "delegation")]
 #[test]
 fn delegate_rejects_concrete_remove_operation_step_not_reflected_in_wildcard_child() {
     use crate::delegation_receipt::ScopeAttenuation;
