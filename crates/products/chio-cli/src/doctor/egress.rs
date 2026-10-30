@@ -89,12 +89,12 @@ pub(crate) mod test_support {
     use std::sync::Arc;
 
     /// Loopback server that answers every request with `response` and counts requests.
-    pub(crate) struct Stub {
+    pub(crate) struct LoopbackServer {
         pub(crate) port: u16,
         pub(crate) hits: Arc<AtomicUsize>,
     }
 
-    pub(crate) fn serve(response: String) -> Stub {
+    pub(crate) fn serve(response: String) -> LoopbackServer {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
         let hits = Arc::new(AtomicUsize::new(0));
@@ -108,7 +108,7 @@ pub(crate) mod test_support {
                 let _ = stream.write_all(response.as_bytes());
             }
         });
-        Stub { port, hits }
+        LoopbackServer { port, hits }
     }
 
     pub(crate) fn redirect_to(location: &str) -> String {
