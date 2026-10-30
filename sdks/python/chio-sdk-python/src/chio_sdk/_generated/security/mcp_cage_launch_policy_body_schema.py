@@ -54,13 +54,7 @@ class Limits(BaseModel):
     nofile_soft: int
 
 
-class EnvironmentVariable(
-    RootModel[
-        constr(
-            pattern=r"^(?!(?:[lL][dD]_|[dD][yY][lL][dD]_|[bB][aA][sS][hH]_[fF][uU][nN][cC]_|[mM][aA][lL][lL][oO][cC]_))(?!(?:[bB][aA][sS][hH]_[eE][nN][vV]|[dD][oO][cC][kK][eE][rR]_[cC][oO][nN][fF][iI][gG]|[eE][nN][vV]|[gG][cC][oO][nN][vV]_[pP][aA][tT][hH]|[gG][eE][mM]_[hH][oO][mM][eE]|[gG][eE][mM]_[pP][aA][tT][hH]|[gG][iI][tT]_[aA][sS][kK][pP][aA][sS][sS]|[gG][lL][iI][bB][cC]_[tT][uU][nN][aA][bB][lL][eE][sS]|[gG][pP][gG]_[aA][gG][eE][nN][tT]_[iI][nN][fF][oO]|[iI][fF][sS]|[jJ][aA][vV][aA]_[tT][oO][oO][lL]_[oO][pP][tT][iI][oO][nN][sS]|[jJ][dD][kK]_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS]|[kK][rR][bB]5[cC][cC][nN][aA][mM][eE]|[lL][oO][cC][pP][aA][tT][hH]|[nN][eE][tT][rR][cC]|[nN][lL][sS][pP][aA][tT][hH]|[nN][oO][dD][eE]_[oO][pP][tT][iI][oO][nN][sS]|[nN][oO][dD][eE]_[pP][aA][tT][hH]|[nN][pP][mM]_[cC][oO][nN][fF][iI][gG]_[uU][sS][eE][rR][cC][oO][nN][fF][iI][gG]|[pP][eE][rR][lL]5[oO][pP][tT]|[pP][eE][rR][lL]5[lL][iI][bB]|[pP][yY][tT][hH][oO][nN][hH][oO][mM][eE]|[pP][yY][tT][hH][oO][nN][iI][nN][sS][pP][eE][cC][tT]|[pP][yY][tT][hH][oO][nN][pP][aA][tT][hH]|[pP][yY][tT][hH][oO][nN][sS][tT][aA][rR][tT][uU][pP]|[rR][uU][bB][yY][lL][iI][bB]|[rR][uU][bB][yY][oO][pP][tT]|[rR][uU][sS][tT][cC]_[wW][rR][aA][pP][pP][eE][rR]|[sS][sS][lL][kK][eE][yY][lL][oO][gG][fF][iI][lL][eE]|[sS][sS][lL]_[cC][eE][rR][tT]_[dD][iI][rR]|[sS][sS][lL]_[cC][eE][rR][tT]_[fF][iI][lL][eE]|[sS][sS][hH]_[aA][uU][tT][hH]_[sS][oO][cC][kK]|[sS][uU][dD][oO]_[aA][sS][kK][pP][aA][sS][sS]|[zZ][dD][oO][tT][dD][iI][rR]|_[jJ][aA][vV][aA]_[oO][pP][tT][iI][oO][nN][sS])$)(?!.*(?:[tT][oO][kK][eE][nN]|[sS][eE][cC][rR][eE][tT]|[pP][aA][sS][sS][wW][oO][rR][dD]|[pP][aA][sS][sS][wW][dD]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[aA][pP][iI]_[kK][eE][yY]|[pP][rR][iI][vV][aA][tT][eE]_[kK][eE][yY]|[aA][cC][cC][eE][sS][sS]_[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]))[A-Za-z_][A-Za-z0-9_]*$"
-        )
-    ]
-):
+class EnvironmentVariable(RootModel):
     model_config = ConfigDict(
         regex_engine="python-re",
     )
@@ -77,14 +71,7 @@ class NetworkDestination(BaseModel):
     port: conint(ge=1, le=65535)
 
 
-class ReadPath(
-    RootModel[
-        constr(
-            pattern=r"^/(?!.*//)(?!.*(?:^|/)\.{1,2}(?:/|$))(?!.*\/$)[^\u0000-\u001F\u007F-\u009F]+$",
-            min_length=2,
-        )
-    ]
-):
+class ReadPath(RootModel):
     model_config = ConfigDict(
         regex_engine="python-re",
     )
@@ -94,14 +81,7 @@ class ReadPath(
     )
 
 
-class WritePath(
-    RootModel[
-        constr(
-            pattern=r"^/(?!.*//)(?!.*(?:^|/)\.{1,2}(?:/|$))(?!.*\/$)[^\u0000-\u001F\u007F-\u009F]+$",
-            min_length=2,
-        )
-    ]
-):
+class WritePath(RootModel):
     model_config = ConfigDict(
         regex_engine="python-re",
     )
@@ -147,14 +127,7 @@ class ExecutionIdentity(BaseModel):
     uid: int
 
 
-class RuntimeFile(
-    RootModel[
-        constr(
-            pattern=r"^/(?!.*//)(?!.*(?:^|/)\.{1,2}(?:/|$))(?!.*\/$)[^\u0000-\u001F\u007F-\u009F]+$",
-            min_length=2,
-        )
-    ]
-):
+class RuntimeFile(RootModel):
     model_config = ConfigDict(
         regex_engine="python-re",
     )
