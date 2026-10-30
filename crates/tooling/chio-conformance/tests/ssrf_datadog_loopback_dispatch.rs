@@ -35,6 +35,7 @@ fn loopback_contract(
         deny_ipv6_ula: true,
         max_redirect_chain,
         max_response_bytes,
+        private_network_allowances: Default::default(),
     }
 }
 

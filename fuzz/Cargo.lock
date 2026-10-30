@@ -1833,6 +1833,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-decision-model"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+]
+
+[[package]]
 name = "chio-decoy"
 version = "0.1.0"
 dependencies = [
@@ -2224,9 +2231,13 @@ dependencies = [
  "async-trait",
  "base64 0.22.1",
  "chio-core",
+ "chio-decision-model",
+ "chio-fixed",
  "chio-http-session",
  "chio-kernel",
+ "chio-predicate-dag",
  "chio-security-types",
+ "chio-weights",
  "glob",
  "libc",
  "lru",

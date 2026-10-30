@@ -785,6 +785,7 @@ impl GuardRegistryClient {
             deny_ipv6_ula: true,
             max_redirect_chain: REGISTRY_HTTP_MAX_REDIRECT_CHAIN,
             max_response_bytes: REGISTRY_HTTP_MAX_RESPONSE_BYTES,
+            private_network_allowances: Default::default(),
         })
     }
 

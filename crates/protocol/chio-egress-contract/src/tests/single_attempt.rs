@@ -70,7 +70,7 @@ fn assert_remote_refusal(error: &(dyn std::error::Error + 'static)) {
 }
 
 async fn refused_attempts(
-    builder: impl FnOnce(&HttpEgressContract) -> reqwest::ClientBuilder,
+    client: impl FnOnce(&HttpEgressContract) -> Result<ContractClient, reqwest::Error>,
 ) -> Result<usize, Box<dyn std::error::Error>> {
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let authority = listener.local_addr()?.to_string();
@@ -78,12 +78,7 @@ async fn refused_attempts(
     let server = tokio::spawn(refuse_http2_streams(listener, observed.clone()));
     let mut contract = HttpEgressContract::permissive_for_tests(&authority);
     contract.max_redirect_chain = 0;
-    let client = ContractClient {
-        inner: builder(&contract)
-            .timeout(Duration::from_secs(5))
-            .http2_prior_knowledge()
-            .build()?,
-    };
+    let client = client(&contract)?;
     let request = client
         .post(format!("http://{authority}/native-attempt"))
         .version(reqwest::Version::HTTP_2)
@@ -110,8 +105,12 @@ async fn refused_attempts(
 #[tokio::test]
 async fn contract_client_does_not_retry_http2_refused_stream(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let observed =
-        refused_attempts(|contract| client_builder_with_contract(contract).inner).await?;
+    let observed = refused_attempts(|contract| {
+        client_builder_with_contract(contract)
+            .timeout(Duration::from_secs(5))
+            .build_tuned(reqwest::ClientBuilder::http2_prior_knowledge)
+    })
+    .await?;
     assert_eq!(observed, 1, "one native attempt was replayed");
     Ok(())
 }
@@ -119,10 +118,24 @@ async fn contract_client_does_not_retry_http2_refused_stream(
 #[tokio::test]
 async fn default_policy_retries_the_same_http2_refusal_fixture(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let observed = refused_attempts(|_| {
-        reqwest::Client::builder()
+    let observed = refused_attempts(|contract| {
+        let default_policy = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
+            .http2_prior_knowledge()
+            .build()?;
+        let dispatchers = contract
+            .allowed_authority_set
+            .iter()
+            .filter_map(|authority| authority.rsplit_once(':'))
+            .filter_map(|(_, port)| port.parse::<u16>().ok())
+            .map(|port| (port, default_policy.clone()))
+            .collect();
+        Ok(ContractClient {
+            inner: default_policy,
+            dispatchers: Arc::new(dispatchers),
+        })
     })
     .await?;
     assert_eq!(

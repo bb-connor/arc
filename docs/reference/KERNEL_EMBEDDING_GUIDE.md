@@ -25,6 +25,12 @@ let response = kernel
     .await?;
 ```
 
+Caller metadata cannot carry kernel-derived keys. In particular
+`decision_model_witness` is reserved: the kernel writes it only from the
+witness a decision-model guard returns (see
+`docs/guards/01-CURRENT-GUARD-SYSTEM.md`, sections 1.3 and 3.4), and refuses
+caller metadata that sets it.
+
 Synchronous host APIs that cannot enter an async context use the blocking
 entrypoints:
 

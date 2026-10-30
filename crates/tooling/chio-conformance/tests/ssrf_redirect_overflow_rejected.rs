@@ -26,6 +26,7 @@ fn no_redirect_contract() -> HttpEgressContract {
         deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: 1024,
+        private_network_allowances: Default::default(),
     }
 }
 

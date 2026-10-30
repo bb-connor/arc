@@ -43,6 +43,10 @@ struct PaymentAmbiguityAdapter {
 }
 
 impl PaymentAdapter for PaymentAmbiguityAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         _request: &PaymentAuthorizeRequest,
@@ -710,6 +714,10 @@ async fn evaluate_nested_payment_ambiguity_request(
 struct DurableDeclinedPaymentAdapter(PaymentAmbiguityCounters);
 
 impl PaymentAdapter for DurableDeclinedPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "test-dpop-payment"
     }

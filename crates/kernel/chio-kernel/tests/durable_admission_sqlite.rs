@@ -257,6 +257,10 @@ impl ToolServerConnection for StreamingPaidMutationServer {
 }
 
 impl PaymentAdapter for ReversiblePaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "sqlite-test-reversible"
     }
@@ -356,6 +360,10 @@ struct PrepaidFinalPaymentAdapter {
 }
 
 impl PaymentAdapter for PrepaidFinalPaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "sqlite-test-prepaid-final"
     }

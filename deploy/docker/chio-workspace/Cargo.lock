@@ -3266,6 +3266,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-decision-model"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+ "proptest",
+]
+
+[[package]]
 name = "chio-decoy"
 version = "0.1.0"
 dependencies = [
@@ -3627,6 +3635,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-fixed"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "chio-flow"
 version = "0.1.0"
 dependencies = [
@@ -3707,11 +3724,17 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "chio-attest-verify",
  "chio-core",
+ "chio-decision-model",
+ "chio-fixed",
  "chio-http-session",
  "chio-kernel",
+ "chio-predicate-dag",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-weights",
+ "chrono",
  "glob",
  "libc",
  "lru 0.18.2",
@@ -4260,6 +4283,15 @@ dependencies = [
  "thiserror 1.0.69",
  "uuid",
  "yaml_serde",
+]
+
+[[package]]
+name = "chio-predicate-dag"
+version = "0.1.0"
+dependencies = [
+ "chio-fixed",
+ "proptest",
+ "sha2 0.10.9",
 ]
 
 [[package]]

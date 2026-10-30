@@ -16,24 +16,30 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 COMMITTED = REPO_ROOT / "tests" / "bindings" / "vectors" / "receipt" / "committed" / "v1.json"
 EXAMPLES = REPO_ROOT / "spec" / "schemas" / "chio-wire" / "v1" / "root_authority" / "examples"
 REJECTED_ALL = {"content": "rejected", "disclosure_valid": False, "parameters": "rejected"}
+# Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32 bytes.
+# Every other vector decodes.
+DECODE_REFUSED = {"salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"}
+SALT_WIRE_ERROR = "salt is not the canonical b64u form of 32 bytes"
 
 
 class DisclosureTests(unittest.TestCase):
     def test_opener_reproduces_committed_vectors(self) -> None:
         cases = json.loads(COMMITTED.read_text())["cases"]
-        self.assertIn("salt_noncanonical_tail", [case["id"] for case in cases])
+        self.assertLessEqual(DECODE_REFUSED, {case["id"] for case in cases})
         for case in cases:
             receipt = case["receipt"]
-            try:
-                disclosure = parse_receipt_disclosure(case["disclosure"])
-            except ChioInvariantError:
+            if case["id"] in DECODE_REFUSED:
+                with self.assertRaises(ChioInvariantError, msg=case["id"]) as refusal:
+                    parse_receipt_disclosure(case["disclosure"])
+                self.assertEqual(refusal.exception.code, "disclosure", case["id"])
+                self.assertEqual(str(refusal.exception), SALT_WIRE_ERROR, case["id"])
                 report = dict(REJECTED_ALL)
             else:
                 report = open_commitments(
                     receipt["id"],
                     receipt["action"]["parameter_commitment"],
                     receipt["content_commitment"],
-                    disclosure,
+                    parse_receipt_disclosure(case["disclosure"]),
                     json.loads(case["preimages"]["parameters_canonical"]),
                     bytes.fromhex(case["preimages"]["content_preimage_hex"]),
                 )

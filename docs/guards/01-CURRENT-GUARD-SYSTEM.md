@@ -22,9 +22,9 @@ pub trait Guard: Send + Sync {
 
     /// Evaluate the guard against a tool call request.
     ///
-    /// Returns `Ok(Verdict::Allow)` to pass, `Ok(Verdict::Deny)` to block,
-    /// or `Err` on internal failure (which the kernel treats as deny).
-    fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError>;
+    /// Returns an allow or deny decision with optional evidence, or `Err` on
+    /// internal failure (which the kernel treats as deny).
+    fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError>;
 }
 ```
 
@@ -34,7 +34,7 @@ different contexts.
 
 ### 1.1 `Verdict` (Kernel)
 
-The kernel's own `Verdict` is a simple two-variant enum defined in
+The kernel's own `Verdict` is defined in
 `crates/kernel/chio-kernel/src/runtime.rs`:
 
 ```rust
@@ -44,12 +44,13 @@ pub enum Verdict {
     Allow,
     /// The action is denied.
     Deny,
+    /// The action is suspended pending a human decision.
+    PendingApproval,
 }
 ```
 
-There is **no `Abstain` variant**. Every guard must return either Allow or
-Deny (or an `Err`, which is treated as Deny). This is a deliberate
-fail-closed design: guards cannot "pass" on a decision.
+There is **no `Abstain` variant**. Every guard returns a decision (or an
+`Err`, which is treated as Deny). Guards cannot "pass" on a decision.
 
 ### 1.2 `Verdict` (HTTP Layer)
 
@@ -71,8 +72,25 @@ The HTTP verdict includes denial reasons, the guard name, and HTTP status
 codes (defaulting to 403). It converts to/from `chio_core_types::Decision`
 for receipt signing.
 
-The kernel-level `Verdict` (Allow/Deny) is what guards return. The richer
-HTTP `Verdict` is used at the transport layer.
+The kernel-level `Verdict` is what guards return inside a `GuardDecision`.
+The richer HTTP `Verdict` is used at the transport layer.
+
+### 1.3 `GuardDecision`
+
+```rust
+pub struct GuardDecision {
+    pub verdict: Verdict,
+    pub evidence: Vec<GuardEvidence>,
+    pub witness: Option<DecisionModelWitness>,
+}
+```
+
+`evidence` is recorded on the receipt subject to the guard's
+`evidence_declaration`. `witness` is set only by a guard that evaluates a
+pinned decision model (see 3.4); `GuardDecision::with_witness` attaches it.
+The kernel validates the witness and binds it into the signed receipt
+metadata under `decision_model_witness`, on allow and deny receipts alike.
+A call whose guards return more than one witness is denied.
 
 ---
 
@@ -196,34 +214,16 @@ reordering mechanism on `ChioKernel` itself.
 The `chio-guards` crate provides `GuardPipeline`, which itself implements
 `Guard`:
 
-```rust
-pub struct GuardPipeline {
-    guards: Vec<Box<dyn Guard>>,
-}
-
-impl Guard for GuardPipeline {
-    fn name(&self) -> &str { "guard-pipeline" }
-
-    fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
-        for guard in &self.guards {
-            match guard.evaluate(ctx) {
-                Ok(Verdict::Allow) => continue,
-                Ok(Verdict::Deny) => {
-                    return Err(KernelError::GuardDenied(format!(
-                        "guard \"{}\" denied the request", guard.name()
-                    )));
-                }
-                Err(e) => {
-                    return Err(KernelError::GuardDenied(format!(
-                        "guard \"{}\" error (fail-closed): {e}", guard.name()
-                    )));
-                }
-            }
-        }
-        Ok(Verdict::Allow)
-    }
-}
-```
+It evaluates its children in order and collects their evidence. The first
+child deny or child error stops the pipeline and returns
+`Ok(GuardDecision::deny(evidence))`: a deny appends
+`action=deny; reason=guard denied request` for that child, and an error
+appends `action=error; reason=fail-closed; error=...`. A
+`PendingApproval` child keeps the pipeline running and makes its final
+verdict `PendingApproval` unless a later child denies. A child's
+decision-model witness is forwarded on the pipeline's decision, including
+when a later child denies or errors. The only `Err` that `evaluate` returns
+is `KernelError::GuardDenied` for a second witness from another child.
 
 A `GuardPipeline` can be registered as a single guard on the kernel:
 
@@ -240,6 +240,50 @@ The `default_pipeline()` includes:
 5. `McpToolGuard`
 6. `SecretLeakGuard`
 7. `PatchIntegrityGuard`
+
+### 3.4 `PredicateDagGuard`
+
+`chio_guards::PredicateDagGuard` evaluates a pinned decision model: a
+`chio.decision-model.v1` artifact (decoded by `chio-predicate-dag`) bound
+by a verified model card (`chio_weights::VerifiedModelCard`).
+
+```rust
+let guard = PredicateDagGuard::load(
+    &verified_card,
+    &artifact_bytes,
+    Box::new(ExactPredicateSource::new(predicates)?),
+    &DecisionModelBinding { requested_scopes, requested_tools },
+    work_cap,
+)?;
+kernel.add_guard(Box::new(guard));
+```
+
+`load` refuses, with a `DecisionModelLoadError`, a card whose canonical
+bytes do not match the attestation subject, a card that does not bind the
+artifact digest or that refuses the requested scopes or tools, an artifact
+that does not decode and validate, a score source that does not provide
+exactly the artifact's atoms, and a `work_cap` below the schedule's op count.
+Nothing knowable at load is left to refuse at call time.
+
+Per call the guard asks its `ScoreSource` for atom scores, classifies them
+against the artifact thresholds, charges the schedule's op count to a
+`VerificationBudget` once, and runs the schedule. The rule outcome maps to
+`Allow`, `PendingApproval` (hold) or `Deny`. Any failure (score source
+error or malformed scores, exhausted work, unavailable policy) falls back
+to `Deny`. A deny carries one fixed evidence entry,
+`action=deny; reason=decision-model`, and never names a rule or atom.
+
+Every decision carries a `DecisionModelWitness`: the model card digest,
+the artifact digest, the outcome, whether the schedule was evaluated or
+fell back (and why), and the work charged. Equal inputs on the public
+tuple give byte-identical witnesses whatever the argument values.
+
+`ExactPredicateSource` scores atoms from deterministic predicates over the
+request (tool name, server id, argument presence, argument JSON kind).
+Predicate `i` scores atom `i`; construction refuses more than `MAX_ATOMS`
+predicates (`ExactPredicateSourceError::TooManyPredicates`), and `load`
+refuses a source whose predicate count differs from the artifact's atom
+count. A deployment with a learned scorer implements `ScoreSource` itself.
 
 ---
 

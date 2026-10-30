@@ -33,7 +33,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
+chio-attest-verify = { workspace = true }
+chio-guards = { workspace = true }
+chio-predicate-dag = { workspace = true }
 chio-test-support = { workspace = true }
+chio-weights = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 rusqlite = { workspace = true }
 

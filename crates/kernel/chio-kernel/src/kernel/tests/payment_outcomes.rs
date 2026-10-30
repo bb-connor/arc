@@ -64,6 +64,10 @@ struct OutcomePaymentAdapter {
 }
 
 impl PaymentAdapter for OutcomePaymentAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        crate::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,

@@ -1758,6 +1758,10 @@ struct ReversibleHoldAdapter {
 }
 
 impl PaymentAdapter for ReversibleHoldAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "wedge-reversible-hold"
     }
@@ -1835,6 +1839,10 @@ struct PrepaidFinalAdapter {
 }
 
 impl PaymentAdapter for PrepaidFinalAdapter {
+    fn egress_allowance_digest(&self) -> &str {
+        chio_kernel::payment::EMPTY_PRIVATE_NETWORK_ALLOWANCE_DIGEST
+    }
+
     fn rail_id(&self) -> &'static str {
         "wedge-prepaid-final"
     }

@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::Keypair;
+use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::{
     ChioKernel, Guard, HotPathDeadlineConfig, KernelConfig, KernelError, NestedFlowBridge,
     ToolCallRequest, ToolServerConnection, Verdict, DEFAULT_MAX_STREAM_DURATION_SECS,
@@ -24,12 +25,13 @@ const CAPABILITY_TTL_HEADROOM_SECONDS: u64 = 300;
 
 /// Raw outcome of a single dispatch through the real kernel. Chaos scenarios
 /// assert on this directly: `verdict` is the kernel's decision, `reason` carries
-/// the denial reason (populated on a deny), and `elapsed` is the measured
-/// end-to-end latency.
+/// the denial reason (populated on a deny), `receipt` is the signed receipt and
+/// `elapsed` is the measured end-to-end latency.
 #[derive(Debug, Clone)]
 pub struct DispatchOutcome {
     pub verdict: Verdict,
     pub reason: Option<String>,
+    pub receipt: ChioReceipt,
     pub elapsed: Duration,
 }
 
@@ -193,6 +195,7 @@ impl StackHarness {
         Ok(DispatchOutcome {
             verdict: response.verdict,
             reason: response.reason,
+            receipt: response.receipt,
             elapsed: started.elapsed(),
         })
     }

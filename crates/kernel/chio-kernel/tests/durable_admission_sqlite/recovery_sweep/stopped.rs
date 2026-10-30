@@ -113,6 +113,10 @@ struct StopOnCapture {
 }
 
 impl PaymentAdapter for StopOnCapture {
+    fn egress_allowance_digest(&self) -> &str {
+        self.inner.egress_allowance_digest()
+    }
+
     fn rail_id(&self) -> &'static str {
         self.inner.rail_id()
     }

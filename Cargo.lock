@@ -2999,14 +2999,20 @@ dependencies = [
 name = "chio-chaos"
 version = "0.1.0"
 dependencies = [
+ "chio-attest-verify",
  "chio-core-types",
+ "chio-guards",
  "chio-kernel",
  "chio-loadgen",
+ "chio-predicate-dag",
  "chio-store-sqlite",
  "chio-test-support",
+ "chio-weights",
+ "chrono",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "tempfile",
  "thiserror 1.0.69",
 ]
@@ -4181,11 +4187,17 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
+ "chio-attest-verify",
  "chio-core",
+ "chio-decision-model",
+ "chio-fixed",
  "chio-http-session",
  "chio-kernel",
+ "chio-predicate-dag",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-weights",
+ "chrono",
  "glob",
  "libc",
  "lru 0.18.2",

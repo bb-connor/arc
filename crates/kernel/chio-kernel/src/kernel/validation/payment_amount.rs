@@ -53,7 +53,10 @@ impl ChioKernel {
         let rail_mode = adapter.rail_mode().ok_or_else(|| {
             PaymentError::RailError("durable payment adapter omitted its rail mode".to_owned())
         })?;
-        if adapter.rail_id() != journal.rail || rail_mode != journal.rail_mode {
+        if adapter.rail_id() != journal.rail
+            || rail_mode != journal.rail_mode
+            || adapter.egress_allowance_digest() != journal.rail_egress_allowance_digest
+        {
             return Err(PaymentError::RailError(
                 "durable payment adapter does not match the persisted rail profile".to_owned(),
             ));
@@ -90,3 +93,12 @@ impl ChioKernel {
         .map_err(|error| PaymentError::RailError(error.to_string()))
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures assert on constructed values and fail the test on a bad fixture."
+)]
+#[path = "payment_amount_tests.rs"]
+mod tests;
