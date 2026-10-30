@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use chio_core_types::capability::anchor::RootAnchor;
 use chio_core_types::root_authority::{
     CapabilityPresentation, DelegationContext, EnterpriseProviderIdentity, IdpKeySnapshot,
-    RootPolicy,
+    RevocationEntry, RootPolicy,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -201,6 +201,27 @@ const REJECTIONS: &[(&str, &str)] = &[
     ("root-policy.alg-hs256.json", "unknown variant `HS256`"),
     ("root-policy.alg-none.json", "unknown variant `none`"),
     (
+        "revocation-entry.entry-id-prefix.json",
+        "`entry_id` is not rev_<64 lowercase hex>",
+    ),
+    (
+        "revocation-entry.non-hex-tag.json",
+        "`target_value` is not 64 lowercase hex",
+    ),
+    ("revocation-entry.padding.json", "unknown field `note`"),
+    (
+        "revocation-entry.unknown-kind.json",
+        "`target_kind` is not a revocation target kind",
+    ),
+    (
+        "revocation-entry.unknown-reason.json",
+        "`reason` is not a revocation reason",
+    ),
+    (
+        "revocation-entry.zero-time.json",
+        "`revoked_at` is 0, outside 1..=",
+    ),
+    (
         "root-policy.clock-skew-61.json",
         "`max_clock_skew_secs` is 61, outside 0..=60",
     ),
@@ -328,6 +349,7 @@ fn decode_example(name: &str, text: &str) -> Option<Result<serde_json::Value, St
         "enterprise-provider-identity" => round_trip::<EnterpriseProviderIdentity>(text),
         "idp-key-snapshot" => round_trip::<IdpKeySnapshot>(text),
         "presentation" => round_trip::<CapabilityPresentation>(text),
+        "revocation-entry" => round_trip::<RevocationEntry>(text),
         _ => return None,
     };
     Some(decoded)
@@ -369,7 +391,7 @@ fn valid_examples_decode_and_round_trip() {
         assert_eq!(value, original, "{name} does not round-trip");
         decoded += 1;
     }
-    assert_eq!(decoded, 12);
+    assert_eq!(decoded, 15);
 }
 
 #[test]

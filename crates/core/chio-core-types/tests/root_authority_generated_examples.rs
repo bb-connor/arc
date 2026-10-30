@@ -50,6 +50,7 @@ const SCHEMA_ONLY_REJECTIONS: &[&str] = &[
     "idp-key-snapshot.okp-with-p256-curve.json",
     "idp-key-snapshot.rsa-without-modulus.json",
     "presentation.too-many-ancestors.json",
+    "revocation-admin-request.unknown-kind.json",
     "root-policy.clock-skew-61.json",
     "root-policy.disclosure-default-inline.json",
     "root-policy.entra-claim-on-id-jag.json",
@@ -91,6 +92,10 @@ fn decode_example(path: &Path) -> Result<(), String> {
         "verifier-trust" => decode::<root_authority_verifier_trust::ChioVerifierTrust>(&text),
         "revocation-request" => {
             decode::<root_authority_revocation_request::ChioRevocationRequest>(&text)
+        }
+        "revocation-entry" => decode::<root_authority_revocation_entry::ChioRevocationEntry>(&text),
+        "revocation-admin-request" => {
+            decode::<root_authority_revocation_admin_request::ChioRevocationAdminRequest>(&text)
         }
         "presentation" => decode::<capability_presentation::ChioCapabilityPresentation>(&text),
         "disclosure" => decode::<receipt_disclosure::ChioReceiptDisclosure>(&text),

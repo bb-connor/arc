@@ -44,6 +44,7 @@ from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
     ChioSignedCallerDispatchAuthorization,
 )
 from chio_sdk._generated.result.pending_approval_schema import ChioToolcallresultPendingApproval
+from chio_sdk._generated.root_authority.revocation_entry_schema import ChioRevocationEntry
 from chio_sdk.client import ChioClient
 from chio_sdk.errors import ChioError
 from chio_sdk.models import (
@@ -89,6 +90,7 @@ _PROTOCOL_PRIMITIVE_MODELS: dict[str, type[Any]] = {
     "agent/active-response-governed-intent.schema.json": ChioGovernedActiveResponseIntentBody,
     "kernel/combined-capture-metadata.schema.json": ChioCombinedAdmissionCaptureMetadata,
     "capability/supplemental-authorization.schema.json": ChioOpaqueSupplementalAuthorization,
+    "root_authority/revocation-entry.schema.json": ChioRevocationEntry,
 }
 
 def _raw_case_params() -> list[Any]:

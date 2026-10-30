@@ -87,6 +87,8 @@ func decodeProtocolPrimitive(schemaFile string, payload []byte) (any, error) {
 		target = &KernelCombinedCaptureMetadata{}
 	case "capability/supplemental-authorization.schema.json":
 		target = &CapabilitySupplementalAuthorization{}
+	case "root_authority/revocation-entry.schema.json":
+		target = &RootAuthorityRevocationEntry{}
 	default:
 		return nil, fmt.Errorf("unmapped protocol-primitives fixture schema %q", schemaFile)
 	}
