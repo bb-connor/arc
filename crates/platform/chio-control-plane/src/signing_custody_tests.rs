@@ -1,14 +1,21 @@
 use super::*;
 
+use chio_secure_ipc::seed_custody::CustodyPolicy;
 use chio_test_support::prelude::*;
+use std::fs;
 
 const CREDENTIAL: &str = "chio-authority-seed";
 const CREDENTIAL_REF: &str = "credential:chio-authority-seed";
 
-fn custody(policy: CustodyPolicy, credentials_directory: Option<&Path>) -> SeedCustody {
-    SeedCustody {
-        policy,
-        credentials_directory: credentials_directory.map(|path| path.as_os_str().to_owned()),
+fn custody(
+    policy: CustodyPolicy,
+    credentials_directory: Option<&Path>,
+) -> AuthoritySeeds<OsSeedSource> {
+    AuthoritySeeds {
+        source: OsSeedSource::new(
+            policy,
+            credentials_directory.map(|path| path.as_os_str().to_owned()),
+        ),
     }
 }
 
@@ -25,75 +32,6 @@ fn credentials_directory() -> (tempfile::TempDir, Keypair) {
     let keypair = Keypair::generate();
     write_authority_seed_file(&directory.path().join(CREDENTIAL), &keypair).test_unwrap();
     (directory, keypair)
-}
-
-#[test]
-fn parses_credential_references_and_seed_paths() {
-    assert_eq!(
-        KeyRef::parse(Path::new("credential:chio-authority_seed.v1")).test_unwrap(),
-        KeyRef::SystemdCredential {
-            name: "chio-authority_seed.v1".to_owned()
-        }
-    );
-    for path in [
-        "/etc/chio/authority.seed",
-        "authority.seed",
-        "./credential:x",
-    ] {
-        assert_eq!(
-            KeyRef::parse(Path::new(path)).test_unwrap(),
-            KeyRef::File(PathBuf::from(path))
-        );
-    }
-    let too_long = format!("credential:{}", "a".repeat(CREDENTIAL_NAME_MAX_BYTES + 1));
-    for raw in [
-        "credential:",
-        "credential:.",
-        "credential:..",
-        "credential:../escape",
-        "credential:a/b",
-        "credential:a b",
-        "credential:caf\u{e9}",
-        too_long.as_str(),
-    ] {
-        assert_eq!(
-            KeyRef::parse(Path::new(raw)),
-            Err(KeyCustodyError::InvalidCredentialName),
-            "{raw:?}"
-        );
-    }
-}
-
-#[test]
-fn custody_policy_values_parse_strictly() {
-    assert_eq!(
-        CustodyPolicy::from_value(None),
-        Ok(CustodyPolicy::AllowFiles)
-    );
-    assert_eq!(
-        CustodyPolicy::from_value(Some(OsStr::new("development"))),
-        Ok(CustodyPolicy::AllowFiles)
-    );
-    assert_eq!(
-        CustodyPolicy::from_value(Some(OsStr::new("required"))),
-        Ok(CustodyPolicy::RequireOsCustody)
-    );
-    for value in ["", "Required", "required ", "requried", "off"] {
-        assert_eq!(
-            CustodyPolicy::from_value(Some(OsStr::new(value))),
-            Err(KeyCustodyError::InvalidPolicy),
-            "{value:?}"
-        );
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::ffi::OsStrExt as _;
-
-        assert_eq!(
-            CustodyPolicy::from_value(Some(OsStr::from_bytes(b"requir\xffed"))),
-            Err(KeyCustodyError::InvalidPolicy)
-        );
-    }
 }
 
 #[test]
@@ -229,51 +167,58 @@ fn development_custody_loads_a_private_credential() {
     assert_eq!(loaded.public_key(), expected.public_key());
 }
 
-/// A private file outside systemd's read-only credential mount is a plaintext
-/// seed, so required custody refuses it.
 #[test]
-fn required_custody_refuses_a_private_credential_off_the_systemd_mount() {
-    let (directory, _) = credentials_directory();
+fn missing_seed_file_reads_as_absent_and_is_created_private() {
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let seed = directory.path().join("authority.seed");
+    let development = custody(CustodyPolicy::AllowFiles, None);
 
-    let error = custody(CustodyPolicy::RequireOsCustody, Some(directory.path()))
-        .load_existing(Path::new(CREDENTIAL_REF))
-        .test_unwrap_err();
-
+    assert_eq!(development.public_key(&seed).test_unwrap(), None);
+    let created = development.load_or_create(&seed).test_unwrap();
     assert_eq!(
-        custody_error(error),
-        KeyCustodyError::CredentialCustodyRefused
+        development.public_key(&seed).test_unwrap(),
+        Some(created.public_key())
+    );
+    assert_eq!(
+        development.load_or_create(&seed).test_unwrap().public_key(),
+        created.public_key()
     );
 }
 
 #[cfg(unix)]
 #[test]
-fn credential_outside_private_or_systemd_custody_is_refused() {
+fn plain_seed_reads_refuse_permissive_or_linked_seed_files() {
     use std::os::unix::fs::{symlink, PermissionsExt as _};
 
-    let credential = Path::new(CREDENTIAL_REF);
-    let (directory, _) = credentials_directory();
-    fs::set_permissions(
-        directory.path().join(CREDENTIAL),
-        fs::Permissions::from_mode(0o644),
-    )
-    .test_unwrap();
-    let error = custody(CustodyPolicy::AllowFiles, Some(directory.path()))
-        .load_existing(credential)
-        .test_unwrap_err();
-    assert_eq!(
-        custody_error(error),
-        KeyCustodyError::CredentialCustodyRefused
-    );
+    let directory = chio_test_support::private_tempdir().test_unwrap();
+    let seed = directory.path().join("authority.seed");
+    let alias = directory.path().join("authority-alias.seed");
+    write_authority_seed_file(&seed, &Keypair::generate()).test_unwrap();
+    let development = custody(CustodyPolicy::AllowFiles, None);
 
-    let (linked, _) = credentials_directory();
-    let target = linked.path().join("target.seed");
-    fs::rename(linked.path().join(CREDENTIAL), &target).test_unwrap();
-    symlink(&target, linked.path().join(CREDENTIAL)).test_unwrap();
-    let error = custody(CustodyPolicy::AllowFiles, Some(linked.path()))
-        .load_existing(credential)
-        .test_unwrap_err();
-    assert_eq!(
-        custody_error(error),
-        KeyCustodyError::CredentialCustodyRefused
-    );
+    fs::set_permissions(&seed, fs::Permissions::from_mode(0o644)).test_unwrap();
+    let before = fs::read(&seed).test_unwrap();
+    for error in [
+        development.public_key(&seed).map(|_| ()).test_unwrap_err(),
+        development
+            .load_or_create(&seed)
+            .map(|_| ())
+            .test_unwrap_err(),
+    ] {
+        assert!(error.to_string().contains("mode 0600"), "{error}");
+    }
+    assert_eq!(fs::read(&seed).test_unwrap(), before);
+
+    fs::set_permissions(&seed, fs::Permissions::from_mode(0o600)).test_unwrap();
+    symlink(&seed, &alias).test_unwrap();
+    for error in [
+        development.public_key(&alias).map(|_| ()).test_unwrap_err(),
+        development
+            .load_or_create(&alias)
+            .map(|_| ())
+            .test_unwrap_err(),
+    ] {
+        assert!(error.to_string().contains("regular file"), "{error}");
+    }
+    assert_eq!(fs::read(&seed).test_unwrap(), before);
 }

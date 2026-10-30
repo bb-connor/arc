@@ -1753,7 +1753,7 @@ pub(crate) mod tests {
                 "credential:chio-authority-seed"
             )),
             Err(CliError::KeyCustody(
-                crate::KeyCustodyError::ReadOnlyCustody
+                chio_secure_ipc::seed_custody::KeyCustodyError::ReadOnlyCustody
             ))
         ));
         assert!(!Path::new("credential:chio-authority-seed").exists());

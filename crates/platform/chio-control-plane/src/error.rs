@@ -82,7 +82,7 @@ pub enum CliError {
     ControlPlane(#[from] ControlPlaneError),
 
     #[error("key custody error: {0}")]
-    KeyCustody(#[from] crate::KeyCustodyError),
+    KeyCustody(#[from] chio_secure_ipc::seed_custody::KeyCustodyError),
 
     #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
@@ -412,6 +412,18 @@ impl CliError {
                 serde_json::json!({ "detail": message }),
                 "Read the error detail, correct the conflicting inputs or missing prerequisite, and retry the command.",
             ),
+        }
+    }
+}
+
+impl From<chio_secure_ipc::seed_custody::SeedReadError> for CliError {
+    fn from(error: chio_secure_ipc::seed_custody::SeedReadError) -> Self {
+        use chio_secure_ipc::seed_custody::SeedReadError;
+
+        match error {
+            SeedReadError::Custody(error) => Self::KeyCustody(error),
+            SeedReadError::UnsafeFile(message) => Self::cli_io_error(message),
+            SeedReadError::Io(error) => Self::Io(error),
         }
     }
 }

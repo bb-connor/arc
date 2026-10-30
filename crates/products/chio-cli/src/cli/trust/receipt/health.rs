@@ -781,7 +781,7 @@ mod receipt_operator_tests {
         assert!(matches!(
             load_existing_kernel_checkpoint_keypair(credential),
             Err(CliError::KeyCustody(
-                chio_control_plane::KeyCustodyError::CredentialsDirectoryUnset
+                chio_secure_ipc::seed_custody::KeyCustodyError::CredentialsDirectoryUnset
             ))
         ));
         assert!(!credential.exists());

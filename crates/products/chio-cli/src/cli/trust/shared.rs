@@ -10,7 +10,7 @@ pub(crate) fn provision_local_issuance_authority(
         (Some(_), Some(_)) => Err(CliError::cli_other_error(
             "local trust issuance requires either --authority-seed-file or --authority-db, not both",
         )),
-        (Some(path), None) if chio_control_plane::KeyRef::parse(path)?.is_os_custody() => {
+        (Some(path), None) if chio_secure_ipc::seed_custody::KeyRef::parse(path)?.is_os_custody() => {
             crate::load_existing_authority_keypair(path).map(|_| ())
         }
         (Some(path), None) => {
@@ -143,7 +143,7 @@ mod local_issuance_seed_tests {
         assert!(matches!(
             result,
             Err(CliError::KeyCustody(
-                chio_control_plane::KeyCustodyError::CredentialsDirectoryUnset
+                chio_secure_ipc::seed_custody::KeyCustodyError::CredentialsDirectoryUnset
             ))
         ));
         assert!(!credential.exists());

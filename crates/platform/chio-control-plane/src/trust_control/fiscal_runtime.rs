@@ -922,7 +922,7 @@ mod tests {
         assert!(matches!(
             load_fiscal_admission_signer(credential),
             Err(CliError::KeyCustody(
-                crate::KeyCustodyError::CredentialsDirectoryUnset
+                chio_secure_ipc::seed_custody::KeyCustodyError::CredentialsDirectoryUnset
             ))
         ));
         assert!(!credential.exists());
