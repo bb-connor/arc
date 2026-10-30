@@ -328,3 +328,188 @@ fn guard_denial_projects_guard_denied_and_keeps_receipt_detail() {
         );
     }
 }
+
+struct IncompleteToolServer;
+
+#[async_trait::async_trait]
+impl ToolServerConnection for IncompleteToolServer {
+    fn server_id(&self) -> &str {
+        "incomplete-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["incomplete".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        Err(KernelError::RequestIncomplete(PRIVATE_DETAIL.to_string()))
+    }
+}
+
+/// A tool server whose call ends as a cancelled or an incomplete deny, with
+/// its server id, tool name and terminal state label.
+fn terminal_denial_cases() -> Vec<(
+    Box<dyn ToolServerConnection>,
+    &'static str,
+    &'static str,
+    &'static str,
+)> {
+    vec![
+        (
+            Box::new(CancelledServer),
+            "cancel-srv",
+            "cancel",
+            "cancelled",
+        ),
+        (
+            Box::new(IncompleteToolServer),
+            "incomplete-srv",
+            "incomplete",
+            "incomplete",
+        ),
+    ]
+}
+
+fn terminal_denial_edge(kernel: ChioKernel, request: &BridgeMcpToolCallRequest) -> ChioMcpEdge {
+    let mut manifest = sample_manifest();
+    manifest.server_id = request.server_id.clone();
+    manifest.tools.truncate(1);
+    manifest.tools[0].name = request.tool_name.clone();
+    ChioMcpEdge::new(
+        McpEdgeConfig::default(),
+        kernel,
+        request.agent_id.clone(),
+        vec![request.capability.clone()],
+        vec![manifest],
+    )
+    .unwrap()
+}
+
+fn assert_generic_terminal_denial(result: &Value, raw_reasons: &[&str]) {
+    assert_eq!(result["isError"], true, "result: {result}");
+    assert_eq!(
+        result["content"],
+        json!([{"type": "text", "text": "Request denied"}]),
+        "result: {result}"
+    );
+    assert_no_detail_outside_receipts(result, raw_reasons);
+}
+
+#[test]
+fn bridge_terminal_denials_project_the_generic_denial_without_their_reason() {
+    for (server, server_id, tool_name, state) in terminal_denial_cases() {
+        let _metrics_guard = metrics_test_guard();
+        let (kernel, request) = make_kernel_error_bridge_fixture(
+            server,
+            server_id,
+            tool_name,
+            &format!("mcp-{state}-deny"),
+        );
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let bridge = runtime
+            .block_on(execute_bridge_mcp_tool_call_async(&kernel, request))
+            .unwrap();
+
+        assert_eq!(bridge.response.verdict, Verdict::Deny);
+        let raw = match (&bridge.response.terminal_state, state) {
+            (OperationTerminalState::Cancelled { reason }, "cancelled")
+            | (OperationTerminalState::Incomplete { reason }, "incomplete") => reason.clone(),
+            (other, _) => panic!("expected a {state} deny, got {other:?}"),
+        };
+        assert_eq!(
+            bridge.mcp_result["structuredContent"],
+            json!({"code": "denied"})
+        );
+        assert_eq!(
+            bridge.mcp_result["_meta"]["chio"]["terminalState"]["reason"],
+            "Request denied"
+        );
+        assert_generic_terminal_denial(&bridge.mcp_result, &[&raw, PRIVATE_DETAIL]);
+    }
+}
+
+#[test]
+fn edge_terminal_denials_project_the_generic_denial_without_their_reason() {
+    for (server, server_id, tool_name, state) in terminal_denial_cases() {
+        let _metrics_guard = metrics_test_guard();
+        let (kernel, request) = make_kernel_error_bridge_fixture(
+            server,
+            server_id,
+            tool_name,
+            &format!("mcp-edge-{state}-deny"),
+        );
+        let mut edge = terminal_denial_edge(kernel, &request);
+        initialize_edge(&mut edge);
+
+        let response = edge
+            .handle_jsonrpc(json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": { "name": tool_name, "arguments": {} }
+            }))
+            .unwrap();
+
+        assert_generic_terminal_denial(
+            &response["result"],
+            &[
+                PRIVATE_DETAIL,
+                "tool server reported cancellation after dispatch; outcome is unknown",
+            ],
+        );
+    }
+}
+
+#[test]
+fn incomplete_stream_denial_projects_the_generic_reason_in_both_stream_modes() {
+    for (peer_streams, mode) in [(true, "notification_stream"), (false, "collapsed_result")] {
+        let _metrics_guard = metrics_test_guard();
+        let mut edge = make_streaming_edge(10);
+        let capabilities = if peer_streams {
+            json!({"experimental": {"chioToolStreaming": {"toolCallChunkNotifications": true}}})
+        } else {
+            json!({})
+        };
+        let _ = edge.handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": { "capabilities": capabilities }
+        }));
+        let _ = edge.handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {}
+        }));
+
+        let response = edge
+            .handle_jsonrpc(json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "tools/call",
+                "params": { "name": "stream_file_incomplete", "arguments": {} }
+            }))
+            .unwrap();
+
+        let result = &response["result"];
+        let stream = &result["structuredContent"][CHIO_TOOL_STREAM_KEY];
+        assert_eq!(result["isError"], true, "result: {result}");
+        assert_eq!(stream["mode"], mode);
+        assert_eq!(stream["terminalState"], "incomplete");
+        assert_eq!(stream["reason"], "Request denied");
+        assert_eq!(
+            result["_meta"]["chio"]["terminalState"]["reason"],
+            "Request denied"
+        );
+        assert_no_detail_outside_receipts(result, &["upstream stream interrupted"]);
+    }
+}
