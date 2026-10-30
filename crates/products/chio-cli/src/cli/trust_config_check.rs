@@ -1,21 +1,65 @@
 //! `chio trust config check`: validate a trust-control access configuration
 //! and print what it grants, never a secret or secret digest.
 
+use std::io::Read;
 use std::path::Path;
 
 use chio_control_plane::trust_control::caller_credentials::{
-    CredentialKind, TenantAuthority, TrustAccess, TrustAccessConfig,
+    AccessConfigDocument, CredentialKind, TenantAuthority, TrustAccess, TrustAccessConfig,
+    TrustAccessError,
 };
 use chio_control_plane::trust_control::credential_roles::CredentialRole;
 use serde_json::json;
 
 use crate::CliError;
 
+/// Largest access configuration document trust-control reads.
+const MAX_ACCESS_CONFIG_BYTES: u64 = 1024 * 1024;
+
+/// Decode an access configuration TOML document and validate it.
+fn parse_access_config(text: &str) -> Result<TrustAccessConfig, TrustAccessError> {
+    let document: AccessConfigDocument = toml::from_str(text)
+        .map_err(|error| TrustAccessError::Malformed(error.message().to_string()))?;
+    TrustAccessConfig::from_document(document)
+}
+
+/// Read, parse and validate the access configuration at `path` and load the
+/// node key its cluster identity names.
+pub(crate) fn load_trust_access(path: &Path) -> Result<TrustAccess, CliError> {
+    let mut text = String::new();
+    std::fs::File::open(path)
+        .and_then(|file| {
+            file.take(MAX_ACCESS_CONFIG_BYTES + 1)
+                .read_to_string(&mut text)
+        })
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to read trust-control access configuration {}: {error}",
+                path.display()
+            ))
+        })?;
+    if u64::try_from(text.len()).map_or(true, |length| length > MAX_ACCESS_CONFIG_BYTES) {
+        return Err(CliError::cli_other_error(format!(
+            "trust-control access configuration {} exceeds {MAX_ACCESS_CONFIG_BYTES} bytes",
+            path.display()
+        )));
+    }
+    let config =
+        parse_access_config(&text).map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let node_keypair = config
+        .peers
+        .identity()
+        .map(|identity| crate::load_existing_authority_keypair(&identity.node_key_file))
+        .transpose()?;
+    TrustAccess::from_parts(config, node_keypair)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
 pub(crate) fn cmd_trust_config_check(
     access_config: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
-    let access = TrustAccess::load(access_config)?;
+    let access = load_trust_access(access_config)?;
     let config = access.config();
     let credentials: Vec<_> = access
         .credentials()
@@ -207,8 +251,7 @@ pub(crate) fn cmd_trust_config_credential(args: &CredentialEntryArgs<'_>) -> Res
         "deployment = {}\ninternal_listen = \"127.0.0.1:0\"\n{entry}",
         toml_string(args.deployment)
     );
-    TrustAccessConfig::from_toml_str(&document)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    parse_access_config(&document).map_err(|error| CliError::cli_other_error(error.to_string()))?;
     print!("{entry}");
     Ok(())
 }

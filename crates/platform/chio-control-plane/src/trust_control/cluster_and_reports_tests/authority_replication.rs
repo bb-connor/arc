@@ -497,7 +497,7 @@ fn authority_replication_peer_client_rejects_plaintext_and_redirects() {
         )
     ));
     assert!(matches!(
-        crate::trust_control::caller_credentials::TrustAccessConfig::from_toml_str(&plaintext_peer),
+        crate::trust_control::caller_credentials::tests::parse(&plaintext_peer),
         Err(crate::trust_control::caller_credentials::TrustAccessError::InvalidPeerUrl { reason, .. })
             if reason.contains("plaintext cluster URLs require a literal loopback address")
     ));

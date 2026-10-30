@@ -179,13 +179,8 @@ Forwarded authority mutations also carry `x-chio-forwarded-authority-term`.
 
 `chio trust serve` refuses to start when the access configuration:
 
-- names a removed key. A document containing `service_token`,
-  `tenant_read_tokens`, or `authority_workload_token` refuses with:
-
-  ```text
-  trust-control configuration key "<key>" is removed; declare [[credentials]] entries with scopes and tenant authority instead
-  ```
-
+- contains a key outside this schema, such as `service_token` or
+  `tenant_read_tokens`;
 - grants an unknown scope, or a peer scope on a credential;
 - repeats a credential id;
 - gives two credentials the same `secret_sha256`;

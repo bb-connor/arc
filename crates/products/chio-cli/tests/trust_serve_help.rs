@@ -48,7 +48,7 @@ fn trust_serve_refuses_the_removed_shared_secret_flags() {
 }
 
 #[test]
-fn trust_config_check_refuses_a_document_naming_removed_keys() {
+fn trust_config_check_refuses_an_unknown_key() {
     let directory =
         std::env::temp_dir().join(format!("chio-trust-config-check-{}", std::process::id()));
     std::fs::create_dir_all(&directory).expect("create directory");
@@ -67,9 +67,7 @@ fn trust_config_check_refuses_a_document_naming_removed_keys() {
         assert!(!output.status.success(), "{key} was accepted");
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
-            stderr.contains(&format!(
-                "trust-control configuration key \"{key}\" is removed; declare [[credentials]] entries with scopes and tenant authority instead"
-            )),
+            stderr.contains(&format!("unknown field `{key}`")),
             "{key}: {stderr}"
         );
     }

@@ -201,7 +201,7 @@ fn each_preset_loads_as_an_access_configuration() {
             "deployment = \"dep-a\"\ninternal_listen = \"127.0.0.1:9101\"\n[[credentials]]\nid = \"{}\"\nkind = \"{kind}\"\nsecret_sha256 = \"{index:064x}\"\nscopes = [{scopes}]\ndeployment = \"dep-a\"\ntenant_authority = {tenant}\n",
             role.as_str()
         );
-        let loaded = super::super::caller_credentials::TrustAccessConfig::from_toml_str(&text);
+        let loaded = super::super::caller_credentials::tests::parse(&text);
         assert!(loaded.is_ok(), "{role:?}: {:?}", loaded.err());
     }
 }
