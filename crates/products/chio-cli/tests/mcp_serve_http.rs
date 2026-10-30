@@ -117,6 +117,23 @@ impl StartupError {
     }
 }
 
+/// A kernel denial reaches the client as its closed code and fixed text only;
+/// the detail stays in the signed receipt.
+fn assert_closed_denial(result: &Value, code: &str) {
+    let denial = chio_kernel::ClientDenialCode::from_code(code).expect("closed denial code");
+    assert_eq!(result["isError"], true, "{result:#}");
+    assert_eq!(
+        result["structuredContent"]["code"].as_str(),
+        Some(code),
+        "{result:#}"
+    );
+    assert_eq!(
+        result["content"][0]["text"].as_str(),
+        Some(denial.text()),
+        "{result:#}"
+    );
+}
+
 fn is_bind_collision(stderr: &str) -> bool {
     stderr.contains("Address already in use")
         || stderr.contains("os error 48")
@@ -3251,14 +3268,7 @@ fn mcp_serve_http_returns_error_when_wrapped_stream_ends_mid_call() {
     );
     let (terminal, notifications) = read_sse_until_response(invoke, json!(36), |_| {});
     assert!(notifications.is_empty());
-    assert_eq!(terminal["result"]["isError"], true);
-    let message = terminal["result"]["content"][0]["text"]
-        .as_str()
-        .expect("interrupted stream text");
-    assert_eq!(
-        message,
-        "dispatch outcome is unknown after transport_return: CHIO-KERNEL-REQUEST-INCOMPLETE"
-    );
+    assert_closed_denial(&terminal["result"], "kernel_unavailable");
 }
 
 #[test]
@@ -3798,10 +3808,7 @@ fn mcp_serve_http_parent_cancellation_during_tasks_result_marks_task_cancelled()
             .expect("owner request id")
             .starts_with("mcp-edge-req-")
     );
-    assert!(task_result["result"]["content"][0]["text"]
-        .as_str()
-        .expect("cancelled task result text")
-        .contains("cancelled by client: user aborted sample"));
+    assert_closed_denial(&task_result["result"], "denied");
     assert!(
         task_messages.iter().any(|message| {
             message["method"] == "notifications/tasks/status"
@@ -4478,15 +4485,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     assert!(notifications.is_empty());
     // Fresh admission refreshes lifecycle authority even for an existing
     // session. An unannounced key rotation cannot silently change operator pins.
-    assert_eq!(tool_call_after_rotation["result"]["isError"], true);
-    assert!(tool_call_after_rotation["result"]["structuredContent"].is_null());
-    assert!(
-        tool_call_after_rotation["result"]["content"][0]["text"]
-            .as_str()
-            .expect("rotation refusal text")
-            .contains("current key does not match the operator pin"),
-        "rotation refusal: {tool_call_after_rotation:#}"
-    );
+    assert_closed_denial(&tool_call_after_rotation["result"], "kernel_unavailable");
 
     let rejected_session = post_json(
         &client,

@@ -192,8 +192,15 @@ pub fn internal_listen_for(public: &str) -> String {
         Err(poisoned) => poisoned.into_inner(),
     };
     registry
-        .entry(key)
-        .or_insert_with(|| chio_test_support::loopback::reserve_listen_addr().to_string())
+        .entry(key.clone())
+        .or_insert_with(|| loop {
+            // A reserved port is released before the service binds it, so a
+            // later reservation can return the public port itself.
+            let internal = chio_test_support::loopback::reserve_listen_addr().to_string();
+            if internal != key {
+                break internal;
+            }
+        })
         .clone()
 }
 
