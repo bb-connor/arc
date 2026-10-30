@@ -119,7 +119,10 @@ class TrustControlClient:
         return self.get(f"/v1/lineage/{capability_id}/chain")
 
     def revoke(self, capability_id: str) -> Json:
-        return self.post("/v1/revocations", {"capabilityId": capability_id})
+        return self.post(
+            "/v1/revocations",
+            {"capability_id": capability_id, "reason": "operator_request"},
+        )
 
     def authorize_exposure(
         self,

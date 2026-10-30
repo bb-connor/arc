@@ -271,7 +271,7 @@ capabilities:
         revoked=call(revoked_token,revoked_sid,'revoked.txt','forbidden','revoked')
         check('credential_revocation_denied',revoked[0]==401 and 'revoked.txt' not in observe(),revoked[:2])
         cap_sid,cap_token,cap_binding=session()
-        request(admin,'/admin/revocations',{'capability_id':cap_binding['capabilityIds'][0]})
+        request(admin,'/admin/revocations',{'target':{'kind':'capability_id','capability_id':cap_binding['capabilityIds'][0]},'reason':'operator_request'})
         revoked_cap=call(cap_token,cap_sid,'revoked-cap.txt','forbidden','revoked-cap')
         check('capability_revocation_denied',revoked_cap[0]==200 and revoked_cap[1]['result']['isError'] and 'revoked-cap.txt' not in observe(),revoked_cap[:2])
         forbidden=call(token2,sid2,'forbidden.txt','forbidden replacement','forbidden')

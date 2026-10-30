@@ -16,20 +16,20 @@ fn stored_revoked_at(
     service_token: &str,
     capability_id: &str,
 ) -> i64 {
-    let revocations = get_json(
+    let page = get_json(
         client,
-        &format!("{leader_url}/v1/revocations?capabilityId={capability_id}&limit=10"),
+        &format!("{leader_url}/v1/revocations?limit=500"),
         service_token,
     );
-    revocations["revocations"]
+    page["entries"]
         .as_array()
-        .and_then(|records| {
-            records
+        .and_then(|items| {
+            items
                 .iter()
-                .find(|record| record["capabilityId"].as_str() == Some(capability_id))
+                .find(|item| item["entry"]["target_value"].as_str() == Some(capability_id))
         })
-        .and_then(|record| record["revokedAt"].as_i64())
-        .expect("stored revocation must carry revokedAt")
+        .and_then(|item| item["entry"]["revoked_at"].as_i64())
+        .expect("stored revocation entry must carry revoked_at")
 }
 
 pub(super) fn insert_same_second_backfill_after_follower_cursor(
@@ -56,7 +56,7 @@ pub(super) fn insert_same_second_backfill_after_follower_cursor(
                 .is_some();
             let first_visible = try_get_json(
                 client,
-                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"),
+                &format!("{follower_url}/v1/revocations?capability_id=cap-revoke-leader"),
                 service_token,
             )
             .is_some_and(|value| value["revoked"].as_bool() == Some(true));

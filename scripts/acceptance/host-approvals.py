@@ -374,7 +374,7 @@ try:
    with urllib.request.urlopen(request,timeout=15) as response:
     result=json.loads(response.read());status=response.status
    save(a.output/(label+'-operator.json'),{'status':status,'response':result,'protectedDispatch':False})
-  admin('capability-revoked','/admin/revocations',{'capability_id':conf['execution']['capabilityId']})
+  admin('capability-revoked','/admin/revocations',{'target':{'kind':'capability_id','capability_id':conf['execution']['capabilityId']},'reason':'operator_request'})
   assert observe()==after
   code,before,after=run('revoked-capability','write_file',{**args,'content':'forbidden after capability revocation'})
   assert code!=0 and before==after
