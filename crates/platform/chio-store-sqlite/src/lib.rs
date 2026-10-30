@@ -93,6 +93,7 @@ pub mod fuzz;
 mod governed_approval_replay_store;
 mod integer;
 pub mod iou_store;
+pub mod issuance_request_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
@@ -521,6 +522,7 @@ pub use governed_approval_replay_store::{
     SqliteGovernedApprovalReplayStore, SqliteGovernedApprovalReplayStoreError,
 };
 pub use iou_store::SqliteIouEnvelopeStore;
+pub use issuance_request_store::{IssuanceRequestStoreOpenError, SqliteIssuanceRequestStore};
 pub use memory_provenance_store::{SqliteMemoryProvenanceStore, SqliteMemoryProvenanceStoreError};
 pub use receipt_store::{
     collect_retained_session_receipts_read_only, BackgroundCheckpointSigner,

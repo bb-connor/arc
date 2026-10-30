@@ -61,6 +61,7 @@ pub mod fiscal_state_anchor;
 pub mod fiscal_state_commit;
 pub mod fiscal_state_recovery;
 pub mod issuance;
+pub mod issuance_requests;
 mod keyring_runtime;
 pub mod passport_revocation;
 pub mod passport_revocation_feed;
