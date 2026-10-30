@@ -797,7 +797,7 @@ fn full_verifier_accepts_plain_pass_through_delegation_when_chain_binding_featur
     )
     .expect("register parent");
 
-    let verified = verify_capability_full_with_root(
+    let verified = verify_capability_full(
         &token,
         &[issuer_public],
         &clock,
