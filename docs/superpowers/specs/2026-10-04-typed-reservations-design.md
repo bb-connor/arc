@@ -847,7 +847,7 @@ Following the RFC-0002 precedent, each phase ships as the only behavior.
   - work-profile installers refuse without durable coverage and refuse `SideEffecting` with retention.
 - **Gate.** One violating fixture per section 5 rule, including a closure-nested discard and an `.inc` file; the allowlist passes; a stale entry fails.
 - **Mutation.** Per engineering standard rule 10.2: removing the binding check, minting after federation co-sign instead of at the commit point, or moving `record_released` before the receipt must each fail a named test.
-- **Unchanged:** reservation law (`tests/property_reservation_ledger.rs`, `kernel/ledger_audit.rs`).
+- **Unchanged:** reservation law (`tests/property_reservation_ledger.rs`).
 - **chio-conformance** `post_effect_receipt_fault`: a non-durable call (`ReadOnly` under `SideEffecting`, and a mutating tool under `Monetary`) whose append fails after dispatch yields a fault receipt or a latched deny on the next call, never a silent success.
 
 ## 10. Alternatives considered

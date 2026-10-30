@@ -1,4 +1,4 @@
-# FV-B3: One budget conservation law, four enforcement lanes
+# FV-B3: One budget conservation law, three enforcement lanes
 
 Status: Implemented (2026-07-10; local evidence complete, hosted verification pending)
 Theme: B - Aim the formal tools at the actual bug generator
@@ -9,7 +9,7 @@ Related docs: [../GAP_ANALYSIS.md](../GAP_ANALYSIS.md) (G3, G2), [FV-A3](FV-A3-c
 
 ## Summary
 
-Every drop-guard fix in the recent family is, at bottom, a violation of one law: an admitted reservation must end in exactly one terminal ledger state, and the amounts must balance. This document states that law once (reserved equals committed plus released plus retained, at all times, including across child splits whose sibling sums are bounded by the parent) and enforces it in four lanes that fail differently: (a) an Apalache invariant over interleavings, (b) a pure verified transition function (Kani + Creusot + Lean) over amounts, (c) a debug-assertions audit inside the real kernel, and (d) a stateful proptest driving the real store. One law with four independent witnesses is worth more than four unrelated properties, because a drift in any lane is detected by disagreement with the others.
+Every drop-guard fix in the recent family is, at bottom, a violation of one law: an admitted reservation must end in exactly one terminal ledger state, and the amounts must balance. This document states that law once (reserved equals committed plus released plus retained, at all times, including across child splits whose sibling sums are bounded by the parent) and enforces it in three lanes that fail differently: (a) an Apalache invariant over interleavings, (b) a pure verified transition function (Kani + Creusot + Lean) over amounts, and (d) a stateful proptest driving the real store. One law with three independent witnesses is worth more than four unrelated properties, because a drift in any lane is detected by disagreement with the others.
 
 ## Decisions (2026-07-10)
 
@@ -37,7 +37,7 @@ The real ledger is spread across three surfaces (all verified by reading this se
 - Kernel transition points: `cleanup_pre_dispatch_state` reverses or releases all kernel-owned pre-dispatch mutations; `retain_post_dispatch_state` preserves budget and payment exposure and signs their identifiers after dispatch; `release_runtime_admission_reservations` and `mark_runtime_admission_reservations_retained_fail_closed` operate only on the trusted `runtime_admission_metadata` captured from the hook; and the capability-budget reversal/release primitives live in `validation.rs`. Runtime-admission lease state itself lives behind the `RuntimeAdmissionHook` trait and is tracked via reserved and retained ids, not a kernel-owned table. Untrusted receipt metadata is merged only after the runtime disposition is derived and cannot supply reservation ids to the hook.
 - Existing tests: `tests/property_budget_store.rs` (referenced in `crates/kernel/chio-kernel/Cargo.toml` dev-dependency comments, lines 85-87) covers store arithmetic. The strengthened `kernel/tests/drop_guard_proptest.rs::drop_guard_disposition_table` now drives the production runtime-admission hook and real `PostAdmissionDropGuard` over all eight cells, then checks release counts, receipt metadata, the monetary journal, and final usage.
 
-Before this implementation, no artifact stated the four-way partition law and nothing checked it across an arbitrary operation sequence. The four enforcement surfaces below now share the same normative text from `budget_store.rs` while retaining explicit model and runtime boundaries.
+Before this implementation, no artifact stated the four-way partition law and nothing checked it across an arbitrary operation sequence. The three enforcement surfaces below now share the same normative text from `budget_store.rs` while retaining explicit model and runtime boundaries.
 
 ## Design
 
@@ -112,18 +112,9 @@ Witnesses:
 
 Implementation-linkage honesty clause: `ledger_apply` starts life uncalled by production. The completed scalar-admission absorption covers only cap admission and does not link reservation conservation or any ledger state transition. Until a separate ledger linkage lands, lanes (c) and (d) are the anti-drift binding between this model and the real store, and the `MAPPING.md` row must say "model-level; production ledger linkage not established" rather than implying refinement.
 
-### Lane (c): debug-assertions conservation audit in the real kernel
+### Lane (c): removed
 
-New module `crates/kernel/chio-kernel/src/kernel/ledger_audit.rs`, compiled under `#[cfg(debug_assertions)]` (zero release cost), exposing `debug_assert_reservation_conservation(kernel_or_store, capability_id, grant_index)`. It replays `list_mutation_events` (`budget_store.rs:484`) for the (capability, grant) pair and asserts (1) the fold of monetary `BudgetMutationKind` deltas reproduces the stored `total_cost_exposed` / `total_cost_realized_spend` (journal-state agreement), and (2) exposure never goes negative mid-fold (no release/reverse of value never reserved). Because that journal has no retain event, this function does not detect or prove retained monetary holds. `debug_assert_runtime_reservations_retained` separately checks runtime lease IDs and the retention marker in receipt metadata.
-
-Call sites (the exact transition groups, all verified this session):
-
-- End of `PostAdmissionDropGuard::drop`: clean pre-dispatch cleanup audits the reversed/released ledger; post-dispatch drop preserves exposure and signs retained identifiers.
-- Every returned error after polling `invoke_stream` or `invoke`, including URL elicitation, calls `retain_post_dispatch_state`; no error variant supplied by a tool server is classified as proof that effects did not occur.
-- After `reverse_pre_execution_budget_mutation` and `release_admitted_capability_budget` on kernel-owned pre-dispatch exits.
-- Known output finalization reconciles budget/payment state normally. Retained-marking finalize arms assert the metadata half of clause 2 without treating untrusted receipt metadata as runtime-admission metadata.
-
-Backends without a journal (`list_mutation_events` defaults to an `Invariant` error, `budget_store.rs:489-493`) make the audit a no-op with a debug log, never a panic on missing capability: the audit must not convert an unsupported backend into a crash (fail-closed applies to access decisions, not to diagnostics).
+The debug-assertions audit module `kernel/ledger_audit.rs` was never compiled and has been deleted. No in-kernel conservation audit exists; lanes (a), (b) and (d) are the enforcement artifacts.
 
 ### Lane (d): stateful proptest on the real store
 
@@ -132,7 +123,7 @@ New test `crates/kernel/chio-kernel/tests/property_reservation_ledger.rs` (sibli
 ## Implementation plan
 
 1. Phase 1 - law text and lane (d). Add the law statement as a doc comment in `budget_store.rs` (single normative location in code) and land `tests/property_reservation_ledger.rs`. No dependencies; catches real regressions immediately.
-2. Phase 2 - lane (c). Add `kernel/ledger_audit.rs` plus the call sites listed above; wire `mod ledger_audit;` in `kernel/mod.rs`. Debug-only; run the full kernel test suite to shake out latent violations before any other lane exists (this is where surprises will surface).
+2. Phase 2 - lane (c): removed (see Lane (c) above).
 3. Phase 3 - lane (b). Add `ledger_apply` to `formal_aeneas.rs`, the Kani harness to `kani_public_harnesses.rs`, the Creusot contract to `formal/rust-verification/creusot-core/`, and `Proofs/ReservationLedger.lean`. Registry rows per the manifest section below.
 4. Phase 4 - lane (a). Strengthen the FV-B1 spec's ledger to counted amounts and the every-state partition equation; add/adjust the FV-B2 negative variants that falsify it.
 5. Phase 5 - optional fuzz promotion via the FV-E4 checklist.
@@ -140,23 +131,20 @@ New test `crates/kernel/chio-kernel/tests/property_reservation_ledger.rs` (sibli
 ## CI and gating changes
 
 - Lane (b) rides existing lanes automatically: the Kani harness joins the `kani-public-pr` sweep via a `[[harness]]` row in `.kani/harnesses.toml` (`lane = "pr"`, `default_unwind` sized to the op-sequence length); the Creusot contract joins the strict lanes via `creusot-contracts.toml`; no workflow edits (the manifest-driven design was built for this, `.kani/harnesses.toml` header lines 24-28).
-- Lane (c) rides every `cargo test` (debug builds) and therefore the standard PR gate; no new job.
 - Lane (d) joins the proptest tiers: default cases on PR, then `PROPTEST_CASES=10000 cargo test -p chio-kernel --test property_reservation_ledger` in the existing `proptest-nightly` job in `.github/workflows/nightly.yml`; shrunk regressions are committed under `proptest-regressions/` per the counterexample template flow [v].
 - Lane (a) rides `apalache-safety.yml` via FV-B1's matrix row; no additional job.
 
 ## Acceptance criteria
 
-- [x] The law is stated verbatim (clauses 1-3) in exactly four enforcement artifacts: `PostAdmissionDropGuard.tla`, `formal_aeneas.rs::ledger_apply` (+ Kani + Creusot + Lean witnesses), `kernel/ledger_audit.rs`, `tests/property_reservation_ledger.rs`, each cross-referencing the others by path.
-- [x] `formal/MAPPING.md` has a mapped row or theorem cross-reference for every artifact, and each entry names the other lanes (the four-lane join is greppable).
+- [x] The law is stated verbatim (clauses 1-3) in exactly three enforcement artifacts: `PostAdmissionDropGuard.tla`, `formal_aeneas.rs::ledger_apply` (+ Kani + Creusot + Lean witnesses), `tests/property_reservation_ledger.rs`, each cross-referencing the others by path.
+- [x] `formal/MAPPING.md` has a mapped row or theorem cross-reference for every artifact, and each entry names the other lanes (the three-lane join is greppable).
 - [x] Kani harness green in the manifest sweep; Creusot contract green in the strict lane; the root-imported Lean module builds without `sorry` and its theorems are registered `proved`.
-- [x] Lane (c) call sites cover all transition-point groups listed above; the documented `omitted_release_is_detected_by_terminal_history_replay` dry run proves the store oracle rejects missing cleanup for a known pre-dispatch disposition. Outcome-unknown post-dispatch retention is instead checked by unchanged exposure plus signed retained identifiers.
 - [x] Lane (d) survives 10k mixed-sequence cases locally and the nightly case count is wired in CI.
 - [x] The implementation-linkage caveat ("scalar admission linked; production ledger linkage not established") appears in the `MAPPING.md` rows and proof-manifest note; no doc claims ledger refinement.
 
 ## Risks and mitigations
 
 - Lane semantics drift apart (the Apalache ledger, the pure ledger, and the store journal disagree on what "released" means). Mitigation: the law text is written once in `budget_store.rs` with the `BudgetMutationKind` mapping table, and every other artifact quotes it by path; [FV-A4](FV-A4-mirror-drift-hashes.md) hashes can pin the quartet later.
-- Lane (c) audit cost distorts debug-profile test time (journal replay per transition). Mitigation: replay is per (capability, grant) and journals are short in tests; add an env kill-switch (`CHIO_LEDGER_AUDIT=0`) if suite time regresses measurably.
 - The real store legitimately violates naive conservation (HA overrun bound: split-brain nodes may jointly over-approve up to `max_cost_per_invocation x node_count`, documented at `budget_store.rs:280-285`). Mitigation: the law is scoped to `SingleNodeAtomic` guarantee level in all four lanes; the HA relaxation is exactly the [FV-D3](FV-D3-economy-conservation.md) problem and is out of scope here, stated explicitly in the law text.
 - Retained lease state and the retained projection of a monetary hold live in receipt metadata, while concrete monetary exposure remains queryable as outstanding store state. Mitigation: keep trusted `runtime_admission_metadata` separate from untrusted receipt metadata, assert the joined state in lane (c) and `drop_guard_disposition_table`, and require the signed receipt to carry locatable hold, payment, and reservation ids. Lane (d) is deliberately store-only and does not claim this cross-surface property.
 
@@ -172,5 +160,5 @@ New test `crates/kernel/chio-kernel/tests/property_reservation_ledger.rs` (sibli
 - `.kani/harnesses.toml`: one `[[harness]]` entry (`crate = "chio-kernel-core"`, `harness = "verify_reservation_ledger_conservation"`, `lane = "pr"`, `default_unwind = 8`, `timeout_secs = 1800`, notes citing this doc).
 - `formal/rust-verification/creusot-contracts.toml`: append `formal/rust-verification/creusot-core::ledger_apply_conservation_contract` to `covered_symbols` and map it to `formal_aeneas::ledger_apply` in `contract_twin`.
 - `formal/theorem-inventory.json`: new entries `theorem.budget.reservation_conservation` and `theorem.budget.reservation_terminal_unique` (`kind = "theorem"`, `status = "proved"`, `mapsTo = ["P1"]`, notes citing the four enforcement surfaces and the fix-commit family), mirroring the `theorem.budget.sibling_sum_soundness` entry shape.
-- `formal/proof-manifest.toml`: add `formal/lean4/Chio/Chio/Proofs/ReservationLedger.lean` to `root_modules`; append a `notes` line stating the conservation law, its four lanes, and the implementation-linkage caveat that scalar admission is linked while ledger transitions are not. No `property_matrix` change (P1-P10 are fixed; the law slots under P1's budget clause via `mapsTo`).
+- `formal/proof-manifest.toml`: add `formal/lean4/Chio/Chio/Proofs/ReservationLedger.lean` to `root_modules`; append a `notes` line stating the conservation law, its three lanes, and the implementation-linkage caveat that scalar admission is linked while ledger transitions are not. No `property_matrix` change (P1-P10 are fixed; the law slots under P1's budget clause via `mapsTo`).
 - `formal/assumptions.toml`: no change (the law is structural plus ASSUME-SQLITE-ATOMICITY already covering per-row store writes).

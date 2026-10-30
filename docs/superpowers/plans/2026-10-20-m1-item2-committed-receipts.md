@@ -1753,7 +1753,7 @@ Test `intent_hash_has_no_public_alias`: two intents equal except `purpose` (and,
 | `operation_owned_replay.reference` | operation id derived over a request that includes the signed capability (`identity.rs:657-686`) | `nonce_evidence.rs:30`, `custody.rs:31`, `call_evidence.rs:276,507` (plaintext) | **Plaintext** | entropy-backed through the capability signature |
 | `verified_swarm_request_binding.capability_sha256` | SHA-256 of the signed capability | `verify_calls.rs:70`, `outcomes.rs:322` (plaintext) | **Plaintext** | entropy-backed |
 | `failure_code` | static code | tests only | **Commitment** | no production reader |
-| `reservation_retained`, `reservations_retained_fail_closed`, `pre_dispatch_cleanup_failed`, `reservation_release_failed`, `dispatch_credential_retention_outcome_unknown` | bools | `ledger_audit.rs:356` (debug assertion) | **Commitment** | no production plaintext reader |
+| `reservation_retained`, `reservations_retained_fail_closed`, `pre_dispatch_cleanup_failed`, `reservation_release_failed`, `dispatch_credential_retention_outcome_unknown` | bools | none (the debug assertion was removed) | **Commitment** | no production plaintext reader |
 | `payment_credential_disposition`, `dispatch_credential_disposition`, `pre_dispatch_cleanup_reason`, `evaluation_started_at` | enums, constant, time | none | **Commitment** | no reader |
 | `admission_id` | caller intent context (`admission_hook/request.rs:27-50`) or the bundle writer | `admission_hook.rs:153-157` | **Commitment** | caller value |
 | `workflow_id`, `workflow_grant_id`, `step_index`, `destructive`, `lease_id`, `governance_receipt_id` | provisioned bundle (`requests.rs:78-94`) | none | **Commitment** | low-entropy, no reader |
