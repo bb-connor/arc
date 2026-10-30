@@ -2,17 +2,17 @@
 set -euo pipefail
 
 ROOT="${CHIO_LIABILITY_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-LIB="${CHIO_LIABILITY_LIB:-${ROOT}/crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs}"
+LIB="${CHIO_LIABILITY_LIB:-${ROOT}/crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability/claims.rs}"
 
 # 1) Every construction of these artifacts anywhere under crates/ must live in
-#    liability.rs (the known choke-point file). Any other site is a violation.
+#    liability/claims.rs (the known choke-point file). Any other site is a violation.
 violations=0
 found_total=0
 while IFS= read -r hit; do
   found_total=$((found_total + 1))
   file="${hit%%:*}"
   if [[ "${file}" != "${LIB}" ]]; then
-    echo "VIOLATION: liability value-path artifact constructed outside liability.rs: ${hit}"
+    echo "VIOLATION: liability value-path artifact constructed outside liability/claims.rs: ${hit}"
     violations=$((violations + 1))
   fi
 done < <(grep -rn --include='*.rs' -F \
@@ -32,11 +32,11 @@ if [[ "${found_total}" -eq 0 ]]; then
   exit 1
 fi
 
-# 3) liability.rs must call validate_against_roster at least three times
+# 3) liability/claims.rs must call validate_against_roster at least three times
 #    (one per value-path choke point).
 roster_calls="$(grep -c "validate_against_roster" "${LIB}" || true)"
 if [[ "${roster_calls}" -lt 3 ]]; then
-  echo "VIOLATION: expected >=3 validate_against_roster calls in liability.rs, found ${roster_calls}"
+  echo "VIOLATION: expected >=3 validate_against_roster calls in liability/claims.rs, found ${roster_calls}"
   violations=$((violations + 1))
 fi
 

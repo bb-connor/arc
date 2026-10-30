@@ -52,3 +52,21 @@ fn build_liability_provider_artifact(
         report,
     })
 }
+
+pub fn list_liability_providers(
+    receipt_store: &SqliteReceiptStore,
+    query: &LiabilityProviderListQuery,
+) -> Result<LiabilityProviderListReport, CliError> {
+    receipt_store
+        .query_liability_providers(query)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}
+
+pub fn resolve_liability_provider(
+    receipt_store: &SqliteReceiptStore,
+    query: &LiabilityProviderResolutionQuery,
+) -> Result<LiabilityProviderResolutionReport, CliError> {
+    receipt_store
+        .resolve_liability_provider(query)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))
+}

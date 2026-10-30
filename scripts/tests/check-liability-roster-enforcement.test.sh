@@ -18,7 +18,7 @@ fi
 work="$(mktemp -d -t chio-liability-roster-enforcement-test-XXXXXX)"
 trap 'rm -rf "${work}"' EXIT
 
-CHOKE_POINT_REL="crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability.rs"
+CHOKE_POINT_REL="crates/platform/chio-control-plane/src/trust_control/capital_and_liability/liability/claims.rs"
 
 make_choke_point() {
   local root="$1"
@@ -87,7 +87,7 @@ if [[ ${violation_status} -eq 0 ]]; then
   echo "FAIL: violation case should fail" >&2
   exit 1
 fi
-if ! printf '%s' "${violation_out}" | grep -qF "VIOLATION: liability value-path artifact constructed outside liability.rs"; then
+if ! printf '%s' "${violation_out}" | grep -qF "VIOLATION: liability value-path artifact constructed outside liability/claims.rs"; then
   echo "FAIL: violation should emit VIOLATION message" >&2
   echo "  got: ${violation_out}" >&2
   exit 1
@@ -113,7 +113,7 @@ if [[ ${roster_status} -eq 0 ]]; then
   echo "FAIL: missing-roster-calls case should fail" >&2
   exit 1
 fi
-if ! printf '%s' "${roster_out}" | grep -qF "validate_against_roster calls in liability.rs"; then
+if ! printf '%s' "${roster_out}" | grep -qF "validate_against_roster calls in liability/claims.rs"; then
   echo "FAIL: missing-roster-calls should emit roster violation message" >&2
   echo "  got: ${roster_out}" >&2
   exit 1
