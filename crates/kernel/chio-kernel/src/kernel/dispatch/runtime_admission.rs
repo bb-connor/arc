@@ -5,7 +5,7 @@ use crate::admission_operation::runtime_participant::RuntimeParticipantAuthority
 
 impl ChioKernel {
     /// Read trusted configuration without granting custody. A failed selector
-    /// must not become an absent selection and enable a legacy fallback.
+    /// must not become an absent selection and silently select the evaluate-only path.
     pub(crate) fn configured_runtime_participant_binding(
         &self,
     ) -> Result<Option<&RuntimeParticipantAuthorityBindingV1>, KernelError> {

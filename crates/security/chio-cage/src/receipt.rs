@@ -1,3 +1,9 @@
+mod projection;
+
+pub use projection::{
+    CageBindingsProjection, CageEnforcementProjection, CageExitProjection, CageReceiptProjection,
+};
+
 use serde::{Deserialize, Serialize};
 
 use chio_core::crypto::{PublicKey, SigningBackend};
@@ -588,4 +594,6 @@ pub enum CageReceiptError {
     Chio(#[from] chio_core::error::Error),
     #[error("cage receipt metadata failed: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("cage receipt metadata commitment failed: {0}")]
+    MetadataCommitment(#[from] chio_core::receipt::metadata::MetadataCommitmentError),
 }

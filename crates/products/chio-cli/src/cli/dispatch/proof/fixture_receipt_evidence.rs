@@ -29,8 +29,11 @@ pub(super) fn generate_minimal_receipt_evidence(
         "capability_id",
         "guard_decision_id",
     ] {
-        let value = source.get(field).and_then(serde_json::Value::as_str)
-            .filter(|value| !value.is_empty()).ok_or_else(|| {
+        let value = source
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
                 CliError::cli_other_error(format!("fixture receipt evidence missing {field}"))
             })?;
         receipt[field] = serde_json::Value::String(value.to_string());
@@ -67,10 +70,16 @@ pub(super) fn write_terminal_receipt_evidence(
     write_json_line_file(destination, &receipt)
 }
 
-fn sign_receipt_evidence(receipt: &mut serde_json::Value, keypair: &Keypair) -> Result<(), CliError> {
-    let signature = fixture_wrapped_signature(keypair, RECEIPT_EVIDENCE_SCHEMA, receipt).map_err(|error| {
-        CliError::cli_other_error(format!("proof fixture receipt evidence signing failed: {error}"))
-    })?;
+fn sign_receipt_evidence(
+    receipt: &mut serde_json::Value,
+    keypair: &Keypair,
+) -> Result<(), CliError> {
+    let signature =
+        fixture_wrapped_signature(keypair, RECEIPT_EVIDENCE_SCHEMA, receipt).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "proof fixture receipt evidence signing failed: {error}"
+            ))
+        })?;
     receipt["signature"] = serde_json::Value::String(signature.to_hex());
     Ok(())
 }

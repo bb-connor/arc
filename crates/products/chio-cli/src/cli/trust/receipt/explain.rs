@@ -1055,14 +1055,19 @@ mod receipt_explain_tests {
     }
 
     #[test]
-    fn receipt_explain_labels_mediated_allow_without_mediated_trust_allowed(
-    ) -> Result<(), CliError> {
+    fn receipt_explain_labels_mediated_allow_without_mediated_trust_allowed() -> Result<(), CliError>
+    {
         let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
         for trust_level in ["verified", "advisory"] {
             let mut value = serde_json::to_value(&receipt)?;
             value["trust_level"] = serde_json::json!(trust_level);
-            let explain =
-                explain_receipt_value(&receipt.id, value, 1, 1, std::slice::from_ref(&receipt.kernel_key))?;
+            let explain = explain_receipt_value(
+                &receipt.id,
+                value,
+                1,
+                1,
+                std::slice::from_ref(&receipt.kernel_key),
+            )?;
 
             assert_eq!(explain["result"].as_str(), Some("Allowed"));
             assert_eq!(explain["authorized"].as_bool(), Some(false));
@@ -1074,7 +1079,8 @@ mod receipt_explain_tests {
     #[test]
     fn receipt_explain_without_trusted_key_is_integrity_only() -> Result<(), CliError> {
         let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
-        let explain = explain_receipt_value(&receipt.id, serde_json::to_value(&receipt)?, 1, 1, &[])?;
+        let explain =
+            explain_receipt_value(&receipt.id, serde_json::to_value(&receipt)?, 1, 1, &[])?;
 
         assert_eq!(explain["signature_ok"].as_bool(), Some(true));
         assert_eq!(explain["scope"].as_str(), Some("integrity_only"));

@@ -573,6 +573,7 @@ impl SqliteReceiptStore {
                     chio_security_types::schema::SchemaRefusal::CreationNotAllowed,
                 ));
             }
+            super::super::openings::validate_receipt_store_identity(&snapshot)?;
             validate_receipt_catalog(&snapshot, namespaces.len() == 2)?;
             crate::capability_lineage::reject_unsigned_projection_lineage(&snapshot, "main")?;
             verify_receipt_cost_projection(&snapshot)?;
@@ -628,10 +629,15 @@ impl SqliteReceiptStore {
             begin_receipt_creation(&mut connection, namespaces, options.pool.max_page_count)?;
         if schema.is_fresh() {
             create_receipt_schema(schema.connection())?;
+            super::super::openings::seed_receipt_store_identity(
+                schema.connection(),
+                &chio_kernel::rng::OsEntropyRng,
+            )?;
             schema
                 .stamp(RECEIPT_STORE_SCHEMA_KEY)
                 .map_err(ReceiptStoreError::from)?;
         }
+        super::super::openings::validate_receipt_store_identity(schema.connection())?;
         validate_receipt_catalog(schema.connection(), namespaces.len() == 2)?;
         super::support::validate_claim_receipt_log_entries_in_transaction(schema.connection())?;
         super::support::validate_checkpoint_transparency_projections(schema.connection())?;
@@ -863,8 +869,13 @@ pub(crate) fn initialize_test_receipt_database(
         .map_err(ReceiptStoreError::from)?;
     if schema.is_fresh() {
         create_receipt_schema(schema.connection())?;
+        super::super::openings::seed_receipt_store_identity(
+            schema.connection(),
+            &chio_kernel::rng::OsEntropyRng,
+        )?;
         schema.stamp("receipt").map_err(ReceiptStoreError::from)?;
     }
+    super::super::openings::validate_receipt_store_identity(schema.connection())?;
     validate_receipt_catalog(schema.connection(), false)?;
     schema.commit().map_err(ReceiptStoreError::from)
 }
@@ -902,6 +913,10 @@ pub fn initialize_receipt_approval_database(
     let schema = begin_receipt_creation(&mut connection, RECEIPT_APPROVAL_NAMESPACES, None)?;
     if schema.is_fresh() {
         create_receipt_schema(schema.connection())?;
+        super::super::openings::seed_receipt_store_identity(
+            schema.connection(),
+            &chio_kernel::rng::OsEntropyRng,
+        )?;
         schema
             .connection()
             .execute_batch(crate::approval_store::APPROVAL_SCHEMA)?;
@@ -909,6 +924,7 @@ pub fn initialize_receipt_approval_database(
             schema.stamp(namespace).map_err(ReceiptStoreError::from)?;
         }
     }
+    super::super::openings::validate_receipt_store_identity(schema.connection())?;
     validate_receipt_catalog(schema.connection(), true)?;
     load_receipt_sink_identity(schema.connection())?;
     load_receipt_rollback_generation(schema.connection())?;
@@ -917,6 +933,7 @@ pub fn initialize_receipt_approval_database(
 }
 
 fn create_receipt_schema(transaction: &rusqlite::Transaction<'_>) -> Result<(), ReceiptStoreError> {
+    transaction.execute_batch(super::super::openings::RECEIPT_OPENINGS_SCHEMA)?;
     transaction.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS chio_tool_receipts (

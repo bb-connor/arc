@@ -3154,6 +3154,14 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         ReceiptStoreError::NotFound(message) => ReceiptStoreError::NotFound(message.clone()),
         ReceiptStoreError::Unsupported(message) => ReceiptStoreError::Unsupported(message.clone()),
         ReceiptStoreError::Fenced => ReceiptStoreError::Fenced,
+        ReceiptStoreError::StoreIdMissing => ReceiptStoreError::StoreIdMissing,
+        ReceiptStoreError::StoreIdChanged => ReceiptStoreError::StoreIdChanged,
+        ReceiptStoreError::CorruptOpeningRow(message) => {
+            ReceiptStoreError::CorruptOpeningRow(message.clone())
+        }
+        ReceiptStoreError::ReceiptNotPublished(receipt_id) => {
+            ReceiptStoreError::ReceiptNotPublished(receipt_id.clone())
+        }
         ReceiptStoreError::OutcomeUnknown(message) => {
             ReceiptStoreError::OutcomeUnknown(message.clone())
         }
@@ -3239,6 +3247,8 @@ pub use bootstrap::initialize_receipt_approval_database;
 pub(crate) use bootstrap::initialize_test_receipt_database;
 pub(crate) use bootstrap::{validate_receipt_catalog, validate_receipt_database};
 mod chaos_test_hooks;
+#[path = "receipt_store/openings.rs"]
+pub(crate) mod openings;
 #[path = "receipt_store/query_snapshot_access.rs"]
 mod query_snapshot_access;
 #[path = "receipt_store/retained_read.rs"]

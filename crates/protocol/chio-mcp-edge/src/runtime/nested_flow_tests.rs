@@ -50,6 +50,34 @@ struct ReplenishedReceiptStore {
     replenished: Mutex<mpsc::Receiver<()>>,
 }
 impl ReceiptStore for ReplenishedReceiptStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Ok(chio_kernel::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         let bytes = canonical_json_bytes(receipt)
             .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;

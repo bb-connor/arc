@@ -126,7 +126,7 @@ impl RuntimeAdmissionHook for ClaimingVerifier {
         &self,
         _: &RuntimeAdmissionContext<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
-        panic!("legacy evaluation is outside this test profile");
+        panic!("evaluate-only admission is outside this test profile");
     }
 
     fn evaluate_operation_owned(

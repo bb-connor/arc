@@ -57,6 +57,9 @@ pub use receipt::{
     CageReceiptError, CageReceiptPersistenceError, CageReceiptSigningContext, CageReceiptStage,
     PreparedCageReceipt, CAGE_RECEIPT_BODY_SCHEMA, CAGE_RECEIPT_METADATA_SCHEMA,
 };
+pub use receipt::{
+    CageBindingsProjection, CageEnforcementProjection, CageExitProjection, CageReceiptProjection,
+};
 use serde::{Deserialize, Serialize};
 
 /// Cage compiler schema emitted by this crate.

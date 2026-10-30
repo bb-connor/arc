@@ -3337,9 +3337,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs"
 rust_symbols = ["GLOBAL_COMMIT_SCHEMA", "budget_event_reference_digest", "initialize_global_commit_schema", "verify_global_commit_schema", "global_schema_catalog"]
-normalized_sha256 = "35911450a38e9c39e5e1a2ead90f2b5e60e8aa9e4812ccbee4af77547ea064b8"
+normalized_sha256 = "175e3fcc90db41fcfbe2eb5b52d0740282446bd72bc41530b49772566c96d738"
 symbol_sha256 = [
-  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "3812b4b71e57cb230aa953dcba15cee9bf2a34dc905965e069badd421f3338be" },
+  { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "081b4179d9f852b5753073388e7565dc509490e174295c262a7ca407a0b62078" },
   { symbol = "budget_event_reference_digest", sha256 = "4b3a4210201b80e3b8f384bc041d173aa01edf63d81cc1ccfb229a8ea1340ee0" },
   { symbol = "initialize_global_commit_schema", sha256 = "5e0cce2bf396594842d64bfb8ee1a779da770437d6101608a78938ac11a69009" },
   { symbol = "verify_global_commit_schema", sha256 = "dd784cb75e3694132fad9a212c16e1cfbc80b7ec066d66987d359177eb04c693" },
@@ -3352,9 +3352,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs"
 rust_symbols = ["projection_reference_digest"]
-normalized_sha256 = "dc57f86d9e1d251a1b903c1752165aed5ae4ffd3b0929a4c162e914b95b09e9c"
+normalized_sha256 = "cdf924d650c91817b1200b8fdbabc82a2d3640efa9667e152240265195dc3613"
 symbol_sha256 = [
-  { symbol = "projection_reference_digest", sha256 = "e5e94baca0128b8ebe2f148db69c811734f2379a3d375ebea16f36ed50534e2e" },
+  { symbol = "projection_reference_digest", sha256 = "1d2ae4fa6ca33c38b0cfc30835002d88a7e29be0ad9f31417f5389d7ece76311" },
 ]
 
 # Native capture entries track source drift only. The lifecycle model does not

@@ -21,7 +21,7 @@ globalThis.fetch=async function(input,init){
   calls++;
   if(calls===2){
    const route=kind==='capability'?'/admin/revocations':`/admin/sessions/${config.execution.sessionId}/credential/revoke`;
-   const body=kind==='capability'?{capability_id:config.execution.capabilityId}:{};
+   const body=kind==='capability'?{target:{kind:'capability_id',capability_id:config.execution.capabilityId},reason:'operator_request'}:{};
    const response=await original(endpoint+route,{method:'POST',headers:{Authorization:`Bearer ${operator.adminToken}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(10000),redirect:'error'});
    if(!response.ok)throw new Error('Explicit test revocation failed');
    await response.json();

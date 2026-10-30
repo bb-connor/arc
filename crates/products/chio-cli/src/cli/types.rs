@@ -512,11 +512,17 @@ mod cli_env_tests {
 
     fn trust_serve_snapshot_quota(args: &[&str]) -> Result<u64, String> {
         use clap::CommandFactory;
-        let argv: Vec<String> = ["chio", "trust", "serve", "--access-config", "/etc/chio/trust-access.toml"]
-            .into_iter()
-            .chain(args.iter().copied())
-            .map(str::to_owned)
-            .collect();
+        let argv: Vec<String> = [
+            "chio",
+            "trust",
+            "serve",
+            "--access-config",
+            "/etc/chio/trust-access.toml",
+        ]
+        .into_iter()
+        .chain(args.iter().copied())
+        .map(str::to_owned)
+        .collect();
         std::thread::Builder::new()
             .stack_size(8 * 1024 * 1024)
             .spawn(move || {

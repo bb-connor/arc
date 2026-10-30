@@ -8,7 +8,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 #[derive(Default)]
 struct Calls {
     selection: AtomicU64,
-    legacy: AtomicU64,
+    evaluate_only: AtomicU64,
     diagnostics: AtomicU64,
 }
 
@@ -33,13 +33,13 @@ impl RuntimeAdmissionHook for SelectionProbe {
         &self,
         _: &RuntimeAdmissionContext<'_>,
     ) -> Result<RuntimeAdmissionDecision, KernelError> {
-        self.calls.legacy.fetch_add(1, Ordering::SeqCst);
-        panic!("failed authority selection must not enter legacy evaluation");
+        self.calls.evaluate_only.fetch_add(1, Ordering::SeqCst);
+        panic!("failed authority selection must not enter evaluate-only admission");
     }
 
     fn release_reserved(&self, _: &serde_json::Value) -> Result<(), KernelError> {
-        self.calls.legacy.fetch_add(1, Ordering::SeqCst);
-        panic!("retained operation custody must not enter legacy release");
+        self.calls.evaluate_only.fetch_add(1, Ordering::SeqCst);
+        panic!("retained operation custody must not enter evaluate-only release_reserved");
     }
 }
 
@@ -70,13 +70,13 @@ fn runtime_selection_panic_is_denied_before_original_admission() {
     assert!(result.expect("contained callback").is_err());
     assert!(store.state.lock().expect("fixture").operation.is_none());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
-    assert_eq!(calls.legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.evaluate_only.load(Ordering::SeqCst), 0);
     assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
 
 #[test]
-fn runtime_selection_panic_cannot_fall_back_to_legacy_evaluation() {
+fn runtime_selection_panic_cannot_fall_back_to_evaluate_only_admission() {
     let (mut kernel, request, store, invocations) =
         durable_admission_fixture("runtime-selection-evaluate");
     let calls = Arc::new(Calls::default());
@@ -95,7 +95,7 @@ fn runtime_selection_panic_cannot_fall_back_to_legacy_evaluation() {
     assert!(!result.expect("contained callback").allowed);
     assert!(store.state.lock().expect("fixture").operation.is_none());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
-    assert_eq!(calls.legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.evaluate_only.load(Ordering::SeqCst), 0);
     assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
@@ -120,7 +120,11 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
             .expect("contained release")
             .expect("release retained owner");
         assert_eq!(calls.selection.load(Ordering::SeqCst), 0, "hook {hook:?}");
-        assert_eq!(calls.legacy.load(Ordering::SeqCst), 0, "hook {hook:?}");
+        assert_eq!(
+            calls.evaluate_only.load(Ordering::SeqCst),
+            0,
+            "hook {hook:?}"
+        );
         assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0, "hook {hook:?}");
         let state = store.runtime_recovery.0.lock().expect("fixture");
         assert_eq!(state.release_calls, 1, "hook {hook:?}");
@@ -146,7 +150,11 @@ fn retained_runtime_release_does_not_depend_on_current_hook_selection() {
             "retry must not release twice for hook {hook:?}",
         );
         assert_eq!(calls.selection.load(Ordering::SeqCst), 0, "hook {hook:?}");
-        assert_eq!(calls.legacy.load(Ordering::SeqCst), 0, "hook {hook:?}");
+        assert_eq!(
+            calls.evaluate_only.load(Ordering::SeqCst),
+            0,
+            "hook {hook:?}"
+        );
         assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0, "hook {hook:?}");
     }
 }
@@ -168,7 +176,7 @@ fn absent_runtime_ledger_does_not_turn_selection_failure_into_successful_release
     );
     assert!(result.expect("contained callback").is_err());
     assert_eq!(calls.selection.load(Ordering::SeqCst), 1);
-    assert_eq!(calls.legacy.load(Ordering::SeqCst), 0);
+    assert_eq!(calls.evaluate_only.load(Ordering::SeqCst), 0);
     assert_eq!(calls.diagnostics.load(Ordering::SeqCst), 0);
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }

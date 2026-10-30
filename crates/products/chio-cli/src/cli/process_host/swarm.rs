@@ -261,7 +261,10 @@ pub(super) fn provision(
         routes,
     };
     let signature = issuer
-        .sign_wrapped(SCHEMA, &chio_core::canonical::CanonicalBytes::from_serializable(&body).map_err(error)?)
+        .sign_wrapped(
+            SCHEMA,
+            &chio_core::canonical::CanonicalBytes::from_serializable(&body).map_err(error)?,
+        )
         .map_err(error)?;
     let (bundle_name, bundle_bytes) =
         if let [bundle] = bundles.as_slice() {

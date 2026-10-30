@@ -176,8 +176,10 @@ fn rejects_the_retired_manifest_id_even_when_signed() {
     let signature = signer
         .sign_wrapped(
             TOOL_MANIFEST_SCHEMA,
-            &chio_core::canonical::CanonicalBytes::from_serializable(&input.manifests[0].signed_envelope.manifest)
-                .test_expect("canonical manifest"),
+            &chio_core::canonical::CanonicalBytes::from_serializable(
+                &input.manifests[0].signed_envelope.manifest,
+            )
+            .test_expect("canonical manifest"),
         )
         .test_expect("re-sign retired-id manifest");
     input.manifests[0].signed_envelope.signature = signature;

@@ -145,8 +145,7 @@ pub(crate) fn cmd_run(
     let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -408,8 +407,7 @@ pub(crate) fn build_mcp_edge_kernel(
 ) -> Result<ChioKernel, CliError> {
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let mut kernel = build_kernel(loaded_policy, kernel_kp);
     configure_receipt_store(
         &mut kernel,
@@ -764,8 +762,7 @@ pub(crate) fn cmd_check(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -1569,7 +1566,9 @@ pub(crate) fn parse_capital_authority_keys(
         .iter()
         .map(|key| {
             chio_core::crypto::PublicKey::from_hex(key).map_err(|error| {
-                CliError::cli_other_error(format!("invalid --capital-authority-key `{key}`: {error}"))
+                CliError::cli_other_error(format!(
+                    "invalid --capital-authority-key `{key}`: {error}"
+                ))
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -1717,8 +1716,11 @@ pub(crate) fn cmd_trust_revoke(
     let (newly_revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         let response = trust_control::service_runtime::client::build_client(url, token)?
-            .revoke_capability(capability_id)?;
-        (response.newly_revoked, url.to_string())
+            .revoke_capability(
+                capability_id,
+                chio_core_types::root_authority::RevocationReason::OperatorRequest,
+            )?;
+        (response.roots_revoked > 0, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
         let store = chio_store_sqlite::SqliteRevocationStore::open(path)?;
@@ -1755,16 +1757,9 @@ pub(crate) fn cmd_trust_status(
 ) -> Result<(), CliError> {
     let (revoked, backend_label) = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
-        let response = trust_control::service_runtime::client::build_client(url, token)?
-            .list_revocations(&trust_control::RevocationQuery {
-                capability_id: Some(capability_id.to_string()),
-                limit: Some(1),
-            })?;
-        let revoked = response.revoked.ok_or_else(|| {
-            CliError::cli_other_error(format!(
-                "trust-control revocation response omitted revoked status for {capability_id}"
-            ))
-        })?;
+        let revoked = trust_control::service_runtime::client::build_client(url, token)?
+            .revocation_status(capability_id)?
+            .revoked;
         (revoked, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;

@@ -166,9 +166,7 @@ fn validate_standalone_risk_approval_case(
         ));
     }
     if approval.decision != "approved" || approval.decision_subject != "evidence-export" {
-        return Err(claim_rejected(
-            "proof verify: risk approval case denied",
-        ));
+        return Err(claim_rejected("proof verify: risk approval case denied"));
     }
     let passport_issued_at =
         parse_risk_timestamp(&passport.issued_at, "risk transaction passport issued_at")?;
@@ -390,10 +388,11 @@ fn load_risk_comptroller_report_from_graph(
 mod tests {
     #[test]
     fn risk_timestamp_rejection_is_a_schema_rejection() {
-        let error = match super::parse_risk_timestamp("digest mismatch", "risk approval case issued_at") {
-            Ok(_) => panic!("expected a rejected timestamp"),
-            Err(error) => error,
-        };
+        let error =
+            match super::parse_risk_timestamp("digest mismatch", "risk approval case issued_at") {
+                Ok(_) => panic!("expected a rejected timestamp"),
+                Err(error) => error,
+            };
         assert_eq!(
             error.report().code,
             chio_errors::_generated::error_codes::TRANSACTION_ARTIFACT_SCHEMA_INVALID.urn

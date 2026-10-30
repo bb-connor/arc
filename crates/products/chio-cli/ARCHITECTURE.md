@@ -20,7 +20,7 @@ command and its flags determine those effects.
 
 | Source | Role |
 |---|---|
-| `src/bin/chio.rs`, `src/main.rs` | Include-based entrypoint, shared imports/re-exports, explicit module mounts, and `main`. |
+| `src/main.rs` | Binary root: shared imports/re-exports, explicit module mounts, and `main`. |
 | `src/cli/types.rs`, `src/cli/types/*.rs` | Clap arguments, global state paths, command enum, and nested command families. |
 | `src/cli/chio/types.rs`, `src/cli/chio/types/` | Federation, runtime, authority, treaty, and pheromone argument trees. |
 | `src/cli/dispatch/mod.rs`, `src/cli/dispatch/*.rs` | Central dispatch, tracing initialization, family routing, error rendering. |

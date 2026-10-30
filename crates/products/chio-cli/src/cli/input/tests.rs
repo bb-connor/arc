@@ -267,7 +267,9 @@ fn signing_custody_is_existing_private_bounded_and_not_aliased() {
     std::fs::remove_file(&alias).unwrap();
     std::os::unix::fs::symlink(&path, &alias).unwrap();
     assert_io_message(
-        crate::load_existing_authority_keypair(&alias).err().unwrap(),
+        crate::load_existing_authority_keypair(&alias)
+            .err()
+            .unwrap(),
         "authority seed must be a regular file",
     );
 }

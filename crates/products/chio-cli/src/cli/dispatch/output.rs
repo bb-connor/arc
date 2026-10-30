@@ -83,7 +83,13 @@ mod dispatch_output_tests {
         let rendered = String::from_utf8(output)
             .unwrap_or_else(|utf8_error| panic!("rendered output is UTF-8: {utf8_error}"));
         assert!(rendered.contains("bad\\n\\u{1b}[2Jforged"));
-        assert_eq!(rendered.chars().filter(|character| *character == '\n').count(), 3);
+        assert_eq!(
+            rendered
+                .chars()
+                .filter(|character| *character == '\n')
+                .count(),
+            3
+        );
         assert!(!rendered.contains('\u{1b}'));
     }
 }

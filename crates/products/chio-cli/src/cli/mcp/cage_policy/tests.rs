@@ -219,29 +219,25 @@ fn cage_policy_requires_canonical_deny_unknown_json() {
 
     let mut noncanonical = canonical.clone();
     noncanonical.push(b'\n');
-    assert!(
-        decode_cage_policy(
-            Path::new("policy.json"),
-            &noncanonical,
-            &signer.public_key(),
-        )
-        .test_unwrap_err()
-        .to_string()
-        .contains("canonical JSON")
-    );
+    assert!(decode_cage_policy(
+        Path::new("policy.json"),
+        &noncanonical,
+        &signer.public_key(),
+    )
+    .test_unwrap_err()
+    .to_string()
+    .contains("canonical JSON"));
 
     let mut value = serde_json::to_value(signed).test_unwrap();
     value["unknown"] = serde_json::json!(true);
     let unknown = chio_core::canonical_json_bytes(&value).test_unwrap();
     assert!(decode_cage_policy(Path::new("policy.json"), &unknown, &signer.public_key(),).is_err());
-    assert!(
-        decode_cage_policy(
-            Path::new("policy.json"),
-            &canonical,
-            &chio_core::Keypair::from_seed(&[93; 32]).public_key(),
-        )
-        .is_err()
-    );
+    assert!(decode_cage_policy(
+        Path::new("policy.json"),
+        &canonical,
+        &chio_core::Keypair::from_seed(&[93; 32]).public_key(),
+    )
+    .is_err());
 
     let mut forged_body = serde_json::to_value(policy(
         chio_manifest::NativeSyscallProfile::NativeMinimalV1,
@@ -335,8 +331,7 @@ fn migration_posture_changes_with_every_authority_component() {
     assert_ne!(first_posture, changed_posture);
 }
 
-const IDENTITY_POINT_HEX: &str =
-    "0100000000000000000000000000000000000000000000000000000000000000";
+const IDENTITY_POINT_HEX: &str = "0100000000000000000000000000000000000000000000000000000000000000";
 
 #[test]
 fn an_identity_point_trust_root_cannot_authenticate_a_forged_policy() {
@@ -412,8 +407,7 @@ fn cage_migration_binding_fails_closed_when_the_ledger_is_replaced() {
         .test_expect("revalidate unchanged cage migration binding");
 
     let replacement = tempfile::tempdir().test_expect("replacement ledger directory");
-    let (replacement_policy, _) =
-        durable_migration_policy_with_evidence(replacement.path(), 0x41);
+    let (replacement_policy, _) = durable_migration_policy_with_evidence(replacement.path(), 0x41);
     std::fs::remove_file(&policy.state_database_path).test_expect("remove pinned ledger");
     std::fs::copy(
         &replacement_policy.state_database_path,
@@ -511,11 +505,9 @@ fn operator_runtime_file_cannot_widen_verified_manifest_authority() {
         None,
     )
     .test_unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("exact read paths in the verified manifest")
-    );
+    assert!(error
+        .to_string()
+        .contains("exact read paths in the verified manifest"));
 }
 
 #[test]
@@ -618,40 +610,32 @@ fn prepared_broker_rejects_another_endpoint_peer_or_binding() {
     };
     // Both listeners have identical kernel peer credentials. The signed
     // endpoint binding must still reject a different connected socket.
-    assert!(
-        retain_prepared_policy_broker(
-            binding.policy_binding(),
-            UnixStream::connect(&other_path).test_expect("other connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        binding.policy_binding(),
+        UnixStream::connect(&other_path).test_expect("other connection"),
+    )
+    .is_err());
     let mut wrong_peer = binding.policy_binding();
     wrong_peer.expected_peer_identity.pid += 1;
-    assert!(
-        retain_prepared_policy_broker(
-            wrong_peer,
-            UnixStream::connect(&path).test_expect("wrong peer connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        wrong_peer,
+        UnixStream::connect(&path).test_expect("wrong peer connection"),
+    )
+    .is_err());
     let mut ambiguous = binding.policy_binding();
     ambiguous.inherited_fd = Some(3);
-    assert!(
-        retain_prepared_policy_broker(
-            ambiguous,
-            UnixStream::connect(&path).test_expect("ambiguous connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        ambiguous,
+        UnixStream::connect(&path).test_expect("ambiguous connection"),
+    )
+    .is_err());
     let mut invalid_digest = binding.policy_binding();
     invalid_digest.authentication_digest = "invalid".to_string();
-    assert!(
-        retain_prepared_policy_broker(
-            invalid_digest,
-            UnixStream::connect(&path).test_expect("invalid digest connection"),
-        )
-        .is_err()
-    );
+    assert!(retain_prepared_policy_broker(
+        invalid_digest,
+        UnixStream::connect(&path).test_expect("invalid digest connection"),
+    )
+    .is_err());
 }
 
 #[test]
@@ -679,11 +663,9 @@ fn unprotected_wrapper_uses_signed_registry_flow_requirement() {
     assert!(registry.requires_flow_runtime());
     let error =
         super::super::wrap::require_unprotected_wrap_compatible(&registry).test_unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("rejects flow-required manifests")
-    );
+    assert!(error
+        .to_string()
+        .contains("rejects flow-required manifests"));
 
     let (signed_manifest, registered_key) =
         signed_manifest(chio_manifest::NativeSyscallProfile::NativeMinimalV1);
@@ -709,7 +691,10 @@ fn staged_migration_policy_shapes_are_refused() {
     let current = serde_json::to_value(&body).test_unwrap();
     for (field, value) in [
         ("stage", serde_json::json!("enforced")),
-        ("minimum_head", current["enterprise_migration"]["head"].clone()),
+        (
+            "minimum_head",
+            current["enterprise_migration"]["head"].clone(),
+        ),
     ] {
         let mut staged = current.clone();
         staged["enterprise_migration"][field] = value;
@@ -717,13 +702,14 @@ fn staged_migration_policy_shapes_are_refused() {
             .err()
             .test_expect("a staged migration policy shape decoded");
         assert!(
-            error.to_string().starts_with(&format!("unknown field `{field}`")),
+            error
+                .to_string()
+                .starts_with(&format!("unknown field `{field}`")),
             "{field}: {error}"
         );
     }
     let mut generation_bound = current;
-    generation_bound["enterprise_migration"]["head"]["minimum_generation"] =
-        serde_json::json!(2);
+    generation_bound["enterprise_migration"]["head"]["minimum_generation"] = serde_json::json!(2);
     let error = serde_json::from_value::<McpCageLaunchPolicy>(generation_bound)
         .err()
         .test_expect("a generation-bounded head decoded");

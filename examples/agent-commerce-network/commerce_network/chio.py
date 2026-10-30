@@ -193,7 +193,7 @@ class TrustControl:
         r = self._http.get(
             f"{self.url}/v1/revocations",
             headers=self._auth(),
-            params={"capabilityId": capability_id, "limit": 1},
+            params={"capability_id": capability_id},
         )
         r.raise_for_status()
         return bool(r.json().get("revoked"))
@@ -202,7 +202,7 @@ class TrustControl:
         r = self._http.post(
             f"{self.url}/v1/revocations",
             headers=self._auth(),
-            json={"capabilityId": capability_id},
+            json={"capability_id": capability_id, "reason": "operator_request"},
         )
         r.raise_for_status()
         return r.json()

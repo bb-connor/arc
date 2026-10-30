@@ -13,6 +13,17 @@ use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBe
 
 use crate::store_connection::{StoreConnection, StoreGuard};
 
+mod targets;
+pub use targets::TargetRevocation;
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "Test fixtures deliberately fail on violated setup invariants."
+)]
+#[path = "revocation_store/target_tests.rs"]
+mod target_tests;
+
 #[derive(Clone)]
 pub struct SqliteRevocationStore {
     clock: crate::store_clock::StoreClock,
@@ -213,6 +224,27 @@ impl SqliteRevocationStore {
             return Ok(false);
         }
         let entry_id = self.record_capability_entry(transaction, capability_id, revoked_at)?;
+        self.mark_revoked(transaction, capability_id, revoked_at, &entry_id)
+    }
+
+    /// Mark `capability_id` revoked by `entry_id` inside `transaction`: the
+    /// projection row, its delta-log entry and, under a serving owner, the
+    /// commit-chain entries. Returns false when it was already revoked.
+    fn mark_revoked(
+        &self,
+        transaction: &Transaction<'_>,
+        capability_id: &str,
+        revoked_at: i64,
+        entry_id: &RevocationEntryId,
+    ) -> Result<bool, RevocationStoreError> {
+        let exists = transaction.query_row(
+            "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+            params![capability_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if exists {
+            return Ok(false);
+        }
         let joint = self.serving_owner.is_some();
         let revocation_index = allocate_revocation_index(transaction, joint)?;
         let index_column = if joint {
@@ -394,12 +426,14 @@ impl SqliteRevocationStore {
     }
 
     /// One page of entries with `entry_seq` above `after_seq`, in sequence
-    /// order, and the highest stored `entry_seq`, read from one snapshot.
+    /// order and of `kind` when one is named, each with its `entry_seq`, and
+    /// the highest stored `entry_seq`, read from one snapshot.
     pub fn list_revocation_entries_after(
         &self,
         after_seq: u64,
         limit: usize,
-    ) -> Result<(Vec<RevocationEntry>, u64), RevocationStoreError> {
+        kind: Option<RevocationTargetKind>,
+    ) -> Result<(Vec<(u64, RevocationEntry)>, u64), RevocationStoreError> {
         let after_seq = i64::try_from(after_seq).map_err(|_| {
             RevocationStoreError::Sync("revocation entry cursor exceeds SQLite range".to_string())
         })?;
@@ -407,23 +441,28 @@ impl SqliteRevocationStore {
             let rows = {
                 let mut statement = transaction.prepare(
                     r#"
-                    SELECT entry_id, target_kind, target_value, revoked_at, reason
+                    SELECT entry_seq, entry_id, target_kind, target_value, revoked_at, reason
                     FROM revocation_entries
-                    WHERE entry_seq > ?1
+                    WHERE entry_seq > ?1 AND (?3 IS NULL OR target_kind = ?3)
                     ORDER BY entry_seq ASC
                     LIMIT ?2
                     "#,
                 )?;
                 let rows = statement
                     .query_map(
-                        params![after_seq, crate::integer::checked::<_, i64>(limit)?],
+                        params![
+                            after_seq,
+                            crate::integer::checked::<_, i64>(limit)?,
+                            kind.map(RevocationTargetKind::as_str)
+                        ],
                         |row| {
                             Ok((
-                                row.get::<_, String>(0)?,
+                                row.get::<_, i64>(0)?,
                                 row.get::<_, String>(1)?,
                                 row.get::<_, String>(2)?,
-                                row.get::<_, i64>(3)?,
-                                row.get::<_, String>(4)?,
+                                row.get::<_, String>(3)?,
+                                row.get::<_, i64>(4)?,
+                                row.get::<_, String>(5)?,
                             ))
                         },
                     )?
@@ -432,10 +471,13 @@ impl SqliteRevocationStore {
             };
             let entries = rows
                 .into_iter()
-                .map(|(entry_id, kind, value, revoked_at, reason)| {
-                    stored_entry(&entry_id, &kind, &value, revoked_at, &reason)
+                .map(|(entry_seq, entry_id, kind, value, revoked_at, reason)| {
+                    Ok((
+                        stored_index(entry_seq)?,
+                        stored_entry(&entry_id, &kind, &value, revoked_at, &reason)?,
+                    ))
                 })
-                .collect::<Result<Vec<_>, _>>()?;
+                .collect::<Result<Vec<_>, RevocationStoreError>>()?;
             let head = transaction.query_row(
                 "SELECT COALESCE(MAX(entry_seq), 0) FROM revocation_entries",
                 [],
@@ -911,6 +953,18 @@ const REVOCATION_SCHEMA: &str = r#"
             )
         ) STRICT;
 
+        CREATE TABLE IF NOT EXISTS revocation_entry_tags (
+            entry_id TEXT NOT NULL REFERENCES revocation_entries(entry_id),
+            tag_key_id TEXT NOT NULL CHECK (
+                length(tag_key_id) = 64 AND tag_key_id NOT GLOB '*[^0-9a-f]*'
+            ),
+            tag TEXT NOT NULL CHECK (length(tag) = 64 AND tag NOT GLOB '*[^0-9a-f]*'),
+            PRIMARY KEY (entry_id, tag_key_id)
+        ) STRICT, WITHOUT ROWID;
+
+        CREATE INDEX IF NOT EXISTS idx_revocation_entry_tags_tag
+            ON revocation_entry_tags(tag_key_id, tag);
+
         CREATE TABLE IF NOT EXISTS revoked_capabilities (
             capability_id TEXT PRIMARY KEY,
             revoked_at INTEGER NOT NULL,
@@ -1009,6 +1063,7 @@ pub(crate) fn initialize_revocation_schema(
             .map_err(|error| RevocationStoreError::Sync(error.to_string()))?;
     }
     verify_revocation_delta_invariants(transaction)?;
+    targets::verify_entry_tags(transaction)?;
     if shared_authority_sequence {
         verify_admission_authority_invariants(transaction)?;
     } else {

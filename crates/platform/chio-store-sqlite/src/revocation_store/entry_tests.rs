@@ -5,7 +5,7 @@ use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
 use chio_core::root_authority::{
-    RevocationEntry, RevocationReason, RevocationTarget, Sha256Digest,
+    RevocationEntry, RevocationReason, RevocationTarget, RevocationTargetKind, Sha256Digest,
 };
 use chio_kernel::{RevocationStore, RevocationStoreError};
 use rusqlite::{ffi, params, Connection, ErrorCode};
@@ -147,13 +147,17 @@ fn capability_revocation_records_and_names_one_entry() -> TestResult {
     let target = RevocationTarget::capability("cap-fixture-1")?;
     assert_eq!(store.revocation_entry("cap-fixture-1")?, Some(target.id()));
     assert_eq!(store.revocation_entry("cap-fixture-2")?, None);
-    let (page, head) = store.list_revocation_entries_after(0, 10)?;
+    let (page, head) = store.list_revocation_entries_after(0, 10, None)?;
     assert_eq!((page.len(), head), (1, 1));
-    assert_eq!(page[0].entry_id, target.id());
-    assert_eq!(page[0].target()?, target);
-    assert_eq!(page[0].reason, RevocationReason::OperatorRequest);
-    let (after_head, head) = store.list_revocation_entries_after(1, 10)?;
-    assert_eq!((after_head, head), (Vec::<RevocationEntry>::new(), 1));
+    assert_eq!(page[0].0, 1);
+    assert_eq!(page[0].1.entry_id, target.id());
+    assert_eq!(page[0].1.target()?, target);
+    assert_eq!(page[0].1.reason, RevocationReason::OperatorRequest);
+    let (after_head, head) = store.list_revocation_entries_after(1, 10, None)?;
+    assert_eq!((after_head, head), (Vec::new(), 1));
+    let (other_kind, _) =
+        store.list_revocation_entries_after(0, 10, Some(RevocationTargetKind::RootPolicyRule))?;
+    assert_eq!(other_kind, Vec::new());
     Ok(())
 }
 
@@ -166,15 +170,18 @@ fn a_newer_replicated_revocation_keeps_the_first_entry() -> TestResult {
     };
     assert!(store.upsert_revocation_if_newer(&record(FIXED_REVOKED_AT))?);
     assert!(store.upsert_revocation_if_newer(&record(FIXED_REVOKED_AT + 60))?);
-    let (page, head) = store.list_revocation_entries_after(0, 10)?;
+    let (page, head) = store.list_revocation_entries_after(0, 10, None)?;
     assert_eq!(head, 1);
     assert_eq!(
         page,
-        vec![RevocationEntry::new(
-            &RevocationTarget::capability("cap-replicated")?,
-            1_792_234_800,
-            RevocationReason::OperatorRequest,
-        )?]
+        vec![(
+            1,
+            RevocationEntry::new(
+                &RevocationTarget::capability("cap-replicated")?,
+                1_792_234_800,
+                RevocationReason::OperatorRequest,
+            )?
+        )]
     );
     Ok(())
 }
@@ -391,9 +398,9 @@ fn every_entry_advances_the_global_commit_chain() -> TestResult {
     let reopened = reopen_serving(&fixture.database, &fixture.lock_root)?;
     let (page, head) = reopened
         .revocation_store()
-        .list_revocation_entries_after(0, 10)?;
+        .list_revocation_entries_after(0, 10, None)?;
     assert_eq!(head, 2);
-    assert_eq!(page[1].entry_id, rule_target().id());
+    assert_eq!(page[1].1.entry_id, rule_target().id());
     Ok(())
 }
 

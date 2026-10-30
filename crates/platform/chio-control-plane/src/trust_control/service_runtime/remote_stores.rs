@@ -67,24 +67,20 @@ pub fn build_remote_revocation_store(
 impl RevocationStore for RemoteRevocationStore {
     fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         self.client
-            .list_revocations(&RevocationQuery {
-                capability_id: Some(capability_id.to_string()),
-                limit: Some(1),
-            })
-            .and_then(|response| {
-                response.revoked.ok_or_else(|| {
-                    CliError::cli_other_error(format!(
-                        "trust-control revocation response omitted revoked status for {capability_id}"
-                    ))
-                })
-            })
+            .revocation_status(capability_id)
+            .map(|status| status.revoked)
             .map_err(into_revocation_store_error)
     }
 
+    /// The trait carries no reason, so a forwarded revocation records
+    /// `operator_request`. True when this call marked the capability.
     fn revoke(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
         self.client
-            .revoke_capability(capability_id)
-            .map(|response| response.newly_revoked)
+            .revoke_capability(
+                capability_id,
+                chio_core_types::root_authority::RevocationReason::OperatorRequest,
+            )
+            .map(|response| response.roots_revoked > 0)
             .map_err(into_revocation_store_error)
     }
 
@@ -94,6 +90,41 @@ impl RevocationStore for RemoteRevocationStore {
 }
 
 impl ReceiptStore for RemoteReceiptStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningStatus,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &chio_kernel::receipt_store::OpeningReadScope,
+    ) -> Result<
+        chio_kernel::receipt_store::OpeningState,
+        chio_kernel::receipt_store::ReceiptStoreError,
+    > {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), chio_kernel::receipt_store::ReceiptStoreError> {
+        Err(chio_kernel::receipt_store::ReceiptStoreError::Unsupported(
+            "remote receipt openings require the trust-control opening routes".to_string(),
+        ))
+    }
+
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.client
             .append_tool_receipt(receipt)

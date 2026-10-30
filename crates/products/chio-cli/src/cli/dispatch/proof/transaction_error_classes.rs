@@ -217,9 +217,10 @@ fn every_transaction_passport_variant_has_its_exit_class() {
 fn expected_commerce(error: &chio_commerce_order::CommerceOrderError) -> i32 {
     use chio_commerce_order::CommerceOrderError as E;
     match error {
-        E::Input(_) | E::EvidenceLimit | E::UnsupportedSchema { .. } | E::InvalidArtifact { .. } => {
-            SCHEMA
-        }
+        E::Input(_)
+        | E::EvidenceLimit
+        | E::UnsupportedSchema { .. }
+        | E::InvalidArtifact { .. } => SCHEMA,
         E::DigestMismatch { .. }
         | E::ReplayDigestMismatch(_)
         | E::ReplaySignatureInvalid(_)
@@ -332,21 +333,27 @@ fn every_commerce_variant_has_its_exit_class() {
         E::SettlementSignatureInvalid(text()),
         E::CoverageFailed(text()),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerSchemaUnsupported(text())),
-        E::Escrow(chio_commerce_order::CommerceEscrowError::Canonicalization(text())),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::Canonicalization(
+            text(),
+        )),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSchemaUnsupported(text())),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceSignatureInvalid),
         E::Escrow(chio_commerce_order::CommerceEscrowError::OfferIssuerNotMerchant),
-        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceUnbound("buyer_subject")),
+        E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceUnbound(
+            "buyer_subject",
+        )),
         E::Escrow(chio_commerce_order::CommerceEscrowError::AcceptanceDigestMismatch),
         E::Escrow(chio_commerce_order::CommerceEscrowError::SettlementSignatureInvalid),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerMissing),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerUnpinned),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerCustodyAccount(text())),
         E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerOrderBinding("order_id")),
-        E::Escrow(chio_commerce_order::CommerceEscrowError::LedgerStatusMismatch {
-            state: text(),
-            required: chio_commerce_order::CommerceEscrowStatus::Locked,
-        }),
+        E::Escrow(
+            chio_commerce_order::CommerceEscrowError::LedgerStatusMismatch {
+                state: text(),
+                required: chio_commerce_order::CommerceEscrowStatus::Locked,
+            },
+        ),
     ];
     assert_classes(samples, expected_commerce, map_commerce_proof_error);
 }
@@ -433,7 +440,11 @@ fn every_disclosure_lineage_variant_has_its_exit_class() {
         E::UnsupportedSchema(text()),
         E::Unsupported(text()),
     ];
-    assert_classes(samples, expected_lineage, map_disclosure_lineage_proof_error);
+    assert_classes(
+        samples,
+        expected_lineage,
+        map_disclosure_lineage_proof_error,
+    );
 }
 
 fn expected_selective_disclosure(
@@ -564,7 +575,9 @@ fn every_runtime_proof_variant_has_its_exit_class() {
     })
     .collect();
     samples.extend([
-        E::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(json_error())),
+        E::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
+            json_error(),
+        )),
         E::Clock(chio_security_types::clock::ClockError::Expired),
         E::DuplicateAdmissionBundle,
         E::Store(text()),

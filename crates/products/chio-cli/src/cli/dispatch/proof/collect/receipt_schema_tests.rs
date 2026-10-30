@@ -34,7 +34,10 @@ fn advertised_receipt_schema_alone_is_not_collected() -> Result<(), Box<dyn std:
 fn closed_receipt_with_schema_member_is_not_collected() -> Result<(), Box<dyn std::error::Error>> {
     let mut value: serde_json::Value = crate::input::json(RECEIPT)?;
     value["schema"] = serde_json::json!(CHIO_RECEIPT_SCHEMA);
-    assert_eq!(classify(&serde_json::to_vec(&value)?)?, (String::new(), false));
+    assert_eq!(
+        classify(&serde_json::to_vec(&value)?)?,
+        (String::new(), false)
+    );
     Ok(())
 }
 
@@ -59,7 +62,11 @@ fn other_artifact_schema_is_preserved() -> Result<(), Box<dyn std::error::Error>
 #[test]
 fn receipt_with_duplicate_parameter_member_is_refused() -> Result<(), Box<dyn std::error::Error>> {
     let text = std::str::from_utf8(RECEIPT)?;
-    let bytes = text.replacen(r#""parameters":{"#, r#""parameters":{"order_id":"forged","#, 1);
+    let bytes = text.replacen(
+        r#""parameters":{"#,
+        r#""parameters":{"order_id":"forged","#,
+        1,
+    );
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("artifact.json");
     std::fs::write(&path, bytes)?;

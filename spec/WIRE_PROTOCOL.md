@@ -572,17 +572,27 @@ Endpoint:
 
 Request body:
 
+Members are snake_case and unknown members are refused.
+
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `capabilityId` | string | Capability identifier to revoke |
+| `capability_id` | string | Capability identifier to revoke |
+| `reason` | string | One of `operator_request`, `credential_compromise`, `principal_offboarded`, `tenant_offboarded`, `policy_withdrawn`, `incident_response` |
 
 Success response:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `capabilityId` | string | Revoked identifier |
-| `revoked` | boolean | Current revocation state |
-| `newlyRevoked` | boolean | Whether this call changed state |
+| `entry` | `chio.revocation-entry.v1` | The stored entry; the first write's `revoked_at` and `reason` stand |
+| `newly_revoked` | boolean | Whether this call recorded the entry |
+| `roots_matched` | integer | Capabilities the target names that stand revoked after the call |
+| `roots_revoked` | integer | How many of those this call marked revoked |
+
+`GET /v1/revocations?capability_id=<id>` reports one capability as
+`{capability_id, revoked, entry_id}`. Without `capability_id`,
+`GET /v1/revocations?after=<seq>&limit=<n>&kind=<kind>` pages the entries as
+`{entries: [{entry_seq, entry}], next_after, head}`; a capability check takes no
+page members.
 
 ## 5. Error Taxonomy
 
@@ -707,9 +717,9 @@ sequenceDiagram
     participant Kernel
     participant Agent
 
-    Operator->>Trust: POST /v1/revocations { capabilityId }
-    Trust->>Store: revoke(capabilityId)
-    Trust-->>Operator: { capabilityId, revoked, newlyRevoked }
+    Operator->>Trust: POST /v1/revocations { capability_id, reason }
+    Trust->>Store: record the capability_id entry
+    Trust-->>Operator: { entry, newly_revoked, roots_matched, roots_revoked }
     Kernel->>Store: consult revocation state on next use
     alt proactive notification
         Kernel-->>Agent: capability_revoked

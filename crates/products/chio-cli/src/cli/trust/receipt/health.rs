@@ -442,7 +442,10 @@ mod receipt_operator_tests {
         let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
         let refusal = match store.receipt_store_health() {
             Ok(report) => {
-                assert!(!report.healthy, "the corrupted store must report not-writable");
+                assert!(
+                    !report.healthy,
+                    "the corrupted store must report not-writable"
+                );
                 receipt_health_report_error(&report).to_string()
             }
             Err(error) => CliError::from(error).to_string(),
@@ -496,7 +499,10 @@ mod receipt_operator_tests {
         let store = chio_store_sqlite::SqliteReceiptStore::open_existing(&path)?;
         let refusal = match store.receipt_store_health() {
             Ok(report) => {
-                assert!(!report.healthy, "the corrupted store must report not-writable");
+                assert!(
+                    !report.healthy,
+                    "the corrupted store must report not-writable"
+                );
                 receipt_health_report_error(&report).to_string()
             }
             Err(error) => CliError::from(error).to_string(),

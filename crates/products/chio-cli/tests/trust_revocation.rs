@@ -245,7 +245,7 @@ fn trust_revoke_and_status_can_target_control_service() {
 
     let listed = client
         .get(format!("{base_url}/v1/revocations"))
-        .query(&[("capabilityId", capability_id), ("limit", "1")])
+        .query(&[("capability_id", capability_id)])
         .header(
             reqwest::header::AUTHORIZATION,
             format!("Bearer {service_token}"),
@@ -254,6 +254,10 @@ fn trust_revoke_and_status_can_target_control_service() {
         .expect("query trust service revocations");
     assert_eq!(listed.status(), reqwest::StatusCode::OK);
     let listed: serde_json::Value = listed.json().expect("revocations json");
+    assert_eq!(listed["capability_id"], capability_id);
     assert_eq!(listed["revoked"], true);
-    assert_eq!(listed["count"], 1);
+    assert!(
+        listed["entry_id"].is_string(),
+        "revocation status: {listed}"
+    );
 }

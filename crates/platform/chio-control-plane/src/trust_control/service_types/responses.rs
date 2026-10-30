@@ -238,12 +238,16 @@ pub struct ChildReceiptQuery {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct RevocationQuery {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<chio_core_types::root_authority::RevocationTargetKind>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -253,17 +257,89 @@ pub struct RevocationRecordView {
     pub revoked_at: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RevocationListResponse {
-    pub configured: bool,
-    pub backend: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub capability_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub revoked: Option<bool>,
-    pub count: usize,
-    pub revocations: Vec<RevocationRecordView>,
+/// Whether one capability is revoked, and by which entry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevocationStatusResponse {
+    pub capability_id: String,
+    pub revoked: bool,
+    pub entry_id: Option<chio_core_types::root_authority::RevocationEntryId>,
+}
+
+/// One page of revocation entries after a cursor, in `entry_seq` order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevocationEntryPage {
+    pub entries: Vec<RevocationEntryPageItem>,
+    /// The cursor for the next page: the last `entry_seq` returned, or the
+    /// requested cursor when the page is empty.
+    pub next_after: u64,
+    /// The highest stored `entry_seq`.
+    pub head: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevocationEntryPageItem {
+    pub entry_seq: u64,
+    pub entry: chio_core_types::root_authority::RevocationEntry,
+}
+
+/// The status and fixed body for a revocation store error. An unknown commit
+/// outcome poisons the serving owner until the process restarts; every other
+/// error left nothing committed. No store text reaches the caller.
+#[must_use]
+pub fn revocation_store_failure(
+    error: &chio_kernel::RevocationStoreError,
+) -> (axum::http::StatusCode, &'static str) {
+    let body = match error {
+        chio_kernel::RevocationStoreError::OutcomeUnknown(_) => {
+            "revocation outcome unknown; restart the provider, then retry the same request"
+        }
+        _ => "revocation store unavailable",
+    };
+    (axum::http::StatusCode::SERVICE_UNAVAILABLE, body)
+}
+
+/// The fixed refusal for a malformed revocation request or query.
+pub const INVALID_REVOCATION_REQUEST: &str = "invalid revocation request";
+pub const DEFAULT_REVOCATION_PAGE: usize = 100;
+pub const MAX_REVOCATION_PAGE: usize = 500;
+
+/// A revocation query, parsed: the check of one capability or a page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RevocationListing {
+    Status(String),
+    Page {
+        after: u64,
+        limit: usize,
+        kind: Option<chio_core_types::root_authority::RevocationTargetKind>,
+    },
+}
+
+impl RevocationQuery {
+    /// `None` for a query this endpoint refuses: a capability check that also
+    /// names a page member, an invalid capability id, or a limit outside
+    /// 1 to `MAX_REVOCATION_PAGE`.
+    #[must_use]
+    pub fn listing(&self) -> Option<RevocationListing> {
+        if let Some(capability_id) = &self.capability_id {
+            if self.after.is_some() || self.limit.is_some() || self.kind.is_some() {
+                return None;
+            }
+            chio_core_types::root_authority::RevocationTarget::capability(capability_id).ok()?;
+            return Some(RevocationListing::Status(capability_id.clone()));
+        }
+        let limit = self.limit.unwrap_or(DEFAULT_REVOCATION_PAGE);
+        if !(1..=MAX_REVOCATION_PAGE).contains(&limit) {
+            return None;
+        }
+        Some(RevocationListing::Page {
+            after: self.after.unwrap_or(0),
+            limit,
+            kind: self.kind,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

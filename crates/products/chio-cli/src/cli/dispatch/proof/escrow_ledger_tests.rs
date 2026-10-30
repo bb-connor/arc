@@ -37,7 +37,12 @@ impl LedgerBundle {
     fn add_ledger(&mut self, path: &str, ledger: &CommerceEscrowLedger) -> Vec<u8> {
         let bytes = ledger_bytes(ledger);
         self.write(path, &bytes);
-        self.add_node(path, COMMERCE_ESCROW_LEDGER_ROLE, COMMERCE_ESCROW_LEDGER_SCHEMA_ID, &bytes);
+        self.add_node(
+            path,
+            COMMERCE_ESCROW_LEDGER_ROLE,
+            COMMERCE_ESCROW_LEDGER_SCHEMA_ID,
+            &bytes,
+        );
         bytes
     }
 
@@ -52,7 +57,10 @@ impl LedgerBundle {
         });
     }
 
-    fn load(&self, context: &chio_commerce_order::CommerceOrderContext) -> Result<Option<Vec<u8>>, CliError> {
+    fn load(
+        &self,
+        context: &chio_commerce_order::CommerceOrderContext,
+    ) -> Result<Option<Vec<u8>>, CliError> {
         self.load_with(context, &mut crate::input::collection::Budget::default())
     }
 
@@ -175,7 +183,10 @@ fn assert_refusal(
 #[test]
 fn selects_the_pinned_ledger_from_a_graph_holding_locked_and_released_ledgers() {
     let mut bundle = LedgerBundle::new();
-    bundle.add_ledger("escrow-ledger-locked.json", &ledger(CommerceEscrowStatus::Locked));
+    bundle.add_ledger(
+        "escrow-ledger-locked.json",
+        &ledger(CommerceEscrowStatus::Locked),
+    );
     let released = ledger(CommerceEscrowStatus::Released);
     let released_bytes = bundle.add_ledger("escrow-ledger-released.json", &released);
     let loaded = bundle.load(&context(Some(digest(&released))));
@@ -185,7 +196,10 @@ fn selects_the_pinned_ledger_from_a_graph_holding_locked_and_released_ledgers() 
 #[test]
 fn refuses_a_pinned_digest_that_matches_no_ledger() {
     let mut bundle = LedgerBundle::new();
-    bundle.add_ledger("escrow-ledger-locked.json", &ledger(CommerceEscrowStatus::Locked));
+    bundle.add_ledger(
+        "escrow-ledger-locked.json",
+        &ledger(CommerceEscrowStatus::Locked),
+    );
     let pinned = digest(&ledger(CommerceEscrowStatus::Released));
     let error = rejection(bundle.load(&context(Some(pinned.clone()))));
     assert_refusal(
@@ -215,7 +229,10 @@ fn refuses_two_ledgers_with_the_pinned_digest() {
 #[test]
 fn loads_nothing_without_a_pin_even_with_a_ledger_node() {
     let mut bundle = LedgerBundle::new();
-    bundle.add_ledger("escrow-ledger.json", &ledger(CommerceEscrowStatus::Released));
+    bundle.add_ledger(
+        "escrow-ledger.json",
+        &ledger(CommerceEscrowStatus::Released),
+    );
     assert_eq!(bundle.load(&context(None)).ok(), Some(None));
 }
 
@@ -273,7 +290,10 @@ fn refuses_a_ledger_node_with_another_schema() {
 #[test]
 fn charges_every_candidate_ledger_to_the_shared_collection_budget() {
     let mut bundle = LedgerBundle::new();
-    let locked = bundle.add_ledger("escrow-ledger-locked.json", &ledger(CommerceEscrowStatus::Locked));
+    let locked = bundle.add_ledger(
+        "escrow-ledger-locked.json",
+        &ledger(CommerceEscrowStatus::Locked),
+    );
     let released = ledger(CommerceEscrowStatus::Released);
     bundle.add_ledger("escrow-ledger-released.json", &released);
     let mut budget = crate::input::collection::Budget::default();
@@ -282,7 +302,9 @@ fn charges_every_candidate_ledger_to_the_shared_collection_budget() {
     }
     let error = rejection(bundle.load_with(&context(Some(digest(&released))), &mut budget));
     assert!(
-        error.to_string().contains("artifact collection byte budget exhausted"),
+        error
+            .to_string()
+            .contains("artifact collection byte budget exhausted"),
         "{error}"
     );
 }

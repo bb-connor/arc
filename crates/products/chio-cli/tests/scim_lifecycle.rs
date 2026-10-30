@@ -427,13 +427,14 @@ fn trust_service_scim_delete_users_deactivates_identity_revokes_capabilities_and
 
     let revocations: Value = client
         .get(format!(
-            "{base_url}/v1/revocations?capabilityId={capability_id}&limit=10"
+            "{base_url}/v1/revocations?capability_id={capability_id}"
         ))
         .header(AUTHORIZATION, bearer(service_token))
         .send()
         .expect("query revocations")
         .json()
         .expect("decode revocations");
+    assert_eq!(revocations["capability_id"], capability_id);
     assert_eq!(revocations["revoked"], true);
 
     let receipts: Value = client

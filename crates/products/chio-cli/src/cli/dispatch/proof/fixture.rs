@@ -23,19 +23,21 @@ use fixture_agent_web::{
 #[path = "fixture_cleanup.rs"]
 mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
-#[path = "fixture_regenerate.rs"]
-mod fixture_regenerate;
+#[path = "fixture_committed_disclosure.rs"]
+mod fixture_committed_disclosure;
 #[path = "fixture_finding.rs"]
 mod fixture_finding;
 #[path = "fixture_finding_cognition.rs"]
 mod fixture_finding_cognition;
+#[path = "fixture_regenerate.rs"]
+mod fixture_regenerate;
 #[path = "fixture_resign.rs"]
 mod fixture_resign;
-use fixture_resign::{normalize_runtime_reused_nonce_fixture, normalize_runtime_security_signatures};
+use fixture_resign::{
+    normalize_runtime_reused_nonce_fixture, normalize_runtime_security_signatures,
+};
 #[path = "fixture_runtime_check.rs"]
 mod fixture_runtime_check;
-#[path = "fixture_committed_disclosure.rs"]
-mod fixture_committed_disclosure;
 use fixture_committed_disclosure::keep_committed_selective_disclosure_proof;
 #[path = "fixture_public_settlement_runtime.rs"]
 mod fixture_public_settlement_runtime;
@@ -45,7 +47,9 @@ mod fixture_paths;
 use fixture_paths::proof_fixture_source_root;
 #[path = "fixture_receipt_evidence.rs"]
 mod fixture_receipt_evidence;
-use fixture_receipt_evidence::{generate_minimal_receipt_evidence, write_terminal_receipt_evidence, RECEIPT_EVIDENCE_SCHEMA};
+use fixture_receipt_evidence::{
+    generate_minimal_receipt_evidence, write_terminal_receipt_evidence, RECEIPT_EVIDENCE_SCHEMA,
+};
 
 const PROOF_FIXTURE_ROOT_ENV: &str = "CHIO_PROOF_FIXTURE_ROOT";
 const PROOF_FIXTURE_CATALOG_FILE: &str = "catalog.json";
@@ -1499,7 +1503,10 @@ fn normalize_commerce_signatures(out: &Path) -> Result<(), CliError> {
         for (file, digest_field) in [
             ("provider-passport.json", "provider_passport_sha256"),
             ("reputation-snapshot.json", "reputation_snapshot_sha256"),
-            ("federation-trust-bundle.json", "federation_trust_bundle_sha256"),
+            (
+                "federation-trust-bundle.json",
+                "federation_trust_bundle_sha256",
+            ),
             ("payment-lifecycle.json", "payment_lifecycle_sha256"),
         ] {
             let path = bundle.join(file);
@@ -1515,7 +1522,9 @@ fn normalize_commerce_signatures(out: &Path) -> Result<(), CliError> {
                 sign_fixture_commerce_provider_trust_artifact(&path)?;
             }
             let current = sha256_file(&path)?;
-            if order_context.get(digest_field).and_then(serde_json::Value::as_str)
+            if order_context
+                .get(digest_field)
+                .and_then(serde_json::Value::as_str)
                 == Some(previous.as_str())
             {
                 order_context[digest_field] = serde_json::Value::String(current);
@@ -1532,7 +1541,8 @@ fn normalize_commerce_signatures(out: &Path) -> Result<(), CliError> {
 }
 
 /// Payment members that carry the digest of the order context they pay for.
-const ORDER_CONTEXT_DIGEST_FIELDS: &[&str] = &["order_context_digest", "transaction_context_digest"];
+const ORDER_CONTEXT_DIGEST_FIELDS: &[&str] =
+    &["order_context_digest", "transaction_context_digest"];
 
 /// Rewrites every top-level order context digest member that named the
 /// `previous` digest in the JSON files beside an order context.
@@ -2081,7 +2091,12 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     let nodes = json_array_mut(&mut evidence_graph, "nodes", &evidence_graph_path)?;
     for (path, node_id, receipt_id, terminal_status) in receipts {
         let receipt_path = bundle.join(path);
-        write_terminal_receipt_evidence(&receipt_path, receipt_id, terminal_status, &policy_sha256)?;
+        write_terminal_receipt_evidence(
+            &receipt_path,
+            receipt_id,
+            terminal_status,
+            &policy_sha256,
+        )?;
         upsert_fixture_graph_node(
             nodes,
             node_id,
@@ -2101,7 +2116,6 @@ fn add_commerce_terminal_receipts(bundle: &Path) -> Result<(), CliError> {
     write_signed_transaction_passport(&passport_path, passport)?;
     Ok(())
 }
-
 
 fn generate_disclosure_agent_web_fixture(out: &Path) -> Result<(), CliError> {
     if path_exists_or_is_symlink(out)? {
@@ -2936,13 +2950,14 @@ fn reseal_public_settlement_anchor_receipt(
         kernel_key: statement.kernel_key.clone(),
         chain_root: statement.chain_root,
     };
-    let signature = fixture_wrapped_signature(&anchor_keypair, &statement_body.schema, &statement_body)
-        .map_err(|error| {
-            CliError::cli_other_error(format!(
-                "public settlement checkpoint statement signing failed: {}: {error}",
-                settlement_proof_path.display()
-            ))
-        })?;
+    let signature =
+        fixture_wrapped_signature(&anchor_keypair, &statement_body.schema, &statement_body)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "public settlement checkpoint statement signing failed: {}: {error}",
+                    settlement_proof_path.display()
+                ))
+            })?;
     statement.signature = signature;
 
     *settlement_proof
@@ -3279,11 +3294,12 @@ fn sign_fixture_commerce_provider_trust_artifact(path: &Path) -> Result<(), CliE
     })?;
     body.remove("signature");
     let schema_id = fixture_schema_id(&artifact)?;
-    let signature = fixture_wrapped_signature(&keypair, &schema_id, &artifact).map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof fixture commerce provider trust signing failed: {error}"
-        ))
-    })?;
+    let signature =
+        fixture_wrapped_signature(&keypair, &schema_id, &artifact).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "proof fixture commerce provider trust signing failed: {error}"
+            ))
+        })?;
     artifact["signature"] = serde_json::Value::String(signature.to_hex());
     write_json_line_file(path, &artifact)
 }
@@ -5147,16 +5163,13 @@ fn sign_enterprise_approval_case(approval_case: &mut serde_json::Value) -> Resul
         fields.remove("signature");
     }
     let keypair = Keypair::from_seed(&[62u8; 32]);
-    let signature = fixture_wrapped_signature(
-        &keypair,
-        "chio.enterprise.approval-case.v1",
-        approval_case,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof fixture approval case signing failed: {error}"
-        ))
-    })?;
+    let signature =
+        fixture_wrapped_signature(&keypair, "chio.enterprise.approval-case.v1", approval_case)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "proof fixture approval case signing failed: {error}"
+                ))
+            })?;
     approval_case["signature"] = serde_json::Value::String(format!(
         "sig-ed25519:{}:{}",
         keypair.public_key().to_hex(),
@@ -5177,16 +5190,13 @@ fn sign_enterprise_risk_comptroller_report(
         fields.remove("signature");
     }
     let keypair = Keypair::from_seed(&ENTERPRISE_RISK_COMPTROLLER_SIGNATURE_SEED);
-    let signature = fixture_wrapped_signature(
-        &keypair,
-        "chio.risk.comptroller-report.v1",
-        risk_report,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof fixture risk comptroller report signing failed: {error}"
-        ))
-    })?;
+    let signature =
+        fixture_wrapped_signature(&keypair, "chio.risk.comptroller-report.v1", risk_report)
+            .map_err(|error| {
+                CliError::cli_other_error(format!(
+                    "proof fixture risk comptroller report signing failed: {error}"
+                ))
+            })?;
     risk_report["signature"] = serde_json::Value::String(format!(
         "sig-ed25519:{}:{}",
         keypair.public_key().to_hex(),

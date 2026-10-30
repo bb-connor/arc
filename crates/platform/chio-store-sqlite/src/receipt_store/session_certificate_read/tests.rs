@@ -362,3 +362,35 @@ fn session_certificate_read_context_is_validated_and_membership_has_no_index_aut
         assert!(signed_membership(Some(&metadata)).is_err());
     }
 }
+
+#[test]
+fn signed_membership_requires_the_three_session_blocks_to_agree() {
+    let refusal = |session: &str| json!({ "schema": "chio.session.protocol-refusal.v1", "session_id": session });
+    let agreeing = json!({
+        "acp": { "sessionId": "target" },
+        "receipt_context": { "session_id": "target" },
+        "protocol_refusal": refusal("target"),
+    });
+    assert_eq!(
+        signed_membership(Some(&agreeing)).test_unwrap(),
+        Some("target")
+    );
+    for metadata in [
+        json!({ "acp": { "sessionId": "foreign" }, "receipt_context": { "session_id": "target" } }),
+        json!({ "acp": { "sessionId": "foreign" }, "protocol_refusal": refusal("target") }),
+        json!({ "receipt_context": { "session_id": "foreign" }, "protocol_refusal": refusal("target") }),
+        json!({
+            "acp": { "sessionId": "target" },
+            "receipt_context": { "session_id": "target" },
+            "protocol_refusal": refusal("foreign"),
+        }),
+    ] {
+        let error = signed_membership(Some(&metadata)).test_unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("signed session membership fields conflict"),
+            "{error}"
+        );
+    }
+}

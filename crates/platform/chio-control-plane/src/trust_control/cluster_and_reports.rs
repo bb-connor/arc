@@ -24,6 +24,8 @@ mod cluster_and_reports_tests {
     mod public_passport_challenge_admission;
     #[path = "replication_heads.rs"]
     mod replication_heads;
+    #[path = "revocation_entry_wire.rs"]
+    mod revocation_entry_wire;
     #[path = "revocation_replication.rs"]
     mod revocation_replication;
     #[path = "snapshot_budget_authority.rs"]

@@ -1253,11 +1253,11 @@ mod tests {
                 expires_at_unix_ms: NOW + 1,
             };
             let signature = issuer
-            .sign_wrapped(
-                TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
-                &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
-            )
-            .unwrap();
+                .sign_wrapped(
+                    TRANSPORT_DIRECTORY_BUNDLE_SCHEMA,
+                    &chio_core::canonical::CanonicalBytes::from_serializable(&body).unwrap(),
+                )
+                .unwrap();
             let bundle = TransportDirectoryBundleDocument {
                 schema: TRANSPORT_DIRECTORY_BUNDLE_SCHEMA.to_string(),
                 body,

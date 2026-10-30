@@ -769,8 +769,8 @@ impl ChioKernel {
         }
         // A durable nonce operation verified its presented nonce against the
         // retained issuance before any mutation, and the store rechecks it when
-        // reserving and capturing. The legacy validator does not know that
-        // profile and must not judge it here.
+        // reserving and capturing. The non-durable execution-nonce validator does
+        // not know that profile and must not judge it here.
         if !reserve_for_caller_preflight && !durable_execution_nonce {
             let _ = self.validate_execution_nonce_non_consuming(
                 request,
@@ -1490,7 +1490,8 @@ impl ChioKernel {
         self.release_operation_owned_approval_before_dispatch(operation)?;
         self.release_operation_owned_dpop_before_dispatch(operation)?;
         // Original ledger custody survives hook removal, replacement or faults.
-        // Current configuration cannot hide this owner or choose legacy cleanup.
+        // Current configuration cannot hide this owner or choose evaluate-only
+        // release_reserved cleanup.
         if operation
             .is_some_and(|operation| operation.runtime_participant_ledger_digest().is_some())
         {

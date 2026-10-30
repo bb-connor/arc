@@ -179,8 +179,10 @@ pub(crate) use self::responses::{
     UnderwritingQuotedExposure,
 };
 pub use self::responses::{
-    BudgetListResponse, BudgetQuery, BudgetUsageView, ChildReceiptQuery, ReceiptListResponse,
-    RevocationListResponse, RevocationQuery, RevocationRecordView,
+    revocation_store_failure, BudgetListResponse, BudgetQuery, BudgetUsageView, ChildReceiptQuery,
+    ReceiptListResponse, RevocationEntryPage, RevocationEntryPageItem, RevocationListing,
+    RevocationQuery, RevocationRecordView, RevocationStatusResponse, DEFAULT_REVOCATION_PAGE,
+    INVALID_REVOCATION_REQUEST, MAX_REVOCATION_PAGE,
 };
 pub(crate) use self::retained_budget_hold::*;
 pub use self::state::TrustControlClient;

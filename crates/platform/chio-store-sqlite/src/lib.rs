@@ -108,6 +108,7 @@ pub mod receipt_store;
 mod replay_clock;
 pub mod revocation_store;
 mod rollback_generation;
+pub mod root_exchange_store;
 mod schema_catalog;
 pub mod schema_version;
 pub mod sealed_decoy_registry;

@@ -331,14 +331,17 @@ impl EdgeAdmin {
             .http
             .post(format!("{}/admin/revocations", self.base_url))
             .header(AUTHORIZATION, format!("Bearer {}", self.bearer))
-            .json(&json!({ "capability_id": capability_id }))
+            .json(&json!({
+                "target": {"kind": "capability_id", "capability_id": capability_id},
+                "reason": "operator_request",
+            }))
             // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: paired with builder above.
             .send()?
             .error_for_status()?
             .json()?;
-        if revoked["revoked"] != json!(true) {
+        if revoked["entry"]["target_value"] != json!(capability_id) {
             return Err(format!("revocation of {capability_id} was not recorded").into());
         }
-        Ok(revoked["newlyRevoked"].as_bool().unwrap_or(false))
+        Ok(revoked["newly_revoked"].as_bool().unwrap_or(false))
     }
 }

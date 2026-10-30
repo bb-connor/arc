@@ -1714,6 +1714,28 @@ fn background_checkpoints_are_installed_at_store_attach_and_fire_off_the_request
 struct CheckpointCapableWithoutBackgroundStore;
 
 impl ReceiptStore for CheckpointCapableWithoutBackgroundStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &crate::receipt_store::OpeningReadScope,
+    ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+        Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }
@@ -1754,6 +1776,28 @@ fn checkpoint_capable_store_without_background_fails_setup() {
 struct CheckpointCapableWithBackgroundStore;
 
 impl ReceiptStore for CheckpointCapableWithBackgroundStore {
+    fn opening_status(
+        &self,
+        _receipt_id: &str,
+    ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningStatus::Unknown)
+    }
+    fn read_openings(
+        &self,
+        _receipt_id: &str,
+        _scope: &crate::receipt_store::OpeningReadScope,
+    ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError> {
+        Ok(crate::receipt_store::OpeningState::Unknown)
+    }
+    fn erase_openings(
+        &self,
+        _receipt_id: &str,
+        _erased_at: u64,
+    ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
+        Err(crate::receipt_store::ReceiptStoreError::Unsupported(
+            "test double holds no receipt openings".to_string(),
+        ))
+    }
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         Ok(())
     }

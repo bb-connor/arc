@@ -200,7 +200,11 @@ fn validate_repository_metadata_confined(
             64 * 1024,
             "Git alternates file",
         )?;
-        for entry in entries.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        for entry in entries
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+        {
             let path = Path::new(entry);
             let candidate = if path.is_absolute() {
                 path.to_path_buf()
@@ -237,9 +241,8 @@ fn confined_metadata_path(
     candidate: &Path,
     label: &str,
 ) -> Result<PathBuf, CliError> {
-    let canonical = fs::canonicalize(candidate).map_err(|_| {
-        CliError::cli_other_error(format!("verified-fix {label} is unavailable"))
-    })?;
+    let canonical = fs::canonicalize(candidate)
+        .map_err(|_| CliError::cli_other_error(format!("verified-fix {label} is unavailable")))?;
     if !canonical.starts_with(approved_root) {
         return Err(CliError::cli_other_error(format!(
             "verified-fix {label} is outside the approved repository root"
@@ -293,10 +296,7 @@ fn isolated_git_command(
         .arg(approved_root)
         .arg(APPROVED_ROOT_MOUNT);
     if let Some(work_root) = work_root {
-        command
-            .arg("--bind")
-            .arg(work_root)
-            .arg(STAGING_ROOT_MOUNT);
+        command.arg("--bind").arg(work_root).arg(STAGING_ROOT_MOUNT);
     }
     command.args([
         "--setenv",

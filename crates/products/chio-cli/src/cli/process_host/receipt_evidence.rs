@@ -1,8 +1,8 @@
 //! Membership of the original call receipt in its owning host's signed log.
 
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_core::{crypto::canonical_json_bytes, receipt::body::ChioReceipt, PublicKey};
 use chio_kernel_core::evidence_verify::validate_checkpoint;
-use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use serde::{Deserialize, Serialize};
 
 use super::state::error;

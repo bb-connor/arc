@@ -591,11 +591,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "MCP edge runtime authorization suite assembled from include! fragments; capped until the fragments become modules",
         max_fragments=1,
     ),
-    "crates/products/chio-cli/src/bin/chio.rs": allow(
-        "2026-10-31",
-        "CLI binary entry point assembled from include! fragments; capped until the fragments become modules",
-        max_fragments=1,
-    ),
     "crates/products/chio-cli/build.rs": allow(
         "2026-10-31",
         "CLI proof fixture build script assembled from include! fragments; capped until the fragments become modules",

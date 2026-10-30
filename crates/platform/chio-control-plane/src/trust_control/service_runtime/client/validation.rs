@@ -161,10 +161,7 @@ mod transport_tests {
             "transport-regression-token",
         )?;
         let error = client
-            .list_revocations(&RevocationQuery {
-                capability_id: Some("test".into()),
-                limit: Some(1),
-            })
+            .revocation_status("test")
             .err()
             .ok_or("redirect accepted as a revocation response")?;
         assert!(

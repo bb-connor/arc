@@ -318,7 +318,9 @@ mod tests {
     #[test]
     fn absent_payment_adapter_is_refused() {
         let (result, receipt) = run("none");
-        let error = result.err().test_expect("absent payment adapter must be refused");
+        let error = result
+            .err()
+            .test_expect("absent payment adapter must be refused");
         let reason = "durable admission failed: durable monetary admission requires a qualified payment adapter";
         assert!(
             error

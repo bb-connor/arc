@@ -1325,7 +1325,10 @@ mod tests {
 
     const NOW: u64 = 2_000_000;
 
-    fn sign_directory_body(issuer: &Keypair, body: &TransportDirectoryBundleBody) -> chio_core_types::crypto::Signature {
+    fn sign_directory_body(
+        issuer: &Keypair,
+        body: &TransportDirectoryBundleBody,
+    ) -> chio_core_types::crypto::Signature {
         let bytes = chio_core::canonical::CanonicalBytes::from_serializable(body).unwrap();
         issuer
             .sign_wrapped(TRANSPORT_DIRECTORY_BUNDLE_SCHEMA, &bytes)
@@ -2234,7 +2237,6 @@ mod tests {
             "a successor that reassigns this node's bound endpoint to another kernel fails closed"
         );
     }
-
 
     #[test]
     fn directory_reload_denies_newer_successor_below_raised_min_version() {

@@ -78,7 +78,11 @@ pub(super) fn normalize_runtime_security_signatures(
                 let previous_file = sha256_file(path)?;
                 write_json_line_file(path, &value)?;
                 record_move(&mut moved, previous_file, sha256_file(path)?);
-                record_move(&mut moved, canonical_sha256(&original)?, canonical_sha256(&value)?);
+                record_move(
+                    &mut moved,
+                    canonical_sha256(&original)?,
+                    canonical_sha256(&value)?,
+                );
                 changed = true;
             }
         }
@@ -234,10 +238,8 @@ fn inline_signed(
     let signature =
         fixture_wrapped_signature(key, schema, &payload).map_err(|error| error.to_string())?;
     let mut signed = value.clone();
-    signed["signature"] = serde_json::Value::String(format!(
-        "sig-ed25519:{key_hex}:{}",
-        signature.to_hex()
-    ));
+    signed["signature"] =
+        serde_json::Value::String(format!("sig-ed25519:{key_hex}:{}", signature.to_hex()));
     Ok(Some(signed))
 }
 
@@ -261,7 +263,10 @@ fn sign_fixture_values(
         _ => return Ok(()),
     }
     let fail = |error: String| {
-        CliError::cli_other_error(format!("fixture {} signing failed: {error}", path.display()))
+        CliError::cli_other_error(format!(
+            "fixture {} signing failed: {error}",
+            path.display()
+        ))
     };
     let mut runtime = value.clone();
     let runtime_signed =
@@ -330,7 +335,11 @@ fn export_envelope_signed(
     let Some(signer) = ENVELOPE_SIGNER_KEYS
         .iter()
         .find_map(|name| object.get(*name))
-        .or_else(|| PAYLOAD_SIGNER_KEYS.iter().find_map(|name| payload.get(*name)))
+        .or_else(|| {
+            PAYLOAD_SIGNER_KEYS
+                .iter()
+                .find_map(|name| payload.get(*name))
+        })
     else {
         return Ok(None);
     };
@@ -340,8 +349,8 @@ fn export_envelope_signed(
         .iter()
         .find(|key| key.public_key() == signer_key)
         .ok_or_else(|| format!("no fixture key for envelope signer {}", signer_key.to_hex()))?;
-    let canonical =
-        chio_core_types::CanonicalBytes::from_serializable(payload).map_err(|error| error.to_string())?;
+    let canonical = chio_core_types::CanonicalBytes::from_serializable(payload)
+        .map_err(|error| error.to_string())?;
     let signature = key
         .sign_wrapped(schema, &canonical)
         .map_err(|error| error.to_string())?;
@@ -380,7 +389,9 @@ fn swarm_signed(
             let Some(graph) = swarm_artifact::<swarm::SwarmTaskGraph>(value) else {
                 return Ok(None);
             };
-            sign_with_any(signers, "task graph", |key| swarm::sign_swarm_task_graph(&graph, key))?
+            sign_with_any(signers, "task graph", |key| {
+                swarm::sign_swarm_task_graph(&graph, key)
+            })?
         }
         swarm::CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA => {
             let Some(plan) = swarm_artifact::<swarm::SwarmRoutePlanReceipt>(value) else {
@@ -459,15 +470,12 @@ fn normalize_runtime_reused_nonce_bundle(
     let mut replay_ack = read_json_value(&source_ack_path)?;
     replay_ack["ack_id"] = serde_json::Value::String("ack-runtime-replay".to_string());
     replay_ack["issued_at"] = serde_json::Value::String("2026-06-10T00:00:03Z".to_string());
-    chio_transaction_passport::sign_runtime_security_artifact(
-        &mut replay_ack,
-        &fixture_signers(),
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "runtime tool-server acknowledgement signing failed: {error}"
-        ))
-    })?;
+    chio_transaction_passport::sign_runtime_security_artifact(&mut replay_ack, &fixture_signers())
+        .map_err(|error| {
+            CliError::cli_other_error(format!(
+                "runtime tool-server acknowledgement signing failed: {error}"
+            ))
+        })?;
     write_json_line_file(&replay_ack_path, &replay_ack)?;
 
     let replay_sha256 = sha256_file(&replay_ack_path)?;

@@ -1422,7 +1422,10 @@ fn post_admin_capability_revoke(
     client
         .post(format!("{base_url}/admin/revocations"))
         .header(AUTHORIZATION, format!("Bearer {token}"))
-        .json(&json!({ "capability_id": capability_id }))
+        .json(&json!({
+            "target": {"kind": "capability_id", "capability_id": capability_id},
+            "reason": "operator_request",
+        }))
         .send()
         .expect("send admin capability revoke request")
 }
@@ -3978,43 +3981,40 @@ fn mcp_serve_http_admin_revocation_queries_and_direct_revoke_work() {
         &client,
         &base_url,
         EDGE_ADMIN_TOKEN,
-        &[("capability_id", &capability_id), ("limit", "10")],
+        &[("capability_id", &capability_id)],
     );
     assert_eq!(before.status(), reqwest::StatusCode::OK);
     let before: Value = before.json().expect("revocations json");
-    assert_eq!(before["capabilityId"], capability_id);
+    assert_eq!(before["capability_id"], capability_id);
     assert_eq!(before["revoked"], false);
-    assert_eq!(before["count"], 0);
+    assert_eq!(before["entry_id"], Value::Null);
 
     let revoked =
         post_admin_capability_revoke(&client, &base_url, EDGE_ADMIN_TOKEN, &capability_id);
     assert_eq!(revoked.status(), reqwest::StatusCode::OK);
     let revoked: Value = revoked.json().expect("revoke json");
-    assert_eq!(revoked["capabilityId"], capability_id);
-    assert_eq!(revoked["revoked"], true);
-    assert_eq!(revoked["newlyRevoked"], true);
+    assert_eq!(revoked["entry"]["target_kind"], "capability_id");
+    assert_eq!(revoked["entry"]["target_value"], capability_id);
+    assert_eq!(revoked["newly_revoked"], true);
 
     let after = get_admin_revocations(
         &client,
         &base_url,
         EDGE_ADMIN_TOKEN,
-        &[("capability_id", &capability_id), ("limit", "10")],
+        &[("capability_id", &capability_id)],
     );
     assert_eq!(after.status(), reqwest::StatusCode::OK);
     let after: Value = after.json().expect("revocations json");
     assert_eq!(after["revoked"], true);
-    assert_eq!(after["count"], 1);
-    let entries = after["revocations"].as_array().expect("revocations array");
-    assert_eq!(entries.len(), 1);
-    assert_eq!(entries[0]["capabilityId"], capability_id);
+    assert_eq!(after["entry_id"], revoked["entry"]["entry_id"]);
 
     let all = get_admin_revocations(&client, &base_url, EDGE_ADMIN_TOKEN, &[("limit", "10")]);
     assert_eq!(all.status(), reqwest::StatusCode::OK);
     let all: Value = all.json().expect("all revocations json");
-    let entries = all["revocations"].as_array().expect("revocations array");
+    let entries = all["entries"].as_array().expect("revocation entries");
     assert!(entries
         .iter()
-        .any(|entry| entry["capabilityId"] == capability_id));
+        .any(|item| item["entry"]["target_value"] == capability_id));
 }
 
 #[test]
@@ -4554,22 +4554,21 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let revoke = post_admin_capability_revoke(&client, &base_url_b, admin_token, &capability_id);
     assert_eq!(revoke.status(), reqwest::StatusCode::OK);
     let revoke: Value = revoke.json().expect("revoke capability json");
-    assert_eq!(revoke["capabilityId"], capability_id);
-    assert_eq!(revoke["revoked"], true);
-    assert_eq!(revoke["newlyRevoked"], true);
+    assert_eq!(revoke["entry"]["target_value"], capability_id);
+    assert_eq!(revoke["newly_revoked"], true);
 
     let control_revocations = get_control_revocations(
         &client,
         &control_base_url,
         control_token,
-        &[("capabilityId", capability_id.as_str()), ("limit", "1")],
+        &[("capability_id", capability_id.as_str())],
     );
     assert_eq!(control_revocations.status(), reqwest::StatusCode::OK);
     let control_revocations: Value = control_revocations
         .json()
         .expect("control revocations json");
     assert_eq!(control_revocations["revoked"], true);
-    assert_eq!(control_revocations["count"], 1);
+    assert_eq!(control_revocations["entry_id"], revoke["entry"]["entry_id"]);
 
     // Prove the repinned node can still execute, then revoke its live token
     // through the other node. The final denial must be due to revocation rather
@@ -4597,7 +4596,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     let revoke_b = post_admin_capability_revoke(&client, &base_url_a, admin_token, capability_b_id);
     assert_eq!(revoke_b.status(), reqwest::StatusCode::OK);
     let revoke_b: Value = revoke_b.json().expect("revoke session B capability");
-    assert_eq!(revoke_b["revoked"], true);
+    assert_eq!(revoke_b["entry"]["target_value"], capability_b_id);
 
     let denied_response = post_json(
         &client,

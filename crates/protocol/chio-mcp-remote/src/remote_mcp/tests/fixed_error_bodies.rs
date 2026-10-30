@@ -175,7 +175,10 @@ async fn every_control_backend_failure_answers_the_fixed_urn_without_the_backend
         (
             "POST",
             ADMIN_REVOCATIONS_PATH,
-            Some(json!({"capability_id": "cap-1"})),
+            Some(json!({
+                "target": {"kind": "capability_id", "capability_id": "cap-1"},
+                "reason": "operator_request"
+            })),
         ),
         ("GET", trust_path.as_str(), None),
     ] {
@@ -280,28 +283,6 @@ async fn an_unopenable_receipt_store_answers_the_fixed_urn_without_its_path() ->
         let (status, response) = admin(&state, "GET", path, None).await?;
         assert_admin_backend_failed(path, status, &response, &path_text);
     }
-    Ok(())
-}
-
-#[tokio::test]
-async fn an_unopenable_revocation_store_answers_the_fixed_urn_without_its_path() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let store = directory.path().join("revocations.sqlite3");
-    std::fs::create_dir(&store)?;
-    let path_text = directory.path().to_string_lossy().into_owned();
-    let state = admin_state(directory.path(), |config| {
-        config.revocation_db_path = Some(store.clone());
-    })?;
-    let (status, response) = admin(&state, "GET", ADMIN_REVOCATIONS_PATH, None).await?;
-    assert_admin_backend_failed("GET revocations", status, &response, &path_text);
-    let (status, response) = admin(
-        &state,
-        "POST",
-        ADMIN_REVOCATIONS_PATH,
-        Some(json!({"capability_id": "cap-1"})),
-    )
-    .await?;
-    assert_admin_backend_failed("POST revocations", status, &response, &path_text);
     Ok(())
 }
 
