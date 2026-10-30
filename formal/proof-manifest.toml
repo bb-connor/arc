@@ -4571,8 +4571,9 @@ rust_symbols = [
   "PostEffectPreparation",
   "ChioKernel::prepare_post_effect",
   "fault_response",
+  "fault_tool_call_response",
 ]
-normalized_sha256 = "2aa91d2f622acd856464d4d051acefc4341da336f75351d7e6dc7ca010a84ca5"
+normalized_sha256 = "1825d2361e8613f616f89248b5d57b39bd3b8acc98cfaf6dd29e7190384bd8de"
 symbol_sha256 = [
   { symbol = "PreparedFaultReceipt::observe_fault_timestamp", sha256 = "f993091cb973eace60a791022d42dd8001fc1669b78dd9af282b0161ab138730" },
   { symbol = "PreparedFaultReceipt::observe_economics", sha256 = "566996166aae0fe72b21b6c6883224afb9fbcebc690a8215ae7cd963b79b9bba" },
@@ -4583,7 +4584,8 @@ symbol_sha256 = [
   { symbol = "PreparedPostEffect", sha256 = "71261edebfea10b075c687faca1d0fbcdc2675d292becc3513f35d197538637e" },
   { symbol = "PostEffectPreparation", sha256 = "89d6f2545d046f69a4d2b03e8e306269828ec221bebea3a127b55d9788fbcf22" },
   { symbol = "ChioKernel::prepare_post_effect", sha256 = "0efdd9c5889551efeefd82932a63706908191f3dbac2a74929e83c1c3d0cc50f" },
-  { symbol = "fault_response", sha256 = "c11684578df72de4f93803b6880a5b7ffd4f510b4a3ef04f2c2f2ed8bb8dd444" },
+  { symbol = "fault_response", sha256 = "ae8b8c913e9599bdadbcc8f297f473f1234ec0a2cd07f53c7744f93d7df6cb76" },
+  { symbol = "fault_tool_call_response", sha256 = "cdf965e18beb3d97431d75f656651b5662abf6cc885ef37362f938b6775f781f" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
