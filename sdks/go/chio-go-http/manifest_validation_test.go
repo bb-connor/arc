@@ -2,10 +2,8 @@ package chio
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -81,6 +79,10 @@ func TestGeneratedManifestRuntimeCorpus(t *testing.T) {
 	if len(corpus.Cases) != 14 {
 		t.Fatalf("expected 14 manifest cases, got %d", len(corpus.Cases))
 	}
+	vector, err := os.ReadFile(filepath.Join("..", "..", "..", "tests", "bindings", "vectors", "security", "cage", "positive", "signed-tool-manifest-v1.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, fixture := range corpus.Cases {
 		t.Run(fixture.Name, func(t *testing.T) {
 			var manifest SecuritySignedToolManifestV1
@@ -119,8 +121,8 @@ func TestGeneratedManifestRuntimeCorpus(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if fmt.Sprintf("%x", sha256.Sum256(canonical)) != "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed" {
-				t.Fatal("current manifest canonical vector hash changed")
+			if !bytes.Equal(canonical, vector) {
+				t.Fatal("current manifest canonical form differs from the frozen vector")
 			}
 		})
 	}

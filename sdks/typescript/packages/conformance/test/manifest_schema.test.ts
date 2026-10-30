@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,6 +20,7 @@ const corpus = JSON.parse(
     instance: Security_SignedToolManifestV1.ChioSignedToolManifestV1 | Record<string, unknown>;
   }>;
 };
+const vector = readFileSync(resolve(workspaceRoot, "tests/bindings/vectors/security/cage/positive/signed-tool-manifest-v1.json"), "utf8");
 const validateWire = createWireSchemaValidator(
   ["tool-flow-declaration", "tool-manifest-v1", "signed-tool-manifest-v1"].map((name) =>
     JSON.parse(readFileSync(resolve(schemaRoot, `security/${name}.schema.json`), "utf8")),
@@ -37,9 +37,7 @@ describe("current manifest consumer wire corpus", () => {
       expect(validateWire(`https://chio.world/schemas/chio-wire/v1/${fixture.schema_file}`, fixture.instance)).toBe(fixture.valid);
       if (fixture.valid) {
         expect(JSON.parse(JSON.stringify(fixture.instance))).toEqual(fixture.instance);
-        expect(createHash("sha256").update(canonicalizeJson(fixture.instance)).digest("hex")).toBe(
-          "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed",
-        );
+        expect(canonicalizeJson(fixture.instance)).toBe(vector);
       }
     });
   }
