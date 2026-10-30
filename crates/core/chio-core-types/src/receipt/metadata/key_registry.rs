@@ -566,7 +566,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Projection,
         None,
-        "Active-defense receipt projection: closed codes and keyed or entropy-backed digests, with every raw identifier a salted commitment under metadata.active_defense. Read by the active-response coordinator, the control-plane security store, lineage ingest and the security event consumer. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Active-defense receipt projection: closed codes and keyed or entropy-backed digests, with every raw identifier a salted commitment under metadata.active_defense. Read by the active-response coordinator, the control-plane security store, lineage ingest and the security event consumer. No production writer emits it, so it is refused.",
     ),
     spec(
         "response_simulation",
@@ -574,7 +574,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Projection,
         None,
-        "Response-simulation report projection: closed codes and keyed digests, with every raw identifier a salted commitment under metadata.response_simulation. Read by the active-response coordinator. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Response-simulation report projection: closed codes and keyed digests, with every raw identifier a salted commitment under metadata.response_simulation. Read by the active-response coordinator. No production writer emits it, so it is refused.",
     ),
     spec(
         "security_event",
@@ -582,7 +582,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Projection,
         None,
-        "Security event projection: closed codes and keyed digests, with the subject a salted commitment under metadata.security_event. Read by the control-plane security event consumer. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Security event projection: closed codes and keyed digests, with the subject a salted commitment under metadata.security_event. Read by the control-plane security event consumer. No production writer emits it, so it is refused.",
     ),
     spec(
         "cage_receipt",
@@ -598,7 +598,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Commitments,
         None,
-        "Guard error detail: the commitment metadata.guard_error.detail over the guard's error text; the signed deny reason carries only the closed code. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Guard error detail: the commitment metadata.guard_error.detail over the guard's error text; the signed deny reason carries only the closed code. No production writer emits it, so it is refused.",
     ),
     spec(
         "refusal",
@@ -606,7 +606,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Commitments,
         None,
-        "Kernel refusal detail: the commitment metadata.refusal.detail over dynamic refusal text; the signed reason carries only the closed code. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Kernel refusal detail: the commitment metadata.refusal.detail over dynamic refusal text; the signed reason carries only the closed code. No production writer emits it, so it is refused.",
     ),
     spec(
         "cancellation",
@@ -614,7 +614,7 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
         Unsafe,
         Commitments,
         None,
-        "Cancellation detail: the commitment metadata.cancellation.detail over host-supplied cancellation text; the signed reason carries only the closed code. No production writer emits it yet, so it is refused until the F commit that lands its writer.",
+        "Cancellation detail: the commitment metadata.cancellation.detail over host-supplied cancellation text; the signed reason carries only the closed code. No production writer emits it, so it is refused.",
     ),
     spec(
         "native_launch",
