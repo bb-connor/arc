@@ -3,6 +3,8 @@ use super::*;
 
 #[path = "runtime_tests/authorization.rs"]
 mod authorization;
+#[path = "runtime_tests/typed_cancellation.rs"]
+mod typed_cancellation;
 use chio_core::capability::{
     governance::ProvenanceEvidenceClass,
     scope::{
@@ -86,10 +88,13 @@ impl ToolServerConnection for EchoServer {
                 "temperature": 22.5,
                 "conditions": "Partly cloudy",
             })),
-            _ => Ok(json!({
-                "tool": tool_name,
-                "arguments": arguments,
-            })),
+            _ => match arguments.get("upstream_result") {
+                Some(result) => Ok(result.clone()),
+                None => Ok(json!({
+                    "tool": tool_name,
+                    "arguments": arguments,
+                })),
+            },
         }
     }
 }
