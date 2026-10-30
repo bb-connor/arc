@@ -68,9 +68,7 @@ use url::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
-use chio_control_plane::trust_control::{
-    self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
-};
+use chio_control_plane::trust_control::{self, RevocationQuery};
 use chio_control_plane::{
     authority_public_key_from_seed_file, configure_budget_store, configure_capability_authority,
     configure_receipt_store, configure_revocation_store, durable_admission_sidecar_path,

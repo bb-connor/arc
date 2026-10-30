@@ -81,12 +81,6 @@ async fn send_revoke(state: &RemoteAppState) -> TestResult<(StatusCode, String)>
     Ok((actual, body))
 }
 
-async fn revoke(state: &RemoteAppState, status: StatusCode) -> TestResult<Value> {
-    let (actual, body) = send_revoke(state).await?;
-    assert_eq!(actual, status, "{body}");
-    Ok(serde_json::from_str(&body)?)
-}
-
 #[tokio::test]
 async fn session_revocation_needs_the_durable_local_store() -> TestResult {
     let directory = tempfile::tempdir()?;
