@@ -14,6 +14,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use chio_core::crypto::{Keypair, SigningBackend};
+use chio_secure_ipc::regular_file::{open_regular, OpenPolicy, RegularFileError};
 use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{Digest32, RecordId};
 use chio_security_types::{
@@ -1440,7 +1441,7 @@ fn load_optional_authority_seed_handoff(
 ) -> Result<Option<(AuthoritySeedHandoff, Keypair, PrivateFileIdentity)>, CliError> {
     match load_authority_seed_handoff(path) {
         Ok(value) => Ok(Some(value)),
-        Err(CliError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(CliError::File(RegularFileError::Missing)) => Ok(None),
         Err(error) => Err(error),
     }
 }
@@ -1533,58 +1534,35 @@ fn write_authority_seed_file_bound(
     atomic_write_private_file(path, contents.as_bytes(), expected_identity).map_err(CliError::Io)
 }
 
+/// Reads private custody opened under [`OpenPolicy::Private`] and returns
+/// its bytes with the identity of the opened file, refusing a path that names
+/// a different file or length once the read ends.
 fn read_private_file(
     path: &Path,
     maximum_bytes: usize,
-) -> Result<(Zeroizing<Vec<u8>>, PrivateFileIdentity), std::io::Error> {
-    let path_metadata = fs::symlink_metadata(path)?;
-    validate_private_file_metadata(&path_metadata)?;
-    #[cfg(unix)]
-    let mut file = {
-        use rustix::fs::{open, Mode, OFlags};
-
-        let descriptor = open(
-            path,
-            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW,
-            Mode::empty(),
-        )
-        .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))?;
-        File::from(descriptor)
-    };
-    #[cfg(not(unix))]
-    let mut file = OpenOptions::new().read(true).open(path)?;
-    let opened_metadata = file.metadata()?;
-    validate_private_file_metadata(&opened_metadata)?;
-    let expected_identity = identity_from_metadata(&path_metadata);
-    if identity_from_metadata(&opened_metadata) != expected_identity {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "private file changed while it was opened",
-        ));
-    }
+) -> Result<(Zeroizing<Vec<u8>>, PrivateFileIdentity), CliError> {
+    let (mut file, opened_metadata) = open_regular(path, OpenPolicy::Private)?;
+    let expected_identity = identity_from_metadata(&opened_metadata);
     let capacity = maximum_bytes
         .checked_add(1)
-        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "file limit"))?;
+        .ok_or_else(|| CliError::cli_io_error("private file limit overflows"))?;
     let limit = u64::try_from(capacity)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "file limit"))?;
+        .map_err(|_| CliError::cli_io_error("private file limit overflows"))?;
     // Capacity covers the overflow byte, so reading never reallocates secret bytes.
     let mut bytes = Zeroizing::new(Vec::with_capacity(capacity));
     Read::by_ref(&mut file)
         .take(limit)
         .read_to_end(&mut bytes)?;
     if bytes.len() > maximum_bytes {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "private file exceeds its byte limit",
-        ));
+        return Err(RegularFileError::TooLarge {
+            max_bytes: maximum_bytes,
+        }
+        .into());
     }
-    let final_path_metadata = fs::symlink_metadata(path)?;
-    validate_private_file_metadata(&final_path_metadata)?;
-    if identity_from_metadata(&final_path_metadata) != expected_identity
+    if private_file_identity(path)? != expected_identity
         || identity_from_metadata(&file.metadata()?) != expected_identity
     {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
+        return Err(CliError::cli_io_error(
             "private file identity changed while it was read",
         ));
     }
@@ -1933,6 +1911,9 @@ pub(crate) mod tests {
         write_authority_seed_file_bound(&path, &Keypair::from_seed(&[0x11; 32]), None)
             .test_unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o4600)).test_unwrap();
-        assert!(load_existing_authority_keypair_with_identity(&path).is_err());
+        assert!(matches!(
+            load_existing_authority_keypair_with_identity(&path),
+            Err(CliError::File(RegularFileError::Exposed { mode: 0o4600 }))
+        ));
     }
 }
