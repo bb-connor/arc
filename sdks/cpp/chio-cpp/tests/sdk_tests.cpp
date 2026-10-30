@@ -1241,7 +1241,7 @@ void test_feature_helpers_and_middleware() {
       [](const std::string& capability_id) {
         return chio::Result<bool>::success(capability_id == "revoked-cap");
       });
-  const auto revoked = verifier.verify("{\"id\":\"revoked-cap\"}");
+  const auto revoked = verifier.verify("{\"id\":\"revoked-cap\"}", std::nullopt);
   require(!revoked.ok(), "expected revoked capability to fail");
   require(revoked.error().code == chio::ErrorCode::CapabilityRevoked,
           "expected revocation error");

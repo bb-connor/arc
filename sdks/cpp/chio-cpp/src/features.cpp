@@ -200,8 +200,8 @@ CapabilityVerifier::CapabilityVerifier(ClockPtr clock,
       max_delegation_depth_(max_delegation_depth),
       revocation_hook_(std::move(revocation_hook)) {}
 
-Result<std::string> CapabilityVerifier::verify(std::string capability_json,
-                                               std::string root_delegator_hex) const {
+Result<std::string> CapabilityVerifier::verify(
+    std::string capability_json, std::optional<std::string> root_delegator_hex) const {
   const auto capability_id = capability_id_from_json(capability_json);
   if (revocation_hook_ && !capability_id.empty()) {
     auto revoked = revocation_hook_(capability_id);

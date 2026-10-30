@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 
 #include "chio/dpop.hpp"
@@ -103,10 +104,10 @@ class CapabilityVerifier {
                      RevocationHook revocation_hook = {});
 
   // `root_delegator_hex` is the parent capability subject the delegation
-  // chain starts from; leave it empty only for a token with no delegation
+  // chain starts from; pass `std::nullopt` only for a token with no delegation
   // chain.
   Result<std::string> verify(std::string capability_json,
-                             std::string root_delegator_hex = {}) const;
+                             std::optional<std::string> root_delegator_hex) const;
 
  private:
   ClockPtr clock_;
