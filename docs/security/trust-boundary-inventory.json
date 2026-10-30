@@ -6012,6 +6012,9 @@
     "crates/platform/chio-control-plane/src/security/event_consumer/verification.rs": [
       "verify_receipt_event::from_value"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/caller_credentials/caller.rs": [
+      "visit_map::custom_deserialize"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs": [
       "sync_peer_child_receipts::from_value",
       "sync_peer_tool_receipts::from_value"
@@ -8361,6 +8364,22 @@
           ],
           "apis": [
             "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-control-plane/src/trust_control/caller_credentials/caller.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "TenantAuthority Deserialize: visit_map decodes an already parsed access configuration table into a deny_unknown_fields TenantTable. Bytes enter through the CLI access configuration reader; no independent ingress here.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
           ],
           "checked": true
         }
