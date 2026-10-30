@@ -1067,17 +1067,6 @@ EXPECTED_ACTIVE_DEFENSE_STEPS = (
     ),
     ("Protocol peer negotiation", "./scripts/check-protocol-peer-negotiation.sh"),
 )
-EXPECTED_ADVERSARIAL_EVIDENCE_STEPS = (
-    ("Install cargo-mutants", "cargo install cargo-mutants --locked --version 25.3.1"),
-    (
-        "Verify gate rejection behavior",
-        "scripts/tests/check-security-adversarial-evidence.test.sh",
-    ),
-    (
-        "Verify freshness-bound mutation evidence",
-        "./scripts/check-security-adversarial-evidence.sh --release",
-    ),
-)
 EXPECTED_ACTIVE_DEFENSE_EXTRAS = {
     "Temporal security gate": {"shell": EXPECTED_TEMPORAL_STEP_SHELL}
 }
