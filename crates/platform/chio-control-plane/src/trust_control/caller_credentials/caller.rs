@@ -3,7 +3,9 @@ use std::collections::BTreeSet;
 use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
-use serde::{Deserialize, Serialize};
+use serde::de::value::MapAccessDeserializer;
+use serde::de::{self, MapAccess, Unexpected, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
@@ -28,11 +30,45 @@ pub enum CredentialKind {
 
 /// The tenants a credential may act for inside its deployment: the keyword
 /// `"deployment"` or `{ tenant = ".." }`.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TenantAuthority {
     Deployment,
     Tenant(String),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TenantTable {
+    tenant: String,
+}
+
+struct TenantAuthorityVisitor;
+
+impl<'de> Visitor<'de> for TenantAuthorityVisitor {
+    type Value = TenantAuthority;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("\"deployment\" or { tenant = \"..\" }")
+    }
+
+    fn visit_str<E: de::Error>(self, value: &str) -> Result<TenantAuthority, E> {
+        if value == "deployment" {
+            return Ok(TenantAuthority::Deployment);
+        }
+        Err(E::invalid_value(Unexpected::Str(value), &self))
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, map: A) -> Result<TenantAuthority, A::Error> {
+        let TenantTable { tenant } = TenantTable::deserialize(MapAccessDeserializer::new(map))?;
+        Ok(TenantAuthority::Tenant(tenant))
+    }
+}
+
+impl<'de> Deserialize<'de> for TenantAuthority {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(TenantAuthorityVisitor)
+    }
 }
 
 /// A caller credential secret: non-empty, without surrounding whitespace or

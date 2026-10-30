@@ -142,6 +142,26 @@ fn old_config_keys_refuse_at_startup() {
 }
 
 #[test]
+fn tenant_authority_decodes_only_its_two_forms() {
+    let deployment = "tenant_authority = \"deployment\"\n";
+    assert!(reader().contains(deployment));
+    for value in [
+        "{ deployment = {} }",
+        "{ tenant = \"a\", x = 1 }",
+        "{ tenant = 1 }",
+        "{}",
+        "\"Deployment\"",
+        "\"tenant\"",
+        "1",
+    ] {
+        let text = reader().replace(deployment, &format!("tenant_authority = {value}\n"));
+        assert!(decode_refused(&config(&text)), "{value}");
+    }
+    let tenant = reader().replace(deployment, "tenant_authority = { tenant = \"a\" }\n");
+    assert!(!decode_refused(&config(&tenant)));
+}
+
+#[test]
 fn credential_with_unknown_scope_refuses_at_startup() {
     let error = refusal(&config(&credential(
         "reader",
