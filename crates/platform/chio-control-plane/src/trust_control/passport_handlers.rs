@@ -1410,56 +1410,69 @@ pub(crate) async fn handle_federated_issue(
         Ok(None) => {}
         Err(response) => return response,
     }
+    match execute_federated_issue(&state, &payload).await {
+        Ok(response) => Json(response).into_response(),
+        Err(response) => response,
+    }
+}
+
+pub(crate) async fn execute_federated_issue(
+    state: &TrustServiceState,
+    payload: &FederatedIssueRequest,
+) -> Result<FederatedIssueResponse, Response> {
     if let Some(advertise_url) = state.config.advertise_url.as_deref() {
         if payload.expected_challenge.verifier != advertise_url {
-            return plain_http_error(
+            return Err(plain_http_error(
                 StatusCode::BAD_REQUEST,
                 "expected challenge verifier must match the trust-control service advertise URL",
-            );
+            ));
         }
     }
-    let (first_seen, _) = match acceptance_instant(&state) {
+    let (first_seen, _) = match acceptance_instant(state) {
         Ok(instant) => instant,
-        Err(response) => return response,
+        Err(response) => return Err(response),
     };
     if let Err(error) =
         chio_credentials::verify_agent_passport(&payload.presentation.passport, first_seen)
     {
-        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+        return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
     }
     let binding = PartnerPassportBinding::Native(payload.presentation.passport.clone());
-    let partner_door = match prepare_partner_door(&state, binding).await {
+    let partner_door = match prepare_partner_door(state, binding).await {
         Ok(door) => door,
-        Err(response) => return response,
+        Err(response) => return Err(response),
     };
-    let (now, accept_unix_ms) = match acceptance_instant(&state) {
+    let (now, accept_unix_ms) = match acceptance_instant(state) {
         Ok(instant) => instant,
-        Err(response) => return response,
+        Err(response) => return Err(response),
     };
     if let Some(policy) = payload.delegation_policy.as_ref() {
         if let Err(error) = verify_federated_delegation_policy(policy)
             .and_then(|_| ensure_federated_delegation_policy_active(policy, now))
         {
-            return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
+            return Err(plain_http_error(
+                StatusCode::BAD_REQUEST,
+                &error.to_string(),
+            ));
         }
         if policy.body.verifier != payload.expected_challenge.verifier {
-            return plain_http_error(
+            return Err(plain_http_error(
                 StatusCode::BAD_REQUEST,
                 "federated delegation policy verifier must match the expected passport challenge verifier",
-            );
+            ));
         }
         if let Some(advertise_url) = state.config.advertise_url.as_deref() {
             if policy.body.verifier != advertise_url {
-                return plain_http_error(
+                return Err(plain_http_error(
                     StatusCode::BAD_REQUEST,
                     "federated delegation policy verifier must match the trust-control service advertise URL",
-                );
+                ));
             }
         }
         if let Err(error) =
             ensure_requested_capability_within_delegation_policy(&payload.capability, policy, now)
         {
-            return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+            return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
         }
     }
     if let Some(upstream_capability_id) = payload.upstream_capability_id.as_deref() {
@@ -1470,10 +1483,10 @@ pub(crate) async fn handle_federated_issue(
         {
             Some(parent_capability_id) if parent_capability_id == upstream_capability_id => {}
             _ => {
-                return plain_http_error(
+                return Err(plain_http_error(
                     StatusCode::BAD_REQUEST,
                     "multi-hop federated issuance requires a delegation policy bound to the exact upstream capability id",
-                );
+                ));
             }
         }
     } else if payload
@@ -1482,10 +1495,10 @@ pub(crate) async fn handle_federated_issue(
         .and_then(|policy| policy.body.parent_capability_id.as_deref())
         .is_some()
     {
-        return plain_http_error(
+        return Err(plain_http_error(
             StatusCode::BAD_REQUEST,
             "delegation policy parent_capability_id requires --upstream-capability-id on the issuance request",
-        );
+        ));
     }
 
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
@@ -1494,23 +1507,28 @@ pub(crate) async fn handle_federated_issue(
         now,
     ) {
         Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error) => {
+            return Err(plain_http_error(
+                StatusCode::BAD_REQUEST,
+                &error.to_string(),
+            ))
+        }
     };
     if resolved_policy.is_none() {
-        return plain_http_error(
+        return Err(plain_http_error(
             StatusCode::BAD_REQUEST,
             "federated issuance requires an embedded or stored verifier policy",
-        );
+        ));
     }
     if resolved_policy
         .as_ref()
         .is_some_and(|policy| policy.require_active_lifecycle)
         && state.config.passport_statuses_file.is_none()
     {
-        return plain_http_error(
+        return Err(plain_http_error(
             StatusCode::CONFLICT,
             "passport verifier policy requires active lifecycle enforcement, but the trust-control service is missing --passport-statuses-file",
-        );
+        ));
     }
 
     let mut verification = match verify_passport_presentation_response_with_policy(
@@ -1521,7 +1539,7 @@ pub(crate) async fn handle_federated_issue(
         policy_source,
     ) {
         Ok(verification) => verification,
-        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+        Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
     };
     match resolve_passport_lifecycle_for_service(&state.config, &payload.presentation.passport, now)
     {
@@ -1548,13 +1566,13 @@ pub(crate) async fn handle_federated_issue(
                 }
             }
         }
-        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+        Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
     }
     let mut store =
         if payload.delegation_policy.is_some() || payload.upstream_capability_id.is_some() {
             match state.receipt_store() {
                 Ok(store) => Some(store),
-                Err(response) => return response,
+                Err(response) => return Err(response),
             }
         } else {
             None
@@ -1563,19 +1581,19 @@ pub(crate) async fn handle_federated_issue(
         payload.upstream_capability_id.as_deref()
     {
         let Some(store) = store.as_ref() else {
-            return plain_http_error(
+            return Err(plain_http_error(
                 StatusCode::CONFLICT,
                 "multi-hop federated issuance requires --receipt-db so imported upstream evidence can be resolved",
-            );
+            ));
         };
         match store.get_federated_share_for_capability(upstream_capability_id) {
             Ok(Some((share, snapshot))) => {
                 if let Some(policy) = payload.delegation_policy.as_ref() {
                     if share.signer_public_key != policy.body.signer_public_key.to_hex() {
-                        return plain_http_error(
+                        return Err(plain_http_error(
                             StatusCode::FORBIDDEN,
                             "delegation policy signer must match the signer that shared the imported upstream evidence package",
-                        );
+                        ));
                     }
                 }
                 if let Err(error) = ensure_requested_capability_within_parent_snapshot(
@@ -1583,25 +1601,28 @@ pub(crate) async fn handle_federated_issue(
                     &snapshot,
                     now,
                 ) {
-                    return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+                    return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
                 }
                 Some((share.share_id, snapshot))
             }
             Ok(None) => {
-                return plain_http_error(
+                return Err(plain_http_error(
                     StatusCode::NOT_FOUND,
                     "imported upstream capability was not found in the local federated evidence-share index",
-                );
+                ));
             }
             Err(error) => {
-                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+                return Err(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                ));
             }
         }
     } else {
         None
     };
     if let Err(error) = partner_door.admit(accept_unix_ms) {
-        return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
+        return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
     }
     match consume_challenge_if_configured(
         &state.config,
@@ -1611,17 +1632,22 @@ pub(crate) async fn handle_federated_issue(
         now,
     ) {
         Ok(replay_state) => verification.replay_state = replay_state,
-        Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+        Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
     }
     if !verification.accepted {
-        return plain_http_error(
+        return Err(plain_http_error(
             StatusCode::FORBIDDEN,
             "passport presentation did not satisfy the verifier policy",
-        );
+        ));
     }
     let subject_did = match DidChio::from_str(&verification.subject) {
         Ok(subject_did) => subject_did,
-        Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+        Err(error) => {
+            return Err(plain_http_error(
+                StatusCode::BAD_REQUEST,
+                &error.to_string(),
+            ))
+        }
     };
     let subject_public_key = subject_did.public_key();
     let subject_public_key_hex = subject_public_key.to_hex();
@@ -1633,7 +1659,7 @@ pub(crate) async fn handle_federated_issue(
                 match EnterpriseProviderRegistry::load(path) {
                     Ok(registry) => Some(registry),
                     Err(error) => {
-                        return plain_http_error(StatusCode::CONFLICT, &error.to_string())
+                        return Err(plain_http_error(StatusCode::CONFLICT, &error.to_string()))
                     }
                 }
             }
@@ -1649,27 +1675,27 @@ pub(crate) async fn handle_federated_issue(
             build_enterprise_admission_audit(identity, &subject_public_key_hex, validated_provider);
         if identity.provider_id.trim().is_empty() {
             audit.decision_reason = Some("enterprise identity is missing provider_id".to_string());
-            return enterprise_admission_response(
+            return Err(enterprise_admission_response(
                 StatusCode::FORBIDDEN,
                 "enterprise-provider admission requires provider_id",
                 &audit,
-            );
+            ));
         }
         if identity.principal.trim().is_empty() {
             audit.decision_reason = Some("enterprise identity is missing principal".to_string());
-            return enterprise_admission_response(
+            return Err(enterprise_admission_response(
                 StatusCode::FORBIDDEN,
                 "enterprise-provider admission requires principal",
                 &audit,
-            );
+            ));
         }
         if identity.subject_key.trim().is_empty() {
             audit.decision_reason = Some("enterprise identity is missing subject_key".to_string());
-            return enterprise_admission_response(
+            return Err(enterprise_admission_response(
                 StatusCode::FORBIDDEN,
                 "enterprise-provider admission requires subject_key",
                 &audit,
-            );
+            ));
         }
         if lane_active {
             let Some(provider) = validated_provider else {
@@ -1677,22 +1703,22 @@ pub(crate) async fn handle_federated_issue(
                     "enterprise-provider lane is active but provider_record_id is not validated"
                         .to_string(),
                 );
-                return enterprise_admission_response(
+                return Err(enterprise_admission_response(
                     StatusCode::FORBIDDEN,
                     "enterprise-provider lane requires a validated provider record",
                     &audit,
-                );
+                ));
             };
             let Some(policy) = payload.admission_policy.as_ref() else {
                 audit.decision_reason = Some(
                     "enterprise-provider lane is active but no admission policy was provided"
                         .to_string(),
                 );
-                return enterprise_admission_response(
+                return Err(enterprise_admission_response(
                     StatusCode::FORBIDDEN,
                     "enterprise-provider lane requires an admission policy with enterprise origin rules",
                     &audit,
-                );
+                ));
             };
             let Some(profile_id) = chio_policy::selected_origin_profile_id(
                 policy,
@@ -1702,11 +1728,11 @@ pub(crate) async fn handle_federated_issue(
                     "enterprise identity did not match any configured enterprise origin profile"
                         .to_string(),
                 );
-                return enterprise_admission_response(
+                return Err(enterprise_admission_response(
                     StatusCode::FORBIDDEN,
                     "enterprise identity did not satisfy any configured origin profile",
                     &audit,
-                );
+                ));
             };
             audit.matched_origin_profile = Some(profile_id);
             if matches!(provider.kind, EnterpriseProviderKind::Scim) {
@@ -1730,11 +1756,11 @@ pub(crate) async fn handle_federated_issue(
                     }
                     Err(error) => {
                         audit.decision_reason = Some(error.to_string());
-                        return enterprise_admission_response(
+                        return Err(enterprise_admission_response(
                             StatusCode::FORBIDDEN,
                             &error.to_string(),
                             &audit,
-                        );
+                        ));
                     }
                 }
             } else {
@@ -1752,9 +1778,9 @@ pub(crate) async fn handle_federated_issue(
         enterprise_audit = Some(audit);
     }
     let authority = if payload.delegation_policy.is_some() {
-        load_capability_authority_with_deferred_lineage(&state)
+        load_capability_authority_with_deferred_lineage(state)
     } else {
-        load_capability_authority(&state)
+        load_capability_authority(state)
     };
     match authority {
         Ok(authority) => {
@@ -1764,10 +1790,10 @@ pub(crate) async fn handle_federated_issue(
                     .iter()
                     .any(|key| key == &policy.body.signer_public_key)
                 {
-                    return plain_http_error(
+                    return Err(plain_http_error(
                         StatusCode::FORBIDDEN,
                         "federated delegation policy signer is not trusted by the local capability authority",
-                    );
+                    ));
                 }
             }
             match authority.issue_capability(
@@ -1784,19 +1810,19 @@ pub(crate) async fn handle_federated_issue(
                             &capability.id,
                             now,
                         ) {
-                            return plain_http_error(
+                            return Err(plain_http_error(
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 &error.to_string(),
-                            );
+                            ));
                         }
                     }
                     let mut delegation_anchor_capability_id = None;
                     if let Some(policy) = payload.delegation_policy.as_ref() {
                         let Some(store) = store.as_mut() else {
-                            return plain_http_error(
+                            return Err(plain_http_error(
                                 StatusCode::CONFLICT,
                                 "federated delegation issuance requires --receipt-db so the lineage anchor can be persisted",
-                            );
+                            ));
                         };
                         let anchor_snapshot = match build_federated_delegation_anchor_snapshot(
                             policy,
@@ -1807,10 +1833,10 @@ pub(crate) async fn handle_federated_issue(
                         ) {
                             Ok(snapshot) => snapshot,
                             Err(error) => {
-                                return plain_http_error(
+                                return Err(plain_http_error(
                                     StatusCode::INTERNAL_SERVER_ERROR,
                                     &error.to_string(),
-                                );
+                                ));
                             }
                         };
                         let signed_parent_capability_id = capability
@@ -1824,10 +1850,10 @@ pub(crate) async fn handle_federated_issue(
                         ) {
                             Ok(snapshot) => snapshot,
                             Err(error) => {
-                                return plain_http_error(
+                                return Err(plain_http_error(
                                     StatusCode::INTERNAL_SERVER_ERROR,
                                     &error.to_string(),
-                                );
+                                ));
                             }
                         };
                         child_snapshot.federated_parent_capability_id =
@@ -1841,14 +1867,14 @@ pub(crate) async fn handle_federated_issue(
                             upstream_bridge,
                             &child_snapshot,
                         ) {
-                            return plain_http_error(
+                            return Err(plain_http_error(
                                 StatusCode::INTERNAL_SERVER_ERROR,
                                 &error.to_string(),
-                            );
+                            ));
                         }
                         delegation_anchor_capability_id = Some(anchor_snapshot.capability_id);
                     }
-                    Json(FederatedIssueResponse {
+                    Ok(FederatedIssueResponse {
                         subject: verification.subject.clone(),
                         subject_public_key: subject_public_key_hex,
                         verification,
@@ -1860,21 +1886,21 @@ pub(crate) async fn handle_federated_issue(
                         enterprise_audit,
                         delegation_anchor_capability_id,
                     })
-                    .into_response()
                 }
                 Err(chio_kernel::KernelError::CapabilityIssuanceDenied(error)) => {
-                    if let Some(audit) = enterprise_audit.as_ref() {
+                    Err(if let Some(audit) = enterprise_audit.as_ref() {
                         enterprise_admission_response(StatusCode::FORBIDDEN, &error, audit)
                     } else {
                         plain_http_error(StatusCode::FORBIDDEN, &error)
-                    }
+                    })
                 }
-                Err(error) => {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                }
+                Err(error) => Err(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &error.to_string(),
+                )),
             }
         }
-        Err(response) => response,
+        Err(response) => Err(response),
     }
 }
 

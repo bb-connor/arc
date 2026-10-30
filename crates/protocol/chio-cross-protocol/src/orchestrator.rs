@@ -66,7 +66,7 @@ impl OrchestratedToolCall {
                 "authoritative": true,
                 "reason": self.response.client_reason(),
                 "denialCode": self.response.client_denial().map(chio_kernel::ClientDenialCode::code),
-                "terminalState": self.response.terminal_state,
+                "terminalState": self.response.client_terminal_state(),
                 "executionNonce": self.response.execution_nonce,
                 "routeSelection": self
                     .response

@@ -691,6 +691,7 @@ impl ChioMcpEdge {
         } = args;
         let peer_supports_chio_tool_streaming = self.peer_supports_chio_tool_streaming(session_id);
         crate::metrics::record_receipt_write_verdict(verdict);
+        let client_denial = chio_kernel::ClientDenialCode::for_verdict(verdict, denial_code);
         let result = kernel_response_to_tool_result(KernelResponseToToolResultArgs {
             pending_notifications: &mut self.pending_notifications,
             request_id: client_request_id,
@@ -711,7 +712,7 @@ impl ChioMcpEdge {
 
         match terminal_state {
             OperationTerminalState::Cancelled { reason } => ToolCallEdgeOutcome::Cancelled {
-                reason: reason.clone(),
+                reason: client_denial.map_or_else(|| reason.clone(), |code| code.text().to_owned()),
             },
             _ => ToolCallEdgeOutcome::Result(result),
         }

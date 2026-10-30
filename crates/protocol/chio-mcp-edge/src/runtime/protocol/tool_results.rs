@@ -31,10 +31,20 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         peer_supports_chio_tool_streaming,
         related_task_id,
     } = args;
+    let client_denial = ClientDenialCode::for_verdict(verdict, denial_code);
+    let client_terminal_state = match client_denial {
+        Some(code) => code.terminal_state(terminal_state),
+        None => terminal_state.clone(),
+    };
+    let terminal_state = &client_terminal_state;
     let is_error = matches!(verdict, Verdict::Deny) || !terminal_state.is_completed();
-    let terminal_reason = reason
-        .as_deref()
-        .or_else(|| terminal_state_reason(terminal_state));
+    let terminal_reason = match client_denial {
+        Some(code) => Some(code.text()),
+        None => reason
+            .as_deref()
+            .or_else(|| terminal_state_reason(terminal_state)),
+    };
+    let streamed = matches!(output, Some(ToolCallOutput::Stream(_)));
 
     // Preserve the exact value whose canonical bytes the kernel signed. MCP
     // projection can wrap it, while denied and incomplete outputs stay hidden.
@@ -50,8 +60,9 @@ pub(in crate::runtime) fn kernel_response_to_tool_result(
         chio_cross_protocol::execution::pending_approval_result(verdict, output.as_ref())
     {
         json!({"content":[], "structuredContent":pending, "isError":false})
-    } else if verdict == Verdict::Deny && terminal_state.is_completed() {
-        denial_tool_result(denial_code.unwrap_or(ClientDenialCode::Denied))
+    } else if let Some(code) = client_denial.filter(|_| !streamed || terminal_state.is_completed())
+    {
+        denial_tool_result(code)
     } else {
         match output {
             Some(ToolCallOutput::Value(value)) if !is_error => value_to_tool_result(value),

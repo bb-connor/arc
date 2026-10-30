@@ -1354,3 +1354,51 @@ fn guard_denial_projects_only_its_family_text() {
     );
     assert_eq!(invocations.load(Ordering::SeqCst), 0);
 }
+
+struct IncompleteToolServer;
+
+#[async_trait::async_trait]
+impl ToolServerConnection for IncompleteToolServer {
+    fn server_id(&self) -> &str {
+        "test-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["get_weather".to_string(), "search".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        Err(KernelError::RequestIncomplete(PRIVATE_DETAIL.to_string()))
+    }
+}
+
+#[test]
+fn incomplete_denial_projects_the_generic_text_without_its_reason() {
+    let adapter = ChioOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+    let mut kernel = ChioKernel::new(test_kernel_config());
+    kernel.register_tool_server(Box::new(IncompleteToolServer));
+    let agent_kp = Keypair::generate();
+    let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+
+    let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+
+    assert!(result.denied);
+    assert_eq!(result.content, "Error: Request denied");
+    let receipt = serde_json::to_string(result.receipt.as_ref().unwrap()).unwrap();
+    assert!(
+        receipt.contains(PRIVATE_DETAIL),
+        "receipt lost the incomplete reason: {receipt}"
+    );
+    let mut client = serde_json::to_value(&result).unwrap();
+    client["receipt"] = Value::Null;
+    let client = client.to_string();
+    assert!(
+        !client.contains(PRIVATE_DETAIL),
+        "incomplete reason reached a client field: {client}"
+    );
+}

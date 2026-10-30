@@ -48,6 +48,30 @@ pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 17] = [
 ];
 
 impl ClientDenialCode {
+    /// The code a client observes for a verdict. A deny without a family
+    /// code observes `Denied`; no other verdict has a code.
+    pub fn for_verdict(verdict: crate::Verdict, code: Option<Self>) -> Option<Self> {
+        (verdict == crate::Verdict::Deny).then(|| code.unwrap_or(Self::Denied))
+    }
+
+    /// The terminal state a client observes under this code: a cancelled or
+    /// incomplete state carries the fixed text of the code as its reason.
+    pub fn terminal_state(
+        self,
+        state: &chio_core::session::OperationTerminalState,
+    ) -> chio_core::session::OperationTerminalState {
+        use chio_core::session::OperationTerminalState;
+        match state {
+            OperationTerminalState::Completed => OperationTerminalState::Completed,
+            OperationTerminalState::Cancelled { .. } => OperationTerminalState::Cancelled {
+                reason: self.text().to_owned(),
+            },
+            OperationTerminalState::Incomplete { .. } => OperationTerminalState::Incomplete {
+                reason: self.text().to_owned(),
+            },
+        }
+    }
+
     /// The stable `(wire code, client text)` pair.
     const fn wire(self) -> (&'static str, &'static str) {
         match self {
