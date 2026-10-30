@@ -3,6 +3,8 @@
 use std::fs::{File, Metadata};
 use std::path::Path;
 
+use zeroize::Zeroizing;
+
 /// Who may own an operator file and which permission bits it may carry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OpenPolicy {
@@ -12,8 +14,8 @@ pub enum OpenPolicy {
     /// Authority-granting configuration: owned by this user or root, and
     /// neither group nor world writable (sshd `StrictModes`).
     Trusted,
-    /// A secret: owned by this user, with no group or other bits and no
-    /// second hard link.
+    /// A secret: owned by this user, with no mode bit outside owner read and
+    /// write, and no second hard link.
     Private,
 }
 
@@ -30,7 +32,7 @@ pub enum RegularFileError {
     ForeignOwner { uid: u32 },
     #[error("file is writable by group or other (mode {mode:o})")]
     Writable { mode: u32 },
-    #[error("file is open to group or other (mode {mode:o})")]
+    #[error("file mode {mode:o} grants more than owner read and write")]
     Exposed { mode: u32 },
     #[error("file has {links} hard links")]
     MultiplyLinked { links: u64 },
@@ -91,26 +93,50 @@ pub fn open_regular(
     Err(RegularFileError::Io(std::io::ErrorKind::Unsupported))
 }
 
-/// Reads the regular file [`open_regular`] opens at `path` under `policy`,
-/// refusing it as [`RegularFileError::TooLarge`] once it holds more than
-/// `max_bytes` bytes. At most `max_bytes + 1` bytes are read.
+/// Reads the regular file [`open_regular`] opens at `path` under `policy`.
+/// See [`read_opened`].
 pub fn read_regular_file(
     path: &Path,
     max_bytes: usize,
     policy: OpenPolicy,
-) -> Result<Vec<u8>, RegularFileError> {
+) -> Result<Zeroizing<Vec<u8>>, RegularFileError> {
+    let (file, _) = open_regular(path, policy)?;
+    read_opened(file, max_bytes)
+}
+
+/// Reads `file` from its current offset, refusing it as
+/// [`RegularFileError::TooLarge`] once it holds more than `max_bytes` bytes.
+/// At most `max_bytes + 1` bytes are read. Every buffer that held file bytes
+/// is wiped when it is dropped, on success and on every refusal, and a buffer
+/// that must grow is copied into a larger one rather than reallocated.
+pub(crate) fn read_opened(
+    mut file: File,
+    max_bytes: usize,
+) -> Result<Zeroizing<Vec<u8>>, RegularFileError> {
     use std::io::Read;
 
-    let (file, _) = open_regular(path, policy)?;
-    let limit = u64::try_from(max_bytes)
-        .unwrap_or(u64::MAX)
-        .saturating_add(1);
-    let mut bytes = Vec::new();
-    file.take(limit).read_to_end(&mut bytes)?;
-    if bytes.len() > max_bytes {
+    let ceiling = max_bytes.saturating_add(1);
+    let expected = usize::try_from(file.metadata()?.len()).unwrap_or(usize::MAX);
+    let mut buffer = Zeroizing::new(vec![0; expected.min(max_bytes).saturating_add(1)]);
+    let mut filled = 0;
+    while filled < ceiling {
+        if filled == buffer.len() {
+            let mut grown = Zeroizing::new(vec![0; buffer.len().saturating_mul(2).min(ceiling)]);
+            grown[..filled].copy_from_slice(&buffer[..filled]);
+            buffer = grown;
+        }
+        match file.read(&mut buffer[filled..]) {
+            Ok(0) => break,
+            Ok(read) => filled += read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if filled > max_bytes {
         return Err(RegularFileError::TooLarge { max_bytes });
     }
-    Ok(bytes)
+    buffer.truncate(filled);
+    Ok(buffer)
 }
 
 /// The owner, mode and link rule of `policy` for a file owned by `uid` with
@@ -132,7 +158,7 @@ pub(crate) fn check_ownership(
         OpenPolicy::Trusted if permissions & 0o022 != 0 => {
             Err(RegularFileError::Writable { mode: permissions })
         }
-        OpenPolicy::Private if permissions & 0o077 != 0 => {
+        OpenPolicy::Private if permissions & !0o600 != 0 => {
             Err(RegularFileError::Exposed { mode: permissions })
         }
         OpenPolicy::Private if links > 1 => Err(RegularFileError::MultiplyLinked { links }),

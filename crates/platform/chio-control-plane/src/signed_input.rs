@@ -7,6 +7,7 @@ use chio_secure_ipc::registry_file::{RegistryFile, RegistryFileError};
 use chio_secure_ipc::regular_file::{read_regular_file, OpenPolicy, RegularFileError};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use zeroize::Zeroizing;
 
 use crate::passport_verifier::{RegistryTransactionError, RegistryUpdateError};
 use crate::CliError;
@@ -17,7 +18,7 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 #[path = "signed_input/read_pause.rs"]
 pub(crate) mod read_pause;
 
-pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, RegularFileError> {
+pub(crate) fn read_bounded(path: &Path) -> Result<Zeroizing<Vec<u8>>, RegularFileError> {
     read_bounded_with_limit(path, MAX_SIGNED_FILE_BYTES)
 }
 
@@ -26,7 +27,7 @@ pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, RegularFileError> {
 pub(crate) fn read_bounded_with_limit(
     path: &Path,
     max_bytes: usize,
-) -> Result<Vec<u8>, RegularFileError> {
+) -> Result<Zeroizing<Vec<u8>>, RegularFileError> {
     read_regular_file(path, max_bytes, OpenPolicy::Authenticated)
 }
 
