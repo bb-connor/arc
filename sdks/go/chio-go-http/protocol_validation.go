@@ -7,6 +7,8 @@ package chio
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +16,7 @@ import (
 	"reflect"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const maxSecurityWireBytes = 1 << 20
@@ -380,4 +383,68 @@ func validateAggregateBudgetJSON(data []byte) error {
 	default:
 		return fmt.Errorf("unknown aggregate budget scope")
 	}
+}
+
+var revocationEntryMembers = []string{"schema", "entry_id", "target_kind", "target_value", "revoked_at", "reason"}
+
+// validateRevocationEntryJSON is invoked by the generated union decoder before
+// retaining new bytes. It refuses what chio.revocation-entry.v1 refuses: a
+// closed member set, the schema constant, a closed reason, a target value whose
+// shape follows its kind, and an entry id other than the one its target derives.
+func validateRevocationEntryJSON(data []byte) error {
+	var entry struct {
+		Schema      string `json:"schema"`
+		EntryID     string `json:"entry_id"`
+		TargetKind  string `json:"target_kind"`
+		TargetValue string `json:"target_value"`
+		RevokedAt   int64  `json:"revoked_at"`
+		Reason      string `json:"reason"`
+	}
+	if err := decodeManifestObject(data, &entry, revocationEntryMembers, nil); err != nil {
+		return err
+	}
+	if entry.Schema != "chio.revocation-entry.v1" {
+		return fmt.Errorf("invalid revocation entry schema")
+	}
+	if entry.RevokedAt < 1 {
+		return fmt.Errorf("invalid revocation time")
+	}
+	switch entry.Reason {
+	case "operator_request", "credential_compromise", "principal_offboarded",
+		"tenant_offboarded", "policy_withdrawn", "incident_response":
+	default:
+		return fmt.Errorf("unknown revocation reason")
+	}
+	switch entry.TargetKind {
+	case "capability_id", "root_policy_rule":
+		length := utf8.RuneCountInString(entry.TargetValue)
+		if !utf8.ValidString(entry.TargetValue) || length < 1 || length > 512 || strings.ContainsRune(entry.TargetValue, 0) {
+			return fmt.Errorf("invalid revocation target identifier")
+		}
+	case "anchor_subject", "tenant_tag", "replay_key":
+		if !isLowercaseHexDigest(entry.TargetValue) {
+			return fmt.Errorf("revocation target digest is not 64 lowercase hex")
+		}
+	default:
+		return fmt.Errorf("unknown revocation target kind")
+	}
+	// Kinds and values are NUL-free, so the NUL-separated preimage is injective.
+	digest := sha256.Sum256([]byte("chio.revocation-entry-id.v1\x00" + entry.TargetKind + "\x00" + entry.TargetValue))
+	if entry.EntryID != "rev_"+hex.EncodeToString(digest[:]) {
+		return fmt.Errorf("revocation entry id is not the id its target derives")
+	}
+	return nil
+}
+
+func isLowercaseHexDigest(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
 }
