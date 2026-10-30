@@ -1554,17 +1554,7 @@ async fn execute_bridge_mcp_tool_call_async_preserves_model_metadata() {
 #[test]
 fn tools_call_uses_meta_model_metadata_and_records_asserted_provenance() {
     let mut edge = make_model_constrained_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let denied = edge
         .handle_jsonrpc(json!({
@@ -1970,17 +1960,7 @@ fn initialize_rejects_non_object_params_without_opening_session() {
 #[test]
 fn tools_list_includes_next_cursor_only_when_another_page_remains() {
     let mut edge = make_edge(1);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let first_page = edge
         .handle_jsonrpc(json!({
@@ -2008,17 +1988,7 @@ fn tools_list_includes_next_cursor_only_when_another_page_remains() {
 #[test]
 fn tools_list_is_paginated() {
     let mut edge = make_edge(2);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let first_page = edge
         .handle_jsonrpc(json!({
@@ -2374,17 +2344,7 @@ fn in_process_runtime_drain_flushes_late_async_events_without_request_bridge() {
 fn in_process_runtime_drain_completes_task_after_tools_call_returns_task() {
     let mut edge = make_edge(10);
     edge.set_session_auth_context(SessionAuthContext::in_process_anonymous());
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let create = edge
         .handle_jsonrpc(json!({
@@ -2439,17 +2399,7 @@ fn in_process_runtime_drain_completes_task_after_tools_call_returns_task() {
 #[test]
 fn tools_call_returns_structured_content_for_object_results() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -2471,17 +2421,7 @@ fn tools_call_returns_structured_content_for_object_results() {
 #[test]
 fn tools_call_denied_by_capabilities_returns_tool_error() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -2561,17 +2501,7 @@ fn tools_call_streams_chunks_via_experimental_notifications_when_negotiated() {
 #[test]
 fn tools_call_streams_collapse_when_peer_does_not_negotiate_extension() {
     let mut edge = make_streaming_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -2788,17 +2718,7 @@ fn task_with_zero_ttl_is_rejected_before_creation() {
         "fingerprint",
         None,
     ));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let create = edge
         .handle_jsonrpc(json!({
@@ -2828,17 +2748,7 @@ fn task_creation_rejects_ttl_above_edge_retention_ceiling() {
         "fingerprint",
         None,
     ));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let rejected = edge
         .handle_jsonrpc(json!({
@@ -2875,17 +2785,7 @@ fn task_creation_rejects_deferred_task_map_over_cap() {
         "fingerprint",
         None,
     ));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     for index in 0..1_024 {
         let create = edge
@@ -2925,17 +2825,7 @@ fn task_creation_rejects_deferred_task_map_over_cap() {
 #[test]
 fn task_methods_reject_malformed_task_ids_before_lookup() {
     let mut edge = make_streaming_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     for (index, method, task_id) in [
         (10, "tasks/get", ""),
@@ -2962,17 +2852,7 @@ fn task_methods_reject_malformed_task_ids_before_lookup() {
 #[test]
 fn tasks_cancel_marks_working_task_cancelled_and_result_returns_error_payload() {
     let mut edge = make_streaming_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let create = edge
         .handle_jsonrpc(json!({
@@ -3412,17 +3292,7 @@ fn read_jsonrpc_line_rejects_delimiterless_frame() {
 #[test]
 fn resources_list_is_filtered_by_capabilities() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -3441,17 +3311,7 @@ fn resources_list_is_filtered_by_capabilities() {
 #[test]
 fn resources_read_returns_contents() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -3486,17 +3346,7 @@ fn resources_read_allows_in_root_filesystem_resources() {
     )
     .unwrap();
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let session_id = match &edge.state {
         EdgeState::Ready { session_id } => session_id.clone(),
@@ -3548,17 +3398,7 @@ fn resources_read_denies_out_of_root_filesystem_resources() {
     )
     .unwrap();
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let session_id = match &edge.state {
         EdgeState::Ready { session_id } => session_id.clone(),
@@ -3621,17 +3461,7 @@ fn resources_read_denies_filesystem_resources_when_roots_are_missing() {
     )
     .unwrap();
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let response = edge
         .handle_jsonrpc(json!({
@@ -3739,17 +3569,7 @@ fn resources_unsubscribe_clears_session_state() {
     )
     .unwrap();
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let _ = edge.handle_jsonrpc(json!({
         "jsonrpc": "2.0",
@@ -3798,17 +3618,7 @@ fn resource_update_notifications_only_emit_for_subscribed_uris() {
     )
     .unwrap();
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
     let _ = edge.handle_jsonrpc(json!({
         "jsonrpc": "2.0",
         "id": 2,
@@ -3834,17 +3644,7 @@ fn resources_list_changed_notification_emits_when_enabled() {
     let mut edge = make_edge(10);
     edge.config.resources_list_changed = true;
 
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     edge.notify_resources_list_changed();
     let notifications = edge.take_pending_notifications();
@@ -3860,17 +3660,7 @@ fn resources_list_changed_notification_emits_when_enabled() {
 #[test]
 fn prompts_list_and_get_are_filtered_by_capabilities() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let list_response = edge
         .handle_jsonrpc(json!({
@@ -3903,17 +3693,7 @@ fn prompts_list_and_get_are_filtered_by_capabilities() {
 #[test]
 fn completion_complete_returns_candidates_for_prompt_and_resource_refs() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let prompt_response = edge
         .handle_jsonrpc(json!({
@@ -3954,17 +3734,7 @@ fn completion_complete_returns_candidates_for_prompt_and_resource_refs() {
 #[test]
 fn completion_complete_rejects_malformed_target_identifiers() {
     let mut edge = make_edge(10);
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "initialize",
-        "params": {}
-    }));
-    let _ = edge.handle_jsonrpc(json!({
-        "jsonrpc": "2.0",
-        "method": "notifications/initialized",
-        "params": {}
-    }));
+    initialize_edge(&mut edge);
 
     let malformed_prompt_name = edge
         .handle_jsonrpc(json!({
