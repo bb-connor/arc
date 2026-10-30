@@ -62,10 +62,10 @@ fn redeemed_code_verifies_into_issue_evidence() {
     .expect("issue evidence");
     let code_digest = Sha256Digest::from_hash(sha256(code.as_bytes()));
     assert_eq!(
-        evidence.replay_key().namespace,
+        evidence.replay_key().namespace(),
         ReplayNamespace::LocalAsIssue
     );
-    assert_eq!(evidence.replay_key().id, code_digest.to_bare_hex());
+    assert_eq!(evidence.replay_key().id(), code_digest.to_bare_hex());
     assert_eq!(evidence.artifact_digest(), Some(&code_digest));
     assert_eq!(Some(evidence.token_exp()), claims["exp"].as_u64());
     assert_eq!(evidence.sender_constraint(), None);

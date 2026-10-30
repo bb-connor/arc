@@ -4,6 +4,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 mod kinds;
+mod replay_keys;
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -13,9 +14,9 @@ use crate::root_exchange::OAuthErrorCode;
 use crate::root_exchange::{
     jws::{CompactJws, VerifyingKey},
     ClientRegistry, ExchangeReplayStore, ExchangeServices, IdJagGrant, IdpKey, IdpKeyLookup,
-    PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey, RequestedTokenType,
-    RootExchange, RootExchangeConfig, RootExchangeConfigError, RootExchangeError,
-    CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey, ReplayStoreError,
+    RequestedTokenType, RootExchange, RootExchangeConfig, RootExchangeConfigError,
+    RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -265,7 +266,12 @@ struct MemoryReplay {
 }
 
 impl ExchangeReplayStore for MemoryReplay {
-    fn bind(&self, key: &ReplayKey, retain_until: u64, now: u64) -> Result<ReplayBinding, String> {
+    fn bind(
+        &self,
+        key: &ReplayKey,
+        retain_until: u64,
+        now: u64,
+    ) -> Result<ReplayBinding, ReplayStoreError> {
         let mut bound = self.bound.lock().unwrap();
         if bound.get(key).is_some_and(|until| *until > now) {
             return Ok(ReplayBinding::AlreadyBound);
@@ -838,7 +844,7 @@ async fn requested_scope_beyond_the_assertion_refuses() {
         assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidScope);
         let bound = harness.replay.bound.lock().unwrap();
         assert_eq!(bound.len(), 1);
-        assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+        assert!(bound.keys().all(|key| key.id() != "id-jag-1"));
     }
 }
 
@@ -1541,7 +1547,7 @@ async fn parse_refusal_does_not_spend_the_id_jag() {
         RootExchangeError::MalformedJws("kid is not an identifier")
     );
     let bound = harness.replay.bound.lock().unwrap();
-    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+    assert!(bound.keys().all(|key| key.id() != "id-jag-1"));
     assert_eq!(bound.len(), 1);
 }
 
@@ -1654,7 +1660,7 @@ fn assert_entropy_denied_before_the_bind(harness: &Harness, error: RootExchangeE
     assert_eq!(error.to_string(), "entropy source failed");
     assert_eq!(error.oauth_error(), OAuthErrorCode::ServerError);
     let bound = harness.replay.bound.lock().unwrap();
-    let ids: Vec<&str> = bound.keys().map(|key| key.id.as_str()).collect();
+    let ids: Vec<&str> = bound.keys().map(ReplayKey::id).collect();
     assert_eq!(ids, vec!["client-assertion-1"]);
 }
 
@@ -1736,7 +1742,7 @@ async fn refusal_after_signature_and_claims_does_not_spend_the_id_jag() {
     );
     let bound = edge_only.replay.bound.lock().unwrap();
     assert_eq!(bound.len(), 1);
-    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+    assert!(bound.keys().all(|key| key.id() != "id-jag-1"));
 }
 
 #[tokio::test]
@@ -1762,7 +1768,7 @@ async fn proof_required_ceiling_grant_outside_the_projection_refuses_an_edge_ses
     );
     let bound = harness.replay.bound.lock().unwrap();
     assert_eq!(bound.len(), 1);
-    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+    assert!(bound.keys().all(|key| key.id() != "id-jag-1"));
 }
 
 #[tokio::test]

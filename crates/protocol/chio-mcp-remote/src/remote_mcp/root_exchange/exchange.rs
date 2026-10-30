@@ -612,11 +612,11 @@ impl RootExchange {
         )?;
         Ok(AnchorEvidence {
             kind,
-            replay_key: ReplayKey {
-                namespace: ReplayNamespace::Assertion(kind),
-                issuer: verified.issuer.clone(),
-                id: verified.jti,
-            },
+            replay_key: ReplayKey::new(
+                ReplayNamespace::Assertion(kind),
+                verified.issuer.as_str(),
+                verified.jti,
+            )?,
             issuer: verified.issuer,
             principal: verified.principal,
             tenant: verified.tenant,
@@ -815,10 +815,7 @@ impl RootExchange {
         replay: &dyn ExchangeReplayStore,
         now: u64,
     ) -> Result<(), RootExchangeError> {
-        match replay
-            .bind(&prepared.replay_key, prepared.replay_retain_until, now)
-            .map_err(RootExchangeError::ReplayStoreUnavailable)?
-        {
+        match replay.bind(&prepared.replay_key, prepared.replay_retain_until, now)? {
             ReplayBinding::Bound => Ok(()),
             ReplayBinding::AlreadyBound => Err(RootExchangeError::AssertionReplay),
         }

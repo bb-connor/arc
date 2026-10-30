@@ -3,6 +3,8 @@
 use chio_core::capability::anchor::AnchorKind;
 use chio_core::root_authority::HolderClass;
 
+use super::replay::{ReplayKeyError, ReplayNamespace, ReplayStoreError};
+
 /// The OAuth error a refusal answers with at the token endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OAuthErrorCode {
@@ -204,8 +206,10 @@ pub enum RootExchangeError {
 
     #[error("entropy source failed")]
     EntropyUnavailable,
-    #[error("replay store is unavailable: {0}")]
-    ReplayStoreUnavailable(String),
+    #[error("{0}")]
+    ReplayStore(#[from] ReplayStoreError),
+    #[error("{0}")]
+    ReplayKeyInvalid(#[from] ReplayKeyError),
     #[error("canonicalization failed: {0}")]
     Canonicalization(String),
 }
@@ -225,6 +229,12 @@ impl RootExchangeError {
             | Self::OperatorRequestTenantMissing
             | Self::RequestedHolderMismatch(_) => OAuthErrorCode::InvalidRequest,
             Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
+            Self::ReplayKeyInvalid(error) => match error.namespace() {
+                ReplayNamespace::ClientAssertion => OAuthErrorCode::InvalidClient,
+                ReplayNamespace::Assertion(_) | ReplayNamespace::LocalAsIssue => {
+                    OAuthErrorCode::InvalidGrant
+                }
+            },
             Self::ClientAssertionMissing
             | Self::ClientAssertionTypeUnsupported
             | Self::ClientNotConfidential
@@ -267,9 +277,9 @@ impl RootExchangeError {
             | Self::ScopeNotProjected
             | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
             Self::ProjectionTargetMalformed => OAuthErrorCode::ServerError,
-            Self::KeysUnavailable(_)
-            | Self::ReplayStoreUnavailable(_)
-            | Self::IntrospectionUnavailable(_) => OAuthErrorCode::TemporarilyUnavailable,
+            Self::KeysUnavailable(_) | Self::ReplayStore(_) | Self::IntrospectionUnavailable(_) => {
+                OAuthErrorCode::TemporarilyUnavailable
+            }
             Self::IdpKeyUnusable
             | Self::ProviderRecordMissing(_)
             | Self::ProviderRecordDisabled(_)

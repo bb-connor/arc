@@ -207,11 +207,11 @@ pub async fn verify(
     let token_digest = Sha256Digest::from_hash(sha256(token.as_bytes()));
     Ok(AnchorEvidence {
         kind: KIND,
-        replay_key: ReplayKey {
-            namespace: ReplayNamespace::Assertion(KIND),
-            issuer: issuer.to_owned(),
-            id: format!("token:{token_digest}"),
-        },
+        replay_key: ReplayKey::new(
+            ReplayNamespace::Assertion(KIND),
+            issuer,
+            format!("token:{token_digest}"),
+        )?,
         issuer: issuer.to_owned(),
         principal,
         tenant,

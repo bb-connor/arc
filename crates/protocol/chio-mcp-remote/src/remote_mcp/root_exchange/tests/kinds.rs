@@ -689,10 +689,10 @@ async fn oidc_jwt_replay_key_is_the_jti_or_the_token_digest() {
     .await
     .unwrap();
     assert_eq!(
-        with_jti.replay_key().namespace,
+        with_jti.replay_key().namespace(),
         ReplayNamespace::Assertion(AnchorKind::OidcJwt)
     );
-    assert_eq!(with_jti.replay_key().id, "jti:oidc-1");
+    assert_eq!(with_jti.replay_key().id(), "jti:oidc-1");
     let token = compact(
         &idp_header(),
         &edit(oidc_claims(), |claims| {
@@ -704,7 +704,7 @@ async fn oidc_jwt_replay_key_is_the_jti_or_the_token_digest() {
         .await
         .unwrap();
     assert_eq!(
-        without_jti.replay_key().id,
+        without_jti.replay_key().id(),
         format!(
             "token:{}",
             Sha256Digest::from_hash(sha256(token.as_bytes()))
@@ -752,10 +752,10 @@ async fn entra_jwt_refusals_and_permissions() {
     .await
     .unwrap();
     assert_eq!(
-        evidence.replay_key().namespace,
+        evidence.replay_key().namespace(),
         ReplayNamespace::Assertion(AnchorKind::EntraJwt)
     );
-    assert_eq!(evidence.replay_key().id, "uti-1");
+    assert_eq!(evidence.replay_key().id(), "uti-1");
     let prepared = exchange
         .prepare(evidence, None, None, NOW, &entropy())
         .unwrap();
@@ -926,7 +926,7 @@ async fn introspection_evidence_is_the_response_digest() {
         Some(&Sha256Digest::from_hash(sha256(&body)))
     );
     assert_eq!(
-        evidence.replay_key().id,
+        evidence.replay_key().id(),
         format!("token:{}", Sha256Digest::from_hash(sha256(b"opaque-token")))
     );
 }
@@ -990,7 +990,7 @@ fn static_bearer_wrong_token_refuses_in_constant_time_path() {
         operator_static_bearer::verify(&exchange, &configured, STATIC_TOKEN, NOW).unwrap();
     assert_eq!(evidence.token_exp(), NOW + 300);
     assert_eq!(
-        evidence.replay_key().id,
+        evidence.replay_key().id(),
         format!(
             "{}:{}",
             Sha256Digest::from_hash(sha256(STATIC_TOKEN.as_bytes())),
@@ -1224,14 +1224,15 @@ fn local_issue_replay_key_is_the_authorization_code_digest() {
     let code_digest = Sha256Digest::from_hash(sha256(AUTHORIZATION_CODE.as_bytes()));
     assert_eq!(
         issued.replay_key(),
-        &ReplayKey {
-            namespace: ReplayNamespace::LocalAsIssue,
-            issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: code_digest.to_bare_hex(),
-        }
+        &ReplayKey::new(
+            ReplayNamespace::LocalAsIssue,
+            LOCAL_AS_ISSUER,
+            code_digest.to_bare_hex()
+        )
+        .unwrap()
     );
     assert_eq!(
-        issued.replay_key().namespace.as_str(),
+        issued.replay_key().namespace().as_str(),
         "chio_local_as_issue"
     );
     assert_eq!(issued.artifact_digest(), Some(&code_digest));
@@ -1258,13 +1259,14 @@ fn local_reexchange_replay_key_is_the_subject_jti() {
     .unwrap();
     assert_eq!(
         narrowed.replay_key(),
-        &ReplayKey {
-            namespace: ReplayNamespace::Assertion(AnchorKind::ChioLocalAs),
-            issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: "local-1".to_owned(),
-        }
+        &ReplayKey::new(
+            ReplayNamespace::Assertion(AnchorKind::ChioLocalAs),
+            LOCAL_AS_ISSUER,
+            "local-1"
+        )
+        .unwrap()
     );
-    assert_eq!(narrowed.replay_key().namespace.as_str(), "chio_local_as");
+    assert_eq!(narrowed.replay_key().namespace().as_str(), "chio_local_as");
     assert_eq!(narrowed.token_exp(), NOW + 200);
 }
 

@@ -77,11 +77,11 @@ pub fn verify(
     let token_digest = Sha256Digest::from_hash(presented);
     Ok(AnchorEvidence {
         kind: KIND,
-        replay_key: ReplayKey {
-            namespace: ReplayNamespace::Assertion(KIND),
-            issuer: OPERATOR_ISSUER.to_owned(),
-            id: format!("{token_digest}:{expires_at}"),
-        },
+        replay_key: ReplayKey::new(
+            ReplayNamespace::Assertion(KIND),
+            OPERATOR_ISSUER,
+            format!("{token_digest}:{expires_at}"),
+        )?,
         issuer: OPERATOR_ISSUER.to_owned(),
         principal: principal.as_str().to_owned(),
         tenant: tenant.as_str().to_owned(),

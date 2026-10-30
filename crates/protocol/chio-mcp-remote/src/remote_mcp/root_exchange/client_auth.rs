@@ -169,15 +169,8 @@ pub fn authenticate_client(
         return Err(RootExchangeError::ClientAssertionInvalid("not yet valid"));
     }
     let jti = required_string(claims, "jti").map_err(claim)?;
-    let key = ReplayKey {
-        namespace: ReplayNamespace::ClientAssertion,
-        issuer: issuer.to_owned(),
-        id: jti.to_owned(),
-    };
-    match replay
-        .bind(&key, exp.saturating_add(skew), context.now)
-        .map_err(RootExchangeError::ReplayStoreUnavailable)?
-    {
+    let key = ReplayKey::new(ReplayNamespace::ClientAssertion, issuer, jti)?;
+    match replay.bind(&key, exp.saturating_add(skew), context.now)? {
         ReplayBinding::Bound => Ok(AuthenticatedClient {
             client_id: issuer.to_owned(),
         }),

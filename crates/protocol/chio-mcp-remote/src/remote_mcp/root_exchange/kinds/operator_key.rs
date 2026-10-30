@@ -100,11 +100,11 @@ pub fn verify(
     }
     Ok(AnchorEvidence {
         kind: KIND,
-        replay_key: ReplayKey {
-            namespace: ReplayNamespace::Assertion(KIND),
-            issuer: OPERATOR_KEY_ISSUER.to_owned(),
-            id: request.request_id.as_str().to_owned(),
-        },
+        replay_key: ReplayKey::new(
+            ReplayNamespace::Assertion(KIND),
+            OPERATOR_KEY_ISSUER,
+            request.request_id.as_str(),
+        )?,
         issuer: OPERATOR_KEY_ISSUER.to_owned(),
         principal: request.principal.as_str().to_owned(),
         tenant: tenant.as_str().to_owned(),

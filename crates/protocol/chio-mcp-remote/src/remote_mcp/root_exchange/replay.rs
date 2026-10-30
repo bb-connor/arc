@@ -29,17 +29,63 @@ impl ReplayNamespace {
     }
 }
 
-/// `(namespace, issuer, id)`: one use per key.
+/// `(namespace, issuer, id)`: one use per key. Neither part holds a NUL,
+/// so [`Self::digest`] is injective.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ReplayKey {
-    pub namespace: ReplayNamespace,
-    pub issuer: String,
-    pub id: String,
+    namespace: ReplayNamespace,
+    issuer: String,
+    id: String,
+}
+
+/// Why a replay key cannot be formed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ReplayKeyError {
+    #[error("replay key issuer for {} contains a NUL byte", .0.as_str())]
+    IssuerContainsNul(ReplayNamespace),
+    #[error("replay key id for {} contains a NUL byte", .0.as_str())]
+    IdContainsNul(ReplayNamespace),
+}
+
+impl ReplayKeyError {
+    #[must_use]
+    pub const fn namespace(self) -> ReplayNamespace {
+        match self {
+            Self::IssuerContainsNul(namespace) | Self::IdContainsNul(namespace) => namespace,
+        }
+    }
 }
 
 impl ReplayKey {
-    /// `SHA-256(domain || namespace || 0x00 || issuer || 0x00 || id)`. NUL-free
-    /// parts make the encoding injective.
+    /// The key of `id` from `issuer` within `namespace`.
+    pub fn new(
+        namespace: ReplayNamespace,
+        issuer: impl Into<String>,
+        id: impl Into<String>,
+    ) -> Result<Self, ReplayKeyError> {
+        Ok(Self {
+            namespace,
+            issuer: issuer.into(),
+            id: id.into(),
+        })
+    }
+
+    #[must_use]
+    pub fn namespace(&self) -> ReplayNamespace {
+        self.namespace
+    }
+
+    #[must_use]
+    pub fn issuer(&self) -> &str {
+        &self.issuer
+    }
+
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// `SHA-256(domain || namespace || 0x00 || issuer || 0x00 || id)`.
     #[must_use]
     pub fn digest(&self) -> Sha256Digest {
         let mut state = Sha256State::new();
@@ -62,8 +108,25 @@ pub enum ReplayBinding {
     AlreadyBound,
 }
 
+/// Why a replay store could not bind a key. The adapter logs its backend
+/// detail; none of it crosses this port.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ReplayStoreError {
+    #[error("replay store is unavailable")]
+    Unavailable,
+    #[error("replay store is busy")]
+    Busy,
+    #[error("replay store state is corrupt")]
+    Corrupt,
+}
+
 /// Durable single-use replay keys. A binding is retained until
 /// `retain_until` (Unix seconds); a store error denies the exchange.
 pub trait ExchangeReplayStore: Send + Sync {
-    fn bind(&self, key: &ReplayKey, retain_until: u64, now: u64) -> Result<ReplayBinding, String>;
+    fn bind(
+        &self,
+        key: &ReplayKey,
+        retain_until: u64,
+        now: u64,
+    ) -> Result<ReplayBinding, ReplayStoreError>;
 }

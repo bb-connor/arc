@@ -339,11 +339,11 @@ pub fn verify_issue(
     let scope_values = scope_values(&claims)?;
     Ok(AnchorEvidence {
         kind: KIND,
-        replay_key: ReplayKey {
-            namespace: ReplayNamespace::LocalAsIssue,
-            issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: code.code_digest.to_bare_hex(),
-        },
+        replay_key: ReplayKey::new(
+            ReplayNamespace::LocalAsIssue,
+            LOCAL_AS_ISSUER,
+            code.code_digest.to_bare_hex(),
+        )?,
         issuer: LOCAL_AS_ISSUER.to_owned(),
         principal,
         tenant: server.issuer.to_owned(),
@@ -405,11 +405,7 @@ pub fn verify_reexchange(
     let scope_values = scope_values(&claims)?;
     Ok(AnchorEvidence {
         kind: KIND,
-        replay_key: ReplayKey {
-            namespace: ReplayNamespace::Assertion(KIND),
-            issuer: LOCAL_AS_ISSUER.to_owned(),
-            id: local.jti,
-        },
+        replay_key: ReplayKey::new(ReplayNamespace::Assertion(KIND), LOCAL_AS_ISSUER, local.jti)?,
         issuer: LOCAL_AS_ISSUER.to_owned(),
         principal: local.principal,
         tenant: server.issuer.to_owned(),
