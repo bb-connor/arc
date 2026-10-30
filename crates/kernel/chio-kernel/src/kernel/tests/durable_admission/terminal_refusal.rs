@@ -194,6 +194,18 @@ fn refusal_replay_projects_the_signed_family_code() -> TestResult {
             .and_then(serde_json::Value::as_str),
         Some("budget_exhausted")
     );
+    let row = chio_core::receipt::metadata::metadata_key_spec("chio_kernel")
+        .ok_or("chio_kernel is unregistered")?;
+    assert_eq!(
+        row.form,
+        chio_core::receipt::metadata::MetadataForm::Projection
+    );
+    assert!(
+        row.reason
+            .contains("client_denial_code stays plaintext for durable refusal replay"),
+        "{}",
+        row.reason
+    );
     let replay = kernel.evaluate_tool_call_blocking(&request)?;
     assert_exact_response(&initial, &replay);
     assert_eq!(

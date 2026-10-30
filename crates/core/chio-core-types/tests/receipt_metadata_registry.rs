@@ -304,6 +304,26 @@ fn projection_and_detail_keys_are_registered_in_their_forms() {
     );
 }
 
+/// Durable refusal replay reads `chio_kernel.client_denial_code`, a closed
+/// denial code, so the row keeps that member plaintext; `rejection_code` has
+/// no reader and becomes a commitment.
+#[test]
+fn chio_kernel_keeps_client_denial_code_plaintext_for_refusal_replay() {
+    let spec =
+        metadata_key_spec("chio_kernel").unwrap_or_else(|| panic!("chio_kernel is unregistered"));
+    assert_eq!(
+        (spec.origin, spec.disclosure, spec.form),
+        (ChioInternal, Unsafe, Projection)
+    );
+    assert!(
+        spec.reason.contains(
+            "Target form: client_denial_code stays plaintext for durable refusal replay; rejection_code becomes a salted commitment."
+        ),
+        "{}",
+        spec.reason
+    );
+}
+
 /// The cage producer still writes the raw cage receipt body under
 /// `cage_receipt`, so the key refuses until the producer writes the projection.
 #[test]
