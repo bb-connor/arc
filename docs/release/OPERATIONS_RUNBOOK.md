@@ -373,6 +373,38 @@ http://127.0.0.1:8940/
 
 Enter the secret of your trust-control `operator` credential in the **Bearer token** field and select **Log in**.
 
+### Authority seed custody
+
+Every authority seed argument (for example `--authority-seed-file`) takes a
+key reference:
+
+| Reference | Seed source | Chio may write it |
+| --- | --- | --- |
+| `credential:<name>` | `$CREDENTIALS_DIRECTORY/<name>`, delivered by systemd | No |
+| any other path | a plaintext seed file, mode 0600 or stricter | Yes |
+
+A credential name is 1 to 255 characters of `[A-Za-z0-9._-]`, and cannot be
+`.` or `..`. Provision the credential with `systemd-creds encrypt` and load it
+in the unit with `LoadCredentialEncrypted=<name>:<path>`, then pass
+`credential:<name>`. Chio never creates, rotates or repairs a credential: a
+missing credential fails startup, and authority rotation and keyring rotation
+refuse a credential reference. If the service runs without
+`$CREDENTIALS_DIRECTORY`, or with a relative value, a credential reference
+fails closed.
+
+`CHIO_KEY_CUSTODY` selects the custody policy:
+
+- unset or `development`: seed files are allowed. A credential must be a
+  private file owned by the service user, or held by systemd.
+- `required`: every seed file reference is refused before it is opened,
+  including on create and rotate paths. A credential must be held by systemd:
+  root-owned with read access granted to the service user by ACL, or owned by
+  the service user with mode 0400 or 0600, on systemd's read-only credential
+  mount.
+
+Any other `CHIO_KEY_CUSTODY` value stops every authority seed load. Set
+`CHIO_KEY_CUSTODY=required` in production units.
+
 ## 3. Configuration Checks Before Promotion
 
 Run the production qualification lane from the repo root:

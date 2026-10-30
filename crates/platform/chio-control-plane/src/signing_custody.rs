@@ -3,7 +3,7 @@ use crate::{CliError, Keypair};
 #[cfg(not(unix))]
 use std::fs::OpenOptions;
 use std::{
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
@@ -102,59 +102,152 @@ pub enum KeyCustodyError {
     CredentialsDirectoryNotAbsolute,
     #[error("systemd credential must be a singly linked regular file in systemd custody or private to this user")]
     CredentialCustodyRefused,
+    #[error("credential references are read-only; provision the seed with systemd-creds and LoadCredentialEncrypted=")]
+    ReadOnlyCustody,
 }
 
 /// Load existing signing custody without creating or repairing it.
 /// `path` is a key reference: `credential:<name>` or a seed file path.
 pub fn load_existing_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
-    let key = KeyRef::parse(path)?;
-    let policy = CustodyPolicy::from_env()?;
-    load_authority_keypair(
-        &key,
-        policy,
-        std::env::var_os(CREDENTIALS_DIRECTORY_ENV).as_deref(),
-    )
+    SeedCustody::from_env()?.load_existing(path)
 }
 
-fn load_authority_keypair(
-    key: &KeyRef,
-    policy: CustodyPolicy,
-    credentials_directory: Option<&OsStr>,
-) -> Result<Keypair, CliError> {
-    let seed_bytes =
-        read_key_custody(key, policy, credentials_directory, AUTHORITY_SEED_MAX_BYTES)?;
-    let seed_hex = std::str::from_utf8(&seed_bytes)
-        .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
-    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+/// Public key of the authority seed `path` names; `None` when a seed file is absent.
+pub fn authority_public_key_from_seed_file(
+    path: &Path,
+) -> Result<Option<chio_core::PublicKey>, CliError> {
+    SeedCustody::from_env()?.public_key(path)
 }
 
-fn read_key_custody(
-    key: &KeyRef,
+/// Replace the seed file with a fresh authority key. OS custody is never written.
+pub fn rotate_authority_keypair(path: &Path) -> Result<chio_core::PublicKey, CliError> {
+    SeedCustody::from_env()?.rotate(path)
+}
+
+/// Load the authority seed, creating a seed file only for a missing file reference.
+pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
+    SeedCustody::from_env()?.load_or_create(path)
+}
+
+/// The seed file a caller may create or replace. Credential references are
+/// read-only, and required custody refuses every seed file.
+pub fn writable_authority_seed_file(path: &Path) -> Result<&Path, CliError> {
+    SeedCustody::from_env()?.writable_seed_file(path)
+}
+
+pub(crate) fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliError> {
+    crate::write_private_file_atomically(path, format!("{}\n", keypair.seed_hex()).as_bytes())
+}
+
+/// Custody policy and credential delivery that every authority seed entry point resolves through.
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SeedCustody {
     policy: CustodyPolicy,
-    credentials_directory: Option<&OsStr>,
-    maximum_bytes: usize,
-) -> Result<zeroize::Zeroizing<Vec<u8>>, CliError> {
-    policy.check(key)?;
-    match key {
-        KeyRef::File(path) => read_custody(path, maximum_bytes, Custody::PrivateFile),
-        KeyRef::SystemdCredential { name } => {
-            let directory =
-                Path::new(credentials_directory.ok_or(KeyCustodyError::CredentialsDirectoryUnset)?);
-            if !directory.is_absolute() {
-                return Err(KeyCustodyError::CredentialsDirectoryNotAbsolute.into());
+    credentials_directory: Option<OsString>,
+}
+
+impl SeedCustody {
+    fn from_env() -> Result<Self, CliError> {
+        Ok(Self {
+            policy: CustodyPolicy::from_env()?,
+            credentials_directory: std::env::var_os(CREDENTIALS_DIRECTORY_ENV),
+        })
+    }
+
+    fn resolve(&self, path: &Path) -> Result<KeyRef, CliError> {
+        let key = KeyRef::parse(path)?;
+        self.policy.check(&key)?;
+        Ok(key)
+    }
+
+    /// The seed file a caller may create or replace; OS custody is read-only.
+    fn writable_seed_file<'a>(&self, path: &'a Path) -> Result<&'a Path, CliError> {
+        match self.resolve(path)? {
+            KeyRef::File(_) => Ok(path),
+            KeyRef::SystemdCredential { .. } => Err(KeyCustodyError::ReadOnlyCustody.into()),
+        }
+    }
+
+    fn load_existing(&self, path: &Path) -> Result<Keypair, CliError> {
+        let key = self.resolve(path)?;
+        self.load_key(&key)
+    }
+
+    fn public_key(&self, path: &Path) -> Result<Option<chio_core::PublicKey>, CliError> {
+        match self.resolve(path)? {
+            KeyRef::File(path) => match fs::read_to_string(&path) {
+                Ok(seed_hex) => Ok(Some(Keypair::from_seed_hex(seed_hex.trim())?.public_key())),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                Err(error) => Err(CliError::Io(error)),
+            },
+            key @ KeyRef::SystemdCredential { .. } => Ok(Some(self.load_key(&key)?.public_key())),
+        }
+    }
+
+    fn rotate(&self, path: &Path) -> Result<chio_core::PublicKey, CliError> {
+        let path = self.writable_seed_file(path)?;
+        let keypair = Keypair::generate();
+        write_authority_seed_file(path, &keypair)?;
+        Ok(keypair.public_key())
+    }
+
+    fn load_or_create(&self, path: &Path) -> Result<Keypair, CliError> {
+        match self.resolve(path)? {
+            KeyRef::File(path) => match self.public_key(&path)? {
+                Some(_) => {
+                    let seed_hex = fs::read_to_string(&path)?;
+                    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+                }
+                None => {
+                    let keypair = Keypair::generate();
+                    write_authority_seed_file(&path, &keypair)?;
+                    Ok(keypair)
+                }
+            },
+            key @ KeyRef::SystemdCredential { .. } => self.load_key(&key),
+        }
+    }
+
+    fn load_key(&self, key: &KeyRef) -> Result<Keypair, CliError> {
+        let seed_bytes = self.read(key, AUTHORITY_SEED_MAX_BYTES)?;
+        let seed_hex = std::str::from_utf8(&seed_bytes)
+            .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
+        Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+    }
+
+    fn read(
+        &self,
+        key: &KeyRef,
+        maximum_bytes: usize,
+    ) -> Result<zeroize::Zeroizing<Vec<u8>>, CliError> {
+        match key {
+            KeyRef::File(path) => read_custody(path, maximum_bytes, Custody::PrivateFile),
+            KeyRef::SystemdCredential { name } => {
+                let directory = Path::new(
+                    self.credentials_directory
+                        .as_deref()
+                        .ok_or(KeyCustodyError::CredentialsDirectoryUnset)?,
+                );
+                if !directory.is_absolute() {
+                    return Err(KeyCustodyError::CredentialsDirectoryNotAbsolute.into());
+                }
+                let custody = match self.policy {
+                    CustodyPolicy::AllowFiles => Custody::Credential,
+                    CustodyPolicy::RequireOsCustody => Custody::SystemdCredential,
+                };
+                read_custody(&directory.join(name), maximum_bytes, custody)
             }
-            read_custody(
-                &directory.join(name),
-                maximum_bytes,
-                Custody::SystemdCredential,
-            )
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Custody {
+    /// Seed file private to this user.
     PrivateFile,
+    /// Credential private to this user or held by systemd.
+    Credential,
+    /// Credential on systemd's read-only credential mount.
     SystemdCredential,
 }
 
@@ -248,35 +341,41 @@ fn read_custody(
 fn validate_path_metadata(metadata: &fs::Metadata, custody: Custody) -> Result<(), CliError> {
     match custody {
         Custody::PrivateFile => validate_authority_seed_metadata(metadata),
-        Custody::SystemdCredential if is_single_regular_file(metadata) => Ok(()),
-        Custody::SystemdCredential => Err(KeyCustodyError::CredentialCustodyRefused.into()),
+        Custody::Credential | Custody::SystemdCredential if is_single_regular_file(metadata) => {
+            Ok(())
+        }
+        Custody::Credential | Custody::SystemdCredential => {
+            Err(KeyCustodyError::CredentialCustodyRefused.into())
+        }
     }
 }
 
-/// A credential is either private to this user or held by systemd: root-owned,
-/// read-only and granted to this user through its ACL.
+/// A credential held by systemd is root-owned, read-only and granted to this
+/// user through its ACL, or, without ACL support, private to this user on the
+/// read-only credential mount. Development custody also accepts a private file.
 fn validate_opened_custody(
     file: &File,
     metadata: &fs::Metadata,
     custody: Custody,
 ) -> Result<(), CliError> {
-    match custody {
-        Custody::PrivateFile => validate_authority_seed_metadata(metadata),
+    let private = validate_authority_seed_metadata(metadata);
+    let held = match custody {
+        Custody::PrivateFile => return private,
+        Custody::Credential => private.is_ok(),
         Custody::SystemdCredential => {
-            if validate_authority_seed_metadata(metadata).is_ok() {
-                return Ok(());
-            }
-            #[cfg(unix)]
-            if chio_secure_ipc::credentials::is_systemd_credential(
-                file,
-                rustix::process::geteuid().as_raw(),
-            )? {
-                return Ok(());
-            }
-            #[cfg(not(unix))]
-            let _ = file;
-            Err(KeyCustodyError::CredentialCustodyRefused.into())
+            private.is_ok() && chio_secure_ipc::credentials::is_on_credential_mount(file)?
         }
+    };
+    #[cfg(unix)]
+    let held = held
+        || chio_secure_ipc::credentials::is_systemd_credential(
+            file,
+            rustix::process::geteuid().as_raw(),
+        )?;
+    if held {
+        Ok(())
+    } else {
+        Err(KeyCustodyError::CredentialCustodyRefused.into())
     }
 }
 

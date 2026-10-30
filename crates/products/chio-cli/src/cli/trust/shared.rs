@@ -10,13 +10,19 @@ pub(crate) fn provision_local_issuance_authority(
         (Some(_), Some(_)) => Err(CliError::cli_other_error(
             "local trust issuance requires either --authority-seed-file or --authority-db, not both",
         )),
-        (Some(path), None) => match std::fs::symlink_metadata(path) {
-            Ok(_) => crate::load_existing_authority_keypair(path).map(|_| ()),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                StagedLocalIssuanceSeed::new(path)?.publish()
+        (Some(path), None) if chio_control_plane::KeyRef::parse(path)?.is_os_custody() => {
+            crate::load_existing_authority_keypair(path).map(|_| ())
+        }
+        (Some(path), None) => {
+            let path = chio_control_plane::writable_authority_seed_file(path)?;
+            match std::fs::symlink_metadata(path) {
+                Ok(_) => crate::load_existing_authority_keypair(path).map(|_| ()),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    StagedLocalIssuanceSeed::new(path)?.publish()
+                }
+                Err(error) => Err(error.into()),
             }
-            Err(error) => Err(error.into()),
-        },
+        }
         (None, Some(path)) => {
             chio_store_sqlite::SqliteCapabilityAuthority::open(path).map(|_| ()).map_err(Into::into)
         }
@@ -129,6 +135,19 @@ pub(crate) fn load_json_or_yaml<T: DeserializeOwned>(path: &Path) -> Result<T, C
 #[cfg(test)]
 mod local_issuance_seed_tests {
     use super::*;
+
+    #[test]
+    fn credential_references_are_loaded_never_initialized() {
+        let credential = Path::new("credential:chio-local-issuance-seed");
+        let result = provision_local_issuance_authority(Some(credential), None);
+        assert!(matches!(
+            result,
+            Err(CliError::KeyCustody(
+                chio_control_plane::KeyCustodyError::CredentialsDirectoryUnset
+            ))
+        ));
+        assert!(!credential.exists());
+    }
 
     #[test]
     fn directory_shaped_seed_paths_are_rejected_without_creating_custody(
