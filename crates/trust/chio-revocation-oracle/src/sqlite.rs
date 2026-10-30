@@ -150,6 +150,11 @@ impl SqliteRevocationOracle {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_busy_timeout(&self, timeout: std::time::Duration) -> Result<()> {
+        Ok(self.lock_connection()?.busy_timeout(timeout)?)
+    }
+
     fn lock_connection(&self) -> Result<MutexGuard<'_, Connection>> {
         self.connection
             .lock()

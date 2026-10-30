@@ -224,6 +224,7 @@ fn an_apply_against_a_held_write_lock_fails_and_commits_nothing() -> TestResult 
     let first = [leaf(1, "passport-a")];
     let offered = partner_root(&first, 2_000);
 
+    mirror.oracle.set_busy_timeout(std::time::Duration::ZERO)?;
     let blocker = rusqlite::Connection::open(&path)?;
     blocker.execute_batch("BEGIN IMMEDIATE")?;
     assert!(matches!(
