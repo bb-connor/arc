@@ -24,8 +24,8 @@ pub enum PartnerMirrorRefusal {
     Equivocation { epoch: u64 },
     #[error("revocation leaf {seq} does not follow mirror leaf {have}")]
     OutOfSequence { seq: u64, have: u64 },
-    #[error("revocation leaf {seq} is not a valid revocation key: {reason}")]
-    InvalidLeaf { seq: u64, reason: String },
+    #[error("revocation leaf {seq} subject exceeds the revocation subject bound")]
+    SubjectTooLong { seq: u64 },
     #[error("revocation leaf {seq} repeats a revoked key")]
     DuplicateLeaf { seq: u64 },
     #[error("revocation leaves rebuild a root that differs from the signed root at epoch {epoch}")]
@@ -37,13 +37,16 @@ impl PartnerMirrorRefusal {
     /// to arriving with leaves the mirror cannot apply.
     #[must_use]
     pub fn is_conflict(&self) -> bool {
-        matches!(
-            self,
+        match self {
             Self::Rollback { .. }
-                | Self::AttestationRollback { .. }
-                | Self::Equivocation { .. }
-                | Self::RootMismatch { .. }
-        )
+            | Self::AttestationRollback { .. }
+            | Self::Equivocation { .. }
+            | Self::RootMismatch { .. } => true,
+            Self::Diverged
+            | Self::OutOfSequence { .. }
+            | Self::SubjectTooLong { .. }
+            | Self::DuplicateLeaf { .. } => false,
+        }
     }
 }
 
