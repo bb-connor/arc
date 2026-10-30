@@ -421,7 +421,7 @@ fn node_diagnostics(client: &Client, base_url: &str, token: &str, capability_id:
         ),
         "budgets": try_get_json(
             client,
-            &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
+            &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
             token,
         ),
     })
@@ -883,15 +883,11 @@ fn assert_child_receipt_visible(
 fn assert_revocation_visible(client: &Client, base_url: &str, token: &str, capability_id: &str) {
     let revocations = get_json(
         client,
-        &format!("{base_url}/v1/revocations?capabilityId={capability_id}&limit=10"),
+        &format!("{base_url}/v1/revocations?capability_id={capability_id}"),
         token,
     );
+    assert_eq!(revocations["capability_id"].as_str(), Some(capability_id));
     assert_eq!(revocations["revoked"].as_bool(), Some(true));
-    assert!(revocations["revocations"]
-        .as_array()
-        .expect("revocations array")
-        .iter()
-        .any(|entry| entry["capabilityId"].as_str() == Some(capability_id)));
 }
 
 fn assert_budget_invocation_count(
@@ -904,7 +900,7 @@ fn assert_budget_invocation_count(
 ) {
     let budgets = get_json(
         client,
-        &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
+        &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
         token,
     );
     let usage = budgets["usages"]
@@ -927,7 +923,7 @@ fn assert_budget_totals(
 ) {
     let budgets = get_json(
         client,
-        &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
+        &format!("{base_url}/v1/budgets?capability_id={capability_id}"),
         token,
     );
     let usage = budgets["usages"]
@@ -1255,9 +1251,12 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         &client,
         &format!("{leader_url}/v1/revocations"),
         service_token,
-        &json!({"capabilityId": "cap-revoke-leader"}),
+        &json!({"capability_id": "cap-revoke-leader", "reason": "operator_request"}),
     );
-    assert_eq!(revoked_leader["revoked"].as_bool(), Some(true));
+    assert_eq!(
+        revoked_leader["entry"]["target_value"].as_str(),
+        Some("cap-revoke-leader")
+    );
     assert_expected_write_visibility_metadata(&revoked_leader, &leader_url);
     assert_revocation_visible(&client, &leader_url, service_token, "cap-revoke-leader");
     let revocation_dbs = [&revocation_db_b, &revocation_db_a];
@@ -1279,25 +1278,18 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         || {
             let revocation_visible = |value: &Value, capability_id: &str| {
                 value["revoked"].as_bool() == Some(true)
-                    && value["revocations"]
-                        .as_array()
-                        .map(|revocations| {
-                            revocations
-                                .iter()
-                                .any(|entry| entry["capabilityId"].as_str() == Some(capability_id))
-                        })
-                        .unwrap_or(false)
+                    && value["capability_id"].as_str() == Some(capability_id)
             };
             let Some(leader_revocation) = try_get_json(
                 &client,
-                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"),
+                &format!("{follower_url}/v1/revocations?capability_id=cap-revoke-leader"),
                 service_token,
             ) else {
                 return false;
             };
             let Some(follower_revocation) = try_get_json(
                 &client,
-                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"),
+                &format!("{follower_url}/v1/revocations?capability_id=cap-revoke-follower"),
                 service_token,
             ) else {
                 return false;
@@ -1315,14 +1307,14 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
                     "capRevokeLeader": try_get_json(
                         &client,
                         &format!(
-                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
+                            "{leader_url}/v1/revocations?capability_id=cap-revoke-leader"
                         ),
                         service_token,
                     ),
                     "capRevokeFollower": try_get_json(
                         &client,
                         &format!(
-                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
+                            "{leader_url}/v1/revocations?capability_id=cap-revoke-follower"
                         ),
                         service_token,
                     ),
@@ -1333,14 +1325,14 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
                     "capRevokeLeader": try_get_json(
                         &client,
                         &format!(
-                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
+                            "{follower_url}/v1/revocations?capability_id=cap-revoke-leader"
                         ),
                         service_token,
                     ),
                     "capRevokeFollower": try_get_json(
                         &client,
                         &format!(
-                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
+                            "{follower_url}/v1/revocations?capability_id=cap-revoke-follower"
                         ),
                         service_token,
                     ),
@@ -1400,7 +1392,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{follower_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
+                &format!("{follower_url}/v1/budgets?capability_id=cap-shared"),
                 service_token,
             ) else {
                 return false;
@@ -1504,7 +1496,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
 
     let budgets = get_json(
         &client,
-        &format!("{survivor_url}/v1/budgets?capabilityId=cap-shared&limit=10"),
+        &format!("{survivor_url}/v1/budgets?capability_id=cap-shared"),
         service_token,
     );
     assert_eq!(budgets["count"].as_u64(), Some(1));
@@ -1983,7 +1975,7 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{isolated_url}/v1/budgets?capabilityId=cap-quorum-heal&limit=10"),
+                &format!("{isolated_url}/v1/budgets?capability_id=cap-quorum-heal"),
                 service_token,
             ) else {
                 return false;
@@ -2338,9 +2330,7 @@ fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
         || {
             let Some(budgets) = try_get_json(
                 &client,
-                &format!(
-                    "{expected_leader_url}/v1/budgets?capabilityId=cap-stalled-commit&limit=10"
-                ),
+                &format!("{expected_leader_url}/v1/budgets?capability_id=cap-stalled-commit"),
                 service_token,
             ) else {
                 return false;
@@ -2895,7 +2885,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             };
             let Some(budgets) = try_get_json(
                 &client,
-                &format!("{late_url}/v1/budgets?capabilityId=cap-snapshot-hold&limit=10"),
+                &format!("{late_url}/v1/budgets?capability_id=cap-snapshot-hold"),
                 service_token,
             ) else {
                 return false;
