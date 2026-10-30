@@ -170,12 +170,14 @@ impl SqlitePartnerMirror {
                     }
                     .into());
                 }
-                let inserted = txn.revoke(&leaf.to_revocation_key()).map_err(|error| {
-                    PartnerMirrorRefusal::InvalidLeaf {
-                        seq: leaf.seq,
-                        reason: error.to_string(),
-                    }
-                })?;
+                let inserted =
+                    txn.revoke(&leaf.to_revocation_key())
+                        .map_err(|error| match error {
+                            SqliteRevocationOracleError::SubjectTooLong => {
+                                PartnerMirrorRefusal::SubjectTooLong { seq: leaf.seq }.into()
+                            }
+                            other => PartnerMirrorError::Store(other),
+                        })?;
                 if !inserted {
                     return Err(PartnerMirrorRefusal::DuplicateLeaf { seq: leaf.seq }.into());
                 }

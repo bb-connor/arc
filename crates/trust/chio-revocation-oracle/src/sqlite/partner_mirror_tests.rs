@@ -3,6 +3,7 @@ use chio_test_support::prelude::*;
 use super::*;
 use crate::{
     InMemoryRevocationOracle, PassportRevocationLeafKind, RevocationOracle, RootSignature,
+    MAX_REVOCATION_SUBJECT_BYTES,
 };
 
 type TestResult = std::result::Result<(), Box<dyn std::error::Error>>;
@@ -239,5 +240,20 @@ fn an_apply_against_a_held_write_lock_fails_and_commits_nothing() -> TestResult 
     assert_eq!(mirror.view(&[])?.tree.leaf_count, 0);
     mirror.apply(&offered, &first, 2_000)?;
     assert_eq!(mirror.accepted()?, Some(offered));
+    Ok(())
+}
+
+#[test]
+fn an_oversized_leaf_subject_is_refused_and_commits_nothing() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mirror = SqlitePartnerMirror::open(&dir.path().join("mirror.sqlite3"), "alpha")?;
+    let oversized = [leaf(1, &"x".repeat(MAX_REVOCATION_SUBJECT_BYTES + 1))];
+    let offered = partner_root(&[leaf(1, "passport-a")], 2_000);
+    assert_eq!(
+        mirror.apply(&offered, &oversized, 2_000),
+        Err(PartnerMirrorRefusal::SubjectTooLong { seq: 1 }.into())
+    );
+    assert_eq!(mirror.accepted()?, None);
+    assert_eq!(mirror.view(&[])?.tree.leaf_count, 0);
     Ok(())
 }
