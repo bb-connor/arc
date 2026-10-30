@@ -29,7 +29,7 @@ Swift and Kotlin integration instructions.
 building the portable request. Positive `now_secs` values select a checked fixed
 clock when representable; other inputs use `MobileClock`. It decodes trusted
 issuers, creates a scope-hash resolver, seeds a fresh registry, and calls
-`evaluate_with_full_floor_and_root` with an allow-classical floor and no guards.
+`evaluate_with_full_floor` with an allow-classical floor and no guards.
 The adapter also denies matched grants requiring mediated authorization.
 Ordinary denial becomes a JSON response; malformed inputs become FFI errors.
 

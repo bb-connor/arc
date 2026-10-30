@@ -895,9 +895,9 @@ trusted_issuers, clock, crypto_floor, trust_root_scope_hash, root_delegator)` en
 the rule in isolation. Production kernels MUST route every inbound
 capability admission through the composite entrypoint
 `chio_kernel_core::verify_capability_full(token, trusted_issuers,
-clock, crypto_floor, peer, trust_root, budgets)` or its shared
-`verify_capability_full_with_root` / `verify_capability_full_with_evidence`
-variants, which chain the W1.1
+clock, crypto_floor, features, trust_root, budgets)` (`features` carries the
+peer profile and the verifier-supplied root evidence) or its
+`verify_capability_full_with_evidence` variant, which chain the W1.1
 chain-binding check and the W1.2
 sibling-sum budget admission alongside signature, floor, and time-bound
 verification. The earlier partial entry points

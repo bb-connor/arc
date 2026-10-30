@@ -15,7 +15,7 @@ use chio_core_types::{
 use chio_kernel_core::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,
     evaluate_with_full_floor, evaluate_with_full_floor_and_evidence,
-    evaluate_with_full_floor_and_root, verify_capability_full_with_evidence,
+    verify_capability_full_with_evidence,
     CapabilityEvidenceContext, CapabilityFeatureContext, EvaluateInput, EvaluationVerdict,
     FixedClock, Guard, GuardContext, KernelCoreError, NoopBudgetRegistry, PortableToolCallRequest,
     Verdict,
@@ -123,19 +123,7 @@ fn evaluate_public_entries(
         ),
         (
             "full_floor",
-            evaluate_with_full_floor(input(), floor, &peer, &resolver, &mut budgets),
-        ),
-        (
-            "full_floor_and_root",
-            evaluate_with_full_floor_and_root(
-                input(),
-                floor,
-                &peer,
-                None,
-                None,
-                &resolver,
-                &mut budgets,
-            ),
+            evaluate_with_full_floor(input(), floor, &peer, None, None, &resolver, &mut budgets),
         ),
         (
             "full_floor_and_evidence",

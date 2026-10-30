@@ -6,7 +6,7 @@ use chio_core::capability::{
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_kernel_core::scope::{resolve_capability_grants, ScopeMatchError};
 use chio_kernel_core::{
-    verify_capability_full_with_root, BudgetRegistry, BudgetSplitError, CapabilityFeatureContext,
+    verify_capability_full, BudgetRegistry, BudgetSplitError, CapabilityFeatureContext,
     InMemoryBudgetRegistry, NoopBudgetRegistry, MAX_BUDGET_SHARE_BPS,
 };
 use tracing::{debug, warn};
@@ -208,7 +208,7 @@ impl AgUiProxy {
                 .delegation_parent_subjects
                 .get(&link.capability_id)
         });
-        if let Err(error) = verify_capability_full_with_root(
+        if let Err(error) = verify_capability_full(
             capability,
             &self.config.trusted_issuers,
             &clock,

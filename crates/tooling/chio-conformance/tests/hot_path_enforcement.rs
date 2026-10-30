@@ -24,7 +24,7 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_kernel_core::{
-    verify_capability_full, verify_capability_full_with_root, BudgetSplitError, CapabilityError,
+    verify_capability_full, BudgetSplitError, CapabilityError,
     CapabilityFeatureContext, FixedClock, InMemoryBudgetRegistry, PortableToolCallRequest,
     Verdict as PortableVerdict,
 };
@@ -467,7 +467,7 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
     // Unknown parents must stay fail-closed so the verifier does not
     // fabricate a parent share.
     let mut budgets = InMemoryBudgetRegistry::new();
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &token,
         &[issuer.public_key()],
         &clock,
@@ -564,7 +564,7 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
     let clock = FixedClock::new(150);
 
     let mut budgets = InMemoryBudgetRegistry::new();
-    let err = verify_capability_full_with_root(
+    let err = verify_capability_full(
         &child_a,
         &[issuer.public_key()],
         &clock,
@@ -641,7 +641,11 @@ fn chain_binding_disabled_rejects_attenuated_token() {
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: None,
+        },
         &trust_resolver,
         &mut budgets,
     )

@@ -48,7 +48,7 @@ use the system clock. The basic capability entrypoint supplies one trusted
 issuer, the default peer profile, no direct root, no trust roots, and no snapshots.
 Delegation requiring those inputs needs the context entrypoint.
 
-`evaluate_with_full_floor_and_root` receives `AllowClassical`, the peer profile
+`evaluate_with_full_floor` receives `AllowClassical`, the peer profile
 (default `t1_default`), root resolver, and seeded registry. Kernel-core checks
 capability validity and bindings, then subject, portable scope, and sibling
 admission. The bridge passes zero guards and no session filesystem roots.
@@ -56,7 +56,7 @@ The response carries `verdict`, optional reason, and matched grant index;
 `PendingApproval` becomes `deny`. A deny response still has ABI status OK because
 evaluation completed successfully. Invalid envelopes/context return error status.
 
-Capability verification calls `verify_capability_full_with_root` and serializes
+Capability verification calls `verify_capability_full` and serializes
 its verified snapshot. Passport verification calls `passport_verify::verify_passport`
 with the original envelope bytes, trusted issuer, and selected clock. It returns
 subject/issuer/time metadata and the canonical payload bytes encoded as hex.
