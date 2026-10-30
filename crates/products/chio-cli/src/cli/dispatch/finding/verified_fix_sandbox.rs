@@ -537,7 +537,7 @@ fn terminate_sandbox(child: &mut std::process::Child, cgroup: &SandboxCgroup) {
 }
 
 #[derive(Clone)]
-struct RuntimeMountSpec {
+pub(super) struct RuntimeMountSpec {
     files: Vec<(PathBuf, PathBuf)>,
     trees: Vec<(PathBuf, PathBuf)>,
     masks: Vec<PathBuf>,
@@ -546,6 +546,7 @@ struct RuntimeMountSpec {
 
 #[derive(Default)]
 struct RuntimeMountSpecBuilder {
+    search_path: Option<std::ffi::OsString>,
     files: BTreeSet<(PathBuf, PathBuf)>,
     trees: BTreeSet<(PathBuf, PathBuf)>,
     masks: BTreeSet<PathBuf>,
@@ -553,8 +554,12 @@ struct RuntimeMountSpecBuilder {
 }
 
 impl RuntimeMountSpecBuilder {
+    fn find_executable(&self, name: &str) -> Option<PathBuf> {
+        find_executable(name, self.search_path.as_deref()?)
+    }
+
     fn add_executable(&mut self, name: &str, required: bool) -> Result<Option<PathBuf>, String> {
-        let Some(path) = executable_on_path(name) else {
+        let Some(path) = self.find_executable(name) else {
             if required {
                 return Err(format!("required sandbox runtime executable {name} is unavailable"));
             }
@@ -644,7 +649,7 @@ impl RuntimeMountSpecBuilder {
 
     fn add_rust_toolchain(&mut self) -> Result<(), String> {
         let (Some(rustc), Some(_cargo)) =
-            (executable_on_path("rustc"), executable_on_path("cargo"))
+            (self.find_executable("rustc"), self.find_executable("cargo"))
         else {
             return Ok(());
         };
@@ -763,14 +768,19 @@ pub(super) fn add_runtime_mounts(
 ) -> Result<(), CliError> {
     let spec = match profile {
         RuntimeMountProfile::Git => GIT_RUNTIME_MOUNT_SPEC.get_or_init(|| {
-            build_runtime_mount_spec(RuntimeMountProfile::Git)
+            build_runtime_mount_spec(RuntimeMountProfile::Git, std::env::var_os("PATH"))
         }),
         RuntimeMountProfile::SellerTest => RUNTIME_MOUNT_SPEC.get_or_init(|| {
-            build_runtime_mount_spec(RuntimeMountProfile::SellerTest)
+            build_runtime_mount_spec(RuntimeMountProfile::SellerTest, std::env::var_os("PATH"))
         }),
     }
         .as_ref()
         .map_err(|error| CliError::cli_other_error(error.clone()))?;
+    apply_runtime_mount_spec(command, spec);
+    Ok(())
+}
+
+pub(super) fn apply_runtime_mount_spec(command: &mut Command, spec: &RuntimeMountSpec) {
     let mut directories = BTreeSet::new();
     for (_, destination) in spec.files.iter().chain(spec.trees.iter()) {
         collect_parent_directories(destination, &mut directories);
@@ -804,11 +814,18 @@ pub(super) fn add_runtime_mounts(
             .arg(target)
             .arg(destination);
     }
-    Ok(())
 }
 
-fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMountSpec, String> {
-    let mut builder = RuntimeMountSpecBuilder::default();
+/// Selects the host runtime components for `profile` from the executables on
+/// `search_path` (the `PATH` the sandbox runtime resolves against).
+pub(super) fn build_runtime_mount_spec(
+    profile: RuntimeMountProfile,
+    search_path: Option<std::ffi::OsString>,
+) -> Result<RuntimeMountSpec, String> {
+    let mut builder = RuntimeMountSpecBuilder {
+        search_path,
+        ..RuntimeMountSpecBuilder::default()
+    };
     let required = match profile {
         RuntimeMountProfile::Git => &["sh", "git", "env"][..],
         RuntimeMountProfile::SellerTest => &["sh", "cp", "mkdir", "git", "env"][..],
@@ -829,7 +846,8 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
         .files
         .insert((environment, PathBuf::from("/usr/bin/env")));
 
-    let git = executable_on_path("git")
+    let git = builder
+        .find_executable("git")
         .ok_or_else(|| "required sandbox Git executable is unavailable".to_owned())?;
     let git_exec = bounded_runtime_path(&git, &["--exec-path"], "Git runtime")?;
     builder.add_tree_dependencies(&git_exec)?;
@@ -848,7 +866,7 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
         builder.add_executable(optional, false)?;
     }
 
-    if let Some(python_command) = executable_on_path("python3") {
+    if let Some(python_command) = builder.find_executable("python3") {
         let (python, _) = bounded_runtime_file(
             &python_command,
             &[
@@ -890,7 +908,7 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
     }
 
     if builder.add_executable("node", false)?.is_some() {
-        if let Some(npm) = executable_on_path("npm") {
+        if let Some(npm) = builder.find_executable("npm") {
             builder.add_npm_runtime(&npm)?;
         }
     }
@@ -898,12 +916,8 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
     Ok(builder.finish())
 }
 
-fn executable_on_path(name: &str) -> Option<PathBuf> {
-    find_executable(name, std::env::var_os("PATH")?.as_os_str())
-}
-
 #[cfg(unix)]
-fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+pub(super) fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
     use rustix::fs::{accessat, Access, AtFlags, CWD};
 
     std::env::split_paths(search_path)
@@ -915,7 +929,7 @@ fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf>
 }
 
 #[cfg(not(unix))]
-fn find_executable(_name: &str, _search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+pub(super) fn find_executable(_name: &str, _search_path: &std::ffi::OsStr) -> Option<PathBuf> {
     None
 }
 

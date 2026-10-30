@@ -53,8 +53,9 @@ use repository_sandbox::{
 };
 #[cfg(test)]
 use sandbox::{
-    add_runtime_mounts, run_test_command_with_limits, run_test_command_with_timeout,
-    RuntimeMountProfile, TestSandboxLimits,
+    apply_runtime_mount_spec, build_runtime_mount_spec, find_executable,
+    run_test_command_with_limits, run_test_command_with_timeout, RuntimeMountProfile,
+    TestSandboxLimits,
 };
 
 const MAX_DRAFT_BYTES: usize = 32 * 1024 * 1024;
