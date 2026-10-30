@@ -245,6 +245,12 @@ query. It does not requalify other rows.
   `crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs:314-324,735-762`.
 - **Not claimed.** The draft does not document the typed snapshot error
   codes or the point-load and export surfaces.
+- **BCP 14 ledger.** The Paging text adds one MUST NOT (`id` as
+  `cursor`, draft line 3853) and one OPTIONAL (the `snapshot` member).
+  The sections 10-12 counts are now MUST=24 and OPTIONAL=22, and the
+  table covers 31 MUST/SHOULD/MAY occurrences. The recount also found
+  the MUST NOT at draft line 3297 (H13) missing from the table, which
+  held 29 rows against the 30 occurrences in the text.
 
 ## Abstract and Sections 1-3
 
@@ -1288,7 +1294,7 @@ Confidence: high for direct source findings and the final wording. The existing-
 
 ## Current BCP 14 coverage
 
-Occurrence counts in sections 10-12: MUST=23, SHOULD=2, MAY=5, REQUIRED=36, OPTIONAL=21, RECOMMENDED=0, SHALL=0, CONDITIONAL=3. REQUIRED and OPTIONAL include table presence labels. CONDITIONAL is a presence label, not a BCP 14 keyword. The following table covers all 30 MUST/SHOULD/MAY occurrences.
+Occurrence counts in sections 10-12: MUST=24, SHOULD=2, MAY=5, REQUIRED=36, OPTIONAL=22, RECOMMENDED=0, SHALL=0, CONDITIONAL=3. REQUIRED and OPTIONAL include table presence labels. CONDITIONAL is a presence label, not a BCP 14 keyword. The following table covers all 31 MUST/SHOULD/MAY occurrences (MUST counts MUST NOT).
 
 | Full-draft line | Keyword occurrences | Ledger rows | Exact requirement line |
 |---|---|---|---|
@@ -1310,6 +1316,7 @@ Occurrence counts in sections 10-12: MUST=23, SHOULD=2, MAY=5, REQUIRED=36, OPTI
 | 3023 | MAY | N30 | projection and its signature. It MAY re-encode the same typed values |
 | 3120 | MUST | H09 | Every request, `initialize` included, MUST carry an `Authorization` |
 | 3146 | MUST | H13 | This edge refuses Chio DPoP sender binding: it MUST reject |
+| 3297 | MUST | H13 | that carries a `DPoP` header, and MUST NOT admit either as a bearer. |
 | 3155 | MUST | H14 | `chioAttestationSha256`, the request MUST carry the header |
 | 3162 | MUST | H15 | session. Every later request of the session MUST present the same |
 | 3166 | MUST | H15 | a fingerprint of the token, the request MUST carry the same token. The |
@@ -1319,6 +1326,7 @@ Occurrence counts in sections 10-12: MUST=23, SHOULD=2, MAY=5, REQUIRED=36, OPTI
 | 3557 | MUST | C11-C17 | The service MUST perform these checks, in this order, and reject the |
 | 3633 | MUST | C20 | The service MUST reject the query with 400 if `minCost` exceeds |
 | 3966 | MUST | C27 | kernel MUST deny the call, with a signed receipt, if any identifier is |
+| 3853 | MUST | Snapshot member entry (2026-10-30) | authenticated by receipt signature only. A client MUST NOT send `id` |
 
 REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07-N09 (both split tables), native response N15-N17, native chunks N18, direct issuance C04/C08, delegated request C10, signed policy C11, delegated response C18, receipt query C19, revocation C24, model metadata H41-H42. The table layout changes preserve the same fields and presence rules; both hosted alias/native-equivalent tables are covered by H32.
 
