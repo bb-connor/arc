@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `6f59119d9045c6918aabd3f5866e6f705363c231e4c5eb7e1f4576a178322980`
+- Input digest: `8410828461f88d6f93162a4977af32db2588c4d6b6a7275b2db57a2a703672d7`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1483,9 +1483,9 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/root_authority/delegation_context.rs`: `3a84774845035bdac63f92e96afb93fab6dd44c6859232907081cb23a4e147d1`
 - `crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs`: `1b275ed05ed8e2e02f6113d96322c9cf59024f49058ba12198c5913513c48faf`
 - `crates/core/chio-core-types/src/root_authority/jwk.rs`: `e0adb50c3dcd806b60490c2e5b7a9cd7dd7b35a7066f3b0ff4b54037d25dac45`
-- `crates/core/chio-core-types/src/root_authority/mod.rs`: `61d358943b15e021e49eea701bea2060966d2706fa7daaf69187f2f526402aaa`
+- `crates/core/chio-core-types/src/root_authority/mod.rs`: `358a16e0c4f663e47e322c7774aba90eff907acbaf04f79e8356c8f4c1db58c6`
 - `crates/core/chio-core-types/src/root_authority/provider_identity.rs`: `e4c714025d18c20389ec188a4a3e0aaf0c16a32453f8594bcc9da4f8d4f55aa0`
-- `crates/core/chio-core-types/src/root_authority/revocation_entry.rs`: `a47a77c3a7fd458167bc73b7cefe1c498e1c6920e31a9eb3c1225dd92b316730`
+- `crates/core/chio-core-types/src/root_authority/revocation_entry.rs`: `aff7e1e042a79c5d78e7b9f508cfe93f28ec520dec7aba2d9aad49fe6508e6bd`
 - `crates/core/chio-core-types/src/root_authority/root_policy.rs`: `e0c55deebbcf85eaa3e529493455f9dbdabb845098be98844733d71abda65460`
 - `crates/core/chio-core-types/src/root_authority/verifier_trust.rs`: `dea5b76d5465dbefbd51aa05c0adbdae5f490c1fdce303139c47c19a8da81142`
 - `crates/core/chio-core-types/src/root_authority/wire.rs`: `ae2bba1570cb7eedfbca4693f3a1a5858b58732d1358db7a3814c5d213dd87b5`
@@ -1684,7 +1684,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `d038b734481964f5f8f817a3e13cd5ff6e38d1fb54bfc6d99305a60c700d22d6`
 - `fuzz/target-map.toml`: `c717aa1f5b7c0939baef981c1809401e344f38bb6df4f3f802a70141f2e03680`
-- `git-worktree://rust-files`: `c5ad6032cee29c6a7e4a689ffd71f560565ed09418da88d22c8549dc27475dd3`
+- `git-worktree://rust-files`: `accbfcc45db41f9faea5ae313ebfee7daab42e2022025d441031d79a9c6aa977`
 - `releases.toml`: `8fb71e1482d0fdbcf4d10f60a1be8f5886cb7bf0ab461f0cc434c256ec8d8546`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
