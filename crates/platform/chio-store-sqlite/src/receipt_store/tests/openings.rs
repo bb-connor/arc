@@ -1,9 +1,9 @@
 //! Receipt openings: the fresh-only v1 DDL refusals, the store identity, reads and erasure.
 
 use super::super::openings::{seed_receipt_store_identity, RECEIPT_OPENINGS_SCHEMA};
-use chio_core::receipt::disclosure::MAX_DISCLOSURE_OPENINGS;
 use super::super::*;
 use super::support::*;
+use chio_core::receipt::disclosure::MAX_DISCLOSURE_OPENINGS;
 use chio_kernel::receipt_store::{OpeningReadScope, OpeningState, OpeningStatus};
 use rusqlite::Connection;
 
@@ -1214,7 +1214,10 @@ fn read_refuses_an_empty_scope() -> TestResult {
         .read_openings(&receipt_id, &scope_of(0)?)
         .err()
         .ok_or("an empty scope read as an answer")?;
-    assert!(matches!(error, ReceiptStoreError::ReadBoundary(_)), "{error:?}");
+    assert!(
+        matches!(error, ReceiptStoreError::ReadBoundary(_)),
+        "{error:?}"
+    );
     Ok(())
 }
 
@@ -1230,7 +1233,10 @@ fn read_refuses_a_scope_above_the_opening_cap() -> TestResult {
         .read_openings(&receipt_id, &scope_of(MAX_DISCLOSURE_OPENINGS + 1)?)
         .err()
         .ok_or("a scope above the opening cap was read")?;
-    assert!(matches!(error, ReceiptStoreError::ReadBoundary(_)), "{error:?}");
+    assert!(
+        matches!(error, ReceiptStoreError::ReadBoundary(_)),
+        "{error:?}"
+    );
     Ok(())
 }
 
