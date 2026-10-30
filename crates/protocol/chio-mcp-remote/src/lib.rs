@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::result_large_err)]
 
+#[path = "remote_mcp/config.rs"]
+mod config;
+pub use config::RemoteServeHttpConfig;
+
 mod rate_limit;
 use rate_limit::{rate_limit_mcp_request, McpRateLimiter};
 mod clock;
