@@ -147,7 +147,10 @@ pub fn loaded_policy(policy_id: &str) -> TestResult<LoadedRootPolicy> {
         "signature": "00".repeat(64)
     });
     let unsigned: RootPolicy = serde_json::from_value(value)?;
-    let signature = policy_keypair().sign_canonical(&unsigned.signing_body())?.0;
+    let signature = policy_keypair().sign_wrapped(
+        chio_core::root_authority::CHIO_ROOT_POLICY_SCHEMA,
+        &chio_core::canonical::CanonicalBytes::from_serializable(&unsigned.signing_body())?,
+    )?;
     let mut fields = unsigned.into_fields();
     fields.signature = signature;
     let policy = RootPolicy::new(fields)?;
