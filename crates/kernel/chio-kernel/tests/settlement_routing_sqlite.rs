@@ -17,7 +17,7 @@ use chio_kernel::{
     ToolServerConnection, Verdict, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_settle::{
+use chio_settle_types::{
     RetryPolicy, SettlementAttemptClaim, SettlementHook, SettlementHookError,
     SettlementObservation, SettlementOutcome, SettlementOutcomeStore, SettlementRoute,
     SettlementRouteError, SettlementRoutingInput, SettlementStoreBinding,
@@ -231,7 +231,7 @@ impl SettlementHook for AcceptingHook {
     fn observe(
         &self,
         _observation: &SettlementObservation,
-        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted("accepted"))
@@ -362,7 +362,7 @@ fn recover_accepted(
         Some(&hook_handle),
         receipt,
         std::slice::from_ref(&receipt.kernel_key),
-        &chio_settle::SettlementIdempotencyKey {
+        &chio_settle_types::SettlementIdempotencyKey {
             receipt_id: claim.receipt_id.clone(),
             row_version: claim.row_version,
         },
@@ -404,7 +404,7 @@ fn simulate_crash(
                 Some(&hook_handle),
                 receipt,
                 std::slice::from_ref(&receipt.kernel_key),
-                &chio_settle::SettlementIdempotencyKey {
+                &chio_settle_types::SettlementIdempotencyKey {
                     receipt_id: claim.receipt_id.clone(),
                     row_version: claim.row_version,
                 },
@@ -645,12 +645,12 @@ impl SettlementHook for RetryOnceHook {
     fn observe(
         &self,
         _observation: &SettlementObservation,
-        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
             return Ok(SettlementOutcome::retryable(
-                chio_settle::SettlementFailureReason::from_detail(
-                    chio_settle::SettlementFailureCode::Rpc,
+                chio_settle_types::SettlementFailureReason::from_detail(
+                    chio_settle_types::SettlementFailureCode::Rpc,
                     "rail unavailable",
                 ),
             ));

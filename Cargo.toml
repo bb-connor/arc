@@ -93,6 +93,7 @@ members = [
     "crates/economy/chio-market",
     "crates/economy/chio-open-market",
     "crates/economy/chio-settle",
+    "crates/economy/chio-settle-types",
     "crates/economy/chio-underwriting",
     "crates/economy/chio-web3",
     "crates/economy/chio-web3-bindings",
@@ -605,6 +606,7 @@ chio-runtime-harness = { version = "=0.1.0", path = "crates/kernel/chio-runtime-
 chio-runtime-proof-parity = { version = "=0.1.0", path = "crates/kernel/chio-runtime-proof-parity" }
 chio-selective-disclosure = { version = "=0.1.0", path = "crates/trust/chio-selective-disclosure" }
 chio-settle = { version = "=0.1.0", path = "crates/economy/chio-settle" }
+chio-settle-types = { version = "=0.1.0", path = "crates/economy/chio-settle-types" }
 chio-security-types = { version = "=0.1.0", path = "crates/security/chio-security-types" }
 chio-security-kernel = { version = "=0.1.0", path = "crates/security/chio-security-kernel" }
 chio-semantic-contracts = { version = "=0.1.0", path = "crates/security/chio-semantic-contracts" }

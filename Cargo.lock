@@ -3088,6 +3088,7 @@ dependencies = [
  "chio-security-types",
  "chio-selective-disclosure",
  "chio-settle",
+ "chio-settle-types",
  "chio-spec-validate",
  "chio-store-sqlite",
  "chio-swarm-authority",
@@ -3326,6 +3327,7 @@ dependencies = [
  "chio-security-kernel",
  "chio-security-types",
  "chio-settle",
+ "chio-settle-types",
  "chio-siem",
  "chio-signing-remote",
  "chio-spec-validate",
@@ -4301,6 +4303,7 @@ dependencies = [
  "chio-response-model",
  "chio-security-types",
  "chio-settle",
+ "chio-settle-types",
  "chio-store-sqlite",
  "chio-supervisor",
  "chio-swarm-authority",
@@ -5322,6 +5325,7 @@ dependencies = [
  "chio-link",
  "chio-open-market",
  "chio-security-types",
+ "chio-settle-types",
  "chio-spec-validate",
  "chio-test-support",
  "chio-web3",
@@ -5336,6 +5340,18 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "zeroize",
+]
+
+[[package]]
+name = "chio-settle-types"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "chio-test-support",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -5429,6 +5445,7 @@ dependencies = [
  "chio-security-types",
  "chio-semantic-contracts",
  "chio-settle",
+ "chio-settle-types",
  "chio-sqlite-file-identity",
  "chio-store-sqlite",
  "chio-supervisor",

@@ -6852,11 +6852,11 @@ impl chio_settle::FindingBondObservationSource for ScriptedObservations {
     fn observe(
         &self,
         _verified: &chio_settle::VerifiedFindingEnforcement,
-    ) -> Result<FindingBondObservationRecheck, chio_settle::SettlementError> {
+    ) -> Result<FindingBondObservationRecheck, chio_settle_types::SettlementError> {
         let scripted = match self.reads.lock() {
             Ok(mut guard) => guard.pop_front(),
             Err(_) => {
-                return Err(chio_settle::SettlementError::InvalidInput(
+                return Err(chio_settle_types::SettlementError::InvalidInput(
                     "observation script is poisoned".to_string(),
                 ))
             }

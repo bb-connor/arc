@@ -3,9 +3,9 @@
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use chio_settle as settle_api;
 use chio_settle::{
-    build_x402_payment_requirements, ApprovalBinding, SettlementError, X402PaymentRequirements,
-    X402SettlementMode,
+    build_x402_payment_requirements, ApprovalBinding, X402PaymentRequirements, X402SettlementMode,
 };
+use chio_settle_types::SettlementError;
 use chio_test_support::prelude::*;
 
 #[path = "support/approval.rs"]

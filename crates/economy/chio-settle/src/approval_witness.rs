@@ -8,7 +8,9 @@ use chio_core::capability::governance::{
 use chio_core::crypto::{verify_wrapped, PublicKey};
 use chio_security_types::clock::{AuthorityDeadline, Clock, UnixMillis};
 
-use crate::{ApprovalBinding, SettlementError};
+use crate::ApprovalBinding;
+
+use chio_settle_types::SettlementError;
 
 mod replay;
 pub use replay::{ApprovalReplayOutcome, ApprovalReplayStore, InMemoryApprovalReplayStore};

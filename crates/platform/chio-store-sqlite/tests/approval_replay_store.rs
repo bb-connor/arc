@@ -1,6 +1,7 @@
 use std::sync::{Arc, Barrier};
 
-use chio_settle::{ApprovalReplayOutcome, ApprovalReplayStore, SettlementError};
+use chio_settle::{ApprovalReplayOutcome, ApprovalReplayStore};
+use chio_settle_types::SettlementError;
 use chio_store_sqlite::{
     SchemaVersionError, SqliteApprovalReplayStore, SqliteApprovalReplayStoreError,
 };

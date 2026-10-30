@@ -10,7 +10,7 @@ use chio_egress_contract::HttpEgressContract;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]

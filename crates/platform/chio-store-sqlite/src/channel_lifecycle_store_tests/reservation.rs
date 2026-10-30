@@ -16,6 +16,7 @@ use chio_kernel::admission_operation::{
     ProviderAttemptBindingV1, QualifiedAdmissionOperationStoreExt,
 };
 use chio_settle::channel::*;
+use chio_settle_types::derive_channel_receipt_authority_digest;
 
 use super::*;
 

@@ -93,8 +93,9 @@ BUDGETS: dict[str, Budget] = {
         # 481 -> 482: chio-semantic-contracts, which chio-store-sqlite needs to
         # install bounded semantic registries; it brings no external package.
         # 482 -> 483: chio-rollback-anchor, split out of chio-store-sqlite; it brings no external package.
+        # 483 -> 484: chio-settle-types, split out of chio-settle; it brings no external package.
         # Other shared platform dependencies remain in the broker's graph.
-        ceiling=483,
+        ceiling=484,
         measured="2026-10-30",
         features=(),
         deny=COMMON_DENY,

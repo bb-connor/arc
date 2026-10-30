@@ -526,7 +526,7 @@ fn atomic_settlement_write_failure_closes_serving_before_returning(
 #[test]
 fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dyn std::error::Error>>
 {
-    use chio_settle::{
+    use chio_settle_types::{
         RetryPolicy, SettlementOutcomeStore, SettlementRoute, SettlementRoutingInput,
     };
 

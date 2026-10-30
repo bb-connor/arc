@@ -51,3 +51,13 @@ pub enum ChannelError {
     #[error("channel canonicalization failed: {0}")]
     Canonicalization(String),
 }
+
+impl From<chio_settle_types::ChannelReceiptAuthorityDigestError> for ChannelError {
+    fn from(error: chio_settle_types::ChannelReceiptAuthorityDigestError) -> Self {
+        match error {
+            chio_settle_types::ChannelReceiptAuthorityDigestError::Canonicalization(detail) => {
+                Self::Canonicalization(detail)
+            }
+        }
+    }
+}

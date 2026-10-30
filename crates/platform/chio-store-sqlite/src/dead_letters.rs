@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_settle::{DeadLetterRecord, SETTLE_DEAD_LETTER_SCHEMA};
+use chio_settle_types::{DeadLetterRecord, SETTLE_DEAD_LETTER_SCHEMA};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, OptionalExtension};
@@ -476,7 +476,7 @@ mod tests {
     use super::*;
 
     use chio_core::canonical::canonical_json_bytes;
-    use chio_settle::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
+    use chio_settle_types::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
     use r2d2::Pool;
     use r2d2_sqlite::SqliteConnectionManager;
     use rusqlite::params;

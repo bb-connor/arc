@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use chio_core::hashing::sha256;
 use chio_kernel::ReceiptStoreError;
-use chio_settle::{
+use chio_settle_types::{
     classify_attempt, validate_settlement_claim, DeadLetterRecord, RetryDecision, RetryPolicy,
     SettlementAttemptClaim, SettlementFailureCode, SettlementOutcomeStore, SettlementRoute,
     SettlementRouteError, SettlementRoutingInput, SettlementStoreBinding,
@@ -432,7 +432,7 @@ fn validate_lease_shape(
         (None, None, None) => Ok(None),
         (Some(owner), Some(token), Some(deadline))
             if !owner.is_empty()
-                && owner.len() <= chio_settle::MAX_SETTLEMENT_WORKER_ID_BYTES
+                && owner.len() <= chio_settle_types::MAX_SETTLEMENT_WORKER_ID_BYTES
                 && !token.is_empty()
                 && token.len() <= 128 =>
         {
@@ -737,7 +737,7 @@ fn schedule_retry(
     observed_at_i64: i64,
     attempt: u32,
     backoff: std::time::Duration,
-    reason: &chio_settle::SettlementFailureReason,
+    reason: &chio_settle_types::SettlementFailureReason,
 ) -> Result<u64, SettlementRouteError> {
     let backoff_ms: u64 = backoff
         .as_millis()
@@ -949,7 +949,7 @@ mod tests {
     use std::time::Duration;
 
     use chio_kernel::ReceiptStore;
-    use chio_settle::{
+    use chio_settle_types::{
         RetryPolicy, SettlementFailureCode, SettlementFailureReason, SettlementOutcomeStore,
         SettlementRoute, SettlementRouteError, SettlementRoutingInput, SettlementSkipReason,
     };
@@ -1057,7 +1057,7 @@ mod tests {
         receipt_id: &str,
         now_ms: u64,
         lease_ms: u64,
-    ) -> chio_settle::SettlementAttemptClaim {
+    ) -> chio_settle_types::SettlementAttemptClaim {
         store
             .claim_receipt(receipt_id, "worker", now_ms, lease_ms)
             .test_expect("claim succeeds")

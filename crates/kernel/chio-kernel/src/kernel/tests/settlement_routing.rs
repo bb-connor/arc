@@ -13,7 +13,7 @@ mod settlement_routing_tests {
         kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel},
         lineage::ChildRequestReceipt,
     };
-    use chio_settle::{
+    use chio_settle_types::{
         RetryPolicy, SettlementAttemptClaim, SettlementFailureCode, SettlementFailureReason,
         SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
         SettlementOutcomeStore, SettlementRoute, SettlementRouteError, SettlementRoutingInput,
@@ -410,7 +410,7 @@ mod settlement_routing_tests {
         fn observe(
             &self,
             observation: &SettlementObservation,
-            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+            _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.store.note_hook_query(&observation.receipt_id);
@@ -450,7 +450,7 @@ mod settlement_routing_tests {
         fn observe(
             &self,
             observation: &SettlementObservation,
-            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+            _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.store.note_hook_query(&observation.receipt_id);

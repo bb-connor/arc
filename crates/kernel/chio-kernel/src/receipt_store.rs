@@ -516,7 +516,7 @@ pub trait ReceiptStore: Send + Sync {
         ))
     }
     /// Identify the durable writer shared with a settlement outcome store.
-    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+    fn settlement_store_binding(&self) -> Option<chio_settle_types::SettlementStoreBinding> {
         None
     }
     /// Report the atomic receipt-sidecar projection implemented by this store.

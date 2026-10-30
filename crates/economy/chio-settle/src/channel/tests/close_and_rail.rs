@@ -33,17 +33,17 @@ fn public_rail_amount_conversion_rejects_invalid_policy_currency_and_ijson_overf
     config.policy.tiers.clear();
     assert!(matches!(
     crate::scale_token_minor_units_to_chio_amount(scaled, "USD", &config).err(),
-    Some(crate::SettlementError::InvalidInput(message)) if message == "settlement policy requires at least one amount tier"
+    Some(chio_settle_types::SettlementError::InvalidInput(message)) if message == "settlement policy requires at least one amount tier"
     ));
     config.policy = crate::SettlementPolicyConfig::default();
     assert!(matches!(
     crate::scale_token_minor_units_to_chio_amount(scaled, "usd", &config).err(),
-    Some(crate::SettlementError::InvalidInput(message)) if message == "currency must be an uppercase ISO 4217 code"
+    Some(chio_settle_types::SettlementError::InvalidInput(message)) if message == "currency must be an uppercase ISO 4217 code"
     ));
     let unsafe_units = (u128::from((1_u64 << 53) - 1) + 1) * 10_000;
     assert!(matches!(
     crate::scale_token_minor_units_to_chio_amount(unsafe_units, "USD", &config).err(),
-    Some(crate::SettlementError::InvalidInput(message)) if message == "Chio amount exceeds the I-JSON safe integer range"
+    Some(chio_settle_types::SettlementError::InvalidInput(message)) if message == "Chio amount exceeds the I-JSON safe integer range"
     ));
     Ok(())
 }
@@ -578,7 +578,7 @@ fn authorized_channel_merkle_preparation_requires_verified_release_authority() {
         &VerifiedChannelReleaseAuthorizationV1,
     ) -> Result<
         Option<crate::PreparedAuthorizedChannelMerkleReleaseV1>,
-        crate::SettlementError,
+        chio_settle_types::SettlementError,
     >;
     let _: PrepareAuthorizedChannelMerkleRelease = crate::prepare_authorized_channel_merkle_release;
 }

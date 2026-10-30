@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use chio_security_types::clock::ClockError;
 
 use super::{clock_error, refused, valid_identifier};
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 const DEFAULT_CAPACITY: usize = 65_536;
 

@@ -27,7 +27,7 @@ use chio_credit::obligation::{
 };
 
 use super::super::*;
-use crate::SettlementError;
+use chio_settle_types::{derive_channel_receipt_authority_digest, SettlementError};
 
 fn digest(label: &str) -> String {
     chio_core::crypto::sha256_hex(label.as_bytes())

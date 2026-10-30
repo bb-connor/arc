@@ -138,6 +138,7 @@ rustix = { workspace = true }
 chio-file-custody = { workspace = true }
 
 [dev-dependencies]
+chio-settle-types = { workspace = true }
 chio-credit = { workspace = true }
 chio-open-market = { workspace = true }
 chio-test-support = { workspace = true }

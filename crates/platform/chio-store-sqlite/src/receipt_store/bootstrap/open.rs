@@ -93,7 +93,7 @@ fn assert_sqlite_durability_pragmas(connection: &Connection) -> Result<(), Recei
 
 fn settlement_store_binding_if_ready(
     connection: &Connection,
-) -> Result<Option<chio_settle::SettlementStoreBinding>, ReceiptStoreError> {
+) -> Result<Option<chio_settle_types::SettlementStoreBinding>, ReceiptStoreError> {
     if !settlement_projection_schema_is_installed(connection)? {
         return Ok(None);
     }
@@ -103,9 +103,9 @@ fn settlement_store_binding_if_ready(
             "failed to generate settlement store binding: {error}"
         )))
     })?;
-    Ok(Some(chio_settle::SettlementStoreBinding::from_digest(
-        digest,
-    )))
+    Ok(Some(
+        chio_settle_types::SettlementStoreBinding::from_digest(digest),
+    ))
 }
 
 fn ensure_receipt_sink_identity(connection: &Connection) -> Result<String, ReceiptStoreError> {

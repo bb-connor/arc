@@ -1,5 +1,5 @@
 use chio_core::receipt::body::ChioReceipt;
-use chio_settle::{SettlementAttemptClaim, SettlementHookError, SettlementIdempotencyKey};
+use chio_settle_types::{SettlementAttemptClaim, SettlementHookError, SettlementIdempotencyKey};
 
 use crate::settlement_routing::SettlementCompletion;
 use crate::ReceiptStoreError;

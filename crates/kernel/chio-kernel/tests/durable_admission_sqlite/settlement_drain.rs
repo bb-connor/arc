@@ -6,7 +6,7 @@ use chio_core::receipt::{
     kinds::{BoundaryClass, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel},
 };
 use chio_kernel::{PendingSettlementObservation, SettlementDrainTrust};
-use chio_settle::{
+use chio_settle_types::{
     RetryPolicy, SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
     SettlementOutcomeStore,
 };
@@ -18,7 +18,7 @@ impl SettlementHook for CountingHook {
     fn observe(
         &self,
         _observation: &SettlementObservation,
-        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.0.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted("sqlite-drain"))

@@ -2,7 +2,9 @@ use chio_core::hashing::sha256;
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use serde::{Deserialize, Serialize};
 
-use crate::{SettlementError, VerifiedApproval};
+use crate::VerifiedApproval;
+
+use chio_settle_types::SettlementError;
 
 #[path = "payments_approval.rs"]
 mod approval_binding;

@@ -8,6 +8,7 @@ use chio_core::receipt::economics::{
 use chio_credit::obligation::{
     derive_obligation_payee_binding_digest, ObligationAtomV1, ObligationCreditElectionV1,
 };
+use chio_settle_types::derive_channel_receipt_authority_digest;
 use serde::{Deserialize, Serialize};
 
 use super::validation::{
@@ -316,12 +317,6 @@ impl VerifiedChannelReceiptBindingV1 {
     pub const fn actual_charge(&self) -> &MonetaryAmount {
         &self.actual_charge
     }
-}
-
-pub fn derive_channel_receipt_authority_digest(
-    kernel_key: &PublicKey,
-) -> Result<String, ChannelError> {
-    digest(b"chio.channel.receipt-authority.digest.v1\0", kernel_key)
 }
 
 pub fn derive_channel_payee_binding_digest(

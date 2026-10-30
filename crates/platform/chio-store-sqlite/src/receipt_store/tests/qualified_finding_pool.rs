@@ -398,7 +398,7 @@ fn qualified_receipt_sink_anchors_standalone_lineage_mutations(
 #[test]
 fn qualified_settlement_state_writes_advance_the_rollback_anchor(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use chio_settle::{
+    use chio_settle_types::{
         RetryPolicy, SettlementOutcomeStore as _, SettlementRoute, SettlementRoutingInput,
     };
 

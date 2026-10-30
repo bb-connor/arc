@@ -5576,12 +5576,12 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.settle.dead-letter.v1"
-files = ["crates/economy/chio-settle/src/retry.rs"]
+files = ["crates/economy/chio-settle-types/src/retry.rs"]
 first_seen = "1ad5bcbea8"
 
 [[schema]]
 value = "chio.settle.observation.v1"
-files = ["crates/economy/chio-settle/src/hook.rs"]
+files = ["crates/economy/chio-settle-types/src/hook.rs"]
 first_seen = "9173b4c589"
 
 [[schema]]
@@ -5591,7 +5591,7 @@ first_seen = "0438fca5d3"
 
 [[schema]]
 value = "chio.settle.outcome.v1"
-files = ["crates/economy/chio-settle/src/hook.rs"]
+files = ["crates/economy/chio-settle-types/src/hook.rs"]
 first_seen = "9173b4c589"
 
 [[schema]]

@@ -16,7 +16,7 @@
 
 use std::sync::{Arc, Barrier};
 
-use chio_settle::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
+use chio_settle_types::{DeadLetterRecord, SettlementFailureCode, SettlementFailureReason};
 use chio_store_sqlite::dead_letters::SqliteDeadLetterStore;
 use chio_store_sqlite::SqliteReceiptStore;
 use chio_test_support::prelude::*;

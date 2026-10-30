@@ -93,6 +93,7 @@ chio-metrics-spec = { workspace = true }
 chio-tool-call-fabric = { workspace = true }
 lru = "0.18.2"
 chio-settle = { workspace = true }
+chio-settle-types = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }
 dashmap = { workspace = true }

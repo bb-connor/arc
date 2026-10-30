@@ -3,7 +3,8 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use chio_security_types::clock::ClockError;
-use chio_settle::{ApprovalReplayOutcome, ApprovalReplayStore, SettlementError};
+use chio_settle::{ApprovalReplayOutcome, ApprovalReplayStore};
+use chio_settle_types::SettlementError;
 use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 

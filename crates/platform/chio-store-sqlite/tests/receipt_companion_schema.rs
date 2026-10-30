@@ -1,6 +1,6 @@
 use chio_credit::IouEnvelopeStoreError;
 use chio_security_types::schema::SchemaRefusal;
-use chio_settle::SettlementRouteError;
+use chio_settle_types::SettlementRouteError;
 use chio_store_sqlite::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStore};
 use chio_store_sqlite::{SqliteIouEnvelopeStore, SqliteSettlementOutcomeStore};
 

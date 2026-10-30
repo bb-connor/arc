@@ -1,7 +1,7 @@
 use chio_credit::IouEnvelopeStoreError;
 use chio_kernel::{ApprovalStoreError, ReceiptStoreError};
 use chio_security_types::schema::SchemaRefusal;
-use chio_settle::SettlementRouteError;
+use chio_settle_types::SettlementRouteError;
 use chio_store_sqlite::dead_letters::{DeadLetterStoreError, SqliteDeadLetterStore};
 use chio_store_sqlite::{
     SqliteApprovalStore, SqliteIouEnvelopeStore, SqliteReceiptStore, SqliteSettlementOutcomeStore,
@@ -31,7 +31,7 @@ fn empty_companion_opens_preserve_typed_creation_refusal() -> TestResult {
     };
     assert_eq!(
         error.class(),
-        chio_settle::SettlementRouteErrorClass::Backend
+        chio_settle_types::SettlementRouteErrorClass::Backend
     );
     assert!(matches!(
         error,

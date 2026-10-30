@@ -2203,6 +2203,7 @@ dependencies = [
  "chio-revocation-oracle",
  "chio-security-types",
  "chio-settle",
+ "chio-settle-types",
  "chio-store-sqlite",
  "chio-underwriting",
  "chio-wasm-guards",
@@ -2325,6 +2326,7 @@ dependencies = [
  "chio-response-model",
  "chio-security-types",
  "chio-settle",
+ "chio-settle-types",
  "chio-supervisor",
  "chio-swarm-authority",
  "chio-tool-call-fabric",
@@ -2733,6 +2735,7 @@ dependencies = [
  "chio-finding",
  "chio-open-market",
  "chio-security-types",
+ "chio-settle-types",
  "chio-web3",
  "chio-web3-bindings",
  "hex",
@@ -2745,6 +2748,16 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "zeroize",
+]
+
+[[package]]
+name = "chio-settle-types"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -2813,6 +2826,7 @@ dependencies = [
  "chio-security-types",
  "chio-semantic-contracts",
  "chio-settle",
+ "chio-settle-types",
  "chio-sqlite-file-identity",
  "chio-supervisor",
  "chio-swarm-authority",

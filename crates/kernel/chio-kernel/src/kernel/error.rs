@@ -45,7 +45,7 @@ pub enum SettlementRuntimeConfigError {
     #[error("settlement drain trust does not contain the current receipt key")]
     MissingCurrentReceiptKey,
     #[error("invalid settlement retry policy: {0}")]
-    InvalidRetryPolicy(#[from] chio_settle::RetryPolicyError),
+    InvalidRetryPolicy(#[from] chio_settle_types::RetryPolicyError),
     #[error("settlement observer runtime requires a receipt store")]
     MissingReceiptStore,
     #[error("receipt store lacks timeout-aware atomic settlement observation projection")]
@@ -391,7 +391,7 @@ pub enum KernelError {
     SettlementConfiguration(#[from] SettlementRuntimeConfigError),
 
     #[error("settlement drain failed: {0}")]
-    SettlementDrain(chio_settle::SettlementRouteError),
+    SettlementDrain(chio_settle_types::SettlementRouteError),
 
     #[error("execution nonce verification failed: {0}")]
     ExecutionNonce(#[source] crate::execution_nonce::ExecutionNonceError),
@@ -880,9 +880,9 @@ impl KernelError {
             Self::SettlementDrain(error) => self.report_with_context(
                 "CHIO-KERNEL-SETTLEMENT-DRAIN",
                 serde_json::json!({ "class": match error.class() {
-                    chio_settle::SettlementRouteErrorClass::Backend => "backend",
-                    chio_settle::SettlementRouteErrorClass::Conflict => "conflict",
-                    chio_settle::SettlementRouteErrorClass::InvalidRecord => "invalid_record",
+                    chio_settle_types::SettlementRouteErrorClass::Backend => "backend",
+                    chio_settle_types::SettlementRouteErrorClass::Conflict => "conflict",
+                    chio_settle_types::SettlementRouteErrorClass::InvalidRecord => "invalid_record",
                 } }),
                 "Restore the settlement outcome store; claimed attempts stay leased until their lease lapses and the next drain reclaims them.",
             ),
@@ -1055,9 +1055,10 @@ mod overload_tests {
 
     #[test]
     fn settlement_drain_reports_its_failure_class() {
-        let error = KernelError::SettlementDrain(chio_settle::SettlementRouteError::Backend {
-            detail: "disk full".to_string(),
-        });
+        let error =
+            KernelError::SettlementDrain(chio_settle_types::SettlementRouteError::Backend {
+                detail: "disk full".to_string(),
+            });
         let report = error.report();
 
         assert_eq!(report.code, "CHIO-KERNEL-SETTLEMENT-DRAIN");

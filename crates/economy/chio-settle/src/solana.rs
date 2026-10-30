@@ -8,7 +8,8 @@ use chio_core::web3::identity::{
 use serde::{Deserialize, Serialize};
 
 use crate::config::{SettlementEvidenceConfig, SettlementKernelAuthority};
-use crate::{SettlementCommitment, SettlementError};
+use crate::SettlementCommitment;
+use chio_settle_types::SettlementError;
 
 pub const SOLANA_ED25519_PROGRAM_ID: &str = "Ed25519SigVerify111111111111111111111111111";
 

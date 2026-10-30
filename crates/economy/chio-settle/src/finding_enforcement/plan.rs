@@ -20,8 +20,9 @@ use super::verify::{
 use super::{parse_chain_hash, parse_evm_address, reject};
 use crate::{
     prepare_bond_impair, scale_chio_amount_to_token_minor_units, EvmBondSnapshot,
-    PreparedBondImpair, PreparedEvmCall, SettlementChainConfig, SettlementError,
+    PreparedBondImpair, PreparedEvmCall, SettlementChainConfig,
 };
+use chio_settle_types::SettlementError;
 
 /// Tool server recorded by the anchored receipt that authorizes one finding
 /// enforcement root.

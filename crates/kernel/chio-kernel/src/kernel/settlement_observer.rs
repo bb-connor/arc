@@ -16,7 +16,7 @@ use chio_core::receipt::{
     body::ChioReceipt,
     economics::{ChannelReceiptMetadataV1, SettlementStatus},
 };
-use chio_settle::{
+use chio_settle_types::{
     ObservedSettlement, SettlementFailureClass, SettlementFailureCode, SettlementFailureReason,
     SettlementHook, SettlementHookError, SettlementIdempotencyKey, SettlementObservation,
     SettlementOutcome, SettlementSkipReason,

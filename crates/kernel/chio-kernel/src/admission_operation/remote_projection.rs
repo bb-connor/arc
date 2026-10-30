@@ -16,7 +16,7 @@ use chio_credit::obligation::{
     ObligationAtomV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
     ObligationDispositionV1,
 };
-use chio_settle::channel::derive_channel_receipt_authority_digest;
+use chio_settle_types::derive_channel_receipt_authority_digest;
 use serde::{Deserialize, Serialize};
 
 use crate::receipt_store::{AuthorizationReceiptConsumption, PendingSettlementObservation};

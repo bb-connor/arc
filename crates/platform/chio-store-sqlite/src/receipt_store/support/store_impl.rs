@@ -601,7 +601,7 @@ impl ReceiptStore for SqliteReceiptStore {
         self.durable_sink_id.as_deref()
     }
 
-    fn settlement_store_binding(&self) -> Option<chio_settle::SettlementStoreBinding> {
+    fn settlement_store_binding(&self) -> Option<chio_settle_types::SettlementStoreBinding> {
         self.settlement_store_binding
     }
 

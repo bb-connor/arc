@@ -23,7 +23,7 @@ let prepared = prepare_erc20_approval(token, owner, spender, 1_000_000)?;
 assert_eq!(prepared.amount_minor_units, 1_000_000);
 assert_eq!(prepared.call().to_address, token);
 assert!(prepared.call().data.starts_with("0x095ea7b3"));
-# Ok::<(), chio_settle::SettlementError>(())
+# Ok::<(), chio_settle_types::SettlementError>(())
 ```
 
 This helper parses the spender address and encodes `approve`; it preserves

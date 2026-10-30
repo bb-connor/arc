@@ -1184,9 +1184,9 @@ impl ChioKernel {
     /// capabilities this requires and the configuration failure modes.
     pub fn set_settlement_observer_runtime(
         &mut self,
-        hook: Arc<dyn chio_settle::SettlementHook>,
-        outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
-        retry_policy: chio_settle::RetryPolicy,
+        hook: Arc<dyn chio_settle_types::SettlementHook>,
+        outcome_store: Arc<dyn chio_settle_types::SettlementOutcomeStore>,
+        retry_policy: chio_settle_types::RetryPolicy,
         drain_trust: crate::SettlementDrainTrust,
     ) -> Result<(), KernelError> {
         if !drain_trust.keys().contains(&self.public_key()) {
@@ -1215,8 +1215,8 @@ impl ChioKernel {
     /// validation as [`Self::set_settlement_observer_runtime`].
     pub fn install_settlement_ledger(
         &mut self,
-        outcome_store: Arc<dyn chio_settle::SettlementOutcomeStore>,
-        retry_policy: chio_settle::RetryPolicy,
+        outcome_store: Arc<dyn chio_settle_types::SettlementOutcomeStore>,
+        retry_policy: chio_settle_types::RetryPolicy,
         drain_trust: crate::SettlementDrainTrust,
     ) -> Result<(), KernelError> {
         let Some(receipt_store) = self.receipt_store.clone() else {
@@ -1252,7 +1252,7 @@ impl ChioKernel {
 
     /// Return the active settlement hook without exposing routing internals.
     #[must_use]
-    pub fn settlement_observer(&self) -> Option<Arc<dyn chio_settle::SettlementHook>> {
+    pub fn settlement_observer(&self) -> Option<Arc<dyn chio_settle_types::SettlementHook>> {
         self.settlement_observer
             .as_ref()
             .map(crate::settlement_routing::SettlementObserverRuntime::hook)
@@ -1267,7 +1267,7 @@ impl ChioKernel {
     pub fn run_settlement_observer(
         &self,
         receipt: &chio_core::receipt::body::ChioReceipt,
-        idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> settlement_observer::SettlementObserverStatus {
         settlement_observer::run_observer(
             self.settlement_observer

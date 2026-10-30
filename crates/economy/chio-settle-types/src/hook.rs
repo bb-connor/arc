@@ -17,7 +17,7 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use chio_core::{
+use chio_core_types::{
     capability::scope::MonetaryAmount, hashing::sha256, receipt::economics::SettlementStatus,
 };
 
@@ -114,7 +114,7 @@ pub struct SettlementObservation {
     /// Schema tag (`chio.settle.observation.v1`).
     #[serde(deserialize_with = "deserialize_observation_schema")]
     pub schema: String,
-    /// `id` of the finalized [`chio_core::receipt::body::ChioReceipt`].
+    /// `id` of the finalized [`chio_core_types::receipt::body::ChioReceipt`].
     pub receipt_id: String,
     /// `timestamp` carried over from the receipt (deterministic sort key).
     pub finalized_at: u64,
@@ -932,7 +932,7 @@ mod tests {
             assert_eq!(reason.code(), expected_code);
             assert_eq!(
                 reason.detail_sha256(),
-                chio_core::hashing::sha256(b"secret").as_bytes()
+                chio_core_types::hashing::sha256(b"secret").as_bytes()
             );
             let encoded = serialize(&reason);
             assert!(!encoded.contains("secret"));
@@ -947,7 +947,7 @@ mod tests {
         assert_eq!(reason, restored);
         assert_eq!(
             reason.detail_sha256(),
-            chio_core::hashing::sha256(b"sensitive detail").as_bytes()
+            chio_core_types::hashing::sha256(b"sensitive detail").as_bytes()
         );
         assert!(!serialize(&reason).contains("sensitive detail"));
     }

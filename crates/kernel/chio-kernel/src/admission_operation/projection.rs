@@ -7,10 +7,11 @@ use chio_core::economic_continuity::{
 };
 use chio_core::receipt::{body::ChioReceipt, decision::Decision};
 use chio_settle::channel::{
-    derive_channel_receipt_authority_digest, ChannelEscrowReservationViewV1,
-    ChannelLifecycleViewV1, SignedChannelReservationV1, SignedChannelStateV1,
-    VerifiedChannelTerminalAdvanceV1, CHANNEL_ESCROW_RESERVATION_RESOURCE_FAMILY,
+    ChannelEscrowReservationViewV1, ChannelLifecycleViewV1, SignedChannelReservationV1,
+    SignedChannelStateV1, VerifiedChannelTerminalAdvanceV1,
+    CHANNEL_ESCROW_RESERVATION_RESOURCE_FAMILY,
 };
+use chio_settle_types::derive_channel_receipt_authority_digest;
 
 use crate::receipt_store::{AuthorizationReceiptConsumption, PendingSettlementObservation};
 use crate::tool_outcome::{

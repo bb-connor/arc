@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chio_log_redact::redacted;
-use chio_settle::{
+use chio_settle_types::{
     RetryPolicy, RetryPolicyError, SettlementAttemptClaim, SettlementFailureClass, SettlementHook,
     SettlementOutcome, SettlementOutcomeStore, SettlementRoute, SettlementRouteError,
     SettlementRouteErrorClass, SettlementRoutingInput,
@@ -37,7 +37,7 @@ pub(crate) struct SettlementObserverRuntime {
     outcome_store: Arc<dyn SettlementOutcomeStore>,
     retry_policy: RetryPolicy,
     drain_trust: crate::SettlementDrainTrust,
-    store_binding: chio_settle::SettlementStoreBinding,
+    store_binding: chio_settle_types::SettlementStoreBinding,
 }
 
 impl SettlementObserverRuntime {
@@ -70,7 +70,7 @@ impl SettlementObserverRuntime {
         &self.hook
     }
 
-    pub(crate) const fn store_binding(&self) -> chio_settle::SettlementStoreBinding {
+    pub(crate) const fn store_binding(&self) -> chio_settle_types::SettlementStoreBinding {
         self.store_binding
     }
 
@@ -212,7 +212,7 @@ impl SettlementObserverRuntime {
 
 fn normalize_failure(
     class: SettlementFailureClass,
-    reason: &chio_settle::SettlementFailureReason,
+    reason: &chio_settle_types::SettlementFailureReason,
 ) -> SettlementRoutingInput {
     match reason.effective_class(class) {
         SettlementFailureClass::Retryable => SettlementRoutingInput::Retryable {
@@ -238,8 +238,8 @@ fn normalize_status(status: &SettlementObserverStatus) -> Option<SettlementRouti
         }
         SettlementObserverStatus::Observed { outcome } if !outcome.has_supported_schema() => {
             Some(SettlementRoutingInput::Permanent {
-                reason: chio_settle::SettlementFailureReason::from_detail(
-                    chio_settle::SettlementFailureCode::InvalidObservation,
+                reason: chio_settle_types::SettlementFailureReason::from_detail(
+                    chio_settle_types::SettlementFailureCode::InvalidObservation,
                     "unsupported settlement outcome schema",
                 ),
             })
@@ -249,16 +249,16 @@ fn normalize_status(status: &SettlementObserverStatus) -> Option<SettlementRouti
                 if !is_valid_transcript_id(transcript_id) =>
             {
                 SettlementRoutingInput::Permanent {
-                    reason: chio_settle::SettlementFailureReason::from_detail(
-                        chio_settle::SettlementFailureCode::InvalidObservation,
+                    reason: chio_settle_types::SettlementFailureReason::from_detail(
+                        chio_settle_types::SettlementFailureCode::InvalidObservation,
                         INVALID_TRANSCRIPT_ID_DETAIL,
                     ),
                 }
             }
             SettlementOutcome::Accepted { .. } => SettlementRoutingInput::Accepted,
             SettlementOutcome::Skipped { .. } => SettlementRoutingInput::Permanent {
-                reason: chio_settle::SettlementFailureReason::from_detail(
-                    chio_settle::SettlementFailureCode::InvalidObservation,
+                reason: chio_settle_types::SettlementFailureReason::from_detail(
+                    chio_settle_types::SettlementFailureCode::InvalidObservation,
                     INVALID_HOOK_SKIP_DETAIL,
                 ),
             },
@@ -361,7 +361,7 @@ mod tests {
     };
 
     use chio_core::receipt::{body::ChioReceipt, lineage::ChildRequestReceipt};
-    use chio_settle::{
+    use chio_settle_types::{
         SettlementAttemptClaim, SettlementFailureClass, SettlementFailureCode,
         SettlementFailureReason, SettlementHookError, SettlementObservation, SettlementOutcome,
         SettlementRoute, SettlementRouteError, SettlementRoutingInput, SettlementSkipReason,
@@ -383,7 +383,7 @@ mod tests {
         fn observe(
             &self,
             _observation: &SettlementObservation,
-            _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+            _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
         ) -> Result<SettlementOutcome, SettlementHookError> {
             Ok(SettlementOutcome::accepted("noop"))
         }
@@ -831,7 +831,7 @@ mod tests {
     fn normalizer_rejects_retry_for_a_known_permanent_code() {
         let outcome = match serde_json::from_value::<SettlementOutcome>(serde_json::json!({
             "kind": "retryable",
-            "schema": chio_settle::SETTLEMENT_OUTCOME_SCHEMA,
+            "schema": chio_settle_types::SETTLEMENT_OUTCOME_SCHEMA,
             "reason": {
                 "code": "invalid_receipt_signature",
                 "detail_sha256": vec![0_u8; 32],
@@ -1090,7 +1090,7 @@ mod tests {
             result,
             Err(KernelError::SettlementConfiguration(
                 SettlementRuntimeConfigError::InvalidRetryPolicy(
-                    chio_settle::RetryPolicyError::MaxRetriesTooHigh { max_retries: 33 }
+                    chio_settle_types::RetryPolicyError::MaxRetriesTooHigh { max_retries: 33 }
                 )
             ))
         ));

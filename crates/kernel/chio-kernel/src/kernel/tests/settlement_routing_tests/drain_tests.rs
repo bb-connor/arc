@@ -154,7 +154,7 @@ fn drain_accepts_explicit_historical_key_but_fresh_observation_refuses_it() -> T
     trust(&mut harness, keys)?;
     let fresh = harness.kernel.run_settlement_observer(
         &receipt,
-        &chio_settle::SettlementIdempotencyKey {
+        &chio_settle_types::SettlementIdempotencyKey {
             receipt_id: receipt.id.clone(),
             row_version: 1,
         },

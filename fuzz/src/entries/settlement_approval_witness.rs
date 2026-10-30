@@ -9,11 +9,8 @@ use chio_core_types::capability::governance::{
 };
 use chio_core_types::crypto::Keypair;
 use chio_security_types::clock::FixedClock;
-use chio_settle::{
-    build_x402_payment_requirements, evaluate_circle_nanopayment, verify_governed_approval,
-    ApprovalBinding, CircleNanopaymentPolicy, InMemoryApprovalReplayStore, SettlementError,
-    X402SettlementMode,
-};
+use chio_settle::{build_x402_payment_requirements, evaluate_circle_nanopayment, verify_governed_approval, ApprovalBinding, CircleNanopaymentPolicy, InMemoryApprovalReplayStore, X402SettlementMode};
+use chio_settle_types::{SettlementError};
 
 pub fn settlement_approval_witness(data: &[u8]) {
     let _ = exercise(data);

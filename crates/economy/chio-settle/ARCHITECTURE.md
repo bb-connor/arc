@@ -3,21 +3,15 @@
 ## Responsibility and boundary
 
 The crate exports EVM preparation, submission, confirmation, and observation
-functions; settlement hook/store traits; payment compatibility helpers;
+functions; payment compatibility helpers;
 finding-enforcement verification and publishers; and `pub mod channel`.
 Other implementation modules are private, with selected items re-exported at
 the crate root. `#![cfg(feature = "web3")]` gates the whole library.
 
 The library owns prepared call data and verification results. A runtime owns
 RPC accounts, deployed contracts, trusted policy, durable receipt storage,
-outcome leases, and publisher effects. `SettlementOutcomeStore` describes an
-atomic leased backend but supplies no backend implementation here.
-
-`SettlementHook::observe` consumes observations after receipt signing and
-persistence. It is observer-only: implementations must leave the receipt store
-unchanged. Its accepted outcome requires a durable local effect. Hooks must
-deduplicate by receipt id even when recovery supplies a new row version.
-The trait requires concurrent safety and ordered batching; it supplies no queue.
+outcome leases, and publisher effects. The settlement hook, outcome-store
+and retry vocabulary lives in `chio-settle-types`.
 
 ## Structure
 
@@ -26,7 +20,6 @@ The trait requires concurrent safety and ordered batching; it supplies no queue.
 | `config` | Chain, amount-tier, oracle, evidence-substrate, and local deployment configuration. |
 | `evm/{prepare,finalize,decode,sign,types}` | Solidity ABI calls, receipt/event decoding, proof and identity checks, signing, and prepared values. |
 | `observe` | Escrow/bond snapshots, confirmation/dispute-window assessment, execution receipt projection, and recovery actions. |
-| `hook`, `outcome_store`, `retry` | Observation/outcome schemas, typed failure reasons, leased claims, retry decisions, and dead letters. |
 | `payments` and `payments_approval` | x402 approval binding and Circle/paymaster checks. |
 | `finding_enforcement/{verify,plan,publish,reconcile,observation_source,remote_http}` | Pinned authority and collateral verification, impairment intent preparation, remote adapters, and post-dispatch recovery. |
 | `channel` | Asset/funding/open artifacts, signatures, reservations, state, lifecycle projections, replay, terminal outcomes, disputes, close, and release authorization. |
@@ -81,17 +74,9 @@ verify the receipt or its anchor proof. RPC helpers use the contract-aware
 HTTP client. Evidence flags express required integration posture; setting them
 does not create or inspect durable receipts, checkpoints, or signer equality.
 
-`settlement_completion_flow_row_id` and its inverse require a nonblank,
-unpadded receipt id and the `economic-completion-flow:` prefix. Instruction
-readiness checks that this row id names its governed receipt before escrow
-preparation. The conversion identifies a row; it does not load durable state.
-
-`RetryPolicy::validate` allows at most 32 retries, nonzero backoff bounded by
-one day, and a multiplier in `1..=16`. The default is five retries with 250 ms
-initial backoff, doubling to a 60-second cap. `validate_settlement_claim`
-limits worker ids to 128 UTF-8 bytes, lease durations to one day, and batches
-to 1,024 rows. `SettlementFailureReason` stores a closed code and detail digest.
-Integrity failures remain permanent even when supplied as retryable outcomes.
+Instruction readiness checks that the completion-flow row id from
+`chio-settle-types` names its governed receipt before escrow preparation. The
+conversion identifies a row; it does not load durable state.
 
 Finding dispatch verification uses independently pinned, distinct signing roles,
 retained lifecycle policy, current authority status, fresh finalized collateral,
@@ -125,6 +110,8 @@ Circle and paymaster helpers validate supplied policy without contacting rails.
 
 ## Dependencies
 
+`chio-settle-types` supplies the settlement hook, outcome-store, retry and
+completion-flow vocabulary and `SettlementError`.
 `chio-core`, `chio-credit`, `chio-web3`, and `chio-finding` provide signed
 artifacts, canonical serialization, economic continuity, and validation.
 `chio-open-market` supplies penalty evidence; `chio-federation` supplies verified
@@ -136,8 +123,7 @@ and chain encodings. Serde provides strict artifact shapes.
 
 ## Verification
 
-`cargo test -p chio-settle --lib` exercises configuration, retries, typed hook
-failures, amount conversion, payment bindings, finding authority, and channel
+`cargo test -p chio-settle --lib` exercises configuration, amount conversion, payment bindings, finding authority, and channel
 state transitions. Channel regressions include replay substitutions, canonical
 crypto strings, exact terminal batches, and close/release authority changes.
 `cargo test -p chio-settle --test channel_schemas` checks schema/wire agreement;

@@ -4,7 +4,7 @@ use chio_core::hashing::sha256;
 use chio_core::web3::settlement::Web3SettlementExecutionReceiptArtifact;
 use serde::{Deserialize, Serialize};
 
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 pub const CHIO_CCIP_SETTLEMENT_MESSAGE_SCHEMA: &str = "chio.ccip-settlement-message.v1";
 

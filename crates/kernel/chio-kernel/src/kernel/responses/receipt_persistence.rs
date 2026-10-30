@@ -593,7 +593,7 @@ impl ChioKernel {
                 return Ok(());
             }
         };
-        let idempotency_key = chio_settle::SettlementIdempotencyKey {
+        let idempotency_key = chio_settle_types::SettlementIdempotencyKey {
             receipt_id: claim.receipt_id.clone(),
             row_version: claim.row_version,
         };

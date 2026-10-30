@@ -2,7 +2,7 @@ use chio_core::hashing::sha256;
 use chio_core::web3::settlement::Web3SettlementDispatchArtifact;
 use serde::{Deserialize, Serialize};
 
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 pub const CHIO_SETTLEMENT_AUTOMATION_JOB_SCHEMA: &str = "chio.settlement-automation-job.v1";
 

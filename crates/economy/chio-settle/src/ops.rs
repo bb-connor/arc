@@ -3,10 +3,9 @@ use chio_core::web3::settlement::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    settlement_completion_flow_receipt_id, SettlementError, SettlementFinalityStatus,
-    SettlementRecoveryAction,
-};
+use crate::{SettlementFinalityStatus, SettlementRecoveryAction};
+
+use chio_settle_types::{settlement_completion_flow_receipt_id, SettlementError};
 
 pub const CHIO_SETTLE_RUNTIME_REPORT_SCHEMA: &str = "chio.settle-runtime-report.v1";
 
@@ -388,9 +387,9 @@ mod tests {
         SettlementIndexerStatus, SettlementOperationKind, SettlementRuntimeReport,
         SettlementRuntimeStatus, CHIO_SETTLE_RUNTIME_REPORT_SCHEMA,
     };
-    use crate::{
-        settlement_completion_flow_row_id, SettlementFinalityStatus,
-        SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
+    use crate::SettlementFinalityStatus;
+    use chio_settle_types::{
+        settlement_completion_flow_row_id, SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
     };
 
     use chio_test_support::prelude::*;

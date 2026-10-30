@@ -48,9 +48,9 @@
     "crates/economy/chio-settle/src/config.rs",
     "crates/economy/chio-settle/src/finding_enforcement/observation_source.rs",
     "crates/economy/chio-settle/src/finding_enforcement/publish.rs",
-    "crates/economy/chio-settle/src/hook.rs",
+    "crates/economy/chio-settle-types/src/hook.rs",
     "crates/economy/chio-settle/src/input.rs",
-    "crates/economy/chio-settle/src/retry.rs",
+    "crates/economy/chio-settle-types/src/retry.rs",
     "crates/guards/chio-data-guards/src/structured_classification.rs",
     "crates/guards/chio-external-guards/src/external/azure_content_safety.rs",
     "crates/guards/chio-external-guards/src/external/bedrock.rs",
@@ -2296,8 +2296,8 @@
     "crates/economy/chio-anchor/src/witness.rs::serialize::custom_deserialize",
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice",
     "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value",
+    "crates/economy/chio-settle-types/src/retry.rs::classify_attempt::custom_deserialize",
     "crates/economy/chio-settle/src/ccip.rs::sample_receipt::from_str",
-    "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value",
     "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_str",
     "crates/kernel/chio-kernel-browser/src/evaluate_input.rs::decode_evaluate_request::from_str",
@@ -4770,7 +4770,7 @@
     "crates/economy/chio-link/src/chainlink.rs::send_json_rpc::from_slice": "Contract-backed HTTP bounds retention; original unsigned JSON rejects duplicates before Alloy RawValue projection of the same bytes, preserving native integers and ordinary float spellings. Native transport and parser causes survive the public oracle error; public errors never echo provider bodies. Chain, feed, configured decimals, round, price and freshness checks remain.",
     "crates/economy/chio-open-market/src/recovery.rs::verify_finding_recovery_context::from_value": "Recovery members preserve the existing strict external I-JSON and exact typed canonical contract under the carrier limit. Parser causes survive member/context/metadata projection. Original kernel receipt signature, purchase and capability identity, subject and recovery authority binding remain unchanged.",
     "crates/economy/chio-settle/src/ccip.rs::sample_receipt::from_str": "The only lexical decoder is a repository-owned include_str receipt fixture inside cfg(test). Production CCIP accepts typed validated receipts and checks lane, receipt, payload and replay identity. No redundant production parser introduced.",
-    "crates/economy/chio-settle/src/retry.rs::classify_attempt::custom_deserialize": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed.",
+    "crates/economy/chio-settle-types/src/retry.rs::classify_attempt::custom_deserialize": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed.",
     "crates/guards/chio-guard-registry/src/marketplace.rs::from_manifest_bytes::from_value": "The complete 16 MiB-bounded original native guard manifest is duplicate-aware before marketplace Value and typed projection. Full-width native prices survive; nested duplicate keys reject. Existing price and reputation checks remain separate.",
     "crates/kernel/chio-kernel-core/src/passport_verify.rs::serialize::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/kernel/chio-kernel/src/admission_operation.rs::is_pre_dispatch::custom_deserialize": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
@@ -5745,7 +5745,7 @@
     "crates/economy/chio-settle/src/channel/terminal.rs": [
       "decode_head::from_value"
     ],
-    "crates/economy/chio-settle/src/retry.rs": [
+    "crates/economy/chio-settle-types/src/retry.rs": [
       "classify_attempt::custom_deserialize"
     ],
     "crates/guards/chio-guard-registry/src/marketplace.rs": [
@@ -7357,7 +7357,7 @@
         }
       ]
     },
-    "crates/economy/chio-settle/src/retry.rs": {
+    "crates/economy/chio-settle-types/src/retry.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed.",
       "readers": [
@@ -16021,7 +16021,7 @@
       "kind": "parser-internal-or-typed",
       "contract": "Publisher responses now enforce the 1 MiB bound at the consumer, including alternate transports, before original strict external canonical projection. Native input causes survive; schema and exact request digest remain required. No failure manufactures a settlement outcome."
     },
-    "crates/economy/chio-settle/src/hook.rs": {
+    "crates/economy/chio-settle-types/src/hook.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "New native input and file errors retain permanent closed settlement failure classes. Input codes are safe diagnostic identities; no parser text enters wire reasons."
     },
@@ -16029,7 +16029,7 @@
       "kind": "parser-internal-or-typed",
       "contract": "Separate native typed canonical and strict external canonical contracts preserve each settlement owner numeric and equality requirements with bounded original bytes and native causes."
     },
-    "crates/economy/chio-settle/src/retry.rs": {
+    "crates/economy/chio-settle-types/src/retry.rs": {
       "kind": "parser-internal-or-typed",
       "contract": "Dead-letter custom Deserialize accepts only the closed typed reason schema and a nonzero attempt count. The legacy string-reason fallback is removed. Terminal reason digests remain bounded, and unsupported schema/unknown fields fail closed."
     },

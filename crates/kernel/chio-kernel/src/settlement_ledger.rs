@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use chio_core::receipt::economics::SettlementStatus;
-use chio_settle::{
+use chio_settle_types::{
     ObservedSettlement, SettlementFailureCode, SettlementFailureReason, SettlementHook,
     SettlementHookError, SettlementIdempotencyKey, SettlementObservation, SettlementOutcome,
 };

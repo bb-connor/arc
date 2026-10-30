@@ -33,7 +33,7 @@ use chio_credit::receipt::{
 use chio_credit::{CreditEvaluatorHook, LocalCreditAccount};
 use chio_guard_registry::GuardPrice;
 use chio_reputation::ReputationTier;
-use chio_settle::{
+use chio_settle_types::{
     ObservedSettlement, SettlementHook, SettlementHookError, SettlementObservation,
     SettlementOutcome,
 };
@@ -62,7 +62,7 @@ impl SettlementHook for CountingSettlementHook {
     fn observe(
         &self,
         observation: &SettlementObservation,
-        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.accepted.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted(format!(
@@ -219,7 +219,7 @@ fn install_priced_guard_run_call_one_iou_one_settlement() {
         receipt.policy_hash.clone(),
     )
     .with_tenant("tenant-a");
-    let idempotency_key = chio_settle::SettlementIdempotencyKey {
+    let idempotency_key = chio_settle_types::SettlementIdempotencyKey {
         receipt_id: receipt.id.clone(),
         row_version: 1,
     };

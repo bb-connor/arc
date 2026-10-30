@@ -82,7 +82,7 @@ pub use verify::{
 use alloy_primitives::{Address, FixedBytes, B256};
 use std::str::FromStr;
 
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 /// Reject with the verification disposition every artifact and binding
 /// failure in this module shares. The paired hook classification treats

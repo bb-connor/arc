@@ -17,7 +17,7 @@ use super::{
     FindingBondObservationRecheck, FindingBondObservationSource, FindingFinalityRequirement,
     ReconciledFindingEnforcement, VerifiedFindingEnforcement,
 };
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 pub const FINDING_BOND_OBSERVATION_REQUEST_SCHEMA: &str =
     "chio.finding.bond-observation-request.v1";

@@ -13,7 +13,8 @@ use crate::evm::{
     confirm_transaction, read_bond_snapshot, read_escrow_snapshot,
     scale_token_minor_units_to_chio_amount, EscrowSnapshot, EvmBondSnapshot, EvmTransactionReceipt,
 };
-use crate::{SettlementChainConfig, SettlementError};
+use crate::SettlementChainConfig;
+use chio_settle_types::SettlementError;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

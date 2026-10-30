@@ -37,6 +37,7 @@ response_lifecycle = ["dep:chio-quarantine"]
 
 [dependencies]
 chio-settle = { path = "../crates/economy/chio-settle" }
+chio-settle-types = { path = "../crates/economy/chio-settle-types" }
 chio-security-types = { path = "../crates/security/chio-security-types", features = ["std"] }
 zeroize = "1.8"
 chio-control-plane = { path = "../crates/platform/chio-control-plane", features = ["fuzz"], optional = true }

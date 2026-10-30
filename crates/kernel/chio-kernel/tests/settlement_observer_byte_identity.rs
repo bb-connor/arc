@@ -32,7 +32,9 @@ use chio_core::receipt::{
 use chio_kernel::settlement_observer::{
     self, SettlementObserverStatus, SETTLEMENT_OBSERVER_STATUS_SCHEMA,
 };
-use chio_settle::{SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome};
+use chio_settle_types::{
+    SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
+};
 
 /// Hook that records every observation it sees and always accepts.
 struct RecordingHook {
@@ -58,7 +60,7 @@ impl SettlementHook for RecordingHook {
     fn observe(
         &self,
         observation: &SettlementObservation,
-        _idempotency_key: &chio_settle::SettlementIdempotencyKey,
+        _idempotency_key: &chio_settle_types::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
         self.observations
             .lock()
@@ -142,7 +144,7 @@ fn ten_receipts_produce_ten_settlements_with_byte_identical_receipts() {
             Some(&hook_handle),
             receipt,
             std::slice::from_ref(&receipt.kernel_key),
-            &chio_settle::SettlementIdempotencyKey {
+            &chio_settle_types::SettlementIdempotencyKey {
                 receipt_id: receipt.id.clone(),
                 row_version: 1,
             },
@@ -217,7 +219,7 @@ fn no_settlement_baseline_matches_with_settlement_canonical_bytes() {
             Some(&hook),
             receipt,
             std::slice::from_ref(&receipt.kernel_key),
-            &chio_settle::SettlementIdempotencyKey {
+            &chio_settle_types::SettlementIdempotencyKey {
                 receipt_id: receipt.id.clone(),
                 row_version: 1,
             },

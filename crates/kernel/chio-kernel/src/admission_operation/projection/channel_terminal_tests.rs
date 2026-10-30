@@ -29,6 +29,7 @@ use chio_credit::obligation::{
     ObligationAtomInputV1, ObligationAtomV1, ObligationCreditElectionV1, ObligationDispositionV1,
 };
 use chio_settle::channel::*;
+use chio_settle_types::derive_channel_receipt_authority_digest;
 
 use crate::tool_outcome::sign_channel_terminal_outcome_commitment;
 use crate::tool_outcome::test_support::{

@@ -1,0 +1,25 @@
+[package]
+name = "chio-settle-types"
+description = "Chain-free settlement vocabulary shared by the Chio kernel, stores and settlement runtime"
+version.workspace = true
+edition.workspace = true
+rust-version = "1.93"
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_settle_types"
+
+[dependencies]
+chio-core-types = { workspace = true }
+chio-security-types = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+chio-test-support = { workspace = true }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true

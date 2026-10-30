@@ -18,7 +18,7 @@ use chio_open_market::penalty::{
 };
 
 use super::{parse_evm_address, reject};
-use crate::SettlementError;
+use chio_settle_types::SettlementError;
 
 /// Finality policy naming deterministic chain finality.
 const DETERMINISTIC_FINALITY_POLICY: &str = "finalized";

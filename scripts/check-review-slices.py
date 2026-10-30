@@ -171,6 +171,7 @@ SLICES: tuple[ReviewSlice, ...] = (
             "crates/economy/chio-market/**",
             "crates/economy/chio-open-market/**",
             "crates/economy/chio-settle/**",
+            "crates/economy/chio-settle-types/**",
             "crates/economy/chio-anchor/**",
             "crates/economy/chio-underwriting/**",
             "crates/economy/chio-link/**",

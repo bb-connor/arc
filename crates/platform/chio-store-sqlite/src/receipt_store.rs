@@ -121,7 +121,7 @@ pub struct SqliteReceiptStore {
     pub(crate) pool: Pool<SqliteConnectionManager>,
     receipt_commit_actor: ReceiptCommitActor,
     pub(crate) rollback_anchor: Option<Arc<chio_rollback_anchor::RollbackGenerationAnchor>>,
-    settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
+    settlement_store_binding: Option<chio_settle_types::SettlementStoreBinding>,
     durable_sink_id: Option<String>,
     pub(crate) receipt_sink_qualification: Option<Arc<ReceiptSinkQualification>>,
     /// Staged-rollout flag: read-only after open.
@@ -855,13 +855,13 @@ pub(crate) struct WriterHandle {
     sender: ReceiptCommitSender,
     health: Arc<ReceiptCommitWriterHealth>,
     worker: Arc<ReceiptCommitWorker>,
-    settlement_store_binding: Option<chio_settle::SettlementStoreBinding>,
+    settlement_store_binding: Option<chio_settle_types::SettlementStoreBinding>,
 }
 
 impl WriterHandle {
     pub(crate) const fn settlement_store_binding(
         &self,
-    ) -> Option<chio_settle::SettlementStoreBinding> {
+    ) -> Option<chio_settle_types::SettlementStoreBinding> {
         self.settlement_store_binding
     }
 

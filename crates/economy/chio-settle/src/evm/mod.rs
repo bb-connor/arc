@@ -45,8 +45,9 @@ use crate::{
         VerifiedChannelReleaseAuthorizationV1,
     },
     ops::ensure_settlement_completion_flow_binding,
-    SettlementChainConfig, SettlementCommitment, SettlementError,
+    SettlementChainConfig, SettlementCommitment,
 };
+use chio_settle_types::SettlementError;
 
 mod decode;
 mod finalize;

@@ -17,7 +17,7 @@
 use std::time::Duration;
 
 #[cfg(test)]
-use crate::SettlementFailureCode;
+use crate::hook::SettlementFailureCode;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 

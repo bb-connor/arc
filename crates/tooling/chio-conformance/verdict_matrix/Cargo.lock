@@ -1385,6 +1385,7 @@ dependencies = [
  "chio-response-model",
  "chio-security-types",
  "chio-settle",
+ "chio-settle-types",
  "chio-supervisor",
  "chio-tool-call-fabric",
  "chio-underwriting",
@@ -1583,6 +1584,7 @@ dependencies = [
  "chio-finding",
  "chio-open-market",
  "chio-security-types",
+ "chio-settle-types",
  "chio-web3",
  "chio-web3-bindings",
  "hex",
@@ -1595,6 +1597,16 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "zeroize",
+]
+
+[[package]]
+name = "chio-settle-types"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "serde",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
