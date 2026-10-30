@@ -8,6 +8,7 @@ use chio_core::federation::open_admission::{
 };
 use chio_core::listing::GenericTrustAdmissionClass;
 use chio_core::sha256_hex;
+use chio_secure_ipc::regular_file::RegularFileError;
 use serde::{Deserialize, Serialize};
 
 use crate::CliError;
@@ -148,8 +149,8 @@ impl FederationAdmissionPolicyRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 

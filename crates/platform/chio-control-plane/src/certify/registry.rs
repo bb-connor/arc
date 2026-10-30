@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use chio_secure_ipc::regular_file::RegularFileError;
+
 use crate::passport_verifier::RegistryUpdateError;
 use crate::CliError;
 
@@ -63,8 +65,8 @@ impl CertificationRegistry {
                 }
                 Ok(registry)
             }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(error) => Err(CliError::Io(error)),
+            Err(RegularFileError::Missing) => Ok(Self::default()),
+            Err(error) => Err(error.into()),
         }
     }
 
