@@ -23,10 +23,10 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{PrincipalId, ResponseEffectKind, ResponseTarget};
 use chio_siem::{Alert, AlertBackend, ExportError};
-use chio_store_sqlite::SqliteSecurityStateStore;
+use chio_store_sqlite::{SqliteSecurityAlertOutboxStore, SqliteSecurityStateStore};
 use serde::Serialize;
 
-use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
+use crate::security::adapters::{AlertOutboxConfig, SecurityAlertOutbox};
 
 #[derive(Default)]
 struct OverlayState {

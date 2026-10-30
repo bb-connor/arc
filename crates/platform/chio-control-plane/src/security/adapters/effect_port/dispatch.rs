@@ -6,9 +6,9 @@ use super::{
     EscalateAlertStore, IssuanceFreezeBackend, IssuanceFreezeStore, LineageFence,
     LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, MaintainedLineageFence,
     PortError, PortResult, RecordId, ResponseEffectKind, ResponsePlanKey, ResponseSchedulerStore,
-    ResponseSnapshot, ResponseTarget, RestrictEgressOverlayBackend,
+    ResponseSnapshot, ResponseTarget, RestrictEgressOverlayBackend, SecurityAlertOutbox,
     SessionSuspensionOverlayBackend, SessionThrottleBackend, SessionThrottleStore,
-    SqliteSecurityStateStore, SqliteSiemOutbox, SystemClock, TenantId, EFFECT_COMMAND_ID_PREFIX,
+    SqliteSecurityStateStore, SystemClock, TenantId, EFFECT_COMMAND_ID_PREFIX,
     LINEAGE_FENCE_MAX_LEASE_MS,
 };
 
@@ -93,7 +93,7 @@ impl ActiveResponseEffectPort {
     /// from the host wall clock.
     pub fn production(
         security_store: Arc<SqliteSecurityStateStore>,
-        alert_outbox: Arc<SqliteSiemOutbox>,
+        alert_outbox: Arc<SecurityAlertOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
     ) -> PortResult<Self> {
         Self::production_with_clock(
@@ -110,7 +110,7 @@ impl ActiveResponseEffectPort {
     /// stamps escalation alerts.
     pub fn production_with_clock(
         security_store: Arc<SqliteSecurityStateStore>,
-        alert_outbox: Arc<SqliteSiemOutbox>,
+        alert_outbox: Arc<SecurityAlertOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
         clock: Arc<dyn Clock>,
     ) -> PortResult<Self> {

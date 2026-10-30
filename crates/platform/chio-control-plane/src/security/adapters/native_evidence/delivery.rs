@@ -1,21 +1,23 @@
-use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
+use std::panic::resume_unwind;
 use std::sync::Arc;
 
-use chio_security_types::ports::{PortError, PortResult};
-use rusqlite::Connection;
-
-use super::{
-    backend_alert, increment, validate_backends, AlertDispatchReport, AlertOutboxBacklog,
-    SqliteSiemOutbox,
+use chio_security_types::ports::{
+    AlertBackendOutcome, DueSecurityAlert, PortError, PortResult, SecurityAlertOutboxBacklog,
+    SecurityAlertOutboxStore,
 };
 
-pub(super) mod store;
+use super::{
+    backend_alert, increment, retry_delay, validate_backends, AlertDispatchReport,
+    SecurityAlertOutbox,
+};
 
 #[cfg(test)]
 mod tests;
 
-impl SqliteSiemOutbox {
-    /// Dispatches up to `limit` due rows to their unconfirmed backends.
+impl SecurityAlertOutbox {
+    /// Dispatches up to `limit` due rows to their unconfirmed backends. A row
+    /// whose failed attempt reaches `max_attempts` is parked in the same write,
+    /// and a due row already at `max_attempts` is parked without a dispatch.
     ///
     /// Storage runs in the current Tokio runtime's blocking pool. Backend
     /// failures leave rows pending under backoff; `Err` means the outbox failed.
@@ -33,21 +35,31 @@ impl SqliteSiemOutbox {
         let guard = Arc::clone(&self.delivery_lock).lock_owned().await;
         let config = self.config;
         let (due, mut guard) = self
-            .with_store(guard, move |connection| {
-                store::ensure_ready(connection)?;
-                store::load_due(connection, config, now_unix_ms, limit)
+            .with_store(guard, move |store| {
+                store.ensure_ready()?;
+                store.load_due(now_unix_ms, limit)
             })
             .await?;
+        let backend_names: Arc<Vec<String>> = Arc::new(
+            self.backends
+                .iter()
+                .map(|backend| backend.name().to_owned())
+                .collect(),
+        );
         let mut report = AlertDispatchReport::default();
         for row in due {
+            if row.attempts >= config.max_attempts {
+                let attempts = row.attempts;
+                guard = self.park(guard, row, attempts).await?;
+                increment(&mut report.parked)?;
+                continue;
+            }
             let row = Arc::new(row);
             increment(&mut report.attempted)?;
             let alert = backend_alert(&row.alert)?;
             let stored = Arc::clone(&row);
             let (confirmed, returned_guard) = self
-                .with_store(guard, move |connection| {
-                    store::load_confirmed_backends(connection, &stored)
-                })
+                .with_store(guard, move |store| store.confirmed_backends(&stored))
                 .await?;
             guard = returned_guard;
             let mut delivery_failed = false;
@@ -56,42 +68,50 @@ impl SqliteSiemOutbox {
                     continue;
                 }
                 increment(&mut report.backend_dispatches)?;
-                let accepted = backend.dispatch(&alert).await.is_ok();
+                let outcome = match backend.dispatch(&alert).await {
+                    Ok(_) => AlertBackendOutcome::Confirmed,
+                    Err(_) => AlertBackendOutcome::Refused,
+                };
                 let name = backend.name().to_owned();
                 let stored = Arc::clone(&row);
                 let ((), returned_guard) = self
-                    .with_store(guard, move |connection| {
-                        store::record_backend_outcome(
-                            connection,
-                            &stored,
-                            &name,
-                            accepted,
-                            now_unix_ms,
-                        )
+                    .with_store(guard, move |store| {
+                        store.record_backend_outcome(&stored, &name, outcome, now_unix_ms)
                     })
                     .await?;
                 guard = returned_guard;
-                if !accepted {
+                if outcome == AlertBackendOutcome::Refused {
                     delivery_failed = true;
                     increment(&mut report.backend_failures)?;
                 }
             }
-            if delivery_failed {
-                let (parked, returned_guard) = self
-                    .with_store(guard, move |connection| {
-                        store::record_failure(connection, config, &row, now_unix_ms)
+            let attempts = row
+                .attempts
+                .checked_add(1)
+                .ok_or_else(PortError::integrity_failure)?;
+            if delivery_failed && attempts >= config.max_attempts {
+                guard = self
+                    .park(guard, Arc::unwrap_or_clone(row), attempts)
+                    .await?;
+                increment(&mut report.failed)?;
+                increment(&mut report.parked)?;
+            } else if delivery_failed {
+                let next_attempt_at_unix_ms = now_unix_ms
+                    .checked_add(retry_delay(config, attempts))
+                    .ok_or_else(PortError::integrity_failure)?;
+                let ((), returned_guard) = self
+                    .with_store(guard, move |store| {
+                        store.record_failure(&row, next_attempt_at_unix_ms)
                     })
                     .await?;
                 guard = returned_guard;
-                if parked {
-                    increment(&mut report.parked)?;
-                }
                 increment(&mut report.failed)?;
             } else {
-                let backends = self.backends.clone();
+                let names = Arc::clone(&backend_names);
                 let ((), returned_guard) = self
-                    .with_store(guard, move |connection| {
-                        store::record_delivery(connection, config, &backends, &row, now_unix_ms)
+                    .with_store(guard, move |store| {
+                        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+                        store.record_delivery(&row, &names, now_unix_ms)
                     })
                     .await?;
                 guard = returned_guard;
@@ -101,41 +121,42 @@ impl SqliteSiemOutbox {
         Ok(report)
     }
 
-    pub(in crate::security) async fn delivery_backlog(&self) -> PortResult<AlertOutboxBacklog> {
-        let config = self.config;
-        self.with_store((), move |connection| store::backlog(connection, config))
+    async fn park<G: Send + 'static>(
+        &self,
+        guard: G,
+        row: DueSecurityAlert,
+        attempts: u32,
+    ) -> PortResult<G> {
+        self.with_store(guard, move |store| store.record_parked(&row, attempts))
+            .await
+            .map(|((), guard)| guard)
+    }
+
+    pub(in crate::security) async fn delivery_backlog(
+        &self,
+    ) -> PortResult<SecurityAlertOutboxBacklog> {
+        self.with_store((), |store| store.backlog())
             .await
             .map(|(backlog, ())| backlog)
     }
 
     /// Custody moves into the blocking operation and returns only after it
     /// finishes. Cancelling the await cannot release delivery serialization
-    /// while a confirmation is still committing. The worker drops its runtime
-    /// before reporting thread completion, draining any started store operation.
+    /// while a confirmation is still committing.
     async fn with_store<T, G>(
         &self,
         custody: G,
-        operation: impl FnOnce(&mut Connection) -> PortResult<T> + Send + 'static,
+        operation: impl FnOnce(&dyn SecurityAlertOutboxStore) -> PortResult<T> + Send + 'static,
     ) -> PortResult<(T, G)>
     where
         T: Send + 'static,
         G: Send + 'static,
     {
-        let connection = Arc::clone(&self.connection);
+        let store = Arc::clone(&self.store);
         let runtime =
             tokio::runtime::Handle::try_current().map_err(|_| PortError::unavailable())?;
-        let task = runtime.spawn_blocking(move || {
-            let mut connection = connection.lock().map_err(|_| PortError::unavailable())?;
-            // Transaction destructors roll back inside this unwind boundary.
-            // Drop the mutex guard normally before resuming a panic, so a later
-            // pass can recover without ignoring a poisoned connection lock.
-            let result = catch_unwind(AssertUnwindSafe(|| operation(&mut connection)));
-            drop(connection);
-            match result {
-                Ok(result) => result.map(|value| (value, custody)),
-                Err(payload) => resume_unwind(payload),
-            }
-        });
+        let task =
+            runtime.spawn_blocking(move || operation(store.as_ref()).map(|value| (value, custody)));
         match task.await {
             Ok(result) => result,
             Err(error) if error.is_panic() => resume_unwind(error.into_panic()),

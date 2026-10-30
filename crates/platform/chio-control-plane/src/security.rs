@@ -46,12 +46,12 @@ pub use active_response_authority::{
     MAX_ACTIVE_RESPONSE_AUTHORITY_SOCKET_PATH_BYTES, MAX_ACTIVE_RESPONSE_AUTHORITY_WIRE_BYTES,
 };
 pub use adapters::{
-    AlertDispatchReport, AlertOutboxBacklog, AlertOutboxConfig, DeclassificationCompactionReport,
+    AlertDispatchReport, AlertOutboxConfig, DeclassificationCompactionReport,
     DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
     DeclassificationReconciliationReport, DeclassificationRevalidationReport, FlowResolverConfig,
     FlowResolverConfigError, NativeActiveResponseFindingAuthority,
     NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
-    PersistentFlowResolver, SqliteSiemOutbox, StructuredClassificationAdapter,
+    PersistentFlowResolver, SecurityAlertOutbox, StructuredClassificationAdapter,
 };
 pub use chio_kernel::{
     ActiveResponseArtifactAuthorityAttestation, ActiveResponseArtifactAuthorityAttestationBody,

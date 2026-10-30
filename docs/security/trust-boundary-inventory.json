@@ -1316,9 +1316,7 @@
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs::decode_session_throttle_limits::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_persisted_alert_command::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::validate_request::from_wire",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due::from_wire",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs::classify_output::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::correlate::from_wire",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::ensure_supported_policy::from_wire",
@@ -1468,6 +1466,7 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire",
     "crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob::from_wire",
+    "crates/platform/chio-store-sqlite/src/security_alert_outbox_store.rs::decode_command::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::decode_suspension_spec::from_wire",
@@ -17355,9 +17354,7 @@
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/issuance.rs::decode_issuance_freeze_spec::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/suspension.rs::decode_capability_set_suspension_spec::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/effect_port/throttle.rs::decode_session_throttle_limits::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::load_persisted_alert_command::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs::validate_request::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs::classify_output::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::correlate::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/event_consumer/correlation.rs::ensure_supported_policy::from_wire#1::decode_signed",
@@ -17507,6 +17504,7 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob::from_wire#1::decode_canonical",
+    "crates/platform/chio-store-sqlite/src/security_alert_outbox_store.rs::decode_command::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs::decode_suspension_spec::from_wire#1::decode_signed",
@@ -18872,15 +18870,8 @@
       "resolve_pre_with_evidence::shared-reader::crates/security/chio-flow/src/declassification.rs::verify_declassification"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs": [
-      "load_persisted_alert_command::original-json-reader::UntrustedJsonText",
       "receipt_body::shared-reader::crates/core/chio-response-model/src/state.rs::decode_response_record",
       "validate_request::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery.rs": [
-      "deliver_due::shared-reader::crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs::load_due"
-    ],
-    "crates/platform/chio-control-plane/src/security/adapters/native_evidence/delivery/store.rs": [
-      "load_due::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/security/adapters/native_flow/output.rs": [
       "classify_output::original-json-reader::UntrustedJsonText"
@@ -20696,6 +20687,11 @@
       "initialize_root_exchange_schema::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_root_exchange_invariants",
       "verify_integrity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::verify_retained_table",
       "verify_root_exchange_invariants::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_integrity"
+    ],
+    "crates/platform/chio-store-sqlite/src/security_alert_outbox_store.rs": [
+      "decode_command::original-json-reader::UntrustedJsonText",
+      "load_command::shared-reader::crates/platform/chio-store-sqlite/src/security_alert_outbox_store.rs::decode_command",
+      "load_due::shared-reader::crates/platform/chio-store-sqlite/src/security_alert_outbox_store.rs::decode_command"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs": [
       "claim_automatic_preparation::shared-reader::crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation",

@@ -21,7 +21,7 @@ use tokio::sync::watch;
 use super::adapters::{
     DeclassificationReceiptDrainReport, DeclassificationReceiptOutboxDrainer,
     NativeActiveResponseFindingAuthority, NativeFindingAuthorityConfigError,
-    NativeSchedulerHealthPort, NativeSecurityReceiptSink, SqliteSiemOutbox,
+    NativeSchedulerHealthPort, NativeSecurityReceiptSink, SecurityAlertOutbox,
 };
 use super::event_consumer::{
     AttestedFindingBatchPlanner, AttestedFindingResponseCoordinator,
@@ -83,7 +83,7 @@ pub struct ProductionActiveDefenseHostConfig {
     pub(crate) security_state_authority: ProductionSecurityStateAuthority,
     pub(crate) indexed_evidence_store: Arc<dyn IndexedSecurityEvidenceStore>,
     pub(crate) signer: Arc<dyn SigningBackend>,
-    pub(crate) alert_outbox: Arc<SqliteSiemOutbox>,
+    pub(crate) alert_outbox: Arc<SecurityAlertOutbox>,
     pub(crate) blast_radius: Arc<dyn BlastRadiusPort>,
     pub(crate) scheduler_health: Arc<dyn SchedulerHealthPort>,
     pub(crate) response_policy_planner: Arc<dyn AttestedFindingResponsePolicyPlanner>,
@@ -103,7 +103,7 @@ impl ProductionActiveDefenseHostConfig {
         security_state_authority: ProductionSecurityStateAuthority,
         indexed_evidence_store: Arc<dyn IndexedSecurityEvidenceStore>,
         signer: Arc<dyn SigningBackend>,
-        alert_outbox: Arc<SqliteSiemOutbox>,
+        alert_outbox: Arc<SecurityAlertOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
         scheduler_health: Arc<dyn SchedulerHealthPort>,
         response_policy_planner: Arc<dyn AttestedFindingResponsePolicyPlanner>,
@@ -854,7 +854,7 @@ pub(super) struct ProductionActiveDefenseOrchestratorContext {
 impl ProductionActiveDefenseOrchestrator {
     pub(super) fn new_with_production_effects_and_lifecycle(
         context: ProductionActiveDefenseOrchestratorContext,
-        alert_outbox: Arc<SqliteSiemOutbox>,
+        alert_outbox: Arc<SecurityAlertOutbox>,
         blast_radius: Arc<dyn BlastRadiusPort>,
     ) -> Result<Self, ProductionActiveDefenseBuildError> {
         context.lifecycle.ensure_authority(

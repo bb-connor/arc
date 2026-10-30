@@ -6,8 +6,8 @@ use std::panic::AssertUnwindSafe;
 use futures_util::FutureExt;
 
 use super::{Arc, Clock, Duration, MissedTickBehavior, Mutex, PortError};
-use crate::security::adapters::{AlertDispatchReport, AlertOutboxBacklog, SqliteSiemOutbox};
-use chio_security_types::ports::PortResult;
+use crate::security::adapters::{AlertDispatchReport, SecurityAlertOutbox};
+use chio_security_types::ports::{PortResult, SecurityAlertOutboxBacklog};
 
 /// Outbox rows one delivery pass may dispatch.
 pub(in crate::security) const SECURITY_ALERT_ROWS_PER_PASS: usize = 16;
@@ -34,14 +34,17 @@ pub struct SecurityAlertDeliveryHealth {
 /// worker's thread, between response ticks. A pass never runs inside a tick,
 /// so a slow or unavailable SIEM backend cannot delay expiry or rollback.
 pub(in crate::security) struct SecurityAlertDelivery {
-    outbox: Arc<SqliteSiemOutbox>,
+    outbox: Arc<SecurityAlertOutbox>,
     clock: Arc<dyn Clock>,
     health: Mutex<SecurityAlertDeliveryHealth>,
 }
 
 impl SecurityAlertDelivery {
     #[must_use]
-    pub(in crate::security) fn new(outbox: Arc<SqliteSiemOutbox>, clock: Arc<dyn Clock>) -> Self {
+    pub(in crate::security) fn new(
+        outbox: Arc<SecurityAlertOutbox>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
         Self {
             outbox,
             clock,
@@ -61,7 +64,7 @@ impl SecurityAlertDelivery {
     }
 
     /// Durable backlog of the outbox, read on every call.
-    pub(in crate::security) fn backlog(&self) -> PortResult<AlertOutboxBacklog> {
+    pub(in crate::security) fn backlog(&self) -> PortResult<SecurityAlertOutboxBacklog> {
         self.outbox.backlog()
     }
 
@@ -99,7 +102,9 @@ impl SecurityAlertDelivery {
         }
     }
 
-    async fn delivery_outcome(&self) -> PortResult<(AlertDispatchReport, AlertOutboxBacklog)> {
+    async fn delivery_outcome(
+        &self,
+    ) -> PortResult<(AlertDispatchReport, SecurityAlertOutboxBacklog)> {
         match self.outbox.delivery_backlog().await {
             Ok(backlog) if backlog.pending == 0 => Ok((AlertDispatchReport::default(), backlog)),
             Ok(_) => match self.dispatch_due().await {

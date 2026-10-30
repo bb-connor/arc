@@ -1,4 +1,4 @@
-use super::native_evidence::SqliteSiemOutbox;
+use super::native_evidence::SecurityAlertOutbox;
 use chio_quarantine::decode_response_record;
 use chio_security_types::clock::{Clock, SystemClock};
 use chio_security_types::ports::{

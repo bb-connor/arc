@@ -405,7 +405,7 @@ impl EffectPort for SimulationOnlyEffects {
 pub(super) fn production_response_effects(
     mode: ResponseExecutionMode,
     security_store: Arc<SqliteSecurityStateStore>,
-    alert_outbox: Arc<super::adapters::SqliteSiemOutbox>,
+    alert_outbox: Arc<super::adapters::SecurityAlertOutbox>,
     blast_radius: Arc<dyn BlastRadiusPort>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> PortResult<Arc<dyn EffectPort>> {
