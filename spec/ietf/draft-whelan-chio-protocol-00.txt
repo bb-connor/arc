@@ -199,14 +199,14 @@ Internet-Draft                Chio Protocol               September 2026
      12.3.  Delegated Issuance . . . . . . . . . . . . . . . . . . . 104
      12.4.  Receipt Query  . . . . . . . . . . . . . . . . . . . . . 108
        12.4.1.  Paging . . . . . . . . . . . . . . . . . . . . . . . 110
-     12.5.  Revocation . . . . . . . . . . . . . . . . . . . . . . . 110
-   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 112
+     12.5.  Revocation . . . . . . . . . . . . . . . . . . . . . . . 111
+   13. Versioning and Negotiation  . . . . . . . . . . . . . . . . . 113
    14. Error Model . . . . . . . . . . . . . . . . . . . . . . . . . 113
      14.1.  Error Registry . . . . . . . . . . . . . . . . . . . . . 113
-     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 113
+     14.2.  Surface Mappings . . . . . . . . . . . . . . . . . . . . 114
    15. Security Considerations . . . . . . . . . . . . . . . . . . . 114
      15.1.  Assets and Trust Boundaries  . . . . . . . . . . . . . . 114
-     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 114
+     15.2.  Transport Security . . . . . . . . . . . . . . . . . . . 115
      15.3.  Token Theft and Replay . . . . . . . . . . . . . . . . . 116
      15.4.  Kernel Impersonation and Receipt Trust . . . . . . . . . 116
      15.5.  Delegation Abuse . . . . . . . . . . . . . . . . . . . . 117
@@ -6116,7 +6116,22 @@ Internet-Draft                Chio Protocol               September 2026
 
    The service orders matching receipts by their position in its store,
    ascending, and returns those whose position is greater than cursor.
-   The response has three members:
+   The response has three members, and a fourth, snapshot, when the
+   service answered from an authenticated query snapshot:
+
+   snapshot:  OPTIONAL.  An object that states the as-of point of the
+      answer: every entry of the service's receipt claim log at or below
+      throughEntrySeq is included and none above it.  Its members are
+      id, a string that names the snapshot version for diagnostics;
+      throughEntrySeq, an integer; checkpointSeq, an integer, or null
+      when the snapshot has no verified checkpoint; observedAt, an
+      integer in Unix milliseconds, the observation time of the newest
+      log head the snapshot fully covers; and recertifiedAt, an integer
+      in Unix milliseconds, the completion time of the last full
+      authentication of the whole history.  Entries above the range of
+      the checkpoint at checkpointSeq are authenticated by receipt
+      signature only.  A client MUST NOT send id as cursor.  The member
+      is absent when the answer did not come from a snapshot.
 
    totalCount:  The number of receipts that match the filters,
       regardless of cursor and limit.
@@ -6133,6 +6148,19 @@ Internet-Draft                Chio Protocol               September 2026
    does not verify.  A query that matches nothing returns:
 
    {"nextCursor": null, "receipts": [], "totalCount": 0}
+
+
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 110]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
 12.5.  Revocation
 
@@ -6151,16 +6179,6 @@ Internet-Draft                Chio Protocol               September 2026
       incident_response.
 
    {"capability_id": "cap-1", "reason": "operator_request"}
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 110]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    A caller authenticates with a credential holding revocations:write
    and deployment tenant authority (Section 12.1).  The service records
@@ -6192,6 +6210,14 @@ Internet-Draft                Chio Protocol               September 2026
       target_kind, a zero octet, and target_value.
 
    target_kind:  The kind of target: capability_id for an entry that
+
+
+
+Whelan                    Expires 3 April 2027                [Page 111]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
       this endpoint records.  Other kinds are root_policy_rule,
       anchor_subject, tenant_tag, and replay_key; their entries are
       recorded by means outside this document.
@@ -6210,13 +6236,6 @@ Internet-Draft                Chio Protocol               September 2026
    capability_id, the identifier; revoked, a boolean; and entry_id, the
    entry_id of the entry that revokes the capability, or null when
    revoked is false.
-
-
-
-Whelan                    Expires 3 April 2027                [Page 111]
-
-Internet-Draft                Chio Protocol               September 2026
-
 
    {"capability_id": "cap-1", "revoked": false, "entry_id": null}
 
@@ -6247,6 +6266,14 @@ Internet-Draft                Chio Protocol               September 2026
    optional capability_revoked message remains a permitted wire
    allocation (Section 10.2).
 
+
+
+
+Whelan                    Expires 3 April 2027                [Page 112]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
 13.  Versioning and Negotiation
 
    Each wire surface has its own version selector.  A version match on
@@ -6266,14 +6293,6 @@ Internet-Draft                Chio Protocol               September 2026
    result.protocolVersion.  The client carries the selected value in
    MCP-Protocol-Version on subsequent requests.  The hosted edge rejects
    an initialization-time mismatch with JSON-RPC code -32600 and Chio
-
-
-
-Whelan                    Expires 3 April 2027                [Page 112]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    code 1000.  An omitted initialize selector uses the compatibility
    default.  A later HTTP version-header mismatch produces HTTP 400 with
    a plain-text body, not that JSON-RPC error; an omitted header is
@@ -6303,6 +6322,14 @@ Internet-Draft                Chio Protocol               September 2026
    A transient flag describes whether a changed condition can permit a
    later attempt.  It is not permission to repeat the same request
    without change.  The retry strategy is part of each allocation.  For
+
+
+
+Whelan                    Expires 3 April 2027                [Page 113]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    example, auth_missing_or_invalid requires fresh credentials, and
    budget_exhausted requires a budget change or reconciliation.  A
    revoked token stays revoked even though a newly issued token can
@@ -6322,14 +6349,6 @@ Internet-Draft                Chio Protocol               September 2026
    Hosted errors use JSON-RPC and, where supplied, a Chio code in error
    data.  The registered mappings are -32600 for unsupported version and
    invalid request shape, and -32002 for a session that is not
-
-
-
-Whelan                    Expires 3 April 2027                [Page 113]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    initialized.  Authentication failures can occur at HTTP session
    admission before a JSON-RPC response exists.  A client keeps HTTP
    status, JSON-RPC code, and Chio code distinct.
@@ -6358,25 +6377,6 @@ Internet-Draft                Chio Protocol               September 2026
    a verifier check the kernel's statements with the kernel's public
    key.
 
-15.2.  Transport Security
-
-   Table 47 states the transport requirements for each surface.  TLS
-   supplies channel protection; [RFC8446] defines TLS 1.3.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -6385,6 +6385,11 @@ Whelan                    Expires 3 April 2027                [Page 114]
 
 Internet-Draft                Chio Protocol               September 2026
 
+
+15.2.  Transport Security
+
+   Table 47 states the transport requirements for each surface.  TLS
+   supplies channel protection; [RFC8446] defines TLS 1.3.
 
    +===============+==============+====================+===============+
    | Surface       | TLS          | Mutual TLS         | Without       |
@@ -6427,11 +6432,6 @@ Internet-Draft                Chio Protocol               September 2026
    confidentiality, peer authentication, or replay resistance for
    traffic it carries in plaintext across a network.
 
-   A hosted edge can run behind a proxy that terminates TLS and passes
-   the client certificate's thumbprint to the edge in a request header.
-   The edge then trusts that header.  An operator MUST ensure that only
-   the proxy can reach the edge, because a client that reaches the edge
-   directly can set the header itself.
 
 
 
@@ -6441,6 +6441,12 @@ Whelan                    Expires 3 April 2027                [Page 115]
 
 Internet-Draft                Chio Protocol               September 2026
 
+
+   A hosted edge can run behind a proxy that terminates TLS and passes
+   the client certificate's thumbprint to the edge in a request header.
+   The edge then trusts that header.  An operator MUST ensure that only
+   the proxy can reach the edge, because a client that reaches the edge
+   directly can set the header itself.
 
 15.3.  Token Theft and Replay
 
@@ -6482,12 +6488,6 @@ Internet-Draft                Chio Protocol               September 2026
    keys, and certificates, rather than learning them from the traffic
    they protect.
 
-   Capability tokens carry no audience.  Any kernel that trusts a
-   token's issuer accepts the token for the grants it names.  Operators
-   that run kernels in different trust domains SHOULD use a distinct
-   issuer key for each domain, so that a token issued for one domain is
-   not accepted in another.
-
 
 
 
@@ -6497,6 +6497,12 @@ Whelan                    Expires 3 April 2027                [Page 116]
 
 Internet-Draft                Chio Protocol               September 2026
 
+
+   Capability tokens carry no audience.  Any kernel that trusts a
+   token's issuer accepts the token for the grants it names.  Operators
+   that run kernels in different trust domains SHOULD use a distinct
+   issuer key for each domain, so that a token issued for one domain is
+   not accepted in another.
 
 15.5.  Delegation Abuse
 
@@ -6540,12 +6546,6 @@ Internet-Draft                Chio Protocol               September 2026
    member names are the usual source of such disagreement.  Verifiers
    SHOULD reject a signed object that contains duplicate member names
    rather than resolving them.  Intermediaries MUST preserve every
-   member and value in the artifact's typed signing projection when
-   forwarding it.  They MAY change insignificant JSON whitespace and
-   member order, since verification reconstructs canonical bytes
-   (Section 10.5).  They MUST NOT add unauthenticated members and
-   represent them as part of the signed statement.
-
 
 
 
@@ -6553,6 +6553,12 @@ Whelan                    Expires 3 April 2027                [Page 117]
 
 Internet-Draft                Chio Protocol               September 2026
 
+
+   member and value in the artifact's typed signing projection when
+   forwarding it.  They MAY change insignificant JSON whitespace and
+   member order, since verification reconstructs canonical bytes
+   (Section 10.5).  They MUST NOT add unauthenticated members and
+   represent them as part of the signed statement.
 
 15.8.  Tool Server Confinement
 
@@ -6594,12 +6600,6 @@ Internet-Draft                Chio Protocol               September 2026
    Threshold approval counts distinct keys.  Distinct keys are not
    distinct people or organizations: an operator who configures an
    eligible key set decides how independent the approvers are.
-
-
-
-
-
-
 
 
 
