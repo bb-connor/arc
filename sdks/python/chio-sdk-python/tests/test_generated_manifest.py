@@ -31,5 +31,5 @@ def test_manifest_runtime_corpus(case):
     # integers, for which compact sorted JSON is exactly the RFC 8785 encoding.
     encoded = json.dumps(decoded, sort_keys=True, separators=(",", ":")).encode("utf-8")
     assert hashlib.sha256(encoded).hexdigest() == (
-        "46062e102f1d1dab0c4200c8a8354796fc180f931785ef9dc89363bc1806ffed"
+        "b3387974261d22131bee3b2d2113e761db60bf610921e96955a76b349ac60bc2"
     )
