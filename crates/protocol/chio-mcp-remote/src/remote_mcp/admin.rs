@@ -831,8 +831,8 @@ fn control_client(
         token,
         &state.factory.config.egress_allowances,
     )
-        .map(Some)
-        .map_err(admin_backend_failure)
+    .map(Some)
+    .map_err(admin_backend_failure)
 }
 
 /// A trust backend failure answers the fixed 500 URN. The cause stays in the

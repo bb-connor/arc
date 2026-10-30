@@ -108,7 +108,11 @@ pub(crate) fn dispatch_trust(
         ),
         TrustCommands::Config { command } => match command {
             TrustConfigCommands::Check { access_config } => {
-                crate::trust_config_check::cmd_trust_config_check(&access_config, egress, json_output)
+                crate::trust_config_check::cmd_trust_config_check(
+                    &access_config,
+                    egress,
+                    json_output,
+                )
             }
             TrustConfigCommands::Credential {
                 id,
@@ -140,7 +144,7 @@ pub(crate) fn dispatch_trust(
                 enterprise_providers_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustProviderCommands::Get {
                 provider_id,
@@ -151,7 +155,7 @@ pub(crate) fn dispatch_trust(
                 enterprise_providers_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustProviderCommands::Upsert {
                 input,
@@ -162,7 +166,7 @@ pub(crate) fn dispatch_trust(
                 enterprise_providers_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustProviderCommands::Delete {
                 provider_id,
@@ -173,7 +177,7 @@ pub(crate) fn dispatch_trust(
                 enterprise_providers_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
         },
         TrustCommands::FederationPolicy { command } => match command {
@@ -184,7 +188,7 @@ pub(crate) fn dispatch_trust(
                 federation_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustFederationPolicyCommands::Get {
                 policy_id,
@@ -195,7 +199,7 @@ pub(crate) fn dispatch_trust(
                 federation_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustFederationPolicyCommands::Upsert {
                 input,
@@ -206,7 +210,7 @@ pub(crate) fn dispatch_trust(
                 federation_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustFederationPolicyCommands::Delete {
                 policy_id,
@@ -217,7 +221,7 @@ pub(crate) fn dispatch_trust(
                 federation_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustFederationPolicyCommands::Evaluate { input } => {
                 admin::cmd_trust_federation_policy_evaluate(
@@ -225,7 +229,7 @@ pub(crate) fn dispatch_trust(
                     json_output,
                     control_url.as_deref(),
                     control_token.as_deref(),
-                        egress,
+                    egress,
                 )
             }
         },
@@ -257,7 +261,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -268,7 +272,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db.as_deref(),
                     control_url.as_deref(),
                     control_token.as_deref(),
-                        egress,
+                    egress,
                 )
             }
             TrustAuthorizationContextCommands::List {
@@ -294,7 +298,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
             TrustAuthorizationContextCommands::ReviewPack {
@@ -320,7 +324,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -334,7 +338,7 @@ pub(crate) fn dispatch_trust(
                     authority_db.as_deref(),
                     control_url.as_deref(),
                     control_token.as_deref(),
-                        egress,
+                    egress,
                 )
             }
             TrustRuntimeAttestationAppraisalCommands::ExportResult {
@@ -350,7 +354,7 @@ pub(crate) fn dispatch_trust(
                 authority_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustRuntimeAttestationAppraisalCommands::Import { input, policy_file } => {
                 cmd_trust_runtime_attestation_appraisal_import(
@@ -359,7 +363,7 @@ pub(crate) fn dispatch_trust(
                     json_output,
                     control_url.as_deref(),
                     control_token.as_deref(),
-                        egress,
+                    egress,
                 )
             }
         },
@@ -388,7 +392,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -424,7 +428,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: None,
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -461,7 +465,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -501,7 +505,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: None,
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -540,7 +544,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -577,7 +581,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: None,
@@ -616,7 +620,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -649,7 +653,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -681,7 +685,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: None,
@@ -720,7 +724,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -744,7 +748,7 @@ pub(crate) fn dispatch_trust(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustCreditBondCommands::List {
                 bond_id,
@@ -773,7 +777,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -792,7 +796,7 @@ pub(crate) fn dispatch_trust(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustCreditLossLifecycleCommands::Issue {
                 bond_id,
@@ -824,7 +828,7 @@ pub(crate) fn dispatch_trust(
                 control_url.as_deref(),
                 control_token.as_deref(),
                 &capital_authority_keys,
-                    egress,
+                egress,
             ),
             TrustCreditLossLifecycleCommands::List {
                 event_id,
@@ -853,7 +857,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -891,7 +895,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     certification_registry_file: certification_registry_file.as_deref(),
@@ -929,7 +933,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -951,7 +955,7 @@ pub(crate) fn dispatch_trust(
                 authority_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustLiabilityProviderCommands::List {
                 provider_id,
@@ -971,7 +975,7 @@ pub(crate) fn dispatch_trust(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustLiabilityProviderCommands::Resolve {
                 provider_id,
@@ -987,19 +991,21 @@ pub(crate) fn dispatch_trust(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
         },
-        TrustCommands::LiabilityMarket { command } => super::trust_liability_market::dispatch_liability_market(
-            command,
-            json_output,
-            receipt_db,
-            authority_seed_file,
-            authority_db,
-            control_url,
-            control_token,
-            egress,
-        ),
+        TrustCommands::LiabilityMarket { command } => {
+            super::trust_liability_market::dispatch_liability_market(
+                command,
+                json_output,
+                receipt_db,
+                authority_seed_file,
+                authority_db,
+                control_url,
+                control_token,
+                egress,
+            )
+        }
         TrustCommands::UnderwritingInput { command } => match command {
             TrustUnderwritingInputCommands::Export {
                 capability,
@@ -1026,7 +1032,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -1061,7 +1067,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     certification_registry_file: certification_registry_file.as_deref(),
@@ -1097,7 +1103,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     certification_registry_file: certification_registry_file.as_deref(),
@@ -1133,7 +1139,7 @@ pub(crate) fn dispatch_trust(
                         receipt_db_path: receipt_db.as_deref(),
                         control_url: control_url.as_deref(),
                         control_token: control_token.as_deref(),
-                            egress,
+                        egress,
                     },
                     budget_db_path: budget_db.as_deref(),
                     authority_seed_path: authority_seed_file.as_deref(),
@@ -1168,7 +1174,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -1187,7 +1193,7 @@ pub(crate) fn dispatch_trust(
                 receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
-                    egress,
+                egress,
             ),
             TrustUnderwritingAppealCommands::Resolve {
                 appeal_id,
@@ -1208,7 +1214,7 @@ pub(crate) fn dispatch_trust(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -1236,7 +1242,7 @@ pub(crate) fn dispatch_trust(
             revocation_db.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
-                egress,
+            egress,
         ),
         TrustCommands::FederatedIssue {
             presentation_response,
@@ -1255,7 +1261,7 @@ pub(crate) fn dispatch_trust(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
-                egress,
+            egress,
         ),
         TrustCommands::FederatedDelegationPolicyCreate {
             output,
@@ -1285,7 +1291,7 @@ pub(crate) fn dispatch_trust(
             revocation_db.as_deref(),
             control_url.as_deref(),
             control_token.as_deref(),
-                egress,
+            egress,
         ),
         TrustCommands::Emergency {
             token_file,

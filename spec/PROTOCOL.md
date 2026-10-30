@@ -3570,16 +3570,15 @@ resolves per request, and the reqwest client keeps one resolver per port the
 contract admits.
 
 An operator declares allowances in one TOML file, read by
-`EgressAllowanceSet::load_file` and named to the `chio` CLI by the global
+`chio` through `EgressAllowanceSet::from_toml_bytes` and named by the global
 `--egress-allowance-file` flag. The file holds one `[[allow]]` table per entry
-with exactly the keys `host`, `port` and `cidr`; any other key is refused. It
-MUST be a regular UTF-8 file of at most 64 KiB, and every entry passes the rules
+with the keys `host`, `port`, `scheme` and `cidr`; any other key is refused. It
+MUST be a regular UTF-8 file of at most 64 KiB, owned by the running user or root, not writable by group or other users, and not reached through a symbolic link, and every entry passes the rules
 above when it loads, so an invalid file stops the process before any contract
-uses it. A file that cannot be loaded is refused with a
-`PrivateNetworkAllowanceError`: `FileUnreadable` (`egress allowance file {path}
-cannot be read: {reason}`), `FileTooLarge` (`egress allowance file {path}
-exceeds {max_bytes} bytes`) or `FileInvalid` (`egress allowance file {path} is
-invalid: {reason}`), or the entry rule it breaks. Without the file the set is
+uses it. A file that cannot be read stops the CLI with `egress allowance file {path}
+cannot be read: {reason}`; a document over the limit is refused as
+`DocumentTooLarge`, bytes that are not UTF-8 as `DocumentNotUtf8`, a malformed one as `DocumentInvalid`, and an entry that
+breaks a rule above as that rule's error. Without the file the set is
 empty. A contract takes only the entries for its own authorities. Every `chio`
 command loads the set before it runs and MUST thread it into every
 trust-control, cluster peer and adapter contract it builds. The `chio finding`

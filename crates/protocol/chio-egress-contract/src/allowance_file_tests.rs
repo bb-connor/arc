@@ -4,10 +4,15 @@ use crate::{
 };
 
 fn parse(text: &str) -> Result<EgressAllowanceSet, PrivateNetworkAllowanceError> {
-    EgressAllowanceSet::from_toml_str(text)
+    EgressAllowanceSet::from_toml_bytes(text.as_bytes())
 }
 
-fn allowance(host: &str, port: u16, scheme: AllowanceScheme, cidr: &str) -> PrivateNetworkAllowance {
+fn allowance(
+    host: &str,
+    port: u16,
+    scheme: AllowanceScheme,
+    cidr: &str,
+) -> PrivateNetworkAllowance {
     PrivateNetworkAllowance {
         host: host.to_string(),
         port,
@@ -23,7 +28,12 @@ fn every_entry_is_parsed_and_the_scheme_defaults_to_https() {
          [[allow]]\nhost = \"10.20.0.5\"\nport = 8443\nscheme = \"http\"\ncidr = \"10.20.0.5/32\"\n",
     );
     let expected = EgressAllowanceSet::new([
-        allowance("control.vpc.internal", 9443, AllowanceScheme::Https, "10.20.0.0/24"),
+        allowance(
+            "control.vpc.internal",
+            9443,
+            AllowanceScheme::Https,
+            "10.20.0.0/24",
+        ),
         allowance("10.20.0.5", 8443, AllowanceScheme::Http, "10.20.0.5/32"),
     ])
     .expect("set");
@@ -48,7 +58,7 @@ fn unknown_keys_are_refused() {
             "[[allow]]\nhost = \"control.vpc.internal\"\nport = 9443\ncidr = \"10.20.0.0/24\"\nproxy = \"x\"\n",
         ),
         Err(PrivateNetworkAllowanceError::DocumentInvalid {
-            reason: "unknown field `proxy`, expected one of `host`, `port`, `cidr`, `scheme`"
+            reason: "unknown field `proxy`, expected one of `host`, `port`, `scheme`, `cidr`"
                 .to_string(),
         })
     );
@@ -101,8 +111,11 @@ fn each_entry_is_validated_with_its_exact_refusal() {
         ),
         (
             "10.20.0.0",
-            PrivateNetworkAllowanceError::InvalidCidr {
-                cidr: "10.20.0.0".to_string(),
+            PrivateNetworkAllowanceError::DocumentInvalid {
+                reason: PrivateNetworkAllowanceError::InvalidCidr {
+                    cidr: "10.20.0.0".to_string(),
+                }
+                .to_string(),
             },
         ),
     ] {
@@ -129,5 +142,13 @@ fn a_document_over_the_ceiling_is_refused() {
         Err(PrivateNetworkAllowanceError::DocumentTooLarge {
             max_bytes: MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES,
         })
+    );
+}
+
+#[test]
+fn bytes_that_are_not_utf8_are_refused() {
+    assert_eq!(
+        EgressAllowanceSet::from_toml_bytes(b"allow = [\xff]"),
+        Err(PrivateNetworkAllowanceError::DocumentNotUtf8)
     );
 }

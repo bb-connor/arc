@@ -333,13 +333,11 @@ impl TrustControlClient {
     {
         let local = std::cell::RefCell::new(None);
         let response = self.dispatch(
-            |client, url| {
-                match self.build_internal_get_request(client, url, request_path, term) {
-                    Ok(request) => request.call_streaming(),
-                    Err(error) => {
-                        *local.borrow_mut() = Some(error);
-                        Err(HttpEgressError::MissingAuthority)
-                    }
+            |client, url| match self.build_internal_get_request(client, url, request_path, term) {
+                Ok(request) => request.call_streaming(),
+                Err(error) => {
+                    *local.borrow_mut() = Some(error);
+                    Err(HttpEgressError::MissingAuthority)
                 }
             },
             request_path,

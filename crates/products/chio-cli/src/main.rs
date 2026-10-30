@@ -189,10 +189,10 @@ pub(crate) use runtime_cli::{
     cmd_trust_revoke, cmd_trust_serve, cmd_trust_status, load_roster_policy,
     parse_capital_authority_keys, require_local_capital_authority, require_receipt_db_path,
 };
-#[path = "cli/runtime/trust_reports.rs"]
-mod runtime_trust_reports;
 #[path = "cli/egress_allowance.rs"]
 mod egress_allowance;
+#[path = "cli/runtime/trust_reports.rs"]
+mod runtime_trust_reports;
 #[path = "cli/trust_commands.rs"]
 mod trust_commands_cli;
 #[path = "cli/trust_config_check.rs"]

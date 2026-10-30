@@ -1,5 +1,5 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 #[path = "runtime/dpop_authority.rs"]
 mod dpop_authority;
 use dpop_authority::attach_durable_admission_runtime;
@@ -11,13 +11,12 @@ mod remote_mcp_auth_egress;
 #[path = "runtime/session_subject.rs"]
 mod session_subject;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
-use control_wiring::ControlEdge;
 pub(crate) use control_wiring::resolve_sidecar_payment_adapter;
+use control_wiring::ControlEdge;
 use remote_mcp_auth_egress::remote_mcp_auth_egress_contract;
 pub(crate) use session_subject::resolve_agent_subject;
 use std::sync::Arc;
 use std::time::Duration;
-
 
 #[cfg(test)]
 #[path = "runtime/payload_maintenance_tests.rs"]

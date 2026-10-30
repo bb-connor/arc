@@ -39,7 +39,7 @@ pub(crate) fn cmd_trust_liability_provider_issue(
             supersedes_provider_record_id: supersedes_provider_record_id.map(ToOwned::to_owned),
         };
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_provider(&request)?
+            .issue_liability_provider(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -103,7 +103,7 @@ pub(crate) fn cmd_trust_liability_provider_list(
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .list_liability_providers(&query)?
+            .list_liability_providers(&query)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -153,7 +153,7 @@ pub(crate) fn cmd_trust_liability_provider_resolve(
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .resolve_liability_provider(&query)?
+            .resolve_liability_provider(&query)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -204,7 +204,7 @@ pub(crate) fn cmd_trust_liability_quote_request_issue(
     let quote_request = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_quote_request(&request)?
+            .issue_liability_quote_request(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -263,7 +263,7 @@ pub(crate) fn cmd_trust_liability_quote_response_issue(
     let quote_response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_quote_response(&request)?
+            .issue_liability_quote_response(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -318,7 +318,7 @@ pub(crate) fn cmd_trust_liability_pricing_authority_issue(
     let authority = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_pricing_authority(&request)?
+            .issue_liability_pricing_authority(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -371,7 +371,7 @@ pub(crate) fn cmd_trust_liability_placement_issue(
     let placement = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_placement(&request)?
+            .issue_liability_placement(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -421,7 +421,7 @@ pub(crate) fn cmd_trust_liability_bound_coverage_issue(
     let bound = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_bound_coverage(&request)?
+            .issue_liability_bound_coverage(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -470,7 +470,7 @@ pub(crate) fn cmd_trust_liability_auto_bind_issue(
     let decision = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_auto_bind(&request)?
+            .issue_liability_auto_bind(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -537,7 +537,7 @@ pub(crate) fn cmd_trust_liability_claim_issue(
     let claim = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_package(&request)?
+            .issue_liability_claim_package(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -586,7 +586,7 @@ pub(crate) fn cmd_trust_liability_claim_response_issue(
     let response = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_response(&request)?
+            .issue_liability_claim_response(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -635,7 +635,7 @@ pub(crate) fn cmd_trust_liability_claim_dispute_issue(
     let dispute = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_dispute(&request)?
+            .issue_liability_claim_dispute(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -685,7 +685,7 @@ pub(crate) fn cmd_trust_liability_claim_adjudication_issue(
     let adjudication = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_adjudication(&request)?
+            .issue_liability_claim_adjudication(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -749,7 +749,7 @@ pub(crate) fn cmd_trust_liability_claim_payout_instruction_issue(
     let payout_instruction = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_payout_instruction(&request)?
+            .issue_liability_claim_payout_instruction(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -819,7 +819,7 @@ pub(crate) fn cmd_trust_liability_claim_payout_receipt_issue(
     let payout_receipt = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_payout_receipt(&request)?
+            .issue_liability_claim_payout_receipt(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -880,7 +880,7 @@ pub(crate) fn cmd_trust_liability_claim_settlement_instruction_issue(
     let settlement_instruction = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_settlement_instruction(&request)?
+            .issue_liability_claim_settlement_instruction(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -952,7 +952,7 @@ pub(crate) fn cmd_trust_liability_claim_settlement_receipt_issue(
     let settlement_receipt = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_liability_claim_settlement_receipt(&request)?
+            .issue_liability_claim_settlement_receipt(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1017,7 +1017,7 @@ pub(crate) fn cmd_trust_liability_market_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .liability_market_workflows(&query)?
+            .liability_market_workflows(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1108,7 +1108,7 @@ pub(crate) fn cmd_trust_liability_claims_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .liability_claim_workflows(&query)?
+            .liability_claim_workflows(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(

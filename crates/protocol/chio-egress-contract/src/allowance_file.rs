@@ -8,56 +8,34 @@
 
 use serde::Deserialize;
 
-use crate::allowance::{
-    AllowanceScheme, EgressAllowanceSet, PrivateNetworkAllowance, PrivateNetworkAllowanceError,
-};
+use crate::allowance::{EgressAllowanceSet, PrivateNetworkAllowance, PrivateNetworkAllowanceError};
 
-/// Largest allowance document [`EgressAllowanceSet::from_toml_str`] parses.
+/// Largest allowance document [`EgressAllowanceSet::from_toml_bytes`] parses.
 pub const MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES: usize = 64 * 1024;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct AllowanceDocument {
-    allow: Vec<AllowanceEntry>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct AllowanceEntry {
-    host: String,
-    port: u16,
-    cidr: String,
-    #[serde(default)]
-    scheme: AllowanceScheme,
+    allow: Vec<PrivateNetworkAllowance>,
 }
 
 impl EgressAllowanceSet {
     /// Parse and validate an allowance document of at most
     /// [`MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES`] bytes.
-    pub fn from_toml_str(text: &str) -> Result<Self, PrivateNetworkAllowanceError> {
-        if text.len() > MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES {
+    pub fn from_toml_bytes(bytes: &[u8]) -> Result<Self, PrivateNetworkAllowanceError> {
+        if bytes.len() > MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES {
             return Err(PrivateNetworkAllowanceError::DocumentTooLarge {
                 max_bytes: MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES,
             });
         }
+        let text = std::str::from_utf8(bytes)
+            .map_err(|_| PrivateNetworkAllowanceError::DocumentNotUtf8)?;
         let document: AllowanceDocument =
             toml::from_str(text).map_err(|error: toml::de::Error| {
                 PrivateNetworkAllowanceError::DocumentInvalid {
                     reason: error.message().to_string(),
                 }
             })?;
-        let entries = document
-            .allow
-            .into_iter()
-            .map(|entry| {
-                Ok(PrivateNetworkAllowance {
-                    host: entry.host,
-                    port: entry.port,
-                    scheme: entry.scheme,
-                    cidr: entry.cidr.parse()?,
-                })
-            })
-            .collect::<Result<Vec<_>, PrivateNetworkAllowanceError>>()?;
-        EgressAllowanceSet::new(entries)
+        EgressAllowanceSet::new(document.allow)
     }
 }

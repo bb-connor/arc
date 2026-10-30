@@ -1,6 +1,6 @@
-use chio_egress_contract::EgressAllowanceSet;
 use super::output::{write_bytes, write_pretty_json_line};
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 fn fiscal_marketplace_client(
     control_url: Option<&str>,

@@ -280,6 +280,8 @@ pub enum PrivateNetworkAllowanceError {
     SchemeConflict { host: String, port: u16 },
     #[error("egress allowance document exceeds {max_bytes} bytes")]
     DocumentTooLarge { max_bytes: usize },
+    #[error("egress allowance document is not UTF-8")]
+    DocumentNotUtf8,
     #[error("egress allowance document is invalid: {reason}")]
     DocumentInvalid { reason: String },
 }
@@ -441,7 +443,7 @@ fn validate_cidr(cidr: &IpCidr) -> Result<(), PrivateNetworkAllowanceError> {
 }
 
 /// An operator's declared allowances, each entry validated on its own and no
-/// two for the same `host:port`. [`EgressAllowanceSet::from_toml_str`] is the only
+/// two for the same `host:port`. [`EgressAllowanceSet::from_toml_bytes`] is the only
 /// document form. A contract takes only the entries for its own
 /// authorities (see `HttpEgressContract::with_private_network_allowances`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

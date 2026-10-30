@@ -25,7 +25,7 @@ fn scratch(name: &str) -> PathBuf {
 
 fn write(directory: &Path, name: &str, text: &str) -> PathBuf {
     let path = directory.join(name);
-    std::fs::write(&path, text).expect("write scratch file");
+    chio_test_support::write_file_with_mode(&path, text, 0o600).expect("write scratch file");
     path
 }
 
@@ -175,8 +175,9 @@ fn trust_config_check_reports_the_digest_of_the_consumed_allowance_file() {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "{stderr}");
-    let set = EgressAllowanceSet::from_toml_str(&std::fs::read_to_string(&allowances).expect("allowance file"))
-        .expect("valid allowance file");
+    let set =
+        EgressAllowanceSet::from_toml_bytes(&std::fs::read(&allowances).expect("allowance file"))
+            .expect("valid allowance file");
     let digest = private_network_allowance_digest(set.entries()).expect("digest");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(

@@ -78,7 +78,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
-                    egress,
+                egress,
             },
         ),
         ReceiptCommands::Health => cmd_receipt_health(QueryBackend {
@@ -86,7 +86,7 @@ pub(crate) fn dispatch_receipt(
             receipt_db_path: receipt_db.as_deref(),
             control_url: control_url.as_deref(),
             control_token: control_token.as_deref(),
-                egress,
+            egress,
         }),
         ReceiptCommands::Audit { repair } => cmd_receipt_audit(
             repair,
@@ -95,7 +95,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
-                    egress,
+                egress,
             },
         ),
         ReceiptCommands::Retention { command } => match command {
@@ -106,7 +106,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -117,7 +117,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
-                    egress,
+                egress,
             },
         ),
         ReceiptCommands::Checkpoint { command } => match command {
@@ -128,7 +128,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
             ReceiptCheckpointCommands::Create {
@@ -142,7 +142,7 @@ pub(crate) fn dispatch_receipt(
                     receipt_db_path: receipt_db.as_deref(),
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
-                        egress,
+                    egress,
                 },
             ),
         },
@@ -171,7 +171,7 @@ pub(crate) fn dispatch_receipt(
                 receipt_db_path: receipt_db.as_deref(),
                 control_url: control_url.as_deref(),
                 control_token: control_token.as_deref(),
-                    egress,
+                egress,
             },
         ),
     }
@@ -243,7 +243,7 @@ pub(crate) fn dispatch_evidence(
                     evidence_export::cmd_evidence_import(
                         &input,
                         receipt_db.as_deref(),
-                            control,
+                        control,
                         json_output,
                         &trust,
                     )

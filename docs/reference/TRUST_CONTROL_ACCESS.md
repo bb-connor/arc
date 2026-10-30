@@ -297,7 +297,8 @@ public ones included, must lie inside the CIDR. The CIDR must be at least a /16
 (IPv4) or /48 (IPv6), lie inside 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16,
 100.64.0.0/10 or fc00::/7, and never touch link-local or a metadata range. A
 host with an allowance is reached over `https` only. The file must be a regular
-file of at most 64 KiB; unknown fields and invalid entries are refused at
+file of at most 64 KiB, owned by the running user or root, not writable by group or
+other users, and not reached through a symbolic link; unknown fields and invalid entries are refused at
 startup. Without the flag no private address is
 reachable. There is no flag that admits private or loopback peers wholesale.
 

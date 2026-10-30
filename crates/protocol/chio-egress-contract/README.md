@@ -45,8 +45,9 @@ This example validates a URL without DNS or network access. DNS checks require
   Link-local and cloud metadata addresses are never reachable. Both the reqwest
   client and the blocking ureq agent check every resolved address with the
   request's port.
-- `EgressAllowanceSet::load_file` is the one operator document form: a TOML file
-  of `[[allow]]` tables with exactly `host`, `port` and `cidr`, at most 64 KiB.
+- `EgressAllowanceSet::from_toml_bytes` is the one operator document form: a TOML
+  document of `[[allow]]` tables with `host`, `port`, `scheme` and `cidr`, at
+  most 64 KiB; the caller reads the file.
   Unknown keys and invalid entries are refused with a typed
   `PrivateNetworkAllowanceError`.
 - `enforce_url_with_dns` checks every resolved address. Response-size enforcement

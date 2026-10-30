@@ -5,12 +5,12 @@ use std::sync::Arc;
 use chio_core::crypto::PublicKey;
 use chio_egress_contract::HttpEgressContract;
 
+#[cfg(test)]
+use crate::SessionLifecyclePolicy;
 use crate::{
     JwtProviderProfile, OAuthClientRegistration, RemoteApprovalConfig, RemoteClock,
     TrustedProxyConfig,
 };
-#[cfg(test)]
-use crate::SessionLifecyclePolicy;
 #[cfg(test)]
 use chio_mcp_adapter::edge::McpTransport;
 

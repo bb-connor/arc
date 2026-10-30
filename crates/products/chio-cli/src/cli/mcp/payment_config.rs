@@ -237,6 +237,7 @@ mod tests {
         let allowances = EgressAllowanceSet::new([chio_egress_contract::PrivateNetworkAllowance {
             host: "10.20.0.5".to_owned(),
             port: 8443,
+            scheme: chio_egress_contract::AllowanceScheme::Https,
             cidr: "10.20.0.5/32".parse().test_unwrap(),
         }])
         .test_unwrap();

@@ -153,7 +153,7 @@ pub(crate) fn cmd_trust_evidence_share_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .shared_evidence_report(&query)?
+            .shared_evidence_report(&query)?
     } else {
         let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
@@ -211,7 +211,7 @@ pub(crate) fn cmd_trust_authorization_context_metadata(
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .authorization_profile_metadata()?
+            .authorization_profile_metadata()?
     } else {
         let path = require_receipt_db_path(receipt_db_path)?;
         let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
@@ -273,7 +273,7 @@ pub(crate) fn cmd_trust_authorization_context_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .authorization_context_report(&query)?
+            .authorization_context_report(&query)?
     } else {
         let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
@@ -369,7 +369,7 @@ pub(crate) fn cmd_trust_authorization_context_review_pack(
     let pack = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .authorization_review_pack(&query)?
+            .authorization_review_pack(&query)?
     } else {
         let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = chio_store_sqlite::SqliteReceiptStore::open(path)?;
@@ -441,7 +441,7 @@ pub(crate) fn cmd_trust_behavioral_feed_export(
     let feed = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .behavioral_feed(&query)?
+            .behavioral_feed(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -508,7 +508,7 @@ pub(crate) fn cmd_trust_exposure_ledger_export(
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .exposure_ledger(&query)?
+            .exposure_ledger(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -580,7 +580,7 @@ pub(crate) fn cmd_trust_credit_scorecard_export(
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .credit_scorecard(&query)?
+            .credit_scorecard(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -655,7 +655,7 @@ pub(crate) fn cmd_trust_capital_book_export(
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .capital_book(&query)?
+            .capital_book(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -731,7 +731,7 @@ pub(crate) fn cmd_trust_capital_instruction_issue(
     let instruction = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .issue_capital_execution_instruction(&request)?
+            .issue_capital_execution_instruction(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -789,7 +789,7 @@ pub(crate) fn cmd_trust_capital_allocation_issue(
     let allocation = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .issue_capital_allocation_decision(&request)?
+            .issue_capital_allocation_decision(&request)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -849,7 +849,7 @@ pub(crate) fn cmd_trust_credit_facility_evaluate(
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .credit_facility_report(&query)?
+            .credit_facility_report(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -911,7 +911,7 @@ pub(crate) fn cmd_trust_credit_facility_issue(
     let facility = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .issue_credit_facility(&request)?
+            .issue_credit_facility(&request)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -981,7 +981,7 @@ pub(crate) fn cmd_trust_credit_facility_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .list_credit_facilities(&query)?
+            .list_credit_facilities(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1034,7 +1034,7 @@ pub(crate) fn cmd_trust_credit_bond_evaluate(
     let report = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .credit_bond_report(&query)?
+            .credit_bond_report(&query)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1096,7 +1096,7 @@ pub(crate) fn cmd_trust_credit_bond_issue(
     let bond = if let Some(url) = backend.query.control_url {
         let token = require_control_token(backend.query.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.query.egress)?
-        .issue_credit_bond(&request)?
+            .issue_credit_bond(&request)?
     } else {
         let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1161,7 +1161,7 @@ pub(crate) fn cmd_trust_credit_bond_simulate(
     let report = if let Some(url) = control_url {
         let token = require_control_token(control_token)?;
         trust_control::service_runtime::client::build_client(url, token, egress)?
-        .simulate_credit_bonded_execution(&request)?
+            .simulate_credit_bonded_execution(&request)?
     } else {
         let receipt_db_path = receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
@@ -1226,7 +1226,7 @@ pub(crate) fn cmd_trust_credit_bond_list(
     let report = if let Some(url) = backend.control_url {
         let token = require_control_token(backend.control_token)?;
         trust_control::service_runtime::client::build_client(url, token, backend.egress)?
-        .list_credit_bonds(&query)?
+            .list_credit_bonds(&query)?
     } else {
         let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::cli_other_error(
