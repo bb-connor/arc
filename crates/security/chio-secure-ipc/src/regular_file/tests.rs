@@ -1,73 +1,78 @@
 use std::io::ErrorKind;
-
 use std::os::unix::fs::PermissionsExt;
 
-use super::{read_regular_file, OpenPolicy};
+use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const LIMIT: usize = 64;
 
+fn private_file(directory: &Path, name: &str, bytes: &[u8]) -> std::io::Result<std::path::PathBuf> {
+    let path = directory.join(name);
+    std::fs::write(&path, bytes)?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    Ok(path)
+}
+
 #[test]
 fn regular_file_preserves_original_bytes() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("input.json");
     let bytes = b"{ \"amount\":18446744073709551615 }\n";
-    std::fs::write(&path, bytes)?;
-    assert_eq!(
-        read_regular_file(&path, OpenPolicy::Authenticated, LIMIT)?,
-        bytes
-    );
+    let path = private_file(directory.path(), "input.json", bytes)?;
+    for policy in [FilePolicy::Private, FilePolicy::Trusted] {
+        assert_eq!(read_regular(&path, policy, LIMIT)?, bytes);
+    }
     Ok(())
 }
 
 #[test]
 fn directory_is_refused_before_reading() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let Err(error) = read_regular_file(directory.path(), OpenPolicy::Authenticated, LIMIT) else {
-        return Err("directory was accepted".into());
-    };
-    assert_eq!(error.kind(), ErrorKind::InvalidInput);
-    assert_eq!(error.to_string(), "input must be a regular file");
+    assert!(matches!(
+        read_regular(directory.path(), FilePolicy::Trusted, LIMIT),
+        Err(RegularFileError::NotRegular)
+    ));
     Ok(())
 }
 
 #[test]
 fn symbolic_link_is_refused() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("input.json");
+    let path = private_file(directory.path(), "input.json", b"{}")?;
     let link = directory.path().join("link.json");
-    std::fs::write(&path, b"{}")?;
     std::os::unix::fs::symlink(&path, &link)?;
-    let Err(error) = read_regular_file(&link, OpenPolicy::Authenticated, LIMIT) else {
-        return Err("symbolic link was followed".into());
-    };
-    assert_eq!(
-        error.raw_os_error(),
-        Some(rustix::io::Errno::LOOP.raw_os_error())
-    );
+    assert!(matches!(
+        read_regular(&link, FilePolicy::Trusted, LIMIT),
+        Err(RegularFileError::Symlink)
+    ));
     assert_eq!(std::fs::read(path)?, b"{}");
     Ok(())
 }
 
 #[test]
-fn oversized_file_stops_one_byte_past_the_limit() -> TestResult {
+fn size_is_refused_one_byte_past_the_limit() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("input.json");
-    std::fs::File::create(&path)?.set_len(u64::try_from(LIMIT + 4096)?)?;
+    let path = private_file(directory.path(), "input.json", b"")?;
+    std::fs::File::options()
+        .write(true)
+        .open(&path)?
+        .set_len(u64::try_from(LIMIT)?)?;
     assert_eq!(
-        read_regular_file(&path, OpenPolicy::Authenticated, LIMIT)?.len(),
-        LIMIT + 1
-    );
-    std::fs::File::create(&path)?.set_len(u64::try_from(LIMIT)?)?;
-    assert_eq!(
-        read_regular_file(&path, OpenPolicy::Authenticated, LIMIT)?.len(),
+        read_regular(&path, FilePolicy::Trusted, LIMIT)?.len(),
         LIMIT
     );
-    assert_eq!(
-        read_regular_file(&path, OpenPolicy::Authenticated, 0)?.len(),
-        1
-    );
+    std::fs::File::options()
+        .write(true)
+        .open(&path)?
+        .set_len(u64::try_from(LIMIT + 4096)?)?;
+    assert!(matches!(
+        read_regular(&path, FilePolicy::Trusted, LIMIT),
+        Err(RegularFileError::TooLarge { max_bytes: LIMIT })
+    ));
+    assert!(matches!(
+        read_regular(&path, FilePolicy::Trusted, 0),
+        Err(RegularFileError::TooLarge { max_bytes: 0 })
+    ));
     Ok(())
 }
 
@@ -82,65 +87,77 @@ fn fifo_without_a_writer_is_refused_without_blocking() -> TestResult {
     )?;
     let (sender, receiver) = std::sync::mpsc::channel();
     let reader = std::thread::spawn(move || {
-        let _ = sender.send(read_regular_file(&path, OpenPolicy::Authenticated, LIMIT));
+        let _ = sender.send(read_regular(&path, FilePolicy::Trusted, LIMIT));
     });
     let result = receiver.recv_timeout(std::time::Duration::from_secs(5))?;
     assert!(reader.join().is_ok(), "file reader panicked");
-    let Err(error) = result else {
-        return Err("FIFO was accepted".into());
-    };
-    assert_eq!(error.kind(), ErrorKind::InvalidInput);
-    assert_eq!(error.to_string(), "input must be a regular file");
+    assert!(matches!(result, Err(RegularFileError::NotRegular)));
     Ok(())
 }
 
 #[test]
-fn missing_file_retains_not_found() -> TestResult {
+fn missing_file_is_not_found() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let Err(error) = read_regular_file(
-        &directory.path().join("absent.json"),
-        OpenPolicy::Authenticated,
-        LIMIT,
-    ) else {
-        return Err("missing file was accepted".into());
-    };
-    assert_eq!(error.kind(), ErrorKind::NotFound);
+    assert!(matches!(
+        read_regular(
+            &directory.path().join("absent.json"),
+            FilePolicy::Trusted,
+            LIMIT
+        ),
+        Err(RegularFileError::Io(ErrorKind::NotFound))
+    ));
     Ok(())
 }
 
 #[test]
 fn trusted_policy_refuses_a_group_or_world_writable_file() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("config.json");
-    std::fs::write(&path, b"{}")?;
+    let path = private_file(directory.path(), "config.json", b"{}")?;
     for mode in [0o620, 0o602] {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode))?;
-        let Err(error) = read_regular_file(&path, OpenPolicy::Trusted, LIMIT) else {
-            return Err(format!("mode {mode:o} was trusted").into());
-        };
-        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert!(
+            matches!(
+                read_regular(&path, FilePolicy::Trusted, LIMIT),
+                Err(RegularFileError::Writable)
+            ),
+            "{mode:o}"
+        );
     }
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644))?;
-    assert_eq!(read_regular_file(&path, OpenPolicy::Trusted, LIMIT)?, b"{}");
+    assert_eq!(read_regular(&path, FilePolicy::Trusted, LIMIT)?, b"{}");
     Ok(())
 }
 
 #[test]
-fn private_policy_refuses_any_group_or_world_access() -> TestResult {
+fn private_policy_refuses_any_group_or_other_access() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("secret");
-    std::fs::write(&path, b"seed")?;
+    let path = private_file(directory.path(), "secret", b"seed")?;
     for mode in [0o640, 0o604] {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode))?;
-        let Err(error) = read_regular_file(&path, OpenPolicy::Private, LIMIT) else {
-            return Err(format!("mode {mode:o} was private").into());
-        };
-        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert!(
+            matches!(
+                read_regular(&path, FilePolicy::Private, LIMIT),
+                Err(RegularFileError::Exposed)
+            ),
+            "{mode:o}"
+        );
     }
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-    assert_eq!(
-        read_regular_file(&path, OpenPolicy::Private, LIMIT)?,
-        b"seed"
-    );
     Ok(())
+}
+
+#[test]
+fn owner_rules_accept_root_only_for_trusted_files() {
+    const EUID: u32 = 1000;
+    assert!(check_policy(FilePolicy::Trusted, 0, 0o644, EUID).is_ok());
+    assert!(check_policy(FilePolicy::Trusted, EUID, 0o644, EUID).is_ok());
+    assert!(matches!(
+        check_policy(FilePolicy::Trusted, 1001, 0o644, EUID),
+        Err(RegularFileError::ForeignOwner)
+    ));
+    assert!(matches!(
+        check_policy(FilePolicy::Private, 0, 0o600, EUID),
+        Err(RegularFileError::ForeignOwner)
+    ));
+    assert!(check_policy(FilePolicy::Private, EUID, 0o600, EUID).is_ok());
+    assert!(check_policy(FilePolicy::Private, EUID, 0o400, EUID).is_ok());
 }
