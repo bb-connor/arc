@@ -65,3 +65,73 @@ fn guard_denial_projects_only_its_family_code_and_text() {
         "denial detail reached a client field: {client}"
     );
 }
+
+struct IncompleteToolServer;
+
+#[async_trait::async_trait]
+impl chio_kernel::ToolServerConnection for IncompleteToolServer {
+    fn server_id(&self) -> &str {
+        "test-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["echo".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        Err(KernelError::RequestIncomplete(PRIVATE_DETAIL.to_string()))
+    }
+}
+
+#[test]
+fn incomplete_denial_projects_the_generic_code_without_its_reason() {
+    let _metrics_guard = metrics_test_guard();
+    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let (kernel, execution) = kernel_for_server(IncompleteToolServer);
+    let response = edge
+        .handle_send_message("echo", &text_message("hello"), &kernel, &execution)
+        .test_unwrap();
+
+    assert_eq!(response.status, TaskStatus::Failed);
+    assert_eq!(response.status_message.as_deref(), Some("Request denied"));
+    let chio = &response.metadata.as_ref().test_unwrap()["chio"];
+    assert_eq!(chio["denialCode"], "denied");
+    assert_eq!(chio["reason"], "Request denied");
+    assert!(
+        chio["receipt"].to_string().contains(PRIVATE_DETAIL),
+        "receipt lost the incomplete reason: {}",
+        chio["receipt"]
+    );
+    let client = client_fields_without_receipt(&response);
+    assert!(
+        !client.contains(PRIVATE_DETAIL),
+        "incomplete reason reached a client field: {client}"
+    );
+}
+
+#[test]
+fn pending_approval_status_message_is_the_fixed_approval_text() {
+    let _metrics_guard = metrics_test_guard();
+    let mut edge = ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let (kernel, execution) = kernel_for_server(test_server());
+    let response = edge
+        .project_pending_approval_for_test(
+            "echo",
+            &text_message("hello"),
+            &kernel,
+            &execution,
+            PRIVATE_DETAIL,
+        )
+        .test_unwrap();
+
+    assert_eq!(response.status, TaskStatus::Working);
+    assert_eq!(
+        response.status_message.as_deref(),
+        Some("Approval required")
+    );
+}

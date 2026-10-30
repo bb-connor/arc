@@ -61,3 +61,54 @@ fn guard_denial_projects_only_its_family_code_and_text() {
         "denial detail reached a client field: {client}"
     );
 }
+
+struct IncompleteToolServer;
+
+#[async_trait::async_trait]
+impl ToolServerConnection for IncompleteToolServer {
+    fn server_id(&self) -> &str {
+        "test-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["read_file".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn chio_kernel::NestedFlowBridge>,
+    ) -> Result<Value, chio_kernel::KernelError> {
+        Err(chio_kernel::KernelError::RequestIncomplete(
+            PRIVATE_DETAIL.to_string(),
+        ))
+    }
+}
+
+#[test]
+fn incomplete_denial_projects_the_generic_code_without_its_reason() {
+    let _metrics_guard = metrics_test_guard();
+    let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let (kernel, execution) =
+        kernel_execution(Box::new(IncompleteToolServer), "test-srv", "read_file");
+    let result = edge
+        .invoke("read_file", json!({}), &kernel, &execution)
+        .test_unwrap();
+
+    assert!(!result.success);
+    assert_eq!(result.error.as_deref(), Some("Request denied"));
+    let chio = &result.metadata.as_ref().test_unwrap()["chio"];
+    assert_eq!(chio["denialCode"], "denied");
+    assert_eq!(chio["reason"], "Request denied");
+    assert!(
+        chio["receipt"].to_string().contains(PRIVATE_DETAIL),
+        "receipt lost the incomplete reason: {}",
+        chio["receipt"]
+    );
+    let client = client_fields_without_receipt(&result);
+    assert!(
+        !client.contains(PRIVATE_DETAIL),
+        "incomplete reason reached a client field: {client}"
+    );
+}

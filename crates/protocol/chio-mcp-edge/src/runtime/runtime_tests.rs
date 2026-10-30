@@ -2628,7 +2628,7 @@ fn incomplete_streamed_tools_call_preserves_chunks_and_terminal_state() {
     );
     assert_eq!(
         response["result"]["structuredContent"][CHIO_TOOL_STREAM_KEY]["reason"],
-        "upstream stream interrupted"
+        "Request denied"
     );
 
     let notifications = edge.take_pending_notifications();

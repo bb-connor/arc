@@ -1448,7 +1448,7 @@ mod tests {
         assert!(!response.status.is_terminal());
         assert_eq!(
             response.status_message.as_deref(),
-            Some("approval required")
+            Some("Approval required")
         );
         assert!(response.message.is_none());
         assert_eq!(
