@@ -3692,7 +3692,7 @@ first_seen = "68d72d43cd"
 [[schema]]
 value = "chio.operator-root-request.v1"
 files = ["crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/kinds/operator_key.rs"]
-first_seen = "afb43c91bf"
+first_seen = "4ea46d78ee"
 
 [[schema]]
 value = "chio.oracle-conversion-evidence.v1"

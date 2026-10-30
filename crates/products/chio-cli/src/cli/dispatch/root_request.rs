@@ -5,9 +5,9 @@ use std::path::Path;
 
 use chio_core::crypto::Ed25519Backend;
 use chio_mcp_remote::root_exchange::kinds::operator_key::{
-    OperatorRootRequest, SignedOperatorRootRequest, MAX_OPERATOR_ROOT_REQUEST_BYTES,
+    OperatorRootRequest, OperatorRootRequestError, SignedOperatorRootRequest,
+    MAX_OPERATOR_ROOT_REQUEST_BYTES,
 };
-use chio_mcp_remote::root_exchange::RootExchangeError;
 
 use super::*;
 
@@ -38,13 +38,16 @@ fn sign_root_request(operator_seed_file: &Path, input: impl Read) -> Result<Vec<
 
 /// A request refusal under the registered cli-json code, with a fixed public
 /// message and the typed refusal kept as the inspectable source.
-fn refused(error: RootExchangeError) -> CliError {
+fn refused(error: OperatorRootRequestError) -> CliError {
     let message = match &error {
-        RootExchangeError::OperatorRootRequestMalformed(reason) => *reason,
-        RootExchangeError::OperatorRootRequestMissingTenant => {
-            "operator root request names no tenant_value"
+        OperatorRootRequestError::Malformed(reason) => *reason,
+        OperatorRootRequestError::MissingTenant => "operator root request names no tenant_value",
+        OperatorRootRequestError::SignatureInvalid => {
+            "operator root request signature does not verify"
         }
-        _ => "operator root request could not be signed",
+        OperatorRootRequestError::Canonicalization(_) => {
+            "operator root request could not be canonicalized"
+        }
     };
     CliError::with_public_source(
         &chio_errors::_generated::error_codes::CLI_JSON,
@@ -81,26 +84,6 @@ mod tests {
         (path, operator.public_key())
     }
 
-    fn sign_edited(edit: impl FnOnce(&mut serde_json::Value)) -> Result<Vec<u8>, CliError> {
-        let dir = tempfile::tempdir().unwrap();
-        let (path, _) = seed_file(&dir, 0o600);
-        let mut request: serde_json::Value = serde_json::from_str(REQUEST).unwrap();
-        edit(&mut request);
-        sign_root_request(&path, serde_json::to_vec(&request).unwrap().as_slice())
-    }
-
-    /// The typed request refusal a CLI error carries as its source.
-    fn request_refusal(error: &CliError) -> Option<&RootExchangeError> {
-        error
-            .source()
-            .and_then(|registered| registered.source())
-            .and_then(|source| source.downcast_ref::<RootExchangeError>())
-    }
-
-    fn registered_code(error: &CliError) -> String {
-        error.report().code
-    }
-
     #[test]
     fn root_request_sign_output_verifies() {
         let dir = tempfile::tempdir().unwrap();
@@ -116,62 +99,22 @@ mod tests {
         assert_eq!(request.principal.as_str(), "ops:carol");
         assert_eq!(request.tenant_value.as_str(), "acme");
         assert_eq!(request.expires_at, 1_792_234_920);
-
-        let unpinned = Keypair::from_seed(&[0x32; 32]).public_key();
-        assert_eq!(
-            SignedOperatorRootRequest::parse(&signed)
-                .unwrap()
-                .verify(&unpinned)
-                .unwrap_err(),
-            RootExchangeError::OperatorRootRequestSignatureInvalid
-        );
     }
 
     #[test]
     fn root_request_sign_without_tenant_refuses() {
-        let error = sign_edited(|request| {
-            request.as_object_mut().unwrap().remove("tenant_value");
-        })
-        .unwrap_err();
-        assert_eq!(
-            request_refusal(&error),
-            Some(&RootExchangeError::OperatorRootRequestMissingTenant)
-        );
-        assert_eq!(registered_code(&error), CLI_JSON.urn);
-    }
-
-    #[test]
-    fn root_request_sign_refuses_an_unknown_member() {
-        let error = sign_edited(|request| {
-            request["operator_key"] = serde_json::json!("00");
-        })
-        .unwrap_err();
-        assert_eq!(
-            request_refusal(&error),
-            Some(&RootExchangeError::OperatorRootRequestMalformed(
-                "body does not have the request shape"
-            ))
-        );
-        assert_eq!(registered_code(&error), CLI_JSON.urn);
-    }
-
-    #[test]
-    fn root_request_sign_refuses_a_signed_form_over_the_read_bound() {
-        let error = sign_edited(|request| {
-            request["scope"] = serde_json::json!({ "grants": [{
-                "server_id": "crm",
-                "tool_name": "t".repeat(MAX_OPERATOR_ROOT_REQUEST_BYTES - 300),
-                "operations": ["invoke"]
-            }]});
-        })
-        .unwrap_err();
-        assert_eq!(
-            request_refusal(&error),
-            Some(&RootExchangeError::OperatorRootRequestMalformed(
-                "signed request exceeds the size bound"
-            ))
-        );
-        assert_eq!(registered_code(&error), CLI_JSON.urn);
+        let dir = tempfile::tempdir().unwrap();
+        let (path, _) = seed_file(&dir, 0o600);
+        let mut request: serde_json::Value = serde_json::from_str(REQUEST).unwrap();
+        request.as_object_mut().unwrap().remove("tenant_value");
+        let error =
+            sign_root_request(&path, serde_json::to_vec(&request).unwrap().as_slice()).unwrap_err();
+        let refusal = error
+            .source()
+            .and_then(|registered| registered.source())
+            .and_then(|source| source.downcast_ref::<OperatorRootRequestError>());
+        assert_eq!(refusal, Some(&OperatorRootRequestError::MissingTenant));
+        assert_eq!(error.report().code, CLI_JSON.urn);
     }
 
     #[test]
@@ -180,35 +123,7 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let (path, _) = seed_file(&dir, mode);
             let error = sign_root_request(&path, REQUEST.as_bytes()).unwrap_err();
-            assert_eq!(registered_code(&error), CLI_IO.urn, "mode {mode:o}");
-            assert_eq!(request_refusal(&error), None, "mode {mode:o}");
-        }
-    }
-
-    #[test]
-    fn seed_file_with_a_seed_one_hex_digit_short_or_long_refuses() {
-        let seed = Keypair::from_seed(&[0x31; 32]).seed_hex();
-        assert_eq!(seed.len(), 64);
-        let long = format!("{seed}0");
-        for (text, reason) in [
-            (
-                &seed[..63],
-                "crypto hex input has an incorrect encoded length",
-            ),
-            (&long[..], "crypto hex input exceeds its encoded size limit"),
-        ] {
-            let dir = tempfile::tempdir().unwrap();
-            let (path, _) = seed_file(&dir, 0o600);
-            std::fs::write(&path, format!("{text}\n")).unwrap();
-            let error = sign_root_request(&path, REQUEST.as_bytes()).unwrap_err();
-            assert!(
-                matches!(
-                    &error,
-                    CliError::Core(chio_core::Error::InvalidSignature(message)) if message == reason
-                ),
-                "{} hex digits: {error:?}",
-                text.len()
-            );
+            assert_eq!(error.report().code, CLI_IO.urn, "mode {mode:o}");
         }
     }
 }

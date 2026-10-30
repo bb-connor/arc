@@ -3,6 +3,8 @@
 use chio_core::capability::anchor::AnchorKind;
 use chio_core::root_authority::HolderClass;
 
+use super::kinds::operator_key::OperatorRootRequestError;
+
 /// The OAuth error a refusal answers with at the token endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OAuthErrorCode {
@@ -170,12 +172,8 @@ pub enum RootExchangeError {
     ReExchangeWidens,
     #[error("re-exchange client is not the client the subject token was issued to")]
     ReExchangeClientMismatch,
-    #[error("operator root request is malformed: {0}")]
-    OperatorRootRequestMalformed(&'static str),
-    #[error("operator root request names no tenant_value")]
-    OperatorRootRequestMissingTenant,
-    #[error("operator root request signature does not verify under the operator key")]
-    OperatorRootRequestSignatureInvalid,
+    #[error(transparent)]
+    OperatorRootRequest(#[from] OperatorRootRequestError),
 
     #[error("root policy is out of force")]
     PolicyOutOfForce,
@@ -223,9 +221,11 @@ impl RootExchangeError {
             | Self::UnsupportedSubjectTokenType
             | Self::UnsupportedRequestedTokenType
             | Self::ClientAuthenticationAmbiguous
-            | Self::OperatorRootRequestMalformed(_)
-            | Self::OperatorRootRequestMissingTenant
-            | Self::OperatorRootRequestSignatureInvalid
+            | Self::OperatorRootRequest(
+                OperatorRootRequestError::Malformed(_)
+                | OperatorRootRequestError::MissingTenant
+                | OperatorRootRequestError::SignatureInvalid,
+            )
             | Self::RequestedHolderMismatch(_) => OAuthErrorCode::InvalidRequest,
             Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
             Self::ClientAssertionMissing
@@ -283,7 +283,10 @@ impl RootExchangeError {
             | Self::IntrospectionInvalid(_)
             | Self::IntrospectionRecordAmbiguous
             | Self::EntropyUnavailable
-            | Self::Canonicalization(_) => OAuthErrorCode::ServerError,
+            | Self::Canonicalization(_)
+            | Self::OperatorRootRequest(OperatorRootRequestError::Canonicalization(_)) => {
+                OAuthErrorCode::ServerError
+            }
         }
     }
 

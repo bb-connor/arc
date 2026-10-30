@@ -199,6 +199,24 @@ fn malformed_hex_within_the_bound_classifies_as_invalid_hex() {
 }
 
 #[test]
+fn a_seed_one_hex_digit_short_or_long_refuses_with_its_length_error() {
+    let seed = Keypair::from_seed(&[0x31; 32]).seed_hex();
+    for (wire, reason) in [
+        (&seed[..63], HEX_LENGTH),
+        (&format!("{seed}0")[..], HEX_SIZE_LIMIT),
+    ] {
+        assert!(
+            matches!(
+                Keypair::from_seed_hex(wire).err(),
+                Some(chio_core_types::Error::InvalidSignature(message)) if message == reason
+            ),
+            "{} hex digits",
+            wire.len()
+        );
+    }
+}
+
+#[test]
 fn oversized_hex_rejects_before_decoding_invalid_digits() {
     let oversized = "g".repeat(100_000);
     for error in [

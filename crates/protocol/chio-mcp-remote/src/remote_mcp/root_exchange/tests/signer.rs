@@ -1,45 +1,18 @@
 //! The exchange signer: built from the signing backend the binary owns,
-//! and every artifact it signs verifying under the exchange key.
+//! and every snapshot it signs verifying under the exchange key.
 
 use std::sync::Arc;
 
 use super::*;
 use crate::idp_keys::{KeyResolutionError, SnapshotNotSigned};
 use crate::root_exchange::signer::{ExchangeSigner, ExchangeSignerError};
-use chio_core::capability::token::{CapabilityTokenBody, CHIO_CAPABILITY_SCHEMA};
-use chio_core::crypto::{
-    verify_wrapped, Ed25519Backend, Signature, SigningBackend, SigningMessage,
-};
+use chio_core::crypto::{Ed25519Backend, Signature, SigningBackend, SigningMessage};
 use chio_core::root_authority::{HttpsUrl, KeySnapshotSource, Uri};
 
 const SEED: [u8; 32] = [0x41; 32];
 
 fn exchange_key() -> PublicKey {
     Keypair::from_seed(&SEED).public_key()
-}
-
-fn foreign_key() -> PublicKey {
-    Keypair::from_seed(&[0x43; 32]).public_key()
-}
-
-fn signer() -> ExchangeSigner {
-    ExchangeSigner::new(Arc::new(Ed25519Backend::new(Keypair::from_seed(&SEED)))).unwrap()
-}
-
-fn root_body(issuer: PublicKey) -> CapabilityTokenBody {
-    CapabilityTokenBody {
-        id: "cap_root_1".to_owned(),
-        issuer,
-        subject: Keypair::from_seed(&[0x42; 32]).public_key(),
-        scope: ChioScope {
-            grants: vec![grant("search")],
-            ..ChioScope::default()
-        },
-        issued_at: NOW,
-        expires_at: NOW + 300,
-        delegation_chain: Vec::new(),
-        aggregate_invocation_budget: None,
-    }
 }
 
 fn sign_snapshot(signer: &ExchangeSigner) -> Result<IdpKeySnapshot, KeyResolutionError> {
@@ -86,30 +59,16 @@ impl SigningBackend for KeylessBackend {
 
 #[test]
 fn exchange_signer_signature_verifies_against_pinned_exchange_key() {
-    let signer = signer();
+    let signer =
+        ExchangeSigner::new(Arc::new(Ed25519Backend::new(Keypair::from_seed(&SEED)))).unwrap();
     assert_eq!(signer.key(), &exchange_key());
-
-    let root = signer.sign_root(root_body(exchange_key())).unwrap();
-    verify_wrapped(
-        &exchange_key(),
-        CHIO_CAPABILITY_SCHEMA,
-        &root.signing_body(),
-        &root.signature,
-    )
-    .unwrap();
-    assert!(matches!(
-        verify_wrapped(
-            &foreign_key(),
-            CHIO_CAPABILITY_SCHEMA,
-            &root.signing_body(),
-            &root.signature,
-        ),
-        Err(chio_core::Error::SignatureRejected)
-    ));
-
     let snapshot = sign_snapshot(&signer).unwrap();
     assert_eq!(snapshot.exchange_key, exchange_key());
     snapshot.verify_signature(&exchange_key()).unwrap();
+    assert_eq!(
+        snapshot.verify_signature(&Keypair::from_seed(&[0x43; 32]).public_key()),
+        Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned)
+    );
 }
 
 #[test]
@@ -121,24 +80,12 @@ fn exchange_signer_without_a_backend_key_refuses() {
 }
 
 #[test]
-fn exchange_signer_refuses_a_root_with_a_foreign_issuer() {
-    assert_eq!(
-        signer().sign_root(root_body(foreign_key())).unwrap_err(),
-        ExchangeSignerError::IssuerNotExchangeKey
-    );
-}
-
-#[test]
 fn exchange_signer_refuses_a_backend_that_signs_under_another_key() {
     let signer = ExchangeSigner::new(Arc::new(ForeignSigningBackend {
         reported: Ed25519Backend::new(Keypair::from_seed(&SEED)),
         signing: Ed25519Backend::new(Keypair::from_seed(&[0x43; 32])),
     }))
     .unwrap();
-    assert_eq!(
-        signer.sign_root(root_body(exchange_key())).unwrap_err(),
-        ExchangeSignerError::RootNotSigned
-    );
     assert_eq!(
         sign_snapshot(&signer).unwrap_err(),
         KeyResolutionError::SnapshotNotSigned(SnapshotNotSigned)

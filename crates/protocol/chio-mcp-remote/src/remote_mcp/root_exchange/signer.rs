@@ -1,17 +1,14 @@
-//! The exchange signer: the key that signs anchored roots and IdP key
-//! snapshots.
+//! The exchange signer: the key that signs IdP key snapshots.
 //!
 //! The binary that owns the key custody builds the signing backend and hands
 //! it to [`ExchangeSigner::new`]; this crate opens no key material. The
-//! exchange key is the key the backend reports. Roots sign through the
-//! capability token's own signing method and snapshots through
-//! `IdpKeySnapshot`'s, both on the signing wrapper, and both signing paths
-//! verify the signature under the exchange key before the artifact exists.
-//! No path falls back to a generated key.
+//! exchange key is the key the backend reports. A snapshot signs through the
+//! signing wrapper bound to that key, and the signing path refuses a
+//! signature that does not verify under it. No path falls back to a
+//! generated key.
 
 use std::sync::Arc;
 
-use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::{sign_wrapped_for_identity, PublicKey, SigningBackend};
 use chio_core::root_authority::idp_key_snapshot::IdpKeySnapshotSigningBody;
 use chio_core::root_authority::{
@@ -25,10 +22,6 @@ use crate::idp_keys::{KeyResolutionError, SnapshotNotSigned};
 pub enum ExchangeSignerError {
     #[error("exchange signing backend cannot report its key")]
     BackendKeyUnavailable,
-    #[error("root issuer is not the exchange key")]
-    IssuerNotExchangeKey,
-    #[error("exchange signer could not sign the root")]
-    RootNotSigned,
 }
 
 /// The exchange signing backend and the exchange key it signs as.
@@ -60,18 +53,6 @@ impl ExchangeSigner {
     #[must_use]
     pub fn key(&self) -> &PublicKey {
         &self.key
-    }
-
-    /// Sign an anchored root body whose issuer is the exchange key.
-    pub fn sign_root(
-        &self,
-        body: CapabilityTokenBody,
-    ) -> Result<CapabilityToken, ExchangeSignerError> {
-        if body.issuer != self.key {
-            return Err(ExchangeSignerError::IssuerNotExchangeKey);
-        }
-        CapabilityToken::sign_with_backend(body, self.backend.as_ref())
-            .map_err(|_| ExchangeSignerError::RootNotSigned)
     }
 
     /// Sign a `chio.idp-key-snapshot.v1` over `keys` as observed at `observed_at`.

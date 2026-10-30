@@ -10,7 +10,7 @@ use crate::root_exchange::kinds::local_as::{
 };
 use crate::root_exchange::kinds::oauth_introspection::TokenIntrospector;
 use crate::root_exchange::kinds::operator_key::{
-    OperatorRootRequest, VerifiedOperatorRootRequest, OPERATOR_KEY_ISSUER,
+    OperatorRootRequest, OperatorRootRequestError, VerifiedOperatorRootRequest, OPERATOR_KEY_ISSUER,
 };
 use crate::root_exchange::kinds::operator_static_bearer::StaticBearerToken;
 use crate::root_exchange::kinds::{
@@ -1433,8 +1433,8 @@ fn operator_request_refusals() {
         request.as_object_mut().unwrap().remove("tenant_value");
     }))
     .unwrap_err();
-    assert_eq!(error, RootExchangeError::OperatorRootRequestMissingTenant);
-    refusal_code(&error, OAuthErrorCode::InvalidRequest);
+    assert_eq!(error, OperatorRootRequestError::MissingTenant);
+    refusal_code(&error.into(), OAuthErrorCode::InvalidRequest);
 
     let mut repeated = operator_body(|_| {});
     repeated.pop();
@@ -1451,11 +1451,8 @@ fn operator_request_refusals() {
         (oversized, "body exceeds the size bound"),
     ] {
         let error = OperatorRootRequest::parse(&body).unwrap_err();
-        assert_eq!(
-            error,
-            RootExchangeError::OperatorRootRequestMalformed(reason)
-        );
-        refusal_code(&error, OAuthErrorCode::InvalidRequest);
+        assert_eq!(error, OperatorRootRequestError::Malformed(reason));
+        refusal_code(&error.into(), OAuthErrorCode::InvalidRequest);
     }
 
     let error = operator_key::verify(

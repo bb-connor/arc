@@ -3539,8 +3539,8 @@ A signed request is one JSON object with exactly these members:
   replay key. An operator root request is single use.
 - `principal`: the identifier of the principal the root is issued for.
 - `tenant_value`: the identifier of the tenant the root is committed to.
-  It is required. A request without it refuses with the typed refusal
-  `OperatorRootRequestMissingTenant`, before its signature is checked.
+  It is required. A request without it refuses with its own typed refusal,
+  before its signature is checked.
 - `scope`: the requested capability scope, which must lie within the
   ceiling scope of the matched root policy rule.
 - `holder`: the holder class, `edge_session` or `caller`.
