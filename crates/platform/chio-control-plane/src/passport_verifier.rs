@@ -11,10 +11,10 @@ use chio_credentials::{
     Oid4vciChioPassportStatusReference, Oid4vciCredentialIssuerMetadata, Oid4vciCredentialOffer,
     Oid4vciCredentialRequest, Oid4vciCredentialResponse, Oid4vciTokenRequest, Oid4vciTokenResponse,
     Oid4vpRequestObject, PassportLifecycleRecord, PassportLifecycleResolution,
-    PassportLifecycleState, PassportPresentationChallenge, PassportStatusDistribution,
-    SignedPassportVerifierPolicy, WalletExchangeTransactionState, WalletExchangeTransactionStatus,
-    CHIO_PASSPORT_JWT_VC_JSON_FORMAT, CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID,
-    CHIO_PASSPORT_SD_JWT_VC_FORMAT,
+    PassportLifecycleState, PassportPresentationChallenge, PassportPresentationResponse,
+    PassportStatusDistribution, SignedPassportVerifierPolicy, WalletExchangeTransactionState,
+    WalletExchangeTransactionStatus, CHIO_PASSPORT_JWT_VC_JSON_FORMAT,
+    CHIO_PASSPORT_OID4VCI_CREDENTIAL_CONFIGURATION_ID, CHIO_PASSPORT_SD_JWT_VC_FORMAT,
 };
 use chrono::DateTime;
 use rusqlite::{params, Connection, OptionalExtension};
@@ -54,6 +54,7 @@ const VERIFIER_POLICY_REGISTRY_VERSION: &str = "chio.passport-verifier-policies.
 const PASSPORT_STATUS_REGISTRY_VERSION: &str = "chio.passport-status-registry.v1";
 const PASSPORT_ISSUANCE_REGISTRY_VERSION: &str = "chio.passport-issuance-offers.v1";
 const CHALLENGE_STATUS_ISSUED: &str = "issued";
+const CHALLENGE_STATUS_VERIFIED: &str = "verified";
 const CHALLENGE_STATUS_CONSUMED: &str = "consumed";
 const CHALLENGE_STATUS_EXPIRED: &str = "expired";
 const OID4VP_TRANSACTION_STATUS_ISSUED: &str = "issued";
@@ -1035,6 +1036,15 @@ impl PassportIssuanceOfferRegistry {
     }
 }
 
+/// What a challenge is spent on. A challenge is single use: verification
+/// spends an issued challenge, and federated issuance spends an issued
+/// challenge or one verified for exactly the presentation it issues against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChallengeConsumer {
+    Verification,
+    FederatedIssuance,
+}
+
 #[derive(Debug, Clone)]
 pub struct PassportVerifierChallengeStore {
     path: PathBuf,
@@ -1069,7 +1079,8 @@ impl PassportVerifierChallengeStore {
                 issued_at INTEGER NOT NULL,
                 expires_at INTEGER NOT NULL,
                 status TEXT NOT NULL,
-                consumed_at INTEGER
+                consumed_at INTEGER,
+                presentation_hash TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_passport_verifier_challenges_status
                 ON passport_verifier_challenges(status, expires_at);",
@@ -1091,8 +1102,9 @@ impl PassportVerifierChallengeStore {
                 issued_at,
                 expires_at,
                 status,
-                consumed_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)",
+                consumed_at,
+                presentation_hash
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL, NULL)",
             params![
                 stored.challenge_id,
                 stored.verifier,
@@ -1138,7 +1150,7 @@ impl PassportVerifierChallengeStore {
         let expires_at = sqlite_u64(expires_at_raw, "passport verifier challenge expires_at")?;
         match status.as_str() {
             CHALLENGE_STATUS_ISSUED => {}
-            CHALLENGE_STATUS_CONSUMED => {
+            CHALLENGE_STATUS_VERIFIED | CHALLENGE_STATUS_CONSUMED => {
                 return Err(CliError::cli_other_error(format!(
                     "challenge `{challenge_id}` has already been consumed"
                 )))
@@ -1179,17 +1191,24 @@ impl PassportVerifierChallengeStore {
         Ok(challenge)
     }
 
+    /// Spends `challenge` for `consumer` with `presentation`. Each challenge
+    /// admits one verification and one federated issuance at most, and the
+    /// issuance after a verification must carry the verified presentation;
+    /// every other reuse is refused as already consumed.
     pub fn consume(
         &self,
         challenge: &PassportPresentationChallenge,
+        presentation: &PassportPresentationResponse,
+        consumer: ChallengeConsumer,
         now: u64,
     ) -> Result<(), CliError> {
+        let presented_hash = sha256_hex(&canonical_json_bytes(presentation)?);
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
         let challenge_id = challenge_identifier(challenge);
-        let Some((stored_challenge_hash, status, expires_at_raw)) = transaction
+        let Some((stored_challenge_hash, status, expires_at_raw, verified_hash)) = transaction
             .query_row(
-                "SELECT challenge_hash, status, expires_at
+                "SELECT challenge_hash, status, expires_at, presentation_hash
                  FROM passport_verifier_challenges
                  WHERE challenge_id = ?1",
                 [AsRef::<str>::as_ref(&challenge_id)],
@@ -1198,6 +1217,7 @@ impl PassportVerifierChallengeStore {
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, i64>(2)?,
+                        row.get::<_, Option<String>>(3)?,
                     ))
                 },
             )
@@ -1216,27 +1236,32 @@ impl PassportVerifierChallengeStore {
             )));
         }
         let expires_at = sqlite_u64(expires_at_raw, "passport verifier challenge expires_at")?;
-        match status.as_str() {
-            CHALLENGE_STATUS_CONSUMED => {
+        let spent_from = match (status.as_str(), consumer) {
+            (CHALLENGE_STATUS_ISSUED, _) => CHALLENGE_STATUS_ISSUED,
+            (CHALLENGE_STATUS_VERIFIED, ChallengeConsumer::FederatedIssuance)
+                if verified_hash.as_deref() == Some(presented_hash.as_str()) =>
+            {
+                CHALLENGE_STATUS_VERIFIED
+            }
+            (CHALLENGE_STATUS_VERIFIED | CHALLENGE_STATUS_CONSUMED, _) => {
                 return Err(CliError::cli_other_error(format!(
                     "challenge `{}` has already been consumed",
                     challenge_id
                 )))
             }
-            CHALLENGE_STATUS_EXPIRED => {
+            (CHALLENGE_STATUS_EXPIRED, _) => {
                 return Err(CliError::cli_other_error(format!(
                     "challenge `{}` has already expired",
                     challenge_id
                 )))
             }
-            CHALLENGE_STATUS_ISSUED => {}
-            other => {
+            (other, _) => {
                 return Err(CliError::cli_other_error(format!(
                     "challenge `{}` has unknown stored status `{other}`",
                     challenge_id
                 )))
             }
-        }
+        };
         if now > expires_at {
             transaction.execute(
                 "UPDATE passport_verifier_challenges
@@ -1253,15 +1278,20 @@ impl PassportVerifierChallengeStore {
                 challenge_id
             )));
         }
+        let spent_to = match consumer {
+            ChallengeConsumer::Verification => CHALLENGE_STATUS_VERIFIED,
+            ChallengeConsumer::FederatedIssuance => CHALLENGE_STATUS_CONSUMED,
+        };
         let updated = transaction.execute(
             "UPDATE passport_verifier_challenges
-             SET status = ?2, consumed_at = ?3
+             SET status = ?2, consumed_at = ?3, presentation_hash = ?5
              WHERE challenge_id = ?1 AND status = ?4",
             params![
                 AsRef::<str>::as_ref(&challenge_id),
-                CHALLENGE_STATUS_CONSUMED,
+                spent_to,
                 sqlite_i64(now, "passport verifier challenge consumed_at")?,
-                CHALLENGE_STATUS_ISSUED,
+                spent_from,
+                presented_hash,
             ],
         )?;
         if updated != 1 {

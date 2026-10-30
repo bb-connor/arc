@@ -767,7 +767,13 @@ fn verify_passport_challenge_payload(
         if let Err(error) = door.admit(now_unix_ms) {
             return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
         }
-        match consume_challenge_if_configured(&state.config, challenge, now) {
+        match consume_challenge_if_configured(
+            &state.config,
+            challenge,
+            &payload.presentation,
+            ChallengeConsumer::Verification,
+            now,
+        ) {
             Ok(replay_state) => verification.replay_state = replay_state,
             Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
         }
@@ -1597,7 +1603,13 @@ pub(crate) async fn handle_federated_issue(
     if let Err(error) = partner_door.admit(accept_unix_ms) {
         return plain_http_error(StatusCode::FORBIDDEN, &error.to_string());
     }
-    match consume_challenge_if_configured(&state.config, &payload.expected_challenge, now) {
+    match consume_challenge_if_configured(
+        &state.config,
+        &payload.expected_challenge,
+        &payload.presentation,
+        ChallengeConsumer::FederatedIssuance,
+        now,
+    ) {
         Ok(replay_state) => verification.replay_state = replay_state,
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
     }
