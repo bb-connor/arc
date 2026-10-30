@@ -179,7 +179,7 @@ fn forwarded_control_response(
             "failed to map forwarded trust-control response status: {error}"
         ))
     })?;
-    let content_type = response.content_type().map(str::to_owned);
+    let content_type = response.header("content-type").map(str::to_owned);
     let body = String::from_utf8(response.body().to_vec()).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to decode forwarded trust-control response body: {error}"

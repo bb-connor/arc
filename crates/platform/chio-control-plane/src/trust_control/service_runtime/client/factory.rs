@@ -220,7 +220,6 @@ pub(super) fn control_client_contract(
         allowed_authority_set,
         deny_loopback: first_loopback.is_none(),
         deny_link_local: true,
-        deny_ipv6_ula: true,
         max_redirect_chain: 0,
         max_response_bytes: MAX_PEER_RESPONSE_BYTES,
         private_network_allowances: BTreeSet::new(),

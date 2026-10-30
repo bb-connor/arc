@@ -153,7 +153,7 @@ fn request_json_retries_retryable_status_and_marks_preferred_endpoint() {
                 agent
                     .get(url)?
                     .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .call()
+                    .call_streaming()
             },
             "/status",
         )
@@ -170,7 +170,7 @@ fn request_text_without_service_auth_reads_text_response() {
         .test_expect("build text client");
 
     let body = client
-        .request_text_without_service_auth(|agent, url| agent.get(url)?.call(), "/health")
+        .request_text_without_service_auth(|agent, url| agent.get(url)?.call_streaming(), "/health")
         .test_expect("read text response");
 
     assert_eq!(body, "ready");

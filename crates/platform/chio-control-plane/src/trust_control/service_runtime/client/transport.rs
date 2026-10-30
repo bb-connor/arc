@@ -331,15 +331,25 @@ impl TrustControlClient {
     where
         T: for<'de> Deserialize<'de>,
     {
+        let local = std::cell::RefCell::new(None);
         let response = self.dispatch(
             |client, url| {
-                self.build_internal_get_request(client, url, request_path, term)?
-                    .call_streaming()
+                match self.build_internal_get_request(client, url, request_path, term) {
+                    Ok(request) => request.call_streaming(),
+                    Err(error) => {
+                        *local.borrow_mut() = Some(error);
+                        Err(HttpEgressError::MissingAuthority)
+                    }
+                }
             },
             request_path,
             |_, body| (CliError::cli_other_error(body), false),
             false,
-        )?;
+        );
+        if let Some(error) = local.into_inner() {
+            return Err(error);
+        }
+        let response = response?;
         read_capped_json(response.into_body(), MAX_PEER_RESPONSE_BYTES)
     }
 

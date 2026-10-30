@@ -73,6 +73,7 @@ fn allowance_set(host: &str, port: u16, cidr: &str) -> EgressAllowanceSet {
     EgressAllowanceSet::new([PrivateNetworkAllowance {
         host: host.to_string(),
         port,
+        scheme: chio_egress_contract::AllowanceScheme::Https,
         cidr: cidr.parse().expect("cidr"),
     }])
     .expect("valid allowance set")
