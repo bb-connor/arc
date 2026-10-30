@@ -1,5 +1,5 @@
 import { canonicalizeJson } from "./json.ts";
-import { wrappedSignatureValid } from "./crypto.ts";
+import { isValidEd25519PublicKeyHex, publicKeyHexMatches, wrappedSignatureValid } from "./crypto.ts";
 import { ChioInvariantError, parseJsonText } from "./errors.ts";
 
 export type CapabilityTimeStatus = "valid" | "not_yet_valid" | "expired";
@@ -87,33 +87,48 @@ function isNonEmptyArray(value: unknown): value is unknown[] {
   return Array.isArray(value) && value.length > 0;
 }
 
-function verifyDelegationChain(chain: DelegationLink[], maxDelegationDepth?: number): boolean {
+function verifyDelegationChain(
+  chain: DelegationLink[],
+  rootDelegator: string | undefined,
+  maxDelegationDepth?: number,
+): boolean {
+  if (rootDelegator !== undefined && rootDelegator !== "" && !isValidEd25519PublicKeyHex(rootDelegator)) {
+    throw new ChioInvariantError("invalid_public_key", "root delegator is not a valid Ed25519 public key");
+  }
+  if (chain.length === 0) {
+    return true;
+  }
+  if (rootDelegator === undefined || rootDelegator === "") {
+    throw new ChioInvariantError(
+      "delegation_root_unresolved",
+      "delegation chain root delegator was not supplied by the verifier",
+    );
+  }
   if (maxDelegationDepth !== undefined && chain.length > maxDelegationDepth) {
     return false;
   }
 
+  let expectedDelegator = rootDelegator;
   let previous: DelegationLink | undefined;
   for (const current of chain) {
     rejectUnknownMembers(current, DELEGATION_LINK_MEMBERS, "delegation link");
+    if (!publicKeyHexMatches(current.delegator, expectedDelegator)) {
+      return false;
+    }
     if (
       !wrappedSignatureValid(
         DELEGATION_LINK_SCHEMA,
         canonicalizeJson(delegationLinkBody(current)),
-        current.delegator,
+        expectedDelegator,
         current.signature,
       )
     ) {
       return false;
     }
-
-    if (previous) {
-      if (previous.delegatee !== current.delegator) {
-        return false;
-      }
-      if (current.timestamp < previous.timestamp) {
-        return false;
-      }
+    if (previous && current.timestamp < previous.timestamp) {
+      return false;
     }
+    expectedDelegator = current.delegatee;
     previous = current;
   }
 
@@ -176,8 +191,13 @@ export function capabilitySigningBodyCanonicalJson(capability: CapabilityToken):
   return canonicalizeJson(capabilitySigningBody(capability));
 }
 
+/**
+ * `rootDelegator` is the subject key of the parent capability the delegation chain starts
+ * from. A delegated token verified without it throws `delegation_root_unresolved`.
+ */
 export function verifyCapability(
   capability: CapabilityToken,
+  rootDelegator: string | undefined,
   now: number,
   maxDelegationDepth?: number,
 ): CapabilityVerification {
@@ -197,7 +217,7 @@ export function verifyCapability(
       capability.issuer,
       capability.signature,
     ),
-    delegation_chain_shape_valid: verifyDelegationChain(capability.delegation_chain ?? [], maxDelegationDepth),
+    delegation_chain_shape_valid: verifyDelegationChain(capability.delegation_chain ?? [], rootDelegator, maxDelegationDepth),
     time_valid: time_status === "valid",
     time_status,
   };
@@ -205,8 +225,9 @@ export function verifyCapability(
 
 export function verifyCapabilityJson(
   input: string,
+  rootDelegator: string | undefined,
   now: number,
   maxDelegationDepth?: number,
 ): CapabilityVerification {
-  return verifyCapability(parseCapabilityJson(input), now, maxDelegationDepth);
+  return verifyCapability(parseCapabilityJson(input), rootDelegator, now, maxDelegationDepth);
 }

@@ -284,6 +284,7 @@ test("capability vectors match the TS capability helpers", async () => {
     cases: Array<{
       id: string;
       verify_at: number;
+      root_delegator_hex?: string;
       capability: unknown;
       capability_signing_body_canonical_json: string;
       expected: unknown;
@@ -300,18 +301,68 @@ test("capability vectors match the TS capability helpers", async () => {
       vectorCase.id,
     );
     assert.deepEqual(
-      verifyCapability(capability, vectorCase.verify_at),
+      verifyCapability(capability, vectorCase.root_delegator_hex, vectorCase.verify_at),
       vectorCase.expected,
       `${vectorCase.id} (no max depth)`,
     );
     if (vectorCase.max_delegation_depth !== undefined) {
       assert.deepEqual(
-        verifyCapability(capability, vectorCase.verify_at, vectorCase.max_delegation_depth),
+        verifyCapability(capability, vectorCase.root_delegator_hex, vectorCase.verify_at, vectorCase.max_delegation_depth),
         vectorCase.expected_with_max_delegation_depth ?? vectorCase.expected,
         `${vectorCase.id} (max_delegation_depth=${vectorCase.max_delegation_depth})`,
       );
     }
   }
+});
+
+async function delegatedVectorCase() {
+  const fixture = await readJson("tests/bindings/vectors/capability/v1.json") as {
+    cases: Array<{ id: string; verify_at: number; root_delegator_hex: string; capability: unknown }>;
+  };
+  const found = fixture.cases.find((vectorCase) => vectorCase.id === "valid_delegated_capability");
+  assert.ok(found, "valid_delegated_capability vector missing");
+  return found;
+}
+
+test("delegated capability without a root delegator is refused", async () => {
+  const vectorCase = await delegatedVectorCase();
+  const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
+  for (const missing of [undefined, ""]) {
+    assert.throws(
+      () => verifyCapability(capability, missing, vectorCase.verify_at),
+      (error: unknown) => error instanceof ChioInvariantError && error.code === "delegation_root_unresolved",
+    );
+  }
+});
+
+test("delegated capability under a wrong root delegator fails the chain shape", async () => {
+  const vectorCase = await delegatedVectorCase();
+  const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
+  const wrong = "00".repeat(32);
+  assert.notEqual(wrong, vectorCase.root_delegator_hex);
+  assert.equal(verifyCapability(capability, wrong, vectorCase.verify_at).delegation_chain_shape_valid, false);
+});
+
+test("delegated capability with a malformed root delegator is refused", async () => {
+  const vectorCase = await delegatedVectorCase();
+  const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
+  assert.throws(
+    () => verifyCapability(capability, "zz", vectorCase.verify_at),
+    (error: unknown) => error instanceof ChioInvariantError && error.code === "invalid_public_key",
+  );
+});
+
+test("malformed root delegator is refused without a delegation chain", async () => {
+  const fixture = await readJson("tests/bindings/vectors/capability/v1.json") as {
+    cases: Array<{ id: string; verify_at: number; capability: { delegation_chain?: unknown[] } }>;
+  };
+  const vectorCase = fixture.cases.find((candidate) => (candidate.capability.delegation_chain ?? []).length === 0);
+  assert.ok(vectorCase, "no undelegated capability vector");
+  const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
+  assert.throws(
+    () => verifyCapability(capability, "zz", vectorCase.verify_at),
+    (error: unknown) => error instanceof ChioInvariantError && error.code === "invalid_public_key",
+  );
 });
 
 test("capability parser rejects non-object JSON", () => {

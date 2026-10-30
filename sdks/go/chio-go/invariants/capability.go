@@ -15,6 +15,10 @@ type CapabilityVerification struct {
 	TimeValid                 bool                 `json:"time_valid"`
 }
 
+// ErrorCodeDelegationRootUnresolved is the InvariantError code for a delegated capability
+// verified without a verifier-supplied parent subject.
+const ErrorCodeDelegationRootUnresolved = "delegation_root_unresolved"
+
 // CapabilitySchema is the only accepted capability token schema and its wrapper id.
 const CapabilitySchema = "chio.capability.v1"
 
@@ -121,15 +125,18 @@ func CapabilitySigningBodyCanonicalJSON(capability map[string]any) (string, erro
 	return CanonicalizeJSON(CapabilitySigningBody(capability))
 }
 
-func VerifyCapability(capability map[string]any, now int64) (CapabilityVerification, error) {
-	return verifyCapability(capability, now, nil)
+// VerifyCapability checks a capability token. rootDelegatorHex is the subject key of the
+// parent capability the delegation chain starts from; a delegated token verified without it
+// is refused with the delegation_root_unresolved error code.
+func VerifyCapability(capability map[string]any, rootDelegatorHex string, now int64) (CapabilityVerification, error) {
+	return verifyCapability(capability, rootDelegatorHex, now, nil)
 }
 
-func VerifyCapabilityWithMaxDelegationDepth(capability map[string]any, now int64, maxDelegationDepth int) (CapabilityVerification, error) {
-	return verifyCapability(capability, now, &maxDelegationDepth)
+func VerifyCapabilityWithMaxDelegationDepth(capability map[string]any, rootDelegatorHex string, now int64, maxDelegationDepth int) (CapabilityVerification, error) {
+	return verifyCapability(capability, rootDelegatorHex, now, &maxDelegationDepth)
 }
 
-func verifyCapability(capability map[string]any, now int64, maxDelegationDepth *int) (CapabilityVerification, error) {
+func verifyCapability(capability map[string]any, rootDelegatorHex string, now int64, maxDelegationDepth *int) (CapabilityVerification, error) {
 	issuedAt, err := int64Field(capability, "issued_at")
 	if err != nil {
 		return CapabilityVerification{}, err
@@ -162,7 +169,7 @@ func verifyCapability(capability map[string]any, now int64, maxDelegationDepth *
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
-	delegationChainValid, err := verifyDelegationChain(capability["delegation_chain"], maxDelegationDepth)
+	delegationChainValid, err := verifyDelegationChain(capability["delegation_chain"], rootDelegatorHex, maxDelegationDepth)
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
@@ -175,23 +182,26 @@ func verifyCapability(capability map[string]any, now int64, maxDelegationDepth *
 	}, nil
 }
 
-func VerifyCapabilityJSON(input string, now int64) (CapabilityVerification, error) {
+func VerifyCapabilityJSON(input string, rootDelegatorHex string, now int64) (CapabilityVerification, error) {
 	capability, err := ParseCapabilityJSON(input)
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
-	return VerifyCapability(capability, now)
+	return VerifyCapability(capability, rootDelegatorHex, now)
 }
 
-func VerifyCapabilityJSONWithMaxDelegationDepth(input string, now int64, maxDelegationDepth int) (CapabilityVerification, error) {
+func VerifyCapabilityJSONWithMaxDelegationDepth(input string, rootDelegatorHex string, now int64, maxDelegationDepth int) (CapabilityVerification, error) {
 	capability, err := ParseCapabilityJSON(input)
 	if err != nil {
 		return CapabilityVerification{}, err
 	}
-	return VerifyCapabilityWithMaxDelegationDepth(capability, now, maxDelegationDepth)
+	return VerifyCapabilityWithMaxDelegationDepth(capability, rootDelegatorHex, now, maxDelegationDepth)
 }
 
-func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
+func verifyDelegationChain(raw any, rootDelegatorHex string, maxDelegationDepth *int) (bool, error) {
+	if rootDelegatorHex != "" && !IsValidEd25519PublicKeyHex(rootDelegatorHex) {
+		return false, newInvariantError("invalid_public_key", "root delegator is not a valid Ed25519 public key")
+	}
 	if raw == nil {
 		return true, nil
 	}
@@ -199,9 +209,19 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 	if !ok {
 		return false, newInvariantError("json", "delegation_chain must be an array")
 	}
+	if len(entries) == 0 {
+		return true, nil
+	}
+	if rootDelegatorHex == "" {
+		return false, newInvariantError(
+			ErrorCodeDelegationRootUnresolved,
+			"delegation chain root delegator was not supplied by the verifier",
+		)
+	}
 	if maxDelegationDepth != nil && len(entries) > *maxDelegationDepth {
 		return false, nil
 	}
+	expectedDelegator := rootDelegatorHex
 	var previous map[string]any
 	for _, entry := range entries {
 		current, ok := entry.(map[string]any)
@@ -211,11 +231,14 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 		if err := rejectUnknownMembers(current, delegationLinkMembers, "delegation link"); err != nil {
 			return false, err
 		}
-		body, err := CanonicalizeJSON(copyWithoutKey(current, "signature"))
+		delegator, err := stringField(current, "delegator")
 		if err != nil {
 			return false, err
 		}
-		delegator, err := stringField(current, "delegator")
+		if !PublicKeyHexMatches(delegator, expectedDelegator) {
+			return false, nil
+		}
+		body, err := CanonicalizeJSON(copyWithoutKey(current, "signature"))
 		if err != nil {
 			return false, err
 		}
@@ -223,7 +246,7 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		signatureValid, err := wrappedSignatureValid(DelegationLinkSchema, body, delegator, signature)
+		signatureValid, err := wrappedSignatureValid(DelegationLinkSchema, body, expectedDelegator, signature)
 		if err != nil {
 			return false, err
 		}
@@ -231,13 +254,6 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 			return false, nil
 		}
 		if previous != nil {
-			previousDelegatee, err := stringField(previous, "delegatee")
-			if err != nil {
-				return false, err
-			}
-			if previousDelegatee != delegator {
-				return false, nil
-			}
 			previousTimestamp, err := int64Field(previous, "timestamp")
 			if err != nil {
 				return false, err
@@ -249,6 +265,10 @@ func verifyDelegationChain(raw any, maxDelegationDepth *int) (bool, error) {
 			if currentTimestamp < previousTimestamp {
 				return false, nil
 			}
+		}
+		expectedDelegator, err = stringField(current, "delegatee")
+		if err != nil {
+			return false, err
 		}
 		previous = current
 	}
