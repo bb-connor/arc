@@ -427,6 +427,20 @@ impl Door {
     async fn federated_issue_route(&self, request: FederatedIssueRequest) -> Response {
         handle_federated_issue(State(self.state()), service_headers(), Json(request)).await
     }
+
+    /// Service state whose issuance check reads the fixture clock through the
+    /// receipt store, so a capability issued at the fixture instant validates.
+    fn issuing_state(&self) -> TrustServiceState {
+        let mut state = self.state();
+        state.receipt_store = Some(Arc::new(
+            SqliteReceiptStore::open_with_clock(
+                self.dir.path().join("receipts.sqlite3"),
+                Arc::clone(&state.finding_challenge_clock),
+            )
+            .test_unwrap(),
+        ));
+        state
+    }
 }
 
 fn issued_credential(
@@ -1225,40 +1239,65 @@ async fn the_extracted_federated_issue_refuses_an_unenforceable_lifecycle_policy
 }
 
 #[tokio::test]
-async fn the_extracted_federated_issue_consumes_the_challenge_like_the_route() {
+async fn the_extracted_federated_issue_issues_like_the_route_and_consumes_each_challenge_once() {
     let door = Door::new(0);
     door.mirror(PARTNER, &door.feed.publish(NOW_MS), NOW_MS);
     let passport = door.passport(&[&door.authority]);
     let route_challenge = door.challenge(Some("route"), VALID_FROM, VALID_UNTIL);
     let extracted_challenge = door.challenge(Some("extracted"), VALID_FROM, VALID_UNTIL);
 
-    let (route_status, _) = response_parts(
-        door.federated_issue_route(federated_issue_request(
-            &door,
-            &passport,
-            route_challenge.clone(),
-        ))
+    let (status, body) = response_parts(
+        handle_federated_issue(
+            State(door.issuing_state()),
+            service_headers(),
+            Json(federated_issue_request(
+                &door,
+                &passport,
+                route_challenge.clone(),
+            )),
+        )
         .await,
     )
     .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let routed: FederatedIssueResponse = serde_json::from_str(&body).test_unwrap();
     let extracted = execute_federated_issue(
-        &door.state(),
+        &door.issuing_state(),
         &federated_issue_request(&door, &passport, extracted_challenge.clone()),
     )
     .await
-    .err()
+    .ok()
     .test_unwrap();
-    assert_eq!(response_parts(extracted).await.0, route_status);
 
-    let route_replay = door
-        .federated_issue_route(federated_issue_request(
+    assert_eq!(extracted.subject, routed.subject);
+    assert_eq!(extracted.subject_public_key, routed.subject_public_key);
+    assert!(extracted.verification.accepted);
+    assert!(routed.verification.accepted);
+    assert_eq!(extracted.capability.subject, routed.capability.subject);
+    assert_eq!(extracted.capability.issuer, routed.capability.issuer);
+    assert_eq!(
+        serde_json::to_value(&extracted.capability.scope).test_unwrap(),
+        serde_json::to_value(&routed.capability.scope).test_unwrap()
+    );
+    assert_eq!(extracted.capability.issued_at, routed.capability.issued_at);
+    assert_eq!(
+        extracted.capability.expires_at,
+        routed.capability.expires_at
+    );
+    assert_ne!(extracted.capability.id, routed.capability.id);
+
+    let route_replay = handle_federated_issue(
+        State(door.issuing_state()),
+        service_headers(),
+        Json(federated_issue_request(
             &door,
             &passport,
             extracted_challenge,
-        ))
-        .await;
+        )),
+    )
+    .await;
     let extracted_replay = execute_federated_issue(
-        &door.state(),
+        &door.issuing_state(),
         &federated_issue_request(&door, &passport, route_challenge),
     )
     .await

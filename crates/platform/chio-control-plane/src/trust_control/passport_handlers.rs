@@ -692,7 +692,7 @@ pub(crate) async fn handle_create_passport_challenge(
 /// Verifies a challenge presentation at `now`. With an `admission`, the
 /// prepared partner door admits at the same instant and the challenge is then
 /// consumed; without one nothing is consumed.
-pub(crate) fn verify_passport_challenge_payload(
+fn verify_passport_challenge_payload(
     state: &TrustServiceState,
     payload: &VerifyPassportChallengeRequest,
     expected_challenge: Option<&PassportPresentationChallenge>,
