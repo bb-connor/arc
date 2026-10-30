@@ -1185,3 +1185,58 @@ fn inbound_authority_operator_proof_policy_refuses_external_bearer_grants() {
         .unwrap();
     assert_eq!(decision.verdict, chio_kernel::Verdict::Deny);
 }
+
+#[test]
+fn sender_proof_guard_err_text_quotes_no_request_text() {
+    use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
+    use chio_kernel::{Guard, GuardEvidenceDeclaration};
+    const MARKER: &str = "chio-sender-proof-err-marker-3d7f";
+    let guard = super::sender_proof::SenderProofGuard;
+    assert_eq!(guard.evidence_declaration(), GuardEvidenceDeclaration::SAFE);
+    for constraint in [
+        Constraint::RegexMatch("(".to_string()),
+        Constraint::Custom("require_finding_purchase".to_string(), MARKER.to_string()),
+    ] {
+        let key = Keypair::generate();
+        let scope = ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "srv".into(),
+                tool_name: "read".into(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![constraint],
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: Some(true),
+            }],
+            ..ChioScope::default()
+        };
+        let capability = chio_core::capability::token::CapabilityToken::sign(
+            chio_core::capability::token::CapabilityTokenBody {
+                id: "external-bearer".into(),
+                issuer: key.public_key(),
+                subject: key.public_key(),
+                scope: scope.clone(),
+                issued_at: 10,
+                expires_at: 100,
+                delegation_chain: Vec::new(),
+                aggregate_invocation_budget: None,
+            },
+            &key,
+        )
+        .unwrap();
+        let request: chio_kernel::ToolCallRequest = serde_json::from_value(serde_json::json!({
+            "request_id": format!("request-{MARKER}"),
+            "capability": capability,
+            "tool_name": "read",
+            "server_id": "srv",
+            "agent_id": key.public_key().to_hex(),
+            "arguments": { MARKER: MARKER, "path": MARKER },
+        }))
+        .unwrap();
+        let error = guard
+            .evaluate(&chio_kernel::GuardContext::new(&request, &scope))
+            .unwrap_err();
+        assert!(!error.to_string().contains(MARKER), "{error}");
+    }
+}

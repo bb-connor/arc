@@ -238,8 +238,10 @@ impl Guard for HttpProjectionGuard {
         "http_projection_policy"
     }
 
+    /// The decode error and the presented capability rejection reason both
+    /// quote request text, and an `Err` becomes the signed deny reason.
     fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
-        GuardEvidenceDeclaration::SAFE
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
