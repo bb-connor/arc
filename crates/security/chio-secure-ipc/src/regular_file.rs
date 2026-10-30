@@ -110,32 +110,43 @@ pub fn read_regular_file(
 /// is wiped when it is dropped, on success and on every refusal, and a buffer
 /// that must grow is copied into a larger one rather than reallocated.
 pub(crate) fn read_opened(
-    mut file: File,
+    file: File,
     max_bytes: usize,
 ) -> Result<Zeroizing<Vec<u8>>, RegularFileError> {
     use std::io::Read;
 
     let ceiling = max_bytes.saturating_add(1);
     let expected = usize::try_from(file.metadata()?.len()).unwrap_or(usize::MAX);
-    let mut buffer = Zeroizing::new(vec![0; expected.min(max_bytes).saturating_add(1)]);
-    let mut filled = 0;
-    while filled < ceiling {
-        if filled == buffer.len() {
-            let mut grown = Zeroizing::new(vec![0; buffer.len().saturating_mul(2).min(ceiling)]);
-            grown[..filled].copy_from_slice(&buffer[..filled]);
+    let mut buffer = Zeroizing::new(Vec::with_capacity(
+        expected.min(max_bytes).saturating_add(1),
+    ));
+    let mut chunk = Zeroizing::new([0_u8; 8192]);
+    let mut reader = file.take(u64::try_from(ceiling).unwrap_or(u64::MAX));
+    loop {
+        let read = match reader.read(chunk.as_mut_slice()) {
+            Ok(0) => break,
+            Ok(read) => read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error.into()),
+        };
+        let bytes = chunk.get(..read).unwrap_or_default();
+        if buffer.capacity().saturating_sub(buffer.len()) < bytes.len() {
+            let needed = buffer.len().saturating_add(bytes.len());
+            let mut grown = Zeroizing::new(Vec::with_capacity(
+                buffer
+                    .capacity()
+                    .saturating_mul(2)
+                    .max(needed)
+                    .min(ceiling.max(needed)),
+            ));
+            grown.extend_from_slice(&buffer);
             buffer = grown;
         }
-        match file.read(&mut buffer[filled..]) {
-            Ok(0) => break,
-            Ok(read) => filled += read,
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(error) => return Err(error.into()),
-        }
+        buffer.extend_from_slice(bytes);
     }
-    if filled > max_bytes {
+    if buffer.len() > max_bytes {
         return Err(RegularFileError::TooLarge { max_bytes });
     }
-    buffer.truncate(filled);
     Ok(buffer)
 }
 
