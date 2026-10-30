@@ -1,6 +1,9 @@
 package invariants_test
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -62,6 +65,7 @@ type receiptVectors struct {
 type capabilityVectors struct {
 	Cases []struct {
 		Capability                     map[string]any                     `json:"capability"`
+		RootDelegatorHex               string                             `json:"root_delegator_hex"`
 		CapabilitySigningBodyCanonical string                             `json:"capability_signing_body_canonical_json"`
 		Expected                       invariants.CapabilityVerification  `json:"expected"`
 		ExpectedWithMaxDelegationDepth *invariants.CapabilityVerification `json:"expected_with_max_delegation_depth"`
@@ -373,7 +377,7 @@ func TestCapabilityVectors(t *testing.T) {
 			if renderedBody != testCase.CapabilitySigningBodyCanonical {
 				t.Fatalf("unexpected capability signing body: %s", renderedBody)
 			}
-			verification, err := invariants.VerifyCapability(testCase.Capability, testCase.VerifyAt)
+			verification, err := invariants.VerifyCapability(testCase.Capability, testCase.RootDelegatorHex, testCase.VerifyAt)
 			if err != nil {
 				t.Fatalf("VerifyCapability returned error: %v", err)
 			}
@@ -386,6 +390,7 @@ func TestCapabilityVectors(t *testing.T) {
 				}
 				withDepth, err := invariants.VerifyCapabilityWithMaxDelegationDepth(
 					testCase.Capability,
+					testCase.RootDelegatorHex,
 					testCase.VerifyAt,
 					*testCase.MaxDelegationDepth,
 				)
@@ -425,6 +430,76 @@ func loadVectorFile(t *testing.T, path string, target any) {
 	if err := decoder.Decode(target); err != nil {
 		t.Fatalf("failed to decode %s: %v", path, err)
 	}
+}
+
+func delegatedCapabilityCase(t *testing.T) (map[string]any, string) {
+	t.Helper()
+	var vectors capabilityVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
+	for _, testCase := range vectors.Cases {
+		if testCase.ID == "valid_delegated_capability" {
+			return testCase.Capability, testCase.RootDelegatorHex
+		}
+	}
+	t.Fatalf("valid_delegated_capability vector missing")
+	return nil, ""
+}
+
+func TestDelegatedCapabilityWithoutRootDelegatorIsRefused(t *testing.T) {
+	capability, _ := delegatedCapabilityCase(t)
+	_, err := invariants.VerifyCapability(capability, "", 1710000400)
+	var invariantErr *invariants.InvariantError
+	if !errors.As(err, &invariantErr) || invariantErr.Code != invariants.ErrorCodeDelegationRootUnresolved {
+		t.Fatalf("expected delegation_root_unresolved, got %v", err)
+	}
+}
+
+func TestDelegatedCapabilityWithWrongRootDelegatorFailsChainShape(t *testing.T) {
+	capability, root := delegatedCapabilityCase(t)
+	otherKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	other := hex.EncodeToString(otherKey)
+	if other == root {
+		t.Fatalf("generated key collided with the vector root")
+	}
+	verification, err := invariants.VerifyCapability(capability, other, 1710000400)
+	if err != nil {
+		t.Fatalf("VerifyCapability returned error: %v", err)
+	}
+	if verification.DelegationChainShapeValid {
+		t.Fatalf("chain verified under a root that is not the link 0 delegator")
+	}
+}
+
+func TestDelegatedCapabilityWithMalformedRootDelegatorIsRefused(t *testing.T) {
+	capability, _ := delegatedCapabilityCase(t)
+	_, err := invariants.VerifyCapability(capability, "zz", 1710000400)
+	var invariantErr *invariants.InvariantError
+	if !errors.As(err, &invariantErr) || invariantErr.Code != "invalid_public_key" {
+		t.Fatalf("expected invalid_public_key, got %v", err)
+	}
+}
+
+func TestMalformedRootDelegatorIsRefusedWithoutDelegationChain(t *testing.T) {
+	var vectors capabilityVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
+	for _, testCase := range vectors.Cases {
+		if testCase.RootDelegatorHex != "" {
+			continue
+		}
+		if chain, ok := testCase.Capability["delegation_chain"].([]any); ok && len(chain) > 0 {
+			continue
+		}
+		_, err := invariants.VerifyCapability(testCase.Capability, "zz", testCase.VerifyAt)
+		var invariantErr *invariants.InvariantError
+		if !errors.As(err, &invariantErr) || invariantErr.Code != "invalid_public_key" {
+			t.Fatalf("%s: expected invalid_public_key, got %v", testCase.ID, err)
+		}
+		return
+	}
+	t.Fatalf("no undelegated capability vector")
 }
 
 func TestCapabilityWithoutV1SchemaIsRefused(t *testing.T) {

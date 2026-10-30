@@ -202,7 +202,7 @@ class VectorTests(unittest.TestCase):
                 case["id"],
             )
             self.assertEqual(
-                verify_capability(capability, case["verify_at"]),
+                verify_capability(capability, case.get("root_delegator_hex"), case["verify_at"]),
                 case["expected"],
                 case["id"],
             )
@@ -210,12 +210,53 @@ class VectorTests(unittest.TestCase):
                 self.assertEqual(
                     verify_capability(
                         capability,
+                        case.get("root_delegator_hex"),
                         case["verify_at"],
                         case["max_delegation_depth"],
                     ),
                     case["expected_with_max_delegation_depth"],
                     case["id"],
                 )
+
+    def _delegated_case(self) -> dict:
+        for case in load_vector("capability")["cases"]:
+            if case["id"] == "valid_delegated_capability":
+                return case
+        raise AssertionError("valid_delegated_capability vector missing")
+
+    def test_delegated_capability_without_root_delegator_is_refused(self) -> None:
+        case = self._delegated_case()
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_capability(case["capability"], None, case["verify_at"])
+        self.assertEqual(raised.exception.code, "delegation_root_unresolved")
+
+    def test_empty_root_delegator_is_not_an_absent_root(self) -> None:
+        case = self._delegated_case()
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_capability(case["capability"], "", case["verify_at"])
+        self.assertEqual(raised.exception.code, "invalid_public_key")
+
+    def test_delegated_capability_with_wrong_root_delegator_fails_chain_shape(self) -> None:
+        case = self._delegated_case()
+        wrong = "00" * 32
+        self.assertNotEqual(wrong, case["root_delegator_hex"])
+        result = verify_capability(case["capability"], wrong, case["verify_at"])
+        self.assertFalse(result["delegation_chain_shape_valid"])
+
+    def test_delegated_capability_with_malformed_root_delegator_is_refused(self) -> None:
+        case = self._delegated_case()
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_capability(case["capability"], "zz", case["verify_at"])
+        self.assertEqual(raised.exception.code, "invalid_public_key")
+
+    def test_malformed_root_delegator_is_refused_without_delegation_chain(self) -> None:
+        for case in load_vector("capability")["cases"]:
+            if not case["capability"].get("delegation_chain"):
+                with self.assertRaises(ChioInvariantError) as raised:
+                    verify_capability(case["capability"], "zz", case["verify_at"])
+                self.assertEqual(raised.exception.code, "invalid_public_key", case["id"])
+                return
+        raise AssertionError("no undelegated capability vector")
 
     def test_capability_parser_rejects_non_object_json(self) -> None:
         for payload in ("null", "[]", '"capability"', "42"):

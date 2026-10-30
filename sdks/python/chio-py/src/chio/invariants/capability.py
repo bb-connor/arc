@@ -4,7 +4,7 @@ from typing import Any
 
 from ..errors import ChioInvariantError, parse_json_text
 from .json import canonicalize_json
-from .signing import wrapped_signature_valid
+from .signing import is_valid_public_key_hex, public_key_hex_matches, wrapped_signature_valid
 
 
 CAPABILITY_SCHEMA = "chio.capability.v1"
@@ -109,33 +109,49 @@ def capability_signing_body_canonical_json(capability: dict[str, Any]) -> str:
 
 def _verify_delegation_chain(
     chain: list[dict[str, Any]],
+    root_delegator: str | None,
     max_delegation_depth: int | None,
 ) -> bool:
+    if root_delegator is not None and not is_valid_public_key_hex(root_delegator):
+        raise ChioInvariantError("invalid_public_key", "root delegator is not a valid Ed25519 public key")
+    if not chain:
+        return True
+    if root_delegator is None:
+        raise ChioInvariantError(
+            "delegation_root_unresolved",
+            "delegation chain root delegator was not supplied by the verifier",
+        )
     if max_delegation_depth is not None and len(chain) > max_delegation_depth:
         return False
+    expected_delegator = root_delegator
     for index, current in enumerate(chain):
         _reject_unknown_members(current, _DELEGATION_LINK_MEMBERS, "delegation link")
+        if not public_key_hex_matches(current["delegator"], expected_delegator):
+            return False
         if not wrapped_signature_valid(
             DELEGATION_LINK_SCHEMA,
             canonicalize_json(_delegation_link_body(current)),
-            current["delegator"],
+            expected_delegator,
             current["signature"],
         ):
             return False
-        if index > 0:
-            previous = chain[index - 1]
-            if previous["delegatee"] != current["delegator"]:
-                return False
-            if current["timestamp"] < previous["timestamp"]:
-                return False
+        if index > 0 and current["timestamp"] < chain[index - 1]["timestamp"]:
+            return False
+        expected_delegator = current["delegatee"]
     return True
 
 
 def verify_capability(
     capability: dict[str, Any],
+    root_delegator: str | None,
     now: int,
     max_delegation_depth: int | None = None,
 ) -> dict[str, Any]:
+    """Verify a capability token.
+
+    `root_delegator` is the subject key of the parent capability the delegation chain
+    starts from. A delegated token verified without it raises `delegation_root_unresolved`.
+    """
     if now < capability["issued_at"]:
         time_status = "not_yet_valid"
     elif now >= capability["expires_at"]:
@@ -151,6 +167,7 @@ def verify_capability(
         ),
         "delegation_chain_shape_valid": _verify_delegation_chain(
             capability.get("delegation_chain", []),
+            root_delegator,
             max_delegation_depth,
         ),
         "time_valid": time_status == "valid",
@@ -160,7 +177,8 @@ def verify_capability(
 
 def verify_capability_json(
     input_text: str,
+    root_delegator: str | None,
     now: int,
     max_delegation_depth: int | None = None,
 ) -> dict[str, Any]:
-    return verify_capability(parse_capability_json(input_text), now, max_delegation_depth)
+    return verify_capability(parse_capability_json(input_text), root_delegator, now, max_delegation_depth)
