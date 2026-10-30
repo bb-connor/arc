@@ -134,6 +134,12 @@ pub enum CapabilityError {
     AttenuationViolation(String),
     /// Sibling-sum budget enforcement rejected this delegation.
     BudgetSplitRejected(BudgetSplitError),
+    /// A delegated token arrived without the subject of the parent
+    /// capability its delegation chain starts from.
+    DelegationRootUnresolved,
+    /// The first delegation link was not issued by the verifier-supplied
+    /// parent subject.
+    DelegationRootMismatch,
     /// An internal invariant was violated (e.g. canonical-JSON failure).
     Internal(String),
 }
@@ -386,6 +392,10 @@ where
 pub struct CapabilityFeatureContext<'a> {
     pub peer: &'a CapabilityNegotiation,
     pub direct_root: Option<&'a CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. `direct_root` and signed ancestors supply it too; every
+    /// supplied source must name the same key.
+    pub root_delegator: Option<&'a PublicKey>,
 }
 
 /// Signed ancestor evidence in root-to-parent order. An empty slice retains
@@ -417,10 +427,11 @@ pub fn verify_capability_with_floor_and_trust_root(
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
     trust_root_scope_hash: &ScopeHash,
+    root_delegator: Option<&PublicKey>,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let verified =
         verify_capability_base(token, trusted_issuers, clock, crypto_floor, false, false)?;
-    verify_delegation_chain_shape(token)?;
+    verify_delegation_chain_shape(token, root_delegator)?;
     verify_chain_binding_with_trust_root(token, trust_root_scope_hash)?;
 
     Ok(verified)
@@ -437,11 +448,12 @@ pub fn verify_capability_with_floor_and_resolver(
     clock: &dyn Clock,
     crypto_floor: CapabilityCryptoFloor,
     trust_root: &dyn TrustRootResolver,
+    root_delegator: Option<&PublicKey>,
 ) -> Result<VerifiedCapability, CapabilityError> {
     let verified =
         verify_capability_base(token, trusted_issuers, clock, crypto_floor, false, false)?;
-    verify_delegation_chain_shape(token)?;
-    verify_chain_binding_with_resolver(token, trust_root)?;
+    verify_delegation_chain_shape(token, root_delegator)?;
+    verify_chain_binding_with_resolver(token, trust_root, root_delegator)?;
 
     Ok(verified)
 }
@@ -465,6 +477,7 @@ pub fn verify_capability_full(
         CapabilityFeatureContext {
             peer,
             direct_root: None,
+            root_delegator: None,
         },
         trust_root,
         budgets,
@@ -512,7 +525,10 @@ pub fn verify_capability_full_with_evidence(
         features,
         ancestors,
     } = evidence;
-    let CapabilityFeatureContext { peer, direct_root } = features;
+    let root_delegator = delegation_root(features, ancestors)?;
+    let CapabilityFeatureContext {
+        peer, direct_root, ..
+    } = features;
     validate_peer_capabilities(peer)?;
     let aggregate_budget_enabled = peer.supports(AGGREGATE_INVOCATION_BUDGET);
     let cumulative_approval_enabled = peer.supports(CUMULATIVE_APPROVAL_BUDGET);
@@ -546,9 +562,9 @@ pub fn verify_capability_full_with_evidence(
         cumulative_approval_enabled,
         direct_root,
     )?;
-    verify_delegation_chain_shape(token)?;
+    verify_delegation_chain_shape(token, root_delegator)?;
     if ancestors.is_empty() {
-        verify_chain_binding_with_negotiation(token, peer, trust_root)?;
+        verify_chain_binding_with_negotiation(token, peer, trust_root, root_delegator)?;
     } else {
         lineage::verify_signed_lineage(
             token,
@@ -639,16 +655,52 @@ fn map_optional_feature_error(error: CoreError) -> CapabilityError {
         CoreError::AttenuationViolation { reason }
         | CoreError::DelegationChainBroken { reason }
         | CoreError::ScopeMismatch { reason } => CapabilityError::AttenuationViolation(reason),
+        CoreError::DelegationRootMismatch => CapabilityError::DelegationRootMismatch,
         other => CapabilityError::Internal(other.to_string()),
     }
 }
 
-fn verify_delegation_chain_shape(token: &CapabilityToken) -> Result<(), CapabilityError> {
+fn map_delegation_chain_error(error: CoreError) -> CapabilityError {
+    match error {
+        CoreError::DelegationRootMismatch => CapabilityError::DelegationRootMismatch,
+        other => CapabilityError::AttenuationViolation(other.to_string()),
+    }
+}
+
+/// Resolves the parent-capability subject a delegated chain starts from out of
+/// the explicit input, the direct root, and the signed root ancestor.
+fn delegation_root<'a>(
+    features: CapabilityFeatureContext<'a>,
+    ancestors: &'a [CapabilityToken],
+) -> Result<Option<&'a PublicKey>, CapabilityError> {
+    let mut root = features.root_delegator;
+    let derived = [
+        features.direct_root.map(|token| &token.subject),
+        ancestors.first().map(|token| &token.subject),
+    ];
+    for candidate in derived.into_iter().flatten() {
+        match root {
+            Some(existing) if existing != candidate => {
+                return Err(CapabilityError::AttenuationViolation(
+                    "delegation root inputs name different parent subjects".to_string(),
+                ));
+            }
+            _ => root = Some(candidate),
+        }
+    }
+    Ok(root)
+}
+
+fn verify_delegation_chain_shape(
+    token: &CapabilityToken,
+    root_delegator: Option<&PublicKey>,
+) -> Result<(), CapabilityError> {
     if token.delegation_chain.is_empty() {
         return Ok(());
     }
-    validate_delegation_chain(&token.delegation_chain, None)
-        .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+    let root_delegator = root_delegator.ok_or(CapabilityError::DelegationRootUnresolved)?;
+    validate_delegation_chain(&token.delegation_chain, root_delegator, None)
+        .map_err(map_delegation_chain_error)?;
     let Some(final_link) = token.delegation_chain.last() else {
         return Ok(());
     };
@@ -676,6 +728,7 @@ fn verify_chain_binding_with_trust_root(
 fn verify_chain_binding_with_resolver(
     token: &CapabilityToken,
     trust_root: &dyn TrustRootResolver,
+    root_delegator: Option<&PublicKey>,
 ) -> Result<(), CapabilityError> {
     if token.requires_chain_binding() {
         let issuer_root = trust_root
@@ -685,8 +738,16 @@ fn verify_chain_binding_with_resolver(
                     "chain-binding: no trust-root scope hash registered for issuer".to_string(),
                 )
             })?;
-        validate_delegation_chain_with_trust_root(&token.delegation_chain, None, &issuer_root)
-            .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
+        if !token.delegation_chain.is_empty() {
+            let root_delegator = root_delegator.ok_or(CapabilityError::DelegationRootUnresolved)?;
+            validate_delegation_chain_with_trust_root(
+                &token.delegation_chain,
+                root_delegator,
+                None,
+                &issuer_root,
+            )
+            .map_err(map_delegation_chain_error)?;
+        }
         token
             .validate_chain_binding(&issuer_root)
             .map_err(|err| CapabilityError::AttenuationViolation(err.to_string()))?;
@@ -698,6 +759,7 @@ fn verify_chain_binding_with_negotiation(
     token: &CapabilityToken,
     peer: &CapabilityNegotiation,
     trust_root: &dyn TrustRootResolver,
+    root_delegator: Option<&PublicKey>,
 ) -> Result<(), CapabilityError> {
     if token.requires_chain_binding() {
         let chain_binding_enabled = peer
@@ -710,7 +772,7 @@ fn verify_chain_binding_with_negotiation(
                 "chain-binding: peer disabled delegation_chain_binding; attenuated tokens are rejected".to_string(),
             ));
         }
-        verify_chain_binding_with_resolver(token, trust_root)?;
+        verify_chain_binding_with_resolver(token, trust_root, root_delegator)?;
     }
     Ok(())
 }

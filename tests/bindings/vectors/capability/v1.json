@@ -51,6 +51,7 @@
         "time_valid": true
       },
       "id": "valid_delegated_capability",
+      "root_delegator_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
       "verify_at": 1710000400,
       "verify_only": true
     },
@@ -223,6 +224,7 @@
         "time_valid": true
       },
       "id": "broken_delegation_chain_signature",
+      "root_delegator_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
       "verify_at": 1710000400
     },
     {
@@ -626,6 +628,7 @@
         "time_valid": true
       },
       "id": "valid_capability_at_delegation_depth_limit",
+      "root_delegator_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
       "verify_at": 1710000400
     },
     {
@@ -703,6 +706,7 @@
         "time_valid": true
       },
       "id": "delegation_depth_exceeded",
+      "root_delegator_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
       "verify_at": 1710000400,
       "verify_only": true,
       "max_delegation_depth": 4,
@@ -903,6 +907,7 @@
         "time_valid": true
       },
       "id": "valid_capability_with_dual_link_chain",
+      "root_delegator_hex": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
       "verify_at": 1710000400
     },
     {

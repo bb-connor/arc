@@ -1082,8 +1082,10 @@ fn evaluate_artifact_assertion(
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::DelegationChainValid => {
-            let (_, child) = fixture.delegation_pair()?;
-            let actual = validate_delegation_chain(&child.delegation_chain, Some(4)).is_ok();
+            let (parent, child) = fixture.delegation_pair()?;
+            let actual = parent.delegation_chain.is_empty()
+                && validate_delegation_chain(&child.delegation_chain, &parent.subject, Some(4))
+                    .is_ok();
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::DelegationAttenuatesParent => {

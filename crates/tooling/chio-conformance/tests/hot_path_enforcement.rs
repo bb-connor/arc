@@ -24,8 +24,9 @@ use chio_kernel::{
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_kernel_core::{
-    verify_capability_full, BudgetSplitError, CapabilityError, FixedClock, InMemoryBudgetRegistry,
-    PortableToolCallRequest, Verdict as PortableVerdict,
+    verify_capability_full, verify_capability_full_with_root, BudgetSplitError, CapabilityError,
+    CapabilityFeatureContext, FixedClock, InMemoryBudgetRegistry, PortableToolCallRequest,
+    Verdict as PortableVerdict,
 };
 
 fn grant(operations: Vec<Operation>) -> ToolGrant {
@@ -466,12 +467,16 @@ fn delegated_child_without_pre_registered_parent_fails_closed() {
     // Unknown parents must stay fail-closed so the verifier does not
     // fabricate a parent share.
     let mut budgets = InMemoryBudgetRegistry::new();
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &token,
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_resolver,
         &mut budgets,
     )
@@ -559,12 +564,16 @@ fn unregistered_parent_rejects_first_sibling_fail_closed() {
     let clock = FixedClock::new(150);
 
     let mut budgets = InMemoryBudgetRegistry::new();
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &child_a,
         &[issuer.public_key()],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_resolver,
         &mut budgets,
     )

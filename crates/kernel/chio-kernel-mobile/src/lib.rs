@@ -169,6 +169,12 @@ struct EvaluateRequest {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
+    root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry; absent issuers fail-closed.
     #[serde(default)]
@@ -196,6 +202,12 @@ struct VerifyCapabilityRequest {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default)]
     direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
+    root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex.
     #[serde(default)]
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
@@ -385,6 +397,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
 
     let capability = parsed.capability;
     let direct_root_capability = parsed.direct_root_capability;
+    let root_delegator = parsed.root_delegator;
 
     let trusted = decode_trusted_issuers(&parsed.trusted_issuers)?;
 
@@ -442,6 +455,7 @@ pub fn evaluate(request_json: String) -> Result<String, ChioMobileError> {
         CapabilityCryptoFloor::AllowClassical,
         &peer_profile,
         direct_root_capability.as_ref(),
+        root_delegator.as_ref(),
         &trust_resolver,
         &mut budgets,
     );
@@ -625,8 +639,11 @@ pub fn verify_capability(
         token,
         vec![authority],
         None,
-        CapabilityNegotiation::t1_default(),
-        None,
+        CapabilityFeatureContext {
+            peer: &CapabilityNegotiation::t1_default(),
+            direct_root: None,
+            root_delegator: None,
+        },
         std::collections::BTreeMap::new(),
         &[],
     )
@@ -656,8 +673,11 @@ pub fn verify_capability_with_context(
         parsed.token,
         trusted,
         parsed.now_secs,
-        peer_profile,
-        parsed.direct_root_capability,
+        CapabilityFeatureContext {
+            peer: &peer_profile,
+            direct_root: parsed.direct_root_capability.as_ref(),
+            root_delegator: parsed.root_delegator.as_ref(),
+        },
         parsed.capability_trust_roots,
         &parsed.parent_budget_snapshots,
     )
@@ -667,8 +687,7 @@ fn verify_capability_with_parts(
     token: CapabilityToken,
     trusted: Vec<PublicKey>,
     now_secs: Option<i64>,
-    peer_profile: CapabilityNegotiation,
-    direct_root_capability: Option<CapabilityToken>,
+    features: CapabilityFeatureContext<'_>,
     capability_trust_roots: std::collections::BTreeMap<String, ScopeHash>,
     parent_budget_snapshots: &[ParentBudgetSnapshot],
 ) -> Result<CapabilityVerificationRecord, ChioMobileError> {
@@ -688,10 +707,7 @@ fn verify_capability_with_parts(
         &trusted,
         clock,
         CapabilityCryptoFloor::AllowClassical,
-        CapabilityFeatureContext {
-            peer: &peer_profile,
-            direct_root: direct_root_capability.as_ref(),
-        },
+        features,
         &trust_resolver,
         &mut budgets,
     )
@@ -713,6 +729,14 @@ fn verify_capability_with_parts(
         },
         CapabilityError::AttenuationViolation(message) => ChioMobileError::InvalidCapability {
             message: format!("capability rejected by chain binding: {message}"),
+        },
+        CapabilityError::DelegationRootMismatch => ChioMobileError::InvalidCapability {
+            message: "capability rejected by chain binding: link 0 delegator does not match the parent capability subject"
+                .to_string(),
+        },
+        CapabilityError::DelegationRootUnresolved => ChioMobileError::InvalidCapability {
+            message: "capability delegation chain has no verifier-supplied root delegator"
+                .to_string(),
         },
         CapabilityError::BudgetSplitRejected(err) => ChioMobileError::InvalidCapability {
             message: format!("capability rejected by sibling-sum budget split: {err}"),

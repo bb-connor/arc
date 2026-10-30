@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use chio_core_types::capability::{
     attenuation::ScopeHash, features::CapabilityNegotiation, token::CapabilityToken,
 };
+use chio_core_types::crypto::PublicKey;
 use chio_core_types::receipt::body::ChioReceiptBody;
 use chio_kernel_core::{PortableToolCallRequest, VerifiedCapability};
 use serde::{Deserialize, Serialize};
@@ -82,6 +83,12 @@ pub struct EvaluateRequestJson {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Tokens with
     /// attenuation, budget sharing, scope attenuation, or delegation require an
     /// issuer entry; absent issuers fail closed.
@@ -239,6 +246,12 @@ pub struct VerifyCapabilityRequestJson {
     /// Authenticated direct-root token for delegated negotiated family features.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub direct_root_capability: Option<CapabilityToken>,
+    /// Subject of the parent capability a delegated token's chain starts
+    /// from. The member is required: `null` states a token
+    /// without a delegation chain, and a delegated token with `null` or without a
+    /// direct root is refused.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub root_delegator: Option<PublicKey>,
     /// Optional chain-binding trust roots, keyed by issuer hex. Attenuated or
     /// delegated tokens require an entry for their issuer; absent issuers
     /// fail-closed.

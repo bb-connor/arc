@@ -299,6 +299,7 @@ fn evaluate_pure_allow_path() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -338,6 +339,7 @@ fn evaluate_pure_rejects_unsupported_authorization_extensions() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -360,6 +362,7 @@ fn browser_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -400,6 +403,7 @@ fn evaluate_pure_deny_on_expired_capability() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -429,6 +433,7 @@ fn evaluate_pure_v2_without_trust_root_fails_closed() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -459,6 +464,7 @@ fn evaluate_pure_allows_delegated_token_with_parent_budget_snapshot() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: Some(issuer.public_key()),
         capability_trust_roots,
         parent_budget_snapshots: std::vec![parent_budget_snapshot("cap-parent")],
     };
@@ -488,6 +494,7 @@ fn evaluate_pure_rejects_oversubscribed_delegated_sibling() {
         session_filesystem_roots: None,
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: Some(issuer.public_key()),
         capability_trust_roots,
         parent_budget_snapshots: std::vec![oversubscribed_budget_snapshot("cap-parent")],
     };
@@ -516,6 +523,7 @@ fn verify_capability_pure_untrusted() {
         clock_override_unix_secs: Some(ISSUED_AT + 1),
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![],
     };
@@ -539,6 +547,7 @@ fn verify_capability_pure_allows_delegated_token_with_parent_budget_snapshot() {
         clock_override_unix_secs: Some(ISSUED_AT + 1),
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: Some(issuer.public_key()),
         capability_trust_roots,
         parent_budget_snapshots: std::vec![parent_budget_snapshot("cap-parent")],
     };
@@ -547,6 +556,32 @@ fn verify_capability_pure_allows_delegated_token_with_parent_budget_snapshot() {
     let verified = verify_capability_pure(input, &clock).expect("verify delegated token");
 
     assert_eq!(verified.id, "cap-child");
+}
+
+#[test]
+fn verify_capability_pure_refuses_delegated_token_without_root_delegator() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+    let capability_trust_roots = trust_roots_for_scope(&issuer, &capability.scope);
+
+    let input = VerifyCapabilityRequestJson {
+        token: capability,
+        trusted_issuers_hex: std::vec![issuer.public_key().to_hex()],
+        clock_override_unix_secs: Some(ISSUED_AT + 1),
+        peer_capabilities: None,
+        direct_root_capability: None,
+        root_delegator: None,
+        capability_trust_roots,
+        parent_budget_snapshots: std::vec![parent_budget_snapshot("cap-parent")],
+    };
+    let clock = FixedClock::new(ISSUED_AT + 1);
+
+    let err = verify_capability_pure(input, &clock)
+        .expect_err("a delegated token without a root delegator must be refused");
+
+    assert_eq!(err.code, "capability_verification_failed");
+    assert!(err.message.contains("no verifier-supplied root delegator"));
 }
 
 #[test]
@@ -562,6 +597,7 @@ fn verify_capability_pure_rejects_oversubscribed_delegated_sibling() {
         clock_override_unix_secs: Some(ISSUED_AT + 1),
         peer_capabilities: None,
         direct_root_capability: None,
+        root_delegator: Some(issuer.public_key()),
         capability_trust_roots,
         parent_budget_snapshots: std::vec![oversubscribed_budget_snapshot("cap-parent")],
     };
@@ -584,6 +620,7 @@ fn negotiated_aggregate_family_requires_matching_root_and_evaluation_denies() ->
         clock_override_unix_secs: Some(ISSUED_AT + 2),
         peer_capabilities: Some(aggregate_peer()),
         direct_root_capability,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![parent_budget_snapshot(&root.id)],
     };
@@ -614,7 +651,7 @@ fn negotiated_aggregate_family_requires_matching_root_and_evaluation_denies() ->
     };
     assert!(mismatch
         .message
-        .contains("does not originate from the authenticated root"));
+        .contains("link 0 delegator does not match the parent capability subject"));
 
     let verdict = evaluate_pure(
         EvaluateRequestJson {
@@ -625,6 +662,7 @@ fn negotiated_aggregate_family_requires_matching_root_and_evaluation_denies() ->
             session_filesystem_roots: None,
             peer_capabilities: Some(aggregate_peer()),
             direct_root_capability: Some(root.clone()),
+            root_delegator: None,
             capability_trust_roots: BTreeMap::new(),
             parent_budget_snapshots: std::vec![parent_budget_snapshot(&root.id)],
         },
@@ -655,6 +693,7 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
         clock_override_unix_secs: Some(ISSUED_AT + 2),
         peer_capabilities: Some(cumulative_peer()),
         direct_root_capability,
+        root_delegator: None,
         capability_trust_roots: BTreeMap::new(),
         parent_budget_snapshots: std::vec![parent_budget_snapshot(&root.id)],
     };
@@ -667,7 +706,7 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
         (None, "direct-root"),
         (
             Some(wrong_root.clone()),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let error = match verify_capability_pure(verify_input(supplied_root), &clock) {
@@ -692,7 +731,7 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
         (
             "mismatched",
             Some(wrong_root),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let verdict = evaluate_pure(
@@ -715,6 +754,7 @@ fn negotiated_cumulative_family_requires_matching_root_in_verify_and_evaluate() 
                 session_filesystem_roots: None,
                 peer_capabilities: Some(cumulative_peer()),
                 direct_root_capability: supplied_root,
+                root_delegator: None,
                 capability_trust_roots: BTreeMap::new(),
                 parent_budget_snapshots: std::vec![parent_budget_snapshot(&root.id)],
             },

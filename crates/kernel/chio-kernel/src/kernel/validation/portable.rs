@@ -91,6 +91,17 @@ impl ChioKernel {
                 };
             }
         };
+        let root_delegator = match self.delegation_root_subject(capability) {
+            Ok(root_delegator) => root_delegator,
+            Err(error) => {
+                return chio_kernel_core::EvaluationVerdict {
+                    verdict: chio_kernel_core::Verdict::Deny,
+                    reason: Some(error.to_string()),
+                    matched_grant_index: None,
+                    verified: None,
+                };
+            }
+        };
         let mut budgets = match self.budget_registry.lock() {
             Ok(guard) => guard,
             Err(_poisoned) => {
@@ -120,6 +131,7 @@ impl ChioKernel {
                 features: chio_kernel_core::CapabilityFeatureContext {
                     peer: &peer_profile,
                     direct_root: direct_root.as_ref(),
+                    root_delegator: root_delegator.as_ref(),
                 },
                 ancestors: &ancestors,
             },

@@ -25,6 +25,7 @@ pub enum ErrorCode {
     SignatureAlgorithmMismatch,
     SignatureRejected,
     SignerKeyMismatch,
+    DelegationRootUnresolved,
     EmptyManifest,
     DuplicateToolName,
     InvalidToolName,
@@ -114,6 +115,8 @@ fn core_error_code(error: &chio_core::Error) -> ErrorCode {
         }
         chio_core::Error::SignatureRejected => ErrorCode::SignatureRejected,
         chio_core::Error::SignerKeyMismatch => ErrorCode::SignerKeyMismatch,
+        chio_core::Error::DelegationRootUnresolved => ErrorCode::DelegationRootUnresolved,
+        chio_core::Error::DelegationRootMismatch => ErrorCode::DelegationChainBroken,
     }
 }
 

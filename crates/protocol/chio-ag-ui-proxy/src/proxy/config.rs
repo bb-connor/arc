@@ -55,6 +55,12 @@ pub struct AgUiProxyConfig {
     #[serde(default)]
     pub capability_family_roots: BTreeMap<String, chio_core::capability::token::CapabilityToken>,
 
+    /// Parent-capability subjects keyed by parent capability id. A delegated
+    /// capability's chain must start from the subject registered for its root
+    /// parent; a delegated capability whose root parent is absent is refused.
+    #[serde(default)]
+    pub delegation_parent_subjects: BTreeMap<String, PublicKey>,
+
     /// Parent-budget snapshots used to seed sibling-sum enforcement for
     /// delegated restricted events.
     #[serde(default)]
@@ -111,6 +117,7 @@ impl Default for AgUiProxyConfig {
             peer_capabilities: default_proxy_peer_capabilities(),
             capability_trust_roots: BTreeMap::new(),
             capability_family_roots: BTreeMap::new(),
+            delegation_parent_subjects: BTreeMap::new(),
             parent_budget_snapshots: Vec::new(),
         }
     }

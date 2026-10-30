@@ -210,6 +210,7 @@ fn build_request_json(
     serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": case.request_id,
             "tool_name": case.tool_name,
@@ -294,6 +295,7 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
         serde_json::json!({
             "token": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "now_secs": EVAL_TIME as i64,
             "peer_capabilities": aggregate_peer(),
             "direct_root_capability": direct_root_capability,
@@ -342,18 +344,19 @@ fn mobile_and_cpp_enforce_negotiated_aggregate_root_evidence() -> TestResult {
     };
     assert!(mobile_mismatch
         .to_string()
-        .contains("does not originate from the authenticated root"));
+        .contains("link 0 delegator does not match the parent capability subject"));
     let (status, error_code, output) = cpp_verify_capability(&mismatch_request)?;
     assert_eq!(status, chio_cpp_kernel_ffi::CHIO_KERNEL_FFI_STATUS_ERROR);
     assert_eq!(
         error_code,
         chio_cpp_kernel_ffi::CHIO_KERNEL_FFI_ERROR_INVALID_CAPABILITY
     );
-    assert!(output.contains("does not originate from the authenticated root"));
+    assert!(output.contains("link 0 delegator does not match the parent capability subject"));
 
     let evaluation_request = serde_json::json!({
         "capability": child,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-cross-ffi-aggregate",
             "tool_name": "echo",
@@ -387,6 +390,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         serde_json::json!({
             "token": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "now_secs": EVAL_TIME as i64,
             "peer_capabilities": cumulative_peer(),
             "direct_root_capability": direct_root_capability,
@@ -408,7 +412,7 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         (None, "direct-root"),
         (
             Some(&wrong_root),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let request = verify_request(supplied_root);
@@ -445,12 +449,13 @@ fn mobile_and_cpp_enforce_negotiated_cumulative_root_evidence() -> TestResult {
         (
             "mismatched",
             Some(&wrong_root),
-            "does not originate from the authenticated root",
+            "link 0 delegator does not match the parent capability subject",
         ),
     ] {
         let evaluation_request = serde_json::json!({
             "capability": child,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "request": {
                 "request_id": format!("req-cross-ffi-cumulative-{name}"),
                 "tool_name": "echo",

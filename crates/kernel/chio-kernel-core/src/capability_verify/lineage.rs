@@ -51,7 +51,7 @@ pub(super) fn verify_signed_lineage(
             return Err(invalid("signed lineage repeats a capability identity"));
         }
         verify_capability_base(parent, trusted, clock, floor, aggregate, cumulative)?;
-        verify_delegation_chain_shape(parent)?;
+        verify_delegation_chain_shape(parent, Some(&root.subject))?;
         let child = ancestors.get(index + 1).unwrap_or(token);
         let link = token
             .delegation_chain

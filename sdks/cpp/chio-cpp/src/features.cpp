@@ -200,7 +200,8 @@ CapabilityVerifier::CapabilityVerifier(ClockPtr clock,
       max_delegation_depth_(max_delegation_depth),
       revocation_hook_(std::move(revocation_hook)) {}
 
-Result<std::string> CapabilityVerifier::verify(std::string capability_json) const {
+Result<std::string> CapabilityVerifier::verify(
+    std::string capability_json, std::optional<std::string> root_delegator_hex) const {
   const auto capability_id = capability_id_from_json(capability_json);
   if (revocation_hook_ && !capability_id.empty()) {
     auto revoked = revocation_hook_(capability_id);
@@ -214,7 +215,8 @@ Result<std::string> CapabilityVerifier::verify(std::string capability_json) cons
     }
   }
   const auto now = clock_ ? clock_->now_unix_secs() : SystemClock().now_unix_secs();
-  return invariants::verify_capability_json(capability_json, now, max_delegation_depth_);
+  return invariants::verify_capability_json(capability_json, root_delegator_hex, now,
+                                            max_delegation_depth_);
 }
 
 ToolClient::ToolClient(Session& session, std::string name)

@@ -1,6 +1,7 @@
 use chio_core::{
     canonical::UntrustedJsonText,
     capability::{attenuation::validate_delegation_chain, token::CapabilityToken},
+    crypto::PublicKey,
     Error as CoreError,
 };
 use serde::{Deserialize, Serialize};
@@ -36,11 +37,26 @@ pub fn capability_signing_body_canonical_json(capability: &CapabilityToken) -> R
     chio_core::canonical_json_string(&capability.signing_body()).map_err(Into::into)
 }
 
+/// `root_delegator` is the subject key of the parent capability the delegation
+/// chain starts from. A delegated capability without it is refused with
+/// `DelegationRootUnresolved`.
 pub fn verify_capability(
     capability: &CapabilityToken,
+    root_delegator: Option<&PublicKey>,
     now: u64,
     max_delegation_depth: Option<u32>,
 ) -> Result<CapabilityVerification> {
+    let delegation_chain_shape_valid = if capability.delegation_chain.is_empty() {
+        true
+    } else {
+        let root_delegator = root_delegator.ok_or(CoreError::DelegationRootUnresolved)?;
+        validate_delegation_chain(
+            &capability.delegation_chain,
+            root_delegator,
+            max_delegation_depth,
+        )
+        .is_ok()
+    };
     let time_status = match capability.validate_time(now) {
         Ok(()) => CapabilityTimeStatus::Valid,
         Err(CoreError::CapabilityNotYetValid { .. }) => CapabilityTimeStatus::NotYetValid,
@@ -50,11 +66,7 @@ pub fn verify_capability(
 
     Ok(CapabilityVerification {
         signature_valid: capability.verify_integrity_embedded_key()?,
-        delegation_chain_shape_valid: validate_delegation_chain(
-            &capability.delegation_chain,
-            max_delegation_depth,
-        )
-        .is_ok(),
+        delegation_chain_shape_valid,
         time_valid: matches!(time_status, CapabilityTimeStatus::Valid),
         time_status,
     })
@@ -62,11 +74,18 @@ pub fn verify_capability(
 
 pub fn verify_capability_json(
     input: &str,
+    root_delegator_hex: Option<&str>,
     now: u64,
     max_delegation_depth: Option<u32>,
 ) -> Result<CapabilityVerification> {
     let capability = parse_capability_json(input)?;
-    verify_capability(&capability, now, max_delegation_depth)
+    let root_delegator = root_delegator_hex.map(PublicKey::from_hex).transpose()?;
+    verify_capability(
+        &capability,
+        root_delegator.as_ref(),
+        now,
+        max_delegation_depth,
+    )
 }
 
 #[cfg(test)]
@@ -118,7 +137,7 @@ mod tests {
     #[test]
     fn verify_valid_capability() -> crate::Result<()> {
         let capability = sample_capability()?;
-        let verification = verify_capability(&capability, 1710000400, None)?;
+        let verification = verify_capability(&capability, None, 1710000400, None)?;
         assert_eq!(
             verification,
             super::CapabilityVerification {

@@ -163,6 +163,7 @@ fn evaluate_allow_roundtrip() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-1",
             "tool_name": "echo",
@@ -213,6 +214,7 @@ fn evaluate_denies_grant_requiring_mediated_authorization() {
         let request_json = serde_json::json!({
             "capability": capability,
             "trusted_issuers": [issuer.public_key().to_hex()],
+            "root_delegator": null,
             "request": {
                 "request_id": "req-mediated",
                 "tool_name": "echo",
@@ -244,6 +246,7 @@ fn evaluate_allows_delegated_token_with_parent_budget_snapshot() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated",
             "tool_name": "echo",
@@ -271,6 +274,7 @@ fn evaluate_rejects_oversubscribed_delegated_sibling() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "request": {
             "request_id": "req-delegated-oversub",
             "tool_name": "echo",
@@ -299,6 +303,7 @@ fn evaluate_deny_out_of_scope() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-2",
             "tool_name": "unknown-tool",
@@ -329,6 +334,7 @@ fn evaluate_deny_expired_capability() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-3",
             "tool_name": "echo",
@@ -367,6 +373,7 @@ fn evaluate_rejects_bad_trusted_hex() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": ["not-hex"],
+        "root_delegator": null,
         "request": {
             "request_id": "req-4",
             "tool_name": "echo",
@@ -394,6 +401,7 @@ fn evaluate_rejects_unsupported_authorization_extensions() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-unsupported-extension",
             "tool_name": "echo",
@@ -420,7 +428,7 @@ fn evaluate_rejects_unnegotiated_approval_set_proposal_and_governed_intent() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
     let envelope = serde_json::json!({
-        "capability":make_capability(&subject, &issuer), "trusted_issuers":[issuer.public_key().to_hex()],
+        "capability":make_capability(&subject, &issuer), "root_delegator": null, "trusted_issuers":[issuer.public_key().to_hex()],
         "request":{"request_id":"portable-positive", "tool_name":"echo", "server_id":"srv-a",
             "agent_id":subject.public_key().to_hex(), "arguments":{}}, "now_secs":EVAL_TIME as i64
     });
@@ -651,6 +659,7 @@ fn verify_capability_with_context_allows_delegated_token_with_parent_budget_snap
     let request_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": EVAL_TIME as i64,
         "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")],
     })
@@ -664,6 +673,34 @@ fn verify_capability_with_context_allows_delegated_token_with_parent_budget_snap
 }
 
 #[test]
+fn verify_capability_with_context_refuses_delegated_token_without_root_delegator() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_delegated_capability("cap-child", "cap-parent", &subject, &issuer);
+
+    let request_json = serde_json::json!({
+        "token": capability,
+        "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
+        "now_secs": EVAL_TIME as i64,
+        "parent_budget_snapshots": [parent_budget_snapshot("cap-parent")],
+    })
+    .to_string();
+
+    let err = verify_capability_with_context(request_json).unwrap_err();
+
+    match err {
+        ChioMobileError::InvalidCapability { message } => {
+            assert!(
+                message.contains("no verifier-supplied root delegator"),
+                "message: {message}"
+            );
+        }
+        other => panic!("expected InvalidCapability, got {other:?}"),
+    }
+}
+
+#[test]
 fn verify_capability_with_context_rejects_oversubscribed_delegated_sibling() {
     let subject = Keypair::generate();
     let issuer = Keypair::generate();
@@ -672,6 +709,7 @@ fn verify_capability_with_context_rejects_oversubscribed_delegated_sibling() {
     let request_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": issuer.public_key().to_hex(),
         "now_secs": EVAL_TIME as i64,
         "parent_budget_snapshots": [oversubscribed_budget_snapshot("cap-parent")],
     })
@@ -949,6 +987,7 @@ fn entry_points_refuse_a_repeated_key_in_the_original_json() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-dup",
             "tool_name": "echo",
@@ -968,6 +1007,7 @@ fn entry_points_refuse_a_repeated_key_in_the_original_json() {
     let context_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "now_secs": EVAL_TIME as i64,
     })
     .to_string();
@@ -1024,6 +1064,7 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     let request_json = serde_json::json!({
         "capability": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "request": {
             "request_id": "req-number",
             "tool_name": "echo",
@@ -1052,6 +1093,7 @@ fn signed_entry_points_refuse_a_non_canonical_number() {
     let context_json = serde_json::json!({
         "token": capability,
         "trusted_issuers": [issuer.public_key().to_hex()],
+        "root_delegator": null,
         "now_secs": EVAL_TIME as i64,
     })
     .to_string();

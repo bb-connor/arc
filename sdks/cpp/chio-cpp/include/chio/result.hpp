@@ -42,6 +42,7 @@ enum class ErrorCode {
   SignatureAlgorithmMismatch = 31,
   SignatureRejected = 32,
   SignerKeyMismatch = 33,
+  DelegationRootUnresolved = 34,
   Transport = 200,
   Protocol = 201,
   Internal = 255,

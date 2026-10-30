@@ -79,28 +79,54 @@ def chainTimestampsMonotone : List DelegationLink → Bool
 def chainWithinDepth (chain : List DelegationLink) (maxDepth : Nat) : Bool :=
   chain.length ≤ maxDepth
 
+/-- The first link must be delegated by the verifier-supplied parent subject. -/
+def chainRooted (rootDelegator : PublicKeyHex) : List DelegationLink → Bool
+  | [] => true
+  | first :: _ => first.delegator == rootDelegator
+
+/-- Every link must verify under its expected delegator: the parent subject for
+    the first link and the previous link's delegatee for each later link. The
+    Lean link has no signature field, so the per-link signature check is the
+    abstract predicate `verifies link expectedDelegator`. -/
+def chainSigned (verifies : DelegationLink → PublicKeyHex → Bool)
+    : PublicKeyHex → List DelegationLink → Bool
+  | _, [] => true
+  | expected, link :: rest => verifies link expected && chainSigned verifies link.delegatee rest
+
 /-- Full delegation chain validation.
     Mirrors: validate_delegation_chain in
-    crates/core/chio-core-types/src/capability/attenuation.rs. -/
-def validateDelegationChain (chain : List DelegationLink) (maxDepth : Option Nat)
+    crates/core/chio-core-types/src/capability/attenuation.rs.
+    Only the accept set is mirrored: the Rust validator checks link by link
+    and reports the first fault in link order, while this model checks each
+    property over the whole chain, so a chain with several faults can report
+    a different first error. -/
+def validateDelegationChain (chain : List DelegationLink) (rootDelegator : PublicKeyHex)
+    (verifies : DelegationLink → PublicKeyHex → Bool) (maxDepth : Option Nat)
     : Except String Unit :=
-  match maxDepth with
-  | some max =>
-    if !chainWithinDepth chain max then
-      .error s!"delegation depth {chain.length} exceeds maximum {max}"
-    else if !chainConnected chain then
-      .error "delegation chain connectivity broken"
-    else if !chainTimestampsMonotone chain then
-      .error "delegation chain timestamps not monotone"
-    else
-      .ok ()
-  | none =>
-    if !chainConnected chain then
-      .error "delegation chain connectivity broken"
-    else if !chainTimestampsMonotone chain then
-      .error "delegation chain timestamps not monotone"
-    else
-      .ok ()
+  if !(match maxDepth with
+      | some max => chainWithinDepth chain max
+      | none => true) then
+    .error s!"delegation depth {chain.length} exceeds maximum {maxDepth.getD 0}"
+  else if !chainRooted rootDelegator chain then
+    .error "link 0 delegator does not match the parent capability subject"
+  else if !chainConnected chain then
+    .error "delegation chain connectivity broken"
+  else if !chainTimestampsMonotone chain then
+    .error "delegation chain timestamps not monotone"
+  else if !chainSigned verifies rootDelegator chain then
+    .error "delegation chain signature invalid"
+  else
+    .ok ()
+
+/-- A chain the validator accepts starts at the verifier-supplied root. -/
+theorem validateDelegationChain_ok_rooted
+    (chain : List DelegationLink) (rootDelegator : PublicKeyHex)
+    (verifies : DelegationLink → PublicKeyHex → Bool) (maxDepth : Option Nat)
+    (h : validateDelegationChain chain rootDelegator verifies maxDepth = .ok ()) :
+    chainRooted rootDelegator chain = true := by
+  unfold validateDelegationChain at h
+  repeat' split at h
+  all_goals simp_all
 
 /-- Simplified kernel evaluation pipeline.
     Every path returns a Decision. Errors map to deny.

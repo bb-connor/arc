@@ -73,13 +73,16 @@ fn make_scope(grants: Vec<ToolGrant>) -> ChioScope {
     }
 }
 
-fn build_validation_fixture() -> (
-    CapabilityToken,
-    ChioScope,
-    ChioScope,
-    Vec<DelegationLink>,
-    u64,
-) {
+struct ValidationFixture {
+    token: CapabilityToken,
+    parent_scope: ChioScope,
+    child_scope: ChioScope,
+    delegation_chain: Vec<DelegationLink>,
+    root_delegator: chio_core::PublicKey,
+    now: u64,
+}
+
+fn build_validation_fixture() -> ValidationFixture {
     let root = Keypair::from_seed(&[0x11; 32]);
     let delegate_one = Keypair::from_seed(&[0x22; 32]);
     let delegate_two = Keypair::from_seed(&[0x33; 32]);
@@ -161,28 +164,25 @@ fn build_validation_fixture() -> (
     )
     .bench_unwrap("sign capability token");
 
-    (
+    ValidationFixture {
         token,
         parent_scope,
         child_scope,
-        vec![link_one, link_two],
+        delegation_chain: vec![link_one, link_two],
+        root_delegator: root.public_key(),
         now,
-    )
+    }
 }
 
-fn capability_validation_pass(
-    token: &CapabilityToken,
-    parent_scope: &ChioScope,
-    child_scope: &ChioScope,
-    delegation_chain: &[DelegationLink],
-    now: u64,
-) -> bool {
-    token
+fn capability_validation_pass(fixture: &ValidationFixture) -> bool {
+    fixture
+        .token
         .verify_integrity_embedded_key()
         .bench_unwrap("verify capability signature")
-        && token.validate_time(now).is_ok()
-        && validate_delegation_chain(delegation_chain, Some(8)).is_ok()
-        && validate_attenuation(parent_scope, child_scope).is_ok()
+        && fixture.token.validate_time(fixture.now).is_ok()
+        && validate_delegation_chain(&fixture.delegation_chain, &fixture.root_delegator, Some(8))
+            .is_ok()
+        && validate_attenuation(&fixture.parent_scope, &fixture.child_scope).is_ok()
 }
 
 fn bench_signature_verification(c: &mut Criterion) {
@@ -261,25 +261,11 @@ fn bench_merkle_paths(c: &mut Criterion) {
 }
 
 fn bench_capability_validation(c: &mut Criterion) {
-    let (token, parent_scope, child_scope, delegation_chain, now) = build_validation_fixture();
-    assert!(capability_validation_pass(
-        &token,
-        &parent_scope,
-        &child_scope,
-        &delegation_chain,
-        now,
-    ));
+    let fixture = build_validation_fixture();
+    assert!(capability_validation_pass(&fixture));
 
     c.bench_function("chio_core/capability_validation_path", |b| {
-        b.iter(|| {
-            black_box(capability_validation_pass(
-                black_box(&token),
-                black_box(&parent_scope),
-                black_box(&child_scope),
-                black_box(&delegation_chain),
-                black_box(now),
-            ))
-        })
+        b.iter(|| black_box(capability_validation_pass(black_box(&fixture))))
     });
 }
 

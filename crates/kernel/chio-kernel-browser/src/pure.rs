@@ -101,6 +101,7 @@ pub fn evaluate_pure(
                 chio_core_types::capability::crypto_floor::CapabilityCryptoFloor::AllowClassical,
                 &peer_profile,
                 input.direct_root_capability.as_ref(),
+                input.root_delegator.as_ref(),
                 &trust_resolver,
                 &mut budgets,
             )
@@ -117,6 +118,7 @@ pub fn evaluate_pure(
             chio_core_types::capability::crypto_floor::CapabilityCryptoFloor::AllowClassical,
             &peer_profile,
             input.direct_root_capability.as_ref(),
+            input.root_delegator.as_ref(),
             &trust_resolver,
             &mut budgets,
         ),
@@ -244,6 +246,7 @@ pub fn verify_capability_pure(
                 CapabilityFeatureContext {
                     peer: &peer_profile,
                     direct_root: input.direct_root_capability.as_ref(),
+                    root_delegator: input.root_delegator.as_ref(),
                 },
                 &trust_resolver,
                 &mut budgets,
@@ -257,6 +260,7 @@ pub fn verify_capability_pure(
             CapabilityFeatureContext {
                 peer: &peer_profile,
                 direct_root: input.direct_root_capability.as_ref(),
+                root_delegator: input.root_delegator.as_ref(),
             },
             &trust_resolver,
             &mut budgets,
@@ -391,6 +395,12 @@ fn capability_error_message(error: &chio_kernel_core::CapabilityError) -> String
             let mut out = String::from("capability rejected by chain binding: ");
             out.push_str(msg);
             out
+        }
+        chio_kernel_core::CapabilityError::DelegationRootMismatch => {
+            "capability rejected by chain binding: link 0 delegator does not match the parent capability subject".to_string()
+        }
+        chio_kernel_core::CapabilityError::DelegationRootUnresolved => {
+            "capability delegation chain has no verifier-supplied root delegator".to_string()
         }
         chio_kernel_core::CapabilityError::BudgetSplitRejected(err) => {
             let mut out = String::from("capability rejected by sibling-sum budget split: ");

@@ -127,7 +127,15 @@ fn evaluate_public_entries(
         ),
         (
             "full_floor_and_root",
-            evaluate_with_full_floor_and_root(input(), floor, &peer, None, &resolver, &mut budgets),
+            evaluate_with_full_floor_and_root(
+                input(),
+                floor,
+                &peer,
+                None,
+                None,
+                &resolver,
+                &mut budgets,
+            ),
         ),
         (
             "full_floor_and_evidence",
@@ -138,6 +146,7 @@ fn evaluate_public_entries(
                     features: CapabilityFeatureContext {
                         peer: &peer,
                         direct_root: None,
+                        root_delegator: None,
                     },
                     ancestors: &[],
                 },
@@ -208,6 +217,7 @@ fn security_binding_projection_preserves_verification_for_context_aware_native_a
             features: CapabilityFeatureContext {
                 peer: &peer,
                 direct_root: None,
+                root_delegator: None,
             },
             ancestors: &[],
         },

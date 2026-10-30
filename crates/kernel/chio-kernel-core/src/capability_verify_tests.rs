@@ -268,6 +268,7 @@ fn delegated_aggregate_mode_requires_root_and_detects_omission() -> Result<(), C
         CapabilityFeatureContext {
             peer: &aggregate_peer(),
             direct_root: Some(&root),
+            root_delegator: None,
         },
         &resolver,
         &mut budgets,
@@ -339,6 +340,7 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
         CapabilityFeatureContext {
             peer: &aggregate_peer(),
             direct_root: Some(&root),
+            root_delegator: None,
         },
         &resolver,
         &mut budgets,
@@ -480,6 +482,7 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
         CapabilityFeatureContext {
             peer: &cumulative_peer(),
             direct_root: Some(&root),
+            root_delegator: None,
         },
         &resolver,
         &mut budgets,
@@ -794,18 +797,144 @@ fn full_verifier_accepts_plain_pass_through_delegation_when_chain_binding_featur
     )
     .expect("register parent");
 
-    let verified = verify_capability_full(
+    let verified = verify_capability_full_with_root(
         &token,
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_roots,
         &mut budgets,
     )
     .expect("pass-through delegation must verify when no new attenuation is introduced");
 
     assert_eq!(verified.id(), "delegated-current-v1-token");
+}
+
+#[test]
+fn full_verifier_refuses_delegated_token_without_parent_subject() {
+    let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
+
+    let err = verify_capability_full(
+        &token,
+        &[issuer.public_key()],
+        &crate::FixedClock::new(150),
+        CapabilityCryptoFloor::AllowClassical,
+        &peer,
+        &trust_roots,
+        &mut budgets,
+    )
+    .expect_err("a delegated token without a parent subject must be refused");
+
+    assert!(matches!(err, CapabilityError::DelegationRootUnresolved));
+}
+
+#[test]
+fn full_verifier_refuses_delegated_token_from_another_parent_subject() {
+    let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
+    let other = chio_core_types::crypto::Keypair::generate().public_key();
+
+    let err = verify_capability_full_with_root(
+        &token,
+        &[issuer.public_key()],
+        &crate::FixedClock::new(150),
+        CapabilityCryptoFloor::AllowClassical,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&other),
+        },
+        &trust_roots,
+        &mut budgets,
+    )
+    .expect_err("a chain that does not start at the supplied parent subject must be refused");
+
+    assert!(matches!(err, CapabilityError::DelegationRootMismatch));
+}
+
+#[test]
+fn full_verifier_refuses_a_parent_subject_that_did_not_sign_the_root_link() {
+    let (issuer, token, peer, trust_roots, mut budgets) = pass_through_delegation_fixture();
+    let other = Keypair::generate().public_key();
+
+    let err = verify_capability_full_with_root(
+        &token,
+        &[issuer.public_key()],
+        &crate::FixedClock::new(150),
+        CapabilityCryptoFloor::AllowClassical,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&other),
+        },
+        &trust_roots,
+        &mut budgets,
+    )
+    .expect_err("a root link from another delegator must be refused");
+
+    match err {
+        CapabilityError::AttenuationViolation(message) => {
+            assert!(message.contains("link 0 delegator"), "{message}");
+        }
+        other => panic!("expected attenuation violation, got {other:?}"),
+    }
+}
+
+type PassThroughFixture = (
+    Keypair,
+    CapabilityToken,
+    CapabilityNegotiation,
+    CountingTrustRootResolver,
+    InMemoryBudgetRegistry,
+);
+
+fn pass_through_delegation_fixture() -> PassThroughFixture {
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let parent_link = DelegationLink::sign(
+        DelegationLinkBody {
+            capability_id: "parent-capability".to_string(),
+            delegator: issuer.public_key(),
+            delegatee: subject.public_key(),
+            attenuations: Vec::new(),
+            timestamp: 100,
+            scope_hash: None,
+            aggregate_budget: None,
+            cumulative_approval: None,
+        },
+        &issuer,
+    )
+    .expect("sign delegation link");
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "delegated-root-input-token".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 100,
+            expires_at: 200,
+            delegation_chain: Vec::from([parent_link]),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .expect("sign delegated token");
+    let mut peer = CapabilityNegotiation::t1_default();
+    peer.features
+        .insert(features::DELEGATION_CHAIN_BINDING.to_string(), false);
+    let trust_roots = counting_resolver_for(&issuer);
+    let mut budgets = InMemoryBudgetRegistry::new();
+    BudgetRegistry::register_parent(
+        &mut budgets,
+        "parent-capability".to_string(),
+        crate::budget_split::MAX_BUDGET_SHARE_BPS,
+    )
+    .expect("register parent");
+    (issuer, token, peer, trust_roots, budgets)
 }
 
 #[test]
@@ -856,12 +985,16 @@ fn full_verifier_rejects_delegation_chain_with_wrong_final_delegatee() {
     };
     let mut budgets = InMemoryBudgetRegistry::new();
 
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &token,
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_roots,
         &mut budgets,
     )
@@ -924,12 +1057,16 @@ fn full_verifier_rejects_tampered_delegation_link_payload() {
     };
     let mut budgets = InMemoryBudgetRegistry::new();
 
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &token,
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_roots,
         &mut budgets,
     )
@@ -986,6 +1123,7 @@ fn resolver_entrypoints_reject_tampered_plain_delegation_link() {
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         &resolver,
+        Some(&issuer.public_key()),
     )
     .expect_err("resolver verifier must validate plain delegation-chain links");
     let trust_root_err = verify_capability_with_floor_and_trust_root(
@@ -994,6 +1132,7 @@ fn resolver_entrypoints_reject_tampered_plain_delegation_link() {
         &clock,
         CapabilityCryptoFloor::AllowClassical,
         &trust_root_hash,
+        Some(&issuer.public_key()),
     )
     .expect_err("trust-root verifier must validate plain delegation-chain links");
 
@@ -1083,12 +1222,16 @@ fn full_verifier_rejects_delegated_attenuation_unbound_from_trust_root() {
     };
     let mut budgets = NoopBudgetRegistry;
 
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &token,
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_roots,
         &mut budgets,
     )
@@ -1195,12 +1338,16 @@ fn full_verifier_rejects_multi_hop_attenuation_without_child_scope_witnesses() {
     };
     let mut budgets = NoopBudgetRegistry;
 
-    let err = verify_capability_full(
+    let err = verify_capability_full_with_root(
         &token,
         &[issuer_public],
         &clock,
         CapabilityCryptoFloor::AllowClassical,
-        &peer,
+        CapabilityFeatureContext {
+            peer: &peer,
+            direct_root: None,
+            root_delegator: Some(&issuer.public_key()),
+        },
         &trust_roots,
         &mut budgets,
     )

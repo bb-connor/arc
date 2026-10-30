@@ -140,11 +140,15 @@ Result<bool> verify_wrapped_json(std::string_view schema_id,
 }
 
 Result<std::string> verify_capability_json(std::string_view input_json,
+                                           std::optional<std::string_view> root_delegator_hex,
                                            std::uint64_t now_secs,
                                            std::uint32_t max_delegation_depth) {
   auto input = owned(input_json);
+  const auto root = owned(root_delegator_hex.value_or(std::string_view{}));
   return from_ffi(
-      chio_verify_capability_json(input.c_str(), now_secs, max_delegation_depth),
+      chio_verify_capability_json(input.c_str(),
+                                  root_delegator_hex ? root.c_str() : nullptr,
+                                  now_secs, max_delegation_depth),
       "invariants::verify_capability_json");
 }
 
