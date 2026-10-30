@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use chio_process::run_journal::{
-    Completion, ContainerIntent, ResourceUsage, WorkerSeed, WorkerState, WorkerTransition,
+    Completion, ContainerIntent, ResourceUsage, WorkerOutcome, WorkerSeed, WorkerState,
+    WorkerTransition,
 };
 use chio_store_sqlite::process_run_store::{SqliteContainerJournal, SqliteRunJournal};
 use serde::Serialize;
@@ -61,7 +62,7 @@ pub(super) struct Snapshot {
     pub state: WorkerState,
     pub attempts: u32,
     pub suspensions: u32,
-    pub outcome: Option<String>,
+    pub outcome: Option<WorkerOutcome>,
     pub peak_resident_bytes: u64,
     pub cpu_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -158,7 +159,10 @@ impl<'a> Journal<'a> {
                     max_attempts: worker.max_attempts,
                     suspensions: snapshot.suspensions,
                     max_suspensions: worker.max_suspensions(),
-                    outcome: snapshot.outcome.clone(),
+                    outcome: snapshot
+                        .outcome
+                        .as_ref()
+                        .map(|outcome| outcome.as_str().to_owned()),
                     peak_resident_bytes: snapshot.peak_resident_bytes,
                     cpu_ms: snapshot.cpu_ms,
                     resource_accounting: snapshot.resource_accounting.map(str::to_owned),
@@ -285,7 +289,7 @@ impl<'a> Journal<'a> {
             .iter()
             .filter(|s| {
                 s.state == WorkerState::Failed
-                    && s.outcome.as_deref() == Some("process_cancelled")
+                    && s.outcome == Some(WorkerOutcome::ProcessCancelled)
                     && cancelled.contains(&s.process)
             })
             .map(|s| s.process.as_str())
@@ -293,7 +297,7 @@ impl<'a> Journal<'a> {
         loop {
             let before = scoped.len();
             for snapshot in snapshots.iter().filter(|s| {
-                s.state == WorkerState::Failed && s.outcome.as_deref() == Some("dependency_failed")
+                s.state == WorkerState::Failed && s.outcome == Some(WorkerOutcome::DependencyFailed)
             }) {
                 let worker = self
                     .workers

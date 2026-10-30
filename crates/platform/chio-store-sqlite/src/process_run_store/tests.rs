@@ -1,7 +1,7 @@
 use super::*;
 use chio_process::run_journal::{
-    Completion, FileIdentity, ResourceUsage, WorkerState, MAX_ABANDONED_SOCKET_INTENTS,
-    MAX_ACCOUNTED, MAX_WORKERS,
+    Completion, FileIdentity, ResourceUsage, WorkerOutcome, WorkerState,
+    MAX_ABANDONED_SOCKET_INTENTS, MAX_ACCOUNTED, MAX_WORKERS,
 };
 use rusqlite::params;
 
@@ -36,7 +36,7 @@ fn cancellation_is_durable_and_rejects_running_and_terminal_workers() -> TestRes
     store.transition(
         "second",
         WorkerTransition::Finish {
-            completion: Completion::Terminal("process_cancelled"),
+            completion: Completion::Terminal(&WorkerOutcome::ProcessCancelled),
             max_attempts: 2,
             max_suspensions: 2,
             usage: ResourceUsage {
@@ -51,7 +51,7 @@ fn cancellation_is_durable_and_rejects_running_and_terminal_workers() -> TestRes
     assert!(workers
         .iter()
         .all(|worker| worker.state == WorkerState::Failed
-            && worker.outcome.as_deref() == Some("process_cancelled")));
+            && worker.outcome == Some(WorkerOutcome::ProcessCancelled)));
     assert_eq!(
         (workers[0].attempts, workers[1].attempts, workers[1].cpu_ms),
         (0, 1, 7)
@@ -85,8 +85,8 @@ fn binding_and_dependency_failures_roll_back_the_whole_operation() -> TestResult
     drop(store);
     let store = initialize(&path)?;
     assert_eq!(
-        store.snapshots()?[1].outcome.as_deref(),
-        Some("host_interrupted")
+        store.snapshots()?[1].outcome,
+        Some(WorkerOutcome::HostInterrupted)
     );
     assert_eq!(store.snapshots()?[1].state, WorkerState::Pending);
     Ok(())
@@ -145,7 +145,7 @@ fn busy_and_corrupt_rows_fail_closed_and_accounting_saturates() -> TestResult {
     let finished = store.transition(
         "first",
         WorkerTransition::Finish {
-            completion: Completion::Completed("ok"),
+            completion: Completion::Completed(&WorkerOutcome::parse("ok")?),
             max_attempts: 2,
             max_suspensions: 2,
             usage: ResourceUsage {
@@ -190,7 +190,7 @@ fn terminal(store: &SqliteRunJournal, process: &str, outcome: &str) -> Result<()
     store.transition(
         process,
         WorkerTransition::Finish {
-            completion: Completion::Terminal(outcome),
+            completion: Completion::Terminal(&WorkerOutcome::parse(outcome)?),
             max_attempts: 2,
             max_suspensions: 2,
             usage: ResourceUsage::default(),

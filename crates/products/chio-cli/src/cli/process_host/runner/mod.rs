@@ -17,7 +17,7 @@ use tokio::time::Instant;
 
 use super::state::{error, read_json, Host};
 use crate::CliError;
-use chio_process::run_journal::{Completion, ResourceUsage, WorkerState};
+use chio_process::run_journal::{Completion, ResourceUsage, WorkerOutcome, WorkerState};
 use journal::Journal;
 use plan::{FailurePolicy, Plan};
 
@@ -407,12 +407,13 @@ async fn drive(
             .clone();
         let cancelled = host.runtime.process(&worker.process).map_err(error)?.state
             == chio_process::ProcessState::Cancelled;
+        let interrupted = WorkerOutcome::parse("runner_interrupted").map_err(error)?;
         journal.finish(
             &worker,
             if cancelled {
-                Completion::Terminal("process_cancelled")
+                Completion::Terminal(&WorkerOutcome::ProcessCancelled)
             } else {
-                Completion::Failed("runner_interrupted")
+                Completion::Failed(&interrupted)
             },
             ResourceUsage::default(),
         )?;
@@ -436,7 +437,9 @@ fn record_attempt(
             } else {
                 journal.finish(
                     &worker,
-                    Completion::Terminal("worker_launch_or_wait_uncertain"),
+                    Completion::Terminal(
+                        &WorkerOutcome::parse("worker_launch_or_wait_uncertain").map_err(error)?,
+                    ),
                     ResourceUsage::default(),
                 )?;
             }
@@ -444,17 +447,18 @@ fn record_attempt(
             return Err(error(failure));
         }
     };
+    let observed = WorkerOutcome::parse(&outcome.reason).map_err(error)?;
     let end = if outcome.success {
-        Completion::Completed(&outcome.reason)
+        Completion::Completed(&observed)
     } else if matches!(
         outcome.reason.as_str(),
         "container_attachment_lost" | "container_state_unknown"
     ) {
-        Completion::Terminal(&outcome.reason)
+        Completion::Terminal(&observed)
     } else if host.runtime.process(&worker.process).map_err(error)?.state
         == chio_process::ProcessState::Cancelled
     {
-        Completion::Terminal("process_cancelled")
+        Completion::Terminal(&WorkerOutcome::ProcessCancelled)
     } else if outcome.reason == "exit_75"
         && host
             .runtime
@@ -465,7 +469,7 @@ fn record_attempt(
     {
         Completion::Suspended
     } else {
-        Completion::Failed(&outcome.reason)
+        Completion::Failed(&observed)
     };
     journal.finish(&worker, end, outcome.usage)?;
     service.revoke_credentials(&worker.process).map_err(error)?;

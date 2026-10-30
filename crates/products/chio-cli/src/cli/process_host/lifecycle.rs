@@ -176,7 +176,20 @@ impl Service {
 fn journal_error(failure: JournalError) -> ProcessError {
     match failure {
         JournalError::NotRunning => ProcessError::Invalid("caller has no running worker attempt"),
-        failure => failure.into(),
+        JournalError::Busy
+        | JournalError::Persistence
+        | JournalError::Integrity
+        | JournalError::Schema
+        | JournalError::Binding
+        | JournalError::MissingWorker
+        | JournalError::Transition
+        | JournalError::Cancellation
+        | JournalError::Overflow
+        | JournalError::ContainerIntent
+        | JournalError::SocketIntent
+        | JournalError::SocketHistoryFull
+        | JournalError::WorkerCapacity
+        | JournalError::ContainerCapacity => failure.into(),
     }
 }
 

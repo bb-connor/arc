@@ -56,7 +56,7 @@ fn pending_cancellation_spends_no_attempt_or_resources() -> TestResult {
         .find(|s| s.process == "A")
         .ok_or("missing A")?;
     assert_eq!(cancelled.state, WorkerState::Failed);
-    assert_eq!(cancelled.outcome.as_deref(), Some("process_cancelled"));
+    assert_eq!(cancelled.outcome, Some(WorkerOutcome::ProcessCancelled));
     assert_eq!(
         (
             cancelled.attempts,
@@ -73,8 +73,12 @@ fn pending_cancellation_spends_no_attempt_or_resources() -> TestResult {
         .find(|s| s.process == "B")
         .ok_or("missing B")?;
     assert_eq!(
-        (blocked.state, blocked.outcome.as_deref(), blocked.attempts),
-        (WorkerState::Failed, Some("dependency_failed"), 0)
+        (blocked.state, blocked.outcome.clone(), blocked.attempts),
+        (
+            WorkerState::Failed,
+            Some(WorkerOutcome::DependencyFailed),
+            0
+        )
     );
     let root = snapshots
         .iter()
@@ -89,7 +93,7 @@ fn pending_cancellation_spends_no_attempt_or_resources() -> TestResult {
     journal.start(&root)?;
     journal.finish(
         &root,
-        Completion::Failed("exit_68"),
+        Completion::Failed(&WorkerOutcome::parse("exit_68")?),
         ResourceUsage::default(),
     )?;
     assert!(journal.has_stop_failure(&journal.snapshots()?, &cancelled)?);
@@ -106,7 +110,7 @@ fn pending_cancellation_refuses_active_and_completed_attempts_without_mutation()
         if completed {
             journal.finish(
                 &worker,
-                Completion::Completed("exit_0"),
+                Completion::Completed(&WorkerOutcome::parse("exit_0")?),
                 ResourceUsage {
                     peak_resident_bytes: 4096,
                     cpu_ms: 7,

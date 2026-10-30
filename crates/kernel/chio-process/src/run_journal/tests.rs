@@ -2,6 +2,46 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn observed(text: &str) -> WorkerOutcome {
+    WorkerOutcome::Observed(ObservedReason(text.to_owned()))
+}
+
+#[test]
+fn every_outcome_has_one_spelling_and_only_reason_tokens_parse() -> TestResult {
+    for outcome in &JOURNAL_AUTHORED {
+        // Adding a journal-authored variant fails here until it is listed.
+        match outcome {
+            WorkerOutcome::ProcessCancelled
+            | WorkerOutcome::DependencyFailed
+            | WorkerOutcome::HostInterrupted
+            | WorkerOutcome::WorkerNotExecuted
+            | WorkerOutcome::Suspended => {}
+            WorkerOutcome::Observed(_) => return Err("observed in journal list".into()),
+        }
+        assert_eq!(&WorkerOutcome::parse(outcome.as_str())?, outcome);
+    }
+    for text in [
+        "exit_0",
+        "exit_-1",
+        "container_state_unknown",
+        &"x".repeat(64),
+    ] {
+        assert_eq!(WorkerOutcome::parse(text)?, observed(text));
+    }
+    for text in ["", "exit 1", "Exit_1", "exit_1\n", &"x".repeat(65)] {
+        assert_eq!(
+            WorkerOutcome::parse(text),
+            Err(JournalError::Integrity),
+            "{text:?}"
+        );
+    }
+    assert_eq!(
+        serde_json::to_value(WorkerOutcome::DependencyFailed)?,
+        serde_json::json!("dependency_failed")
+    );
+    Ok(())
+}
+
 #[test]
 fn invalid_budget_and_accounting_transitions_fail_closed() -> TestResult {
     let mut record = WorkerRecord::pending("worker".into());
@@ -46,11 +86,12 @@ fn finish(completion: Completion<'_>, usage: ResourceUsage) -> WorkerTransition<
 
 #[test]
 fn transitions_at_each_budget_boundary() -> TestResult {
+    let (ok, exit_1, cancelled) = (observed("ok"), observed("exit_1"), observed("cancelled"));
     let running = |attempts, suspensions| WorkerRecord {
         state: WorkerState::Running,
         attempts,
         suspensions,
-        outcome: Some("stale".into()),
+        outcome: Some(observed("stale")),
         ..WorkerRecord::pending("worker".into())
     };
     let none = ResourceUsage::default();
@@ -67,17 +108,17 @@ fn transitions_at_each_budget_boundary() -> TestResult {
         ),
         (
             running(1, 0),
-            finish(Completion::Failed("exit_1"), none),
+            finish(Completion::Failed(&exit_1), none),
             WorkerState::Pending,
         ),
         (
             running(2, 0),
-            finish(Completion::Failed("exit_1"), none),
+            finish(Completion::Failed(&exit_1), none),
             WorkerState::Failed,
         ),
         (
             running(2, 1),
-            finish(Completion::Failed("exit_1"), none),
+            finish(Completion::Failed(&exit_1), none),
             WorkerState::Pending,
         ),
         (
@@ -92,7 +133,7 @@ fn transitions_at_each_budget_boundary() -> TestResult {
         ),
         (
             running(1, 0),
-            finish(Completion::Terminal("cancelled"), none),
+            finish(Completion::Terminal(&cancelled), none),
             WorkerState::Failed,
         ),
         (
@@ -108,7 +149,7 @@ fn transitions_at_each_budget_boundary() -> TestResult {
     let started = pending.transition(WorkerTransition::Start { max_attempts: 1 }, false)?;
     assert_eq!((started.attempts, started.outcome), (1, None));
     for (record, transition) in [
-        (pending.clone(), finish(Completion::Completed("ok"), none)),
+        (pending.clone(), finish(Completion::Completed(&ok), none)),
         (pending.clone(), WorkerTransition::Unreserve),
         (running(1, 1), WorkerTransition::Unreserve),
         (running(1, 0), WorkerTransition::DependencyFailed),
@@ -126,7 +167,7 @@ fn transitions_at_each_budget_boundary() -> TestResult {
     }
     .transition(
         finish(
-            Completion::Completed("ok"),
+            Completion::Completed(&ok),
             ResourceUsage {
                 peak_resident_bytes: u64::MAX,
                 cpu_ms: u64::MAX,
@@ -189,13 +230,14 @@ proptest::proptest! {
     ) {
         const MAX_ATTEMPTS: u32 = 3;
         let mut record = WorkerRecord::pending("worker".into());
+        let (ok, exit_1, cancelled) = (observed("ok"), observed("exit_1"), observed("cancelled"));
         for (kind, peak, cpu) in steps {
             let usage = ResourceUsage { peak_resident_bytes: peak, cpu_ms: cpu };
             let completion = match peak % 4 {
-                0 => Completion::Completed("ok"),
+                0 => Completion::Completed(&ok),
                 1 => Completion::Suspended,
-                2 => Completion::Failed("exit_1"),
-                _ => Completion::Terminal("cancelled"),
+                2 => Completion::Failed(&exit_1),
+                _ => Completion::Terminal(&cancelled),
             };
             let transition = match kind {
                 0 => WorkerTransition::Start { max_attempts: MAX_ATTEMPTS },

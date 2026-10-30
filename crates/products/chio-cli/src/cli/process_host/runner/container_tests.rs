@@ -19,7 +19,10 @@ fn worker(state: &Path) -> Result<(String, u32, String), Box<dyn std::error::Err
     Ok((
         record.state.as_str().to_owned(),
         record.attempts,
-        record.outcome.unwrap_or_default(),
+        record
+            .outcome
+            .map(|outcome| outcome.as_str().to_owned())
+            .unwrap_or_default(),
     ))
 }
 

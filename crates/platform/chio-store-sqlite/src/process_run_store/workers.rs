@@ -1,6 +1,7 @@
 use super::{bounded, immediate, limit, storage_error, SqliteRunJournal};
 use chio_process::run_journal::{
-    workers_within_capacity, JournalError, WorkerRecord, WorkerState, WorkerTransition, MAX_WORKERS,
+    workers_within_capacity, JournalError, WorkerOutcome, WorkerRecord, WorkerState,
+    WorkerTransition, MAX_WORKERS,
 };
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -13,11 +14,19 @@ pub(super) const HAS_CONTAINER: &str =
     "SELECT EXISTS(SELECT 1 FROM run_containers WHERE process=?1)";
 const WRITE: &str = "UPDATE run_workers SET state=?2,attempts=?3,suspensions=?4,outcome=?5,peak_resident_bytes=?6,cpu_ms=?7 WHERE process=?1";
 
+/// A text column the journal domain refuses.
+fn refused(column: usize, error: JournalError) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(column, rusqlite::types::Type::Text, Box::new(error))
+}
+
 fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkerRecord> {
     let state: String = row.get(1)?;
-    let state = WorkerState::try_from(state.as_str()).map_err(|error| {
-        rusqlite::Error::FromSqlConversionFailure(1, rusqlite::types::Type::Text, Box::new(error))
-    })?;
+    let state = WorkerState::try_from(state.as_str()).map_err(|error| refused(1, error))?;
+    let outcome = row.get::<_, Option<String>>(4)?;
+    let outcome = outcome
+        .map(|text| WorkerOutcome::parse(&text))
+        .transpose()
+        .map_err(|error| refused(4, error))?;
     let accounted = |column| -> rusqlite::Result<u64> {
         let value: i64 = row.get(column)?;
         u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(column, value))
@@ -27,7 +36,7 @@ fn row(row: &rusqlite::Row<'_>) -> rusqlite::Result<WorkerRecord> {
         state,
         attempts: row.get(2)?,
         suspensions: row.get(3)?,
-        outcome: row.get(4)?,
+        outcome,
         peak_resident_bytes: accounted(5)?,
         cpu_ms: accounted(6)?,
     })
@@ -72,7 +81,7 @@ pub(super) fn transition(
                 next.state.as_str(),
                 next.attempts,
                 next.suspensions,
-                next.outcome,
+                next.outcome.as_ref().map(WorkerOutcome::as_str),
                 peak,
                 cpu
             ],
