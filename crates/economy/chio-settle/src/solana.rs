@@ -369,6 +369,27 @@ mod tests {
         )
     }
 
+    const RELEASE_EXAMPLE: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../../docs/standards/CHIO_SETTLE_SOLANA_RELEASE_EXAMPLE.json"
+    );
+
+    /// Set `CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS=1` to rewrite the committed
+    /// release example from `prepare_solana_settlement`.
+    #[test]
+    fn release_example_is_the_generator_output() {
+        let (config, request) = sample_request();
+        let prepared = prepare_solana_settlement(&config, &request).test_unwrap();
+        let mut bytes = serde_json::to_vec_pretty(&prepared).test_unwrap();
+        bytes.push(b'\n');
+        if std::env::var_os("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS").is_some() {
+            std::fs::write(RELEASE_EXAMPLE, &bytes).test_unwrap();
+        }
+        assert_eq!(std::fs::read(RELEASE_EXAMPLE).test_unwrap(), bytes);
+        let committed: PreparedSolanaSettlement = serde_json::from_slice(&bytes).test_unwrap();
+        assert_eq!(committed, prepared);
+    }
+
     #[test]
     fn solana_path_verifies_binding_and_receipt() {
         let (config, request) = sample_request();

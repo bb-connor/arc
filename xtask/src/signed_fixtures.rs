@@ -860,6 +860,27 @@ pub(crate) const STEPS: &[Step] = &[
         ],
     },
     Step {
+        name: "Solana release example",
+        regenerate: cargo_env(
+            &[
+                "test",
+                "-p",
+                "chio-settle",
+                "--lib",
+                "solana::tests::release_example_is_the_generator_output",
+            ],
+            &[("CHIO_WRITE_WEB3_REFERENCE_ARTIFACTS", "1")],
+        ),
+        check: cargo(&[
+            "test",
+            "-p",
+            "chio-settle",
+            "--lib",
+            "solana::tests::release_example_is_the_generator_output",
+        ]),
+        owns: &["docs/standards/CHIO_SETTLE_SOLANA_RELEASE_EXAMPLE.json"],
+    },
+    Step {
         name: "three-vendor, attestation loopback and pheromone relay fixtures",
         regenerate: Invocation::Internal(InternalGenerator::ThreeVendorFixtures),
         check: Invocation::Internal(InternalGenerator::ThreeVendorFixtures),
@@ -983,15 +1004,6 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
                                committed_placeholder_handshake_envelope_is_refused",
         },
         reason: "fuzz seed with an all-zero signature and no capabilities, refused at decoding",
-    },
-    ClosedEntry {
-        pattern: "docs/standards/CHIO_SETTLE_SOLANA_RELEASE_EXAMPLE.json",
-        kind: ClosedKind::FixedPattern {
-            fail_closed_test: "chio-settle --test placeholder_solana_release_example \
-                               committed_placeholder_solana_release_example_is_refused",
-        },
-        reason: "illustrative Solana release document: its ed25519Signature does not verify \
-                 under the key it names and it does not decode as a prepared settlement",
     },
     ClosedEntry {
         pattern: "spec/schemas/signed-artifact-schemas.json",
