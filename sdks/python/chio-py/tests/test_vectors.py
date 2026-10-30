@@ -226,10 +226,15 @@ class VectorTests(unittest.TestCase):
 
     def test_delegated_capability_without_root_delegator_is_refused(self) -> None:
         case = self._delegated_case()
-        for missing in (None, ""):
-            with self.assertRaises(ChioInvariantError) as raised:
-                verify_capability(case["capability"], missing, case["verify_at"])
-            self.assertEqual(raised.exception.code, "delegation_root_unresolved")
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_capability(case["capability"], None, case["verify_at"])
+        self.assertEqual(raised.exception.code, "delegation_root_unresolved")
+
+    def test_empty_root_delegator_is_not_an_absent_root(self) -> None:
+        case = self._delegated_case()
+        with self.assertRaises(ChioInvariantError) as raised:
+            verify_capability(case["capability"], "", case["verify_at"])
+        self.assertEqual(raised.exception.code, "invalid_public_key")
 
     def test_delegated_capability_with_wrong_root_delegator_fails_chain_shape(self) -> None:
         case = self._delegated_case()

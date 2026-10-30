@@ -112,11 +112,11 @@ def _verify_delegation_chain(
     root_delegator: str | None,
     max_delegation_depth: int | None,
 ) -> bool:
-    if root_delegator and not is_valid_public_key_hex(root_delegator):
+    if root_delegator is not None and not is_valid_public_key_hex(root_delegator):
         raise ChioInvariantError("invalid_public_key", "root delegator is not a valid Ed25519 public key")
     if not chain:
         return True
-    if not root_delegator:
+    if root_delegator is None:
         raise ChioInvariantError(
             "delegation_root_unresolved",
             "delegation chain root delegator was not supplied by the verifier",

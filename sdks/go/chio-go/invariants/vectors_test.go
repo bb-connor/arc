@@ -1,6 +1,9 @@
 package invariants_test
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -453,9 +456,13 @@ func TestDelegatedCapabilityWithoutRootDelegatorIsRefused(t *testing.T) {
 
 func TestDelegatedCapabilityWithWrongRootDelegatorFailsChainShape(t *testing.T) {
 	capability, root := delegatedCapabilityCase(t)
-	other := strings.Repeat("0", len(root)-1) + "1"
+	otherKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	other := hex.EncodeToString(otherKey)
 	if other == root {
-		other = strings.Repeat("0", len(root))
+		t.Fatalf("generated key collided with the vector root")
 	}
 	verification, err := invariants.VerifyCapability(capability, other, 1710000400)
 	if err != nil {

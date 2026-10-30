@@ -327,12 +327,19 @@ async function delegatedVectorCase() {
 test("delegated capability without a root delegator is refused", async () => {
   const vectorCase = await delegatedVectorCase();
   const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
-  for (const missing of [undefined, ""]) {
-    assert.throws(
-      () => verifyCapability(capability, missing, vectorCase.verify_at),
-      (error: unknown) => error instanceof ChioInvariantError && error.code === "delegation_root_unresolved",
-    );
-  }
+  assert.throws(
+    () => verifyCapability(capability, undefined, vectorCase.verify_at),
+    (error: unknown) => error instanceof ChioInvariantError && error.code === "delegation_root_unresolved",
+  );
+});
+
+test("an empty root delegator is not an absent root", async () => {
+  const vectorCase = await delegatedVectorCase();
+  const capability = parseCapabilityJson(JSON.stringify(vectorCase.capability));
+  assert.throws(
+    () => verifyCapability(capability, "", vectorCase.verify_at),
+    (error: unknown) => error instanceof ChioInvariantError && error.code === "invalid_public_key",
+  );
 });
 
 test("delegated capability under a wrong root delegator fails the chain shape", async () => {

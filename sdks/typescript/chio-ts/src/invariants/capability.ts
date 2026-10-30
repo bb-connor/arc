@@ -92,13 +92,13 @@ function verifyDelegationChain(
   rootDelegator: string | undefined,
   maxDelegationDepth?: number,
 ): boolean {
-  if (rootDelegator !== undefined && rootDelegator !== "" && !isValidEd25519PublicKeyHex(rootDelegator)) {
+  if (rootDelegator !== undefined && !isValidEd25519PublicKeyHex(rootDelegator)) {
     throw new ChioInvariantError("invalid_public_key", "root delegator is not a valid Ed25519 public key");
   }
   if (chain.length === 0) {
     return true;
   }
-  if (rootDelegator === undefined || rootDelegator === "") {
+  if (rootDelegator === undefined) {
     throw new ChioInvariantError(
       "delegation_root_unresolved",
       "delegation chain root delegator was not supplied by the verifier",
