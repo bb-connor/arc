@@ -540,7 +540,7 @@ fn normalized_alert_authority(url: &url::Url) -> Result<String, ExportError> {
         ExportError::HttpError(format!("endpoint URL `{url}` is missing an authority"))
     })?;
     let host = match url.host() {
-        Some(url::Host::Ipv6(_)) => format!("[{}]", host.to_ascii_lowercase()),
+        Some(url::Host::Ipv6(address)) => format!("[{address}]"),
         Some(url::Host::Domain(_)) => host.trim_end_matches('.').to_ascii_lowercase(),
         _ => host.to_ascii_lowercase(),
     };

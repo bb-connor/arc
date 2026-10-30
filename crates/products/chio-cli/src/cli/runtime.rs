@@ -1489,7 +1489,7 @@ pub(crate) fn cli_normalized_url_authority(url: &url::Url) -> Result<String, Cli
         ))
     })?;
     let host = match url.host() {
-        Some(url::Host::Ipv6(_)) => format!("[{}]", host.to_ascii_lowercase()),
+        Some(url::Host::Ipv6(address)) => format!("[{address}]"),
         Some(url::Host::Domain(_)) => host.trim_end_matches('.').to_ascii_lowercase(),
         _ => host.to_ascii_lowercase(),
     };
