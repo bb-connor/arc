@@ -6090,13 +6090,13 @@ Internet-Draft                Chio Protocol               September 2026
 
    {"capability_id": "cap-1", "reason": "operator_request"}
 
-   Only the service token authenticates this endpoint.  The service
-   records the identifier as revoked without checking that it names an
-   issued capability, so a caller can revoke an identifier before any
-   token uses it.  It answers 200 only after the revocation is visible
-   in its store, 400 for a body that is not this structure, 409 if it
-   has no revocation store, and 503 if the store fails.  A 200 response
-   has these members:
+   A caller authenticates with a credential holding revocations:write.
+   The service records the identifier as revoked without checking that
+   it names an issued capability, so a caller can revoke an identifier
+   before any token uses it.  It answers 200 only after the revocation
+   is visible in its store, 400 for a body that is not this structure,
+   409 if it has no revocation store, and 503 if the store fails.  A 200
+   response has these members:
 
 
 
@@ -6138,12 +6138,12 @@ Internet-Draft                Chio Protocol               September 2026
 
    reason:  The reason of the first revocation.
 
-   GET /v1/revocations, authenticated by the service token, reports
-   revocation state.  With the parameter capability_id, it reports one
-   capability and accepts no other parameter.  The response has the
-   members capability_id, the identifier; revoked, a boolean; and
-   entry_id, the entry_id of the entry that revokes the capability, or
-   null when revoked is false.
+   GET /v1/revocations, authenticated by a credential holding
+   revocations:read, reports revocation state.  With the parameter
+   capability_id, it reports one capability and accepts no other
+   parameter.  The response has the members capability_id, the
+   identifier; revoked, a boolean; and entry_id, the entry_id of the
+   entry that revokes the capability, or null when revoked is false.
 
    {"capability_id": "cap-1", "revoked": false, "entry_id": null}
 
