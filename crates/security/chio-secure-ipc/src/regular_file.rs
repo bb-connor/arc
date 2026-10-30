@@ -3,98 +3,86 @@
 use std::fs::{File, Metadata};
 use std::path::Path;
 
-/// Who may own and write a file before its bytes are used.
+/// Who may own an operator file and which permission bits it may carry.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FilePolicy {
-    /// Secrets and keys: owned by this user, with no group or other access.
-    Private,
+pub enum OpenPolicy {
+    /// The content is verified after the read (signed input), so any owner
+    /// and mode is accepted.
+    Authenticated,
     /// Authority-granting configuration: owned by this user or root, and
     /// neither group nor world writable (sshd `StrictModes`).
     Trusted,
+    /// A secret: owned by this user, with no group or other bits.
+    Private,
 }
 
+/// Why [`open_regular`] or [`read_regular_file`] refused a path.
 #[derive(Debug, thiserror::Error)]
 pub enum RegularFileError {
-    #[error("file is a symbolic link")]
-    Symlink,
-    #[error("file is not a regular file")]
+    #[error("file does not exist")]
+    Missing,
+    #[error("path is a symbolic link")]
+    SymbolicLink,
+    #[error("path is not a regular file")]
     NotRegular,
-    #[error("file is owned by a user its policy does not accept")]
-    ForeignOwner,
-    #[error("file is group or world writable")]
-    Writable,
-    #[error("file grants group or other access")]
-    Exposed,
-    /// The path named a different file at open than at the check.
-    #[error("file was replaced while it was opened")]
-    Replaced,
-    #[error("file is larger than {max_bytes} bytes")]
+    #[error("file is owned by uid {uid}, which the policy does not allow")]
+    ForeignOwner { uid: u32 },
+    #[error("file is writable by group or other (mode {mode:o})")]
+    Writable { mode: u32 },
+    #[error("file is open to group or other (mode {mode:o})")]
+    Exposed { mode: u32 },
+    #[error("file exceeds {max_bytes} bytes")]
     TooLarge { max_bytes: usize },
-    #[error("file could not be read: {0}")]
+    #[error("file cannot be read: {0}")]
     Io(std::io::ErrorKind),
 }
 
 impl From<std::io::Error> for RegularFileError {
     fn from(error: std::io::Error) -> Self {
-        Self::Io(error.kind())
+        #[cfg(unix)]
+        if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) {
+            return Self::SymbolicLink;
+        }
+        match error.kind() {
+            std::io::ErrorKind::NotFound => Self::Missing,
+            kind => Self::Io(kind),
+        }
     }
 }
 
-/// Opens the regular file at `path` under `policy`.
+/// Opens the regular file at `path` if it satisfies `policy`.
 ///
-/// The path is checked with `lstat`, opened with `O_NOFOLLOW` and
-/// `O_NONBLOCK` (a FIFO never blocks the open), and the opened descriptor is
-/// checked again: it must be the same regular file the path named, and its
-/// owner and mode must satisfy `policy`. A missing file is
-/// `Io(ErrorKind::NotFound)`.
+/// The open refuses a final-component symbolic link and never blocks on a
+/// FIFO or device. The type, owner and mode checks run on the opened
+/// descriptor, so a path replaced after the open cannot change what is
+/// checked or read.
 #[cfg(unix)]
-pub fn open_regular(path: &Path, policy: FilePolicy) -> Result<(File, Metadata), RegularFileError> {
+pub fn open_regular(path: &Path, policy: OpenPolicy) -> Result<(File, Metadata), RegularFileError> {
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 
-    let named = std::fs::symlink_metadata(path)?;
-    if named.file_type().is_symlink() {
-        return Err(RegularFileError::Symlink);
-    }
-    if !named.file_type().is_file() {
-        return Err(RegularFileError::NotRegular);
-    }
-    let flags =
-        rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::CLOEXEC;
-    let flags = i32::try_from(flags.bits())
-        .map_err(|_| RegularFileError::Io(std::io::ErrorKind::InvalidInput))?;
-    let file = match std::fs::OpenOptions::new()
+    let file = std::fs::OpenOptions::new()
         .read(true)
-        .custom_flags(flags)
-        .open(path)
-    {
-        Ok(file) => file,
-        Err(error) if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) => {
-            return Err(RegularFileError::Symlink);
-        }
-        Err(error) => return Err(error.into()),
-    };
-    let opened = file.metadata()?;
-    if !opened.file_type().is_file() {
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC)
+        .open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.file_type().is_file() {
         return Err(RegularFileError::NotRegular);
     }
-    if opened.dev() != named.dev() || opened.ino() != named.ino() {
-        return Err(RegularFileError::Replaced);
-    }
-    check_policy(
+    check_ownership(
         policy,
-        opened.uid(),
-        opened.mode(),
+        metadata.uid(),
+        metadata.mode(),
         rustix::process::geteuid().as_raw(),
     )?;
     #[cfg(feature = "test-support")]
-    test_support::before_read(&opened);
-    Ok((file, opened))
+    test_support::before_read(&metadata);
+    Ok((file, metadata))
 }
 
 #[cfg(not(unix))]
 pub fn open_regular(
     _path: &Path,
-    _policy: FilePolicy,
+    _policy: OpenPolicy,
 ) -> Result<(File, Metadata), RegularFileError> {
     Err(RegularFileError::Io(std::io::ErrorKind::Unsupported))
 }
@@ -102,10 +90,10 @@ pub fn open_regular(
 /// Reads the regular file [`open_regular`] opens at `path` under `policy`,
 /// refusing it as [`RegularFileError::TooLarge`] once it holds more than
 /// `max_bytes` bytes. At most `max_bytes + 1` bytes are read.
-pub fn read_regular(
+pub fn read_regular_file(
     path: &Path,
-    policy: FilePolicy,
     max_bytes: usize,
+    policy: OpenPolicy,
 ) -> Result<Vec<u8>, RegularFileError> {
     use std::io::Read;
 
@@ -121,20 +109,28 @@ pub fn read_regular(
     Ok(bytes)
 }
 
-/// The owner and mode rule of `policy`, for a file owned by `uid` with
-/// `mode`, read by `euid`.
-fn check_policy(
-    policy: FilePolicy,
+/// The owner and mode rule of `policy` for a file owned by `uid` with
+/// `st_mode` `mode`, read by `euid`.
+fn check_ownership(
+    policy: OpenPolicy,
     uid: u32,
     mode: u32,
     euid: u32,
 ) -> Result<(), RegularFileError> {
+    let permissions = mode & 0o7777;
     match policy {
-        FilePolicy::Private if uid != euid => Err(RegularFileError::ForeignOwner),
-        FilePolicy::Private if mode & 0o077 != 0 => Err(RegularFileError::Exposed),
-        FilePolicy::Trusted if uid != euid && uid != 0 => Err(RegularFileError::ForeignOwner),
-        FilePolicy::Trusted if mode & 0o022 != 0 => Err(RegularFileError::Writable),
-        FilePolicy::Private | FilePolicy::Trusted => Ok(()),
+        OpenPolicy::Authenticated => Ok(()),
+        OpenPolicy::Trusted if uid != euid && uid != 0 => {
+            Err(RegularFileError::ForeignOwner { uid })
+        }
+        OpenPolicy::Private if uid != euid => Err(RegularFileError::ForeignOwner { uid }),
+        OpenPolicy::Trusted if permissions & 0o022 != 0 => {
+            Err(RegularFileError::Writable { mode: permissions })
+        }
+        OpenPolicy::Private if permissions & 0o077 != 0 => {
+            Err(RegularFileError::Exposed { mode: permissions })
+        }
+        OpenPolicy::Trusted | OpenPolicy::Private => Ok(()),
     }
 }
 
