@@ -117,6 +117,43 @@ pub struct IssuanceRequestRecord {
     pub decision_reason: Option<String>,
 }
 
+/// Proof that a caller won [`IssuanceRequestRepository::claim`]. Each claim of
+/// a request carries a higher `epoch`, so a token from a released claim never
+/// finishes or releases a later one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssuanceClaimToken {
+    challenge_id: String,
+    epoch: u64,
+}
+
+impl IssuanceClaimToken {
+    #[must_use]
+    pub fn new(challenge_id: impl Into<String>, epoch: u64) -> Self {
+        Self {
+            challenge_id: challenge_id.into(),
+            epoch,
+        }
+    }
+
+    #[must_use]
+    pub fn challenge_id(&self) -> &str {
+        &self.challenge_id
+    }
+
+    #[must_use]
+    pub const fn epoch(&self) -> u64 {
+        self.epoch
+    }
+}
+
+/// A won claim: the request, now `deciding`, and the token that alone may
+/// finish or release it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssuanceClaim {
+    pub token: IssuanceClaimToken,
+    pub record: IssuanceRequestRecord,
+}
+
 /// A listing row: the record without its presentation and challenge payloads.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -179,8 +216,8 @@ pub struct IssuanceRequestPage {
 ///   `denied` with reason [`EXPIRED_REASON`] before every capacity check,
 ///   claim and listing; a `deciding` request is never retired, because its
 ///   decision may already have issued authority;
-/// - only the caller that won [`IssuanceRequestRepository::claim`] may
-///   finish or release the request;
+/// - only the [`IssuanceClaimToken`] of the claim in force finishes or
+///   releases a request;
 /// - each method is one atomic unit.
 pub trait IssuanceRequestRepository: Send + Sync {
     /// Store a new pending request. Refuses a record whose challenge expired
@@ -196,27 +233,23 @@ pub trait IssuanceRequestRepository: Send + Sync {
         now: u64,
     ) -> Result<IssuanceRequestPage, IssuanceStoreError>;
 
-    /// Move a pending request to `deciding` and return it. A request that is
-    /// not pending, including one just retired as expired, is `NotPending`.
-    fn claim(
-        &self,
-        challenge_id: &str,
-        now: u64,
-    ) -> Result<IssuanceRequestRecord, IssuanceStoreError>;
+    /// Move a pending request to `deciding` under a new claim. A request that
+    /// is not pending, including one just retired as expired, is `NotPending`.
+    fn claim(&self, challenge_id: &str, now: u64) -> Result<IssuanceClaim, IssuanceStoreError>;
 
-    /// Finish a claimed request. A request that is not `deciding` is
-    /// `NotClaimed`.
+    /// Finish the request `token` claimed. A token that is not the claim in
+    /// force is `NotClaimed`.
     fn finish(
         &self,
-        challenge_id: &str,
+        token: &IssuanceClaimToken,
         decision: &IssuanceDecision,
         now: u64,
         reason: Option<&str>,
     ) -> Result<(), IssuanceStoreError>;
 
-    /// Return a claimed request to `pending` after a decision that had no
-    /// effect. A request that is not `deciding` is `NotClaimed`.
-    fn release(&self, challenge_id: &str) -> Result<(), IssuanceStoreError>;
+    /// Return the request `token` claimed to `pending` after a decision that
+    /// had no effect. A token that is not the claim in force is `NotClaimed`.
+    fn release(&self, token: &IssuanceClaimToken) -> Result<(), IssuanceStoreError>;
 }
 
 #[cfg(any(test, feature = "test-support"))]

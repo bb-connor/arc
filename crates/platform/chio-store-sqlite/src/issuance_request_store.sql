@@ -10,6 +10,7 @@ CREATE TABLE federation_issuance_requests (
     decided_at INTEGER CHECK (decided_at IS NULL OR decided_at >= 0),
     capability_id TEXT,
     decision_reason TEXT,
+    claim_epoch INTEGER NOT NULL CHECK (claim_epoch >= 0),
     CHECK ((status = 'approved') = (capability_id IS NOT NULL))
 ) STRICT;
 CREATE INDEX idx_federation_issuance_requests_status

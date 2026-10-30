@@ -5,9 +5,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use chio_federation::issuance_requests::{
-    IssuanceDecision, IssuanceListQuery, IssuanceRequestPage, IssuanceRequestRecord,
-    IssuanceRequestRepository, IssuanceRequestStatus, IssuanceRequestSummary, IssuanceStoreError,
-    EXPIRED_REASON, MAX_PENDING_ISSUANCE_REQUESTS,
+    IssuanceClaim, IssuanceClaimToken, IssuanceDecision, IssuanceListQuery, IssuanceRequestPage,
+    IssuanceRequestRecord, IssuanceRequestRepository, IssuanceRequestStatus,
+    IssuanceRequestSummary, IssuanceStoreError, EXPIRED_REASON, MAX_PENDING_ISSUANCE_REQUESTS,
 };
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension, Row, TransactionBehavior};
 
@@ -298,23 +298,26 @@ impl IssuanceRequestRepository for SqliteIssuanceRequestStore {
         })
     }
 
-    fn claim(
-        &self,
-        challenge_id: &str,
-        now: u64,
-    ) -> Result<IssuanceRequestRecord, IssuanceStoreError> {
+    fn claim(&self, challenge_id: &str, now: u64) -> Result<IssuanceClaim, IssuanceStoreError> {
         let mut connection = self.lock()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(classify)?;
         expire_stale(&tx, now)?;
-        let changed = tx
-            .execute(sql::CLAIM, params![challenge_id])
+        let epoch: Option<i64> = tx
+            .query_row(sql::CLAIM, params![challenge_id], |row| row.get(0))
+            .optional()
             .map_err(classify)?;
         let record = get_with(&tx, challenge_id)?;
         tx.commit().map_err(classify)?;
-        match (changed, record) {
-            (1, Some(record)) => Ok(record),
+        match (epoch, record) {
+            (Some(epoch), Some(record)) => Ok(IssuanceClaim {
+                token: IssuanceClaimToken::new(
+                    challenge_id,
+                    u64::try_from(epoch).map_err(|_| IssuanceStoreError::Integrity)?,
+                ),
+                record,
+            }),
             (_, Some(_)) => Err(IssuanceStoreError::NotPending(challenge_id.to_string())),
             (_, None) => Err(IssuanceStoreError::NotFound(challenge_id.to_string())),
         }
@@ -322,11 +325,14 @@ impl IssuanceRequestRepository for SqliteIssuanceRequestStore {
 
     fn finish(
         &self,
-        challenge_id: &str,
+        token: &IssuanceClaimToken,
         decision: &IssuanceDecision,
         now: u64,
         reason: Option<&str>,
     ) -> Result<(), IssuanceStoreError> {
+        let challenge_id = token.challenge_id();
+        let not_claimed = || IssuanceStoreError::NotClaimed(challenge_id.to_string());
+        let epoch = i64::try_from(token.epoch()).map_err(|_| not_claimed())?;
         let mut connection = self.lock()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -339,26 +345,30 @@ impl IssuanceRequestRepository for SqliteIssuanceRequestStore {
                     decision.status().as_str(),
                     to_i64(now)?,
                     decision.capability_id(),
-                    reason
+                    reason,
+                    epoch
                 ],
             )
             .map_err(classify)?;
         if changed == 0 {
-            return Err(IssuanceStoreError::NotClaimed(challenge_id.to_string()));
+            return Err(not_claimed());
         }
         tx.commit().map_err(classify)
     }
 
-    fn release(&self, challenge_id: &str) -> Result<(), IssuanceStoreError> {
+    fn release(&self, token: &IssuanceClaimToken) -> Result<(), IssuanceStoreError> {
+        let challenge_id = token.challenge_id();
+        let not_claimed = || IssuanceStoreError::NotClaimed(challenge_id.to_string());
+        let epoch = i64::try_from(token.epoch()).map_err(|_| not_claimed())?;
         let mut connection = self.lock()?;
         let tx = connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(classify)?;
         let changed = tx
-            .execute(sql::RELEASE, params![challenge_id])
+            .execute(sql::RELEASE, params![challenge_id, epoch])
             .map_err(classify)?;
         if changed == 0 {
-            return Err(IssuanceStoreError::NotClaimed(challenge_id.to_string()));
+            return Err(not_claimed());
         }
         tx.commit().map_err(classify)
     }

@@ -4,9 +4,9 @@
 use std::sync::{Arc, Barrier};
 
 use super::{
-    IssuanceDecision, IssuanceListQuery, IssuancePageLimit, IssuanceRequestPage,
-    IssuanceRequestRecord, IssuanceRequestRepository, IssuanceRequestStatus, IssuanceStoreError,
-    EXPIRED_REASON, MAX_ISSUANCE_LIST_PAGE,
+    IssuanceClaim, IssuanceClaimToken, IssuanceDecision, IssuanceListQuery, IssuancePageLimit,
+    IssuanceRequestPage, IssuanceRequestRecord, IssuanceRequestRepository, IssuanceRequestStatus,
+    IssuanceStoreError, EXPIRED_REASON, MAX_ISSUANCE_LIST_PAGE,
 };
 
 /// Opens a fresh, empty repository holding at most `pending_cap` open
@@ -63,6 +63,13 @@ fn next_after(page: &Result<IssuanceRequestPage, IssuanceStoreError>) -> Option<
     page.as_ref().ok().and_then(|page| page.next_after.clone())
 }
 
+fn claimed(claim: Result<IssuanceClaim, IssuanceStoreError>) -> IssuanceClaimToken {
+    match claim {
+        Ok(claim) => claim.token,
+        Err(error) => panic!("claim refused: {error}"),
+    }
+}
+
 fn status_of(
     repository: &dyn IssuanceRequestRepository,
     id: &str,
@@ -95,10 +102,12 @@ pub fn second_submission_for_a_challenge_is_already_submitted(make: Factory<'_>)
 pub fn only_the_claimant_finishes_a_request(make: Factory<'_>) {
     let repository = make(4);
     assert_eq!(repository.submit(&record("c2"), 100), Ok(()));
+    let claim = repository.claim("c2", 120);
     assert!(matches!(
-        repository.claim("c2", 120),
-        Ok(claimed) if claimed.status == IssuanceRequestStatus::Deciding
+        &claim,
+        Ok(claim) if claim.record.status == IssuanceRequestStatus::Deciding
     ));
+    let token = claimed(claim);
     assert_eq!(
         repository.claim("c2", 120).map(|_| ()),
         Err(IssuanceStoreError::NotPending("c2".into()))
@@ -106,7 +115,7 @@ pub fn only_the_claimant_finishes_a_request(make: Factory<'_>) {
     let approved = IssuanceDecision::Approved {
         capability_id: "cap-1".into(),
     };
-    assert_eq!(repository.finish("c2", &approved, 150, None), Ok(()));
+    assert_eq!(repository.finish(&token, &approved, 150, None), Ok(()));
     let stored = repository.get("c2").ok().flatten();
     assert_eq!(
         stored.as_ref().map(|stored| stored.status),
@@ -123,7 +132,7 @@ pub fn only_the_claimant_finishes_a_request(make: Factory<'_>) {
         Some("cap-1")
     );
     assert_eq!(
-        repository.finish("c2", &IssuanceDecision::Denied, 160, Some("late")),
+        repository.finish(&token, &IssuanceDecision::Denied, 160, Some("late")),
         Err(IssuanceStoreError::NotClaimed("c2".into()))
     );
     assert_eq!(
@@ -135,16 +144,44 @@ pub fn only_the_claimant_finishes_a_request(make: Factory<'_>) {
 pub fn released_request_is_pending_again(make: Factory<'_>) {
     let repository = make(4);
     assert_eq!(repository.submit(&record("c3"), 100), Ok(()));
-    assert!(repository.claim("c3", 120).is_ok());
-    assert_eq!(repository.release("c3"), Ok(()));
+    let token = claimed(repository.claim("c3", 120));
+    assert_eq!(repository.release(&token), Ok(()));
     assert_eq!(
         status_of(&*repository, "c3"),
         Some(IssuanceRequestStatus::Pending)
     );
     assert!(repository.claim("c3", 120).is_ok());
     assert_eq!(
-        repository.release("absent"),
+        repository.release(&IssuanceClaimToken::new("absent", 1)),
         Err(IssuanceStoreError::NotClaimed("absent".into()))
+    );
+}
+
+pub fn a_superseded_or_forged_claim_never_finishes_or_releases(make: Factory<'_>) {
+    let repository = make(4);
+    assert_eq!(repository.submit(&record("c4"), 100), Ok(()));
+    let first = claimed(repository.claim("c4", 120));
+    assert_eq!(repository.release(&first), Ok(()));
+    let second = claimed(repository.claim("c4", 130));
+    assert_ne!(first, second);
+    let refused = Err(IssuanceStoreError::NotClaimed("c4".into()));
+    assert_eq!(
+        repository.finish(&first, &IssuanceDecision::Denied, 140, None),
+        refused
+    );
+    assert_eq!(repository.release(&first), refused);
+    let forged = IssuanceClaimToken::new("c4", second.epoch().wrapping_add(1));
+    assert_eq!(
+        repository.finish(&forged, &IssuanceDecision::Denied, 140, None),
+        refused
+    );
+    assert_eq!(
+        status_of(&*repository, "c4"),
+        Some(IssuanceRequestStatus::Deciding)
+    );
+    assert_eq!(
+        repository.finish(&second, &IssuanceDecision::Denied, 150, Some("no")),
+        Ok(())
     );
 }
 
@@ -172,9 +209,9 @@ pub fn expired_pending_request_is_not_claimed(make: Factory<'_>) {
 pub fn denied_request_names_no_capability(make: Factory<'_>) {
     let repository = make(4);
     assert_eq!(repository.submit(&record("c5"), 100), Ok(()));
-    assert!(repository.claim("c5", 120).is_ok());
+    let token = claimed(repository.claim("c5", 120));
     assert_eq!(
-        repository.finish("c5", &IssuanceDecision::Denied, 150, Some("no")),
+        repository.finish(&token, &IssuanceDecision::Denied, 150, Some("no")),
         Ok(())
     );
     let denied = repository.get("c5").ok().flatten();
@@ -195,9 +232,9 @@ pub fn list_pages_summaries_by_status(make: Factory<'_>) {
     for id in ["c4", "c5", "c6"] {
         assert_eq!(repository.submit(&record(id), 100), Ok(()));
     }
-    assert!(repository.claim("c5", 120).is_ok());
+    let token = claimed(repository.claim("c5", 120));
     assert_eq!(
-        repository.finish("c5", &IssuanceDecision::Denied, 150, Some("no")),
+        repository.finish(&token, &IssuanceDecision::Denied, 150, Some("no")),
         Ok(())
     );
     let pending = Some(IssuanceRequestStatus::Pending);
@@ -224,9 +261,9 @@ pub fn status_listing_pages_across_terminal_history(make: Factory<'_>) {
         assert_eq!(repository.submit(&record(id), 100), Ok(()));
     }
     for id in ["d1", "d2", "d3"] {
-        assert!(repository.claim(id, 120).is_ok());
+        let token = claimed(repository.claim(id, 120));
         assert_eq!(
-            repository.finish(id, &IssuanceDecision::Denied, 130, Some("no")),
+            repository.finish(&token, &IssuanceDecision::Denied, 130, Some("no")),
             Ok(())
         );
     }
@@ -352,6 +389,7 @@ pub fn all(make: Factory<'_>) {
     second_submission_for_a_challenge_is_already_submitted(make);
     only_the_claimant_finishes_a_request(make);
     released_request_is_pending_again(make);
+    a_superseded_or_forged_claim_never_finishes_or_releases(make);
     expired_pending_request_is_not_claimed(make);
     denied_request_names_no_capability(make);
     list_pages_summaries_by_status(make);

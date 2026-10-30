@@ -5,16 +5,34 @@ use std::collections::BTreeMap;
 use std::sync::{Mutex, MutexGuard};
 
 use super::{
-    IssuanceDecision, IssuanceListQuery, IssuanceRequestPage, IssuanceRequestRecord,
-    IssuanceRequestRepository, IssuanceRequestStatus, IssuanceRequestSummary, IssuanceStoreError,
-    EXPIRED_REASON, MAX_PENDING_ISSUANCE_REQUESTS,
+    IssuanceClaim, IssuanceClaimToken, IssuanceDecision, IssuanceListQuery, IssuanceRequestPage,
+    IssuanceRequestRecord, IssuanceRequestRepository, IssuanceRequestStatus,
+    IssuanceRequestSummary, IssuanceStoreError, EXPIRED_REASON, MAX_PENDING_ISSUANCE_REQUESTS,
 };
 
 type Requests = BTreeMap<String, IssuanceRequestRecord>;
 
+#[derive(Debug, Default)]
+struct State {
+    requests: Requests,
+    claim_epochs: BTreeMap<String, u64>,
+}
+
+impl State {
+    fn claimed_mut(&mut self, token: &IssuanceClaimToken) -> Option<&mut IssuanceRequestRecord> {
+        let id = token.challenge_id();
+        if self.claim_epochs.get(id) != Some(&token.epoch()) {
+            return None;
+        }
+        self.requests
+            .get_mut(id)
+            .filter(|record| record.status == IssuanceRequestStatus::Deciding)
+    }
+}
+
 #[derive(Debug)]
 pub struct InMemoryIssuanceRequestRepository {
-    requests: Mutex<Requests>,
+    state: Mutex<State>,
     pending_cap: usize,
 }
 
@@ -28,13 +46,13 @@ impl InMemoryIssuanceRequestRepository {
     #[must_use]
     pub fn with_pending_cap(pending_cap: usize) -> Self {
         Self {
-            requests: Mutex::new(BTreeMap::new()),
+            state: Mutex::new(State::default()),
             pending_cap,
         }
     }
 
-    fn lock(&self) -> Result<MutexGuard<'_, Requests>, IssuanceStoreError> {
-        self.requests
+    fn lock(&self) -> Result<MutexGuard<'_, State>, IssuanceStoreError> {
+        self.state
             .lock()
             .map_err(|_| IssuanceStoreError::Unavailable)
     }
@@ -55,8 +73,9 @@ impl IssuanceRequestRepository for InMemoryIssuanceRequestRepository {
         if record.expires_at <= now {
             return Err(IssuanceStoreError::Expired(record.challenge_id.clone()));
         }
-        let mut requests = self.lock()?;
-        Self::expire_stale(&mut requests, now);
+        let mut state = self.lock()?;
+        let requests = &mut state.requests;
+        Self::expire_stale(requests, now);
         if requests.contains_key(&record.challenge_id) {
             return Err(IssuanceStoreError::AlreadySubmitted(
                 record.challenge_id.clone(),
@@ -86,7 +105,7 @@ impl IssuanceRequestRepository for InMemoryIssuanceRequestRepository {
     }
 
     fn get(&self, challenge_id: &str) -> Result<Option<IssuanceRequestRecord>, IssuanceStoreError> {
-        Ok(self.lock()?.get(challenge_id).cloned())
+        Ok(self.lock()?.requests.get(challenge_id).cloned())
     }
 
     fn list(
@@ -94,8 +113,9 @@ impl IssuanceRequestRepository for InMemoryIssuanceRequestRepository {
         query: IssuanceListQuery<'_>,
         now: u64,
     ) -> Result<IssuanceRequestPage, IssuanceStoreError> {
-        let mut requests = self.lock()?;
-        Self::expire_stale(&mut requests, now);
+        let mut state = self.lock()?;
+        let requests = &mut state.requests;
+        Self::expire_stale(requests, now);
         let cursor = match query.after {
             None => None,
             Some(id) => match requests.get(id) {
@@ -130,52 +150,54 @@ impl IssuanceRequestRepository for InMemoryIssuanceRequestRepository {
         })
     }
 
-    fn claim(
-        &self,
-        challenge_id: &str,
-        now: u64,
-    ) -> Result<IssuanceRequestRecord, IssuanceStoreError> {
-        let mut requests = self.lock()?;
-        Self::expire_stale(&mut requests, now);
-        match requests.get_mut(challenge_id) {
-            None => Err(IssuanceStoreError::NotFound(challenge_id.to_string())),
-            Some(record) if record.status == IssuanceRequestStatus::Pending => {
-                record.status = IssuanceRequestStatus::Deciding;
-                Ok(record.clone())
-            }
-            Some(_) => Err(IssuanceStoreError::NotPending(challenge_id.to_string())),
-        }
+    fn claim(&self, challenge_id: &str, now: u64) -> Result<IssuanceClaim, IssuanceStoreError> {
+        let mut state = self.lock()?;
+        let State {
+            requests,
+            claim_epochs,
+        } = &mut *state;
+        Self::expire_stale(requests, now);
+        let record = match requests.get_mut(challenge_id) {
+            None => return Err(IssuanceStoreError::NotFound(challenge_id.to_string())),
+            Some(record) if record.status == IssuanceRequestStatus::Pending => record,
+            Some(_) => return Err(IssuanceStoreError::NotPending(challenge_id.to_string())),
+        };
+        let epoch = claim_epochs.entry(challenge_id.to_string()).or_default();
+        *epoch = epoch
+            .checked_add(1)
+            .ok_or(IssuanceStoreError::Unavailable)?;
+        record.status = IssuanceRequestStatus::Deciding;
+        Ok(IssuanceClaim {
+            token: IssuanceClaimToken::new(challenge_id, *epoch),
+            record: record.clone(),
+        })
     }
 
     fn finish(
         &self,
-        challenge_id: &str,
+        token: &IssuanceClaimToken,
         decision: &IssuanceDecision,
         now: u64,
         reason: Option<&str>,
     ) -> Result<(), IssuanceStoreError> {
-        let mut requests = self.lock()?;
-        match requests.get_mut(challenge_id) {
-            Some(record) if record.status == IssuanceRequestStatus::Deciding => {
-                record.status = decision.status();
-                record.decided_at = Some(now);
-                record.capability_id = decision.capability_id().map(str::to_string);
-                record.decision_reason = reason.map(str::to_string);
-                Ok(())
-            }
-            _ => Err(IssuanceStoreError::NotClaimed(challenge_id.to_string())),
-        }
+        let mut state = self.lock()?;
+        let record = state
+            .claimed_mut(token)
+            .ok_or_else(|| IssuanceStoreError::NotClaimed(token.challenge_id().to_string()))?;
+        record.status = decision.status();
+        record.decided_at = Some(now);
+        record.capability_id = decision.capability_id().map(str::to_string);
+        record.decision_reason = reason.map(str::to_string);
+        Ok(())
     }
 
-    fn release(&self, challenge_id: &str) -> Result<(), IssuanceStoreError> {
-        let mut requests = self.lock()?;
-        match requests.get_mut(challenge_id) {
-            Some(record) if record.status == IssuanceRequestStatus::Deciding => {
-                record.status = IssuanceRequestStatus::Pending;
-                Ok(())
-            }
-            _ => Err(IssuanceStoreError::NotClaimed(challenge_id.to_string())),
-        }
+    fn release(&self, token: &IssuanceClaimToken) -> Result<(), IssuanceStoreError> {
+        let mut state = self.lock()?;
+        let record = state
+            .claimed_mut(token)
+            .ok_or_else(|| IssuanceStoreError::NotClaimed(token.challenge_id().to_string()))?;
+        record.status = IssuanceRequestStatus::Pending;
+        Ok(())
     }
 }
 
