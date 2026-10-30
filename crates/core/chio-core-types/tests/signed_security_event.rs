@@ -325,7 +325,47 @@ mod projection {
         }
     }
 
+    use chio_core_types::receipt::metadata::{MetadataCommitter, ProjectionError};
     use chio_core_types::security_event::SecurityEventProjection;
+
+    /// A receipt whose only committed block is its `security_event` block: one committer
+    /// per receipt, finished once.
+    trait SingleBlockReceipt: Sized {
+        fn project(
+            body: &SecurityEventBody,
+            keys: &TenantIndexKeySet,
+            rng: &dyn Rng,
+        ) -> Result<(Self, MetadataOpenings), ProjectionError>;
+
+        fn matches(
+            &self,
+            body: &SecurityEventBody,
+            openings: &MetadataOpenings,
+            keys: &TenantIndexKeySet,
+        ) -> bool;
+    }
+
+    impl SingleBlockReceipt for SecurityEventProjection {
+        fn project(
+            body: &SecurityEventBody,
+            keys: &TenantIndexKeySet,
+            rng: &dyn Rng,
+        ) -> Result<(Self, MetadataOpenings), ProjectionError> {
+            let mut committer = MetadataCommitter::project(rng);
+            let projection = Self::project_with(body, keys, &mut committer)?;
+            Ok((projection, committer.into_openings()))
+        }
+
+        fn matches(
+            &self,
+            body: &SecurityEventBody,
+            openings: &MetadataOpenings,
+            keys: &TenantIndexKeySet,
+        ) -> bool {
+            let mut committer = MetadataCommitter::verify(openings);
+            self.matches_with(body, keys, &mut committer) && committer.finish().is_ok()
+        }
+    }
 
     #[test]
     fn security_event_projection_carries_no_raw_tenant_or_subject() {

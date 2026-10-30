@@ -3,12 +3,12 @@
 
 use std::cell::Cell;
 
-use chio_core_types::receipt::metadata::{MetadataOpenings, MetadataValue};
+use chio_core_types::receipt::metadata::{MetadataCommitter, MetadataOpenings, MetadataValue};
 use chio_core_types::rng::{Rng, RngError};
 use chio_core_types::root_authority::SaltRef;
 use chio_core_types::tenant_index::{TenantIndexKey, TenantIndexKeySet};
 use chio_kernel::response_simulation_report::{
-    ResponseSimulationProjection, ResponseSimulationReport,
+    ResponseSimulationProjection, ResponseSimulationReport, SimulationProjectionError,
 };
 use chio_response_model::simulation::evaluate_response_simulation;
 use chio_security_types::{ports::*, response_simulation::*};
@@ -16,6 +16,45 @@ use chio_security_types::{ports::*, response_simulation::*};
 #[path = "response_support/simulation.rs"]
 mod support;
 use support::{fixture, TestResult};
+
+/// A receipt whose only committed block is its `response_simulation` block: one committer
+/// per receipt, finished once.
+trait SingleBlockReceipt {
+    fn project(
+        &self,
+        keys: &TenantIndexKeySet,
+        rng: &dyn Rng,
+    ) -> Result<(ResponseSimulationProjection, MetadataOpenings), SimulationProjectionError>;
+
+    fn matches_projection(
+        &self,
+        projection: &ResponseSimulationProjection,
+        openings: &MetadataOpenings,
+        keys: &TenantIndexKeySet,
+    ) -> bool;
+}
+
+impl SingleBlockReceipt for ResponseSimulationReport {
+    fn project(
+        &self,
+        keys: &TenantIndexKeySet,
+        rng: &dyn Rng,
+    ) -> Result<(ResponseSimulationProjection, MetadataOpenings), SimulationProjectionError> {
+        let mut committer = MetadataCommitter::project(rng);
+        let projection = self.project_with(keys, &mut committer)?;
+        Ok((projection, committer.into_openings()))
+    }
+
+    fn matches_projection(
+        &self,
+        projection: &ResponseSimulationProjection,
+        openings: &MetadataOpenings,
+        keys: &TenantIndexKeySet,
+    ) -> bool {
+        let mut committer = MetadataCommitter::verify(openings);
+        self.matches_with(projection, keys, &mut committer) && committer.finish().is_ok()
+    }
+}
 
 struct CountingRng(Cell<u64>);
 

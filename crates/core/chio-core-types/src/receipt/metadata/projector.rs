@@ -1,45 +1,42 @@
 //! Builds and checks signed metadata projections that also carry keyed values: each raw
-//! identifier becomes a `MetadataCommitment` through a `MetadataCommitter`, and each
-//! low-entropy digest a keyed value under the deployment's tenant index key set.
+//! identifier becomes a `MetadataCommitment` through the receipt's `MetadataCommitter`, and
+//! each low-entropy digest a keyed value under the deployment's tenant index key set.
 //!
-//! In project mode keyed values derive under the active generation; in verify mode under the
-//! generation the projection names. The caller compares the rebuilt projection with the
-//! signed one and calls `finish`.
+//! A projector borrows the caller's committer, so every block of one receipt commits through
+//! one committer and the caller calls `finish` once per receipt. Keyed values derive under
+//! the active generation when building and under the generation the signed projection names
+//! when checking.
 
-use crate::receipt::metadata::{
-    MetadataCommitment, MetadataCommitmentError, MetadataCommitter, MetadataOpenings,
-};
-use crate::rng::Rng;
+use crate::receipt::metadata::{MetadataCommitment, MetadataCommitmentError, MetadataCommitter};
 use crate::root_authority::{SaltRef, Sha256Digest};
 use crate::tenant_index::{
     IndexDomain, KeyedIndexValue, TenantBinding, TenantBindingAlg, TenantBindingError,
     TenantIndexKeySet,
 };
 
-/// The state of one projection build or check.
-pub struct MetadataProjector<'a> {
+/// One block's view of a receipt projection build or check.
+pub struct MetadataProjector<'a, 'o> {
     keys: &'a TenantIndexKeySet,
     key_id: Sha256Digest,
-    committer: MetadataCommitter<'a>,
+    committer: &'a mut MetadataCommitter<'o>,
 }
 
-impl<'a> MetadataProjector<'a> {
-    /// Builds a projection under the active generation of `keys`.
+impl<'a, 'o> MetadataProjector<'a, 'o> {
+    /// Derives keyed values under the active generation of `keys`.
     #[must_use]
-    pub fn project(keys: &'a TenantIndexKeySet, rng: &'a dyn Rng) -> Self {
+    pub fn active(keys: &'a TenantIndexKeySet, committer: &'a mut MetadataCommitter<'o>) -> Self {
         Self {
             keys,
             key_id: *keys.active_key_id(),
-            committer: MetadataCommitter::project(rng),
+            committer,
         }
     }
 
-    /// Rebuilds a projection signed under generation `key_id` from `openings`. An unknown
-    /// `key_id` refuses.
-    pub fn verify(
+    /// Derives keyed values under generation `key_id` of `keys`. An unknown `key_id` refuses.
+    pub fn generation(
         keys: &'a TenantIndexKeySet,
         key_id: &Sha256Digest,
-        openings: &'a MetadataOpenings,
+        committer: &'a mut MetadataCommitter<'o>,
     ) -> Result<Self, ProjectionError> {
         if !keys.key_ids().any(|loaded| loaded == key_id) {
             return Err(ProjectionError::Key(
@@ -49,7 +46,7 @@ impl<'a> MetadataProjector<'a> {
         Ok(Self {
             keys,
             key_id: *key_id,
-            committer: MetadataCommitter::verify(openings),
+            committer,
         })
     }
 
@@ -62,7 +59,7 @@ impl<'a> MetadataProjector<'a> {
         Ok(self.committer.commit(salt_ref, value)?)
     }
 
-    /// The keyed value of `domain || preimage` under the projection's generation.
+    /// The keyed value of `domain || preimage` under the projector's generation.
     pub fn keyed(
         &self,
         domain: IndexDomain,
@@ -71,7 +68,7 @@ impl<'a> MetadataProjector<'a> {
         Ok(self.keys.derive_in(&self.key_id, domain, preimage)?)
     }
 
-    /// The tenant binding of `tenant_id` under the projection's generation.
+    /// The tenant binding of `tenant_id` under the projector's generation.
     pub fn tenant_binding(&self, tenant_id: &str) -> Result<TenantBinding, ProjectionError> {
         let keyed = self.keyed(IndexDomain::TenantBinding, tenant_id.as_bytes())?;
         Ok(TenantBinding {
@@ -79,17 +76,6 @@ impl<'a> MetadataProjector<'a> {
             key_id: keyed.key_id,
             value: keyed.value,
         })
-    }
-
-    /// Ends a verify-mode check; see `MetadataCommitter::finish`.
-    pub fn finish(&self) -> Result<(), ProjectionError> {
-        Ok(self.committer.finish()?)
-    }
-
-    /// The openings a project-mode build drew. A verify-mode check draws none.
-    #[must_use]
-    pub fn into_openings(self) -> MetadataOpenings {
-        self.committer.into_openings()
     }
 }
 

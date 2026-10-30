@@ -20,14 +20,13 @@ use chio_security_types::{
 use serde::{Deserialize, Serialize};
 
 use crate::receipt::metadata::{
-    metadata_salt_ref, MetadataCommitment, MetadataOpenings, MetadataProjector, ProjectionError,
+    metadata_salt_ref, MetadataCommitment, MetadataCommitter, MetadataProjector, ProjectionError,
 };
 use crate::receipt::security::{
     ActiveDefenseEffectCommitment, ActiveDefenseEffectOutcome,
     ActiveDefenseEffectOutcomeCommitment, ActiveDefensePolicyBinding, ActiveDefensePriorReceiptIds,
     ActiveDefenseReceiptBody, ActiveDefenseReceiptHeader, ActiveDefenseResponseBinding,
 };
-use crate::rng::Rng;
 use crate::tenant_index::{IndexDomain, KeyedIndexValue, TenantIndexKeySet};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -361,43 +360,37 @@ impl ActiveDefenseReceiptProjection {
 }
 
 impl ActiveDefenseReceiptBody {
-    /// Draws one salt per committed field from `rng` and derives each keyed value under the
-    /// active generation of `keys`; returns the projection and its openings.
-    pub fn project(
+    /// The projection of this body, committing through `committer`, which the receipt's
+    /// other blocks share, and deriving each keyed value under the active generation of
+    /// `keys`.
+    pub fn project_with(
         &self,
         keys: &TenantIndexKeySet,
-        rng: &dyn Rng,
-    ) -> Result<(ActiveDefenseReceiptProjection, MetadataOpenings), ProjectionError> {
-        let mut projector = MetadataProjector::project(keys, rng);
-        let projection = Projection(&mut projector).body(self)?;
-        Ok((projection, projector.into_openings()))
+        committer: &mut MetadataCommitter<'_>,
+    ) -> Result<ActiveDefenseReceiptProjection, ProjectionError> {
+        Projection(&mut MetadataProjector::active(keys, committer)).body(self)
     }
 
-    /// True when every commitment in `projection` opens to this body with `openings`, every
-    /// opening is used, and every keyed value derives from this body under the generation
-    /// the projection names; false on any mismatch, missing or unused opening or unknown
-    /// generation.
+    /// True when `projection` is the projection of this body under `committer` and the
+    /// generation the projection names; false on any mismatch, missing opening or unknown
+    /// generation. The caller calls `finish` once per receipt.
     #[must_use]
-    pub fn matches_projection(
+    pub fn matches_with(
         &self,
         projection: &ActiveDefenseReceiptProjection,
-        openings: &MetadataOpenings,
         keys: &TenantIndexKeySet,
+        committer: &mut MetadataCommitter<'_>,
     ) -> bool {
         let key_id = projection.header().transition_id.key_id;
-        MetadataProjector::verify(keys, &key_id, openings)
-            .and_then(|mut projector| {
-                let rebuilt = Projection(&mut projector).body(self)?;
-                projector.finish()?;
-                Ok(rebuilt)
-            })
+        MetadataProjector::generation(keys, &key_id, committer)
+            .and_then(|mut projector| Projection(&mut projector).body(self))
             .is_ok_and(|rebuilt| rebuilt == *projection)
     }
 }
 
-struct Projection<'p, 'k>(&'p mut MetadataProjector<'k>);
+struct Projection<'p, 'a, 'o>(&'p mut MetadataProjector<'a, 'o>);
 
-impl Projection<'_, '_> {
+impl Projection<'_, '_, '_> {
     fn commit<T: Serialize>(
         &mut self,
         field: &str,

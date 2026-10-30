@@ -93,9 +93,9 @@ mod projection {
     use serde::{Deserialize, Serialize};
 
     use crate::receipt::metadata::{
-        metadata_salt_ref, MetadataCommitment, MetadataOpenings, MetadataProjector, ProjectionError,
+        metadata_salt_ref, MetadataCommitment, MetadataCommitter, MetadataProjector,
+        ProjectionError,
     };
-    use crate::rng::Rng;
     use crate::tenant_index::{TenantBinding, TenantIndexKeySet};
 
     /// Signed metadata block `security_event`: the tenant as a keyed binding, the subject
@@ -111,40 +111,35 @@ mod projection {
     }
 
     impl SecurityEventProjection {
-        /// Projects `body` under the active generation of `keys`, drawing the subject salt
-        /// from `rng`; returns the projection and its openings.
-        pub fn project(
+        /// The projection of `body`, committing the subject through `committer`, which the
+        /// receipt's other blocks share, and binding the tenant under the active generation
+        /// of `keys`.
+        pub fn project_with(
             body: &SecurityEventBody,
             keys: &TenantIndexKeySet,
-            rng: &dyn Rng,
-        ) -> Result<(Self, MetadataOpenings), ProjectionError> {
-            let mut projector = MetadataProjector::project(keys, rng);
-            let projection = Self::build(body, &mut projector)?;
-            Ok((projection, projector.into_openings()))
+            committer: &mut MetadataCommitter<'_>,
+        ) -> Result<Self, ProjectionError> {
+            Self::build(body, &mut MetadataProjector::active(keys, committer))
         }
 
-        /// True when this projection is the projection of `body` under `openings` and the
-        /// generation its tenant binding names; false on any mismatch, missing or unused
-        /// opening or unknown generation.
+        /// True when this projection is the projection of `body` under `committer` and the
+        /// generation its tenant binding names; false on any mismatch, missing opening or
+        /// unknown generation. The caller calls `finish` once per receipt.
         #[must_use]
-        pub fn matches(
+        pub fn matches_with(
             &self,
             body: &SecurityEventBody,
-            openings: &MetadataOpenings,
             keys: &TenantIndexKeySet,
+            committer: &mut MetadataCommitter<'_>,
         ) -> bool {
-            MetadataProjector::verify(keys, &self.tenant_binding.key_id, openings)
-                .and_then(|mut projector| {
-                    let rebuilt = Self::build(body, &mut projector)?;
-                    projector.finish()?;
-                    Ok(rebuilt)
-                })
+            MetadataProjector::generation(keys, &self.tenant_binding.key_id, committer)
+                .and_then(|mut projector| Self::build(body, &mut projector))
                 .is_ok_and(|rebuilt| rebuilt == *self)
         }
 
         fn build(
             body: &SecurityEventBody,
-            projector: &mut MetadataProjector<'_>,
+            projector: &mut MetadataProjector<'_, '_>,
         ) -> Result<Self, ProjectionError> {
             Ok(Self {
                 tenant_binding: projector.tenant_binding(body.tenant_id.as_str())?,
