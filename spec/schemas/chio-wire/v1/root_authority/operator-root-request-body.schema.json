@@ -30,39 +30,7 @@
       "const": "chio.operator-root-request.v1"
     },
     "scope": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "grants"
-      ],
-      "properties": {
-        "grants": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "operations",
-              "server_id",
-              "tool_name"
-            ],
-            "properties": {
-              "operations": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "server_id": {
-                "type": "string"
-              },
-              "tool_name": {
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
+      "$ref": "../capability/token.schema.json#/$defs/chioScope"
     },
     "tenant_value": {
       "type": "string"

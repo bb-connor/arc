@@ -1,0 +1,33 @@
+{
+  "schema": "chio.operator-root-request.v1",
+  "request_id": "req-ops-2026-001",
+  "principal": "ops:carol",
+  "tenant_value": "acme",
+  "scope": {
+    "grants": [
+      {
+        "server_id": "crm",
+        "tool_name": "search",
+        "operations": ["invoke"],
+        "constraints": [],
+        "max_invocations": 1,
+        "dpop_required": false
+      }
+    ],
+    "resource_grants": [
+      {
+        "uri_pattern": "crm://accounts/*",
+        "operations": ["read"]
+      }
+    ],
+    "prompt_grants": [
+      {
+        "prompt_name": "summarize",
+        "operations": ["get"]
+      }
+    ]
+  },
+  "holder": "caller",
+  "expires_at": 1792235100,
+  "signature": "55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555"
+}
