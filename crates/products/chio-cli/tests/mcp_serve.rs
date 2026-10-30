@@ -2750,14 +2750,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
     );
     let (tool_response, notifications_during_call) = read_response(&mut stdout, 2);
     assert!(notifications_during_call.is_empty());
-    assert_eq!(tool_response["result"]["isError"], true);
-    let message = tool_response["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text");
-    assert_eq!(
-        message,
-        "dispatch outcome is unknown after transport_return: CHIO-KERNEL-REQUEST-INCOMPLETE"
-    );
+    assert_closed_denial(&tool_response["result"], "kernel_unavailable");
 
     drop(stdin);
 

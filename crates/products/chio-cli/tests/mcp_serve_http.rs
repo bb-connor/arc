@@ -4485,7 +4485,7 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
     assert!(notifications.is_empty());
     // Fresh admission refreshes lifecycle authority even for an existing
     // session. An unannounced key rotation cannot silently change operator pins.
-    assert_closed_denial(&tool_call_after_rotation["result"], "kernel_unavailable");
+    assert_closed_denial(&tool_call_after_rotation["result"], "capability_invalid");
 
     let rejected_session = post_json(
         &client,
