@@ -4,8 +4,8 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 use chio_kernel::{
-    Guard, GuardContext, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    Verdict,
+    Guard, GuardContext, GuardEvidenceDeclaration, SecurityInvocationContext,
+    SecurityInvocationContextV1, ToolCallRequest, Verdict,
 };
 use chio_security_kernel::{EgressRestrictionGuard, MissingContextPolicy};
 use chio_security_types::ports::{
@@ -232,4 +232,52 @@ fn typed_destination_is_the_request_server_identifier() {
     let destination =
         DestinationId::new("server-a").unwrap_or_else(|error| panic!("destination: {error}"));
     assert_eq!(destination.as_str(), request().server_id);
+}
+
+const MARKER: &str = "chio-egress-deny-marker-5c2e";
+
+/// Deny evidence becomes the signed deny reason, so no path quotes request
+/// text. The guard has no `Err` path; a store outage takes its failure path.
+#[test]
+fn deny_text_carries_no_request_text() {
+    let mut request = request();
+    request.request_id = format!("request-{MARKER}");
+    request.arguments = serde_json::json!({ MARKER: MARKER, "value": MARKER });
+    let scope = request.capability.scope.clone();
+    let security = context();
+    let mut failure_path_ran = false;
+    for behavior in [
+        StoreBehavior::Allow,
+        StoreBehavior::Deny,
+        StoreBehavior::Fail,
+        StoreBehavior::CorruptAllowWithEffects,
+    ] {
+        for security in [Some(&security), None] {
+            let guard = EgressRestrictionGuard::new(
+                Arc::new(FixedEgressStore { behavior }),
+                MissingContextPolicy::Deny,
+            );
+            assert_eq!(guard.evidence_declaration(), GuardEvidenceDeclaration::SAFE);
+            let context = GuardContext::new(&request, &scope).with_security_context(security);
+            let decision = guard
+                .evaluate(&context)
+                .unwrap_or_else(|error| panic!("guard evaluation: {error}"));
+            let details: Vec<_> = decision
+                .evidence
+                .iter()
+                .filter_map(|evidence| evidence.details.as_deref())
+                .collect();
+            for detail in &details {
+                assert!(!detail.contains(MARKER), "{detail}");
+            }
+            if matches!(behavior, StoreBehavior::Fail) && security.is_some() {
+                assert_eq!(details, ["egress restriction lookup failed"]);
+                failure_path_ran = true;
+            }
+            guard
+                .revalidate_before_dispatch(&context)
+                .unwrap_or_else(|error| panic!("revalidation: {error}"));
+        }
+    }
+    assert!(failure_path_ran);
 }

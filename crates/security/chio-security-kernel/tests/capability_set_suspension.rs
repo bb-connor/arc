@@ -4,8 +4,8 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 use chio_kernel::{
-    Guard, GuardContext, GuardDecision, SecurityInvocationContext, SecurityInvocationContextV1,
-    ToolCallRequest, Verdict,
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, SecurityInvocationContext,
+    SecurityInvocationContextV1, ToolCallRequest, Verdict,
 };
 use chio_security_kernel::{CapabilitySetSuspensionGuard, MissingContextPolicy};
 use chio_security_types::ports::{
@@ -248,4 +248,53 @@ fn missing_authoritative_context_denies_without_store_access() {
     let guard = CapabilitySetSuspensionGuard::new(suspension_store, MissingContextPolicy::Deny);
     assert_eq!(evaluate(&guard, &request(), None), Verdict::Deny);
     assert!(store.queries().is_empty());
+}
+
+const MARKER: &str = "chio-suspension-deny-marker-81b0";
+
+/// Deny evidence and the revalidation `Err` become the signed deny reason, so
+/// neither quotes request text. Each behavior denies on revalidation except
+/// `Allow`, and a store outage takes the failure path.
+#[test]
+fn deny_and_err_text_carry_no_request_text() {
+    let mut request = request();
+    request.request_id = format!("request-{MARKER}");
+    request.arguments = serde_json::json!({ MARKER: MARKER, "value": MARKER });
+    let security = security_context();
+    let mut failure_path_ran = false;
+    let mut err_path_ran = false;
+    for behavior in [
+        Behavior::Allow,
+        Behavior::Deny,
+        Behavior::Fail,
+        Behavior::Tamper,
+    ] {
+        for security in [Some(&security), None] {
+            let store: Arc<dyn CapabilitySetSuspensionStore> =
+                Arc::new(FakeSuspensions::new(behavior));
+            let guard = CapabilitySetSuspensionGuard::new(store, MissingContextPolicy::Deny);
+            assert_eq!(guard.evidence_declaration(), GuardEvidenceDeclaration::SAFE);
+            let decision = decide(&guard, &request, security);
+            let details: Vec<_> = decision
+                .evidence
+                .iter()
+                .filter_map(|evidence| evidence.details.as_deref())
+                .collect();
+            for detail in &details {
+                assert!(!detail.contains(MARKER), "{detail}");
+            }
+            if matches!(behavior, Behavior::Fail) && security.is_some() {
+                assert_eq!(details, ["capability suspension lookup failed"]);
+                failure_path_ran = true;
+            }
+            let context = GuardContext::new(&request, &request.capability.scope)
+                .with_security_context(security);
+            if let Err(error) = guard.revalidate_before_dispatch(&context) {
+                assert!(!error.to_string().contains(MARKER), "{error}");
+                err_path_ran = true;
+            }
+        }
+    }
+    assert!(failure_path_ran);
+    assert!(err_path_ran);
 }

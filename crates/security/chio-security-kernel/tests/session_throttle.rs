@@ -6,7 +6,7 @@ use chio_core::Keypair;
 use chio_kernel::{
     ChioKernel, Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelConfig,
     KernelError, MemoryBudgetConfig, NestedFlowBridge, SecurityInvocationContext,
-    SecurityInvocationContextV1, ToolCallRequest, ToolServerConnection, Verdict,
+    SecurityInvocationContextV1, ToolCallRequest, ToolCallResponse, ToolServerConnection, Verdict,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
@@ -299,15 +299,15 @@ fn evaluate(
     request: &ToolCallRequest,
     security: Option<&SecurityInvocationContext>,
 ) -> Verdict {
-    evaluate_recording_attempts(guard, request, security, &Arc::default())
+    respond_recording_attempts(guard, request, security, &Arc::default()).verdict
 }
 
-fn evaluate_recording_attempts(
+fn respond_recording_attempts(
     guard: &Arc<SessionThrottleGuard>,
     request: &ToolCallRequest,
     security: Option<&SecurityInvocationContext>,
     attempts: &Arc<Mutex<Vec<String>>>,
-) -> Verdict {
+) -> ToolCallResponse {
     let mut kernel = ChioKernel::new_with_clock(
         KernelConfig {
             keypair: Keypair::generate(),
@@ -339,9 +339,7 @@ fn evaluate_recording_attempts(
     } else {
         kernel.evaluate_tool_call_blocking(request)
     };
-    result
-        .unwrap_or_else(|error| panic!("evaluate throttle guard: {error}"))
-        .verdict
+    result.unwrap_or_else(|error| panic!("evaluate throttle guard: {error}"))
 }
 
 #[test]
@@ -407,7 +405,7 @@ fn invocation_id_commits_to_the_v1_domain_and_schema_only() {
     let security = security_context(&request);
     let attempts = Arc::default();
     assert_eq!(
-        evaluate_recording_attempts(&guard, &request, Some(&security), &attempts),
+        respond_recording_attempts(&guard, &request, Some(&security), &attempts).verdict,
         Verdict::Allow
     );
     let attempts = attempts
@@ -558,4 +556,49 @@ fn standalone_security_context_cannot_mint_a_kernel_attempt() {
         Verdict::Deny
     );
     assert!(store.invocations().is_empty());
+}
+
+const MARKER: &str = "chio-throttle-deny-marker-4e19";
+
+/// Deny evidence becomes the signed deny reason, so no path quotes request
+/// text. The guard has no `Err` path; a store outage takes its failure path.
+#[test]
+fn deny_reason_carries_no_request_text() {
+    let mut request = request();
+    request.request_id = format!("request-{MARKER}");
+    request.arguments = serde_json::json!({ MARKER: MARKER, "value": MARKER });
+    let security = security_context(&request);
+    for behavior in [
+        Behavior::Allow,
+        Behavior::Deny,
+        Behavior::Fail,
+        Behavior::Tamper,
+    ] {
+        for security in [Some(&security), None] {
+            let store: Arc<dyn SessionThrottleStore> = Arc::new(FakeThrottles::new(behavior));
+            let guard = Arc::new(SessionThrottleGuard::new(
+                store,
+                Arc::new(FixedClock(10_500)),
+                MissingContextPolicy::Deny,
+            ));
+            assert_eq!(guard.evidence_declaration(), GuardEvidenceDeclaration::SAFE);
+            let response = respond_recording_attempts(&guard, &request, security, &Arc::default());
+            let reason = response.reason.unwrap_or_default();
+            assert!(!reason.contains(MARKER), "{reason}");
+            let details: Vec<_> = response
+                .receipt
+                .evidence
+                .iter()
+                .filter(|evidence| evidence.guard_name == "chio-session-throttle")
+                .filter_map(|evidence| evidence.details.as_deref())
+                .collect();
+            for detail in &details {
+                assert!(!detail.contains(MARKER), "{detail}");
+            }
+            if matches!(behavior, Behavior::Fail) && security.is_some() {
+                assert_eq!(response.verdict, Verdict::Deny);
+                assert_eq!(details, ["session throttle consumption failed"]);
+            }
+        }
+    }
 }
