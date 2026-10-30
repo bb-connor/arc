@@ -270,6 +270,9 @@ jobs:
           fi
           echo "cap=${cap}" >> "${GITHUB_OUTPUT}"
 
+      - name: Mutants gate self-test
+        run: bash scripts/tests/mutants-gate-missing-outcomes.test.sh
+
       - name: Apply gate posture (advisory or blocking per releases.toml)
         id: gate
         if: steps.select.outputs.selected == 'true'
