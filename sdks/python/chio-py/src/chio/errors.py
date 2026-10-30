@@ -14,6 +14,7 @@ ChioInvariantErrorCode = Literal[
     "unsupported_algorithm",
     "signature_rejected",
     "disclosure",
+    "delegation_root_unresolved",
 ]
 
 

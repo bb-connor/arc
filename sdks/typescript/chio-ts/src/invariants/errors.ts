@@ -8,7 +8,8 @@ export type ChioInvariantErrorCode =
   | "signature_algorithm_mismatch"
   | "unsupported_algorithm"
   | "signature_rejected"
-  | "disclosure";
+  | "disclosure"
+  | "delegation_root_unresolved";
 
 export class ChioInvariantError extends Error {
   readonly code: ChioInvariantErrorCode;
