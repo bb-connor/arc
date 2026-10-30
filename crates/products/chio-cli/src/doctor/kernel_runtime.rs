@@ -118,8 +118,11 @@ impl Probe for KernelRuntimeProbe {
                 format!("Metrics URL {url} refused by the egress contract: {err}"),
             )
             .with_help(
-                "The doctor probe refuses link-local, private-network and special-use \
-                 targets. The gauge is not checked.",
+                "The doctor probe refuses link-local and special-use targets, and \
+                 reaches a private-network endpoint only by an IPv4 or unique-local \
+                 IPv6 address literal pinned to that address (a /32 or /128). A \
+                 name that resolves into private address space is refused. \
+                 The gauge is not checked.",
             ),
             Err(err) => ProbeReport::fail(
                 self.name(),

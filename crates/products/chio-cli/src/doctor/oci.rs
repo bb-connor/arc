@@ -132,8 +132,11 @@ impl Probe for OciProbe {
                 format!("Registry {registry} refused by the egress contract: {err}"),
             )
             .with_help(
-                "The doctor probe refuses link-local, private-network and special-use \
-                 targets. Reachability of such a registry is not checked.",
+                "The doctor probe refuses link-local and special-use targets, and \
+                 reaches a private-network endpoint only by an IPv4 or unique-local \
+                 IPv6 address literal pinned to that address (a /32 or /128). A \
+                 name that resolves into private address space is refused. \
+                 Reachability of such a registry is not checked.",
             )
             .with_context("registry", registry),
             Err(err) => ProbeReport::fail(

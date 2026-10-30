@@ -61,8 +61,10 @@ fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
 }
 
 /// True when the contract refused the target, as opposed to the target being
-/// unreachable. Private and special-use addresses are always refused by the
-/// contract, so a probe of a private-network endpoint reports a refusal.
+/// unreachable. A private IPv4 or unique-local IPv6 literal is reachable only
+/// through its pinned /32 or /128 allowance. Every other private, special-use
+/// and link-local address is refused, so a probe of such an endpoint reports a
+/// refusal.
 pub(super) fn is_policy_refusal(error: &HttpEgressError) -> bool {
     !matches!(
         error,
@@ -79,6 +81,7 @@ pub(super) fn probe_get(url: &str) -> Result<BlockingContractResponse, HttpEgres
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 pub(crate) mod test_support {
     use std::io::{Read, Write};
     use std::net::TcpListener;
