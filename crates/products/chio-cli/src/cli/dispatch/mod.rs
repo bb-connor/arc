@@ -22,6 +22,7 @@ mod settle_arena;
 #[path = "trust.rs"]
 mod trust_cmd;
 mod trust_emergency;
+mod trust_liability_market;
 mod workflow;
 
 #[cfg(test)]

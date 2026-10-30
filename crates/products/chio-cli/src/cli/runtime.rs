@@ -4,28 +4,24 @@ use super::*;
 mod dpop_authority;
 use dpop_authority::attach_durable_admission_runtime;
 pub(crate) use dpop_authority::{configured_dpop_replay_authority, policy_dpop_replay_authority};
+#[path = "runtime/control_wiring.rs"]
+mod control_wiring;
 #[path = "runtime/remote_mcp_auth_egress.rs"]
 mod remote_mcp_auth_egress;
 #[path = "runtime/session_subject.rs"]
 mod session_subject;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
+use control_wiring::ControlEdge;
+pub(crate) use control_wiring::resolve_sidecar_payment_adapter;
 use remote_mcp_auth_egress::remote_mcp_auth_egress_contract;
 pub(crate) use session_subject::resolve_agent_subject;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::mcp_cli::payment_config::PaymentAdapterConfig;
 
 #[cfg(test)]
 #[path = "runtime/payload_maintenance_tests.rs"]
 mod payload_maintenance_tests;
-
-pub(crate) fn resolve_sidecar_payment_adapter(egress: &chio_egress_contract::EgressAllowanceSet) -> Result<Option<Box<dyn chio_kernel::PaymentAdapter>>, CliError> {
-    let config = PaymentAdapterConfig::from_env(egress).map_err(|error| {
-        CliError::cli_other_error(format!("invalid payment adapter configuration: {error}"))
-    })?;
-    Ok(config.map(|config| config.build_adapter()))
-}
 
 /// The trust-control internal listener URL a kernel host reaches the
 /// admission authority through.
@@ -170,21 +166,10 @@ pub(crate) fn cmd_run(
         .map(DurableAdmissionRuntime::kernel_keypair)
         .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(
-        &mut kernel,
-        receipt_db_path,
-        control_url,
-        control_token,
-        egress,
-    )?;
+    let control = ControlEdge::new(control_url, control_token, egress);
+    control.receipts(&mut kernel, receipt_db_path)?;
     if durable_admission.is_none() {
-        configure_revocation_store(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-            control_token,
-            egress,
-        )?;
+        control.revocations(&mut kernel, revocation_db_path)?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(
@@ -206,13 +191,7 @@ pub(crate) fn cmd_run(
         egress,
     )?;
     if durable_admission.is_none() {
-        configure_budget_store(
-            &mut kernel,
-            budget_db_path,
-            control_url,
-            control_token,
-            egress,
-        )?;
+        control.budgets(&mut kernel, budget_db_path)?;
     }
 
     let session_agent_id = agent_pk.to_hex();
@@ -428,21 +407,10 @@ pub(crate) fn build_mcp_edge_kernel(
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
     let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let mut kernel = build_kernel(loaded_policy, kernel_kp);
-    configure_receipt_store(
-        &mut kernel,
-        stores.receipt_db_path,
-        stores.control_url,
-        stores.control_token,
-        stores.egress,
-    )?;
+    let control = ControlEdge::new(stores.control_url, stores.control_token, stores.egress);
+    control.receipts(&mut kernel, stores.receipt_db_path)?;
     if stores.durable_admission.is_none() {
-        configure_revocation_store(
-            &mut kernel,
-            stores.revocation_db_path,
-            stores.control_url,
-            stores.control_token,
-            stores.egress,
-        )?;
+        control.revocations(&mut kernel, stores.revocation_db_path)?;
     }
     attach_durable_admission_runtime(
         &mut kernel,
@@ -463,13 +431,7 @@ pub(crate) fn build_mcp_edge_kernel(
         stores.egress,
     )?;
     if stores.durable_admission.is_none() {
-        configure_budget_store(
-            &mut kernel,
-            stores.budget_db_path,
-            stores.control_url,
-            stores.control_token,
-            stores.egress,
-        )?;
+        control.budgets(&mut kernel, stores.budget_db_path)?;
     }
     Ok(kernel)
 }
@@ -809,21 +771,10 @@ pub(crate) fn cmd_check(
         .map(DurableAdmissionRuntime::kernel_keypair)
         .unwrap_or_else(Keypair::generate);
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
-    configure_receipt_store(
-        &mut kernel,
-        receipt_db_path,
-        control_url,
-        control_token,
-        egress,
-    )?;
+    let control = ControlEdge::new(control_url, control_token, egress);
+    control.receipts(&mut kernel, receipt_db_path)?;
     if durable_admission.is_none() {
-        configure_revocation_store(
-            &mut kernel,
-            revocation_db_path,
-            control_url,
-            control_token,
-            egress,
-        )?;
+        control.revocations(&mut kernel, revocation_db_path)?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
     attach_durable_admission_runtime(
@@ -845,13 +796,7 @@ pub(crate) fn cmd_check(
         egress,
     )?;
     if durable_admission.is_none() {
-        configure_budget_store(
-            &mut kernel,
-            budget_db_path,
-            control_url,
-            control_token,
-            egress,
-        )?;
+        control.budgets(&mut kernel, budget_db_path)?;
     }
 
     kernel.register_tool_server(Box::new(CheckToolServer {
