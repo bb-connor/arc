@@ -1,24 +1,22 @@
 //! Bearer role separation for a hosted deployment.
 //!
-//! A hosted edge carries up to four bearer roles: the session credential
-//! clients present, the admin credential for the admin routes, the control
-//! credential it presents to the trust service, and the workload credential
-//! the trust service accepts only for capability issuance. The edge refuses
-//! a launch that reuses a value across roles, and this probe reports that
+//! A hosted deployment carries up to three bearer roles: the session
+//! credential clients present, the admin credential for the admin routes, and
+//! the control credential a kernel host presents to the trust service. A
+//! launch refuses a value reused across roles, and this probe reports that
 //! refusal before the launch, from the same environment variables the launch
-//! reads. A role that is not set is not an error: a local edge without a
-//! control URL legitimately carries fewer roles.
+//! reads. A role that is not set is not an error: a host without a control
+//! URL legitimately carries fewer roles.
 
 use std::collections::BTreeMap;
 
 use super::super::probe::{Probe, ProbeConfig, ProbeReport, ProbeSeverity};
 
 /// The environment variables the launch surface reads for each role.
-pub const ROLE_VARIABLES: [(&str, &str); 4] = [
+pub const ROLE_VARIABLES: [(&str, &str); 3] = [
     ("session", "CHIO_AUTH_TOKEN"),
     ("admin", "CHIO_ADMIN_TOKEN"),
     ("control", "CHIO_CONTROL_TOKEN"),
-    ("workload", "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN"),
 ];
 
 /// One defect in the presented roles.
@@ -109,7 +107,7 @@ impl Probe for BearerRoleProbe {
                 "urn:chio:error:cli:other",
                 "no bearer role is set in the environment, so role separation was not checked",
             )
-            .with_help("export CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN, CHIO_CONTROL_TOKEN and CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN as the launch would")
+            .with_help("export CHIO_AUTH_TOKEN, CHIO_ADMIN_TOKEN and CHIO_CONTROL_TOKEN as the launch would")
         } else {
             let defects = role_defects(&self.values);
             if defects.is_empty() {
@@ -149,22 +147,14 @@ mod tests {
 
     #[test]
     fn distinct_usable_roles_pass() {
-        let roles = values(&[
-            ("session", "s"),
-            ("admin", "a"),
-            ("control", "c"),
-            ("workload", "w"),
-        ]);
+        let roles = values(&[("session", "s"), ("admin", "a"), ("control", "c")]);
         assert!(role_defects(&roles).is_empty());
         let report = BearerRoleProbe::with_values(roles).run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Ok);
-        assert!(
-            report
-                .context
-                .iter()
-                .any(|entry| entry.key == "present"
-                    && entry.value == "session,admin,control,workload")
-        );
+        assert!(report
+            .context
+            .iter()
+            .any(|entry| entry.key == "present" && entry.value == "session,admin,control"));
     }
 
     #[test]

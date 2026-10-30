@@ -4,7 +4,7 @@ use tower::ServiceExt;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-async fn state(directory: &FsPath, remote: Option<String>) -> TestResult<RemoteAppState> {
+async fn state(directory: &FsPath) -> TestResult<RemoteAppState> {
     let mut config = test_remote_config();
     config.policy_path = directory.join("policy.yaml");
     std::fs::write(&config.policy_path, "kernel:\n  allow_ephemeral_receipt_log: true\n  allow_ephemeral_revocation_store: true\n  durable_admission_mode: off\n  allow_unsafe_durable_admission_off: true\n")?;
@@ -13,8 +13,6 @@ async fn state(directory: &FsPath, remote: Option<String>) -> TestResult<RemoteA
     configure_signed_manifest(&mut config, directory);
     // The test owns a terminal diagnostic record, without launching an upstream.
     let mut factory = RemoteSessionFactory::new(config.clone())?;
-    factory.config.control_url = remote;
-    factory.config.control_token = Some("separate-control-token".into());
     factory.config.revocation_db_path = Some(directory.join("revocations.db"));
     let sessions = Arc::new(RemoteSessionLedger::new(
         config.clock.clone(),
@@ -89,90 +87,10 @@ async fn revoke(state: &RemoteAppState, status: StatusCode) -> TestResult<Value>
     Ok(serde_json::from_str(&body)?)
 }
 
-#[derive(Default)]
-struct Backend {
-    mode: std::sync::atomic::AtomicUsize,
-    revoked: StdMutex<std::collections::HashSet<String>>,
-}
-
-async fn mock_write(State(backend): State<Arc<Backend>>, Json(body): Json<Value>) -> Response {
-    let id = body["capability_id"].as_str().unwrap_or_default();
-    if backend.mode.load(Ordering::SeqCst) == 1 && id == "b" {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
-    }
-    let newly_revoked = backend.revoked.lock().unwrap().insert(id.into());
-    let entry = chio_core::root_authority::RevocationEntry::new(
-        &chio_core::root_authority::RevocationTarget::capability(id).unwrap(),
-        1_792_234_800,
-        chio_core::root_authority::RevocationReason::OperatorRequest,
-    )
-    .unwrap();
-    Json(json!({
-        "entry": entry,
-        "newly_revoked": newly_revoked,
-        "roots_matched": 1,
-        "roots_revoked": u64::from(newly_revoked),
-    }))
-    .into_response()
-}
-
-async fn mock_read(
-    State(backend): State<Arc<Backend>>,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    if backend.mode.load(Ordering::SeqCst) == 2 {
-        return (StatusCode::INTERNAL_SERVER_ERROR, "private-backend-detail").into_response();
-    }
-    let id = query.get("capability_id").cloned().unwrap_or_default();
-    let revoked =
-        backend.mode.load(Ordering::SeqCst) != 3 && backend.revoked.lock().unwrap().contains(&id);
-    let entry_id = revoked.then(|| {
-        chio_core::root_authority::RevocationTarget::capability(&id)
-            .unwrap()
-            .id()
-    });
-    Json(json!({"capability_id": id, "revoked": revoked, "entry_id": entry_id})).into_response()
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn session_revocation_remote_failures_partial_retry_and_readback() -> TestResult {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-    let endpoint = format!("http://{}", listener.local_addr()?);
-    let backend = Arc::new(Backend::default());
-    let router = Router::new()
-        .route("/v1/revocations", post(mock_write).get(mock_read))
-        .with_state(backend.clone());
-    let server = tokio::spawn(async move { axum::serve(listener, router).await });
-    let directory = tempfile::tempdir()?;
-    let state = state(directory.path(), Some(endpoint)).await?;
-    backend.mode.store(1, Ordering::SeqCst);
-    let partial = revoke(&state, StatusCode::SERVICE_UNAVAILABLE).await?;
-    assert_eq!(partial["revoked"], false);
-    assert_eq!(partial["newlyRevokedCount"], 1);
-    assert_eq!(partial["capabilities"][0]["revoked"], true);
-    assert_eq!(partial["capabilities"][1]["failure"], "write_failed");
-    backend.mode.store(0, Ordering::SeqCst);
-    let retry = revoke(&state, StatusCode::OK).await?;
-    assert_eq!(retry["revoked"], true);
-    assert_eq!(retry["newlyRevokedCount"], 1);
-    assert_eq!(
-        revoke(&state, StatusCode::OK).await?["newlyRevokedCount"],
-        0
-    );
-    for (mode, failure) in [(2, "readback_failed"), (3, "not_confirmed")] {
-        backend.mode.store(mode, Ordering::SeqCst);
-        let failed = revoke(&state, StatusCode::SERVICE_UNAVAILABLE).await?;
-        assert_eq!(failed["revoked"], false);
-        assert_eq!(failed["capabilities"][0]["failure"], failure);
-    }
-    server.abort();
-    Ok(())
-}
-
 #[tokio::test]
 async fn session_revocation_needs_the_durable_local_store() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let state = state(directory.path(), None).await?;
+    let state = state(directory.path()).await?;
     let (status, body) = send_revoke(&state).await?;
     assert_eq!(status, StatusCode::CONFLICT, "{body}");
     assert_eq!(body, "remote trust admin requires durable revocation state");
@@ -200,9 +118,8 @@ async fn mcp_transport_denies_public_plaintext_before_policy_or_store_work() -> 
 #[tokio::test]
 async fn mcp_transport_serves_admin_over_tls() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let fixture = state(directory.path(), None).await?;
+    let fixture = state(directory.path()).await?;
     let mut config = fixture.factory.config.clone();
-    config.control_token = None;
     let identity = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
     let cert = directory.path().join("cert.pem");
     let key = directory.path().join("key.pem");

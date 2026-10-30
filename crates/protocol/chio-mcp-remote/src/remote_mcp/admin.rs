@@ -144,23 +144,10 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
             "audienceConfigured": state.factory.config.auth_jwt_audience.is_some(),
             "adminTokenConfigured": state.admin_token.is_some(),
         },
-        "controlPlane": {
-            "proxied": state.factory.config.control_url.is_some(),
-            "controlUrl": &state.factory.config.control_url,
-            "controlTokenConfigured": state.factory.config.control_token.is_some(),
-            "workloadTokenConfigured": state.factory.config.remote_authority_workload_token.is_some(),
-            "authorityCurrentKeyPinned": state.factory.config.control_authority_public_key.is_some(),
-            "authorityAdditionalTrustedKeyCount": state.factory.config.control_authority_trusted_public_keys.len(),
-        },
         "stores": {
             "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),
-            "revocationsConfigured": state.factory.config.control_url.is_some()
-                || state.factory.durable_admission.is_some(),
             "authorityDbConfigured": state.factory.config.authority_db_path.is_some(),
             "authoritySeedConfigured": state.factory.config.authority_seed_path.is_some(),
-            "budgetsConfigured": state.factory.config.control_url.is_some()
-                || state.factory.config.budget_db_path.is_some()
-                || state.factory.durable_admission.is_some(),
             "sessionTombstonesConfigured": state.factory.config.session_db_path.is_some(),
         },
         "sessions": {
@@ -191,26 +178,6 @@ async fn handle_admin_rotate_authority(
 ) -> Response {
     if let Err(response) = validate_admin_request(request.headers(), state.admin_token.as_deref()) {
         return response;
-    }
-
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match client.rotate_authority() {
-            Ok(status) => Json(json!({
-                "configured": status.configured,
-                "backend": status.backend,
-                "rotated": true,
-                "publicKey": status.public_key,
-                "generation": status.generation,
-                "rotatedAt": status.rotated_at,
-                "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
-                "trustedPublicKeys": status.trusted_public_keys,
-            }))
-            .into_response(),
-            Err(error) => admin_backend_failure(error),
-        };
     }
 
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
@@ -262,22 +229,6 @@ async fn handle_admin_tool_receipts(
         return response;
     }
 
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match client.list_tool_receipts(&ToolReceiptQuery {
-            receipt_id: None,
-            capability_id: query.capability_id.clone(),
-            tool_server: query.tool_server.clone(),
-            tool_name: query.tool_name.clone(),
-            decision: query.decision.clone(),
-            limit: Some(admin_list_limit(query.limit)),
-        }) {
-            Ok(response) => Json(response).into_response(),
-            Err(error) => admin_backend_failure(error),
-        };
-    }
     let store = match open_receipt_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
@@ -332,23 +283,6 @@ async fn handle_admin_child_receipts(
         return response;
     }
 
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match client.list_child_receipts(&ChildReceiptQuery {
-            receipt_id: None,
-            session_id: query.session_id.clone(),
-            parent_request_id: query.parent_request_id.clone(),
-            request_id: query.request_id.clone(),
-            operation_kind: query.operation_kind.clone(),
-            terminal_state: query.terminal_state.clone(),
-            limit: Some(admin_list_limit(query.limit)),
-        }) {
-            Ok(response) => Json(response).into_response(),
-            Err(error) => admin_backend_failure(error),
-        };
-    }
     let store = match open_receipt_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
@@ -405,19 +339,6 @@ async fn handle_admin_budgets(
         return response;
     }
 
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match client.list_budgets(&trust_control::BudgetQuery {
-            capability_id: query.capability_id.clone(),
-            limit: Some(admin_list_limit(query.limit)),
-        }) {
-            Ok(response) => Json(response).into_response(),
-            Err(error) => admin_backend_failure(error),
-        };
-    }
-
     let store = match open_budget_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
@@ -470,25 +391,6 @@ async fn handle_admin_revocations(
         return invalid_revocation_request();
     };
 
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match listing {
-            trust_control::RevocationListing::Status(capability_id) => {
-                match client.revocation_status(&capability_id) {
-                    Ok(response) => Json(response).into_response(),
-                    Err(error) => admin_backend_failure(error),
-                }
-            }
-            trust_control::RevocationListing::Page { after, limit, kind } => {
-                match client.list_revocation_entries(after, limit, kind) {
-                    Ok(response) => Json(response).into_response(),
-                    Err(error) => admin_backend_failure(error),
-                }
-            }
-        };
-    }
     let store = match open_revocation_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
@@ -549,22 +451,6 @@ async fn handle_admin_revoke_capability(
         return invalid_revocation_request();
     };
 
-    if let Some(client) = match control_client(&state) {
-        Ok(client) => client,
-        Err(response) => return response,
-    } {
-        return match client.revoke_capability(&capability_id, reason) {
-            Ok(response) => Json(json!({
-                "reason_conflict": response.entry.reason != reason,
-                "entry": response.entry,
-                "newly_revoked": response.newly_revoked,
-                "roots_matched": response.roots_matched,
-                "roots_revoked": response.roots_revoked,
-            }))
-            .into_response(),
-            Err(error) => admin_backend_failure(error),
-        };
-    }
     let store = match open_revocation_store(&state) {
         Ok(store) => store,
         Err(response) => return response,
@@ -814,23 +700,6 @@ fn admin_list_limit(requested: Option<usize>) -> usize {
         .clamp(1, MAX_ADMIN_LIST_LIMIT)
 }
 
-fn control_client(
-    state: &RemoteAppState,
-) -> Result<Option<trust_control::TrustControlClient>, Response> {
-    let Some(url) = state.factory.config.control_url.as_deref() else {
-        return Ok(None);
-    };
-    let Some(token) = state.factory.config.control_token.as_deref() else {
-        return Err(plain_http_error(
-            StatusCode::CONFLICT,
-            "remote trust admin requires --control-token when --control-url is configured",
-        ));
-    };
-    trust_control::service_runtime::client::build_client(url, token)
-        .map(Some)
-        .map_err(admin_backend_failure)
-}
-
 /// A trust backend failure answers the fixed 500 URN. The cause stays in the
 /// server log because it can name store paths, peer URLs and backend bodies.
 fn admin_backend_failure(error: impl std::fmt::Display) -> Response {
@@ -896,19 +765,6 @@ fn open_budget_store(
 }
 
 fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
-    if let Some(client) = control_client(state)? {
-        let status = client.authority_status().map_err(admin_backend_failure)?;
-        return Ok(json!({
-            "configured": status.configured,
-            "backend": status.backend,
-            "publicKey": status.public_key,
-            "generation": status.generation,
-            "rotatedAt": status.rotated_at,
-            "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
-            "trustedPublicKeys": status.trusted_public_keys,
-        }));
-    }
-
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
         let status = chio_store_sqlite::SqliteCapabilityAuthority::open(path)
             .and_then(|authority| authority.status())
@@ -957,25 +813,6 @@ fn load_session_revocation_status(
     state: &RemoteAppState,
     capabilities: &[RemoteSessionCapability],
 ) -> Result<Vec<Value>, Response> {
-    if let Some(client) = control_client(state)? {
-        return capabilities
-            .iter()
-            .map(|capability| {
-                client
-                    .revocation_status(&capability.id)
-                    .map(|response| {
-                        json!({
-                            "capabilityId": capability.id,
-                            "issuerPublicKey": capability.issuer_public_key,
-                            "subjectPublicKey": capability.subject_public_key,
-                            "revoked": response.revoked,
-                        })
-                    })
-                    .map_err(admin_backend_failure)
-            })
-            .collect();
-    }
-
     let store = open_revocation_store(state)?;
     capabilities
         .iter()

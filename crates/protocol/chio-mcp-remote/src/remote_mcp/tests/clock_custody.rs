@@ -4,9 +4,6 @@ use chio_security_types::clock::{ClockReading, MonotonicInstant};
 #[path = "clock_custody/dispatch.rs"]
 mod dispatch;
 
-#[path = "clock_custody/pinned_authority.rs"]
-mod pinned_authority;
-
 pub(super) struct TestClock(pub(super) StdMutex<Result<ClockReading, ClockError>>);
 impl Clock for TestClock {
     fn read(&self) -> Result<ClockReading, ClockError> {

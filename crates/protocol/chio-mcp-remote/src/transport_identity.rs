@@ -61,8 +61,6 @@ impl TrustedProxyConfig {
         for token in [
             &config.auth_token,
             &config.admin_token,
-            &config.control_token,
-            &config.remote_authority_workload_token,
             &config.auth_introspection_client_secret,
         ]
         .into_iter()

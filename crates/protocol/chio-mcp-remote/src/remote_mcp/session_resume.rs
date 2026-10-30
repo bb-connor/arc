@@ -268,12 +268,6 @@ fn fingerprint_remote_runtime_contract(
             "serialize signed manifest for resume binding: {error}"
         ))
     })?;
-    let mut trusted_authority_keys = config
-        .control_authority_trusted_public_keys
-        .iter()
-        .map(PublicKey::to_hex)
-        .collect::<Vec<_>>();
-    trusted_authority_keys.sort();
     let contract = json!({
         "schema": "chio.remote-mcp.resume-runtime-contract.v1",
         "trusted_proxy": config.trusted_proxy.as_ref().map(TrustedProxyConfig::fingerprint),
@@ -294,14 +288,6 @@ fn fingerprint_remote_runtime_contract(
         "admitted_signed_manifest_sha256": sha256_hex(&signed_manifest),
         "egress_contract": config.egress_contract,
         "approval_authority": config.approval,
-        "remote_authority": {
-            "control_url": config.control_url,
-            "control_internal_url": config.control_internal_url,
-            "service_token_sha256": config.control_token.as_deref().map(|token| sha256_hex(token.as_bytes())),
-            "workload_token_sha256": config.remote_authority_workload_token.as_deref().map(|token| sha256_hex(token.as_bytes())),
-            "current_public_key": config.control_authority_public_key.as_ref().map(PublicKey::to_hex),
-            "additional_trusted_public_keys": trusted_authority_keys,
-        },
     });
     let encoded = canonical_json_bytes(&contract).map_err(|error| {
         CliError::cli_other_error(format!(

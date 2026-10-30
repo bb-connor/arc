@@ -33,7 +33,6 @@ fn reused_bearer_roles_fail_the_preflight() {
         .env("CHIO_AUTH_TOKEN", "shared-secret")
         .env("CHIO_ADMIN_TOKEN", "shared-secret")
         .env("CHIO_CONTROL_TOKEN", "control-secret")
-        .env_remove("CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN")
         .arg("--receipt-db")
         .arg(temporary.path().join("receipts.sqlite3"))
         .args(["security", "preflight", "--json"])

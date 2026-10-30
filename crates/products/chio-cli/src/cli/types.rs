@@ -358,18 +358,8 @@ mod cli_env_tests {
         let prior_admin = std::env::var_os("CHIO_ADMIN_TOKEN");
         let prior_mcp_auth = std::env::var_os("CHIO_MCP_AUTH_TOKEN");
         let prior_mcp_admin = std::env::var_os("CHIO_MCP_ADMIN_TOKEN");
-        let prior_workload = std::env::var_os("CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN");
-        let prior_authority_key = std::env::var_os("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY");
-        let authority_key = chio_core::Keypair::from_seed(&[0x51; 32])
-            .public_key()
-            .to_hex();
         std::env::set_var("CHIO_AUTH_TOKEN", "documented-auth-token");
         std::env::set_var("CHIO_ADMIN_TOKEN", "documented-admin-token");
-        std::env::set_var(
-            "CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN",
-            "documented-workload-token",
-        );
-        std::env::set_var("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", &authority_key);
         std::env::remove_var("CHIO_MCP_AUTH_TOKEN");
         std::env::remove_var("CHIO_MCP_ADMIN_TOKEN");
 
@@ -390,13 +380,6 @@ mod cli_env_tests {
             "/bin/true",
         ])
         .unwrap_or_else(|error| panic!("CLI parse failed: {error}"));
-        assert_eq!(
-            parsed
-                .control_authority_public_key
-                .as_ref()
-                .map(chio_core::PublicKey::to_hex),
-            Some(authority_key)
-        );
 
         match parsed.command {
             Commands::Mcp {
@@ -404,17 +387,12 @@ mod cli_env_tests {
                     McpCommands::ServeHttp {
                         auth_token,
                         admin_token,
-                        remote_authority_workload_token,
                         resume_hmac_keyring,
                         ..
                     },
             } => {
                 assert_eq!(auth_token.as_deref(), Some("documented-auth-token"));
                 assert_eq!(admin_token.as_deref(), Some("documented-admin-token"));
-                assert_eq!(
-                    remote_authority_workload_token.as_deref(),
-                    Some("documented-workload-token")
-                );
                 assert_eq!(
                     resume_hmac_keyring.as_deref(),
                     Some(std::path::Path::new("/secure/resume-hmac-keyring.json"))
@@ -427,8 +405,6 @@ mod cli_env_tests {
         restore_env("CHIO_ADMIN_TOKEN", prior_admin);
         restore_env("CHIO_MCP_AUTH_TOKEN", prior_mcp_auth);
         restore_env("CHIO_MCP_ADMIN_TOKEN", prior_mcp_admin);
-        restore_env("CHIO_REMOTE_AUTHORITY_WORKLOAD_TOKEN", prior_workload);
-        restore_env("CHIO_CONTROL_AUTHORITY_PUBLIC_KEY", prior_authority_key);
     }
 
     #[test]

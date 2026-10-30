@@ -68,7 +68,6 @@ use url::Url;
 use zeroize::{Zeroize, Zeroizing};
 
 use chio_control_plane::policy::{load_policy, LoadedPolicy};
-use chio_control_plane::trust_control::service_runtime::remote_authority::build_pinned_remote_capability_authority_with_clock;
 use chio_control_plane::trust_control::{
     self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery,
 };
@@ -79,7 +78,7 @@ use chio_control_plane::{
         EnterpriseProviderKind, EnterpriseProviderRecord, EnterpriseProviderRegistry,
     },
     issue_default_capabilities, load_or_create_authority_keypair, open_durable_admission_runtime,
-    require_control_token, rotate_authority_keypair, validate_distinct_database_paths,
+    rotate_authority_keypair, validate_distinct_database_paths,
     validate_durable_admission_participant_paths, DurableAdmissionRuntime,
 };
 
@@ -204,17 +203,6 @@ pub struct RemoteServeHttpConfig {
     pub admin_token: Option<String>,
     /// Explicit operator principals and activated native approval replay custody.
     pub approval: Option<RemoteApprovalConfig>,
-    pub control_url: Option<String>,
-    /// Trust-control internal listener base URL; durable admission reaches
-    /// the admission authority through it.
-    pub control_internal_url: Option<String>,
-    pub control_token: Option<String>,
-    /// Dedicated trust-control bearer used only for remote capability issuance.
-    pub remote_authority_workload_token: Option<String>,
-    /// Exact current capability-authority key expected from trust-control.
-    pub control_authority_public_key: Option<PublicKey>,
-    /// Exact trusted capability-authority key set expected from trust-control.
-    pub control_authority_trusted_public_keys: Vec<PublicKey>,
     pub public_base_url: Option<String>,
     pub auth_servers: Vec<String>,
     pub auth_authorization_endpoint: Option<String>,
@@ -1130,8 +1118,6 @@ struct RemoteSessionCapability {
     subject_public_key: String,
 }
 
-#[path = "session_core/authority_mode.rs"]
-mod session_core_authority_mode;
 #[path = "session_core/factory.rs"]
 mod session_core_factory;
 #[path = "session_core/ledger.rs"]

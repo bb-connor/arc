@@ -1268,7 +1268,6 @@ pub(crate) fn cmd_mcp_serve_http(
     auth_jwt_issuer: Option<&str>,
     auth_jwt_audience: Option<&str>,
     admin_token: Option<&str>,
-    remote_authority_workload_token: Option<&str>,
     public_base_url: Option<&str>,
     auth_servers: &[String],
     auth_authorization_endpoint: Option<&str>,
@@ -1288,11 +1287,6 @@ pub(crate) fn cmd_mcp_serve_http(
     budget_db_path: Option<&Path>,
     session_db_path: Option<&Path>,
     resume_hmac_keyring_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_internal_url: Option<&str>,
-    control_token: Option<&str>,
-    control_authority_public_key: Option<&chio_core::PublicKey>,
-    control_authority_trusted_public_keys: &[chio_core::PublicKey],
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(&transport, listen)?;
@@ -1352,12 +1346,6 @@ pub(crate) fn cmd_mcp_serve_http(
         auth_jwt_issuer: auth_jwt_issuer.map(ToOwned::to_owned),
         auth_jwt_audience: auth_jwt_audience.map(ToOwned::to_owned),
         admin_token,
-        control_url: control_url.map(ToOwned::to_owned),
-        control_internal_url: control_internal_url.map(ToOwned::to_owned),
-        control_token: control_token.map(ToOwned::to_owned),
-        remote_authority_workload_token: remote_authority_workload_token.map(ToOwned::to_owned),
-        control_authority_public_key: control_authority_public_key.cloned(),
-        control_authority_trusted_public_keys: control_authority_trusted_public_keys.to_vec(),
         public_base_url: public_base_url.map(ToOwned::to_owned),
         auth_servers: auth_servers.to_vec(),
         auth_authorization_endpoint: auth_authorization_endpoint.map(ToOwned::to_owned),

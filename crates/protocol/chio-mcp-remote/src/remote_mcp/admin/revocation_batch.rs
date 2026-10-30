@@ -3,8 +3,6 @@ use super::*;
 
 #[derive(thiserror::Error)]
 enum Failure {
-    #[error("control revocation operation failed")]
-    Control(#[from] CliError),
     #[error("local revocation operation failed")]
     Local(#[from] chio_kernel::RevocationStoreError),
     #[error("backend did not confirm the requested capability")]
@@ -34,44 +32,24 @@ impl std::error::Error for BatchFailure {
     }
 }
 
-enum Backend {
-    Remote(trust_control::TrustControlClient),
-    Local(chio_store_sqlite::SqliteRevocationStore),
-}
+struct Backend(chio_store_sqlite::SqliteRevocationStore);
 impl Backend {
     fn open(state: &RemoteAppState) -> Result<Self, Response> {
-        match control_client(state)? {
-            Some(client) => Ok(Self::Remote(client)),
-            None => open_revocation_store(state).map(Self::Local),
-        }
+        open_revocation_store(state).map(Self)
     }
     fn revoke(&self, id: &str) -> Result<bool, Failure> {
-        match self {
-            Self::Remote(client) => {
-                let response = client.revoke_capability(
-                    id,
-                    chio_core::root_authority::RevocationReason::OperatorRequest,
-                )?;
-                Ok(response.roots_revoked > 0)
-            }
-            Self::Local(store) => {
-                let target = chio_core::root_authority::RevocationTarget::capability(id)
-                    .map_err(|_| Failure::InvalidConfirmation)?;
-                let revocation = store.revoke_target(
-                    &target,
-                    &[],
-                    None,
-                    chio_core::root_authority::RevocationReason::OperatorRequest,
-                )?;
-                Ok(revocation.roots_revoked > 0)
-            }
-        }
+        let target = chio_core::root_authority::RevocationTarget::capability(id)
+            .map_err(|_| Failure::InvalidConfirmation)?;
+        let revocation = self.0.revoke_target(
+            &target,
+            &[],
+            None,
+            chio_core::root_authority::RevocationReason::OperatorRequest,
+        )?;
+        Ok(revocation.roots_revoked > 0)
     }
     fn readback(&self, id: &str) -> Result<bool, Failure> {
-        match self {
-            Self::Remote(client) => Ok(client.revocation_status(id)?.revoked),
-            Self::Local(store) => Ok(store.is_revoked(id)?),
-        }
+        Ok(self.0.is_revoked(id)?)
     }
 }
 

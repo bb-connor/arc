@@ -9,7 +9,6 @@ use tower::ServiceExt;
 const ADMIN_BACKEND_FAILED: &str = "urn:chio:error:transport:admin-backend-failed";
 const SESSION_SEND_FAILED: &str = "urn:chio:error:transport:session-send-failed";
 const INTROSPECTION_UNAVAILABLE: &str = "urn:chio:error:transport:token-introspection-unavailable";
-const BACKEND_DETAIL: &str = "private-backend-detail /srv/chio/authority.sqlite3";
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -71,35 +70,6 @@ fn admin_state(
     })
 }
 
-async fn insert_terminal_session(state: &RemoteAppState) -> TestResult {
-    let now = state.factory.config.clock.millis()?;
-    state.sessions.terminal.lock().await.insert(
-        "terminal".into(),
-        Arc::new(RemoteSessionDiagnosticRecord {
-            session_id: "terminal".into(),
-            auth_context: SessionAuthContext::streamable_http_static_bearer("test", "test", None),
-            capabilities: vec![RemoteSessionCapability {
-                id: "cap-1".into(),
-                issuer_public_key: "issuer".into(),
-                subject_public_key: "subject".into(),
-            }],
-            lifecycle: RemoteSessionLifecycleSnapshot {
-                deadline: None,
-                state: RemoteSessionState::Closed,
-                created_at: now,
-                last_seen_at: now,
-                idle_expires_at: now,
-                drain_deadline_at: None,
-            },
-            protocol_version: None,
-            ownership: Default::default(),
-            terminal_at: now,
-            terminal_reason: None,
-        }),
-    );
-    Ok(())
-}
-
 async fn admin(
     state: &RemoteAppState,
     method: &str,
@@ -127,71 +97,6 @@ fn assert_admin_backend_failed(route: &str, status: StatusCode, body: &str, deta
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{route}: {body}");
     assert_eq!(body, ADMIN_BACKEND_FAILED, "{route}");
     assert!(!body.contains(detail), "{route}");
-}
-
-async fn failing_backend() -> TestResult<(String, tokio::task::JoinHandle<std::io::Result<()>>)> {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-    let endpoint = format!("http://{}", listener.local_addr()?);
-    let router = Router::new()
-        .fallback(|| async { (StatusCode::INTERNAL_SERVER_ERROR, BACKEND_DETAIL).into_response() });
-    let server = tokio::spawn(async move { axum::serve(listener, router).await });
-    Ok((endpoint, server))
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn every_control_backend_failure_answers_the_fixed_urn_without_the_backend_body() -> TestResult
-{
-    let (endpoint, server) = failing_backend().await?;
-    let directory = chio_test_support::private_tempdir()?;
-    let state = admin_state(directory.path(), |config| {
-        config.control_url = Some(endpoint.clone());
-        config.control_token = Some("separate-control-token".into());
-    })?;
-    insert_terminal_session(&state).await?;
-    let client =
-        trust_control::service_runtime::client::build_client(&endpoint, "separate-control-token")?;
-    let cause = tokio::task::spawn_blocking(move || {
-        client
-            .list_budgets(&trust_control::BudgetQuery {
-                capability_id: None,
-                limit: Some(1),
-            })
-            .err()
-            .map(|error| error.to_string())
-    })
-    .await?
-    .ok_or("the failing backend answered a budget list")?;
-    assert!(cause.contains(BACKEND_DETAIL), "{cause}");
-
-    let trust_path = ADMIN_SESSION_TRUST_PATH.replace("{session_id}", "terminal");
-    for (method, path, body) in [
-        ("GET", ADMIN_HEALTH_PATH, None),
-        ("GET", ADMIN_AUTHORITY_PATH, None),
-        ("POST", ADMIN_AUTHORITY_PATH, None),
-        ("GET", ADMIN_TOOL_RECEIPTS_PATH, None),
-        ("GET", ADMIN_CHILD_RECEIPTS_PATH, None),
-        ("GET", ADMIN_BUDGETS_PATH, None),
-        ("GET", ADMIN_REVOCATIONS_PATH, None),
-        (
-            "POST",
-            ADMIN_REVOCATIONS_PATH,
-            Some(json!({
-                "target": {"kind": "capability_id", "capability_id": "cap-1"},
-                "reason": "operator_request"
-            })),
-        ),
-        ("GET", trust_path.as_str(), None),
-    ] {
-        let (status, response) = admin(&state, method, path, body).await?;
-        assert_admin_backend_failed(
-            &format!("{method} {path}"),
-            status,
-            &response,
-            "private-backend-detail",
-        );
-    }
-    server.abort();
-    Ok(())
 }
 
 #[tokio::test]
@@ -248,25 +153,6 @@ async fn a_local_budget_store_failure_answers_the_fixed_urn_without_its_path() -
     })?;
     let (status, response) = admin(&state, "GET", ADMIN_BUDGETS_PATH, None).await?;
     assert_admin_backend_failed("GET budgets", status, &response, &path_text);
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_malformed_control_url_answers_the_fixed_urn_without_its_cause() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let state = admin_state(directory.path(), |config| {
-        config.control_url = Some(" , ".into());
-        config.control_token = Some("separate-control-token".into());
-    })?;
-    for path in [
-        ADMIN_AUTHORITY_PATH,
-        ADMIN_TOOL_RECEIPTS_PATH,
-        ADMIN_BUDGETS_PATH,
-        ADMIN_REVOCATIONS_PATH,
-    ] {
-        let (status, response) = admin(&state, "GET", path, None).await?;
-        assert_admin_backend_failed(path, status, &response, "control URL");
-    }
     Ok(())
 }
 
