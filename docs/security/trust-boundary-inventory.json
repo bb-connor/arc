@@ -23481,7 +23481,7 @@
     "crates/kernel/chio-kernel-mobile/src/lib.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "0803c7b927796232ca4df505bbec715ca1e0ed9b8161eb3be983a4656f8d941b",
-      "source_sha256": "02e5f80c9d496687a11682c7f5318828a5ecbc52007fcc1110f1fc54414b1489",
+      "source_sha256": "50cc986c1604be556b1951a6b22c96bc645bdac6fe6ce9d74745754d0713b5f1",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "evaluate::shared-reader::crates/kernel/chio-kernel-mobile/src/evaluate_input.rs::decode_evaluate_request",
@@ -23512,7 +23512,7 @@
     "crates/sdk/chio-binding-helpers/src/capability.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "19fde1e9a226287425d9637b80805b7a6915faf5981ef852399290d1469276a2",
+      "source_sha256": "118e5a34cc8f7346a9fbdb898c9ceec6fbcf8528f25d33f70fe6ea7fd7930311",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "parse_capability_json::original-json-reader::UntrustedJsonText",
@@ -23539,7 +23539,7 @@
     "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs": {
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
-      "source_sha256": "b5518816be2ebf01a344bbf0ac07c52e19816e2f519348a7811baed1e9b263a1",
+      "source_sha256": "9bc7e1e27d6e5167027ea12a20b9abc0ab5f8e8b59c4e988cd02366da8d189b1",
       "bound_source_sha256": "d8fb28de38318787470167710626a62ad1241ab3e89b0846fa47483d8c8aab11",
       "ingress": [
         "chio_kernel_evaluate_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::evaluate_json_str",
