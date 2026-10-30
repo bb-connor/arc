@@ -2,6 +2,7 @@ package invariants_test
 
 import (
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,11 +36,20 @@ func loadCommittedCases(t *testing.T) []committedCase {
 	return document.Cases
 }
 
+const saltWireError = "salt is not the canonical b64u form of 32 bytes"
+
+// decodeRefusedCases are the committed vectors whose disclosure carries a salt outside the
+// canonical b64u form of 32 bytes. Every other vector decodes.
+var decodeRefusedCases = map[string]bool{
+	"salt_31_bytes":          true,
+	"salt_padded_b64u":       true,
+	"salt_noncanonical_tail": true,
+}
+
 func TestOpenCommitmentsReproducesCommittedVectors(t *testing.T) {
 	cases := loadCommittedCases(t)
-	sawNoncanonicalTail := false
+	refused := 0
 	for _, vector := range cases {
-		sawNoncanonicalTail = sawNoncanonicalTail || vector.ID == "salt_noncanonical_tail"
 		action := vector.Receipt["action"].(map[string]any)
 		parameterCommitment := action["parameter_commitment"].(map[string]any)
 		contentCommitment := vector.Receipt["content_commitment"].(map[string]any)
@@ -51,8 +61,18 @@ func TestOpenCommitmentsReproducesCommittedVectors(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: content preimage: %v", vector.ID, err)
 		}
+		disclosure, err := invariants.ParseReceiptDisclosure(vector.Disclosure)
+		if (err != nil) != decodeRefusedCases[vector.ID] {
+			t.Fatalf("%s: decode error %v, refusal expected %v", vector.ID, err, decodeRefusedCases[vector.ID])
+		}
 		report := invariants.OpeningReport{Parameters: invariants.FieldRejected, Content: invariants.FieldRejected}
-		if disclosure, err := invariants.ParseReceiptDisclosure(vector.Disclosure); err == nil {
+		if err != nil {
+			var invariantError *invariants.InvariantError
+			if !errors.As(err, &invariantError) || invariantError.Code != "disclosure" || invariantError.Message != saltWireError {
+				t.Fatalf("%s: decode refused with %v, expected the salt wire error", vector.ID, err)
+			}
+			refused++
+		} else {
 			report = invariants.OpenCommitments(
 				vector.Receipt["id"].(string),
 				parameterCommitment,
@@ -69,8 +89,8 @@ func TestOpenCommitmentsReproducesCommittedVectors(t *testing.T) {
 			t.Fatalf("%s: disclosure_valid %v, expected %v", vector.ID, report.DisclosureValid, vector.Expected.DisclosureValid)
 		}
 	}
-	if !sawNoncanonicalTail {
-		t.Fatal("committed vectors lack salt_noncanonical_tail")
+	if refused != len(decodeRefusedCases) {
+		t.Fatalf("committed vectors carry %d of the %d decode-refused cases", refused, len(decodeRefusedCases))
 	}
 }
 

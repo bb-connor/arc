@@ -35,7 +35,12 @@ export interface ReceiptCommitment {
   salt_ref: string;
 }
 
-/** `disclosure_valid` is false exactly when the document is tampered disclosure. */
+/**
+ * `disclosure_valid` is false exactly when the document is tampered disclosure. The report covers
+ * only the parameter and content commitments: the delegation-context anchor commitments
+ * (`anchor_subject`, `anchor_tenant`) are outside it, and a disclosure that opens them is accepted
+ * only after they are judged separately.
+ */
 export interface OpeningReport {
   parameters: FieldVerdict;
   content: FieldVerdict;

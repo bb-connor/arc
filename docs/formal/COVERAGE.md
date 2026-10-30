@@ -1350,7 +1350,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `aaadae605fc7a83d5d5f7000a57310a9d8f74fd00c557709ce77e9948e8f1cdd`
+- Input digest: `ae18045bf56dab316cf53d9a660cdae0c4e2e528c589b8b4862674ead7f53d60`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1441,7 +1441,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/receipt/commitment.rs`: `ef845676775d99938542958ac3276afa058b46e691f5293bf95c454c62e66d40`
 - `crates/core/chio-core-types/src/receipt/crypto_floor.rs`: `e81e8154fee4913a55a26a828670c2bd81d3361a1a2b28823ef102464bbc3ed9`
 - `crates/core/chio-core-types/src/receipt/decision.rs`: `5dca4908badbc0cb1400c36ff5ef83689f0659cae9bfeb8b0a749d9128484d28`
-- `crates/core/chio-core-types/src/receipt/disclosure.rs`: `565473aacc9bd8538660bcbd9d1ae361299b7fd547ab4a15a764891c9695972b`
+- `crates/core/chio-core-types/src/receipt/disclosure.rs`: `1d763d2bff1e7f4766971f50627d6fbd1c0d355168115afaa805081b59ab4ff4`
 - `crates/core/chio-core-types/src/receipt/economics.rs`: `1a3290837b0410c56a4817aace836f8528d6c968c6cf0beea27b45d3894877d0`
 - `crates/core/chio-core-types/src/receipt/economics/tests.rs`: `207ab36a7b5b5f22fb5caca84ff03f2a292955d92a83822e94a925b799cbdec7`
 - `crates/core/chio-core-types/src/receipt/evidence.rs`: `f424519ef4952b273d8ee3b797833b89e5aea7bd2c83183d4642cdf23f1382f5`
