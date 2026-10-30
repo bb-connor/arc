@@ -99,9 +99,8 @@ fn settlement_store_binding_if_ready(
     }
     let mut digest = [0u8; 32];
     OsRng.try_fill_bytes(&mut digest).map_err(|error| {
-        ReceiptStoreError::Io(std::io::Error::other(format!(
-            "failed to generate settlement store binding: {error}"
-        )))
+        tracing::error!(%error, "failed to generate settlement store binding");
+        ReceiptStoreError::Io(chio_kernel::IoFault::Other)
     })?;
     Ok(Some(chio_settle::SettlementStoreBinding::from_digest(
         digest,

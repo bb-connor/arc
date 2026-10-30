@@ -1334,7 +1334,19 @@ fn retry_statuses_and_error_adapters_match_expected_behavior() {
     let revocation_error = into_revocation_store_error(CliError::cli_other_error(message.clone()));
     let budget_error = into_budget_store_error(CliError::cli_other_error(message.clone()));
 
-    assert!(receipt_error.to_string().contains(&message));
-    assert!(revocation_error.to_string().contains(&message));
-    assert!(budget_error.to_string().contains(&message));
+    assert!(matches!(
+        receipt_error,
+        ReceiptStoreError::Io(chio_kernel::IoFault::Other)
+    ));
+    assert!(matches!(
+        revocation_error,
+        RevocationStoreError::Io(chio_kernel::IoFault::Other)
+    ));
+    assert!(matches!(
+        budget_error,
+        BudgetStoreError::Io(chio_kernel::IoFault::Other)
+    ));
+    assert!(!receipt_error.to_string().contains(&message));
+    assert!(!revocation_error.to_string().contains(&message));
+    assert!(!budget_error.to_string().contains(&message));
 }

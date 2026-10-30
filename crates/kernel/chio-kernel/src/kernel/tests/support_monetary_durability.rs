@@ -78,7 +78,7 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
             .reverse_charge_cost(capability_id, grant_index, cost_units)?;
         if self.failure == PostCommitBudgetFailure::Reverse {
             return Err(crate::budget_store::BudgetStoreError::Io(
-                std::io::Error::other("reverse acknowledgement lost"),
+                crate::IoFault::Other,
             ));
         }
         Ok(())
@@ -158,7 +158,7 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
         let decision = self.inner.reverse_budget_hold(request)?;
         if self.failure == PostCommitBudgetFailure::Reverse {
             return Err(crate::budget_store::BudgetStoreError::Io(
-                std::io::Error::other("reverse acknowledgement lost"),
+                crate::IoFault::Other,
             ));
         }
         Ok(decision)
@@ -174,7 +174,7 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
         let decision = self.inner.capture_invocation_reservations(request)?;
         if self.failure == PostCommitBudgetFailure::Capture {
             Err(crate::budget_store::BudgetStoreError::Io(
-                std::io::Error::other("capture acknowledgement lost"),
+                crate::IoFault::Other,
             ))
         } else {
             Ok(decision)
@@ -191,7 +191,7 @@ impl crate::budget_store::BudgetStore for CommittingCaptureErrorBudgetStore {
         let decision = self.inner.cancel_captured_before_dispatch(request)?;
         if self.failure == PostCommitBudgetFailure::Cancellation {
             Err(crate::budget_store::BudgetStoreError::Io(
-                std::io::Error::other("cancellation acknowledgement lost"),
+                crate::IoFault::Other,
             ))
         } else {
             Ok(decision)

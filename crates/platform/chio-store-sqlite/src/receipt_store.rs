@@ -3137,9 +3137,7 @@ fn receipt_store_error_snapshot(error: &ReceiptStoreError) -> ReceiptStoreError 
         ReceiptStoreError::Json(error) => ReceiptStoreError::Json(serde_json::Error::io(
             std::io::Error::other(error.to_string()),
         )),
-        ReceiptStoreError::Io(error) => {
-            ReceiptStoreError::Io(std::io::Error::new(error.kind(), error.to_string()))
-        }
+        ReceiptStoreError::Io(fault) => ReceiptStoreError::Io(*fault),
         ReceiptStoreError::CryptoDecode(message) => {
             ReceiptStoreError::CryptoDecode(message.clone())
         }

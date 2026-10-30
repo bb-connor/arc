@@ -2,7 +2,7 @@ use std::fs::{self, File};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Component, Path, PathBuf};
 
-use chio_kernel::AuthorityStoreError;
+use chio_kernel::{AuthorityStoreError, IoFault};
 use chio_sqlite_file_identity::{main_database_file_identity, SqliteFileIdentity};
 use rusqlite::{Connection, OpenFlags};
 use rustix::fs::{mkdirat, openat, Mode, OFlags};
@@ -87,9 +87,7 @@ impl AuthorityCustody {
             .ok_or_else(|| refused("database parent is missing"))?;
         let directories = match prepare_directories(parent, false) {
             Ok(directories) => directories,
-            Err(AuthorityStoreError::Io(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(None)
-            }
+            Err(AuthorityStoreError::Io(IoFault::NotFound)) => return Ok(None),
             Err(error) => return Err(error),
         };
         validate_sidecars(&parsed.filesystem)?;

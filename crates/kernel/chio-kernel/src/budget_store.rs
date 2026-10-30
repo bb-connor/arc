@@ -14,8 +14,8 @@ pub enum BudgetStoreError {
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
-    #[error("failed to prepare budget store directory: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("budget store io fault: {0}")]
+    Io(crate::io_fault::IoFault),
 
     #[error("budget arithmetic overflow: {0}")]
     Overflow(String),
@@ -36,6 +36,12 @@ pub enum BudgetStoreError {
 
     #[error("budget mutation durable outcome is unknown: {0}")]
     OutcomeUnknown(String),
+}
+
+impl From<std::io::Error> for BudgetStoreError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(crate::io_fault::IoFault::from(error.kind()))
+    }
 }
 
 impl From<AccountingError> for BudgetStoreError {

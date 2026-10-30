@@ -5,8 +5,8 @@ pub enum RevocationStoreError {
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
-    #[error("failed to prepare revocation store directory: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("revocation store io fault: {0}")]
+    Io(crate::io_fault::IoFault),
 
     #[error("revocation store synchronization error: {0}")]
     Sync(String),
@@ -41,6 +41,12 @@ pub enum RevocationStoreError {
 
     #[error("revocation entry {entry_id} has inconsistent tag rows")]
     InconsistentTagRows { entry_id: String },
+}
+
+impl From<std::io::Error> for RevocationStoreError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(crate::io_fault::IoFault::from(error.kind()))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

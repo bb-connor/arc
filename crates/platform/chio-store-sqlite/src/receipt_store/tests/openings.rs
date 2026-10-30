@@ -1285,7 +1285,10 @@ fn identity_draw_failure_is_an_entropy_fault_not_a_conflict() -> TestResult {
     let error = seed_receipt_store_identity(&transaction, &FailingRng)
         .err()
         .ok_or("a failed draw seeded a store identity")?;
-    assert!(matches!(error, ReceiptStoreError::Io(_)), "{error:?}");
+    assert!(
+        matches!(error, ReceiptStoreError::Io(chio_kernel::IoFault::Other)),
+        "{error:?}"
+    );
     Ok(())
 }
 

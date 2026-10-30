@@ -23,13 +23,12 @@ impl ReceiptSinkQualification {
         internal_sink_id: &str,
     ) -> Result<Self, ReceiptStoreError> {
         let canonical_path = fs::canonicalize(filesystem_path).map_err(|error| {
-            ReceiptStoreError::Io(std::io::Error::new(
-                error.kind(),
-                format!(
-                    "receipt database filesystem identity is unavailable for {}: {error}",
-                    filesystem_path.display()
-                ),
-            ))
+            tracing::error!(
+                path = %filesystem_path.display(),
+                %error,
+                "receipt database filesystem identity is unavailable"
+            );
+            ReceiptStoreError::from(error)
         })?;
         let path_metadata = fs::symlink_metadata(filesystem_path)?;
         let metadata = fs::metadata(&canonical_path)?;

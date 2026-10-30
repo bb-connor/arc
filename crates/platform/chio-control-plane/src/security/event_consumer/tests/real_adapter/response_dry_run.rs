@@ -605,9 +605,12 @@ fn response_dry_run_diagnostic_retains_readiness_native_and_clock_failures() {
                 "urn:chio:error:kernel:clock-wall-clock-regression"
             );
         } else {
-            assert!(
-                matches!(native, Some(chio_kernel::ReceiptStoreError::Io(error)) if error.kind() == std::io::ErrorKind::PermissionDenied)
-            );
+            assert!(matches!(
+                native,
+                Some(chio_kernel::ReceiptStoreError::Io(
+                    chio_kernel::IoFault::PermissionDenied
+                ))
+            ));
             assert_eq!(
                 error.code().as_str(),
                 "urn:chio:error:attest:receipt-store-unavailable"

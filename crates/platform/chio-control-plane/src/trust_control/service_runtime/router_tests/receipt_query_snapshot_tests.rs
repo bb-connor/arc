@@ -202,7 +202,7 @@ async fn cancelled_export_keeps_its_permit_until_blocking_work_stops() -> TestRe
             let _ = entered.send(());
             release_rx
                 .recv()
-                .map_err(|error| ReceiptStoreError::Io(std::io::Error::other(error)))?;
+                .map_err(|_| ReceiptStoreError::Io(chio_kernel::IoFault::Other))?;
             Ok::<(), ReceiptStoreError>(())
         })
         .await

@@ -65,17 +65,17 @@ pub(super) fn pause_after_receipt_write_before_commit(
         .write(true)
         .create_new(true)
         .open(&ready)
-        .map_err(ReceiptStoreError::Io)?;
+        .map_err(ReceiptStoreError::from)?;
     std::io::Write::write_all(&mut marker, b"receipt-written-before-commit\n")
-        .map_err(ReceiptStoreError::Io)?;
-    marker.sync_all().map_err(ReceiptStoreError::Io)?;
+        .map_err(ReceiptStoreError::from)?;
+    marker.sync_all().map_err(ReceiptStoreError::from)?;
 
     let deadline = Instant::now() + HOOK_TIMEOUT;
     loop {
         match std::fs::metadata(&release) {
             Ok(_) => return Ok(()),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(ReceiptStoreError::Io(error)),
+            Err(error) => return Err(ReceiptStoreError::from(error)),
         }
         if Instant::now() >= deadline {
             return Err(ReceiptStoreError::Conflict(

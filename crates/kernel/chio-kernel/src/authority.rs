@@ -1294,8 +1294,8 @@ pub enum AuthorityStoreError {
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
-    #[error("failed to prepare authority store directory: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("authority store io fault: {0}")]
+    Io(crate::io_fault::IoFault),
 
     #[error("invalid authority seed: {0}")]
     Core(#[from] chio_core::error::Error),
@@ -1317,4 +1317,10 @@ pub enum AuthorityStoreError {
 
     #[error("authority storage uses journal mode `{found}`; readers require WAL")]
     UnsupportedJournalMode { found: String },
+}
+
+impl From<std::io::Error> for AuthorityStoreError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(crate::io_fault::IoFault::from(error.kind()))
+    }
 }

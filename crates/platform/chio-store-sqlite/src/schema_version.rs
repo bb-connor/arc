@@ -64,7 +64,7 @@ impl From<SchemaVersionError> for chio_kernel::ReceiptStoreError {
     fn from(error: SchemaVersionError) -> Self {
         use chio_security_types::schema::SchemaRefusal;
         let refusal = match error {
-            SchemaVersionError::Io(error) => return Self::Io(error),
+            SchemaVersionError::Io(error) => return Self::from(error),
             SchemaVersionError::Sqlite(error) => return Self::Sqlite(error),
             SchemaVersionError::InvalidCreationPlan => SchemaRefusal::InvalidCreationPlan,
             SchemaVersionError::MissingSchema { store_key } => {
@@ -106,7 +106,7 @@ impl From<SchemaVersionError> for chio_kernel::AuthorityStoreError {
     fn from(error: SchemaVersionError) -> Self {
         use chio_security_types::schema::SchemaRefusal;
         let refusal = match error {
-            SchemaVersionError::Io(error) => return Self::Io(error),
+            SchemaVersionError::Io(error) => return Self::from(error),
             SchemaVersionError::Sqlite(error) => return Self::Sqlite(error),
             SchemaVersionError::InvalidCreationPlan => SchemaRefusal::InvalidCreationPlan,
             SchemaVersionError::MissingSchema { store_key } => {

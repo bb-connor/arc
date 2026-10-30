@@ -81,13 +81,13 @@ pub mod dpop;
 pub mod evidence_export;
 #[cfg(not(loom))]
 pub mod execution_nonce;
-pub mod io_fault;
 #[cfg(not(loom))]
 pub mod federation_artifact_store;
 #[cfg(not(loom))]
 pub mod finding_denial;
 #[cfg(all(not(loom), feature = "finding-market"))]
 pub mod finding_pool;
+pub mod io_fault;
 #[cfg(not(loom))]
 pub mod security_admission_operation;
 /// With the market lane compiled out, only the ledger error vocabulary
@@ -274,7 +274,6 @@ pub use authority::{
     CapabilityAuthorityWorkloadBinding, CapabilityIssuanceContext, Clock, ClockError,
     GovernedCapabilityAuthority, LocalCapabilityAuthority, SystemClock,
 };
-pub use io_fault::IoFault;
 #[cfg(not(loom))]
 pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 #[cfg(not(loom))]
@@ -503,6 +502,7 @@ pub use governed_approval_replay::{
     GovernedApprovalReplayStore, InMemoryGovernedApprovalReplayStore,
     DEFAULT_GOVERNED_APPROVAL_REPLAY_CAPACITY,
 };
+pub use io_fault::IoFault;
 #[cfg(not(loom))]
 pub use memory_provenance::{
     classify_memory_action, next_entry_id as next_memory_provenance_entry_id,

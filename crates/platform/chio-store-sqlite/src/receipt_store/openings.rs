@@ -133,9 +133,8 @@ pub(crate) fn seed_receipt_store_identity(
 ) -> Result<StoreId, ReceiptStoreError> {
     let mut bytes = [0_u8; 16];
     rng.fill_bytes(&mut bytes).map_err(|error| {
-        ReceiptStoreError::Io(std::io::Error::other(format!(
-            "receipt store identity draw failed: {error}"
-        )))
+        tracing::error!(%error, "receipt store identity draw failed");
+        ReceiptStoreError::Io(chio_kernel::IoFault::Other)
     })?;
     let store_id = StoreId(hex::encode(bytes));
     transaction.execute(

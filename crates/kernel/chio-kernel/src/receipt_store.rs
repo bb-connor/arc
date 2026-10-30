@@ -358,8 +358,8 @@ pub enum ReceiptStoreError {
     #[error("serialization error: {0}")]
     Json(#[from] serde_json::Error),
 
-    #[error("failed to prepare receipt store directory: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("receipt store io fault: {0}")]
+    Io(crate::io_fault::IoFault),
 
     #[error("crypto decode error: {0}")]
     CryptoDecode(String),
@@ -423,6 +423,12 @@ pub enum ReceiptStoreError {
 
     #[error("receipt {0} is not published in this store")]
     ReceiptNotPublished(String),
+}
+
+impl From<std::io::Error> for ReceiptStoreError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(crate::io_fault::IoFault::from(error.kind()))
+    }
 }
 
 /// Atomic sidecar projections supported by a receipt store.
