@@ -241,34 +241,6 @@ impl PrivateNetworkAllowance {
             },
         })
     }
-
-    /// The allowance an operator grants by naming a private IPv4 literal
-    /// (RFC 1918 or RFC 6598) as an endpoint URL: that address, port and
-    /// scheme only. `None` when the URL host is not such a literal or the
-    /// scheme is not `http` or `https`.
-    #[must_use]
-    pub fn for_private_ipv4_literal(url: &Url) -> Option<Self> {
-        let Some(Host::Ipv4(address)) = url.host() else {
-            return None;
-        };
-        if !is_unlockable_address(IpAddr::V4(address)) {
-            return None;
-        }
-        let scheme = match url.scheme() {
-            "https" => AllowanceScheme::Https,
-            "http" => AllowanceScheme::Http,
-            _ => return None,
-        };
-        Some(Self {
-            host: address.to_string(),
-            port: url.port_or_known_default()?,
-            scheme,
-            cidr: IpCidr {
-                network: IpAddr::V4(address),
-                prefix: 32,
-            },
-        })
-    }
 }
 
 /// Why a declared allowance is refused when its contract is loaded.

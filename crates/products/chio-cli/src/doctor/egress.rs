@@ -1,21 +1,17 @@
 //! Egress contract for the doctor network probes.
 //!
-//! A probe targets one user-configured URL. The contract admits exactly that
-//! authority, never follows redirects, ignores proxy variables, pins the
-//! resolved addresses and refuses link-local answers. A non-loopback
-//! authority also refuses loopback answers. A private IPv4 or unique-local
-//! IPv6 literal is reachable through an allowance pinned to that address;
-//! a name never reaches private address space.
+//! A probe uses the runtime's own single-endpoint contract for the URL the
+//! operator configured: `https`, or plaintext `http` to a loopback host,
+//! that authority only, no redirects, no proxy, and no private, unique-local,
+//! link-local or special-use address. An endpoint the runtime would refuse
+//! is reported as a finding and never dialed.
 
-use std::collections::BTreeSet;
-use std::net::IpAddr;
 use std::time::Duration;
 
 use chio_egress_contract::{
-    BlockingContractAgent, BlockingContractResponse, HttpEgressContract, HttpEgressError,
-    PrivateNetworkAllowance,
+    BlockingContractAgent, BlockingContractResponse, EndpointSource, HttpEgressContract,
+    HttpEgressError,
 };
-use url::{Host, Url};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
 const PROBE_DEADLINE: Duration = Duration::from_secs(10);
@@ -24,52 +20,56 @@ const PROBE_DEADLINE: Duration = Duration::from_secs(10);
 /// above this is refused by the contract and reported as a policy refusal.
 const MAX_PROBE_BODY_BYTES: u64 = 1024 * 1024;
 
+/// Help attached to every egress refusal of a doctor probe.
+pub(super) const REFUSAL_HELP: &str = "The doctor probe uses the runtime's egress contract: \
+     https, or http to a loopback host, no redirects, and no private, unique-local, \
+     link-local or special-use address. A name that resolves into private address \
+     space is refused. The runtime refuses this endpoint too.";
+
 fn probe_contract(url: &str) -> Result<HttpEgressContract, HttpEgressError> {
-    let parsed = Url::parse(url)
-        .map_err(|err| HttpEgressError::InvalidContract(format!("invalid probe url: {err}")))?;
-    let host = parsed
-        .host()
-        .ok_or_else(|| HttpEgressError::InvalidContract("probe url has no host".to_string()))?;
-    let loopback = match &host {
-        Host::Domain(name) => name.trim_end_matches('.').eq_ignore_ascii_case("localhost"),
-        Host::Ipv4(address) => IpAddr::V4(*address).is_loopback(),
-        Host::Ipv6(address) => IpAddr::V6(*address).is_loopback(),
-    };
-    let authority = match (host, parsed.port()) {
-        (Host::Ipv6(address), Some(port)) => format!("[{address}]:{port}"),
-        (Host::Ipv6(address), None) => format!("[{address}]"),
-        (Host::Domain(name), Some(port)) => {
-            format!("{}:{port}", name.trim_end_matches('.').to_ascii_lowercase())
-        }
-        (Host::Domain(name), None) => name.trim_end_matches('.').to_ascii_lowercase(),
-        (host, Some(port)) => format!("{host}:{port}"),
-        (host, None) => host.to_string(),
-    };
-    Ok(HttpEgressContract {
-        tenant_egress_namespace: "chio-doctor".to_string(),
-        allowed_schemes: BTreeSet::from([parsed.scheme().to_string()]),
-        allowed_authority_set: BTreeSet::from([authority]),
-        deny_loopback: !loopback,
-        deny_link_local: true,
-        max_redirect_chain: 0,
-        max_response_bytes: MAX_PROBE_BODY_BYTES,
-        private_network_allowances: PrivateNetworkAllowance::for_private_ipv4_literal(&parsed)
-            .or_else(|| PrivateNetworkAllowance::for_ipv6_ula_literal(&parsed))
-            .into_iter()
-            .collect(),
-    })
+    HttpEgressContract::single_endpoint(
+        EndpointSource::Operator,
+        "chio-doctor",
+        url,
+        MAX_PROBE_BODY_BYTES,
+    )
 }
 
 /// True when the contract refused the target, as opposed to the target being
-/// unreachable. A private IPv4 or unique-local IPv6 literal is reachable only
-/// through its pinned /32 or /128 allowance. Every other private, special-use
-/// and link-local address is refused, so a probe of such an endpoint reports a
-/// refusal.
+/// unreachable.
 pub(super) fn is_policy_refusal(error: &HttpEgressError) -> bool {
-    !matches!(
-        error,
-        HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. }
-    )
+    match error {
+        HttpEgressError::Transport(_) | HttpEgressError::DnsResolutionFailed { .. } => false,
+        HttpEgressError::MissingContract
+        | HttpEgressError::InvalidContract(_)
+        | HttpEgressError::InvalidUrl(_)
+        | HttpEgressError::MissingAuthority
+        | HttpEgressError::UserinfoDenied
+        | HttpEgressError::SchemeDenied { .. }
+        | HttpEgressError::AuthorityDenied { .. }
+        | HttpEgressError::LoopbackDenied { .. }
+        | HttpEgressError::LinkLocalDenied { .. }
+        | HttpEgressError::Ipv6UlaDenied { .. }
+        | HttpEgressError::PrivateNetworkDenied { .. }
+        | HttpEgressError::RedirectLimitExceeded { .. }
+        | HttpEgressError::ResponseTooLarge { .. }
+        | HttpEgressError::InvalidAllowance(_)
+        | HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
+        | HttpEgressError::PrivateNetworkAllowanceSchemeMismatch { .. }
+        | HttpEgressError::ReservedAddressDenied { .. }
+        | HttpEgressError::LoopbackNameResolvedOffHost { .. } => true,
+    }
+}
+
+/// The finding for a refused endpoint. A scheme refusal names the scheme,
+/// because the runtime refuses it for the same reason.
+pub(super) fn refusal_finding(error: &HttpEgressError) -> String {
+    match error {
+        HttpEgressError::SchemeDenied { scheme } => format!(
+            "uses {scheme}, which the runtime refuses: only https, or http to a loopback host, is admitted"
+        ),
+        error => format!("refused by the egress contract: {error}"),
+    }
 }
 
 /// GET `url` under a contract that admits only its own authority.
@@ -125,26 +125,45 @@ mod tests {
     #[test]
     fn link_local_target_is_refused_as_link_local() {
         assert!(matches!(
-            probe_get("http://169.254.169.254/latest/meta-data"),
+            probe_get("https://169.254.169.254/latest/meta-data"),
             Err(HttpEgressError::LinkLocalDenied { .. })
         ));
     }
 
-    fn resolved(
-        contract: &HttpEgressContract,
-        host: &str,
-        address: &str,
-        port: u16,
-    ) -> Result<(), HttpEgressError> {
-        contract.enforce_resolved_address(host, SocketAddr::new(address.parse().unwrap(), port))
+    #[test]
+    fn plaintext_http_to_a_remote_host_is_a_refused_scheme() {
+        let error = probe_get("http://metrics.example.com:9100/metrics").expect_err("http");
+        assert_eq!(
+            error,
+            HttpEgressError::SchemeDenied {
+                scheme: "http".to_string()
+            }
+        );
+        assert!(is_policy_refusal(&error));
+        assert!(refusal_finding(&error).starts_with("uses http, which the runtime refuses"));
+    }
+
+    #[test]
+    fn private_and_unique_local_literals_are_refused() {
+        assert!(matches!(
+            probe_get("https://10.0.0.5:9100/metrics"),
+            Err(HttpEgressError::PrivateNetworkDenied { .. })
+        ));
+        assert!(matches!(
+            probe_get("https://[fd12:3456::7]:9100/metrics"),
+            Err(HttpEgressError::Ipv6UlaDenied { .. })
+        ));
     }
 
     #[test]
     fn a_configured_name_never_reaches_private_address_space() {
-        let contract = probe_contract("http://metrics.example.com:9100/metrics").unwrap();
-        assert!(contract.private_network_allowances.is_empty());
+        let contract = probe_contract("https://metrics.example.com:9100/metrics").unwrap();
         for address in ["10.1.2.3", "172.16.0.1", "192.168.1.1", "100.64.0.1"] {
-            let error = resolved(&contract, "metrics.example.com", address, 9100)
+            let error = contract
+                .enforce_resolved_address(
+                    "metrics.example.com",
+                    SocketAddr::new(address.parse().unwrap(), 9100),
+                )
                 .expect_err("rebound name");
             assert!(matches!(
                 error,
@@ -152,67 +171,19 @@ mod tests {
             ));
             assert!(is_policy_refusal(&error));
         }
-        assert!(resolved(&contract, "metrics.example.com", "93.184.216.34", 9100).is_ok());
     }
 
     #[test]
-    fn a_private_literal_is_reached_only_at_its_pinned_address() {
-        let contract = probe_contract("http://10.0.0.5:9100/metrics").unwrap();
-        assert_eq!(contract.private_network_allowances.len(), 1);
-        assert!(contract
-            .enforce_url("http://10.0.0.5:9100/metrics", 0)
-            .is_ok());
-        assert!(resolved(&contract, "10.0.0.5", "10.0.0.5", 9100).is_ok());
-        for address in ["10.0.0.6", "10.1.2.3", "192.168.1.1", "93.184.216.34"] {
-            let error = resolved(&contract, "10.0.0.5", address, 9100).expect_err("off pin");
-            assert!(
-                matches!(
-                    error,
-                    HttpEgressError::PrivateNetworkAllowanceMismatch { .. }
-                ),
-                "{address}"
-            );
-        }
-    }
-
-    #[test]
-    fn a_unique_local_literal_is_pinned_and_other_private_space_stays_refused() {
-        let contract = probe_contract("http://[fd12:3456::7]:9100/metrics").unwrap();
-        assert_eq!(contract.private_network_allowances.len(), 1);
-        assert!(resolved(&contract, "fd12:3456::7", "fd12:3456::7", 9100).is_ok());
-        assert!(resolved(&contract, "fd12:3456::7", "fd12:3456::8", 9100).is_err());
-    }
-
-    #[test]
-    fn metadata_and_public_literals_get_no_allowance() {
-        for url in [
-            "http://169.254.169.254/latest/meta-data",
-            "http://100.100.100.200/",
-            "http://93.184.216.34/",
-        ] {
-            assert!(probe_contract(url)
+    fn only_a_loopback_url_may_use_plaintext_http() {
+        assert!(
+            !probe_contract("http://localhost.:9100/metrics")
                 .unwrap()
-                .private_network_allowances
-                .is_empty());
-        }
-        assert!(matches!(
-            probe_get("http://100.100.100.200/"),
-            Err(HttpEgressError::PrivateNetworkDenied { .. })
-        ));
-    }
-
-    #[test]
-    fn trailing_dot_authority_matches_its_contract() {
-        let contract = probe_contract("http://localhost.:9100/metrics").unwrap();
-        assert!(!contract.deny_loopback);
-        assert!(contract.allowed_authority_set.contains("localhost:9100"));
-        let contract = probe_contract("https://registry.example.com./v2/").unwrap();
-        assert!(contract.deny_loopback);
-        assert!(contract
-            .allowed_authority_set
-            .contains("registry.example.com"));
-        assert!(contract
-            .enforce_url("https://registry.example.com./v2/", 0)
-            .is_ok());
+                .deny_loopback
+        );
+        assert!(
+            probe_contract("https://registry.example.com./v2/")
+                .unwrap()
+                .deny_loopback
+        );
     }
 }
