@@ -122,3 +122,121 @@ fn a_conflicting_root_is_recorded_once_with_the_accepted_root() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_reopened_mirror_keeps_its_accepted_root_tree_and_conflicts() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("mirror.sqlite3");
+    let first = [leaf(1, "passport-a")];
+    let accepted = partner_root(&first, 2_000);
+    let mut stale = accepted.root.clone();
+    stale.issued_at_unix_ms = 1_500;
+    let offered = signed(stale);
+    {
+        let mirror = SqlitePartnerMirror::open(&path, "alpha")?;
+        mirror.apply(&accepted, &first, 2_000)?;
+        mirror.record_conflict("rollback", &offered, 3_000)?;
+    }
+
+    let reopened = SqlitePartnerMirror::open(&path, "alpha")?;
+    let view = reopened.view(&[leaf(1, "passport-a").to_revocation_key()])?;
+    assert_eq!(view.accepted, Some(accepted.clone()));
+    assert!(view.tree.same_tree(&accepted.root));
+    assert_eq!(
+        view.revoked,
+        Some(leaf(1, "passport-a").to_revocation_key())
+    );
+    assert_eq!(
+        reopened.conflicts()?,
+        vec![PartnerMirrorConflict {
+            observed_at_unix_ms: 3_000,
+            reason: "rollback".to_owned(),
+            accepted_root: Some(accepted),
+            offered_root: offered,
+        }]
+    );
+    Ok(())
+}
+
+#[test]
+fn a_tree_written_outside_the_mirror_refuses_every_apply() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("mirror.sqlite3");
+    let mirror = SqlitePartnerMirror::open(&path, "alpha")?;
+    let first = [leaf(1, "passport-a")];
+    let accepted = partner_root(&first, 2_000);
+    mirror.apply(&accepted, &first, 2_000)?;
+    SqliteRevocationOracle::open(&path)?
+        .revoke(leaf(2, "passport-b").to_revocation_key(), 2_500)?;
+
+    let next = [leaf(1, "passport-a"), leaf(2, "passport-b")];
+    assert_eq!(
+        mirror.apply(&partner_root(&next, 3_000), &next[1..], 3_000),
+        Err(PartnerMirrorRefusal::Diverged.into())
+    );
+    assert_eq!(mirror.accepted()?, Some(accepted));
+    Ok(())
+}
+
+#[test]
+fn a_tampered_stored_root_is_refused_as_corrupt() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("mirror.sqlite3");
+    let mirror = SqlitePartnerMirror::open(&path, "alpha")?;
+    let first = [leaf(1, "passport-a")];
+    let accepted = partner_root(&first, 2_000);
+    mirror.apply(&accepted, &first, 2_000)?;
+    let mut stale = accepted.root.clone();
+    stale.issued_at_unix_ms = 1_500;
+    mirror.record_conflict("rollback", &signed(stale), 3_000)?;
+
+    let raw = rusqlite::Connection::open(&path)?;
+    raw.execute(
+        "UPDATE chio_partner_revocation_conflicts SET offered_root = '{}'",
+        [],
+    )?;
+    assert!(matches!(
+        mirror.conflicts(),
+        Err(SqliteRevocationOracleError::CorruptRecord(_))
+    ));
+    raw.execute(
+        "UPDATE chio_partner_revocation_mirror SET signed_root = '{\"root\":null}'",
+        [],
+    )?;
+    assert!(matches!(
+        mirror.accepted(),
+        Err(SqliteRevocationOracleError::CorruptRecord(_))
+    ));
+    assert!(matches!(
+        mirror.apply(&accepted, &[], 4_000),
+        Err(PartnerMirrorError::Store(
+            SqliteRevocationOracleError::CorruptRecord(_)
+        ))
+    ));
+    Ok(())
+}
+
+#[test]
+fn an_apply_against_a_held_write_lock_fails_and_commits_nothing() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("mirror.sqlite3");
+    let mirror = SqlitePartnerMirror::open(&path, "alpha")?;
+    let first = [leaf(1, "passport-a")];
+    let offered = partner_root(&first, 2_000);
+
+    let blocker = rusqlite::Connection::open(&path)?;
+    blocker.execute_batch("BEGIN IMMEDIATE")?;
+    assert!(matches!(
+        mirror.apply(&offered, &first, 2_000),
+        Err(PartnerMirrorError::Store(
+            SqliteRevocationOracleError::Storage(_)
+        ))
+    ));
+    blocker.execute_batch("ROLLBACK")?;
+
+    assert_eq!(mirror.accepted()?, None);
+    assert_eq!(mirror.view(&[])?.tree.leaf_count, 0);
+    mirror.apply(&offered, &first, 2_000)?;
+    assert_eq!(mirror.accepted()?, Some(offered));
+    Ok(())
+}
