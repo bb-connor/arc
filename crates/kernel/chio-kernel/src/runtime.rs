@@ -247,8 +247,7 @@ impl ToolCallResponse {
     /// The closed denial code a client observes for a deny, whatever its
     /// terminal state. A deny without a family code observes `Denied`.
     pub fn client_denial(&self) -> Option<crate::ClientDenialCode> {
-        (self.verdict == Verdict::Deny)
-            .then(|| self.denial_code.unwrap_or(crate::ClientDenialCode::Denied))
+        crate::ClientDenialCode::for_verdict(self.verdict, self.denial_code)
     }
 
     /// The reason a client may observe: the fixed text of the denial code for
@@ -263,18 +262,9 @@ impl ToolCallResponse {
     /// The terminal state a client may observe: a cancelled or incomplete
     /// deny carries the fixed text of its denial code as its reason.
     pub fn client_terminal_state(&self) -> OperationTerminalState {
-        match (self.client_denial(), &self.terminal_state) {
-            (Some(code), OperationTerminalState::Cancelled { .. }) => {
-                OperationTerminalState::Cancelled {
-                    reason: code.text().to_owned(),
-                }
-            }
-            (Some(code), OperationTerminalState::Incomplete { .. }) => {
-                OperationTerminalState::Incomplete {
-                    reason: code.text().to_owned(),
-                }
-            }
-            (_, state) => state.clone(),
+        match self.client_denial() {
+            Some(code) => code.terminal_state(&self.terminal_state),
+            None => self.terminal_state.clone(),
         }
     }
 }
