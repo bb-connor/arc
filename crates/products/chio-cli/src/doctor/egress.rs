@@ -146,7 +146,10 @@ mod tests {
         for address in ["10.1.2.3", "172.16.0.1", "192.168.1.1", "100.64.0.1"] {
             let error = resolved(&contract, "metrics.example.com", address, 9100)
                 .expect_err("rebound name");
-            assert!(matches!(error, HttpEgressError::PrivateNetworkDenied { .. }));
+            assert!(matches!(
+                error,
+                HttpEgressError::PrivateNetworkDenied { .. }
+            ));
             assert!(is_policy_refusal(&error));
         }
         assert!(resolved(&contract, "metrics.example.com", "93.184.216.34", 9100).is_ok());
@@ -156,7 +159,9 @@ mod tests {
     fn a_private_literal_is_reached_only_at_its_pinned_address() {
         let contract = probe_contract("http://10.0.0.5:9100/metrics").unwrap();
         assert_eq!(contract.private_network_allowances.len(), 1);
-        assert!(contract.enforce_url("http://10.0.0.5:9100/metrics", 0).is_ok());
+        assert!(contract
+            .enforce_url("http://10.0.0.5:9100/metrics", 0)
+            .is_ok());
         assert!(resolved(&contract, "10.0.0.5", "10.0.0.5", 9100).is_ok());
         for address in ["10.0.0.6", "10.1.2.3", "192.168.1.1", "93.184.216.34"] {
             let error = resolved(&contract, "10.0.0.5", address, 9100).expect_err("off pin");
@@ -203,7 +208,9 @@ mod tests {
         assert!(contract.allowed_authority_set.contains("localhost:9100"));
         let contract = probe_contract("https://registry.example.com./v2/").unwrap();
         assert!(contract.deny_loopback);
-        assert!(contract.allowed_authority_set.contains("registry.example.com"));
+        assert!(contract
+            .allowed_authority_set
+            .contains("registry.example.com"));
         assert!(contract
             .enforce_url("https://registry.example.com./v2/", 0)
             .is_ok());

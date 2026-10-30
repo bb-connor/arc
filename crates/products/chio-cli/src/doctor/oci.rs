@@ -187,7 +187,8 @@ mod tests {
     fn redirect_to_another_authority_is_not_followed() {
         use super::super::egress::test_support::{redirect_to, serve};
         use std::sync::atomic::Ordering;
-        let target = serve("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string());
+        let target =
+            serve("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string());
         let origin = serve(redirect_to(&format!("http://127.0.0.1:{}/", target.port)));
         let probe = OciProbe::default().with_registry(format!("http://127.0.0.1:{}/", origin.port));
         let _ = probe.run(&ProbeConfig::default());
@@ -200,10 +201,6 @@ mod tests {
         let probe = OciProbe::default().with_registry("http://169.254.169.254/latest/meta-data");
         let report = probe.run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Warning);
-        assert!(
-            report.message.contains("link-local"),
-            "{}",
-            report.message
-        );
+        assert!(report.message.contains("link-local"), "{}", report.message);
     }
 }
