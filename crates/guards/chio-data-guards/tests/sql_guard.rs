@@ -325,6 +325,28 @@ fn denylisted_predicate_complexity_limit_fails_closed() {
 }
 
 #[test]
+fn column_allowlist_case_colliding_tables_fail_closed() {
+    let result = SqlQueryGuard::try_new(SqlGuardConfig {
+        column_allowlist: Some(
+            [
+                ("Orders".to_string(), vec!["id".to_string()]),
+                (
+                    "orders".to_string(),
+                    vec!["id".to_string(), "card_number".to_string()],
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ),
+        ..base_cfg()
+    });
+    let Err(error) = result else {
+        panic!("case-colliding column allowlist tables should fail closed");
+    };
+    assert!(error.contains("column_allowlist names table `orders` more than once"));
+}
+
+#[test]
 fn delete_without_where_denied_by_default() {
     let cfg = SqlGuardConfig {
         operation_allowlist: vec![SqlOperation::Delete],
