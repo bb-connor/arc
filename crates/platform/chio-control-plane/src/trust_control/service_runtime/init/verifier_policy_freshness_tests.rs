@@ -2,10 +2,12 @@
 //! the registry file each request reads, so an operator mutation governs the
 //! next challenge and verification without a restart.
 
+use super::super::client::build_client;
 use super::*;
+use crate::ControlPlaneError;
 use chio_credentials::{
     build_agent_passport, issue_reputation_credential, respond_to_passport_presentation_challenge,
-    AttestationWindow, ChioCredentialEvidence, PassportPresentationVerification,
+    AttestationWindow, ChioCredentialEvidence, PassportPresentationChallenge,
     PassportVerifierPolicy,
 };
 use std::path::PathBuf;
@@ -19,15 +21,13 @@ const POLICY_ID: &str = "admission";
 struct RunningService {
     _directory: tempfile::TempDir,
     policies: PathBuf,
-    base: String,
-    client: reqwest::Client,
+    client: TrustControlClient,
     server: tokio::task::JoinHandle<Result<(), CliError>>,
+    _runtime: tokio::runtime::Runtime,
 }
 
 impl RunningService {
-    async fn start(
-        initial: Option<&VerifierPolicyRegistry>,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    fn start(initial: Option<&VerifierPolicyRegistry>) -> Result<Self, Box<dyn std::error::Error>> {
         let directory = chio_test_support::private_tempdir()?;
         let policies = directory.path().join("verifier-policies.json");
         if let Some(registry) = initial {
@@ -42,107 +42,42 @@ impl RunningService {
             policies.clone(),
             directory.path().join("verifier-challenges.sqlite3"),
         );
-        let server = tokio::spawn(serve_async(config, None, None, None, None, None, None));
-        let service = Self {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()?;
+        let server = runtime.spawn(serve_async(config, None, None, None, None, None, None));
+        let client = build_client(&format!("http://127.0.0.1:{}", address.port()), TOKEN)?;
+        (0..500)
+            .find(|_| {
+                let ready = client.list_verifier_policies().is_ok();
+                if !ready {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                ready
+            })
+            .ok_or("the trust service never answered")?;
+        Ok(Self {
             _directory: directory,
             policies,
-            base: format!("http://127.0.0.1:{}", address.port()),
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-            client: reqwest::Client::builder().no_proxy().build()?,
+            client,
             server,
-        };
-        tokio::time::timeout(Duration::from_secs(10), async {
-            loop {
-                if let Ok(response) = service
-                    .client
-                    .get(service.url(PASSPORT_VERIFIER_POLICIES_PATH))
-                    .bearer_auth(TOKEN)
-                    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-                    .send()
-                    .await
-                {
-                    if response.status() == reqwest::StatusCode::OK {
-                        break;
-                    }
-                }
-                tokio::time::sleep(Duration::from_millis(20)).await;
-            }
+            _runtime: runtime,
         })
-        .await?;
-        Ok(service)
     }
 
-    fn url(&self, path: &str) -> String {
-        format!("{}{path}", self.base)
-    }
-
-    fn policy_url(&self, policy_id: &str) -> String {
-        self.url(&PASSPORT_VERIFIER_POLICY_PATH.replace("{policy_id}", policy_id))
-    }
-
-    async fn upsert(&self, document: &SignedPassportVerifierPolicy) -> TestResult {
-        let response = self
+    fn create_challenge(&self) -> Result<PassportPresentationChallenge, CliError> {
+        Ok(self
             .client
-            .put(self.policy_url(&document.body.policy_id))
-            .bearer_auth(TOKEN)
-            .json(document)
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-            .send()
-            .await?;
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-        Ok(())
-    }
-
-    async fn create_challenge(&self) -> Result<reqwest::Response, reqwest::Error> {
-        self.client
-            .post(self.url(PASSPORT_CHALLENGES_PATH))
-            .bearer_auth(TOKEN)
-            .json(&CreatePassportChallengeRequest {
+            .create_passport_challenge(&CreatePassportChallengeRequest {
                 verifier: VERIFIER.to_string(),
                 ttl_seconds: 600,
                 issuers: Vec::new(),
                 max_credentials: None,
                 policy_id: Some(POLICY_ID.to_string()),
                 policy: None,
-            })
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-            .send()
-            .await
-    }
-
-    async fn challenge(
-        &self,
-    ) -> Result<chio_credentials::PassportPresentationChallenge, Box<dyn std::error::Error>> {
-        let response = self.create_challenge().await?;
-        assert_eq!(response.status(), reqwest::StatusCode::OK);
-        Ok(response
-            .json::<CreatePassportChallengeResponse>()
-            .await?
+            })?
             .challenge)
-    }
-
-    async fn verify(
-        &self,
-        holder: &Holder,
-        challenge: &chio_credentials::PassportPresentationChallenge,
-    ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
-        let presentation = respond_to_passport_presentation_challenge(
-            &holder.keypair,
-            &holder.passport,
-            challenge,
-            unix_timestamp_now()?,
-        )?;
-        Ok(self
-            .client
-            .post(self.url(PASSPORT_CHALLENGE_VERIFY_PATH))
-            .bearer_auth(TOKEN)
-            .json(&VerifyPassportChallengeRequest {
-                presentation,
-                expected_challenge: None,
-            })
-            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-            .send()
-            .await?)
     }
 }
 
@@ -189,6 +124,21 @@ impl Holder {
         let subject = credential.unsigned.credential_subject.id.clone();
         let passport = build_agent_passport(&subject, vec![credential])?;
         Ok(Self { keypair, passport })
+    }
+
+    fn answer(
+        &self,
+        challenge: &PassportPresentationChallenge,
+    ) -> Result<VerifyPassportChallengeRequest, Box<dyn std::error::Error>> {
+        Ok(VerifyPassportChallengeRequest {
+            presentation: respond_to_passport_presentation_challenge(
+                &self.keypair,
+                &self.passport,
+                challenge,
+                unix_timestamp_now()?,
+            )?,
+            expected_challenge: None,
+        })
     }
 }
 
@@ -259,42 +209,42 @@ fn registry_with(
     Ok(registry)
 }
 
-async fn error_body(response: reqwest::Response) -> Result<serde_json::Value, reqwest::Error> {
-    response.json::<serde_json::Value>().await
+fn refusal<T>(
+    outcome: Result<T, CliError>,
+) -> Result<(u16, serde_json::Value), Box<dyn std::error::Error>> {
+    match outcome {
+        Err(CliError::ControlPlane(ControlPlaneError::Rejected { status, body })) => {
+            Ok((status, serde_json::from_str(&body)?))
+        }
+        Err(other) => Err(other.into()),
+        Ok(_) => Err("the service accepted a request it must refuse".into()),
+    }
 }
 
-#[tokio::test]
-async fn a_policy_deleted_after_startup_refuses_the_next_challenge() -> TestResult {
+#[test]
+fn a_policy_deleted_after_startup_refuses_the_next_challenge() -> TestResult {
     let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
-    let service = RunningService::start(Some(&initial)).await?;
-    let deleted = service
-        .client
-        .delete(service.policy_url(POLICY_ID))
-        .bearer_auth(TOKEN)
-        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
-        .send()
-        .await?;
-    assert_eq!(deleted.status(), reqwest::StatusCode::OK);
+    let service = RunningService::start(Some(&initial))?;
+    service.client.delete_verifier_policy(POLICY_ID)?;
     let expected = VerifierPolicyRegistry::load(&service.policies)?
         .active_policy(POLICY_ID, unix_timestamp_now()?)
         .err()
         .ok_or("the deleted policy is still on disk")?;
-    let response = service.create_challenge().await?;
-    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     assert_eq!(
-        error_body(response).await?,
-        serde_json::json!({"error": expected.to_string()})
+        refusal(service.create_challenge())?,
+        (400, serde_json::json!({"error": expected.to_string()}))
     );
     Ok(())
 }
 
-#[tokio::test]
-async fn a_policy_added_after_startup_serves_the_next_challenge() -> TestResult {
-    let service = RunningService::start(None).await?;
-    service
-        .upsert(&signed_policy(PassportVerifierPolicy::default())?)
-        .await?;
-    let challenge = service.challenge().await?;
+#[test]
+fn a_policy_added_after_startup_serves_the_next_challenge() -> TestResult {
+    let service = RunningService::start(None)?;
+    service.client.upsert_verifier_policy(
+        POLICY_ID,
+        &signed_policy(PassportVerifierPolicy::default())?,
+    )?;
+    let challenge = service.create_challenge()?;
     assert_eq!(
         challenge.policy_ref.map(|reference| reference.policy_id),
         Some(POLICY_ID.to_string())
@@ -302,16 +252,16 @@ async fn a_policy_added_after_startup_serves_the_next_challenge() -> TestResult 
     Ok(())
 }
 
-#[tokio::test]
-async fn a_policy_tightened_after_startup_denies_the_next_verification() -> TestResult {
+#[test]
+fn a_policy_tightened_after_startup_denies_the_next_verification() -> TestResult {
     let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
-    let service = RunningService::start(Some(&initial)).await?;
+    let service = RunningService::start(Some(&initial))?;
     let holder = Holder::new()?;
 
-    let control = service.challenge().await?;
-    let response = service.verify(&holder, &control).await?;
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
-    let accepted = response.json::<PassportPresentationVerification>().await?;
+    let control = service.create_challenge()?;
+    let accepted = service
+        .client
+        .verify_passport_challenge(&holder.answer(&control)?)?;
     assert!(
         accepted.accepted,
         "the permissive policy refused the holder"
@@ -321,15 +271,17 @@ async fn a_policy_tightened_after_startup_denies_the_next_verification() -> Test
         Some("registry:admission")
     );
 
-    let challenge = service.challenge().await?;
+    let challenge = service.create_challenge()?;
     let tightened = PassportVerifierPolicy {
         min_receipt_count: Some(1),
         ..PassportVerifierPolicy::default()
     };
-    service.upsert(&signed_policy(tightened.clone())?).await?;
-    let response = service.verify(&holder, &challenge).await?;
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
-    let denied = response.json::<PassportPresentationVerification>().await?;
+    service
+        .client
+        .upsert_verifier_policy(POLICY_ID, &signed_policy(tightened.clone())?)?;
+    let denied = service
+        .client
+        .verify_passport_challenge(&holder.answer(&challenge)?)?;
     assert!(
         !denied.accepted,
         "a verification after the tightening was judged by the startup policy"
@@ -344,12 +296,12 @@ async fn a_policy_tightened_after_startup_denies_the_next_verification() -> Test
     Ok(())
 }
 
-#[tokio::test]
-async fn a_registry_corrupted_after_startup_refuses_challenges_and_verifications() -> TestResult {
+#[test]
+fn a_registry_corrupted_after_startup_refuses_challenges_and_verifications() -> TestResult {
     let initial = registry_with(signed_policy(PassportVerifierPolicy::default())?)?;
-    let service = RunningService::start(Some(&initial)).await?;
+    let service = RunningService::start(Some(&initial))?;
     let holder = Holder::new()?;
-    let challenge = service.challenge().await?;
+    let challenge = service.create_challenge()?;
 
     let mut tampered = initial.clone();
     let document = tampered
@@ -366,18 +318,17 @@ async fn a_registry_corrupted_after_startup_refuses_challenges_and_verifications
         .ok_or("the tampered registry loaded")?
         .to_string();
 
-    let response = service.create_challenge().await?;
-    assert_eq!(response.status(), reqwest::StatusCode::CONFLICT);
     assert_eq!(
-        error_body(response).await?,
-        serde_json::json!({"error": expected})
+        refusal(service.create_challenge())?,
+        (409, serde_json::json!({"error": expected}))
     );
-
-    let response = service.verify(&holder, &challenge).await?;
-    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     assert_eq!(
-        error_body(response).await?,
-        serde_json::json!({"error": expected})
+        refusal(
+            service
+                .client
+                .verify_passport_challenge(&holder.answer(&challenge)?)
+        )?,
+        (400, serde_json::json!({"error": expected}))
     );
     Ok(())
 }

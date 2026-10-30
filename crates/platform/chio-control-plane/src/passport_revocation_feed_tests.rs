@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chio_core::Keypair;
 use chio_credentials::{PassportLifecycleRecord, PassportStatusDistribution};
@@ -7,6 +7,7 @@ use chio_revocation_oracle::{
     PassportRevocationLeafKind, RevocationKey, RevocationOracleError, SqliteRevocationOracle,
     SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
 };
+use chio_spec_validate::ValidateError;
 
 use super::{
     passport_revocation_leaves_page, passport_revocation_root_verifier,
@@ -482,20 +483,25 @@ fn assert_json_safe(value: &serde_json::Value) -> TestResult {
     Ok(())
 }
 
-fn published_schema(source: &str) -> Fallible<jsonschema::Validator> {
-    Ok(jsonschema::validator_for(&serde_json::from_str(source)?)?)
+fn conforms(schema: &str, document: &serde_json::Value) -> Result<(), ValidateError> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../spec/schemas/chio-trust/v1")
+        .join(schema);
+    let schema = chio_spec_validate::load_json(&path)?;
+    chio_spec_validate::validate_value(&path, &schema, Path::new("<feed>"), document)
+}
+
+fn assert_violates(schema: &str, document: &serde_json::Value) {
+    assert!(matches!(
+        conforms(schema, document),
+        Err(ValidateError::SchemaViolation(..))
+    ));
 }
 
 #[test]
 fn published_documents_match_their_registered_schemas() -> TestResult {
-    let root_schema = published_schema(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../../spec/schemas/chio-trust/v1/passport-revocation-root.schema.json"
-    )))?;
-    let leaves_schema = published_schema(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../../spec/schemas/chio-trust/v1/passport-revocation-leaves.schema.json"
-    )))?;
+    const ROOT: &str = "passport-revocation-root.schema.json";
+    const LEAVES: &str = "passport-revocation-leaves.schema.json";
     let feed = feed()?;
     revoke_many(
         &feed.oracle,
@@ -512,24 +518,20 @@ fn published_documents_match_their_registered_schemas() -> TestResult {
         &feed.registry,
         0,
     )?)?;
-    root_schema
-        .validate(&root)
-        .map_err(|error| error.to_string())?;
-    leaves_schema
-        .validate(&page)
-        .map_err(|error| error.to_string())?;
+    conforms(ROOT, &root)?;
+    conforms(LEAVES, &page)?;
 
     let mut foreign_root = root.clone();
     foreign_root["signedRoot"]["root"]["extra"] = serde_json::json!(0);
-    assert!(!root_schema.is_valid(&foreign_root));
+    assert_violates(ROOT, &foreign_root);
     let mut imprecise_root = root;
     imprecise_root["signedRoot"]["root"]["epoch"] = serde_json::json!(MAX_JSON_SAFE_INTEGER + 1);
-    assert!(!root_schema.is_valid(&imprecise_root));
+    assert_violates(ROOT, &imprecise_root);
     let mut foreign_leaf = page.clone();
     foreign_leaf["leaves"][0]["kind"] = serde_json::json!("issuer");
-    assert!(!leaves_schema.is_valid(&foreign_leaf));
+    assert_violates(LEAVES, &foreign_leaf);
     let mut nonce_leaf = page;
     nonce_leaf["leaves"][0]["epochNonce"] = serde_json::json!(0);
-    assert!(!leaves_schema.is_valid(&nonce_leaf));
+    assert_violates(LEAVES, &nonce_leaf);
     Ok(())
 }

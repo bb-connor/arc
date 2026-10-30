@@ -55,31 +55,42 @@ async fn trust_transport_serves_authenticated_requests_over_tls(
     let server = tokio::spawn(super::serve_async(
         config, None, None, None, None, None, None,
     ));
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .add_root_certificate(reqwest::Certificate::from_pem(
-            identity.cert.pem().as_bytes(),
-        )?)
-        .build()?;
-    let response = tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if let Ok(response) = client
-                .get(format!(
-                    "https://localhost:{}{}",
-                    address.port(),
-                    super::REVOCATIONS_PATH
-                ))
-                .bearer_auth("service-token")
-                .send()
-                .await
-            {
-                break response;
+    let agent = chio_egress_contract::BlockingContractAgent::new(
+        &chio_egress_contract::HttpEgressContract::permissive_for_tests(&format!(
+            "localhost:{}",
+            address.port()
+        )),
+        Duration::from_secs(1),
+        Duration::from_secs(1),
+    )?
+    .with_tls(chio_egress_contract::BlockingContractTls::from_pem(
+        &[identity.cert.pem()],
+        None,
+    )?);
+    let url = format!(
+        "https://localhost:{}{}",
+        address.port(),
+        super::REVOCATIONS_PATH
+    );
+    let status = tokio::task::spawn_blocking(move || {
+        (0..250).find_map(|_| {
+            let answer = agent
+                .get(&url)
+                .and_then(|request| {
+                    request
+                        .header("authorization", "Bearer service-token")
+                        .call()
+                })
+                .ok();
+            if answer.is_none() {
+                std::thread::sleep(Duration::from_millis(20));
             }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
+            answer.map(|response| response.status())
+        })
     })
-    .await?;
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    .await?
+    .ok_or("the TLS listener never answered")?;
+    assert_eq!(status, 200);
     server.abort();
     let _ = server.await;
     Ok(())
