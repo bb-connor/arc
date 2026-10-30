@@ -245,6 +245,10 @@ fn unix_now() -> u64 {
 }
 
 fn test_kernel() -> (Keypair, ChioKernel) {
+    test_kernel_with_server(Box::new(MockToolServer))
+}
+
+fn test_kernel_with_server(server: Box<dyn ToolServerConnection>) -> (Keypair, ChioKernel) {
     let keypair = Keypair::generate();
     let config = KernelConfig {
         ca_public_keys: vec![keypair.public_key()],
@@ -265,7 +269,7 @@ fn test_kernel() -> (Keypair, ChioKernel) {
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     };
     let mut kernel = ChioKernel::new(config);
-    kernel.register_tool_server(Box::new(MockToolServer));
+    kernel.register_tool_server(server);
     (keypair, kernel)
 }
 
@@ -1728,5 +1732,86 @@ fn bridge_fidelity_helpers_report_publication_state() {
     assert_eq!(
         unsupported.unsupported_reason(),
         Some("interactive permission prompt required")
+    );
+}
+
+const PRIVATE_DETAIL: &str = "/srv/chio/tenant-7/private-key.json Bearer secret-token";
+
+struct IncompleteToolServer;
+
+#[async_trait::async_trait]
+impl ToolServerConnection for IncompleteToolServer {
+    fn server_id(&self) -> &str {
+        "test-srv"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["echo".to_string()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        Err(KernelError::RequestIncomplete(PRIVATE_DETAIL.to_string()))
+    }
+}
+
+#[test]
+fn orchestrator_metadata_projects_an_incomplete_denial_without_its_reason() {
+    let (issuer, kernel) = test_kernel_with_server(Box::new(IncompleteToolServer));
+    let subject = Keypair::generate();
+    let registry = test_manifest_registry();
+    let orchestrator = CrossProtocolOrchestrator::new(&kernel, &registry);
+
+    let result = orchestrator
+        .execute(
+            &MockBridge,
+            CrossProtocolExecutionRequest {
+                origin_request_id: "a2a-task-incomplete".to_string(),
+                kernel_request_id: "a2a-a2a-task-incomplete".to_string(),
+                target_protocol: DiscoveryProtocol::Native,
+                target_server_id: "test-srv".to_string(),
+                target_tool_name: "echo".to_string(),
+                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
+                agent_id: subject.public_key().to_hex(),
+                arguments: json!({"message":"hello"}),
+                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                source_envelope: json!({
+                    "message": {"role":"user"},
+                    "metadata": { "chio": { "targetSkillId": "echo" } }
+                }),
+                dpop_proof: None,
+                execution_nonce: None,
+                governed_intent: None,
+                approval_token: None,
+                approval_tokens: Vec::new(),
+                threshold_approval_proposal: None,
+                supplemental_authorization: None,
+                model_metadata: None,
+                authenticated_session_id: None,
+                security_context: None,
+            },
+        )
+        .unwrap();
+
+    let mut metadata = result.metadata();
+    let chio = &metadata["chio"];
+    assert_eq!(chio["decision"], "deny");
+    assert_eq!(chio["denialCode"], "denied");
+    assert_eq!(chio["reason"], "Request denied");
+    assert_eq!(chio["terminalState"]["reason"], "Request denied");
+    assert!(
+        chio["receipt"].to_string().contains(PRIVATE_DETAIL),
+        "receipt lost the incomplete reason: {}",
+        chio["receipt"]
+    );
+    metadata["chio"]["receipt"] = Value::Null;
+    let client = metadata.to_string();
+    assert!(
+        !client.contains(PRIVATE_DETAIL),
+        "incomplete reason reached orchestrator metadata: {client}"
     );
 }
