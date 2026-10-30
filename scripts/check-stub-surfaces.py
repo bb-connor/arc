@@ -253,14 +253,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "intentional advisory permission preview text, enforcement happens at invoke time",
         "2026-12-31",
     ),
-    "crates/economy/chio-anchor/src/witness.rs": allow(
-        "reviewed test fixture helper",
-        "2026-12-31",
-    ),
-    "crates/economy/chio-anchor/src/witness/rekor.rs": allow(
-        "reviewed test fixture helper",
-        "2026-12-31",
-    ),
     "crates/core/chio-arena/src/promote.rs": allow(
         "reviewed test seam for injecting CHIO_BLESS environment access",
         "2026-12-31",
@@ -393,10 +385,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     ),
     "crates/guards/chio-policy/src/detection.rs": allow(
         "policy detector name used as domain data and covered by tests",
-        "2026-12-31",
-    ),
-    "crates/trust/chio-revocation-oracle/src/signer.rs": allow(
-        "reviewed digest-only test signature marker",
         "2026-12-31",
     ),
     "crates/tooling/chio-spec-codegen/src/main.rs": allow(
@@ -649,12 +637,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     "crates/protocol/chio-acp-edge/src/bridge.rs": (
         r"permission preview is advisory only; enforcement happens at invoke time",
     ),
-    "crates/economy/chio-anchor/src/witness.rs": (
-        r"rekor:placeholder",
-    ),
-    "crates/economy/chio-anchor/src/witness/rekor.rs": (
-        r"rekor:placeholder",
-    ),
     "crates/core/chio-arena/src/promote.rs": (
         r"CHIO_BLESS gate\. Tests inject a stub",
     ),
@@ -765,9 +747,6 @@ ALLOWLIST_MATCHES: dict[str, tuple[str, ...]] = {
     "crates/guards/chio-policy/src/detection.rs": (
         r'"stub"',
         r"detector_name, \"stub\"",
-    ),
-    "crates/trust/chio-revocation-oracle/src/signer.rs": (
-        r"digest-stub-sha256",
     ),
     "crates/tooling/chio-spec-codegen/src/main.rs": (
         r"chio-spec-codegen --threat-model <input\.json> --out <stubs-dir>",

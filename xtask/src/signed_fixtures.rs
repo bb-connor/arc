@@ -71,7 +71,7 @@ pub(crate) struct Step {
 pub(crate) enum ClosedKind {
     /// Signature strings that are not a signature over the file's contents.
     /// `fail_closed_test` names the test proving a verifier refuses them.
-    Placeholder { fail_closed_test: &'static str },
+    FixedPattern { fail_closed_test: &'static str },
     /// Bytes pinned by a recorded digest; regenerating breaks the pin. The
     /// signatures are not wrapper signatures.
     HashPinned {
@@ -910,7 +910,7 @@ pub(crate) const STEPS: &[Step] = &[
 pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     ClosedEntry {
         pattern: "spec/schemas/chio-wire/v1/root_authority/examples/**",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-core-types --test root_authority_generated_examples \
                                placeholder_example_signatures_are_refused",
         },
@@ -929,16 +929,16 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     },
     ClosedEntry {
         pattern: "examples/chio-3vendor/fixtures/runtime-spine/runtime-trust-schema-only.json",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-runtime-core --test placeholder_verifier_trust_bundle \
                                committed_placeholder_verifier_trust_bundle_is_refused",
         },
         reason: "schema-shape example for scripts/check-chio-runtime-spine-fixtures.sh: the \
-                 signer key and signature are repeated-byte placeholders",
+                 signer key and signature are repeated-byte patterns",
     },
     ClosedEntry {
         pattern: "fuzz/corpus/capability_receipt/child-request-receipt.json",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-core-types --test placeholder_child_request_receipt \
                                committed_placeholder_child_request_receipt_is_refused",
         },
@@ -946,7 +946,7 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     },
     ClosedEntry {
         pattern: "fuzz/corpus/federation_trust_establishment/invalid-signature-envelope.json",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-federation --test placeholder_handshake_envelope \
                                committed_placeholder_handshake_envelope_is_refused",
         },
@@ -954,7 +954,7 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     },
     ClosedEntry {
         pattern: "docs/standards/CHIO_SETTLE_SOLANA_RELEASE_EXAMPLE.json",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-settle --test placeholder_solana_release_example \
                                committed_placeholder_solana_release_example_is_refused",
         },
@@ -993,38 +993,38 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     },
     ClosedEntry {
         pattern: "crates/products/chio-cli/tests/replay_traffic/fixtures/**",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-cli --test replay_traffic \
                                replay_from_tee_rejects_the_committed_placeholder_tenant_sig",
         },
         reason: "unsigned TEE capture frames: every tenant_sig is an `ed25519:AAAA...` \
-                 placeholder; the tests sign copies at runtime",
+                 fixed pattern; the tests sign copies at runtime",
     },
     ClosedEntry {
         pattern: "crates/sdk/chio-eval-receipt/tests/fixtures/**",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-eval-receipt --test export_roundtrip \
                                production_verifier_rejects_the_committed_placeholder_bundles",
         },
-        reason: "receipt payloads carry the `p2-fixture-signature` placeholder, accepted only \
+        reason: "receipt payloads carry the `p2-fixture-signature` fixed pattern, accepted only \
                  by digest in fixture mode",
     },
     ClosedEntry {
         pattern: "examples/eval-receipt-ingest/metr/out/**",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-eval-receipt --test export_roundtrip \
                                production_verifier_rejects_the_committed_placeholder_bundles",
         },
-        reason: "placeholder receipt payloads under a `test-sha256` bundle digest, not a \
+        reason: "fixed-pattern receipt payloads under a `test-sha256` bundle digest, not a \
                  signature",
     },
     ClosedEntry {
         pattern: "fuzz/corpus/eval_receipt_bundle/**",
-        kind: ClosedKind::Placeholder {
+        kind: ClosedKind::FixedPattern {
             fail_closed_test: "chio-eval-receipt --test export_roundtrip \
                                production_verifier_rejects_the_committed_placeholder_bundles",
         },
-        reason: "fuzz seeds built from the placeholder eval bundle and its `test-sha256` digest",
+        reason: "fuzz seeds built from the fixed-pattern eval bundle and its `test-sha256` digest",
     },
     ClosedEntry {
         pattern: "spec/eval/receipt-format.v1.json",
@@ -1054,7 +1054,7 @@ pub(crate) const CLOSED_SETS: &[ClosedEntry] = &[
     },
 ];
 
-/// Placeholder signatures inside a step-owned file: the step's generator
+/// Fixed-pattern signatures inside a step-owned file: the step's generator
 /// rewrites the file and carries these cases through unchanged.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct EmbeddedPlaceholder {
@@ -1154,7 +1154,7 @@ fn check_coverage(root: &Path) -> Result<(), XtaskError> {
 }
 
 /// Closed entries must state why no generator owns them, and every embedded
-/// placeholder must sit in exactly one step-owned file with its cases and
+/// fixed-pattern entry must sit in exactly one step-owned file with its cases and
 /// fail-closed test named.
 fn registry_problems() -> Vec<String> {
     let mut problems = Vec::new();
@@ -1167,13 +1167,13 @@ fn registry_problems() -> Vec<String> {
         let found = owners(entry.path);
         if found.len() != 1 || !found[0].starts_with("step ") {
             problems.push(format!(
-                "placeholder `{}` must have one step owner: {found:?}",
+                "fixed-pattern entry `{}` must have one step owner: {found:?}",
                 entry.path
             ));
         }
         if entry.cases.trim().is_empty() || entry.fail_closed_test.trim().is_empty() {
             problems.push(format!(
-                "placeholder `{}` must name its cases and fail-closed test",
+                "fixed-pattern entry `{}` must name its cases and fail-closed test",
                 entry.path
             ));
         }
@@ -1460,7 +1460,7 @@ mod tests {
     fn closed_entries_carry_their_kind_evidence() {
         for entry in CLOSED_SETS {
             let evidence: Vec<&str> = match entry.kind {
-                ClosedKind::Placeholder { fail_closed_test } => vec![fail_closed_test],
+                ClosedKind::FixedPattern { fail_closed_test } => vec![fail_closed_test],
                 ClosedKind::HashPinned {
                     wrapper_signed,
                     pin,
