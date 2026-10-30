@@ -16,7 +16,7 @@ public_entrypoint = true
 
 [[bin]]
 name = "chio"
-path = "src/bin/chio.rs"
+path = "src/main.rs"
 
 [dependencies]
 async-trait = { workspace = true }
