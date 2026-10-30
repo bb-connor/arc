@@ -261,3 +261,136 @@ fn signed_operator_request_wire_refusals() {
         assert_eq!(error.oauth_error(), OAuthErrorCode::InvalidRequest);
     }
 }
+
+#[test]
+fn operator_request_signed_with_explicit_empty_members_verifies_over_the_received_body() {
+    let mut body = request_value(|request| {
+        request["scope"] = json!({
+            "grants": [{
+                "server_id": "crm",
+                "tool_name": "search",
+                "operations": ["invoke"],
+                "constraints": []
+            }],
+            "resource_grants": []
+        });
+    });
+    body["schema"] = json!(CHIO_OPERATOR_ROOT_REQUEST_SCHEMA);
+    let (outcome, signed_bytes) =
+        sign_wrapped(&operator(), CHIO_OPERATOR_ROOT_REQUEST_SCHEMA, &body).unwrap();
+    let mut wire = body.clone();
+    wire["signature"] = json!(outcome.signature.to_hex());
+
+    let parsed = parse_value(&wire).unwrap();
+    assert_eq!(
+        serde_json::from_slice::<Value>(&parsed.to_canonical_json().unwrap()).unwrap(),
+        wire
+    );
+    let verified = parsed.verify(&pinned_key()).unwrap();
+    assert_eq!(
+        verified.request_digest(),
+        Sha256Digest::from_hash(sha256(signed_bytes.as_bytes()))
+    );
+    assert_eq!(verified.request().scope.grants.len(), 1);
+}
+
+fn signed_len(tool_name_len: usize) -> Result<usize, RootExchangeError> {
+    let request = request(|request| {
+        request["scope"] = json!({ "grants": [{
+            "server_id": "crm",
+            "tool_name": "t".repeat(tool_name_len),
+            "operations": ["invoke"]
+        }]});
+    });
+    SignedOperatorRootRequest::sign(request, &operator())
+        .and_then(|signed| signed.to_canonical_json())
+        .map(|bytes| bytes.len())
+}
+
+#[test]
+fn operator_request_sign_refuses_a_signed_form_over_the_size_bound() {
+    let base = signed_len(1).unwrap();
+    let at_bound = 1 + (MAX_OPERATOR_ROOT_REQUEST_BYTES - base);
+    assert_eq!(
+        signed_len(at_bound).unwrap(),
+        MAX_OPERATOR_ROOT_REQUEST_BYTES
+    );
+
+    let request = request(|request| {
+        request["scope"] = json!({ "grants": [{
+            "server_id": "crm",
+            "tool_name": "t".repeat(at_bound),
+            "operations": ["invoke"]
+        }]});
+    });
+    let signed = SignedOperatorRootRequest::sign(request, &operator()).unwrap();
+    SignedOperatorRootRequest::parse(&signed.to_canonical_json().unwrap())
+        .unwrap()
+        .verify(&pinned_key())
+        .unwrap();
+
+    assert_eq!(
+        signed_len(at_bound + 1).unwrap_err(),
+        RootExchangeError::OperatorRootRequestMalformed("signed request exceeds the size bound")
+    );
+}
+
+mod properties {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    fn identifier() -> impl Strategy<Value = String> {
+        "[a-z0-9:._-]{1,64}"
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        #[test]
+        fn parse_refuses_arbitrary_bytes_with_a_typed_refusal(
+            bytes in proptest::collection::vec(any::<u8>(), 0..512)
+        ) {
+            if let Err(error) = SignedOperatorRootRequest::parse(&bytes) {
+                prop_assert!(matches!(
+                    error,
+                    RootExchangeError::OperatorRootRequestMalformed(_)
+                        | RootExchangeError::OperatorRootRequestMissingTenant
+                ));
+            }
+        }
+
+        #[test]
+        fn signed_requests_round_trip_and_bind_every_member(
+            request_id in identifier(),
+            principal in identifier(),
+            tenant in identifier(),
+            caller_held in any::<bool>(),
+            lifetime in 1u64..1_000_000,
+        ) {
+            let value = request_value(|request| {
+                request["request_id"] = json!(&request_id);
+                request["principal"] = json!(&principal);
+                request["tenant_value"] = json!(&tenant);
+                request["holder"] = json!(if caller_held { "caller" } else { "edge_session" });
+                request["expires_at"] = json!(NOW + lifetime);
+            });
+            let request = OperatorRootRequest::parse(&serde_json::to_vec(&value).unwrap()).unwrap();
+            let bytes = SignedOperatorRootRequest::sign(request, &operator())
+                .unwrap()
+                .to_canonical_json()
+                .unwrap();
+            let parsed = SignedOperatorRootRequest::parse(&bytes).unwrap();
+            prop_assert_eq!(parsed.to_canonical_json().unwrap(), bytes.clone());
+            let verified = parsed.verify(&pinned_key()).unwrap();
+            prop_assert_eq!(verified.request().tenant_value.as_str(), tenant.as_str());
+
+            let mut altered: Value = serde_json::from_slice(&bytes).unwrap();
+            altered["tenant_value"] = json!(format!("{tenant}x"));
+            prop_assert_eq!(
+                parse_value(&altered).unwrap().verify(&pinned_key()).unwrap_err(),
+                RootExchangeError::OperatorRootRequestSignatureInvalid
+            );
+        }
+    }
+}

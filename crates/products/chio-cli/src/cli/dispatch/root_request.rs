@@ -156,6 +156,25 @@ mod tests {
     }
 
     #[test]
+    fn root_request_sign_refuses_a_signed_form_over_the_read_bound() {
+        let error = sign_edited(|request| {
+            request["scope"] = serde_json::json!({ "grants": [{
+                "server_id": "crm",
+                "tool_name": "t".repeat(MAX_OPERATOR_ROOT_REQUEST_BYTES - 300),
+                "operations": ["invoke"]
+            }]});
+        })
+        .unwrap_err();
+        assert_eq!(
+            request_refusal(&error),
+            Some(&RootExchangeError::OperatorRootRequestMalformed(
+                "signed request exceeds the size bound"
+            ))
+        );
+        assert_eq!(registered_code(&error), CLI_JSON.urn);
+    }
+
+    #[test]
     fn seed_file_group_readable_refuses() {
         for mode in [0o640, 0o604] {
             let dir = tempfile::tempdir().unwrap();
