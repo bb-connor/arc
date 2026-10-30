@@ -364,6 +364,7 @@ fn signed_capability_refuses_a_padded_local_selector() {
         expires_at: 1_710_003_600,
         delegation_chain: Vec::new(),
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &issuer).expect("token signs");
     let mut value = serde_json::to_value(&token).expect("token serializes");

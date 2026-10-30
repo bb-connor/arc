@@ -43,6 +43,7 @@ fn token_body(issuer: &Keypair) -> CapabilityTokenBody {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     }
 }
 

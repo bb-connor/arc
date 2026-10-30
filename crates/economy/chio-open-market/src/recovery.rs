@@ -410,6 +410,7 @@ pub fn mint_verified_finding_recovery_grant(
             expires_at,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
+            root_anchor: None,
         },
         issuer_keypair,
     )

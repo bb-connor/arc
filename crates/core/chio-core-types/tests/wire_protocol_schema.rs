@@ -264,6 +264,7 @@ fn make_token(kp: &Keypair) -> CapabilityToken {
             expires_at: 1_710_000_600,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         },
         kp,
     )

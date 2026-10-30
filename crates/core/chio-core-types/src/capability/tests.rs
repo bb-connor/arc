@@ -61,6 +61,7 @@ fn capability_token_serde_roundtrip() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -91,6 +92,7 @@ fn capability_token_signature_verification() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     assert!(token.verify_integrity_embedded_key().unwrap());
@@ -109,6 +111,7 @@ fn wrong_key_signature_fails() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let mut token = CapabilityToken::sign(body, &kp).unwrap();
     token.issuer = other_kp.public_key();
@@ -128,6 +131,7 @@ fn time_validation() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
 
@@ -329,6 +333,7 @@ fn attenuated_capability_schema_and_budget_fail_closed() {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -384,6 +389,7 @@ fn attenuated_capability_chain_binding_feature_disabled_fails_closed() {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -434,6 +440,7 @@ fn attenuated_capability_requires_attenuation_proof() -> Result<()> {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let mut token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -475,6 +482,7 @@ fn empty_child_scope_attenuation_proof_survives_serialization() -> Result<()> {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {
@@ -562,6 +570,7 @@ fn chain_binding_disabled_does_not_reject_v1_tokens() {
             expires_at: 20,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         },
         &issuer,
     )
@@ -616,6 +625,7 @@ fn plain_delegated_token_without_attenuation_proof_verifies_and_skips_chain_bind
             expires_at: 200,
             delegation_chain: vec![parent_link],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         },
         &issuer,
     )
@@ -672,6 +682,7 @@ fn requires_chain_binding_tracks_only_new_attenuation() {
             expires_at: 200,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         },
         &issuer,
     )
@@ -1659,6 +1670,7 @@ fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     let json = serde_json::to_value(&token).unwrap();
@@ -1682,6 +1694,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
     assert!(token.verify_integrity_embedded_key().unwrap());
@@ -1794,6 +1807,7 @@ fn delegate_parent_token(
         expires_at,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     CapabilityToken::sign(body, parent_kp).unwrap()
 }
@@ -2084,6 +2098,7 @@ fn bac573_capability_token(issued_at: u64, expires_at: u64) -> (Keypair, Capabil
         expires_at,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     (kp, token)

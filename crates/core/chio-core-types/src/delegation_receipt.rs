@@ -242,6 +242,7 @@ mod tests {
             expires_at: 2000,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         };
         CapabilityToken::sign(body, parent_kp).unwrap()
     }

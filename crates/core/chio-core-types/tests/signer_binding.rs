@@ -39,6 +39,7 @@ fn capability_body(
         expires_at: 1_710_003_600,
         delegation_chain: Vec::new(),
         aggregate_invocation_budget: None,
+        root_anchor: None,
     }
 }
 

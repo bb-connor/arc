@@ -290,6 +290,7 @@ mod algorithm_member {
             expires_at: 1_792_238_400,
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
+            root_anchor: None,
         };
         CapabilityToken::sign(body, key).unwrap()
     }

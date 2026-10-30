@@ -54,6 +54,7 @@ fn token_body(
         expires_at: 1_000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     }
 }
 
