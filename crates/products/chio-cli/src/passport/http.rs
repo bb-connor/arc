@@ -16,7 +16,11 @@ struct UnexpectedStatus(u16);
 
 impl std::fmt::Display for UnexpectedStatus {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(formatter, "remote document request returned HTTP {}", self.0)
+        write!(
+            formatter,
+            "remote document request returned HTTP {}",
+            self.0
+        )
     }
 }
 
@@ -143,9 +147,8 @@ mod tests {
         let second_server = std::thread::spawn(move || {
             let (mut stream, _) = second.accept().unwrap();
             let head = read_request_head(&mut stream);
-            let _ = stream.write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
-            );
+            let _ = stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}");
             head.starts_with("GET /document ")
         });
         let first = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -265,7 +268,10 @@ mod tests {
             ("http://127.0.0.1:8081/jwks", EndpointSource::Remote),
             ("http://localhost:8080/jwks", EndpointSource::Remote),
             ("https://127.0.0.1:8080/jwks", EndpointSource::Remote),
-            ("http://127.0.0.1.attacker.example:8080/jwks", EndpointSource::Remote),
+            (
+                "http://127.0.0.1.attacker.example:8080/jwks",
+                EndpointSource::Remote,
+            ),
             ("not a url", EndpointSource::Remote),
         ] {
             assert_eq!(verifier_chosen_source(operator, url), source, "{url}");

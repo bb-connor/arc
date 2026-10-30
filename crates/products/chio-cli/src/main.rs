@@ -190,10 +190,10 @@ pub(crate) use runtime_cli::{
 };
 #[path = "cli/runtime/trust_reports.rs"]
 mod runtime_trust_reports;
-#[path = "cli/trust_config_check.rs"]
-mod trust_config_check;
 #[path = "cli/trust_commands.rs"]
 mod trust_commands_cli;
+#[path = "cli/trust_config_check.rs"]
+mod trust_config_check;
 pub(crate) use trust_commands_cli::{
     cmd_receipt_audit, cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,

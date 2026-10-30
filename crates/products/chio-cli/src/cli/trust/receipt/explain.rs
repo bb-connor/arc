@@ -997,8 +997,8 @@ mod receipt_explain_tests {
     }
 
     #[test]
-    fn receipt_explain_labels_mediated_allow_without_mediated_trust_allowed(
-    ) -> Result<(), CliError> {
+    fn receipt_explain_labels_mediated_allow_without_mediated_trust_allowed() -> Result<(), CliError>
+    {
         let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
         for trust_level in ["verified", "advisory"] {
             let mut value = serde_json::to_value(&receipt)?;

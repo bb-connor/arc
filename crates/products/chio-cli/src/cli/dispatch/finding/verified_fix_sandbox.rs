@@ -58,12 +58,7 @@ pub(super) fn run_test_command_with_timeout(
     command: &str,
     timeout: Duration,
 ) -> Result<VerifiedFixCommandResult, CliError> {
-    run_test_command_with_limits(
-        worktree,
-        command,
-        timeout,
-        TestSandboxLimits::production(),
-    )
+    run_test_command_with_limits(worktree, command, timeout, TestSandboxLimits::production())
 }
 
 #[derive(Clone, Copy)]
@@ -100,10 +95,7 @@ impl SandboxCgroup {
             return Ok(cgroup);
         }
         Ok(Self::UserScope {
-            unit: format!(
-                "chio-verified-fix-{}.scope",
-                uuid::Uuid::new_v4().simple()
-            ),
+            unit: format!("chio-verified-fix-{}.scope", uuid::Uuid::new_v4().simple()),
         })
     }
 
@@ -133,12 +125,17 @@ impl SandboxCgroup {
             return Ok(None);
         }
         let configured = (|| -> Result<File, std::io::Error> {
-            fs::write(path.join("memory.max"), limits.address_space_bytes.to_string())?;
+            fs::write(
+                path.join("memory.max"),
+                limits.address_space_bytes.to_string(),
+            )?;
             if path.join("memory.swap.max").is_file() {
                 fs::write(path.join("memory.swap.max"), "0")?;
             }
             fs::write(path.join("pids.max"), limits.process_count.to_string())?;
-            OpenOptions::new().write(true).open(path.join("cgroup.procs"))
+            OpenOptions::new()
+                .write(true)
+                .open(path.join("cgroup.procs"))
         })();
         match configured {
             Ok(procs) => Ok(Some(Self::Direct { path, procs })),
@@ -191,13 +188,7 @@ impl SandboxCgroup {
             }
             Self::UserScope { unit } => {
                 let _ = Command::new("systemctl")
-                    .args([
-                        "--user",
-                        "kill",
-                        "--kill-who=all",
-                        "--signal=KILL",
-                        unit,
-                    ])
+                    .args(["--user", "kill", "--kill-who=all", "--signal=KILL", unit])
                     .stdout(Stdio::null())
                     .stderr(Stdio::null())
                     .status();
@@ -242,13 +233,8 @@ fn write_current_pid(fd: std::os::fd::RawFd) -> Result<(), std::io::Error> {
     while written < bytes.len() {
         // SAFETY: the slice remains live for this synchronous write, and its
         // length bounds the readable buffer. An invalid fd returns an OS error.
-        let result = unsafe {
-            libc::write(
-                fd,
-                bytes[written..].as_ptr().cast(),
-                bytes.len() - written,
-            )
-        };
+        let result =
+            unsafe { libc::write(fd, bytes[written..].as_ptr().cast(), bytes.len() - written) };
         if result < 0 {
             return Err(std::io::Error::last_os_error());
         }
@@ -314,10 +300,7 @@ pub(super) fn run_test_command_with_limits(
             "--dir",
             "/workspace/.tmp",
         ]);
-    add_runtime_mounts(
-        &mut isolated,
-        RuntimeMountProfile::SellerTest,
-    )?;
+    add_runtime_mounts(&mut isolated, RuntimeMountProfile::SellerTest)?;
     isolated
         .arg("--ro-bind")
         .arg(worktree)
@@ -477,8 +460,12 @@ mod rlimit_tests {
             .map(|argument| argument.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
 
-        assert!(arguments.iter().all(|argument| !argument.starts_with("--nproc=")));
-        assert!(arguments.iter().any(|argument| argument.starts_with("--as=")));
+        assert!(arguments
+            .iter()
+            .all(|argument| !argument.starts_with("--nproc=")));
+        assert!(arguments
+            .iter()
+            .any(|argument| argument.starts_with("--as=")));
         assert!(arguments
             .iter()
             .any(|argument| argument.starts_with("--nofile=")));
@@ -504,7 +491,10 @@ fn read_and_digest(
         }
         digest.update(&buffer[..read]);
     }
-    Ok((hex::encode(digest.finalize()), total > MAX_COMMAND_OUTPUT_BYTES))
+    Ok((
+        hex::encode(digest.finalize()),
+        total > MAX_COMMAND_OUTPUT_BYTES,
+    ))
 }
 
 fn join_digest(
@@ -561,7 +551,9 @@ impl RuntimeMountSpecBuilder {
     fn add_executable(&mut self, name: &str, required: bool) -> Result<Option<PathBuf>, String> {
         let Some(path) = self.find_executable(name) else {
             if required {
-                return Err(format!("required sandbox runtime executable {name} is unavailable"));
+                return Err(format!(
+                    "required sandbox runtime executable {name} is unavailable"
+                ));
             }
             return Ok(None);
         };
@@ -583,10 +575,7 @@ impl RuntimeMountSpecBuilder {
         }
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
-        for line in stdout
-            .lines()
-            .chain(stderr.lines())
-        {
+        for line in stdout.lines().chain(stderr.lines()) {
             for token in line.split_whitespace() {
                 let path = token.trim_end_matches(':');
                 if !path.starts_with('/') {
@@ -653,11 +642,8 @@ impl RuntimeMountSpecBuilder {
         else {
             return Ok(());
         };
-        let sysroot = bounded_runtime_path(
-            &rustc,
-            &["--print", "sysroot"],
-            "Rust toolchain sysroot",
-        )?;
+        let sysroot =
+            bounded_runtime_path(&rustc, &["--print", "sysroot"], "Rust toolchain sysroot")?;
         self.add_rust_sysroot(&sysroot)?;
 
         let cc = self
@@ -731,10 +717,8 @@ impl RuntimeMountSpecBuilder {
                 if let Ok(relative) = destination.strip_prefix("/usr/lib") {
                     self.add_runtime_file(source, Path::new("/lib").join(relative))?;
                 }
-                self.symlinks.insert((
-                    destination,
-                    Path::new("/runtime/link/lib").join(artifact),
-                ));
+                self.symlinks
+                    .insert((destination, Path::new("/runtime/link/lib").join(artifact)));
             }
         }
         Ok(())
@@ -774,8 +758,8 @@ pub(super) fn add_runtime_mounts(
             build_runtime_mount_spec(RuntimeMountProfile::SellerTest, std::env::var_os("PATH"))
         }),
     }
-        .as_ref()
-        .map_err(|error| CliError::cli_other_error(error.clone()))?;
+    .as_ref()
+    .map_err(|error| CliError::cli_other_error(error.clone()))?;
     apply_runtime_mount_spec(command, spec);
     Ok(())
 }
@@ -785,7 +769,11 @@ pub(super) fn apply_runtime_mount_spec(command: &mut Command, spec: &RuntimeMoun
     for (_, destination) in spec.files.iter().chain(spec.trees.iter()) {
         collect_parent_directories(destination, &mut directories);
     }
-    for destination in spec.masks.iter().chain(spec.symlinks.iter().map(|(_, path)| path)) {
+    for destination in spec
+        .masks
+        .iter()
+        .chain(spec.symlinks.iter().map(|(_, path)| path))
+    {
         collect_parent_directories(destination, &mut directories);
     }
     let mut directories = directories.into_iter().collect::<Vec<_>>();
@@ -794,25 +782,16 @@ pub(super) fn apply_runtime_mount_spec(command: &mut Command, spec: &RuntimeMoun
         command.arg("--dir").arg(directory);
     }
     for (source, destination) in &spec.trees {
-        command
-            .arg("--ro-bind")
-            .arg(source)
-            .arg(destination);
+        command.arg("--ro-bind").arg(source).arg(destination);
     }
     for (source, destination) in &spec.files {
-        command
-            .arg("--ro-bind")
-            .arg(source)
-            .arg(destination);
+        command.arg("--ro-bind").arg(source).arg(destination);
     }
     for destination in &spec.masks {
         command.arg("--tmpfs").arg(destination);
     }
     for (target, destination) in &spec.symlinks {
-        command
-            .arg("--symlink")
-            .arg(target)
-            .arg(destination);
+        command.arg("--symlink").arg(target).arg(destination);
     }
 }
 
@@ -836,9 +815,7 @@ pub(super) fn build_runtime_mount_spec(
     let shell = builder
         .add_executable("sh", true)?
         .ok_or_else(|| "required sandbox shell is unavailable".to_owned())?;
-    builder
-        .files
-        .insert((shell, PathBuf::from("/bin/sh")));
+    builder.files.insert((shell, PathBuf::from("/bin/sh")));
     let environment = builder
         .add_executable("env", true)?
         .ok_or_else(|| "required sandbox environment executable is unavailable".to_owned())?;
@@ -860,8 +837,8 @@ pub(super) fn build_runtime_mount_spec(
     }
 
     for optional in [
-        "bash", "rm", "touch", "sed", "grep", "find", "cat", "sort", "cut", "tr", "wc",
-        "xargs", "basename", "dirname", "readlink", "realpath", "dd", "sleep",
+        "bash", "rm", "touch", "sed", "grep", "find", "cat", "sort", "cut", "tr", "wc", "xargs",
+        "basename", "dirname", "readlink", "realpath", "dd", "sleep",
     ] {
         builder.add_executable(optional, false)?;
     }
@@ -869,12 +846,7 @@ pub(super) fn build_runtime_mount_spec(
     if let Some(python_command) = builder.find_executable("python3") {
         let (python, _) = bounded_runtime_file(
             &python_command,
-            &[
-                "-I",
-                "-S",
-                "-c",
-                "import sys; print(sys.executable)",
-            ],
+            &["-I", "-S", "-c", "import sys; print(sys.executable)"],
             "Python interpreter",
         )?
         .ok_or_else(|| "Python interpreter path is invalid".to_owned())?;
@@ -901,10 +873,9 @@ pub(super) fn build_runtime_mount_spec(
                     .join("site-packages"),
             );
         }
-        builder.trees.insert((
-            stdlib,
-            Path::new("/runtime/python/lib").join(version),
-        ));
+        builder
+            .trees
+            .insert((stdlib, Path::new("/runtime/python/lib").join(version)));
     }
 
     if builder.add_executable("node", false)?.is_some() {
@@ -1094,8 +1065,10 @@ pub(super) fn runtime_fingerprint() -> Result<Vec<u8>, CliError> {
     let git = command_version("git", &["--version"])?;
     let bwrap = command_version("bwrap", &["--version"])?;
     let prlimit = command_version("prlimit", &["--version"])?;
-    let cargo = command_version("cargo", &["--version"]).unwrap_or_else(|_| "unavailable".to_owned());
-    let rustc = command_version("rustc", &["--version"]).unwrap_or_else(|_| "unavailable".to_owned());
+    let cargo =
+        command_version("cargo", &["--version"]).unwrap_or_else(|_| "unavailable".to_owned());
+    let rustc =
+        command_version("rustc", &["--version"]).unwrap_or_else(|_| "unavailable".to_owned());
     let systemd_run =
         command_version("systemd-run", &["--version"]).unwrap_or_else(|_| "unavailable".to_owned());
     let shell = command_version("sh", &["--version"]).unwrap_or_else(|_| "sh".to_owned());
@@ -1171,8 +1144,7 @@ mod tests {
         let runnable = private_dir();
         write_with_mode(sourceable.path(), "env", 0o644);
         let expected = write_with_mode(runnable.path(), "env", 0o755);
-        let search_path =
-            std::env::join_paths([sourceable.path(), runnable.path()]).unwrap();
+        let search_path = std::env::join_paths([sourceable.path(), runnable.path()]).unwrap();
 
         assert_eq!(find_executable("env", &search_path), Some(expected));
     }
@@ -1193,8 +1165,7 @@ mod tests {
             let runnable = private_dir();
             let first = write_with_mode(inaccessible.path(), "env", mode);
             let later = write_with_mode(runnable.path(), "env", 0o700);
-            let search_path =
-                std::env::join_paths([inaccessible.path(), runnable.path()]).unwrap();
+            let search_path = std::env::join_paths([inaccessible.path(), runnable.path()]).unwrap();
             let expected = if rustix::process::geteuid().is_root() {
                 first
             } else {

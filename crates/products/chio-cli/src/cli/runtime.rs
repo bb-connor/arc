@@ -145,8 +145,7 @@ pub(crate) fn cmd_run(
     let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -408,8 +407,7 @@ pub(crate) fn build_mcp_edge_kernel(
 ) -> Result<ChioKernel, CliError> {
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let mut kernel = build_kernel(loaded_policy, kernel_kp);
     configure_receipt_store(
         &mut kernel,
@@ -764,8 +762,7 @@ pub(crate) fn cmd_check(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
-    let dpop_authority =
-        policy_dpop_replay_authority(&loaded_policy)?;
+    let dpop_authority = policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,

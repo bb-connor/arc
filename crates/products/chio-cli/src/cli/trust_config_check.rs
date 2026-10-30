@@ -11,7 +11,10 @@ use serde_json::json;
 
 use crate::CliError;
 
-pub(crate) fn cmd_trust_config_check(access_config: &Path, json_output: bool) -> Result<(), CliError> {
+pub(crate) fn cmd_trust_config_check(
+    access_config: &Path,
+    json_output: bool,
+) -> Result<(), CliError> {
     let access = TrustAccess::load(access_config)?;
     let config = access.config();
     let credentials: Vec<_> = access

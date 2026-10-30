@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
+use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use chio_core::{Keypair, PublicKey};
 use chio_credentials::{
     build_agent_passport, create_passport_presentation_challenge_with_reference,
@@ -24,8 +25,10 @@ use chio_credentials::{
 use chio_credentials::{synthesize_trust_tier, TrustTier};
 use chio_did::DidChio;
 use chio_errors::_generated::error_codes::TRANSACTION_RECEIPT_UNCHECKPOINTED;
-use chio_kernel::{ComplianceReport, ComplianceScoreConfig, ComplianceScoreInputs, EmaBaselineState, behavioral_anomaly_score, compliance_score};
-use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
+use chio_kernel::{
+    behavioral_anomaly_score, compliance_score, ComplianceReport, ComplianceScoreConfig,
+    ComplianceScoreInputs, EmaBaselineState,
+};
 use chio_reputation::{compute_local_scorecard, ReputationConfig};
 use chio_store_sqlite::SqliteReceiptStore;
 use url::Url;

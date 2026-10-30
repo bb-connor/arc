@@ -78,7 +78,9 @@ impl Notifier {
             Target::Abstract(name) => {
                 use std::os::linux::net::SocketAddrExt;
                 let address = std::os::unix::net::SocketAddr::from_abstract_name(name)?;
-                socket.send_to_addr(message.as_bytes(), &address).map(|_| ())
+                socket
+                    .send_to_addr(message.as_bytes(), &address)
+                    .map(|_| ())
             }
         }
     }
@@ -108,7 +110,9 @@ mod tests {
             .status("ready\nMAINPID=1")
             .unwrap_or_else(|error| panic!("{error}"));
         assert_eq!(receive(&manager), "STATUS=readyMAINPID=1");
-        notifier.stopping().unwrap_or_else(|error| panic!("{error}"));
+        notifier
+            .stopping()
+            .unwrap_or_else(|error| panic!("{error}"));
         assert_eq!(receive(&manager), "STOPPING=1");
     }
 

@@ -95,7 +95,10 @@ pub fn missing_prerequisites(facts: &PlatformFacts) -> Vec<Prerequisite> {
     if facts.os != "linux" || facts.arch != ENFORCEMENT_ARCH {
         missing.push(Prerequisite::LinuxX86_64);
     }
-    if facts.kernel_version().is_none_or(|version| version < MINIMUM_KERNEL) {
+    if facts
+        .kernel_version()
+        .is_none_or(|version| version < MINIMUM_KERNEL)
+    {
         missing.push(Prerequisite::Kernel);
     }
     if facts
@@ -113,7 +116,10 @@ pub fn missing_prerequisites(facts: &PlatformFacts) -> Vec<Prerequisite> {
         (facts.sealed_memfd, Prerequisite::SealedMemfd),
         (facts.openat2, Prerequisite::Openat2),
         (facts.statx_mount_id, Prerequisite::StatxMountId),
-        (facts.nofile_soft >= MINIMUM_NOFILE, Prerequisite::FileDescriptors),
+        (
+            facts.nofile_soft >= MINIMUM_NOFILE,
+            Prerequisite::FileDescriptors,
+        ),
     ] {
         if !present {
             missing.push(prerequisite);
@@ -328,12 +334,14 @@ mod host {
     fn sealed_memfd() -> bool {
         let name = c"chio-preflight";
         // SAFETY: memfd_create takes a NUL-terminated name and flags.
-        let descriptor =
-            unsafe { libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING) };
+        let descriptor = unsafe {
+            libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC | libc::MFD_ALLOW_SEALING)
+        };
         if descriptor < 0 {
             return false;
         }
-        let seals = libc::F_SEAL_SEAL | libc::F_SEAL_SHRINK | libc::F_SEAL_GROW | libc::F_SEAL_WRITE;
+        let seals =
+            libc::F_SEAL_SEAL | libc::F_SEAL_SHRINK | libc::F_SEAL_GROW | libc::F_SEAL_WRITE;
         // SAFETY: fcntl on a descriptor we own with integer arguments.
         let sealed = unsafe { libc::fcntl(descriptor, libc::F_ADD_SEALS, seals) } == 0;
         // SAFETY: the descriptor is ours.
@@ -483,8 +491,8 @@ mod tests {
             .run(&ProbeConfig::default());
         assert_eq!(advisory.severity, ProbeSeverity::Warning);
         assert!(advisory.message.contains("linux x86_64"));
-        let enforced = PlatformProbe::with_source(Box::new(Fixed(facts)), true)
-            .run(&ProbeConfig::default());
+        let enforced =
+            PlatformProbe::with_source(Box::new(Fixed(facts)), true).run(&ProbeConfig::default());
         assert_eq!(enforced.severity, ProbeSeverity::Error);
         assert!(enforced.help.is_some());
     }

@@ -12,11 +12,26 @@ pub(crate) struct ReceiptRetentionArgs {
 }
 
 impl ReceiptRetentionArgs {
-    pub(crate) fn into_config(self) -> Result<Option<chio_api_protect::ProtectRetentionConfig>, chio_control_plane::CliError> {
-        match (self.receipt_retention_days, self.receipt_archive, self.receipt_retention_interval_secs) {
+    pub(crate) fn into_config(
+        self,
+    ) -> Result<Option<chio_api_protect::ProtectRetentionConfig>, chio_control_plane::CliError>
+    {
+        match (
+            self.receipt_retention_days,
+            self.receipt_archive,
+            self.receipt_retention_interval_secs,
+        ) {
             (None, None, None) => Ok(None),
-            (Some(retention_days), Some(archive_path), Some(check_interval_secs)) => Ok(Some(chio_api_protect::ProtectRetentionConfig { retention_days, archive_path, check_interval_secs })),
-            _ => Err(chio_control_plane::CliError::cli_other_error("receipt retention requires days, archive and interval together")),
+            (Some(retention_days), Some(archive_path), Some(check_interval_secs)) => {
+                Ok(Some(chio_api_protect::ProtectRetentionConfig {
+                    retention_days,
+                    archive_path,
+                    check_interval_secs,
+                }))
+            }
+            _ => Err(chio_control_plane::CliError::cli_other_error(
+                "receipt retention requires days, archive and interval together",
+            )),
         }
     }
 }

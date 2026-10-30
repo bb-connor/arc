@@ -22,7 +22,9 @@ mod tests {
         assert!(!has_mount_id(0));
         assert!(!has_mount_id(StatxFlags::BASIC_STATS.bits()));
         assert!(has_mount_id(StatxFlags::MNT_ID.bits()));
-        assert!(has_mount_id((StatxFlags::BASIC_STATS | StatxFlags::MNT_ID).bits()));
+        assert!(has_mount_id(
+            (StatxFlags::BASIC_STATS | StatxFlags::MNT_ID).bits()
+        ));
     }
 
     #[test]

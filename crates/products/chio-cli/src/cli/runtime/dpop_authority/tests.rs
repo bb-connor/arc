@@ -39,10 +39,7 @@ fn descriptor_sources_preserve_the_selected_value_and_input_bytes() -> TestResul
     let mut bytes = canonical_json_bytes(&authority)?;
     bytes.resize(4096, b' ');
     fs::write(&path, &bytes)?;
-    assert_eq!(
-        configured_dpop_replay_authority_from_path(None)?,
-        None
-    );
+    assert_eq!(configured_dpop_replay_authority_from_path(None)?, None);
     assert_eq!(
         configured_dpop_replay_authority_from_path(Some(&path))?,
         Some(authority)

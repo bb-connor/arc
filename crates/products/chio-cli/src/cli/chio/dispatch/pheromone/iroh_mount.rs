@@ -2228,7 +2228,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn directory_reload_denies_newer_successor_below_raised_min_version() {
         // A staged successor that is NEWER than the running directory but STILL BELOW a

@@ -1183,13 +1183,12 @@ fn trust_config(
     profile: &FindingOperatorProfile,
     paths: &ResolvedOperatorPaths,
 ) -> Result<TrustServiceConfig, CliError> {
-    let access =
-        chio_control_plane::trust_control::caller_credentials::TrustAccess::single_client(
-            "finding-operator",
-            "finding-operator",
-            &profile.service_token,
-        )
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let access = chio_control_plane::trust_control::caller_credentials::TrustAccess::single_client(
+        "finding-operator",
+        "finding-operator",
+        &profile.service_token,
+    )
+    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     Ok(TrustServiceConfig {
         transport: Default::default(),
         listen: profile.listen,

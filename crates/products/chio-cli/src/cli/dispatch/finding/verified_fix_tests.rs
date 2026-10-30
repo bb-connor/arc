@@ -166,7 +166,9 @@ fn source_git_sandbox_rejects_repository_config_includes() {
         "read seller revision",
     )
     .unwrap_err();
-    assert!(error.to_string().contains("config includes are not allowed"));
+    assert!(error
+        .to_string()
+        .contains("config includes are not allowed"));
 }
 
 #[test]
@@ -331,18 +333,22 @@ fn sandbox_mounts_only_explicit_runtime_components() {
         }));
     }
     for forbidden in ["/runtime/rust", "/runtime/rust/bin", "/runtime/rust/lib"] {
-        assert!(!arguments.windows(3).any(|window| {
-            window[0] == "--ro-bind" && window[2] == forbidden
-        }));
+        assert!(!arguments
+            .windows(3)
+            .any(|window| { window[0] == "--ro-bind" && window[2] == forbidden }));
     }
-    assert!(arguments.iter().all(|argument| !argument.starts_with("/runtime/rust/share")));
-    assert!(arguments.iter().any(|argument| argument == "/runtime/bin/sh"));
+    assert!(arguments
+        .iter()
+        .all(|argument| !argument.starts_with("/runtime/rust/share")));
+    assert!(arguments
+        .iter()
+        .any(|argument| argument == "/runtime/bin/sh"));
     assert!(arguments
         .iter()
         .any(|argument| argument == "/runtime/rust/bin/cargo"));
-    assert!(arguments
-        .iter()
-        .all(|argument| !argument.contains("/.cargo/registry") && !argument.contains("/.cargo/git")));
+    assert!(arguments.iter().all(
+        |argument| !argument.contains("/.cargo/registry") && !argument.contains("/.cargo/git")
+    ));
     let temporary_root = root.path().to_string_lossy().into_owned();
     assert!(arguments
         .iter()
@@ -412,7 +418,10 @@ fn repository_identity_strips_remote_credentials_and_url_secrets() {
 
 #[test]
 fn paid_terminal_uses_its_authenticated_historical_verification_time() {
-    assert_eq!(proof_verification_time(Some(1_700_000_000)).unwrap(), 1_700_000_000);
+    assert_eq!(
+        proof_verification_time(Some(1_700_000_000)).unwrap(),
+        1_700_000_000
+    );
 }
 
 #[test]
@@ -484,12 +493,8 @@ fn isolated_test_cannot_read_operator_sibling_and_has_a_deadline() {
     assert_ne!(bounded_write.exit_code, 0);
 
     let started = Instant::now();
-    let error = run_test_command_with_timeout(
-        &worktree,
-        "sleep 5",
-        Duration::from_millis(50),
-    )
-    .unwrap_err();
+    let error =
+        run_test_command_with_timeout(&worktree, "sleep 5", Duration::from_millis(50)).unwrap_err();
     assert!(error.to_string().contains("execution deadline"));
     assert!(started.elapsed() < Duration::from_secs(2));
 }
@@ -531,13 +536,9 @@ fn isolated_test_supports_offline_path_vendored_rust() {
         "collect2 --version",
         "rustc -C linker=/usr/bin/cc -C link-arg=-L/runtime/link/lib smoke.rs -o smoke-rust",
     ] {
-        let result = run_test_command_with_timeout(&worktree, command, Duration::from_secs(10))
-            .unwrap();
-        assert_eq!(
-            result.exit_code,
-            0,
-            "sandbox command failed: {command}"
-        );
+        let result =
+            run_test_command_with_timeout(&worktree, command, Duration::from_secs(10)).unwrap();
+        assert_eq!(result.exit_code, 0, "sandbox command failed: {command}");
     }
     let result = run_test_command_with_timeout(
         &worktree,

@@ -33,8 +33,13 @@ pub enum RoleDefect {
 impl std::fmt::Display for RoleDefect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Unusable(role) => write!(f, "the {role} credential is padded, empty or carries a control character"),
-            Self::Reused(left, right) => write!(f, "the {left} and {right} credentials share one value"),
+            Self::Unusable(role) => write!(
+                f,
+                "the {role} credential is padded, empty or carries a control character"
+            ),
+            Self::Reused(left, right) => {
+                write!(f, "the {left} and {right} credentials share one value")
+            }
         }
     }
 }
@@ -55,7 +60,10 @@ pub fn role_defects(values: &BTreeMap<&str, String>) -> Vec<RoleDefect> {
     for (index, (left, left_value)) in roles.iter().enumerate() {
         for (right, right_value) in &roles[index + 1..] {
             if left_value == right_value {
-                defects.push(RoleDefect::Reused((*left).to_string(), (*right).to_string()));
+                defects.push(RoleDefect::Reused(
+                    (*left).to_string(),
+                    (*right).to_string(),
+                ));
             }
         }
     }
@@ -110,7 +118,11 @@ impl Probe for BearerRoleProbe {
                     format!("{} bearer roles are usable and distinct", present.len()),
                 )
             } else {
-                let listed = defects.iter().map(ToString::to_string).collect::<Vec<_>>().join("; ");
+                let listed = defects
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("; ");
                 ProbeReport::fail(
                     self.name(),
                     ProbeSeverity::Error,
@@ -129,21 +141,39 @@ mod tests {
     use super::*;
 
     fn values(pairs: &[(&'static str, &str)]) -> BTreeMap<&'static str, String> {
-        pairs.iter().map(|(role, value)| (*role, (*value).to_string())).collect()
+        pairs
+            .iter()
+            .map(|(role, value)| (*role, (*value).to_string()))
+            .collect()
     }
 
     #[test]
     fn distinct_usable_roles_pass() {
-        let roles = values(&[("session", "s"), ("admin", "a"), ("control", "c"), ("workload", "w")]);
+        let roles = values(&[
+            ("session", "s"),
+            ("admin", "a"),
+            ("control", "c"),
+            ("workload", "w"),
+        ]);
         assert!(role_defects(&roles).is_empty());
         let report = BearerRoleProbe::with_values(roles).run(&ProbeConfig::default());
         assert_eq!(report.severity, ProbeSeverity::Ok);
-        assert!(report.context.iter().any(|entry| entry.key == "present" && entry.value == "session,admin,control,workload"));
+        assert!(
+            report
+                .context
+                .iter()
+                .any(|entry| entry.key == "present"
+                    && entry.value == "session,admin,control,workload")
+        );
     }
 
     #[test]
     fn reuse_and_padding_are_named() {
-        let roles = values(&[("session", "same"), ("admin", "same"), ("control", " padded")]);
+        let roles = values(&[
+            ("session", "same"),
+            ("admin", "same"),
+            ("control", " padded"),
+        ]);
         assert_eq!(
             role_defects(&roles),
             vec![

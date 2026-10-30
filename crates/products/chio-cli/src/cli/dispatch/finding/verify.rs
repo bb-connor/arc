@@ -4,6 +4,9 @@ use std::collections::BTreeMap;
 
 use base64::Engine as _;
 use chio_appraisal::SignedRuntimeAttestationAppraisalReport;
+use chio_core::receipt::checkpoint::{
+    CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
+};
 use chio_core_types::capability::runtime_attestation::RuntimeAttestationEvidence;
 use chio_core_types::capability::trust_policy::AttestationTrustPolicy;
 use chio_core_types::crypto::{sha256_hex, PublicKey};
@@ -23,7 +26,6 @@ use chio_finding_verifier::{
     FindingVerifierDraft, FindingVerifierTrustRoots, ResolvedFindingDeliveryEvidence,
     ResolvedReceiptEvidence, SignedFindingBondStoreSnapshot, MAX_RAW_FINDING_BYTES,
 };
-use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof};
 use chio_open_market::fee_schedule::SignedOpenMarketFeeSchedule;
 
 const FINDING_SCHEMA_JSON: &str =

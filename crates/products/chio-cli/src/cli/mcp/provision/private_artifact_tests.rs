@@ -16,8 +16,7 @@ fn victim(directory: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn a_symlinked_artifact_path_does_not_chmod_its_target() -> Result<(), Box<dyn std::error::Error>>
-{
+fn a_symlinked_artifact_path_does_not_chmod_its_target() -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     let victim = victim(root.path())?;
     let artifact = root.path().join("artifact");
@@ -100,10 +99,12 @@ fn a_private_directory_must_belong_to_the_provisioning_user(
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700))?;
     validate_private_directory(root.path())?;
     let metadata = std::fs::symlink_metadata(root.path())?;
-    let refused =
-        private_files::require_private_directory_metadata(&metadata, metadata.uid().wrapping_add(1))
-            .err()
-            .ok_or("a directory owned by another user must be refused")?;
+    let refused = private_files::require_private_directory_metadata(
+        &metadata,
+        metadata.uid().wrapping_add(1),
+    )
+    .err()
+    .ok_or("a directory owned by another user must be refused")?;
     assert!(
         refused
             .to_string()

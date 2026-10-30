@@ -379,7 +379,9 @@ impl ProvisionedCagePolicyFactory {
             ));
         }
         input.execution_identity.validate().map_err(|error| {
-            CliError::cli_other_error(format!("provisioned cage execution identity is invalid: {error}"))
+            CliError::cli_other_error(format!(
+                "provisioned cage execution identity is invalid: {error}"
+            ))
         })?;
         chio_manifest::verify_manifest(&input.signed_manifest, &input.registered_public_key)
             .map_err(|error| {
@@ -399,7 +401,8 @@ impl ProvisionedCagePolicyFactory {
             .as_ref()
             .ok_or_else(|| {
                 CliError::cli_other_error(
-                    "provisioned native MCP manifest requires explicit platform permissions".to_string(),
+                    "provisioned native MCP manifest requires explicit platform permissions"
+                        .to_string(),
                 )
             })?;
         let expected_profile = if let Some(broker) = &input.broker {
@@ -697,14 +700,10 @@ fn load_cage_migration_enforcer(
         })?,
     );
     let store: Arc<dyn EnterpriseMigrationStateStore> = concrete;
-    chio_security_types::EnterpriseMigrationRuntimeBinding::load(
-        &store,
-        &expected_key,
-        posture,
-    )
-    .map_err(|error| {
-        CliError::cli_other_error(format!("cage migration runtime binding denied: {error}"))
-    })
+    chio_security_types::EnterpriseMigrationRuntimeBinding::load(&store, &expected_key, posture)
+        .map_err(|error| {
+            CliError::cli_other_error(format!("cage migration runtime binding denied: {error}"))
+        })
 }
 
 pub(crate) fn load_native_mcp_launch(

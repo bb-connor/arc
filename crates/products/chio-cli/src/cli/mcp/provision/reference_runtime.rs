@@ -133,8 +133,10 @@ pub(crate) struct ProvisionReferenceRuntimeArgs {
 pub(crate) fn cmd_provision_reference_runtime(
     args: &ProvisionReferenceRuntimeArgs,
 ) -> Result<(), CliError> {
-    let receipt_rollback_anchor_root =
-        require_exact_canonical_path(&args.receipt_rollback_anchor_root, "receipt rollback anchor")?;
+    let receipt_rollback_anchor_root = require_exact_canonical_path(
+        &args.receipt_rollback_anchor_root,
+        "receipt rollback anchor",
+    )?;
     if !std::fs::metadata(&receipt_rollback_anchor_root)?.is_dir() {
         return Err(CliError::cli_other_error(
             "receipt rollback anchor must be a directory".to_string(),
