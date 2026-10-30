@@ -51,8 +51,7 @@ EXTENDS Naturals, FiniteSets
 (*    and every child independently obeys clauses 1 and 2.                 *)
 (*                                                                         *)
 (* Equivalent checks are maintained in                                     *)
-(* chio-kernel-core/src/formal_aeneas.rs,                                   *)
-(* chio-kernel/src/kernel/ledger_audit.rs, and                              *)
+(* chio-kernel-core/src/formal_aeneas.rs and                               *)
 (* chio-kernel/tests/property_reservation_ledger.rs.                        *)
 (***************************************************************************)
 

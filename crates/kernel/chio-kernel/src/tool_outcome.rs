@@ -733,7 +733,6 @@ impl CanonicalInvocationBlobV1 {
         &self.bytes
     }
 
-    #[allow(dead_code)]
     fn verify(&self, raw: &RawInvocationOutcomeV1) -> Result<(), ToolOutcomeError> {
         if *self != raw.canonical_blob()? {
             return Err(ToolOutcomeError::Binding("raw_invocation_blob"));
