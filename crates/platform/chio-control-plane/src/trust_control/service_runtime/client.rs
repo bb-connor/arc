@@ -8,6 +8,8 @@ mod cluster;
 mod factory;
 #[path = "client/operations.rs"]
 mod operations;
+#[path = "client/stop.rs"]
+mod stop;
 #[path = "client/transport.rs"]
 mod transport;
 #[path = "client/validation.rs"]

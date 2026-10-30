@@ -407,6 +407,49 @@ pub(crate) enum TrustCommands {
         #[arg(long)]
         capability_id: String,
     },
+
+    /// Stop, resume or inspect admissions on a trust-control node through its
+    /// emergency routes. Needs `--control-url` and an `admin:emergency`
+    /// credential in `CHIO_CONTROL_TOKEN` or `--token-file`, never on the
+    /// command line. Exits 77 when trust-control refuses the credential and 69
+    /// when no endpoint answers.
+    Emergency {
+        /// File holding the admin bearer token.
+        #[arg(long, global = true)]
+        token_file: Option<PathBuf>,
+
+        #[command(subcommand)]
+        command: TrustEmergencyCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum TrustEmergencyCommands {
+    /// Stop admissions on the node's kernel scope.
+    Stop {
+        /// Operator reason recorded on the stop.
+        #[arg(long)]
+        reason: String,
+
+        /// Refuse governed containment while stopped. By default containment
+        /// stays available.
+        #[arg(long)]
+        no_containment: bool,
+    },
+
+    /// Resume the stopped head named by `status`.
+    Resume {
+        /// Chain generation of the stopped head.
+        #[arg(long)]
+        expected_generation: u32,
+
+        /// Epoch of the stopped head.
+        #[arg(long)]
+        expected_epoch: u64,
+    },
+
+    /// Report whether the node is stopped and its current head.
+    Status,
 }
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]

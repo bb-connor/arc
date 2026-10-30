@@ -1442,5 +1442,15 @@ pub(crate) fn dispatch_trust(
             control_url.as_deref(),
             control_token.as_deref(),
         ),
+        TrustCommands::Emergency {
+            token_file,
+            command,
+        } => super::trust_emergency::cmd_trust_emergency(
+            command,
+            token_file.as_deref(),
+            json_output,
+            control_url.as_deref(),
+            control_token.as_deref(),
+        ),
     }
 }

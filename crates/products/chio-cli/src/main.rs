@@ -110,11 +110,12 @@ pub(crate) use types_cli::{
     TrustAuthorizationContextCommands, TrustBehavioralFeedCommands, TrustCapitalAllocationCommands,
     TrustCapitalBookCommands, TrustCapitalInstructionCommands, TrustCommands, TrustConfigCommands,
     TrustCreditBacktestCommands, TrustCreditBondCommands, TrustCreditFacilityCommands,
-    TrustCreditLossLifecycleCommands, TrustCreditScorecardCommands, TrustEvidenceShareCommands,
-    TrustExposureLedgerCommands, TrustFederationPolicyCommands, TrustLiabilityMarketCommands,
-    TrustLiabilityProviderCommands, TrustProviderCommands, TrustProviderRiskPackageCommands,
-    TrustRuntimeAttestationAppraisalCommands, TrustUnderwritingAppealCommands,
-    TrustUnderwritingDecisionCommands, TrustUnderwritingInputCommands, WorkflowCommands,
+    TrustCreditLossLifecycleCommands, TrustCreditScorecardCommands, TrustEmergencyCommands,
+    TrustEvidenceShareCommands, TrustExposureLedgerCommands, TrustFederationPolicyCommands,
+    TrustLiabilityMarketCommands, TrustLiabilityProviderCommands, TrustProviderCommands,
+    TrustProviderRiskPackageCommands, TrustRuntimeAttestationAppraisalCommands,
+    TrustUnderwritingAppealCommands, TrustUnderwritingDecisionCommands,
+    TrustUnderwritingInputCommands, WorkflowCommands,
 };
 pub(crate) use types_cli::{
     FindingChallengeClassArg, FindingCommands, FindingOperatorCommands, FindingPackageCommands,
