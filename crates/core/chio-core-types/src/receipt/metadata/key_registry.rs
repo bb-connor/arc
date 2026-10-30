@@ -243,18 +243,18 @@ pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec] = &[
     spec(
         FINDING_DELIVERY_METADATA_KEY,
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         Some(FINDING_DELIVERY_SCHEMA),
-        "Purchased-finding delivery overlay: public finding and listing ids, kernel comparison results and Chio-minted reservation and payment operation ids. Read by open-market recovery and the remote admission projection.",
+        "Purchased-finding delivery overlay. finding_id is an unsalted SHA-256 of the provider's finding body and listing_id is provider-assigned, the members committed in finding_purchase_replay_snapshot. Read by open-market recovery and the remote admission projection. Target form: schema, the transform profile, the digest, media-type and settlement-mode results, the accepted-bid and venue-admission envelope digests, reservation_id, purchase_intent_id, authoritative_payment_operation_id and the keyed status-proof members stay plaintext; finding_id, listing_id and the other status-proof members become commitments.",
     ),
     spec(
         FINDING_RECOVERY_METADATA_KEY,
         ChioInternal,
-        CommittedSafe,
+        Unsafe,
         Projection,
         Some(FINDING_RECOVERY_SCHEMA),
-        "Finding-recovery binding: recovery and finding ids, the original capability and delivery receipt ids and the purchase key. Read by the kernel's terminal and recovery-gate paths.",
+        "Finding-recovery binding. finding_id is an unsalted SHA-256 of the provider's finding body and original_capability_id is the issuer's token id, the members committed in finding_recovery_replay_snapshot. Read by the kernel's terminal and recovery-gate paths. Target form: schema, recovery_id, original_delivery_receipt_id and purchase_key stay plaintext; finding_id and original_capability_id become commitments.",
     ),
     spec(
         "finding_purchase_replay_snapshot",
