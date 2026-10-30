@@ -12,7 +12,8 @@ pub enum OpenPolicy {
     /// Authority-granting configuration: owned by this user or root, and
     /// neither group nor world writable (sshd `StrictModes`).
     Trusted,
-    /// A secret: owned by this user, with no group or other bits.
+    /// A secret: owned by this user, with no group or other bits and no
+    /// second hard link.
     Private,
 }
 
@@ -31,6 +32,8 @@ pub enum RegularFileError {
     Writable { mode: u32 },
     #[error("file is open to group or other (mode {mode:o})")]
     Exposed { mode: u32 },
+    #[error("file has {links} hard links")]
+    MultiplyLinked { links: u64 },
     #[error("file exceeds {max_bytes} bytes")]
     TooLarge { max_bytes: usize },
     #[error("file cannot be read: {0}")]
@@ -72,6 +75,7 @@ pub fn open_regular(path: &Path, policy: OpenPolicy) -> Result<(File, Metadata),
         policy,
         metadata.uid(),
         metadata.mode(),
+        metadata.nlink(),
         rustix::process::geteuid().as_raw(),
     )?;
     #[cfg(feature = "test-support")]
@@ -109,12 +113,13 @@ pub fn read_regular_file(
     Ok(bytes)
 }
 
-/// The owner and mode rule of `policy` for a file owned by `uid` with
-/// `st_mode` `mode`, read by `euid`.
+/// The owner, mode and link rule of `policy` for a file owned by `uid` with
+/// `st_mode` `mode` and `links` hard links, read by `euid`.
 pub(crate) fn check_ownership(
     policy: OpenPolicy,
     uid: u32,
     mode: u32,
+    links: u64,
     euid: u32,
 ) -> Result<(), RegularFileError> {
     let permissions = mode & 0o7777;
@@ -130,6 +135,7 @@ pub(crate) fn check_ownership(
         OpenPolicy::Private if permissions & 0o077 != 0 => {
             Err(RegularFileError::Exposed { mode: permissions })
         }
+        OpenPolicy::Private if links > 1 => Err(RegularFileError::MultiplyLinked { links }),
         OpenPolicy::Trusted | OpenPolicy::Private => Ok(()),
     }
 }
