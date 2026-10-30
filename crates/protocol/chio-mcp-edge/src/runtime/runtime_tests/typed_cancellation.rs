@@ -91,7 +91,7 @@ fn request_cancelled_errors_record_cancelled_task_terminal_state() {
     task.record_outcome(outcome, observed);
 
     assert_eq!(task.status, EdgeTaskStatus::Cancelled);
-    let code = chio_kernel::ClientDenialCode::from_code("request_cancelled").expect("closed code");
+    let code = chio_kernel::ClientDenialCode::RequestCancelled;
     assert_eq!(task.status_message.as_deref(), Some(code.text()));
 
     let result = task_outcome_to_jsonrpc(Some(task.clone()), &json!(3), &task_id);
