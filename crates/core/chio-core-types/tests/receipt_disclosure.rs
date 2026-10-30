@@ -16,7 +16,11 @@ use serde_json::{json, Value};
 
 /// Committed vectors whose disclosure carries a salt outside the canonical b64u form of 32
 /// bytes. Every other vector decodes.
-const DECODE_REFUSED: [&str; 3] = ["salt_31_bytes", "salt_padded_b64u", "salt_noncanonical_tail"];
+const DECODE_REFUSED: [&str; 3] = [
+    "salt_31_bytes",
+    "salt_padded_b64u",
+    "salt_noncanonical_tail",
+];
 
 const RECEIPT_ID: &str = "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33";
 
