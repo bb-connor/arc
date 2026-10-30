@@ -393,7 +393,8 @@ pub fn build_post_invocation_pipeline(
     let mut pipeline = PostInvocationPipeline::new();
 
     if let Some(query_result) = &config.query_result {
-        let guard = QueryResultGuard::new(query_result.clone()).map_err(PolicyError::Invalid)?;
+        let guard = QueryResultGuard::new(query_result.clone())
+            .map_err(|error| PolicyError::Invalid(error.to_string()))?;
         pipeline.add(Box::new(guard.into_owned_hook(ChioScope::default())));
     }
 

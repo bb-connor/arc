@@ -17,6 +17,7 @@ use chio_core::crypto::Keypair;
 use chio_data_guards::{
     SqlDialect, SqlGuardConfig, SqlGuardConfigError, SqlOperation, SqlQueryGuard,
 };
+use chio_guards::PatternError;
 use chio_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
 fn make_request(
@@ -298,7 +299,7 @@ fn denylisted_predicate_count_limit_fails_closed() {
     });
     assert!(matches!(
         result,
-        Err(SqlGuardConfigError::TooManyPredicates { max: 64 })
+        Err(SqlGuardConfigError::Predicate(PatternError::TooMany { .. }))
     ));
 }
 
@@ -310,7 +311,7 @@ fn denylisted_predicate_length_limit_fails_closed() {
     });
     assert!(matches!(
         result,
-        Err(SqlGuardConfigError::PredicateTooLong { max: 512 })
+        Err(SqlGuardConfigError::Predicate(PatternError::TooLong { .. }))
     ));
 }
 
@@ -322,7 +323,9 @@ fn denylisted_predicate_complexity_limit_fails_closed() {
     });
     assert!(matches!(
         result,
-        Err(SqlGuardConfigError::PredicateTooComplex { .. })
+        Err(SqlGuardConfigError::Predicate(
+            PatternError::TooComplex { .. }
+        ))
     ));
 }
 

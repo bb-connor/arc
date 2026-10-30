@@ -6,6 +6,7 @@
 //! receipt builder or a policy test harness) can match on them structurally
 //! rather than string-parsing log lines.
 
+use chio_guards::PatternError;
 use thiserror::Error;
 
 /// Reason [`SqlQueryGuard::try_new`](crate::sql_guard::SqlQueryGuard::try_new)
@@ -19,40 +20,9 @@ pub enum SqlGuardConfigError {
         table: String,
     },
 
-    /// More `denylisted_predicates` than the guard accepts.
-    #[error("sql_query.denylisted_predicates allows at most {max} patterns")]
-    TooManyPredicates {
-        /// The pattern limit.
-        max: usize,
-    },
-
-    /// A `denylisted_predicates` entry is empty after trimming.
-    #[error("sql_query.denylisted_predicates cannot contain empty patterns")]
-    EmptyPredicate,
-
-    /// A `denylisted_predicates` entry exceeds the length limit.
-    #[error("sql_query.denylisted_predicates entries must be at most {max} characters")]
-    PredicateTooLong {
-        /// The length limit in bytes.
-        max: usize,
-    },
-
-    /// A `denylisted_predicates` entry exceeds the complexity limit.
-    #[error("sql_query.denylisted_predicates entries must have complexity at most {max}")]
-    PredicateTooComplex {
-        /// The complexity limit.
-        max: usize,
-    },
-
-    /// A `denylisted_predicates` entry does not compile within the regex limits.
-    #[error("invalid sql_query.denylisted_predicates entry `{pattern}`: {source}")]
-    InvalidPredicate {
-        /// The trimmed pattern.
-        pattern: String,
-        /// The regex compiler's refusal.
-        #[source]
-        source: regex::Error,
-    },
+    /// A `denylisted_predicates` entry was refused.
+    #[error(transparent)]
+    Predicate(#[from] PatternError),
 }
 
 /// Structured reason for a [`SqlQueryGuard`](crate::sql_guard::SqlQueryGuard)

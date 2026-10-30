@@ -52,7 +52,7 @@
 
 use std::borrow::Cow;
 
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::warn;
@@ -61,15 +61,11 @@ use chio_core::capability::scope::{ChioScope, Constraint};
 use chio_guards::post_invocation::{
     PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity, PostInvocationVerdict,
 };
+use chio_guards::{compile_bounded_patterns, PatternCase, PatternError};
 use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 /// Default redaction marker written in place of denied columns.
 pub const DEFAULT_REDACTION_MARKER: &str = "[REDACTED]";
-const MAX_REDACT_PII_PATTERNS: usize = 64;
-const MAX_REDACT_PII_PATTERN_LEN: usize = 512;
-const MAX_REDACT_PII_PATTERN_COMPLEXITY: usize = 96;
-const REDACT_PII_REGEX_SIZE_LIMIT: usize = 1 << 20;
-const REDACT_PII_DFA_SIZE_LIMIT: usize = 1 << 20;
 
 /// Configuration for [`QueryResultGuard`].
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -128,41 +124,12 @@ impl QueryResultGuard {
     ///
     /// Invalid or over-broad PII regex patterns reject guard construction so
     /// policy loading fails closed instead of silently widening output.
-    pub fn new(config: QueryResultGuardConfig) -> Result<Self, String> {
-        if config.redact_pii_patterns.len() > MAX_REDACT_PII_PATTERNS {
-            return Err(format!(
-                "query_result.redact_pii_patterns allows at most {MAX_REDACT_PII_PATTERNS} patterns"
-            ));
-        }
-        let mut pii_regex = Vec::with_capacity(config.redact_pii_patterns.len());
-        for pattern in &config.redact_pii_patterns {
-            let trimmed = pattern.trim();
-            if trimmed.is_empty() {
-                return Err(
-                    "query_result.redact_pii_patterns cannot contain empty patterns".to_string(),
-                );
-            }
-            if trimmed.len() > MAX_REDACT_PII_PATTERN_LEN {
-                return Err(format!(
-                    "query_result.redact_pii_patterns entries must be at most {MAX_REDACT_PII_PATTERN_LEN} characters"
-                ));
-            }
-            let complexity = pii_pattern_complexity(trimmed);
-            if complexity > MAX_REDACT_PII_PATTERN_COMPLEXITY {
-                return Err(format!(
-                    "query_result.redact_pii_patterns entries must have complexity at most {MAX_REDACT_PII_PATTERN_COMPLEXITY}"
-                ));
-            }
-            let re = RegexBuilder::new(trimmed)
-                .case_insensitive(true)
-                .size_limit(REDACT_PII_REGEX_SIZE_LIMIT)
-                .dfa_size_limit(REDACT_PII_DFA_SIZE_LIMIT)
-                .build()
-                .map_err(|error| {
-                    format!("invalid query_result.redact_pii_patterns entry `{trimmed}`: {error}")
-                })?;
-            pii_regex.push((trimmed.to_string(), re));
-        }
+    pub fn new(config: QueryResultGuardConfig) -> Result<Self, PatternError> {
+        let pii_regex = compile_bounded_patterns(
+            "query_result.redact_pii_patterns",
+            &config.redact_pii_patterns,
+            PatternCase::Insensitive,
+        )?;
         Ok(Self { config, pii_regex })
     }
 
@@ -241,68 +208,12 @@ impl QueryResultGuard {
     }
 }
 
-fn pii_pattern_complexity(pattern: &str) -> usize {
-    let mut score = 0usize;
-    let mut escaped = false;
-    for ch in pattern.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' => escaped = true,
-            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
-            '{' | '[' | '(' => score = score.saturating_add(2),
-            _ => {}
-        }
-    }
-    score
-}
-
 /// Non-mutating convenience that bundles the scope.
 impl QueryResultGuard {
-    /// Build a [`PostInvocationHook`] adapter bound to an [`ChioScope`].
-    ///
-    /// Callers that already have a concrete scope can still construct a
-    /// fresh adapter per request. When the kernel provides a scope via
-    /// [`PostInvocationContext`], the hook prefers that context over the
-    /// fallback scope stored here.
-    pub fn as_hook(&self, scope: ChioScope) -> QueryResultHook<'_> {
-        QueryResultHook { guard: self, scope }
-    }
-
     /// Build an owned [`PostInvocationHook`] adapter for runtime
     /// pipelines that need a `'static` hook object.
     pub fn into_owned_hook(self, scope: ChioScope) -> OwnedQueryResultHook {
         OwnedQueryResultHook { guard: self, scope }
-    }
-}
-
-/// `PostInvocationHook` adapter around a [`QueryResultGuard`] + scope.
-pub struct QueryResultHook<'a> {
-    guard: &'a QueryResultGuard,
-    scope: ChioScope,
-}
-
-impl<'a> PostInvocationHook for QueryResultHook<'a> {
-    fn name(&self) -> &str {
-        "query-result"
-    }
-
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
-        let scope = ctx.scope.unwrap_or(&self.scope);
-        let redacted =
-            self.guard
-                .redact_result_cloned_for_request(scope, ctx.matched_grant_index, response);
-        if redacted == *response {
-            PostInvocationVerdict::Allow
-        } else {
-            PostInvocationVerdict::Redact(redacted)
-        }
-    }
-
-    fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
-        query_result_hook_identity(&self.guard.config, &self.scope).map(Some)
     }
 }
 
@@ -729,7 +640,7 @@ mod tests {
             ..Default::default()
         })
         .unwrap_err();
-        assert!(error.contains("invalid query_result.redact_pii_patterns entry"));
+        assert!(matches!(error, PatternError::Invalid { .. }));
     }
 
     #[test]
@@ -769,7 +680,7 @@ mod tests {
     fn post_invocation_hook_returns_redact_when_modified() {
         let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
-        let hook = guard.as_hook(scope);
+        let hook = guard.into_owned_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}, {"id": 2}]});
         let context = PostInvocationContext::synthetic("sql");
         match hook.inspect(&context, &value) {
@@ -784,7 +695,7 @@ mod tests {
     fn post_invocation_hook_returns_allow_when_unchanged() {
         let guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
         let scope = scope(vec![]);
-        let hook = guard.as_hook(scope);
+        let hook = guard.into_owned_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}]});
         let context = PostInvocationContext::synthetic("sql");
         match hook.inspect(&context, &value) {
@@ -796,9 +707,9 @@ mod tests {
     #[test]
     fn durable_identity_binds_effective_config_and_fallback_scope() {
         let base_scope = scope(vec![]);
-        let base_guard = QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
-        let base = base_guard
-            .as_hook(base_scope.clone())
+        let base_guard = || QueryResultGuard::new(QueryResultGuardConfig::default()).unwrap();
+        let base = base_guard()
+            .into_owned_hook(base_scope.clone())
             .durable_identity()
             .unwrap()
             .unwrap();
@@ -809,12 +720,12 @@ mod tests {
         })
         .unwrap();
         let configured = configured_guard
-            .as_hook(base_scope)
+            .into_owned_hook(base_scope)
             .durable_identity()
             .unwrap()
             .unwrap();
-        let scoped = base_guard
-            .as_hook(scope(vec![Constraint::MaxRowsReturned(1)]))
+        let scoped = base_guard()
+            .into_owned_hook(scope(vec![Constraint::MaxRowsReturned(1)]))
             .durable_identity()
             .unwrap()
             .unwrap();

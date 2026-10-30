@@ -17,10 +17,10 @@
 
 use std::collections::BTreeSet;
 
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 use tracing::warn;
 
-use chio_guards::{extract_action_checked, ToolAction};
+use chio_guards::{compile_bounded_patterns, extract_action_checked, PatternCase, ToolAction};
 use chio_kernel::{GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 use crate::config::{SqlGuardConfig, SqlOperation};
@@ -32,12 +32,6 @@ pub struct SqlQueryGuard {
     config: SqlGuardConfig,
     denylist_regex: Vec<(String, Regex)>,
 }
-
-const MAX_DENYLISTED_PREDICATES: usize = 64;
-const MAX_DENYLISTED_PREDICATE_LEN: usize = 512;
-const MAX_DENYLISTED_PREDICATE_COMPLEXITY: usize = 96;
-const DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT: usize = 1 << 20;
-const DENYLISTED_PREDICATE_DFA_SIZE_LIMIT: usize = 1 << 20;
 
 impl SqlQueryGuard {
     /// Construct a new guard with the given configuration.
@@ -82,40 +76,11 @@ impl SqlQueryGuard {
             }
         }
 
-        if config.denylisted_predicates.len() > MAX_DENYLISTED_PREDICATES {
-            return Err(SqlGuardConfigError::TooManyPredicates {
-                max: MAX_DENYLISTED_PREDICATES,
-            });
-        }
-        let mut denylist_regex = Vec::with_capacity(config.denylisted_predicates.len());
-        for pattern in &config.denylisted_predicates {
-            let trimmed = pattern.trim();
-            if trimmed.is_empty() {
-                return Err(SqlGuardConfigError::EmptyPredicate);
-            }
-            if trimmed.len() > MAX_DENYLISTED_PREDICATE_LEN {
-                return Err(SqlGuardConfigError::PredicateTooLong {
-                    max: MAX_DENYLISTED_PREDICATE_LEN,
-                });
-            }
-            let complexity = predicate_pattern_complexity(trimmed);
-            if complexity > MAX_DENYLISTED_PREDICATE_COMPLEXITY {
-                return Err(SqlGuardConfigError::PredicateTooComplex {
-                    max: MAX_DENYLISTED_PREDICATE_COMPLEXITY,
-                });
-            }
-            let re = RegexBuilder::new(trimmed)
-                .case_insensitive(true)
-                .size_limit(DENYLISTED_PREDICATE_REGEX_SIZE_LIMIT)
-                .dfa_size_limit(DENYLISTED_PREDICATE_DFA_SIZE_LIMIT)
-                .build()
-                .map_err(|source| SqlGuardConfigError::InvalidPredicate {
-                    pattern: trimmed.to_string(),
-                    source,
-                })?;
-            denylist_regex.push((trimmed.to_string(), re));
-        }
-
+        let denylist_regex = compile_bounded_patterns(
+            "sql_query.denylisted_predicates",
+            &config.denylisted_predicates,
+            PatternCase::Insensitive,
+        )?;
         Ok(Self {
             config,
             denylist_regex,
@@ -290,24 +255,6 @@ impl SqlQueryGuard {
         }
         Ok(())
     }
-}
-
-fn predicate_pattern_complexity(pattern: &str) -> usize {
-    let mut score = 0usize;
-    let mut escaped = false;
-    for ch in pattern.chars() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match ch {
-            '\\' => escaped = true,
-            '|' | '*' | '+' | '?' => score = score.saturating_add(4),
-            '{' | '[' | '(' => score = score.saturating_add(2),
-            _ => {}
-        }
-    }
-    score
 }
 
 impl chio_kernel::Guard for SqlQueryGuard {

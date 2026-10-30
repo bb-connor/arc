@@ -44,7 +44,7 @@ pub mod warehouse_cost_guard;
 pub use config::{SqlDialect, SqlGuardConfig, SqlOperation};
 pub use error::{SqlGuardConfigError, SqlGuardDenyReason};
 pub use result_guard::{
-    QueryResultGuard, QueryResultGuardConfig, QueryResultHook, DEFAULT_REDACTION_MARKER,
+    OwnedQueryResultHook, QueryResultGuard, QueryResultGuardConfig, DEFAULT_REDACTION_MARKER,
 };
 pub use sql_guard::SqlQueryGuard;
 pub use sql_parser::SqlAnalysis;
