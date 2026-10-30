@@ -135,7 +135,7 @@ pub trait SessionHandleResolver {
         &self,
         queries: &[SessionHandleQuery],
     ) -> Result<Vec<SessionHandleMatches>, SessionHandleResolveError>;
-    /// The distinct key generations named by pins of `signer`.
+    /// The key generations recorded for `signer` in `session_handle_generations`.
     fn pinned_generations(
         &self,
         signer: &PublicKey,
@@ -148,15 +148,23 @@ pub trait SessionHandleResolver {
   - The store writes a session's pin once, in the transaction that appends the session's first handle-bearing receipt. It uses `INSERT ... ON CONFLICT DO NOTHING`, so later appends of that session are no-ops.
   - The handle and origin come from `session_membership`, which reports the origin from the carrying member: `protocol_refusal` gives `kernel`, `acp` and `receipt_context` give `acp`. `opened_at` is the receipt's trusted timestamp.
   - An append whose membership refuses is itself refused.
-  - Pins are never archived or pruned. The retention and rotation paths (`receipt_store/evidence_retention.rs`) exclude the table, and a store test pins that exclusion.
+- **Generations table.** `session_handle_generations(signer, key_id)` has `PRIMARY KEY (signer, key_id)`. The same transaction writes it with `INSERT OR IGNORE` whenever it writes a pin, so it lists every key generation that keyed a pin for that signer.
+- **Retention exclusion.** Pins and generations are never archived or pruned. The retention and rotation paths (`receipt_store/evidence_retention.rs`) exclude both tables, and store tests pin that exclusion.
 - **No receipt scan.** Resolution reads only `session_handle_pins`. It never scans receipts, the claim log or the archive. A session whose receipts were all archived still has its pin.
 - **Lookups.**
   - `pinned_handles` runs `WHERE signer = ?1 AND key_id = ?2 AND handle_value IN (...)`, or the equivalent per-generation seek, for each query. The candidates are one per loaded generation, and every query in a call is batched in one read transaction. Each lookup is a primary-key seek.
-  - `pinned_generations` runs `SELECT DISTINCT key_id ... WHERE signer = ?1`, a seek on the primary-key prefix whose result is bounded by the number of generations.
+  - `pinned_generations` runs `SELECT key_id FROM session_handle_generations WHERE signer = ?1`, a primary-key prefix seek on that table. It reads neither the pins nor the receipts, and its result is bounded by the number of generations.
   - If any pinned `key_id` is not loaded, the caller refuses with `UnknownGeneration` before accepting a resolution. A session under that generation cannot be ruled out.
-- **Store files.** The table DDL and each query are their own `.sql` files in a `session_handle_pins` module of the store, loaded through named consts.
+- **Store files.** Both tables' DDL and each query are their own `.sql` files in a `session_handle_pins` module of the store, loaded through named consts.
 - **Batching.** `chio-mcp-remote` resolves every session it restores at startup in one call.
-- **One store.** The ACP proxy resolves against the same receipt store its `KernelReceiptSigner` appends to, through the same `chio-store-sqlite` implementation. There is no second store.
+- **One store.** The ACP proxy holds an `Arc<dyn SessionHandleResolver>` backed by the same `chio-store-sqlite` receipt store that its `KernelReceiptSigner` appends to. Its pins are written by that store's append transaction. There is no second store.
+- **Coverage.** Every path that fixes a continuing session's handle goes through the pin lookup:
+  - kernel restore (`chio-mcp-remote`);
+  - ACP `session/load`;
+  - an ACP entry for a `sessionId` the proxy has not seen open in this process;
+  - `chio cert generate`.
+
+  No path derives a continuing session's handle any other way.
 - **Cardinality.** One pure function in `chio-core-types`, `SessionHandleMatches::into_resolution`, applies the rule: zero pins gives `None`, one pin gives `Some(handle)`, and more than one gives `Ambiguous`.
 - **Consumers.** Kernel restore, ACP `session/load` and `chio cert generate` share it. The store keeps only the pins and their lookups; the rule stays in the domain crate.
 - **Certification.** `chio cert generate` uses the resolver only to name the handle. It still reads the session through the checkpoint-authenticated claim corpus (`session_certificate_read.rs`), because certification needs authenticated completeness, which the pin table cannot give.
@@ -224,11 +232,13 @@ PR 4 (flip):
 17. Store tests (`chio-store-sqlite`):
     - `session_handle_pin_written_once_on_first_append`;
     - `append_refuses_malformed_session_membership`;
-    - `session_handle_pins_survive_retention`: rotation and archive leave every pin in place;
+    - `session_handle_pins_survive_retention`: rotation and archive leave every pin and generation row in place;
+    - `generation_row_written_with_pin`;
     - `archived_session_resolves_to_original_handle`: session H1 is opened under G1, all its receipts are archived, then a restart under active G2 resolves the same raw id to H1. Fails with any receipt-backed lookup;
     - `pin_under_unloaded_generation_refuses`;
     - `two_pins_for_one_raw_id_refuse_as_ambiguous`;
-    - `pinned_handles_is_an_index_seek`: `EXPLAIN QUERY PLAN` for both lookups shows `SEARCH ... USING PRIMARY KEY`, never `SCAN`.
+    - `pinned_handles_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the pin lookup shows `SEARCH session_handle_pins USING PRIMARY KEY`, never `SCAN`;
+    - `pinned_generations_is_an_index_seek`: `EXPLAIN QUERY PLAN` for the generation lookup shows `SEARCH session_handle_generations USING PRIMARY KEY`, never `SCAN`.
 
 Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<raw>` changes to the handle in the same PR: `chio-core-types` `tests/receipt_metadata_blocks.rs`, `tests/security_receipts.rs`; `chio-kernel` `compliance_certificate/tests.rs`, `kernel/tests/{protocol_refusal,reserved_session_metadata,session,post_effect_receipts}.rs`, `kernel/tests/reserved_session_metadata/kernel_written.rs`, `kernel/tests/durable_admission/review_regressions.rs`, `admission_operation_tests/terminal_projection.rs`, `tests/compliance_certificate_hybrid.rs`; `chio-store-sqlite` `receipt_store/session_certificate_read/tests.rs`, `tests/session_certificate_read.rs`, `admission_operation_store_tests/authorization_consumption.rs`; `chio-cli` `cert/session_receipts_tests.rs`, `tests/session_certificate.rs`, `cli/session/tests/pending_approval.rs`; `chio-acp-proxy` `compliance/bundle_tests.rs`, `tests/attestation_{denials,signer,support,compliance,clock,telemetry_transport}.rs`; `chio-acp-edge` `tests/all.rs`; `chio-cross-protocol` `tests.rs`; `chio-mcp-edge` `runtime/nested_flow_tests.rs`, `runtime/source_receipt_tests.rs`, `runtime/runtime_tests/{execution_evidence,stateless_revision}.rs`; `chio-mcp-remote` `remote_mcp/hosted_tests/protocol_refusal.rs`, `remote_mcp/tests.rs`; `chio-http-core` `authority/tests.rs`; `chio-control-plane` `security/active_defense_host_tests/terminal_response_refusal.rs`.
 
@@ -236,7 +246,7 @@ Every existing test that seeds a raw `session_id`, `sessionId` or `acp-session:<
 
 1. **Primitive** (`chio-core-types` only, no signed bytes). `IndexPurpose::SessionHandle`, `IndexDomain::SessionHandle`, shared field encoder, `SessionHandle`, `session_membership`, the `AcpReceiptProjection` type change and the protocol-refusal schema constant. Tests 1-6. Lands first so PD2-F writes the handle directly.
 2. **Key-set wiring** (no signed bytes; after #1996). The directory reader in `tenant_index/load.rs` moves to `chio-secure-ipc` as a module beside `seed_custody`. It keeps the directory walk and the directory owner and mode checks. It reads each key file through `seed_custody::read_private_file(path, 32)`, which checks for a regular, singly linked file owned by the process user with mode 0600 or stricter, opens it with no-follow, re-checks file identity around the read and refuses over-length input. The module copies each file into a `Zeroizing<[u8; 32]>` after an exact length check. That function's `UnsafeFile` messages become purpose-neutral in `seed_custody` itself, together with the two control-plane tests that match them. The module returns the active key and the retired `(file name, key)` pairs. `TenantIndexKeySet` gains one pure constructor that refuses a retired file name other than the derived `key_id` hex, so that check stays with the key type, and `chio-secure-ipc` takes no dependency on `chio-core-types`. The core copy, its `std`-gated module and its `TenantIndexKeyLoadError` are deleted, and the loader tests in `chio-core-types` `tests/tenant_index.rs:363-395` move with it. `Arc<TenantIndexKeySet>` becomes a required argument of `KernelReceiptSigner::new` (`kernel_signer.rs:70`), `KernelCapabilityChecker::new` (`kernel_checker.rs:149`) and the kernel configuration that `open_session_with_id` reads. The `chio mcp` hosts and `chio cert` take `--tenant-index-keys <dir>` and refuse to start without it, local dev flows included. `chio init` and the dev quickstart provision a key set explicitly through `chio keys tenant-index generate`. The kernel never generates one itself. Test 7.
-3. **Retained-session statements and resolver** (no signed bytes). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3), and the existing reader tests stay green unchanged. The same PR adds the `SessionHandleResolver` port in `chio-kernel` (required methods only), the `session_handle_pins` table with its append write and its exclusion from retention, its `chio-store-sqlite` implementation with its own `.sql` files and consts, and the cardinality function. The table is an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path. It runs test 16 and the store tests in section 7 item 17.
+3. **Retained-session statements and resolver** (no signed bytes). The SQL in `session_certificate_read.rs:277-281,362-366` and `session_certificate_read/preflight.rs` moves into named `.sql` files beside the reader (section 10.3), and the existing reader tests stay green unchanged. The same PR adds the `SessionHandleResolver` port in `chio-kernel` (required methods only), the `session_handle_pins` and `session_handle_generations` tables with their append writes and their exclusion from retention, its `chio-store-sqlite` implementation with its own `.sql` files and consts, and the cardinality function. The table is an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path. It runs test 16 and the store tests in section 7 item 17.
 4. **Flip** (signed bytes, one PR). All three writers, both readers through `session_membership`, the authorization-path carriers in 3.2, both certificate bodies, schemas, signed-artifact examples, generated SDK types, `wire-schemas.lock`, registry descriptions, PROTOCOL 6.4, `spec/COMPLIANCE-CERTIFICATE.md`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` and the CLI. Writers and readers move together because the reader compares across members and receipts; a split leaves a window where the readers join raw ids against handles. Tests 8-15 and every fixture in section 7. `docs/formal/COVERAGE.md` regenerates last if the proof-coverage check asks for it.
 
 ## 9. Decisions
@@ -276,13 +286,17 @@ This section maps the design onto `DESIGN-QUALITY-CHARTER.md` and the R1-R15 che
 
 ### 10.1 Persistence
 
-The design persists no key. Handles persist in two places: inside signed receipts, and in one new store-owned table, `session_handle_pins` in `chio-store-sqlite` (section 4.6).
+The design persists no key. Handles persist in two places: inside signed receipts, and in one new store-owned table, `session_handle_pins` in `chio-store-sqlite` (section 4.6). The design also adds `session_handle_generations`, which holds no handles.
 
 - **Pin table.**
   - It sits behind the `SessionHandleResolver` port and is written once per session in the receipt append transaction.
-  - It is never archived or pruned, and retention excludes it.
   - It holds the signer key, the origin, the handle `(key_id, value)` and an open timestamp. It holds no raw session id, so it discloses nothing beyond what the signed receipts already carry.
-  - It is an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path.
+- **Generations table.** `session_handle_generations(signer, key_id)` holds a signer key and a key id, and no handle value or raw id.
+- **Retention policy change.**
+  - Today retention archives and prunes receipt-store tables along checkpoint boundaries (`receipt_store/evidence_retention.rs`). This design adds the first two receipt-store tables that retention never archives or prunes: `session_handle_pins` and `session_handle_generations`. The retention module lists both as excluded, and store tests pin that.
+  - Their growth is bounded by the workload: one pin row per session that signed a handle-bearing receipt, and one generation row per signer and key generation.
+  - The exclusion is what lets a session whose receipts are all archived keep its original handle across a rotation.
+  - Both tables are an in-place edit of the v1 receipt-store schema. Chio is unshipped, so there is no migration step and no backfill path.
 
 - **Kernel.** The kernel holds a session's handle in memory for the life of the session. On restore it recovers the handle from the pin table (section 4.6), so the restore record gains nothing.
 - **ACP proxy.** The proxy keeps a bounded in-memory map for the life of the process.
@@ -298,7 +312,7 @@ The design persists no key. Handles persist in two places: inside signed receipt
 | `chio-kernel` | `SessionHandleResolver` port, `HandleGeneration` on session open (new module `kernel/session_ops/handle.rs`), refusal writer, consumption field, certificate body | port only; no storage or SQL added |
 | `chio-acp-proxy` | signer, checker, compliance verifier, bounded handle map | no storage or SQL added |
 | `chio-cross-protocol` | carries the handle in place of the raw id | no storage |
-| `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership`; owns `session_handle_pins` (written once on append, never archived) and implements `SessionHandleResolver` with its own `.sql` files and consts | persistence stays in the store crate |
+| `chio-store-sqlite` | retained reader takes `&SessionHandle` and calls `session_membership`; owns `session_handle_pins` and `session_handle_generations` (written on append, never archived or pruned) and implements `SessionHandleResolver` with its own `.sql` files and consts | persistence stays in the store crate |
 | `chio-secure-ipc` | key-set directory reader moved from `chio-core-types` (PR 2) | custody IO stays in the security crate; no dependency on `chio-core-types` |
 | `chio-mcp-remote` | restore resolves handles in one batched call and passes `HandleGeneration::Pinned` | no storage or SQL added |
 | `chio-cli` | `--tenant-index-keys`, `--origin`, `chio cert` input and output | host crate; no SQL |
@@ -308,7 +322,7 @@ The design persists no key. Handles persist in two places: inside signed receipt
 
 ### 10.3 Queries (R4)
 
-The design adds one table and its two lookups, each a named `.sql` file in a `session_handle_pins` module of `chio-store-sqlite`, loaded through consts. The retained-session reader already embeds SQL in its logic: `git grep -c 'SELECT\|INSERT\|UPDATE '` counts 4 lines in `session_certificate_read.rs` and 6 in `session_certificate_read/preflight.rs`. PR 4 edits that reader, so PR 3 first moves those statements into named `.sql` files in `receipt_store/session_certificate_read/` and loads them with `include_str!`, following the `admission_operation_*.sql` convention in the same crate. The files are grouped by the retained-session aggregate.
+The design adds two tables and their two lookups, each a named `.sql` file in a `session_handle_pins` module of `chio-store-sqlite`, loaded through consts. The retained-session reader already embeds SQL in its logic: `git grep -c 'SELECT\|INSERT\|UPDATE '` counts 4 lines in `session_certificate_read.rs` and 6 in `session_certificate_read/preflight.rs`. PR 4 edits that reader, so PR 3 first moves those statements into named `.sql` files in `receipt_store/session_certificate_read/` and loads them with `include_str!`, following the `admission_operation_*.sql` convention in the same crate. The files are grouped by the retained-session aggregate.
 
 ### 10.4 Abstractions and their payoff (R5)
 
