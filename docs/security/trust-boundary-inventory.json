@@ -22186,7 +22186,7 @@
       "gate_sse_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames"
     ],
     "crates/protocol/chio-egress-contract/src/allowance_file.rs": [
-      "load_file::shared-reader::crates/protocol/chio-egress-contract/src/allowance_file.rs::parse",
+      "from_toml_str::shared-reader::crates/protocol/chio-egress-contract/src/allowance_file.rs::parse",
       "parse::format-toml::from_str"
     ],
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs": [
