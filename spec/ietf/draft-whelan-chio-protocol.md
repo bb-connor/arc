@@ -3836,7 +3836,23 @@ whose `tenant_id` is that tenant.
 
 The service orders matching receipts by their position in its store,
 ascending, and returns those whose position is greater than `cursor`.
-The response has three members:
+The response has three members, and a fourth, `snapshot`, when the
+service answered from an authenticated query snapshot:
+
+`snapshot`:
+: OPTIONAL. An object that states the as-of point of the answer: every
+  entry of the service's receipt claim log at or below `throughEntrySeq`
+  is included and none above it. Its members are `id`, a string that
+  names the snapshot version for diagnostics; `throughEntrySeq`, an
+  integer; `checkpointSeq`, an integer, or `null` when the snapshot has
+  no verified checkpoint; `observedAt`, an integer in Unix milliseconds,
+  the observation time of the newest log head the snapshot fully
+  covers; and `recertifiedAt`, an integer in Unix milliseconds, the
+  completion time of the last full authentication of the whole history.
+  Entries above the range of the checkpoint at `checkpointSeq` are
+  authenticated by receipt signature only. A client MUST NOT send `id`
+  as `cursor`. The member is absent when the answer did not come from a
+  snapshot.
 
 `totalCount`:
 : The number of receipts that match the filters, regardless of `cursor`

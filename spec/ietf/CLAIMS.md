@@ -221,6 +221,31 @@ MAY of the September 30 snapshot.
   counts are recomputed at this draft. Draft line pointers other than
   the changed BCP 14 rows stay at the frozen snapshot.
 
+### 2026-10-30: receipt query snapshot member
+
+This targeted source review covers the Paging section of the receipt
+query. It does not requalify other rows.
+
+- **Member.** `ReceiptQueryResponse` serializes `snapshot` only when it
+  is present (`skip_serializing_if = "Option::is_none"`), in camelCase.
+  Its members serialize as `id`, `throughEntrySeq`, `checkpointSeq`
+  (`null` when absent), `observedAt` (milliseconds), and `recertifiedAt`
+  (milliseconds). Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:521-531`;
+  `crates/kernel/chio-kernel/src/receipt_query.rs:305-340`.
+- **When present.** The `GET /v1/receipts/query` handler answers every
+  successful query through the snapshot service, which sets the
+  watermark on each page. The type allows `None` for a read that
+  authenticated the retained corpus itself, so the draft keeps the
+  member OPTIONAL. The snapshot service refuses a read that is building,
+  stale, busy, unavailable, or invalid with a typed error instead of a
+  page. Evidence:
+  `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:300-315`;
+  `crates/platform/chio-control-plane/src/trust_control/receipt_query_service.rs:49-72`;
+  `crates/platform/chio-store-sqlite/src/receipt_query_snapshot/service.rs:314-324,735-762`.
+- **Not claimed.** The draft does not document the typed snapshot error
+  codes or the point-load and export surfaces.
+
 ## Abstract and Sections 1-3
 
 # Final opening-section claim review
