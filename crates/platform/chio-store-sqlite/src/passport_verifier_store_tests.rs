@@ -98,21 +98,71 @@ fn duplicate_and_out_of_range_rows_are_refused() {
     let fixture = fixture();
     let store = &fixture.store;
     PresentationChallengeLedger::insert(store, &challenge_entry("challenge-1")).test_unwrap();
-    assert!(matches!(
+    assert_eq!(
         PresentationChallengeLedger::insert(store, &challenge_entry("challenge-1")),
-        Err(PassportVerifierStoreError::Duplicate(id)) if id == "challenge-1"
-    ));
+        Err(LedgerFault::Duplicate)
+    );
     Oid4vpRequestLedger::insert(store, &request_entry("request-1")).test_unwrap();
-    assert!(matches!(
+    assert_eq!(
         Oid4vpRequestLedger::insert(store, &request_entry("request-1")),
-        Err(PassportVerifierStoreError::Duplicate(id)) if id == "request-1"
-    ));
+        Err(LedgerFault::Duplicate)
+    );
     let mut far = challenge_entry("challenge-far");
     far.expires_at = u64::MAX;
-    assert!(matches!(
+    assert_eq!(
         PresentationChallengeLedger::insert(store, &far),
-        Err(PassportVerifierStoreError::IntegerRange(_))
-    ));
+        Err(LedgerFault::Unrepresentable)
+    );
+}
+
+#[test]
+fn store_errors_reach_the_port_as_closed_faults() {
+    let corrupt = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_CORRUPT),
+        None,
+    );
+    let not_a_database = rusqlite::Error::SqliteFailure(
+        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_NOTADB),
+        None,
+    );
+    let busy =
+        rusqlite::Error::SqliteFailure(rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY), None);
+    for (error, fault) in [
+        (
+            PassportVerifierStoreError::Duplicate("challenge-1".into()),
+            LedgerFault::Duplicate,
+        ),
+        (
+            PassportVerifierStoreError::InvalidRow,
+            LedgerFault::IntegrityFailure,
+        ),
+        (
+            PassportVerifierStoreError::InvalidField(LedgerFieldError::Digest("request_hash")),
+            LedgerFault::IntegrityFailure,
+        ),
+        (
+            PassportVerifierStoreError::Sqlite(corrupt),
+            LedgerFault::IntegrityFailure,
+        ),
+        (
+            PassportVerifierStoreError::Sqlite(not_a_database),
+            LedgerFault::IntegrityFailure,
+        ),
+        (
+            PassportVerifierStoreError::Sqlite(busy),
+            LedgerFault::Unavailable,
+        ),
+        (
+            PassportVerifierStoreError::Unavailable("fenced".into()),
+            LedgerFault::Unavailable,
+        ),
+        (
+            PassportVerifierStoreError::Io(std::io::Error::from(std::io::ErrorKind::Other)),
+            LedgerFault::Unavailable,
+        ),
+    ] {
+        assert_eq!(ledger_fault(error), fault);
+    }
 }
 
 #[test]

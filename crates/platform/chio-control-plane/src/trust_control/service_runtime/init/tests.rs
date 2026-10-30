@@ -107,7 +107,7 @@ fn test_config(joint_authority_db_path: PathBuf) -> TrustServiceConfig {
         federation_policies_file: None,
         scim_lifecycle_file: None,
         verifier_policies_file: None,
-        verifier_challenge_db_path: None,
+        verifier_ledger: None,
         passport_statuses_file: None,
         revocation_partners_file: None,
         passport_issuance_offers_file: None,
@@ -521,4 +521,38 @@ mod snapshot_recovery {
         );
         fixture.assert_reclaimed_before_open_refusal()
     }
+}
+
+static VERIFIER_LEDGER_OPENS: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
+
+fn refusing_verifier_ledger(
+    _database: &std::path::Path,
+) -> Result<Arc<dyn chio_federation::verifier_ledger::VerifierLedger>, CliError> {
+    VERIFIER_LEDGER_OPENS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    Err(CliError::cli_other_error("verifier ledger refused to open"))
+}
+
+#[tokio::test]
+async fn trust_service_refuses_to_start_when_the_verifier_ledger_cannot_open(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = chio_test_support::private_tempdir()?;
+    let mut config = test_config(directory.path().join("joint-authority.db"));
+    config.verifier_ledger = Some(crate::trust_control::VerifierLedgerSource {
+        database: directory.path().join("verifier.sqlite3"),
+        open: refusing_verifier_ledger,
+    });
+    let error = super::serve_async(config, None, None, None, None, None, None)
+        .await
+        .err()
+        .ok_or("trust service started without its verifier ledger")?;
+    let CliError::Chio(error) = error else {
+        return Err(format!("unexpected startup error: {error}").into());
+    };
+    assert_eq!(error.message(), "verifier ledger refused to open");
+    assert_eq!(
+        VERIFIER_LEDGER_OPENS.load(std::sync::atomic::Ordering::SeqCst),
+        1
+    );
+    Ok(())
 }
