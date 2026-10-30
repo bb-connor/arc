@@ -8,69 +8,86 @@ fn store_path(dir: &tempfile::TempDir) -> std::path::PathBuf {
     dir.path().join("cluster-peer-replay.sqlite3")
 }
 
+fn open(
+    dir: &tempfile::TempDir,
+) -> Result<SqliteClusterPeerReplayStore, ClusterPeerReplayStoreError> {
+    SqliteClusterPeerReplayStore::open(store_path(dir))
+}
+
+fn node(id: &str) -> ClusterPeerNodeId {
+    ClusterPeerNodeId::new(id).test_unwrap()
+}
+
+fn at(secs: i64) -> PeerIssuedAtSecs {
+    PeerIssuedAtSecs::new(secs).test_unwrap()
+}
+
+fn marks(entries: &[(&str, i64)]) -> BTreeMap<ClusterPeerNodeId, PeerIssuedAtSecs> {
+    entries
+        .iter()
+        .map(|(node_id, issued_at)| (node(node_id), at(*issued_at)))
+        .collect()
+}
+
 #[test]
 fn high_water_survives_reopen() {
     let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    let store = open(&dir).test_unwrap();
     assert!(store.high_waters().test_unwrap().is_empty());
-    store.advance(NODE_B, 100).test_unwrap();
-    store.advance(NODE_B, 105).test_unwrap();
-    store.advance(NODE_C, 7).test_unwrap();
+    store.advance(&node(NODE_B), at(100)).test_unwrap();
+    store.advance(&node(NODE_B), at(105)).test_unwrap();
+    store.advance(&node(NODE_C), at(7)).test_unwrap();
     drop(store);
-    let reopened = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    let reopened = open(&dir).test_unwrap();
     assert_eq!(
         reopened.high_waters().test_unwrap(),
-        BTreeMap::from([(NODE_B.to_string(), 105), (NODE_C.to_string(), 7)])
+        marks(&[(NODE_B, 105), (NODE_C, 7)])
     );
 }
 
 #[test]
 fn advance_requires_a_strictly_greater_issue_time() {
     let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
-    store.advance(NODE_B, 100).test_unwrap();
+    let store = open(&dir).test_unwrap();
+    store.advance(&node(NODE_B), at(100)).test_unwrap();
     for issued_at in [100, 99] {
-        assert!(matches!(
-            store.advance(NODE_B, issued_at).test_unwrap_err(),
-            ClusterPeerReplayStoreError::NotAdvanced
-        ));
+        assert_eq!(
+            store
+                .advance(&node(NODE_B), at(issued_at))
+                .test_unwrap_err(),
+            PeerReplayStoreError::NotAdvanced
+        );
     }
-    store.advance(NODE_C, 50).test_unwrap();
+    store.advance(&node(NODE_C), at(50)).test_unwrap();
     assert_eq!(
         store.high_waters().test_unwrap(),
-        BTreeMap::from([(NODE_B.to_string(), 100), (NODE_C.to_string(), 50)])
+        marks(&[(NODE_B, 100), (NODE_C, 50)])
     );
 }
 
 #[test]
-fn advance_refuses_invalid_rows() {
-    let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
-    for (node_id, issued_at) in [("", 1), (NODE_B, -1)] {
-        assert!(matches!(
-            store.advance(node_id, issued_at).test_unwrap_err(),
-            ClusterPeerReplayStoreError::InvalidRow
-        ));
+fn peer_values_refuse_out_of_range_input() {
+    let long = "n".repeat(CLUSTER_PEER_NODE_ID_MAX_BYTES + 1);
+    for node_id in ["", long.as_str()] {
+        assert_eq!(ClusterPeerNodeId::new(node_id), None);
     }
-    let long = "n".repeat(MAX_NODE_ID_BYTES + 1);
-    assert!(matches!(
-        store.advance(&long, 1).test_unwrap_err(),
-        ClusterPeerReplayStoreError::InvalidRow
-    ));
+    assert_eq!(PeerIssuedAtSecs::new(-1), None);
 }
 
 #[test]
 fn store_holds_at_most_the_peer_cap() {
     let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    let store = open(&dir).test_unwrap();
     for index in 0..CLUSTER_PEER_REPLAY_MAX_PEERS {
-        store.advance(&format!("node-{index}"), 1).test_unwrap();
+        store
+            .advance(&node(&format!("node-{index}")), at(1))
+            .test_unwrap();
     }
-    assert!(matches!(
-        store.advance("node-extra", 1).test_unwrap_err(),
-        ClusterPeerReplayStoreError::CapacityExhausted
-    ));
-    store.advance("node-0", 2).test_unwrap();
+    assert_eq!(
+        store.advance(&node("node-extra"), at(1)).test_unwrap_err(),
+        PeerReplayStoreError::CapacityExhausted
+    );
+    store.advance(&node("node-0"), at(2)).test_unwrap();
 }
 
 #[test]
@@ -86,9 +103,9 @@ fn in_memory_paths_refuse() {
 #[test]
 fn corrupt_rows_refuse_on_open() {
     let dir = tempfile::tempdir().test_unwrap();
-    SqliteClusterPeerReplayStore::open(store_path(&dir))
+    open(&dir)
         .test_unwrap()
-        .advance(NODE_B, 100)
+        .advance(&node(NODE_B), at(100))
         .test_unwrap();
     let raw = Connection::open(store_path(&dir)).test_unwrap();
     raw.execute_batch("PRAGMA ignore_check_constraints = ON;")
@@ -100,7 +117,7 @@ fn corrupt_rows_refuse_on_open() {
     .test_unwrap();
     drop(raw);
     assert!(matches!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        open(&dir).test_unwrap_err(),
         ClusterPeerReplayStoreError::InvalidRow
     ));
 }
@@ -108,13 +125,13 @@ fn corrupt_rows_refuse_on_open() {
 #[test]
 fn foreign_schema_refuses_on_open() {
     let dir = tempfile::tempdir().test_unwrap();
-    SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    open(&dir).test_unwrap();
     let raw = Connection::open(store_path(&dir)).test_unwrap();
     raw.execute_batch("CREATE TABLE intruder (id INTEGER) STRICT;")
         .test_unwrap();
     drop(raw);
     assert!(matches!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        open(&dir).test_unwrap_err(),
         ClusterPeerReplayStoreError::Schema(SchemaVersionError::CatalogMismatch)
     ));
 }
@@ -122,25 +139,25 @@ fn foreign_schema_refuses_on_open() {
 #[test]
 fn a_dropped_table_refuses_reads_and_advances() {
     let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    let store = open(&dir).test_unwrap();
     let raw = Connection::open(store_path(&dir)).test_unwrap();
     raw.execute_batch("DROP TABLE cluster_peer_replay_high_water;")
         .test_unwrap();
     drop(raw);
-    assert!(matches!(
-        store.advance(NODE_B, 1).test_unwrap_err(),
-        ClusterPeerReplayStoreError::Sqlite(_)
-    ));
-    assert!(matches!(
+    assert_eq!(
+        store.advance(&node(NODE_B), at(1)).test_unwrap_err(),
+        PeerReplayStoreError::Unavailable
+    );
+    assert_eq!(
         store.high_waters().test_unwrap_err(),
-        ClusterPeerReplayStoreError::Sqlite(_)
-    ));
+        PeerReplayStoreError::Unavailable
+    );
 }
 
 fn seed_raw_row(dir: &tempfile::TempDir, node_id_sql: &str, issued_at_sql: &str) {
-    SqliteClusterPeerReplayStore::open(store_path(dir))
+    open(dir)
         .test_unwrap()
-        .advance(NODE_B, 100)
+        .advance(&node(NODE_B), at(100))
         .test_unwrap();
     let raw = Connection::open(store_path(dir)).test_unwrap();
     raw.execute_batch("PRAGMA ignore_check_constraints = ON;")
@@ -159,7 +176,7 @@ fn oversized_undecodable_node_id_refuses_on_open_before_it_is_read() {
     let dir = tempfile::tempdir().test_unwrap();
     seed_raw_row(&dir, "CAST(zeroblob(1048576) || x'ff' AS TEXT)", "1");
     assert!(matches!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        open(&dir).test_unwrap_err(),
         ClusterPeerReplayStoreError::InvalidRow
     ));
 }
@@ -169,7 +186,7 @@ fn oversized_node_id_refuses_on_open() {
     let dir = tempfile::tempdir().test_unwrap();
     seed_raw_row(&dir, "printf('%.*c', 1048576, 'n')", "1");
     assert!(matches!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        open(&dir).test_unwrap_err(),
         ClusterPeerReplayStoreError::InvalidRow
     ));
 }
@@ -177,17 +194,13 @@ fn oversized_node_id_refuses_on_open() {
 #[test]
 fn a_valid_store_reopens_after_corrupt_row_controls() {
     let dir = tempfile::tempdir().test_unwrap();
-    let store = SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap();
+    let store = open(&dir).test_unwrap();
     store
-        .advance(&"n".repeat(MAX_NODE_ID_BYTES), 1)
+        .advance(&node(&"n".repeat(CLUSTER_PEER_NODE_ID_MAX_BYTES)), at(1))
         .test_unwrap();
     drop(store);
     assert_eq!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir))
-            .test_unwrap()
-            .high_waters()
-            .test_unwrap()
-            .len(),
+        open(&dir).test_unwrap().high_waters().test_unwrap().len(),
         1
     );
 }
@@ -213,7 +226,7 @@ fn utf16_node_id_over_the_utf8_bound_refuses_on_open() {
     assert!(encoding.starts_with("UTF-16"), "{encoding}");
     assert_eq!(stored_octets, 2048);
     assert!(matches!(
-        SqliteClusterPeerReplayStore::open(store_path(&dir)).test_unwrap_err(),
+        open(&dir).test_unwrap_err(),
         ClusterPeerReplayStoreError::InvalidRow
     ));
 }
