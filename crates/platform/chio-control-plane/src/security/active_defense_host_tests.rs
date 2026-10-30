@@ -20,8 +20,8 @@ use crate::security::{
     DurableActiveResponseExecutor, NativeSecurityReceiptSink, ProductionActiveDefenseConfig,
     ProductionActiveDefenseHost, ProductionActiveDefenseHostConfig,
     ProductionResponseSchedulerConfig, ProductionResponseWorkerLoopConfig,
-    ProductionSecurityStateAuthority, ResponseWorkerLifecycle, SecurityDurability,
-    SqliteSiemOutbox, TrustedSecurityEventProducer,
+    ProductionSecurityStateAuthority, ResponseWorkerLifecycle, SecurityAlertOutbox,
+    SecurityDurability, TrustedSecurityEventProducer,
 };
 use chio_core::{Ed25519Backend, Keypair, SigningBackend};
 use chio_kernel::{ActiveResponseExecutorAuthorityIdentity, IndexedSecurityEvidenceStore};
@@ -42,7 +42,9 @@ use chio_security_types::{
     ResponsePlanInput, ResponseState, ResponseTarget,
 };
 use chio_siem::{Alert, AlertBackend, ExportError};
-use chio_store_sqlite::{SqliteReceiptStore, SqliteSecurityStateStore};
+use chio_store_sqlite::{
+    SqliteReceiptStore, SqliteSecurityAlertOutboxStore, SqliteSecurityStateStore,
+};
 
 const HOST_LIFECYCLE_TEST_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -309,16 +311,19 @@ impl HostFixture {
                 .unwrap_or_else(|error| panic!("receipt store: {error}")),
         );
         let alert_outbox = Arc::new(
-            SqliteSiemOutbox::open(
-                directory.path().join("alerts.sqlite"),
-                vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
-                AlertOutboxConfig {
-                    base_retry_ms: 10,
-                    max_retry_ms: 100,
-                    max_attempts: 3,
-                },
-            )
-            .unwrap_or_else(|error| panic!("alert outbox: {error}")),
+            SqliteSecurityAlertOutboxStore::open(directory.path().join("alerts.sqlite"))
+                .and_then(|store| {
+                    SecurityAlertOutbox::new(
+                        Arc::new(store),
+                        vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
+                        AlertOutboxConfig {
+                            base_retry_ms: 10,
+                            max_retry_ms: 100,
+                            max_attempts: 3,
+                        },
+                    )
+                })
+                .unwrap_or_else(|error| panic!("alert outbox: {error}")),
         );
         let signer_keypair = Keypair::from_seed(&[91_u8; 32]);
         let signer: Arc<dyn SigningBackend> = Arc::new(Ed25519Backend::new(signer_keypair.clone()));

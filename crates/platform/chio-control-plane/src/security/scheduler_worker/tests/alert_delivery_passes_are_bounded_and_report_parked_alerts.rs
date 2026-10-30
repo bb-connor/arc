@@ -6,9 +6,10 @@ use std::sync::Arc;
 use chio_security_types::clock::{ClockError, ClockReading, FixedClock};
 use chio_security_types::ports::{Digest32, RecordId, SecurityAlert, SecurityAlertPort, TenantId};
 use chio_siem::{Alert, AlertBackend, ExportError};
+use chio_store_sqlite::SqliteSecurityAlertOutboxStore;
 
 use super::{SecurityAlertDelivery, SecurityAlertDeliveryHealth, SECURITY_ALERT_ROWS_PER_PASS};
-use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
+use crate::security::adapters::{AlertOutboxConfig, SecurityAlertOutbox};
 
 const NOW_UNIX_MS: u64 = 1_700_000_000_000;
 
@@ -82,7 +83,7 @@ impl AlertBackend for CountingBackend {
 
 struct DeliveryFixture {
     _directory: tempfile::TempDir,
-    outbox: Arc<SqliteSiemOutbox>,
+    outbox: Arc<SecurityAlertOutbox>,
     backend: Arc<CountingBackend>,
     clock: Arc<CountingClock>,
     delivery: SecurityAlertDelivery,
@@ -93,16 +94,19 @@ fn fixture(accept: bool, max_attempts: u32) -> DeliveryFixture {
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let backend = Arc::new(CountingBackend::new(accept));
     let outbox = Arc::new(
-        SqliteSiemOutbox::open(
-            directory.path().join("alerts.sqlite"),
-            vec![backend.clone() as Arc<dyn AlertBackend>],
-            AlertOutboxConfig {
-                base_retry_ms: 1_000,
-                max_retry_ms: 60_000,
-                max_attempts,
-            },
-        )
-        .unwrap_or_else(|error| panic!("alert outbox: {error}")),
+        SqliteSecurityAlertOutboxStore::open(directory.path().join("alerts.sqlite"))
+            .and_then(|store| {
+                SecurityAlertOutbox::new(
+                    Arc::new(store),
+                    vec![backend.clone() as Arc<dyn AlertBackend>],
+                    AlertOutboxConfig {
+                        base_retry_ms: 1_000,
+                        max_retry_ms: 60_000,
+                        max_attempts,
+                    },
+                )
+            })
+            .unwrap_or_else(|error| panic!("alert outbox: {error}")),
     );
     let clock = Arc::new(CountingClock::new());
     let delivery = SecurityAlertDelivery::new(Arc::clone(&outbox), clock.clone());
@@ -119,7 +123,7 @@ fn digest(byte: u8) -> Digest32 {
     Digest32::new([byte; 32])
 }
 
-fn page(outbox: &SqliteSiemOutbox, index: usize) {
+fn page(outbox: &SecurityAlertOutbox, index: usize) {
     let record = |value: String| RecordId::new(value).unwrap_or_else(|error| panic!("{error}"));
     let alert = SecurityAlert {
         tenant_id: TenantId::new("tenant-alert-delivery")
@@ -254,16 +258,19 @@ async fn parked_alerts_remain_parked_after_reopening_with_a_larger_retry_limit()
     let refusing = Arc::new(CountingBackend::new(false));
     {
         let outbox = Arc::new(
-            SqliteSiemOutbox::open(
-                &path,
-                vec![refusing.clone() as Arc<dyn AlertBackend>],
-                AlertOutboxConfig {
-                    base_retry_ms: 1_000,
-                    max_retry_ms: 60_000,
-                    max_attempts: 1,
-                },
-            )
-            .unwrap_or_else(|error| panic!("first outbox: {error}")),
+            SqliteSecurityAlertOutboxStore::open(&path)
+                .and_then(|store| {
+                    SecurityAlertOutbox::new(
+                        Arc::new(store),
+                        vec![refusing.clone() as Arc<dyn AlertBackend>],
+                        AlertOutboxConfig {
+                            base_retry_ms: 1_000,
+                            max_retry_ms: 60_000,
+                            max_attempts: 1,
+                        },
+                    )
+                })
+                .unwrap_or_else(|error| panic!("first outbox: {error}")),
         );
         page(&outbox, 0);
         let delivery = SecurityAlertDelivery::new(outbox, Arc::new(CountingClock::new()));
@@ -274,16 +281,19 @@ async fn parked_alerts_remain_parked_after_reopening_with_a_larger_retry_limit()
 
     let accepting = Arc::new(CountingBackend::new(true));
     let reopened = Arc::new(
-        SqliteSiemOutbox::open(
-            &path,
-            vec![accepting.clone() as Arc<dyn AlertBackend>],
-            AlertOutboxConfig {
-                base_retry_ms: 1_000,
-                max_retry_ms: 60_000,
-                max_attempts: 3,
-            },
-        )
-        .unwrap_or_else(|error| panic!("reopened outbox: {error}")),
+        SqliteSecurityAlertOutboxStore::open(&path)
+            .and_then(|store| {
+                SecurityAlertOutbox::new(
+                    Arc::new(store),
+                    vec![accepting.clone() as Arc<dyn AlertBackend>],
+                    AlertOutboxConfig {
+                        base_retry_ms: 1_000,
+                        max_retry_ms: 60_000,
+                        max_attempts: 3,
+                    },
+                )
+            })
+            .unwrap_or_else(|error| panic!("reopened outbox: {error}")),
     );
     let clock = Arc::new(CountingClock::new());
     let delivery = SecurityAlertDelivery::new(reopened, clock.clone());

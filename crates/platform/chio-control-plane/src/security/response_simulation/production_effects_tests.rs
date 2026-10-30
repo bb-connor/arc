@@ -28,13 +28,13 @@ use chio_security_types::{
     ResponseExecutionMode, ResponsePlan, ResponsePlanInput, ResponseTarget,
 };
 use chio_siem::{Alert, AlertBackend, ExportError};
-use chio_store_sqlite::SqliteSecurityStateStore;
+use chio_store_sqlite::{SqliteSecurityAlertOutboxStore, SqliteSecurityStateStore};
 
 use super::production_response_effects;
 use crate::security::adapters::effect_port::{
     egress_restriction_version_hash, session_containment_target, session_overlay_version_hash,
 };
-use crate::security::adapters::{AlertOutboxConfig, SqliteSiemOutbox};
+use crate::security::adapters::{AlertOutboxConfig, SecurityAlertOutbox};
 
 mod finality;
 
@@ -186,7 +186,7 @@ struct ProductionEffectsFixture {
     wall_clock: Arc<dyn Clock>,
     trusted_clock: Arc<dyn Clock>,
     store: Arc<SqliteSecurityStateStore>,
-    outbox: Arc<SqliteSiemOutbox>,
+    outbox: Arc<SecurityAlertOutbox>,
     resolver: Arc<CausalBlastRadiusResolver<StaticLineage, SqliteFences>>,
 }
 
@@ -210,12 +210,15 @@ impl ProductionEffectsFixture {
         );
         let outbox_path = directory.path().join("production-effects-alerts.db");
         let outbox = Arc::new(
-            SqliteSiemOutbox::open(
-                &outbox_path,
-                vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
-                AlertOutboxConfig::default(),
-            )
-            .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
+            SqliteSecurityAlertOutboxStore::open(&outbox_path)
+                .and_then(|store| {
+                    SecurityAlertOutbox::new(
+                        Arc::new(store),
+                        vec![Arc::new(NoopAlertBackend) as Arc<dyn AlertBackend>],
+                        AlertOutboxConfig::default(),
+                    )
+                })
+                .unwrap_or_else(|error| panic!("open alert outbox: {error}")),
         );
         let resolver = Arc::new(CausalBlastRadiusResolver::new(
             Arc::new(StaticLineage(lineage_snapshot())),

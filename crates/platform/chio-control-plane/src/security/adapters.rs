@@ -44,9 +44,9 @@ use chio_security_types::ports::{
 use chio_security_types::InformationLabel;
 pub use flow_dispatch::PreparedFlowDispatch;
 pub use native_evidence::{
-    AlertDispatchReport, AlertOutboxBacklog, AlertOutboxConfig,
-    NativeActiveResponseFindingAuthority, NativeFindingAuthorityConfigError,
-    NativeSchedulerHealthPort, NativeSecurityReceiptSink, SqliteSiemOutbox,
+    AlertDispatchReport, AlertOutboxConfig, NativeActiveResponseFindingAuthority,
+    NativeFindingAuthorityConfigError, NativeSchedulerHealthPort, NativeSecurityReceiptSink,
+    SecurityAlertOutbox,
 };
 pub use native_flow::{
     NativeFlowCustody, NativeFlowError, NativeFlowPolicyEvidence, NativeFlowResolver,

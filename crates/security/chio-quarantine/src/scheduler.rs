@@ -503,7 +503,7 @@ impl<
             .health
             .page_once(&request)
             .map_err(SchedulerError::Health)?;
-        if matches!(delivery, AlertDeliveryStatus::Pending { .. }) {
+        if !matches!(delivery, AlertDeliveryStatus::Delivered { .. }) {
             return Ok(());
         }
         self.store

@@ -7,7 +7,6 @@ use crate::security::ProductionActiveDefenseHostError;
 const DELIVERY_TICKS: u64 = 20;
 const EXHAUSTING_MAX_ATTEMPTS: u32 = 2;
 const MAX_EXHAUSTION_PASSES: usize = 8;
-const PARKED_AT_UNIX_MS: i64 = i64::MAX;
 
 #[derive(Default)]
 struct RecordingAlertBackend {
@@ -109,18 +108,21 @@ fn install_alert_outbox(
     path: &std::path::Path,
     backend: Arc<dyn AlertBackend>,
     max_attempts: u32,
-) -> Arc<SqliteSiemOutbox> {
+) -> Arc<SecurityAlertOutbox> {
     let outbox = Arc::new(
-        SqliteSiemOutbox::open(
-            path,
-            vec![backend],
-            AlertOutboxConfig {
-                base_retry_ms: 10,
-                max_retry_ms: 100,
-                max_attempts,
-            },
-        )
-        .unwrap_or_else(|error| panic!("host test alert outbox: {error}")),
+        SqliteSecurityAlertOutboxStore::open(path)
+            .and_then(|store| {
+                SecurityAlertOutbox::new(
+                    Arc::new(store),
+                    vec![backend],
+                    AlertOutboxConfig {
+                        base_retry_ms: 10,
+                        max_retry_ms: 100,
+                        max_attempts,
+                    },
+                )
+            })
+            .unwrap_or_else(|error| panic!("host test alert outbox: {error}")),
     );
     fixture.config.alert_outbox = Arc::clone(&outbox);
     fixture.config.scheduler_health = outbox.clone();
@@ -340,7 +342,7 @@ async fn production_host_readiness_reports_an_alert_that_exhausted_siem_delivery
     let mut reports = Vec::new();
     for _ in 0..MAX_EXHAUSTION_PASSES {
         let row = outbox_rows(&alert_path).remove(0);
-        if row.next_attempt_at_unix_ms == PARKED_AT_UNIX_MS {
+        if row.status == "parked" {
             break;
         }
         let due_at_unix_ms = u64::try_from(row.next_attempt_at_unix_ms)
@@ -358,17 +360,9 @@ async fn production_host_readiness_reports_an_alert_that_exhausted_siem_delivery
     assert_eq!(
         exhausted
             .iter()
-            .map(|row| (
-                row.status.as_str(),
-                row.attempts,
-                row.next_attempt_at_unix_ms
-            ))
+            .map(|row| (row.status.as_str(), row.attempts))
             .collect::<Vec<_>>(),
-        vec![(
-            "pending",
-            i64::from(EXHAUSTING_MAX_ATTEMPTS),
-            PARKED_AT_UNIX_MS
-        )],
+        vec![("parked", i64::from(EXHAUSTING_MAX_ATTEMPTS))],
         "precondition: the paged alert must be parked after max_attempts; reports {reports:?}"
     );
     assert_eq!(

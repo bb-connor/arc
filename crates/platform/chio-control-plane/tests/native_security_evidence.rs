@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use chio_control_plane::security::{
     AlertDispatchReport, AlertOutboxConfig, AttestedCorrelationWriter,
-    NativeActiveResponseFindingAuthority, NativeSecurityReceiptSink, SqliteSiemOutbox,
+    NativeActiveResponseFindingAuthority, NativeSecurityReceiptSink, SecurityAlertOutbox,
 };
 use chio_core::crypto::{Ed25519Backend, Keypair};
 use chio_core::receipt::body::ChioReceipt;
@@ -26,7 +26,7 @@ use chio_security_types::{
     DetectorWatermarkEvidence,
 };
 use chio_siem::{Alert, AlertBackend, ExportError};
-use chio_store_sqlite::SqliteReceiptStore;
+use chio_store_sqlite::{SqliteReceiptStore, SqliteSecurityAlertOutboxStore};
 use rusqlite::Connection;
 use serde_json::json;
 use tempfile::TempDir;
@@ -1004,12 +1004,15 @@ async fn sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durabl
         max_retry_ms: 100,
         max_attempts: 3,
     };
-    let outbox = SqliteSiemOutbox::open(
-        &database_path,
-        vec![Arc::clone(&backend) as Arc<dyn AlertBackend>],
-        config,
-    )
-    .unwrap_or_else(|error| panic!("outbox: {error}"));
+    let outbox = SqliteSecurityAlertOutboxStore::open(&database_path)
+        .and_then(|store| {
+            SecurityAlertOutbox::new(
+                Arc::new(store),
+                vec![Arc::clone(&backend) as Arc<dyn AlertBackend>],
+                config,
+            )
+        })
+        .unwrap_or_else(|error| panic!("outbox: {error}"));
     outbox
         .ensure_alerts_ready()
         .unwrap_or_else(|error| panic!("outbox readiness: {error}"));
@@ -1081,12 +1084,15 @@ async fn sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durabl
         .contains("seeded-secret-material"));
 
     drop(outbox);
-    let reopened = SqliteSiemOutbox::open(
-        &database_path,
-        vec![backend as Arc<dyn AlertBackend>],
-        config,
-    )
-    .unwrap_or_else(|error| panic!("reopen outbox: {error}"));
+    let reopened = SqliteSecurityAlertOutboxStore::open(&database_path)
+        .and_then(|store| {
+            SecurityAlertOutbox::new(
+                Arc::new(store),
+                vec![backend as Arc<dyn AlertBackend>],
+                config,
+            )
+        })
+        .unwrap_or_else(|error| panic!("reopen outbox: {error}"));
     assert_eq!(
         reopened
             .page(&alert)
@@ -1107,12 +1113,15 @@ async fn sqlite_siem_outbox_recovers_ack_loss_with_the_same_dedup_key_and_durabl
 fn outbox_rejects_idempotency_rebinding_and_scheduler_wrapper_mismatch() {
     let tempdir = TempDir::new().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let backend = Arc::new(AckLossBackend::default());
-    let outbox = SqliteSiemOutbox::open(
-        tempdir.path().join("alerts.sqlite"),
-        vec![backend as Arc<dyn AlertBackend>],
-        AlertOutboxConfig::default(),
-    )
-    .unwrap_or_else(|error| panic!("outbox: {error}"));
+    let outbox = SqliteSecurityAlertOutboxStore::open(tempdir.path().join("alerts.sqlite"))
+        .and_then(|store| {
+            SecurityAlertOutbox::new(
+                Arc::new(store),
+                vec![backend as Arc<dyn AlertBackend>],
+                AlertOutboxConfig::default(),
+            )
+        })
+        .unwrap_or_else(|error| panic!("outbox: {error}"));
     let alert = security_alert();
     SecurityAlertPort::page(&outbox, &alert).unwrap_or_else(|error| panic!("enqueue: {error}"));
 

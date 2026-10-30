@@ -94,7 +94,7 @@ type HostResponseExecutor = DurableActiveResponseExecutor<
     SqliteSecurityStateStore,
     ActiveResponseEffectPort,
     NativeSecurityReceiptSink,
-    SqliteSiemOutbox,
+    SecurityAlertOutbox,
 >;
 
 struct ExecutingResponseCoordinator {

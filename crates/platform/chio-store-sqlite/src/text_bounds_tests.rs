@@ -405,6 +405,18 @@ fn sealed_decoy_registry_refuses_nul_padding() -> TestResult {
 }
 
 #[test]
+fn security_alert_outbox_refuses_nul_padding() -> TestResult {
+    let catalog = catalog(include_str!("security_alert_outbox_store.sql"))?;
+    for table in [
+        "chio_security_alert_outbox",
+        "chio_security_alert_outbox_backend",
+    ] {
+        assert_column_refuses_nul_padding(&catalog, table, "command_hash", Bound::Blob(32))?;
+    }
+    Ok(())
+}
+
+#[test]
 fn settle_attempts_refuse_nul_padding() -> TestResult {
     let catalog = catalog(crate::dead_letters::SETTLE_DEAD_LETTERS_SCHEMA)?;
     catalog.execute_batch(crate::settle_attempts::SETTLE_ATTEMPTS_SCHEMA)?;
