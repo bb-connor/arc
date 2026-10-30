@@ -320,6 +320,21 @@ impl Door {
         issued_at: u64,
         expires_at: u64,
     ) -> PassportPresentationChallenge {
+        self.challenge_with_policy(
+            challenge_id,
+            issued_at,
+            expires_at,
+            PassportVerifierPolicy::default(),
+        )
+    }
+
+    fn challenge_with_policy(
+        &self,
+        challenge_id: Option<&str>,
+        issued_at: u64,
+        expires_at: u64,
+        policy: PassportVerifierPolicy,
+    ) -> PassportPresentationChallenge {
         let challenge = create_passport_presentation_challenge_with_reference(
             PassportPresentationChallengeArgs {
                 verifier: ADVERTISE_URL.to_owned(),
@@ -329,7 +344,7 @@ impl Door {
                 expires_at,
                 options: PassportPresentationOptions::default(),
                 policy_ref: None,
-                policy: Some(PassportVerifierPolicy::default()),
+                policy: Some(policy),
             },
         )
         .test_unwrap();
@@ -380,6 +395,51 @@ impl Door {
             expected_challenge: None,
         };
         handle_public_verify_passport_challenge(State(self.state()), Json(request)).await
+    }
+}
+
+fn federated_issue_request(
+    door: &Door,
+    passport: &AgentPassport,
+    challenge: PassportPresentationChallenge,
+) -> FederatedIssueRequest {
+    FederatedIssueRequest {
+        presentation: respond_to_passport_presentation_challenge(
+            &door.holder,
+            passport,
+            &challenge,
+            PRESENTED_AT,
+        )
+        .test_unwrap(),
+        expected_challenge: challenge,
+        capability: crate::policy::DefaultCapability {
+            scope: chio_core::capability::scope::ChioScope::default(),
+            ttl: 60,
+        },
+        admission_policy: None,
+        enterprise_identity: None,
+        delegation_policy: None,
+        upstream_capability_id: None,
+    }
+}
+
+impl Door {
+    async fn federated_issue_route(&self, request: FederatedIssueRequest) -> Response {
+        handle_federated_issue(State(self.state()), service_headers(), Json(request)).await
+    }
+
+    /// Service state whose issuance check reads the fixture clock through the
+    /// receipt store, so a capability issued at the fixture instant validates.
+    fn issuing_state(&self) -> TrustServiceState {
+        let mut state = self.state();
+        state.receipt_store = Some(Arc::new(
+            SqliteReceiptStore::open_with_clock(
+                self.dir.path().join("receipts.sqlite3"),
+                Arc::clone(&state.finding_challenge_clock),
+            )
+            .test_unwrap(),
+        ));
+        state
     }
 }
 
@@ -509,26 +569,8 @@ async fn the_oid4vp_door_refuses_a_partner_revoked_passport() {
 async fn the_federated_issue_door_refuses_a_partner_revoked_passport() {
     let (door, passport) = door_with_revoked_passport();
     let challenge = door.challenge(None, VALID_FROM, VALID_UNTIL);
-    let request = FederatedIssueRequest {
-        presentation: respond_to_passport_presentation_challenge(
-            &door.holder,
-            &passport,
-            &challenge,
-            PRESENTED_AT,
-        )
-        .test_unwrap(),
-        expected_challenge: challenge,
-        capability: crate::policy::DefaultCapability {
-            scope: chio_core::capability::scope::ChioScope::default(),
-            ttl: 60,
-        },
-        admission_policy: None,
-        enterprise_identity: None,
-        delegation_policy: None,
-        upstream_capability_id: None,
-    };
-    let response =
-        handle_federated_issue(State(door.state()), service_headers(), Json(request)).await;
+    let request = federated_issue_request(&door, &passport, challenge);
+    let response = door.federated_issue_route(request).await;
     let passport_id = passport_artifact_id(&passport).test_unwrap();
     assert_refused(response, revoked(PARTNER, &passport_id)).await;
 }
@@ -1146,6 +1188,131 @@ async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume
     );
     assert_eq!(door.sync.calls(), 1);
     assert_eq!(active_challenge(&door, "parent-expiring"), challenge);
+}
+
+#[tokio::test]
+async fn the_extracted_federated_issue_refuses_a_partner_revoked_passport_like_the_route() {
+    let (door, passport) = door_with_revoked_passport();
+    let request = federated_issue_request(
+        &door,
+        &passport,
+        door.challenge(None, VALID_FROM, VALID_UNTIL),
+    );
+    let refusal = execute_federated_issue(&door.state(), &request)
+        .await
+        .err()
+        .test_unwrap();
+    let passport_id = passport_artifact_id(&passport).test_unwrap();
+    assert_refused(refusal, revoked(PARTNER, &passport_id)).await;
+}
+
+#[tokio::test]
+async fn the_extracted_federated_issue_refuses_an_unenforceable_lifecycle_policy_like_the_route() {
+    let door = Door::new(0);
+    door.mirror(PARTNER, &door.feed.publish(NOW_MS), NOW_MS);
+    let passport = door.passport(&[&door.authority]);
+    let policy = PassportVerifierPolicy {
+        require_active_lifecycle: true,
+        ..PassportVerifierPolicy::default()
+    };
+    let route = door
+        .federated_issue_route(federated_issue_request(
+            &door,
+            &passport,
+            door.challenge_with_policy(Some("route"), VALID_FROM, VALID_UNTIL, policy.clone()),
+        ))
+        .await;
+    let extracted = execute_federated_issue(
+        &door.state(),
+        &federated_issue_request(
+            &door,
+            &passport,
+            door.challenge_with_policy(Some("extracted"), VALID_FROM, VALID_UNTIL, policy),
+        ),
+    )
+    .await
+    .err()
+    .test_unwrap();
+    let route = response_parts(route).await;
+    assert_eq!(route.0, StatusCode::CONFLICT, "{}", route.1);
+    assert_eq!(response_parts(extracted).await, route);
+}
+
+#[tokio::test]
+async fn the_extracted_federated_issue_issues_like_the_route_and_consumes_each_challenge_once() {
+    let door = Door::new(0);
+    door.mirror(PARTNER, &door.feed.publish(NOW_MS), NOW_MS);
+    let passport = door.passport(&[&door.authority]);
+    let route_challenge = door.challenge(Some("route"), VALID_FROM, VALID_UNTIL);
+    let extracted_challenge = door.challenge(Some("extracted"), VALID_FROM, VALID_UNTIL);
+
+    let (status, body) = response_parts(
+        handle_federated_issue(
+            State(door.issuing_state()),
+            service_headers(),
+            Json(federated_issue_request(
+                &door,
+                &passport,
+                route_challenge.clone(),
+            )),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let routed: FederatedIssueResponse = serde_json::from_str(&body).test_unwrap();
+    let extracted = execute_federated_issue(
+        &door.issuing_state(),
+        &federated_issue_request(&door, &passport, extracted_challenge.clone()),
+    )
+    .await
+    .ok()
+    .test_unwrap();
+
+    assert_eq!(extracted.subject, routed.subject);
+    assert_eq!(extracted.subject_public_key, routed.subject_public_key);
+    assert!(extracted.verification.accepted);
+    assert!(routed.verification.accepted);
+    assert_eq!(extracted.capability.subject, routed.capability.subject);
+    assert_eq!(extracted.capability.issuer, routed.capability.issuer);
+    assert_eq!(
+        serde_json::to_value(&extracted.capability.scope).test_unwrap(),
+        serde_json::to_value(&routed.capability.scope).test_unwrap()
+    );
+    assert_eq!(extracted.capability.issued_at, routed.capability.issued_at);
+    assert_eq!(
+        extracted.capability.expires_at,
+        routed.capability.expires_at
+    );
+    assert_ne!(extracted.capability.id, routed.capability.id);
+
+    let route_replay = handle_federated_issue(
+        State(door.issuing_state()),
+        service_headers(),
+        Json(federated_issue_request(
+            &door,
+            &passport,
+            extracted_challenge,
+        )),
+    )
+    .await;
+    let extracted_replay = execute_federated_issue(
+        &door.issuing_state(),
+        &federated_issue_request(&door, &passport, route_challenge),
+    )
+    .await
+    .err()
+    .test_unwrap();
+    for ((status, body), consumed) in [
+        (response_parts(route_replay).await, "extracted"),
+        (response_parts(extracted_replay).await, "route"),
+    ] {
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert!(
+            body.contains(&format!("challenge `{consumed}` has already been consumed")),
+            "{body}"
+        );
+    }
 }
 
 fn consumed(challenge_id: &str) -> serde_json::Value {
