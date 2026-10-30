@@ -114,17 +114,8 @@ fn is_cli_ipv6_unicast_link_local(address: &std::net::Ipv6Addr) -> bool {
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
+    use super::super::runtime_local_error_domain_tests::assert_registry_error;
     use super::*;
-
-    fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
-        match err {
-            CliError::Chio(chio) => {
-                assert_eq!(chio.code().as_str(), expected_code);
-                assert_eq!(chio.domain().as_str(), expected_domain);
-            }
-            other => panic!("expected registry-backed CliError::Chio, got: {other:?}"),
-        }
-    }
 
     #[test]
     fn remote_mcp_auth_contract_is_derived_from_external_auth_urls() {

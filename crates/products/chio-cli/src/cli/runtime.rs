@@ -1683,7 +1683,11 @@ mod runtime_local_error_domain_tests {
         }
     }
 
-    fn assert_registry_error(err: &CliError, expected_code: &str, expected_domain: &str) {
+    pub(super) fn assert_registry_error(
+        err: &CliError,
+        expected_code: &str,
+        expected_domain: &str,
+    ) {
         match err {
             CliError::Chio(chio) => {
                 assert_eq!(chio.code().as_str(), expected_code);
