@@ -10,7 +10,7 @@ use rand_core::{OsRng, RngCore};
 use rusqlite::{Transaction, TransactionBehavior};
 use sha2::{Digest, Sha256};
 
-use crate::rollback_generation::RollbackGenerationAnchor;
+use chio_rollback_anchor::RollbackGenerationAnchor;
 
 pub(super) struct FindingPoolDomainLease {
     database_identity: PathBuf,

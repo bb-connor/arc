@@ -14,8 +14,13 @@ The caller owns the connection and keeps it borrowed throughout inspection.
 
 The crate owns the narrow unsafe boundary needed to inspect SQLite's actual
 main-file descriptor. Store callers combine that result with filesystem
-custody checks. This crate does not validate ownership, permissions, regular
-file type, expected identity, or a required link count. It neither acquires
+custody checks. Identity inspection does not validate ownership, permissions,
+regular file type, expected identity, or a required link count. The safe
+`custody` module supplies those owner, mode, link-count and positioned-I/O
+checks as predicates over caller-held metadata and descriptors; the rollback
+anchors in `chio-rollback-anchor` and `chio-store-sqlite` share them. Because both
+anchors refuse through these predicates, `src/custody.rs` forbids unsafe code
+and carries the same production clippy deny set as those TCB crates. It neither acquires
 serving locks nor retains a descriptor beyond the call. Available space and
 write geometry are data: the crate reserves no space and grants no write
 capacity or writer authority.
@@ -26,7 +31,8 @@ Descriptor extraction, identity inspection, and their tests live in
 `src/lib.rs`. `src/available_space.rs` and `src/available_space/tests.rs` hold
 the available-space inspection and its tests. `src/write_geometry.rs` and
 `src/write_geometry/tests.rs` hold the write geometry observation and its
-tests. Unix-only code imports SQLite
+tests. `src/custody.rs` holds the custody predicates and positioned I/O with
+their tests. Unix-only code imports SQLite
 FFI and defines `BundledUnixFilePrefix`, a C-layout copy of the audited prefix
 containing method, VFS, inode-information, and descriptor fields. The non-Unix
 implementations return a validation refusal.
@@ -34,7 +40,8 @@ implementations return a validation refusal.
 `rusqlite` provides the borrowed connection and SQLite FFI. The workspace
 selects `rusqlite` 0.39 with the `bundled` feature;
 the prefix assumption belongs to that pinned SQLite build. `libc` supplies
-`fstat`, `fstatvfs`, and target-specific metadata. `tempfile` creates isolated databases
+`fstat`, `fstatvfs`, and target-specific metadata. `nix` supplies the
+effective user id for custody ownership checks. `tempfile` creates isolated databases
 for tests and the README example. The manifest declares no Cargo features.
 
 ## Data and control flow
@@ -182,6 +189,10 @@ separate test process.
 That process attempts `BEGIN IMMEDIATE` with zero busy timeout and must receive
 `DatabaseBusy`. The probe is marked ignored because its parent test supplies
 the database through `CHIO_IDENTITY_LOCK_PROBE_DATABASE`.
+
+Custody tests accept a 0700 directory and a 0600 single-link file and refuse
+group-writable modes and a second hard link; positioned I/O tests round-trip
+bytes at an offset and refuse a short read with `UnexpectedEof`.
 
 Run `cargo test -p chio-sqlite-file-identity` for these tests. Non-Unix tests
 check the explicit unsupported-platform diagnostics. The README example

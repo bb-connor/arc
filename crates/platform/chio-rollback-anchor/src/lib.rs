@@ -1,3 +1,31 @@
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
+//! External rollback generation anchor for SQLite stores.
+//!
+//! A [`RollbackGenerationAnchor`] keeps a monotonic store generation in a
+//! private two-slot file outside the protected database. A store binds the
+//! anchor once, verifies its own generation against the anchor on open and
+//! before serving, and advances both through a prepare, operation and commit
+//! sequence. A database image restored to an older generation no longer
+//! matches the anchor and is refused.
+//!
+//! [`require_separate_snapshot_domain`] refuses an anchor root on the same
+//! device as the database, since one filesystem snapshot could roll both back.
+
+#![forbid(unsafe_code)]
+
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -5,6 +33,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::sha256_hex;
+use chio_sqlite_file_identity::custody::{self, read_exact_at, write_all_at};
 use serde::{Deserialize, Serialize};
 
 const SLOT_SIZE: usize = 512;
@@ -44,7 +73,7 @@ static PROCESS_ANCHOR_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Weak<Mutex<()>>>>>
 /// Reject an anchor that can be rolled back by the same filesystem snapshot
 /// as its protected SQLite database. A qualified anchor must cross a device
 /// boundary; path separation alone is not a rollback boundary.
-pub(crate) fn require_separate_snapshot_domain(
+pub fn require_separate_snapshot_domain(
     database_path: &Path,
     anchor_root: &Path,
 ) -> Result<(), String> {
@@ -60,7 +89,7 @@ pub(crate) fn require_separate_snapshot_domain(
     Ok(())
 }
 
-pub(crate) struct RollbackGenerationAnchor {
+pub struct RollbackGenerationAnchor {
     file: File,
     root: PathBuf,
     path: PathBuf,
@@ -71,7 +100,7 @@ pub(crate) struct RollbackGenerationAnchor {
 }
 
 impl RollbackGenerationAnchor {
-    pub(crate) fn open(root: &Path, scope: &[u8]) -> Result<Self, String> {
+    pub fn open(root: &Path, scope: &[u8]) -> Result<Self, String> {
         validate_secure_root(root)?;
         let root = fs::canonicalize(root)
             .map_err(|error| format!("rollback anchor root is unavailable: {error}"))?;
@@ -120,7 +149,7 @@ impl RollbackGenerationAnchor {
         Ok(anchor)
     }
 
-    pub(crate) fn bind_initial_while(
+    pub fn bind_initial_while(
         &self,
         load: impl FnOnce() -> Result<(u64, bool), String>,
     ) -> Result<(), String> {
@@ -168,7 +197,7 @@ impl RollbackGenerationAnchor {
         })
     }
 
-    pub(crate) fn instance_id(&self) -> Result<String, String> {
+    pub fn instance_id(&self) -> Result<String, String> {
         self.with_lock(|| {
             let loaded = self
                 .load_record()?
@@ -181,14 +210,11 @@ impl RollbackGenerationAnchor {
         })
     }
 
-    pub(crate) fn verify(&self, store_generation: u64) -> Result<(), String> {
+    pub fn verify(&self, store_generation: u64) -> Result<(), String> {
         self.verify_while(|| Ok(store_generation))
     }
 
-    pub(crate) fn verify_while(
-        &self,
-        load: impl FnOnce() -> Result<u64, String>,
-    ) -> Result<(), String> {
+    pub fn verify_while(&self, load: impl FnOnce() -> Result<u64, String>) -> Result<(), String> {
         self.with_lock(|| {
             let store_generation = load()?;
             let loaded = self
@@ -211,7 +237,7 @@ impl RollbackGenerationAnchor {
         })
     }
 
-    pub(crate) fn advance_while(
+    pub fn advance_while(
         &self,
         expected: u64,
         next: u64,
@@ -589,128 +615,36 @@ fn process_anchor_lock(path: &Path) -> Result<Arc<Mutex<()>>, String> {
     Ok(lock)
 }
 
-#[cfg(unix)]
-fn validate_secure_root(path: &Path) -> Result<(), String> {
-    use std::os::unix::fs::MetadataExt as _;
+fn unix_only(_error: std::io::Error) -> String {
+    "rollback generation anchors require Unix file identity".to_string()
+}
 
+fn validate_secure_root(path: &Path) -> Result<(), String> {
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| format!("rollback anchor root metadata failed: {error}"))?;
-    if !metadata.file_type().is_dir()
-        || metadata.uid() != nix::unistd::geteuid().as_raw()
-        || metadata.mode() & 0o022 != 0
-    {
+    if !custody::private_directory(&metadata).map_err(unix_only)? {
         return Err("rollback anchor root has unsafe ownership or permissions".to_string());
     }
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn validate_secure_root(_path: &Path) -> Result<(), String> {
-    Err("rollback generation anchors require Unix file identity".to_string())
-}
-
-#[cfg(unix)]
 fn validate_anchor_metadata(metadata: &fs::Metadata) -> Result<(), String> {
-    use std::os::unix::fs::MetadataExt as _;
-
-    if !metadata.file_type().is_file()
-        || metadata.nlink() != 1
-        || metadata.uid() != nix::unistd::geteuid().as_raw()
-        || metadata.mode() & 0o777 != 0o600
-    {
+    if !custody::private_file(metadata).map_err(unix_only)? {
         return Err("rollback anchor file has unsafe ownership or permissions".to_string());
     }
     Ok(())
 }
 
-#[cfg(not(unix))]
-fn validate_anchor_metadata(_metadata: &fs::Metadata) -> Result<(), String> {
-    Err("rollback generation anchors require Unix file identity".to_string())
-}
-
-#[cfg(unix)]
 fn metadata_device(metadata: &fs::Metadata) -> Result<u64, String> {
-    use std::os::unix::fs::MetadataExt as _;
-    Ok(metadata.dev())
+    custody::device_inode(metadata)
+        .map(|(device, _)| device)
+        .map_err(unix_only)
 }
 
-#[cfg(not(unix))]
-fn metadata_device(_metadata: &fs::Metadata) -> Result<u64, String> {
-    Err("rollback generation anchors require Unix file identity".to_string())
-}
-
-#[cfg(unix)]
 fn metadata_inode(metadata: &fs::Metadata) -> Result<u64, String> {
-    use std::os::unix::fs::MetadataExt as _;
-    Ok(metadata.ino())
-}
-
-#[cfg(not(unix))]
-fn metadata_inode(_metadata: &fs::Metadata) -> Result<u64, String> {
-    Err("rollback generation anchors require Unix file identity".to_string())
-}
-
-#[cfg(unix)]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "The OS read or write count cannot exceed the supplied buffer length."
-)]
-fn read_exact_at(file: &File, mut bytes: &mut [u8], mut offset: usize) -> std::io::Result<()> {
-    use std::os::unix::fs::FileExt as _;
-
-    while !bytes.is_empty() {
-        let read = file.read_at(bytes, io_offset(offset)?)?;
-        if read == 0 {
-            return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof));
-        }
-        offset += read;
-        bytes = &mut bytes[read..];
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn read_exact_at(_file: &File, _bytes: &mut [u8], _offset: usize) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "rollback generation anchors require Unix positioned I/O",
-    ))
-}
-
-#[cfg(unix)]
-#[allow(
-    clippy::indexing_slicing,
-    reason = "The OS read or write count cannot exceed the supplied buffer length."
-)]
-fn write_all_at(file: &File, mut bytes: &[u8], mut offset: usize) -> std::io::Result<()> {
-    use std::os::unix::fs::FileExt as _;
-
-    while !bytes.is_empty() {
-        let written = file.write_at(bytes, io_offset(offset)?)?;
-        if written == 0 {
-            return Err(std::io::Error::from(std::io::ErrorKind::WriteZero));
-        }
-        offset += written;
-        bytes = &bytes[written..];
-    }
-    Ok(())
-}
-
-#[cfg(not(unix))]
-fn write_all_at(_file: &File, _bytes: &[u8], _offset: usize) -> std::io::Result<()> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "rollback generation anchors require Unix positioned I/O",
-    ))
-}
-
-fn io_offset(offset: usize) -> std::io::Result<u64> {
-    u64::try_from(offset).map_err(|_| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "rollback anchor offset overflowed",
-        )
-    })
+    custody::device_inode(metadata)
+        .map(|(_, inode)| inode)
+        .map_err(unix_only)
 }
 
 #[cfg(all(test, unix))]

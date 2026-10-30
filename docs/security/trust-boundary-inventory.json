@@ -226,6 +226,7 @@
     "crates/platform/chio-manifest/src/admission.rs",
     "crates/platform/chio-manifest/src/lib_parts/part_01.inc",
     "crates/platform/chio-risk-comptroller/src/evidence_refs.rs",
+    "crates/platform/chio-rollback-anchor/src/lib.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_claim/records.rs",
@@ -290,7 +291,6 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs",
-    "crates/platform/chio-store-sqlite/src/rollback_generation.rs",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs",
     "crates/platform/chio-store-sqlite/src/security_state/capability_set_suspension.rs",
     "crates/platform/chio-store-sqlite/src/security_state/codec.rs",
@@ -1385,6 +1385,7 @@
     "crates/platform/chio-http-core/src/input.rs::decode::from_wire",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_wire",
     "crates/platform/chio-manifest/src/admission.rs::read_existing_signed_manifest::new",
+    "crates/platform/chio-rollback-anchor/src/lib.rs::decode_slot::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_projection_receipt::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row::from_wire",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs::decode_credit_exposure_record::from_wire",
@@ -1469,7 +1470,6 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire",
-    "crates/platform/chio-store-sqlite/src/rollback_generation.rs::decode_slot::from_wire",
     "crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire",
@@ -14743,7 +14743,7 @@
         "verify_head_against_latest_checkpoint::from_str"
       ]
     },
-    "crates/platform/chio-store-sqlite/src/rollback_generation.rs": {
+    "crates/platform/chio-rollback-anchor/src/lib.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "migrations": [
         [
@@ -18507,6 +18507,7 @@
     "crates/platform/chio-http-core/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-http-core/src/plan.rs::decode_plan::from_wire#1::decode_document",
     "crates/platform/chio-manifest/src/admission.rs::read_existing_signed_manifest::new#1::decode_signed",
+    "crates/platform/chio-rollback-anchor/src/lib.rs::decode_slot::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_projection_receipt::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store.rs::decode_row::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/admission_operation_store/credit_exposure.rs::decode_credit_exposure_record::from_wire#1::decode_canonical",
@@ -18591,7 +18592,6 @@
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_stored_json::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/signed_readback.rs::decode_signed_json::new#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::record_checkpoint_publication_trust_anchor_binding::from_wire#1::decode_signed",
-    "crates/platform/chio-store-sqlite/src/rollback_generation.rs::decode_slot::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob::from_wire#1::decode_canonical",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::load_preparation::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs::validate_all_automatic_preparations::from_wire#1::decode_signed",
@@ -21601,7 +21601,7 @@
       "trusted_retention_archive_for_connection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/store_impl.rs::trusted_retention_archive_for_connection_with_preflight",
       "trusted_retention_archive_for_connection_with_preflight::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::retention_archive_connection_is_trusted"
     ],
-    "crates/platform/chio-store-sqlite/src/rollback_generation.rs": [
+    "crates/platform/chio-rollback-anchor/src/lib.rs": [
       "decode_slot::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/automatic_preparation.rs": [
