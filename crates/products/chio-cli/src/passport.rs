@@ -35,9 +35,9 @@ use url::Url;
 
 use crate::issuance::build_local_reputation_corpus;
 use crate::passport_verifier::{
-    PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
-    PassportStatusRevocationRequest, PassportVerifierChallengeStore, PublishPassportStatusRequest,
-    VerifierPolicyRegistry,
+    ChallengeConsumer, PassportIssuanceOfferRegistry, PassportStatusListResponse,
+    PassportStatusRegistry, PassportStatusRevocationRequest, PassportVerifierChallengeStore,
+    PublishPassportStatusRequest, VerifierPolicyRegistry,
 };
 use crate::trust_control::{
     CreateIdentityAssertionRequest, CreateOid4vpRequest, CreatePassportChallengeRequest,

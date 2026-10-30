@@ -12,7 +12,7 @@ use chio_credentials::{
     issue_chio_passport_sd_jwt_vc, issue_reputation_credential, passport_artifact_id,
     present_agent_passport, respond_to_oid4vp_request, respond_to_passport_presentation_challenge,
     AgentPassport, AttestationWindow, ChioCredentialEvidence, PassportPresentationChallengeArgs,
-    PassportPresentationOptions, PassportVerifierPolicy,
+    PassportPresentationOptions, PassportPresentationResponse, PassportVerifierPolicy,
 };
 use chio_revocation_oracle::{
     credential_revocation_key, passport_revocation_key, EpochRoot, RevocationKey, SignedEpochRoot,
@@ -1152,4 +1152,129 @@ async fn a_parent_snapshot_that_expires_during_the_partner_sync_does_not_consume
     );
     assert_eq!(door.sync.calls(), 1);
     assert_eq!(active_challenge(&door, "parent-expiring"), challenge);
+}
+
+fn consumed(challenge_id: &str) -> serde_json::Value {
+    serde_json::json!({
+        "error": CliError::cli_other_error(format!(
+            "challenge `{challenge_id}` has already been consumed"
+        ))
+        .to_string()
+    })
+}
+
+fn federated_issue_of(
+    challenge: &PassportPresentationChallenge,
+    presentation: PassportPresentationResponse,
+) -> FederatedIssueRequest {
+    FederatedIssueRequest {
+        presentation,
+        expected_challenge: challenge.clone(),
+        capability: crate::policy::DefaultCapability {
+            scope: chio_core::capability::scope::ChioScope::default(),
+            ttl: 60,
+        },
+        admission_policy: None,
+        enterprise_identity: None,
+        delegation_policy: None,
+        upstream_capability_id: None,
+    }
+}
+
+/// A door whose partner feed is published, with a receipt store at the door
+/// clock, a passport it admits, and a registered challenge.
+struct IssuingDoor {
+    door: Door,
+    receipts: Arc<chio_store_sqlite::SqliteReceiptStore>,
+    passport: AgentPassport,
+    challenge: PassportPresentationChallenge,
+}
+
+impl IssuingDoor {
+    fn new(challenge_id: &str) -> Self {
+        let mut door = Door::new(0);
+        let receipts = with_receipts(&mut door);
+        door.sync.publish(PARTNER, door.feed.publish(NOW_MS));
+        let passport = door.passport(&[&door.authority]);
+        let challenge = door.challenge(Some(challenge_id), VALID_FROM, VALID_UNTIL);
+        Self {
+            door,
+            receipts,
+            passport,
+            challenge,
+        }
+    }
+
+    fn submission(&self) -> VerifyPassportChallengeRequest {
+        self.door.service_request(&self.passport, &self.challenge)
+    }
+
+    async fn submit(&self) -> Response {
+        self.door.service_door(self.submission()).await
+    }
+
+    async fn issue(&self, presentation: PassportPresentationResponse) -> Response {
+        handle_federated_issue(
+            State(receipts_state(&self.door, &self.receipts)),
+            service_headers(),
+            Json(federated_issue_of(&self.challenge, presentation)),
+        )
+        .await
+    }
+}
+
+#[tokio::test]
+async fn a_submitted_challenge_issues_once_and_then_refuses_every_replay() {
+    let issuing = IssuingDoor::new("submit-then-issue");
+    let presentation = issuing.submission().presentation;
+    assert_admitted(issuing.submit().await).await;
+
+    assert_admitted(issuing.issue(presentation.clone()).await).await;
+
+    assert_refused(
+        issuing.issue(presentation).await,
+        consumed("submit-then-issue"),
+    )
+    .await;
+    assert_refused(issuing.submit().await, consumed("submit-then-issue")).await;
+}
+
+#[tokio::test]
+async fn a_submitted_challenge_issues_only_for_the_submitted_presentation() {
+    let issuing = IssuingDoor::new("submit-other-presentation");
+    let presentation = issuing.submission().presentation;
+    assert_admitted(issuing.submit().await).await;
+
+    let other = respond_to_passport_presentation_challenge(
+        &issuing.door.holder,
+        &issuing.passport,
+        &issuing.challenge,
+        PRESENTED_AT - 1,
+    )
+    .test_unwrap();
+    assert_ne!(
+        serde_json::to_value(&other).test_unwrap(),
+        serde_json::to_value(&presentation).test_unwrap()
+    );
+    assert_refused(
+        issuing.issue(other).await,
+        consumed("submit-other-presentation"),
+    )
+    .await;
+
+    assert_admitted(issuing.issue(presentation).await).await;
+}
+
+#[tokio::test]
+async fn a_directly_issued_challenge_refuses_a_second_issue_and_a_later_submit() {
+    let issuing = IssuingDoor::new("issue-without-submit");
+    let presentation = issuing.submission().presentation;
+    assert_admitted(issuing.issue(presentation.clone()).await).await;
+
+    assert_refused(
+        issuing.issue(presentation).await,
+        consumed("issue-without-submit"),
+    )
+    .await;
+    assert_refused(issuing.submit().await, consumed("issue-without-submit")).await;
 }

@@ -774,6 +774,8 @@ pub(crate) fn passport_presentation_transport_for_service(
 pub(crate) fn consume_challenge_if_configured(
     config: &TrustServiceConfig,
     challenge: &PassportPresentationChallenge,
+    presentation: &PassportPresentationResponse,
+    consumer: ChallengeConsumer,
     now: u64,
 ) -> Result<Option<String>, CliError> {
     let Some(path) = config.verifier_challenge_db_path.as_deref() else {
@@ -786,7 +788,7 @@ pub(crate) fn consume_challenge_if_configured(
         return Ok(None);
     };
     let store = PassportVerifierChallengeStore::open(path)?;
-    store.consume(challenge, now)?;
+    store.consume(challenge, presentation, consumer, now)?;
     Ok(Some("consumed".to_string()))
 }
 

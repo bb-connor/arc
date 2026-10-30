@@ -281,9 +281,10 @@ use crate::{
     },
     issuance, load_or_create_authority_keypair,
     passport_verifier::{
-        Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord, PassportIssuanceOfferRegistry,
-        PassportStatusListResponse, PassportStatusRegistry, PassportStatusRevocationRequest,
-        PassportVerifierChallengeStore, PublishPassportStatusRequest, VerifierPolicyRegistry,
+        ChallengeConsumer, Oid4vpVerifierTransactionStore, PassportIssuanceOfferRecord,
+        PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
+        PassportStatusRevocationRequest, PassportVerifierChallengeStore,
+        PublishPassportStatusRequest, VerifierPolicyRegistry,
     },
     reputation, rotate_authority_keypair,
     scim_lifecycle::{

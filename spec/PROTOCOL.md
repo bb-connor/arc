@@ -5598,12 +5598,32 @@ The contract is challenge-bound, not session-marketplace state:
 - public fetch is read-only and resolves one already-stored verifier challenge
   by `challengeId`
 - public submit verifies the holder response against stored verifier truth and
-  consumes the replay-safe challenge record on success
+  spends the replay-safe challenge record on success
 - public routes do not expose verifier policy CRUD, challenge creation, or
   other admin mutation
 - missing `challengeId`, expired challenges, consumed challenges, malformed
   stored challenge state, or holder submissions that do not match stored
   verifier truth fail closed
+
+A stored verifier challenge moves through one state machine shared by
+challenge verification and federated issuance:
+
+- `issued`: created and registered, not yet spent
+- `verified`: a successful submit, public or service-authenticated, moved the
+  challenge here and recorded the SHA-256 of the canonical JSON of the
+  verified presentation
+- `consumed`: a federated issuance spent the challenge
+- `expired`: a fetch or spend was attempted after `expiresAt`
+
+Verification spends only an `issued` challenge. Federated issuance spends an
+`issued` challenge, or a `verified` challenge only when the issuance carries
+the presentation whose hash was recorded, so one challenge admits at most one
+verification and one federated issuance of the same presentation. Every other
+spend fails closed with the consumed-challenge error: a second submit, a submit
+after issuance, a second issuance, and an issuance with a different
+presentation. Public fetch treats a `verified` challenge as consumed. Each
+state change is conditional on the state that was read, so concurrent spends
+of one challenge admit at most one.
 
 This transport is Chio-specific. It coexists with the separate OID4VP verifier
 profile above, but it does not itself imply generic OID4VP, DIDComm, or other

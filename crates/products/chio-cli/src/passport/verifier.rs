@@ -491,7 +491,12 @@ pub(crate) fn cmd_passport_challenge_verify(
         )?;
         apply_passport_lifecycle_to_presentation(&mut verification, lifecycle);
         if let Some(path) = verifier_challenge_db {
-            PassportVerifierChallengeStore::open(path)?.consume(challenge, now)?;
+            PassportVerifierChallengeStore::open(path)?.consume(
+                challenge,
+                &response,
+                ChallengeConsumer::Verification,
+                now,
+            )?;
             verification.replay_state = Some("consumed".to_string());
         }
         verification
