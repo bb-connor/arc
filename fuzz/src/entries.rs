@@ -29,7 +29,9 @@ pub fn decision_model_artifact(data: &[u8]) {
     use chio_predicate_dag::{DagError, ScheduleStorage, TriSet, ATOM_WORDS};
 
     static STORAGE: Mutex<ScheduleStorage> = Mutex::new(ScheduleStorage::empty());
-    let mut storage = STORAGE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut storage = STORAGE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if storage.decode(data).is_err() {
         assert_eq!(storage.schedule().err(), Some(DagError::NotValidated));
         return;
