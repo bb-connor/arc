@@ -210,7 +210,7 @@ mod tests {
     use super::*;
 
     use crate::capability::{
-        attenuation::{delegate, Attenuation},
+        attenuation::{delegate, Attenuation, DelegationStamp},
         scope::{ChioScope, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     };
@@ -266,14 +266,82 @@ mod tests {
         let parent = parent_token(&issuer, &subject);
         delegate(
             &parent,
+            &parent.issuer,
             &child_scope(),
             &subject,
             &delegatee.public_key(),
             ScopeAttenuation::empty(),
-            1500,
-            nonce,
+            DelegationStamp {
+                signed_at: 1500,
+                nonce,
+            },
         )
         .unwrap()
+    }
+
+    #[test]
+    fn delegate_refuses_a_parent_under_another_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let parent = parent_token(&issuer, &subject);
+        let result = delegate(
+            &parent,
+            &Keypair::generate().public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [3_u8; 16],
+            },
+        );
+        assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
+    }
+
+    #[test]
+    fn delegate_refuses_the_parent_subject_as_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let parent = parent_token(&issuer, &subject);
+        let result = delegate(
+            &parent,
+            &subject.public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [4_u8; 16],
+            },
+        );
+        assert!(matches!(result, Err(crate::Error::SignerKeyMismatch)));
+    }
+
+    #[test]
+    fn delegate_refuses_a_parent_relabelled_to_the_trusted_issuer() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let trusted = Keypair::generate();
+        let mut parent = parent_token(&issuer, &subject);
+        parent.issuer = trusted.public_key();
+        let result = delegate(
+            &parent,
+            &trusted.public_key(),
+            &child_scope(),
+            &subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            DelegationStamp {
+                signed_at: 1500,
+                nonce: [5_u8; 16],
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(crate::Error::SignatureVerificationFailed)
+        ));
     }
 
     #[test]

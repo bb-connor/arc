@@ -98,12 +98,15 @@ fn hosted_aggregate_family_uses_signed_root_lineage_before_enforcement(
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [13_u8; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [13_u8; 16],
+        },
     )?;
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -252,12 +255,15 @@ fn hosted_cumulative_family_requires_matching_signed_root_lineage(
     let child_scope = make_scope(vec![child_grant]);
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
         chio_core_types::ScopeAttenuation::empty(),
-        now,
-        [15_u8; 16],
+        chio_core::capability::attenuation::DelegationStamp {
+            signed_at: now,
+            nonce: [15_u8; 16],
+        },
     )?;
     let child = CapabilityToken::sign(
         CapabilityTokenBody {

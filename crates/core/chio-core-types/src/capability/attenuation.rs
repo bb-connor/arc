@@ -993,6 +993,13 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
     Ok(())
 }
 
+/// Signing time and nonce for a minted delegation receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DelegationStamp {
+    pub signed_at: u64,
+    pub nonce: [u8; 16],
+}
+
 /// Recursive-delegation mint helper.
 ///
 /// `delegate` wraps [`DelegationLink::sign`] with fail-closed attenuation
@@ -1024,26 +1031,29 @@ pub(crate) fn validate_delegable_attenuation(parent: &ChioScope, child: &ChioSco
 ///   an omitted child share as a no-op.
 /// * The requested `child_expires_at` is greater than the parent's
 ///   `expires_at` (rejected as an [`Error::AttenuationViolation`]).
+/// * The parent token's signature does not verify under
+///   `trusted_parent_issuer`, or its carried issuer is a different key.
 /// * `delegator_keypair.public_key() != parent.subject` (the mint helper
 ///   is fail-closed: only the parent capability's bound subject may
 ///   delegate further).
 ///
 /// The helper is intentionally pure with respect to the local clock:
-/// callers pass `signed_at` and `nonce` explicitly so unit tests, replay
+/// callers pass the [`DelegationStamp`] explicitly so unit tests, replay
 /// proofs, and proptest-driven invariants stay deterministic.
 ///
 /// This function is gated behind the `delegation` feature flag. Callers
 /// must opt in explicitly.
 pub fn delegate(
     parent: &CapabilityToken,
+    trusted_parent_issuer: &PublicKey,
     child_scope: &ChioScope,
     delegator_keypair: &Keypair,
     delegatee: &PublicKey,
     attenuation: crate::delegation_receipt::ScopeAttenuation,
-    signed_at: u64,
-    nonce: [u8; 16],
+    stamp: DelegationStamp,
 ) -> Result<crate::delegation_receipt::DelegationReceipt> {
-    if !parent.verify_integrity_embedded_key()? {
+    let DelegationStamp { signed_at, nonce } = stamp;
+    if !parent.verify_signature(trusted_parent_issuer)? {
         return Err(Error::SignatureVerificationFailed);
     }
     if signed_at < parent.issued_at {

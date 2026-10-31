@@ -8,7 +8,9 @@ use super::aggregate_invocation::{
     verify_aggregate_invocation_budget, AggregateBudgetRootBinding, AggregateInvocationBudget,
     AggregateInvocationScope,
 };
-use super::attenuation::{delegate, scope_hash, DelegationLink, DelegationLinkBody};
+use super::attenuation::{
+    delegate, scope_hash, DelegationLink, DelegationLinkBody, DelegationStamp,
+};
 use super::scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant};
 use super::token::{
     CapabilityToken, CapabilityTokenBody, CapabilityTokenSigningBody, CHIO_CAPABILITY_SCHEMA,
@@ -907,12 +909,15 @@ fn aggregate_invocation_rejects_multi_hop_scope_pivot_and_intermediate_predating
     intermediate_scope.grants[0].server_id = "server-a".to_string();
     let first_receipt = delegate(
         &root,
+        &root.issuer,
         &intermediate_scope,
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [3_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [3_u8; 16],
+        },
     )?;
     let mut intermediate_body = token_body(
         "cap-intermediate",
@@ -989,12 +994,15 @@ fn aggregate_invocation_delegate_projects_marker_across_hops() -> TestResult {
     let root = signed_family_root("cap-delegate-root", &issuer, &root_subject, 7)?;
     let first = delegate(
         &root,
+        &root.issuer,
         &tool_scope(true),
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [1_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [1_u8; 16],
+        },
     )?;
     assert_eq!(first.aggregate_budget, first.link.aggregate_budget);
     assert!(first.aggregate_budget.is_some());
@@ -1012,12 +1020,15 @@ fn aggregate_invocation_delegate_projects_marker_across_hops() -> TestResult {
     let intermediate_token = CapabilityToken::sign(intermediate_body, &issuer)?;
     let second = delegate(
         &intermediate_token,
+        &intermediate_token.issuer,
         &tool_scope(false),
         &intermediate,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        300,
-        [2_u8; 16],
+        DelegationStamp {
+            signed_at: 300,
+            nonce: [2_u8; 16],
+        },
     )?;
 
     assert_eq!(second.aggregate_budget, first.aggregate_budget);

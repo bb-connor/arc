@@ -4,7 +4,7 @@ use alloc::vec;
 use super::aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope};
 use super::attenuation::{
     compute_attenuation_witness, delegate, scope_hash, AttenuationProof, DelegationLink,
-    DelegationLinkBody,
+    DelegationLinkBody, DelegationStamp,
 };
 use super::cumulative_approval::{
     verify_cumulative_approval_constraints, CumulativeApprovalDelegationMarker,
@@ -167,12 +167,15 @@ fn child_token(
     }
     let receipt = delegate(
         root,
+        &root.issuer,
         &child_scope,
         root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [9_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [9_u8; 16],
+        },
     )?;
     let mut body = token_body(
         "cap-child",
@@ -383,12 +386,15 @@ fn cumulative_approval_delegation_rejects_omission() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &tool_scope(false, None),
             &root_subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            200,
-            [1_u8; 16],
+            DelegationStamp {
+                signed_at: 200,
+                nonce: [1_u8; 16],
+            },
         ),
         "child scope is not a subset of parent scope",
     )?;
@@ -408,12 +414,15 @@ fn cumulative_approval_delegation_rejects_binding_mutation() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &child_scope,
             &root_subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            200,
-            [2_u8; 16],
+            DelegationStamp {
+                signed_at: 200,
+                nonce: [2_u8; 16],
+            },
         ),
         "child scope is not a subset of parent scope",
     )?;
@@ -438,12 +447,15 @@ fn cumulative_approval_delegation_rejects_fresh_constraint() -> TestResult {
     refused_with(
         delegate(
             &root,
+            &root.issuer,
             &child_scope,
             &root_subject,
             &Keypair::generate().public_key(),
             ScopeAttenuation::empty(),
-            200,
-            [3_u8; 16],
+            DelegationStamp {
+                signed_at: 200,
+                nonce: [3_u8; 16],
+            },
         ),
         "child scope is not a subset of parent scope",
     )?;
@@ -741,12 +753,15 @@ fn cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating(
     intermediate_scope.grants[0].server_id = "server-a".to_string();
     let first = delegate(
         &root,
+        &root.issuer,
         &intermediate_scope,
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [10_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [10_u8; 16],
+        },
     )?;
     assert!(first.cumulative_approval.is_some());
     assert_eq!(first.cumulative_approval, first.link.cumulative_approval);
@@ -765,12 +780,15 @@ fn cumulative_approval_rejects_multi_hop_scope_pivot_and_intermediate_predating(
     chronology_scope.grants[0].server_id = "server-a".to_string();
     let projected = delegate(
         &intermediate_token,
+        &intermediate_token.issuer,
         &chronology_scope,
         &intermediate,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        300,
-        [11_u8; 16],
+        DelegationStamp {
+            signed_at: 300,
+            nonce: [11_u8; 16],
+        },
     )?;
     assert_eq!(projected.cumulative_approval, first.cumulative_approval);
     assert_eq!(
@@ -868,12 +886,15 @@ fn cumulative_approval_marker_is_bounded_sorted_and_deduplicated() -> TestResult
     )?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &root.scope,
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [12_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [12_u8; 16],
+        },
     )?;
     let marker = receipt
         .cumulative_approval
@@ -936,12 +957,15 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
     let child_scope = bound_tool_scope(&root, false, 80)?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [13_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [13_u8; 16],
+        },
     )?;
     let marker = receipt
         .cumulative_approval
@@ -1065,21 +1089,27 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
     };
     let first = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &intermediate.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [14_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [14_u8; 16],
+        },
     )?;
     let other = delegate(
         &other_root,
+        &other_root.issuer,
         &other_child_scope,
         &other_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        200,
-        [15_u8; 16],
+        DelegationStamp {
+            signed_at: 200,
+            nonce: [15_u8; 16],
+        },
     )?;
     let root_marker = first
         .cumulative_approval

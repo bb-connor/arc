@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use chio_core_types::capability::attenuation::{
-    compute_attenuation_witness, delegate, scope_hash, AttenuationProof,
+    compute_attenuation_witness, delegate, scope_hash, AttenuationProof, DelegationStamp,
 };
 use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::capability::token::{
@@ -307,6 +307,7 @@ pub fn child(
 ) -> Result<CapabilityToken> {
     let receipt = delegate(
         parent,
+        &parent.issuer,
         &scope,
         parent_key,
         &child_key.public_key(),
@@ -314,8 +315,10 @@ pub fn child(
             budget_share_bps: Some(parent.budget_share_bps.unwrap_or(10_000).min(1_000)),
             ..Default::default()
         },
-        parent.issued_at,
-        [11; 16],
+        DelegationStamp {
+            signed_at: parent.issued_at,
+            nonce: [11; 16],
+        },
     )?;
     Ok(CapabilityToken::sign_attenuated(
         CapabilityTokenAttenuationBody {

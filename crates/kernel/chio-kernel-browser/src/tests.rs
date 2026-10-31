@@ -5,7 +5,7 @@ use alloc::string::{String, ToString};
 use chio_core_types::capability::{
     attenuation::{
         compute_attenuation_witness, delegate, scope_hash, AttenuationProof, DelegationLink,
-        DelegationLinkBody, ScopeHash,
+        DelegationLinkBody, DelegationStamp, ScopeHash,
     },
     features::{CapabilityNegotiation, AGGREGATE_INVOCATION_BUDGET, CUMULATIVE_APPROVAL_BUDGET},
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
@@ -158,12 +158,15 @@ fn aggregate_family_fixture() -> TestResult<(
     let child_body = make_capability_body("cap-aggregate-child", &delegatee, &issuer);
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_body.scope,
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        ISSUED_AT + 1,
-        [7_u8; 16],
+        DelegationStamp {
+            signed_at: ISSUED_AT + 1,
+            nonce: [7_u8; 16],
+        },
     )?;
     let mut child_body = child_body;
     child_body.issued_at = ISSUED_AT + 1;
@@ -208,12 +211,15 @@ fn cumulative_family_fixture(
         .push(cumulative_constraint(80, Some(binding)));
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_body.scope,
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        ISSUED_AT + 1,
-        [8_u8; 16],
+        DelegationStamp {
+            signed_at: ISSUED_AT + 1,
+            nonce: [8_u8; 16],
+        },
     )?;
     child_body.issued_at = ISSUED_AT + 1;
     child_body.delegation_chain = receipt.complete_chain();

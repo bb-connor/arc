@@ -1,6 +1,6 @@
-#[cfg(feature = "delegation")]
-use super::attenuation::delegate;
 use super::attenuation::{compute_attenuation_witness, scope_hash, AttenuationProof};
+#[cfg(feature = "delegation")]
+use super::attenuation::{delegate, DelegationStamp};
 use super::caveat::{
     CapabilitySecurityBinding, Caveat, CaveatKind, CAPABILITY_SECURITY_BINDING_SCHEMA,
 };
@@ -230,12 +230,15 @@ fn delegate_rejects_child_grant_without_delegate_on_covering_parent_grant() {
 
     let err = delegate(
         &parent,
+        &parent.issuer,
         &child_scope,
         &subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        1500,
-        [0_u8; 16],
+        DelegationStamp {
+            signed_at: 1500,
+            nonce: [0_u8; 16],
+        },
     )
     .unwrap_err();
     assert!(matches!(err, Error::AttenuationViolation { .. }));

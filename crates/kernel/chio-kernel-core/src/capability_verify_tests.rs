@@ -5,7 +5,7 @@ use chio_core_types::capability::{
     aggregate_invocation::{AggregateInvocationBudget, AggregateInvocationScope},
     attenuation::{
         compute_attenuation_witness, delegate, scope_hash, AttenuationProof, DelegationLink,
-        DelegationLinkBody,
+        DelegationLinkBody, DelegationStamp,
     },
     features,
     scope::{ChioScope, Constraint, MonetaryAmount, Operation, ToolGrant},
@@ -302,12 +302,15 @@ fn delegated_aggregate_budget_accepts_authenticated_root() -> Result<(), Capabil
     .map_err(|error| CapabilityError::Internal(error.to_string()))?;
     let receipt = delegate(
         &root,
+        &root.issuer,
         &ChioScope::default(),
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        120,
-        [7_u8; 16],
+        DelegationStamp {
+            signed_at: 120,
+            nonce: [7_u8; 16],
+        },
     )
     .map_err(|error| CapabilityError::Internal(error.to_string()))?;
     let child = CapabilityToken::sign(
@@ -424,12 +427,15 @@ fn delegated_cumulative_approval_requires_authenticated_root() -> Result<(), Cap
     let child_scope = cumulative_scope(false, cumulative_constraint(Some(binding)));
     let receipt = delegate(
         &root,
+        &root.issuer,
         &child_scope,
         &root_subject,
         &delegatee.public_key(),
         ScopeAttenuation::empty(),
-        120,
-        [8_u8; 16],
+        DelegationStamp {
+            signed_at: 120,
+            nonce: [8_u8; 16],
+        },
     )
     .map_err(|error| CapabilityError::Internal(error.to_string()))?;
     let child = CapabilityToken::sign(
