@@ -870,8 +870,12 @@ fn url_elicitation_completions_become_session_late_events() {
         .expect("fixture session clock");
     session.register_pending_url_elicitation("elicit-1", Some("task-7".to_string()));
 
-    session.queue_elicitation_completion("elicit-1");
-    session.queue_elicitation_completion("unknown");
+    session.queue_tool_server_event(ToolServerEvent::ElicitationCompleted {
+        elicitation_id: "elicit-1".to_string(),
+    });
+    session.queue_tool_server_event(ToolServerEvent::ElicitationCompleted {
+        elicitation_id: "unknown".to_string(),
+    });
 
     assert_eq!(
         session.take_late_events(),
