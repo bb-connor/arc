@@ -21,28 +21,7 @@ pub(super) struct GatedStore {
 }
 
 impl ReceiptStore for GatedStore {
-    fn opening_status(
-        &self,
-        _receipt_id: &str,
-    ) -> Result<crate::receipt_store::OpeningStatus, crate::receipt_store::ReceiptStoreError> {
-        Ok(crate::receipt_store::OpeningStatus::Unknown)
-    }
-    fn read_openings(
-        &self,
-        _receipt_id: &str,
-        _scope: &crate::receipt_store::OpeningReadScope,
-    ) -> Result<crate::receipt_store::OpeningState, crate::receipt_store::ReceiptStoreError> {
-        Ok(crate::receipt_store::OpeningState::Unknown)
-    }
-    fn erase_openings(
-        &self,
-        _receipt_id: &str,
-        _erased_at: u64,
-    ) -> Result<(), crate::receipt_store::ReceiptStoreError> {
-        Err(crate::receipt_store::ReceiptStoreError::Unsupported(
-            "test double holds no receipt openings".to_string(),
-        ))
-    }
+    no_receipt_openings!();
     fn append_chio_receipt(&self, receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
         self.entered.send(receipt.id.clone()).unwrap();
         let (released, _) = self
