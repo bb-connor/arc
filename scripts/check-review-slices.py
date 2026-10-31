@@ -18,6 +18,15 @@ BROAD_DIFF_FILE_COUNT = 200
 BROAD_DIFF_MIN_SLICES = 5
 COGNITION_COMPONENTS = REPO_ROOT / "config/cognition-market-components.json"
 COGNITION_WORKFLOW = REPO_ROOT / ".github/workflows/cognition-market-hosted.yml"
+SPEC_DRIFT_WORKFLOW = REPO_ROOT / ".github/workflows/spec-drift.yml"
+# Regenerated output that `make codegen-check` compares byte for byte. These
+# paths are still classified; they only leave the broad-diff count.
+CODEGEN_CHECKED_FILES = (
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs",
+    "sdks/go/chio-go-http/types.go",
+    "sdks/typescript/packages/conformance/src/_generated/index.ts",
+)
+CODEGEN_CHECKED_TREE = "sdks/python/chio-sdk-python/src/chio_sdk/_generated"
 
 
 @dataclass(frozen=True)
@@ -348,13 +357,27 @@ def check_cognition_market_workflow_paths() -> list[str]:
     return errors
 
 
+def is_codegen_checked(path: str) -> bool:
+    return path in CODEGEN_CHECKED_FILES or path.startswith(f"{CODEGEN_CHECKED_TREE}/")
+
+
+def check_codegen_step() -> list[str]:
+    try:
+        workflow = SPEC_DRIFT_WORKFLOW.read_text(encoding="utf-8")
+    except OSError as error:
+        return [f"cannot read spec-drift workflow: {error}"]
+    if not any(line.strip() == "run: make codegen-check" for line in workflow.splitlines()):
+        return ["spec-drift workflow does not run make codegen-check"]
+    return []
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check changed files are partitioned into reviewable slices."
     )
     parser.add_argument("--base-ref", default="origin/main")
     args = parser.parse_args()
-    workflow_errors = check_cognition_market_workflow_paths()
+    workflow_errors = check_cognition_market_workflow_paths() + check_codegen_step()
     if workflow_errors:
         for error in workflow_errors:
             print(f"review-slice error: {error}", file=sys.stderr)
@@ -378,14 +401,17 @@ def main() -> int:
         return 1
 
     active = sorted(by_slice)
-    if len(files) >= BROAD_DIFF_FILE_COUNT and len(active) < BROAD_DIFF_MIN_SLICES:
+    reviewed = [path for path in files if not is_codegen_checked(path)]
+    reviewed_slices = {classify(path).name for path in reviewed}
+    if len(reviewed) >= BROAD_DIFF_FILE_COUNT and len(reviewed_slices) < BROAD_DIFF_MIN_SLICES:
         print(
-            f"broad diff has {len(files)} files but only {len(active)} review slices",
+            f"broad diff has {len(reviewed)} files but only {len(reviewed_slices)} review slices",
             file=sys.stderr,
         )
         return 1
 
     print(f"review slice check passed ({len(files)} files across {len(active)} slices)")
+    print(f"codegen-checked files outside the broad-diff count: {len(files) - len(reviewed)}")
     for name in active:
         review_slice = next(item for item in SLICES if item.name == name)
         print(f"- {name}: {len(by_slice[name])} files - {review_slice.description}")
