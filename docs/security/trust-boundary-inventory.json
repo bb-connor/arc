@@ -1681,6 +1681,7 @@
     "crates/trust/chio-pheromone-runtime/src/input.rs::encode::from_wire",
     "crates/trust/chio-replay-corpus/src/fixture_writer.rs::stripped_receipt::from_wire",
     "crates/trust/chio-reputation/src/input.rs::from_scope_json::from_wire",
+    "crates/trust/chio-revocation-oracle/src/sqlite/partner_mirror.rs::decode_root::from_wire",
     "crates/trust/chio-signing-remote/src/lib.rs::read_json::from_wire",
     "crates/trust/chio-tee-frame/src/frame.rs::parse::from_wire",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire",
@@ -17720,6 +17721,7 @@
     "crates/trust/chio-pheromone-runtime/src/input.rs::encode::from_wire#1::bounds_only",
     "crates/trust/chio-replay-corpus/src/fixture_writer.rs::stripped_receipt::from_wire#1::decode_signed",
     "crates/trust/chio-reputation/src/input.rs::from_scope_json::from_wire#1::decode_signed",
+    "crates/trust/chio-revocation-oracle/src/sqlite/partner_mirror.rs::decode_root::from_wire#1::decode_signed",
     "crates/trust/chio-signing-remote/src/lib.rs::read_json::from_wire#1::decode_external",
     "crates/trust/chio-tee-frame/src/frame.rs::parse#2::from_wire#1::decode_signed",
     "crates/trust/chio-tee/src/observation_input.rs::next::from_wire#1::decode_signed",
@@ -18777,10 +18779,6 @@
       "rotate_remote_authority_seed::shared-reader::crates/platform/chio-control-plane/src/keyring_runtime.rs::remove_authority_seed_handoff",
       "rotate_remote_authority_seed::shared-reader::crates/platform/chio-control-plane/src/keyring_runtime.rs::remove_authority_seed_handoff",
       "rotate_remote_authority_seed::shared-reader::crates/platform/chio-control-plane/src/keyring_runtime.rs::remove_authority_seed_handoff"
-    ],
-    "crates/platform/chio-control-plane/src/passport_revocation_mirror.rs": [
-      "conflicts::shared-reader::crates/platform/chio-control-plane/src/passport_revocation_mirror.rs::decode_root",
-      "decode_root::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read"
     ],
     "crates/platform/chio-control-plane/src/passport_verifier.rs": [
       "fetch_active#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
@@ -23325,6 +23323,10 @@
     ],
     "crates/trust/chio-weights/src/card.rs": [
       "from_canonical_json::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/trust/chio-revocation-oracle/src/sqlite/partner_mirror.rs": [
+      "conflicts::shared-reader::crates/trust/chio-revocation-oracle/src/sqlite/partner_mirror.rs::decode_root",
+      "decode_root::original-json-reader::UntrustedJsonText"
     ]
   },
   "retired_direct_readers": {
