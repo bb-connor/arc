@@ -18,9 +18,7 @@ fn test_exposure_ledger_report_surfaces() {
     let dir = unique_dir("chio-exposure-ledger");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-exposure-1";
     let issuer_key = "issuer-exposure-1";
@@ -82,17 +80,7 @@ fn test_exposure_ledger_report_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "exposure-ledger-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let issue_response = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))
@@ -225,24 +213,10 @@ fn test_exposure_ledger_requires_anchor() {
     skip_when_loopback_denied!(test_exposure_ledger_requires_anchor);
     let dir = unique_dir("chio-exposure-ledger-anchor");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "exposure-ledger-anchor-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/exposure-ledger"))
@@ -271,9 +245,6 @@ fn test_exposure_ledger_rejects_contradictory_currency_row() {
     let dir = unique_dir("chio-exposure-ledger-currency-conflict");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-exposure-conflict-1";
     let issuer_key = "issuer-exposure-conflict-1";
@@ -300,17 +271,7 @@ fn test_exposure_ledger_rejects_contradictory_currency_row() {
 
     let listen = reserve_listen_addr();
     let service_token = "exposure-ledger-currency-conflict-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/exposure-ledger"))
@@ -345,7 +306,6 @@ fn test_credit_scorecard_report_surfaces() {
     let dir = unique_dir("chio-credit-scorecard");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
@@ -412,17 +372,7 @@ fn test_credit_scorecard_report_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-scorecard-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let issue_response = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))
@@ -531,24 +481,10 @@ fn test_credit_scorecard_requires_agent_subject() {
     skip_when_loopback_denied!(test_credit_scorecard_requires_agent_subject);
     let dir = unique_dir("chio-credit-scorecard-anchor");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "credit-scorecard-anchor-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/credit-scorecard"))
@@ -576,24 +512,10 @@ fn test_credit_scorecard_requires_matching_history() {
     skip_when_loopback_denied!(test_credit_scorecard_requires_matching_history);
     let dir = unique_dir("chio-credit-scorecard-history");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "credit-scorecard-history-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/credit-scorecard"))
@@ -622,9 +544,6 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
     let dir = unique_dir("chio-credit-facility-grant");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-facility-grant-1";
     let issuer_key = "issuer-facility-grant-1";
@@ -654,17 +573,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-facility-grant-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let evaluate_response = client
         .get(format!("{base_url}/v1/reports/facility-policy"))
@@ -817,24 +726,10 @@ fn test_credit_issue_endpoints_require_service_auth() {
     skip_when_loopback_denied!(test_credit_issue_endpoints_require_service_auth);
     let dir = unique_dir("chio-credit-issue-auth");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "credit-issue-auth-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_response = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -970,24 +865,10 @@ fn test_trust_control_report_endpoints_require_service_auth() {
     skip_when_loopback_denied!(test_trust_control_report_endpoints_require_service_auth);
     let dir = unique_dir("chio-trust-report-auth");
     std::fs::create_dir_all(&dir).expect("create temp dir");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "trust-report-auth-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     for path in [
         "/v1/reports/capital-book?agentSubject=auth-matrix&receiptLimit=10",
@@ -1114,9 +995,6 @@ fn test_credit_facility_report_denies_missing_prerequisites() {
     let dir = unique_dir("chio-credit-facility-prerequisites");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -1139,17 +1017,7 @@ fn test_credit_facility_report_denies_missing_prerequisites() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-facility-prereq-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/facility-policy"))
@@ -1200,9 +1068,6 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
     let dir = unique_dir("chio-credit-facility-mixed-currency");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-facility-mixed-1";
     let issuer_key = "issuer-facility-mixed-1";
@@ -1249,17 +1114,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-facility-mixed-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/facility-policy"))
@@ -1299,9 +1154,6 @@ fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provena
     let dir = unique_dir("chio-credit-facility-mixed-runtime-provenance");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-facility-mixed-runtime-1";
     let issuer_key = "issuer-facility-mixed-runtime-1";
@@ -1351,17 +1203,7 @@ fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provena
 
     let listen = reserve_listen_addr();
     let service_token = "credit-facility-mixed-runtime-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/facility-policy"))

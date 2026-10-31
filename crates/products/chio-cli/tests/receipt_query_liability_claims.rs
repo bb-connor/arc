@@ -938,9 +938,6 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
     let dir = unique_dir("chio-liability-claims-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-liability-claims-negative-1";
     let issuer_key = "issuer-liability-claims-negative-1";
@@ -974,17 +971,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
 
     let listen = reserve_listen_addr();
     let service_token = "liability-claims-negative-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))

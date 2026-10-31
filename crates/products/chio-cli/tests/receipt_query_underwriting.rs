@@ -18,8 +18,6 @@ fn test_underwriting_policy_input_export_surfaces() {
     let dir = unique_dir("chio-underwriting-input");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-underwrite-1";
@@ -41,17 +39,7 @@ fn test_underwriting_policy_input_export_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-input-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/underwriting-input"))
@@ -190,8 +178,6 @@ fn test_underwriting_decision_report_surfaces() {
     let dir = unique_dir("chio-underwriting-decision");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-underwrite-decision-1";
@@ -215,17 +201,7 @@ fn test_underwriting_decision_report_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-decision-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/underwriting-decision"))
@@ -418,9 +394,6 @@ fn test_underwriting_decision_links_failed_settlement_evidence() {
     let dir = unique_dir("chio-underwriting-failed-settlement");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let rc_failed_settlement_1 = make_governed_authorization_receipt_with_options(
         "rc-failed-settlement-1",
@@ -446,17 +419,7 @@ fn test_underwriting_decision_links_failed_settlement_evidence() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-failed-settlement-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/underwriting-decision"))
@@ -499,8 +462,6 @@ fn test_underwriting_simulation_report_surfaces() {
     let dir = unique_dir("chio-underwriting-simulation");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
     let policy_file = dir.join("underwriting-policy.yaml");
 
@@ -538,17 +499,7 @@ fn test_underwriting_simulation_report_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-simulation-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .post(format!("{base_url}/v1/reports/underwriting-simulation"))
@@ -637,7 +588,6 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
     let dir = unique_dir("chio-underwriting-issue");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
@@ -661,17 +611,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-issue-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let remote_issue = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))
@@ -821,9 +761,6 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
     let dir = unique_dir("chio-underwriting-mixed-currency");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-underwrite-mixed-1";
     let issuer_key = "issuer-underwrite-mixed-1";
@@ -868,17 +805,7 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-mixed-currency-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let issue_response = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))
@@ -920,9 +847,6 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
     let dir = unique_dir("chio-underwriting-premium-currencies");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -964,17 +888,7 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-premium-currency-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     for subject_key in ["subject-underwrite-usd-1", "subject-underwrite-eur-1"] {
         let response = client
@@ -1035,9 +949,6 @@ fn test_underwriting_appeal_and_supersession_lifecycle() {
     let dir = unique_dir("chio-underwriting-appeal");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-underwrite-appeal-1";
     let issuer_key = "issuer-underwrite-appeal-1";
@@ -1059,17 +970,7 @@ fn test_underwriting_appeal_and_supersession_lifecycle() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-appeal-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let initial_issue = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))
@@ -1217,9 +1118,6 @@ fn test_underwriting_rejected_appeal_cannot_link_replacement_decision() {
     let dir = unique_dir("chio-underwriting-appeal-rejected-replacement");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-underwrite-appeal-2";
     let issuer_key = "issuer-underwrite-appeal-2";
@@ -1241,17 +1139,7 @@ fn test_underwriting_rejected_appeal_cannot_link_replacement_decision() {
 
     let listen = reserve_listen_addr();
     let service_token = "underwriting-appeal-rejected-replacement-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let initial_issue = client
         .post(format!("{base_url}/v1/underwriting/decisions/issue"))

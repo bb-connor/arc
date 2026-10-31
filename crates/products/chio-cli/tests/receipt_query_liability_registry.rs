@@ -18,23 +18,11 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
     let dir = unique_dir("chio-liability-provider-registry");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "liability-provider-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let provider_report = serde_json::json!({
         "schema": "chio.market.provider.v1",

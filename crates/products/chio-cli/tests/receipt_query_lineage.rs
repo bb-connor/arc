@@ -125,9 +125,6 @@ fn test_lineage_get_capability_snapshot() {
     let dir = unique_dir("chio-lineage-get");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
     let subject_kp = Keypair::generate();
@@ -139,17 +136,7 @@ fn test_lineage_get_capability_snapshot() {
 
     let listen = reserve_listen_addr();
     let service_token = "lineage-get-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/lineage/cap-lineage-1"))
@@ -189,9 +176,6 @@ fn test_lineage_get_delegation_chain() {
     let dir = unique_dir("chio-lineage-chain");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
     let root_kp = Keypair::generate();
@@ -214,17 +198,7 @@ fn test_lineage_get_delegation_chain() {
 
     let listen = reserve_listen_addr();
     let service_token = "chain-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/lineage/chain-child/chain"))
@@ -313,9 +287,6 @@ fn test_cost_attribution_report_endpoint() {
     let dir = unique_dir("chio-cost-attribution");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
     let root_kp = Keypair::generate();
@@ -375,17 +346,7 @@ fn test_cost_attribution_report_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "cost-attribution-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/cost-attribution"))

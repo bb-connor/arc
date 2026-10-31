@@ -18,9 +18,6 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
     let dir = unique_dir("chio-credit-loss-lifecycle");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-credit-loss-1";
     let issuer_key = "issuer-credit-loss-1";
@@ -50,17 +47,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-loss-lifecycle-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -260,9 +247,6 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     let dir = unique_dir("chio-credit-loss-lifecycle-release");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-credit-loss-release-1";
     let issuer_key = "issuer-credit-loss-release-1";
@@ -292,17 +276,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-loss-release-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let _facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -631,9 +605,6 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
     let dir = unique_dir("chio-credit-loss-lifecycle-slash");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-credit-loss-slash-1";
     let issuer_key = "issuer-credit-loss-slash-1";
@@ -663,17 +634,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
 
     let listen = reserve_listen_addr();
     let service_token = "credit-loss-slash-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -915,7 +876,6 @@ fn test_provider_risk_package_export_surfaces() {
     let dir = unique_dir("chio-provider-risk-package");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
@@ -946,17 +906,7 @@ fn test_provider_risk_package_export_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "provider-risk-package-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let issue_response = client
         .post(format!("{base_url}/v1/facilities/issue"))

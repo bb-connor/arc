@@ -18,9 +18,6 @@ fn test_authorization_context_report_and_cli() {
     let dir = unique_dir("chio-authorization-context");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -63,17 +60,7 @@ fn test_authorization_context_report_and_cli() {
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -335,9 +322,6 @@ fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_boun
     let dir = unique_dir("chio-authorization-context-asserted-call-chain");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -371,17 +355,7 @@ fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_boun
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-asserted-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -427,9 +401,6 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
     let dir = unique_dir("chio-authorization-review-pack");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -472,17 +443,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-review-pack-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let metadata_response = client
         .get(format!(
@@ -719,9 +680,6 @@ fn test_authorization_context_report_rejects_invalid_chio_oauth_profile_projecti
     let dir = unique_dir("chio-authorization-context-invalid");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -805,17 +763,7 @@ fn test_authorization_context_report_rejects_invalid_chio_oauth_profile_projecti
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-invalid-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -854,9 +802,6 @@ fn test_authorization_context_report_rejects_missing_sender_binding_material() {
     let dir = unique_dir("chio-authorization-context-missing-sender");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     {
         let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
@@ -873,17 +818,7 @@ fn test_authorization_context_report_rejects_missing_sender_binding_material() {
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-missing-sender-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -922,9 +857,6 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
     let dir = unique_dir("chio-authorization-context-missing-issuer");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -963,17 +895,7 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-missing-issuer-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -1012,9 +934,6 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
     let dir = unique_dir("chio-authorization-context-invalid-assurance");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -1107,17 +1026,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-invalid-assurance-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))
@@ -1156,9 +1065,6 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
     let dir = unique_dir("chio-authorization-context-invalid-call-chain");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
@@ -1250,17 +1156,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
 
     let listen = reserve_listen_addr();
     let service_token = "authorization-context-invalid-call-chain-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/authorization-context"))

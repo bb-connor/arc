@@ -330,6 +330,27 @@ pub(crate) fn spawn_trust_service(
     }
 }
 
+/// Spawns the trust service over the receipt, revocation, authority and
+/// budget databases in `dir` and waits until it serves receipt reads.
+pub(crate) fn serve_trust_service(
+    listen: std::net::SocketAddr,
+    service_token: &str,
+    dir: &Path,
+) -> (ServerGuard, Client, String) {
+    let service = spawn_trust_service(
+        listen,
+        service_token,
+        &dir.join("receipts.sqlite3"),
+        &dir.join("revocations.sqlite3"),
+        &dir.join("authority.sqlite3"),
+        &dir.join("budgets.sqlite3"),
+    );
+    let client = build_test_client();
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+    (service, client, base_url)
+}
+
 pub(crate) fn spawn_trust_service_without_receipt_db(
     listen: std::net::SocketAddr,
     service_token: &str,

@@ -18,9 +18,7 @@ fn test_capital_book_report_export_surfaces() {
     let dir = unique_dir("chio-capital-book");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-capital-book-1";
     let issuer_key = "issuer-capital-book-1";
@@ -50,17 +48,7 @@ fn test_capital_book_report_export_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-book-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -337,9 +325,6 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
     let dir = unique_dir("chio-capital-book-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-capital-book-negative-1";
     let issuer_key = "issuer-capital-book-negative-1";
@@ -386,17 +371,7 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-book-negative-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let mixed_response = client
         .get(format!("{base_url}/v1/reports/capital-book"))
@@ -452,9 +427,6 @@ fn test_capital_instruction_issue_surfaces() {
     let dir = unique_dir("chio-capital-instruction");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
     let input_file = dir.join("capital-instruction.json");
 
     let subject_key = "subject-capital-instruction-1";
@@ -485,17 +457,7 @@ fn test_capital_instruction_issue_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-instruction-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -691,9 +653,6 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
     let dir = unique_dir("chio-capital-instruction-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-capital-instruction-negative-1";
     let issuer_key = "issuer-capital-instruction-negative-1";
@@ -723,17 +682,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-instruction-negative-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -907,8 +856,6 @@ fn test_capital_allocation_issue_surfaces() {
     let dir = unique_dir("chio-capital-allocation");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
     let input_file = dir.join("capital-allocation.json");
 
@@ -940,17 +887,7 @@ fn test_capital_allocation_issue_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-allocation-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -1141,9 +1078,6 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
     let dir = unique_dir("chio-capital-allocation-boundaries");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let manual_subject = "subject-capital-allocation-manual-1";
     let queue_subject = "subject-capital-allocation-queue-1";
@@ -1212,17 +1146,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
 
     let listen = reserve_listen_addr();
     let service_token = "capital-allocation-boundaries-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     for subject_key in [manual_subject, queue_subject] {
         let facility_issue = client

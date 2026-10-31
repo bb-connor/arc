@@ -25,9 +25,6 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let dir = unique_dir("chio-liability-market-workflow");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-liability-market-1";
     let issuer_key = "issuer-liability-market-1";
@@ -56,17 +53,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
 
     let listen = reserve_listen_addr();
     let service_token = "liability-market-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -341,9 +328,6 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
     let dir = unique_dir("chio-liability-market-auto-bind");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-liability-market-auto-bind-1";
     let issuer_key = "issuer-liability-market-auto-bind-1";
@@ -373,17 +357,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
 
     let listen = reserve_listen_addr();
     let service_token = "liability-market-auto-bind-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -761,7 +735,6 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
     let dir = unique_dir("chio-liability-market-auto-bind-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
@@ -794,17 +767,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
 
     let listen = reserve_listen_addr();
     let service_token = "liability-market-auto-bind-negative-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -1226,9 +1189,6 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
     let dir = unique_dir("chio-liability-market-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-liability-market-negative-1";
     let issuer_key = "issuer-liability-market-negative-1";
@@ -1257,17 +1217,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
 
     let listen = reserve_listen_addr();
     let service_token = "liability-market-negative-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))

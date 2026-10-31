@@ -145,9 +145,6 @@ fn test_agent_subject_filter_via_http() {
     let dir = unique_dir("chio-agent-filter");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
     let agent1_kp = Keypair::generate();
@@ -205,17 +202,7 @@ fn test_agent_subject_filter_via_http() {
 
     let listen = reserve_listen_addr();
     let service_token = "agent-filter-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/receipts/query"))
@@ -256,9 +243,6 @@ fn test_agent_receipts_endpoint() {
     let dir = unique_dir("chio-agent-receipts");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
     let agent1_kp = Keypair::generate();
@@ -314,17 +298,7 @@ fn test_agent_receipts_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "agent-receipts-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/agents/{agent1_hex}/receipts"))

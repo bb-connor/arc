@@ -18,8 +18,6 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
     let dir = unique_dir("chio-credit-backtest");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-credit-backtest-1";
@@ -129,17 +127,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-backtest-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/credit-backtest"))
@@ -220,9 +208,6 @@ fn test_credit_bond_issue_and_list_surfaces() {
     let dir = unique_dir("chio-credit-bond-lock");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let subject_key = "subject-credit-bond-lock-1";
     let issuer_key = "issuer-credit-bond-lock-1";
@@ -252,17 +237,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-bond-lock-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -457,9 +432,6 @@ fn test_credit_bond_report_hold_and_release_semantics() {
     let dir = unique_dir("chio-credit-bond-hold-release");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let hold_subject = "subject-credit-bond-hold-1";
     let release_subject = "subject-credit-bond-release-1";
@@ -507,17 +479,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-bond-hold-release-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -594,9 +556,6 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
     let dir = unique_dir("chio-credit-bond-impair-mixed");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let impair_subject = "subject-credit-bond-impair-1";
     let mixed_subject = "subject-credit-bond-mixed-1";
@@ -663,17 +622,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-bond-impair-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))
@@ -774,9 +723,6 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
     let dir = unique_dir("chio-credit-bonded-execution-simulation");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
     let kill_switch_policy_file = dir.join("bonded-execution-kill-switch.yaml");
 
     let subject_key = "subject-credit-bonded-execution-1";
@@ -823,17 +769,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "credit-bonded-execution-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let facility_issue = client
         .post(format!("{base_url}/v1/facilities/issue"))

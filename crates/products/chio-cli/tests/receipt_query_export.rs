@@ -64,8 +64,6 @@ fn test_operator_report_endpoint() {
     let dir = unique_dir("chio-operator-report");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
@@ -179,17 +177,7 @@ fn test_operator_report_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "operator-report-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/operator"))
@@ -312,9 +300,6 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
     let dir = unique_dir("chio-settlement-reconciliation");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let rc_settle_pending = make_financial_receipt_with_settlement_status(
         "rc-settle-pending",
@@ -359,17 +344,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "settlement-report-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let initial = client
         .get(format!("{base_url}/v1/reports/settlements"))
@@ -495,9 +470,6 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
     let dir = unique_dir("chio-metered-billing-reconciliation");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
     let subject_kp = Keypair::generate();
     let issuer_kp = Keypair::generate();
 
@@ -536,17 +508,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "metered-billing-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let initial = client
         .get(format!("{base_url}/v1/reports/metered-billing"))
@@ -823,8 +785,6 @@ fn test_comptroller_surface_report_endpoint() {
     let dir = unique_dir("chio-comptroller-surface");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
@@ -938,17 +898,7 @@ fn test_comptroller_surface_report_endpoint() {
 
     let listen = reserve_listen_addr();
     let service_token = "comptroller-surface-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/comptroller-surface"))

@@ -18,8 +18,6 @@ fn test_shared_evidence_reporting_surfaces() {
     let dir = unique_dir("chio-shared-evidence-report");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let remote_issuer_kp = Keypair::generate();
@@ -190,17 +188,7 @@ fn test_shared_evidence_reporting_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "shared-evidence-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let operator_response = client
         .get(format!("{base_url}/v1/reports/operator"))
@@ -304,8 +292,6 @@ fn test_behavioral_feed_export_surfaces() {
     let dir = unique_dir("chio-behavioral-feed");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
 
     let issuer_kp = Keypair::generate();
@@ -409,17 +395,7 @@ fn test_behavioral_feed_export_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "behavioral-feed-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .get(format!("{base_url}/v1/reports/behavioral-feed"))
@@ -554,10 +530,7 @@ fn test_runtime_attestation_appraisal_export_surfaces() {
     directory
         .create(&dir)
         .expect("create private test directory");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
     let attestation_path = dir.join("runtime-attestation.json");
     let policy_path = dir.join("runtime-policy.yaml");
     let attestation = sample_google_runtime_attestation();
@@ -604,17 +577,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .post(format!(
@@ -783,10 +746,7 @@ fn test_runtime_attestation_appraisal_result_import_export_surfaces() {
     directory
         .create(&dir)
         .expect("create private test directory");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
     let attestation_path = dir.join("runtime-attestation.json");
     let signed_result_path = dir.join("signed-appraisal-result.json");
     let runtime_policy_path = dir.join("runtime-policy.yaml");
@@ -836,17 +796,7 @@ extensions:
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-result-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let response = client
         .post(format!(
@@ -1092,24 +1042,10 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
     directory
         .create(&dir)
         .expect("create private test directory");
-    let receipt_db_path = dir.join("receipts.sqlite3");
-    let revocation_db_path = dir.join("revocations.sqlite3");
-    let authority_db_path = dir.join("authority.sqlite3");
-    let budget_db_path = dir.join("budgets.sqlite3");
 
     let listen = reserve_listen_addr();
     let service_token = "runtime-appraisal-mixed-provider-token";
-    let _service = spawn_trust_service(
-        listen,
-        service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
-    let client = build_test_client();
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let (_service, client, base_url) = serve_trust_service(listen, service_token, &dir);
 
     let providers = vec![
         ProviderCase {
