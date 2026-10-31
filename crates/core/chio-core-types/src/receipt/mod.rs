@@ -19,6 +19,7 @@ pub mod kinds;
 pub mod lineage;
 pub mod metadata;
 pub mod security;
+pub mod signed_note;
 pub mod signing;
 pub(crate) mod validation;
 
