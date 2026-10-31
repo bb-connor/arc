@@ -225,9 +225,7 @@ fn assembled_claim_set_bytes(
             })
         }).collect::<Vec<_>>()
     });
-    let mut bytes = serde_json::to_vec(&claim_set)?;
-    bytes.push(b'\n');
-    Ok(bytes)
+    canonical_json_line(&claim_set)
 }
 
 fn ensure_required_receipt(nodes: &[AssembledEvidenceNode]) -> Result<(), CliError> {

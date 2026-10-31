@@ -360,10 +360,14 @@ struct ProofBundleManifestClaim {
     caveat: Option<String>,
 }
 
+fn canonical_json_line<T: serde::Serialize>(value: &T) -> Result<Vec<u8>, CliError> {
+    let mut bytes = chio_core::canonical_json_bytes(value)?;
+    bytes.push(b'\n');
+    Ok(bytes)
+}
+
 fn write_json_line_file<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
-    let mut file = std::fs::File::create(path)?;
-    serde_json::to_writer(&mut file, value)?;
-    file.write_all(b"\n")?;
+    std::fs::write(path, canonical_json_line(value)?)?;
     Ok(())
 }
 

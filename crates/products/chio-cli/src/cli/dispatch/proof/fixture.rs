@@ -5743,7 +5743,7 @@ fn set_json_string(value: &mut serde_json::Value, field: &str, replacement: Stri
 }
 
 fn sha256_json_value(value: &serde_json::Value) -> Result<String, CliError> {
-    let bytes = serde_json::to_vec(value)?;
+    let bytes = chio_core::canonical_json_bytes(value)?;
     Ok(chio_core::sha256_hex(&bytes))
 }
 

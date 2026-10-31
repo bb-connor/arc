@@ -747,12 +747,6 @@ fn dsse_pre_auth_encoding(payload_type: &str, payload: &[u8]) -> Vec<u8> {
     encoded
 }
 
-fn canonical_json_line(value: &serde_json::Value) -> Result<Vec<u8>, CliError> {
-    let mut bytes = chio_core::canonical_json_bytes(value)?;
-    bytes.push(b'\n');
-    Ok(bytes)
-}
-
 fn public_proof_archive_member_allowlist(
     root: &Path,
     manifest: &serde_json::Value,
