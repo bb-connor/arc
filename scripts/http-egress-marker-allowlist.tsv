@@ -2,8 +2,6 @@
 # kind<TAB>path<TAB>reason. A marker in any other file fails check-http-egress-contract.sh.
 reqwest	crates/platform/chio-control-plane/src/trust_control/service_runtime/init/verifier_policy_freshness_tests.rs	loopback test harness for the spawned service
 reqwest	crates/products/chio-cli/src/cli/conformance.rs	conformance peer binary downloads verified by sha256
-reqwest	crates/products/chio-cli/src/doctor/kernel_runtime.rs	doctor metrics probe of a user-configured endpoint
-reqwest	crates/products/chio-cli/src/doctor/oci.rs	doctor reachability probe of a user-configured registry
 reqwest	crates/protocol/chio-provider-adapter-core/src/http.rs	provider-adapter transport bounded by the validated base URL
 reqwest	crates/tooling/chio-conformance/src/native_suite.rs	conformance driver for a caller-supplied harness endpoint
 reqwest	crates/tooling/chio-conformance/src/runner/restart_probe.rs	loopback restart probe

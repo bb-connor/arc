@@ -20,6 +20,7 @@
 
 pub mod chio_yaml;
 pub mod cosign;
+mod egress;
 pub mod kernel_runtime;
 pub mod oci;
 pub mod otel;
