@@ -1,131 +1,112 @@
-//! Existing private signing custody with bounded reads and zeroizing ownership.
+//! Authority signing keys loaded through key custody.
 use crate::{CliError, Keypair};
-#[cfg(not(unix))]
-use std::fs::OpenOptions;
-use std::{
-    fs::{self, File},
-    io::Read,
-    path::Path,
-};
+use chio_secure_ipc::seed_custody::{KeyCustodyError, KeyRef, OsSeedSource, SeedSource};
+use std::path::Path;
 
-/// Load existing seed-file signing custody without creating or repairing it.
+const AUTHORITY_SEED_MAX_BYTES: usize = 256;
+
+/// Load existing signing custody without creating or repairing it.
+/// `path` is a key reference: `credential:<name>` or a seed file path.
 pub fn load_existing_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
-    let seed_bytes = read_private_signing_custody(path, 256)?;
-    let seed_hex = std::str::from_utf8(&seed_bytes)
-        .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
-    Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
+    AuthoritySeeds::from_env()?.load_existing(path)
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct AuthoritySeedFileIdentity {
-    #[cfg(unix)]
-    device: u64,
-    #[cfg(unix)]
-    inode: u64,
-    length: u64,
-}
-
-/// Read existing private signing custody, bounded and wiped on every exit path.
-pub fn read_private_signing_custody(
+/// Public key of the authority seed `path` names; `None` when a seed file is absent.
+pub fn authority_public_key_from_seed_file(
     path: &Path,
-    maximum_bytes: usize,
-) -> Result<zeroize::Zeroizing<Vec<u8>>, CliError> {
-    let path_metadata = fs::symlink_metadata(path)?;
-    validate_authority_seed_metadata(&path_metadata)?;
-    let expected_identity = authority_seed_file_identity(&path_metadata);
+) -> Result<Option<chio_core::PublicKey>, CliError> {
+    AuthoritySeeds::from_env()?.public_key(path)
+}
 
-    #[cfg(unix)]
-    let mut file = {
-        use rustix::fs::{open, Mode, OFlags};
+/// Replace the seed file with a fresh authority key. OS custody is never written.
+pub fn rotate_authority_keypair(path: &Path) -> Result<chio_core::PublicKey, CliError> {
+    AuthoritySeeds::from_env()?.rotate(path)
+}
 
-        let descriptor = open(
-            path,
-            OFlags::RDONLY | OFlags::CLOEXEC | OFlags::NOFOLLOW | OFlags::NONBLOCK,
-            Mode::empty(),
-        )
-        .map_err(|error| std::io::Error::from_raw_os_error(error.raw_os_error()))?;
-        File::from(descriptor)
-    };
-    #[cfg(not(unix))]
-    let mut file = OpenOptions::new().read(true).open(path)?;
+/// Load the authority seed, creating a seed file only for a missing file reference.
+pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
+    AuthoritySeeds::from_env()?.load_or_create(path)
+}
 
-    let opened_metadata = file.metadata()?;
-    validate_authority_seed_metadata(&opened_metadata)?;
-    if authority_seed_file_identity(&opened_metadata) != expected_identity {
-        return Err(CliError::cli_io_error(
-            "authority seed changed while it was opened",
-        ));
+/// The seed file a caller may create or replace. Credential references are
+/// read-only, and required custody refuses every seed file.
+pub fn writable_authority_seed_file(path: &Path) -> Result<&Path, CliError> {
+    AuthoritySeeds::from_env()?.writable_seed_file(path)
+}
+
+pub(crate) fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliError> {
+    crate::write_private_file_atomically(path, format!("{}\n", keypair.seed_hex()).as_bytes())
+}
+
+/// Authority keys over the seed source every entry point resolves through.
+struct AuthoritySeeds<S> {
+    source: S,
+}
+
+impl AuthoritySeeds<OsSeedSource> {
+    fn from_env() -> Result<Self, CliError> {
+        Ok(Self {
+            source: OsSeedSource::from_env()?,
+        })
     }
+}
 
-    let capacity = maximum_bytes
-        .checked_add(1)
-        .ok_or_else(|| CliError::cli_io_error("invalid signing custody byte limit"))?;
-    // Fixed storage never releases secret-bearing allocations during growth.
-    let mut bytes = zeroize::Zeroizing::new(vec![0; capacity]);
-    let mut filled = 0;
-    while filled < bytes.len() {
-        let remaining = bytes
-            .get_mut(filled..)
-            .ok_or_else(|| CliError::cli_io_error("signing custody read exceeds its byte limit"))?;
-        match file.read(remaining) {
-            Ok(0) => break,
-            Ok(count) => filled += count,
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(error.into()),
+impl<S: SeedSource> AuthoritySeeds<S> {
+    /// The seed file a caller may create or replace; OS custody is read-only.
+    fn writable_seed_file<'a>(&self, path: &'a Path) -> Result<&'a Path, CliError> {
+        match self.source.resolve(path)? {
+            KeyRef::File(_) => Ok(path),
+            KeyRef::SystemdCredential { .. } => Err(KeyCustodyError::ReadOnlyCustody.into()),
         }
     }
-    bytes.truncate(filled);
-    if bytes.len() > maximum_bytes {
-        bytes.fill(0);
-        return Err(CliError::cli_io_error(
-            "authority seed exceeds its byte limit",
-        ));
+
+    fn load_existing(&self, path: &Path) -> Result<Keypair, CliError> {
+        let key = self.source.resolve(path)?;
+        self.load_key(&key)
     }
 
-    let final_path_metadata = fs::symlink_metadata(path)?;
-    validate_authority_seed_metadata(&final_path_metadata)?;
-    if authority_seed_file_identity(&final_path_metadata) != expected_identity
-        || authority_seed_file_identity(&file.metadata()?) != expected_identity
-    {
-        bytes.fill(0);
-        return Err(CliError::cli_io_error(
-            "authority seed identity changed while it was read",
-        ));
-    }
-    Ok(bytes)
-}
-
-fn validate_authority_seed_metadata(metadata: &fs::Metadata) -> Result<(), CliError> {
-    if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
-        return Err(CliError::cli_io_error(
-            "authority seed must be a regular file",
-        ));
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt as _;
-
-        if metadata.nlink() != 1
-            || metadata.mode() & 0o177 != 0
-            || metadata.uid() != rustix::process::geteuid().as_raw()
-        {
-            return Err(CliError::cli_io_error(
-                "authority seed must be singly linked with mode 0600 or stricter",
-            ));
+    /// `None` only for an absent seed file; a missing credential is an error.
+    fn public_key(&self, path: &Path) -> Result<Option<chio_core::PublicKey>, CliError> {
+        let key = self.source.resolve(path)?;
+        match self.load_key(&key) {
+            Ok(keypair) => Ok(Some(keypair.public_key())),
+            Err(error) if is_missing_seed_file(&key, &error) => Ok(None),
+            Err(error) => Err(error),
         }
     }
-    Ok(())
-}
 
-fn authority_seed_file_identity(metadata: &fs::Metadata) -> AuthoritySeedFileIdentity {
-    #[cfg(unix)]
-    use std::os::unix::fs::MetadataExt as _;
+    fn rotate(&self, path: &Path) -> Result<chio_core::PublicKey, CliError> {
+        let path = self.writable_seed_file(path)?;
+        let keypair = Keypair::generate();
+        write_authority_seed_file(path, &keypair)?;
+        Ok(keypair.public_key())
+    }
 
-    AuthoritySeedFileIdentity {
-        #[cfg(unix)]
-        device: metadata.dev(),
-        #[cfg(unix)]
-        inode: metadata.ino(),
-        length: metadata.len(),
+    fn load_or_create(&self, path: &Path) -> Result<Keypair, CliError> {
+        let key = self.source.resolve(path)?;
+        match self.load_key(&key) {
+            Err(error) if is_missing_seed_file(&key, &error) => {
+                let keypair = Keypair::generate();
+                write_authority_seed_file(path, &keypair)?;
+                Ok(keypair)
+            }
+            loaded => loaded,
+        }
+    }
+
+    fn load_key(&self, key: &KeyRef) -> Result<Keypair, CliError> {
+        let seed_bytes = self.source.read_seed(key, AUTHORITY_SEED_MAX_BYTES)?;
+        let seed_hex = std::str::from_utf8(&seed_bytes)
+            .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8"))?;
+        Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
     }
 }
+
+fn is_missing_seed_file(key: &KeyRef, error: &CliError) -> bool {
+    matches!(key, KeyRef::File(_))
+        && matches!(error, CliError::Io(error) if error.kind() == std::io::ErrorKind::NotFound)
+}
+
+#[cfg(test)]
+#[path = "signing_custody_tests.rs"]
+mod tests;

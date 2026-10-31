@@ -74,7 +74,7 @@ fn admin_token(
 /// The token file is custody: a singly linked regular file owned by this user
 /// with mode 0600 or stricter, opened without following links.
 fn read_token_file(path: &Path) -> Result<Zeroizing<String>, CliError> {
-    let bytes = chio_control_plane::read_private_signing_custody(path, MAX_TOKEN_FILE_BYTES)?;
+    let bytes = chio_secure_ipc::seed_custody::read_private_file(path, MAX_TOKEN_FILE_BYTES)?;
     let text = std::str::from_utf8(&bytes)
         .map_err(|_| CliError::cli_other_error("admin token file is not UTF-8".to_string()))?;
     let token = text.trim_end_matches(['\r', '\n']);

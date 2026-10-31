@@ -159,7 +159,7 @@ fn kind_and_scopes(args: &CredentialEntryArgs<'_>) -> Result<(String, Vec<String
 fn read_secret(args: &CredentialEntryArgs<'_>) -> Result<String, CliError> {
     let secret = match (args.secret_file, args.secret_env) {
         (Some(path), None) => {
-            let bytes = chio_control_plane::read_private_signing_custody(path, 4096)?;
+            let bytes = chio_secure_ipc::seed_custody::read_private_file(path, 4096)?;
             String::from_utf8(bytes.to_vec()).map_err(|_| {
                 CliError::cli_other_error("credential secret is not valid UTF-8".to_owned())
             })?

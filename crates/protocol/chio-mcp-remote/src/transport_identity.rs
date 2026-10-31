@@ -32,7 +32,7 @@ impl std::fmt::Debug for TrustedProxyConfig {
 impl TrustedProxyConfig {
     /// Read a dedicated private token file using the same bounded custody checks as signing keys.
     pub fn from_token_file(peers: Vec<IpAddr>, path: &Path) -> Result<Self, CliError> {
-        let mut secret = chio_control_plane::read_private_signing_custody(path, 513)?;
+        let mut secret = chio_secure_ipc::seed_custody::read_private_file(path, 513)?;
         if secret.last() == Some(&b'\n') {
             secret.pop();
         }

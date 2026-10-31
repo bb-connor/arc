@@ -1472,7 +1472,7 @@ fn unix_time() -> Result<u64, CliError> {
 fn read_private_client_profile<T: serde::de::DeserializeOwned + serde::Serialize>(
     path: &Path,
 ) -> Result<T, CliError> {
-    let bytes = chio_control_plane::read_private_signing_custody(path, 1024 * 1024)?;
+    let bytes = chio_secure_ipc::seed_custody::read_private_file(path, 1024 * 1024)?;
     Ok(
         chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 1024 * 1024)?
             .decode_canonical()?,

@@ -20,16 +20,7 @@ pub fn is_systemd_credential(file: &File, service_uid: u32) -> io::Result<bool> 
     {
         return Ok(false);
     }
-    let filesystem = rustix::fs::fstatfs(file)?;
-    // RAMFS_MAGIC from Linux's uapi/linux/magic.h is not exported by libc.
-    if filesystem.f_type != libc::TMPFS_MAGIC && u64::try_from(filesystem.f_type) != Ok(0x8584_58f6)
-    {
-        return Ok(false);
-    }
-    if !rustix::fs::fstatvfs(file)?
-        .f_flag
-        .contains(rustix::fs::StatVfsMountFlags::RDONLY)
-    {
+    if !is_on_credential_mount(file)? {
         return Ok(false);
     }
     let mut acl = [0_u8; 44];
@@ -45,6 +36,25 @@ pub fn is_systemd_credential(file: &File, service_uid: u32) -> io::Result<bool> 
 
 #[cfg(not(target_os = "linux"))]
 pub fn is_systemd_credential(_file: &File, _service_uid: u32) -> io::Result<bool> {
+    Ok(false)
+}
+
+/// Recognize the read-only tmpfs or ramfs mount systemd delivers credentials on.
+#[cfg(target_os = "linux")]
+pub fn is_on_credential_mount(file: &File) -> io::Result<bool> {
+    let filesystem = rustix::fs::fstatfs(file)?;
+    // RAMFS_MAGIC from Linux's uapi/linux/magic.h is not exported by libc.
+    if filesystem.f_type != libc::TMPFS_MAGIC && u64::try_from(filesystem.f_type) != Ok(0x8584_58f6)
+    {
+        return Ok(false);
+    }
+    Ok(rustix::fs::fstatvfs(file)?
+        .f_flag
+        .contains(rustix::fs::StatVfsMountFlags::RDONLY))
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn is_on_credential_mount(_file: &File) -> io::Result<bool> {
     Ok(false)
 }
 

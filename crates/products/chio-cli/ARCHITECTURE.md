@@ -116,8 +116,11 @@ before startup. These rules belong to these launchers and do not describe
 every command's persistence behavior.
 
 Trust issuance has an explicit owner initialization step:
-`provision_local_issuance_authority` accepts a seed file or private SQLite
-authority, validates existing custody, or initializes missing custody.
+`provision_local_issuance_authority` accepts a seed file, a `credential:`
+reference or private SQLite authority, validates existing custody, or
+initializes a missing seed file. A credential reference is only loaded, never
+initialized, and `CHIO_KEY_CUSTODY=required` refuses a seed file before
+staging one.
 `StagedLocalIssuanceSeed::publish` uses non-overwriting publication and reads
 back the retained owner. Later business refusal can leave initialized custody.
 Receipt preflight can also leave an initialized store. Read/report paths use

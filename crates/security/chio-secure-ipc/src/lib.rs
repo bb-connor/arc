@@ -36,6 +36,7 @@ use serde::{Deserialize, Serialize};
 pub mod credentials;
 #[cfg(unix)]
 mod lifecycle_lock;
+pub mod seed_custody;
 
 #[cfg(unix)]
 pub use lifecycle_lock::LifecycleLock;
