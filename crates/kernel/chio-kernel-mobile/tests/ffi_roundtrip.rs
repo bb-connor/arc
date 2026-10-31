@@ -74,6 +74,7 @@ fn make_capability_with_grant(
         expires_at: EXPIRES_AT,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     CapabilityToken::sign(body, issuer).unwrap()
 }
@@ -625,6 +626,7 @@ fn verify_capability_happy_path() {
         expires_at: 5_000_000_000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let capability = CapabilityToken::sign(body, &issuer).unwrap();
 

@@ -461,6 +461,7 @@ fn make_capability(
         expires_at: EXPIRES_AT,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     CapabilityToken::sign(body, issuer).map_err(|error| error.to_string())
 }

@@ -34,6 +34,7 @@ fn direct_body(issuer: &Keypair, subject: &Keypair) -> CapabilityTokenBody {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     }
 }
 
@@ -156,6 +157,7 @@ fn capability_caveats_reject_fail_closed_until_admission_enforces_them() {
         expires_at: 20,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let caveat = Caveat {
         kind: CaveatKind::RestrictAudience,
@@ -209,6 +211,7 @@ fn delegate_parent_token(
         expires_at,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     CapabilityToken::sign(body, parent_kp).unwrap()
 }

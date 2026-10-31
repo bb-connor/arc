@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 6a4f02054dab3f55b85533fd4f33677ec67db525b20471b63cbd2ab1264c0d90
+// Schema content SHA-256: 7414bd527155a5f79b1cc4063abcc9c205845c2b4aec5d106fbd2181c0f03867
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -7381,7 +7381,10 @@ type CapabilityToken struct {
 	Id              string                           `json:"id"`
 	IssuedAt        int64                            `json:"issued_at"`
 	Issuer          string                           `json:"issuer"`
-	Schema          CapabilityTokenSchema            `json:"schema"`
+
+	// RootAnchor The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
+	RootAnchor *RootAuthorityRootAnchor `json:"root_anchor,omitempty"`
+	Schema     CapabilityTokenSchema    `json:"schema"`
 
 	// Scope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
 	Scope             CapabilityTokenChioScope                  `json:"scope"`

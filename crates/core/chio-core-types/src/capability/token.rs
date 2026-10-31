@@ -1,3 +1,4 @@
+use crate::capability::anchor::RootAnchor;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -148,6 +149,10 @@ pub struct CapabilityToken {
     /// 10000 are rejected by validation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget_share_bps: Option<u16>,
+    /// How the root of this token was anchored. A delegated token carries its
+    /// root's anchor byte for byte.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_anchor: Option<RootAnchor>,
     /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
@@ -172,6 +177,8 @@ pub struct CapabilityTokenBody {
     pub delegation_chain: Vec<DelegationLink>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub aggregate_invocation_budget: Option<AggregateInvocationBudget>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_anchor: Option<RootAnchor>,
 }
 
 /// The capability-token signing input.
@@ -217,6 +224,7 @@ impl CapabilityToken {
             expires_at: self.expires_at,
             delegation_chain: self.delegation_chain.clone(),
             aggregate_invocation_budget: self.aggregate_invocation_budget.clone(),
+            root_anchor: self.root_anchor.clone(),
         }
     }
 
@@ -498,6 +506,7 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
+            root_anchor: body.root_anchor,
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
@@ -541,6 +550,7 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
+            root_anchor: body.root_anchor,
             caveats,
             scope_attenuations: None,
             attenuation_proof: None,
@@ -708,6 +718,7 @@ impl CapabilityToken {
             expires_at: body.body.expires_at,
             delegation_chain: body.body.delegation_chain,
             aggregate_invocation_budget: body.body.aggregate_invocation_budget,
+            root_anchor: body.body.root_anchor,
             caveats: body.caveats,
             scope_attenuations: Some(body.scope_attenuations),
             attenuation_proof: Some(body.attenuation_proof),
@@ -756,6 +767,7 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
+            root_anchor: body.root_anchor,
             caveats: Vec::new(),
             scope_attenuations: None,
             attenuation_proof: None,
@@ -808,6 +820,7 @@ impl CapabilityToken {
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
             aggregate_invocation_budget: body.aggregate_invocation_budget,
+            root_anchor: body.root_anchor,
             caveats,
             scope_attenuations: None,
             attenuation_proof: None,

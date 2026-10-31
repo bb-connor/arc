@@ -1,16 +1,15 @@
-//! Consistency of a root capability with a `root_anchor`, a delegation
-//! context and the loaded root policy. Every check is offline and takes no
-//! clock.
+//! Consistency of a root capability with its signed `root_anchor`, a
+//! delegation context and the loaded root policy. Every check is offline and
+//! takes no clock.
 //!
-//! These checks authenticate nothing. The anchor and the context are unsigned
-//! inputs here, so a substituted anchor and context that agree with each
-//! other and with the root pass. Authenticating the pairing needs the anchor
-//! read from the signed capability body.
+//! The anchor is read from the root's signed body; the root's signature is
+//! checked by the capability verifier, not here. The delegation context is
+//! bound through `root_anchor.context_digest`.
 
 use alloc::string::{String, ToString};
 use core::fmt;
 
-use crate::capability::anchor::{AnchorKind, RootAnchor};
+use crate::capability::anchor::AnchorKind;
 use crate::capability::token::CapabilityToken;
 use crate::crypto::PublicKey;
 
@@ -18,11 +17,10 @@ use super::delegation_context::{DelegationContext, HolderClass};
 use super::root_policy::{LoadedRootPolicy, RootPolicyRule};
 use super::wire::Sha256Digest;
 
-/// The root, its anchor and the evidence it is checked against.
+/// The root and the evidence it is checked against.
 #[derive(Debug, Clone, Copy)]
 pub struct RootConsistencyInput<'a> {
     pub root: &'a CapabilityToken,
-    pub anchor: &'a RootAnchor,
     pub context: &'a DelegationContext,
     pub policy: &'a LoadedRootPolicy,
     /// The `cnf.chioSenderKey` the presenter proved, if any.
@@ -33,6 +31,7 @@ pub struct RootConsistencyInput<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootConsistencyError {
     NotARoot,
+    NotAnchored,
     RootPolicyDigestMismatch,
     ContextDigestMismatch,
     AnchorKindMismatch,
@@ -68,6 +67,7 @@ impl fmt::Display for RootConsistencyError {
             Self::NotARoot => {
                 formatter.write_str("anchored root carries delegation or attenuation")
             }
+            Self::NotAnchored => formatter.write_str("root carries no root_anchor"),
             Self::RootPolicyDigestMismatch => {
                 formatter.write_str("root_anchor names a root policy other than the loaded one")
             }
@@ -180,13 +180,12 @@ fn require(holds: bool, error: RootConsistencyError) -> Result<(), RootConsisten
     }
 }
 
-/// Check that a depth-0 root agrees with `anchor`, `context` and `policy`.
-/// Signature, issuer trust and time-window checks belong to the capability
-/// verifier; the pairing of `anchor` with `root` is not authenticated.
+/// Check that a depth-0 root and its `root_anchor` agree with `context` and
+/// `policy`. Signature, issuer trust and time-window checks belong to the
+/// capability verifier.
 pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), RootConsistencyError> {
     let RootConsistencyInput {
         root,
-        anchor,
         context,
         policy,
         sender_key,
@@ -198,6 +197,10 @@ pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), Roo
         root.delegation_chain.is_empty() && !root.requires_chain_binding(),
         RootConsistencyError::NotARoot,
     )?;
+    let anchor = root
+        .root_anchor
+        .as_ref()
+        .ok_or(RootConsistencyError::NotAnchored)?;
     require(
         &anchor.root_policy_digest == policy.digest(),
         RootConsistencyError::RootPolicyDigestMismatch,

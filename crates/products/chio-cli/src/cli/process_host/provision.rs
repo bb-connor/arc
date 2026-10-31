@@ -95,6 +95,7 @@ pub(super) fn child_capability(
                 delegation_chain: delegation.complete_chain(),
                 aggregate_invocation_budget: parent.aggregate_invocation_budget.clone(),
                 scope: scope.clone(),
+                root_anchor: delegation.root_anchor.clone(),
             },
             caveats: parent.caveats.clone(),
             scope_attenuations: parent.scope_attenuations.clone().unwrap_or_default(),

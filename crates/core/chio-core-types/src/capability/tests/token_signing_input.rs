@@ -16,6 +16,7 @@ fn capability_token_without_schema_is_refused() {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let token = CapabilityToken::sign(body, &kp).unwrap();
     let mut value = serde_json::to_value(&token).unwrap();
@@ -44,6 +45,7 @@ fn plain_body_signature_is_refused() -> Result<()> {
         expires_at: 2000,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     let signature = kp.sign_wrapped(
         CHIO_CAPABILITY_SCHEMA,
@@ -63,6 +65,7 @@ fn plain_body_signature_is_refused() -> Result<()> {
         attenuation_proof: None,
         budget_share_bps: None,
         aggregate_invocation_budget: None,
+        root_anchor: body.root_anchor,
         signature,
     };
 

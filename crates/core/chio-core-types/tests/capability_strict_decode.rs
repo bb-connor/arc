@@ -67,6 +67,7 @@ fn signed_token() -> TestResult<Value> {
         expires_at: 1_710_003_600,
         delegation_chain: vec![link],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     Ok(serde_json::to_value(CapabilityToken::sign(body, &issuer)?)?)
 }
@@ -202,6 +203,7 @@ fn token_with_add_constraint() -> TestResult<String> {
         expires_at: 1_710_003_600,
         delegation_chain: vec![link],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     Ok(serde_json::to_string(&CapabilityToken::sign(
         body, &issuer,

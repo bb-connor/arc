@@ -167,7 +167,6 @@ struct Fixture {
     policy: LoadedRootPolicy,
     context: DelegationContext,
     root: CapabilityToken,
-    anchor: RootAnchor,
     sender_key: Option<PublicKey>,
 }
 
@@ -187,6 +186,13 @@ impl Fixture {
         let mut context = context_json(&root_scope);
         edit_context(&mut context);
         let context: DelegationContext = serde_json::from_value(context).unwrap();
+        let anchor = RootAnchor {
+            kind: context.anchor.kind,
+            context_digest: context.digest().unwrap(),
+            root_policy_digest: *policy.digest(),
+            anchored_at: context.exchange.exchanged_at,
+            assertion_exp: context.anchor.token_exp,
+        };
         let root = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: "cap-root".into(),
@@ -197,30 +203,26 @@ impl Fixture {
                 expires_at: EXPIRES_AT,
                 delegation_chain: Vec::new(),
                 aggregate_invocation_budget: None,
+                root_anchor: Some(anchor),
             },
             signer,
         )
         .unwrap();
-        let anchor = RootAnchor {
-            kind: context.anchor.kind,
-            context_digest: context.digest().unwrap(),
-            root_policy_digest: *policy.digest(),
-            anchored_at: context.exchange.exchanged_at,
-            assertion_exp: context.anchor.token_exp,
-        };
         Self {
             policy,
             context,
             root,
-            anchor,
             sender_key: None,
         }
+    }
+
+    fn anchor(&mut self) -> &mut RootAnchor {
+        self.root.root_anchor.as_mut().unwrap()
     }
 
     fn check(&self) -> Result<(), RootConsistencyError> {
         check_root_consistency(RootConsistencyInput {
             root: &self.root,
-            anchor: &self.anchor,
             context: &self.context,
             policy: &self.policy,
             sender_key: self.sender_key.as_ref(),
@@ -461,9 +463,25 @@ fn delegated_token_is_not_a_root() {
 }
 
 #[test]
+fn consistency_reads_the_anchor_from_the_root_body() {
+    let fixture = Fixture::new();
+    let anchor = fixture.root.root_anchor.clone().unwrap();
+    assert_eq!(anchor.context_digest, fixture.context.digest().unwrap());
+    assert_eq!(&anchor.root_policy_digest, fixture.policy.digest());
+    assert_eq!(fixture.check(), Ok(()));
+}
+
+#[test]
+fn consistency_refuses_an_unanchored_root() {
+    let mut fixture = Fixture::new();
+    fixture.root.root_anchor = None;
+    assert_eq!(fixture.check(), Err(RootConsistencyError::NotAnchored));
+}
+
+#[test]
 fn anchor_naming_another_policy_denies() {
     let mut fixture = Fixture::new();
-    fixture.anchor.root_policy_digest = Sha256Digest::from_bytes([7; 32]);
+    fixture.anchor().root_policy_digest = Sha256Digest::from_bytes([7; 32]);
     assert_eq!(
         fixture.check(),
         Err(RootConsistencyError::RootPolicyDigestMismatch)
@@ -473,7 +491,7 @@ fn anchor_naming_another_policy_denies() {
 #[test]
 fn anchor_naming_another_context_denies() {
     let mut fixture = Fixture::new();
-    fixture.anchor.context_digest = Sha256Digest::from_bytes([7; 32]);
+    fixture.anchor().context_digest = Sha256Digest::from_bytes([7; 32]);
     assert_eq!(
         fixture.check(),
         Err(RootConsistencyError::ContextDigestMismatch)
@@ -483,7 +501,7 @@ fn anchor_naming_another_context_denies() {
 #[test]
 fn anchor_kind_must_equal_the_context_kind() {
     let mut fixture = Fixture::new();
-    fixture.anchor.kind = AnchorKind::OidcJwt;
+    fixture.anchor().kind = AnchorKind::OidcJwt;
     assert_eq!(
         fixture.check(),
         Err(RootConsistencyError::AnchorKindMismatch)
@@ -493,7 +511,7 @@ fn anchor_kind_must_equal_the_context_kind() {
 #[test]
 fn assertion_exp_must_equal_the_token_exp() {
     let mut fixture = Fixture::new();
-    fixture.anchor.assertion_exp += 1;
+    fixture.anchor().assertion_exp += 1;
     assert_eq!(
         fixture.check(),
         Err(RootConsistencyError::AssertionExpMismatch)
@@ -503,7 +521,7 @@ fn assertion_exp_must_equal_the_token_exp() {
 #[test]
 fn anchored_at_must_equal_the_exchange_time() {
     let mut fixture = Fixture::new();
-    fixture.anchor.anchored_at += 1;
+    fixture.anchor().anchored_at += 1;
     assert_eq!(
         fixture.check(),
         Err(RootConsistencyError::AnchoredAtMismatch)

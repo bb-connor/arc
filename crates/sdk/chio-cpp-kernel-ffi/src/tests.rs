@@ -47,6 +47,7 @@ fn make_capability_at(
         expires_at,
         delegation_chain: vec![],
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     CapabilityToken::sign(body, issuer).unwrap()
 }

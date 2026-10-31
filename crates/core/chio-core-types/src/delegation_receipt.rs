@@ -140,6 +140,9 @@ pub struct DelegationReceipt {
     /// Cumulative approval root-binding preservation copied from the signed link.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cumulative_approval: Option<CumulativeApprovalDelegationMarker>,
+    /// The parent's `root_anchor`, which the child capability carries byte for byte.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_anchor: Option<crate::capability::anchor::RootAnchor>,
 }
 
 impl DelegationReceipt {
@@ -239,6 +242,7 @@ mod tests {
             expires_at: 2000,
             delegation_chain: vec![],
             aggregate_invocation_budget: None,
+            root_anchor: None,
         };
         CapabilityToken::sign(body, parent_kp).unwrap()
     }

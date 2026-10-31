@@ -570,6 +570,7 @@ The v1 signed body is:
 | `expires_at` | Unix timestamp seconds |
 | `delegation_chain` | Ordered chain of delegation links |
 | `aggregate_invocation_budget` | Optional capability-wide or delegation-family invocation ceiling |
+| `root_anchor` | Optional `root_authority/root-anchor.schema.json` object naming how the root was anchored; omitted on unanchored tokens, so their signed bytes are unchanged, and copied byte for byte into every delegated token ([ADR-0039](../docs/adr/ADR-0039-customer-hosted-root-exchange.md)) |
 
 Capability public-key fields and signatures use the same self-describing
 encoding defined in section 4. Hybrid capability tokens encode `issuer`,

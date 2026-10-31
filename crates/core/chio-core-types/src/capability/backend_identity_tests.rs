@@ -78,6 +78,7 @@ fn sign(artifact: u8, backend: &dyn SigningBackend) -> Result<(Vec<u8>, bool)> {
         expires_at: 100,
         delegation_chain: Vec::new(),
         aggregate_invocation_budget: None,
+        root_anchor: None,
     };
     match artifact {
         0 | 1 => {
