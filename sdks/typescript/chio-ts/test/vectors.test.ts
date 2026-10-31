@@ -298,6 +298,7 @@ test("root_anchor refuses malformed values", async () => {
   const { assertion_exp: _exp, ...withoutExp } = ROOT_ANCHOR;
   const cases: Array<[unknown, string]> = [
     ["oidc_jwt", "root_anchor must be a JSON object"],
+    [null, "root_anchor must be a JSON object"],
     [{ ...ROOT_ANCHOR, padding: "x" }, "root_anchor has unknown member padding"],
     [withoutKind, "root_anchor is missing member kind"],
     [withoutExp, "root_anchor is missing member assertion_exp"],

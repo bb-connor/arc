@@ -258,6 +258,7 @@ func TestRootAnchorRefusesMalformedValues(t *testing.T) {
 		message string
 	}{
 		{"oidc_jwt", "root_anchor must be a JSON object"},
+		{nil, "root_anchor must be a JSON object"},
 		{with("padding", "x"), "root_anchor has unknown member padding"},
 		{without("kind"), "root_anchor is missing member kind"},
 		{without("assertion_exp"), "root_anchor is missing member assertion_exp"},

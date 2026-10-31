@@ -684,6 +684,19 @@ func TestVerifyCapabilityRefusesSignedRootAnchorPadding(t *testing.T) {
 	}
 }
 
+func TestVerifyCapabilityRefusesNullRootAnchor(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	emitted := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	emitted["root_anchor"] = nil
+	raw := signedRawToken(t, signer, body, emitted)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor must be a JSON object` {
+		t.Fatalf("expected null root_anchor refusal, got %v", err)
+	}
+}
+
 func TestVerifyCapabilityRefusesSignedUnknownAnchorKind(t *testing.T) {
 	signer := newKernelSigner(t)
 	anchor := rootAnchorFixture()

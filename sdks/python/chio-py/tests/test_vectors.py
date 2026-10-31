@@ -156,6 +156,7 @@ class VectorTests(unittest.TestCase):
         without_exp = {k: v for k, v in ROOT_ANCHOR.items() if k != "assertion_exp"}
         cases = [
             ("oidc_jwt", "root_anchor must be a JSON object"),
+            (None, "root_anchor must be a JSON object"),
             ({**ROOT_ANCHOR, "padding": "x"}, "root_anchor has unknown member padding"),
             (without_kind, "root_anchor is missing member kind"),
             (without_exp, "root_anchor is missing member assertion_exp"),
