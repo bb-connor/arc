@@ -8,7 +8,7 @@ impl ChioKernel {
     pub(crate) fn build_cancelled_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -16,7 +16,7 @@ impl ChioKernel {
     ) -> Result<ToolCallResponse, KernelError> {
         let prepared = self.prepare_cancelled_response_with_metadata_and_payee_binding(
             request,
-            reason,
+            denial,
             timestamp,
             matched_grant_index,
             extra_metadata,
@@ -32,7 +32,7 @@ impl ChioKernel {
     pub(in crate::kernel) fn prepare_cancelled_response_with_metadata_and_payee_binding(
         &self,
         request: &ToolCallRequest,
-        reason: &str,
+        denial: &Denial,
         timestamp: u64,
         matched_grant_index: Option<usize>,
         extra_metadata: RefusalReceiptMetadata,
@@ -60,7 +60,7 @@ impl ChioKernel {
             tool_name: &request.tool_name,
             server_id: &request.server_id,
             decision: Decision::Cancelled {
-                reason: reason.to_string(),
+                reason: denial.detail().to_string(),
             },
             action,
             content_hash: receipt_content.content_hash,
@@ -82,13 +82,13 @@ impl ChioKernel {
                 request_id: request.request_id.clone(),
                 verdict: Verdict::Deny,
                 output: None,
-                reason: Some(reason.to_string()),
+                reason: Some(denial.detail().to_string()),
                 terminal_state: OperationTerminalState::Cancelled {
-                    reason: reason.to_string(),
+                    reason: denial.detail().to_string(),
                 },
                 receipt,
                 execution_nonce: None,
-                denial_code: None,
+                denial_code: Some(denial.code()),
             },
             ReceiptRecordMode::WithFederation,
         ))

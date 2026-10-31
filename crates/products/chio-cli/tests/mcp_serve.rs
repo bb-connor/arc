@@ -13,6 +13,9 @@ use serde_json::{json, Value};
 #[path = "mcp_serve/sampling_progress.rs"]
 mod sampling_progress;
 
+#[path = "support/closed_denial.rs"]
+mod closed_denial;
+use closed_denial::assert_closed_denial;
 #[path = "support/mcp_security.rs"]
 mod mcp_security;
 
@@ -2733,14 +2736,7 @@ fn mcp_serve_returns_error_result_when_wrapped_stream_ends_mid_call() {
     );
     let (tool_response, notifications_during_call) = read_response(&mut stdout, 2);
     assert!(notifications_during_call.is_empty());
-    assert_eq!(tool_response["result"]["isError"], true);
-    let message = tool_response["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text");
-    assert_eq!(
-        message,
-        "dispatch outcome is unknown after transport_return: CHIO-KERNEL-REQUEST-INCOMPLETE"
-    );
+    assert_closed_denial(&tool_response["result"], "kernel_unavailable");
 
     drop(stdin);
 
@@ -3274,11 +3270,7 @@ fn mcp_serve_propagates_nested_sampling_cancellation() {
         read_response_with_nested_flow_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_eq!(cancelled["result"]["isError"], true);
-    assert!(cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text")
-        .contains("cancelled by client"));
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     let progress = cancelled_notifications
         .iter()
@@ -3368,12 +3360,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_during_nested_sampling() {
         read_response_with_parent_cancellation(&mut stdout, &mut stdin, 2);
     assert_eq!(nested_requests.len(), 1);
     assert_eq!(nested_requests[0]["method"], "sampling/createMessage");
-    assert_eq!(cancelled["result"]["isError"], true);
-    let cancelled_text = cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text");
-    assert!(cancelled_text.contains("cancelled by client"));
-    assert!(cancelled_text.contains("user aborted tool"));
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     let progress = cancelled_notifications
         .iter()
@@ -3470,11 +3457,7 @@ fn mcp_serve_propagates_parent_tool_cancellation_outside_nested_flow_windows() {
 
     let (cancelled, cancelled_notifications) = read_response(&mut stdout, 2);
     assert!(cancelled_notifications.is_empty());
-    assert_eq!(cancelled["result"]["isError"], true);
-    assert!(cancelled["result"]["content"][0]["text"]
-        .as_str()
-        .expect("tool error text")
-        .contains("cancelled by client: user aborted slow tool"));
+    assert_closed_denial(&cancelled["result"], "request_cancelled");
 
     drop(stdin);
 
@@ -3949,10 +3932,7 @@ fn mcp_serve_parent_cancellation_during_tasks_result_marks_task_cancelled() {
         task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"],
         task_id
     );
-    assert!(task_result["result"]["content"][0]["text"]
-        .as_str()
-        .expect("cancelled task result text")
-        .contains("cancelled by client: user aborted sample"));
+    assert_closed_denial(&task_result["result"], "request_cancelled");
     assert!(
         notifications.iter().any(|notification| {
             notification["method"] == "notifications/tasks/status"
@@ -4083,10 +4063,7 @@ fn mcp_serve_tasks_cancel_during_tasks_result_marks_task_cancelled() {
         task_result["result"]["_meta"]["io.modelcontextprotocol/related-task"]["taskId"],
         task_id
     );
-    assert!(task_result["result"]["content"][0]["text"]
-        .as_str()
-        .expect("cancelled task result text")
-        .contains("task cancelled by client"));
+    assert_closed_denial(&task_result["result"], "request_cancelled");
     assert!(
         notifications.iter().any(|notification| {
             notification["method"] == "notifications/tasks/status"

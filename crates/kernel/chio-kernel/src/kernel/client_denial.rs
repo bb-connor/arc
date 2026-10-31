@@ -23,11 +23,12 @@ pub enum ClientDenialCode {
     KernelUnavailable,
     SessionUnsupported,
     OperationConflict,
+    RequestCancelled,
     Denied,
 }
 
 /// Every client denial code, in wire order.
-pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 17] = [
+pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 18] = [
     ClientDenialCode::EmergencyStop,
     ClientDenialCode::CapabilityInvalid,
     ClientDenialCode::CapabilityRevoked,
@@ -44,6 +45,7 @@ pub const CLIENT_DENIAL_CODES: [ClientDenialCode; 17] = [
     ClientDenialCode::KernelUnavailable,
     ClientDenialCode::SessionUnsupported,
     ClientDenialCode::OperationConflict,
+    ClientDenialCode::RequestCancelled,
     ClientDenialCode::Denied,
 ];
 
@@ -112,6 +114,7 @@ impl ClientDenialCode {
                 "operation_conflict",
                 "Request id is bound to a different retained operation",
             ),
+            Self::RequestCancelled => ("request_cancelled", "Request was cancelled"),
             Self::Denied => ("denied", "Request denied"),
         }
     }
@@ -261,8 +264,8 @@ impl KernelError {
             | Self::ElicitationFormNotSupported
             | Self::ElicitationUrlNotSupported
             | Self::UrlElicitationsRequired { .. }
-            | Self::RootsNotNegotiated
-            | Self::RequestCancelled { .. } => Code::SessionUnsupported,
+            | Self::RootsNotNegotiated => Code::SessionUnsupported,
+            Self::RequestCancelled { .. } => Code::RequestCancelled,
         }
     }
 }
@@ -305,6 +308,7 @@ mod tests {
                 "operation_conflict",
                 "Request id is bound to a different retained operation",
             ),
+            ("request_cancelled", "Request was cancelled"),
             ("denied", "Request denied"),
         ];
         assert_eq!(pinned.len(), CLIENT_DENIAL_CODES.len());

@@ -1082,12 +1082,12 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "2cc2f6c8e1fe2d60f342b70f2dba811f032ee7d54933bf2f821b8f549f031add"
+normalized_sha256 = "848d428bb15d25930d78fc9baf579b2a18a97bd738442a878af527dc90944fff"
 symbol_sha256 = [
   { symbol = "PostAdmissionDropGuard", sha256 = "50fb6ebdb2ed2f281c534412aba0b13cb7f96e6ef5daf373a870ab1d15b06b6e" },
   { symbol = "PostAdmissionDropGuard::new", sha256 = "ef9ec0db94abad7561b5b48a1d95a6a1f3f5932f46d91ae07a8845a9209d3d86" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
-  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "5d03397f9888e848b9e2a59162299793913ff01264d4f05111fc544c419f00c7" },
+  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "7ace31561a0a29bab6eefe6101337beac24aaa87a08ca6532e5be8e82aa7a228" },
   { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "b62fa747e34a43b6f7ce981108382c0bcd4fb1e226f57ec4c32e53d37e1af337" },
   { symbol = "PostAdmissionDropGuard::drop", sha256 = "3b12e27332b865f1228d1022e644a519fa261f97f217ae20db73794e5e5f796b" },
 ]
@@ -1118,14 +1118,14 @@ rust_symbols = [
   "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt",
   "PostAdmissionDropGuard::drop",
 ]
-normalized_sha256 = "fad345f19c2507a6b0d8ce9d09cfc62b3e4043b54548c54286e36a01900b84e4"
+normalized_sha256 = "a3fc173776d9132723809f80ef93a17dd248390b10ae0ca07d32a80bb48dc8ac"
 symbol_sha256 = [
   { symbol = "PostAdmissionReceiptContext", sha256 = "812f5bdbba8ba446880cc69f27ea13942eac3001760eae5414e90e79201fe041" },
   { symbol = "PostAdmissionDropGuard", sha256 = "50fb6ebdb2ed2f281c534412aba0b13cb7f96e6ef5daf373a870ab1d15b06b6e" },
   { symbol = "PostAdmissionDropGuard::new", sha256 = "ef9ec0db94abad7561b5b48a1d95a6a1f3f5932f46d91ae07a8845a9209d3d86" },
   { symbol = "PostAdmissionDropGuard::with_durable_operation", sha256 = "075ee346bdcb7602fd9396c62e115ac78fb0ada7fbac6731d6a5ff4086c37ce3" },
   { symbol = "PostAdmissionDropGuard::disarm", sha256 = "133f33f226e614fc6cd6565ac33e34a806f13b4c105d2ab4c2ce605a170f70e0" },
-  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "5d03397f9888e848b9e2a59162299793913ff01264d4f05111fc544c419f00c7" },
+  { symbol = "PostAdmissionDropGuard::handle_pre_dispatch_drop", sha256 = "7ace31561a0a29bab6eefe6101337beac24aaa87a08ca6532e5be8e82aa7a228" },
   { symbol = "PostAdmissionDropGuard::record_pre_dispatch_cleanup_fault_receipt", sha256 = "b62fa747e34a43b6f7ce981108382c0bcd4fb1e226f57ec4c32e53d37e1af337" },
   { symbol = "PostAdmissionDropGuard::drop", sha256 = "3b12e27332b865f1228d1022e644a519fa261f97f217ae20db73794e5e5f796b" },
 ]
@@ -4519,7 +4519,7 @@ rust_symbols = [
   "Discharged::drop",
   "run_post_effect",
 ]
-normalized_sha256 = "db4a419979026d0333c904aade24bfa85662cb863770a4f60cf813092a31eec8"
+normalized_sha256 = "b8d3c42a9163fcb082cfb04199868a97821b3850dcae3838409d78fc12644268"
 symbol_sha256 = [
   { symbol = "PostEffectError", sha256 = "580fdad417efb5965bfd3118c466e412f7f108bbcc0e1ff4f265f0da468e21ef" },
   { symbol = "PostEffectError::at", sha256 = "c6ba9b349f124ef688ed041b544de1a96ee9fffd81eb6f9dbf5b1a92fe07fe5e" },
@@ -4530,7 +4530,7 @@ symbol_sha256 = [
   { symbol = "PostEffectObligation::enter", sha256 = "afc090d2ded6a515df90611f3b2bebc81d25d3d292a4a932acdc30cd216fc5f2" },
   { symbol = "PostEffectObligation::nested_receipt_sinks", sha256 = "7cdb0480893005ba5eeb33edcda24cd51ce756813b471ec16c39b80c0ee58057" },
   { symbol = "PostEffectObligation::commit_terminal_receipt", sha256 = "30de4ca97c6e86b1f4709ec627808c2786b4f4090eac1f3ecaaf9ffdc4ebf105" },
-  { symbol = "PostEffectObligation::fail", sha256 = "7a3a1ee14d52f4e190c3801b6c34cbc6c8049a608d26673d5a45b3c71a2ccae8" },
+  { symbol = "PostEffectObligation::fail", sha256 = "db5d70dc038772f1e10a30bf6e5859bbfe375c727ed205d4af3d4c941b8e533e" },
   { symbol = "PostEffectObligation::buffer", sha256 = "4d7e6e820190a96980dfb9b622e614f4908fdef5db1c2f335c5733f97e3c9929" },
   { symbol = "PostEffectObligation::drop", sha256 = "e2a78b7af42fee5f92e2635feeae2a99392005112cebf8da8ed0f70bac0f12bb" },
   { symbol = "Discharged::deliver", sha256 = "13b2e8bbaf84bccb136227795913c0dbb58ee8b879f8d6b83dc40ab8b840f780" },
@@ -4548,12 +4548,12 @@ rust_symbols = [
   "record_durable_return",
   "prepare_ordinary",
 ]
-normalized_sha256 = "a17d60c584bfbd6a2207844acdc85cbc77cb4c471dd6a7cc5f0d7920c86f47da"
+normalized_sha256 = "173c7ad1853bb032ac6495ed731adc9306959391012c4091bcd781619d5013fa"
 symbol_sha256 = [
   { symbol = "run", sha256 = "46513508ea95a557b20a3ed7132054a64f3487d252bfcd5e8548c534eab2b5b9" },
   { symbol = "flush_children", sha256 = "1c9adc6b7fa0adfbfdd35c3dd6ca75c450c8f59359ef282dad72bd520316f0a1" },
   { symbol = "record_durable_return", sha256 = "acbaf860624830d9b6b43eebfcfe307701c7dd35db1095a0c27938e9e3be11c6" },
-  { symbol = "prepare_ordinary", sha256 = "c9e4550387403afd8fd3a929d2fd84974e553e05874a6a5d21f90682ea58fc19" },
+  { symbol = "prepare_ordinary", sha256 = "43ebc47b5c7c358584dd59c57ce25d7879dde5978268542b73b698e17eb816f2" },
 ]
 [[mirror]]
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"

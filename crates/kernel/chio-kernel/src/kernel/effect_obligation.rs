@@ -99,14 +99,45 @@ impl ChioKernel {
     }
 }
 
+/// Why a dispatched call ended cancelled instead of with a known outcome.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::kernel) enum PostDispatchCancellation {
+    UrlElicitation,
+    Request,
+    HotPathDeadline,
+}
+
+impl PostDispatchCancellation {
+    /// The closed code a client observes for this cancellation.
+    pub(in crate::kernel) const fn code(self) -> ClientDenialCode {
+        match self {
+            Self::UrlElicitation => ClientDenialCode::SessionUnsupported,
+            Self::Request => ClientDenialCode::RequestCancelled,
+            Self::HotPathDeadline => ClientDenialCode::Overloaded,
+        }
+    }
+}
+
 /// The terminal refusal a dispatched call signs when its tool outcome is not
 /// known. The reason is kernel-authored; tool-supplied text never reaches it.
 pub(in crate::kernel) struct PostDispatchRefusal {
     pub(in crate::kernel) reason: String,
-    pub(in crate::kernel) cancelled: bool,
+    pub(in crate::kernel) cancellation: Option<PostDispatchCancellation>,
 }
 
 impl PostDispatchRefusal {
+    /// The client code and signed detail: a cancellation reports its own code,
+    /// an unknown outcome reports `KernelUnavailable`.
+    pub(in crate::kernel) fn denial(&self) -> Denial {
+        Denial::new(
+            self.cancellation.map_or(
+                ClientDenialCode::KernelUnavailable,
+                PostDispatchCancellation::code,
+            ),
+            self.reason.as_str(),
+        )
+    }
+
     pub(in crate::kernel) fn classify(
         kernel: &ChioKernel,
         context: Option<&OperationContext>,
@@ -116,22 +147,22 @@ impl PostDispatchRefusal {
         match error {
             KernelError::UrlElicitationsRequired { .. } => Self {
                 reason: URL_ELICITATION_AFTER_DISPATCH.to_owned(),
-                cancelled: true,
+                cancellation: Some(PostDispatchCancellation::UrlElicitation),
             },
             KernelError::RequestCancelled { request_id, .. } => Self {
                 reason: kernel.cancellation_reason_after_dispatch(context, request_id),
-                cancelled: true,
+                cancellation: Some(PostDispatchCancellation::Request),
             },
             KernelError::HotPathDeadlineExceeded { stage, budget_ms } => Self {
                 reason: format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms"),
-                cancelled: true,
+                cancellation: Some(PostDispatchCancellation::HotPathDeadline),
             },
             error => Self {
                 reason: format!(
                     "dispatch outcome is unknown after {step}: {}",
                     error.report().code
                 ),
-                cancelled: false,
+                cancellation: None,
             },
         }
     }
@@ -417,11 +448,8 @@ impl<'a> PostEffectObligation<'a> {
                         .saturating_mul(1_000),
                     parts.inputs.return_context.as_ref(),
                     super::admission_coordinator::DurableRefusalResponse {
-                        denial: &Denial::new(
-                            ClientDenialCode::KernelUnavailable,
-                            refusal.reason.as_str(),
-                        ),
-                        cancelled: refusal.cancelled,
+                        denial: &refusal.denial(),
+                        cancelled: refusal.cancellation.is_some(),
                         matched_grant_index: Some(parts.inputs.matched_grant_index),
                         metadata: self.kernel.ambiguous_dispatch_receipt_metadata(
                             &parts.inputs.budget,

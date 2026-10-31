@@ -706,13 +706,12 @@ impl ChioMcpEdge {
             related_task_id,
         });
 
-        if let Some(reason) = cancellation_reason_from_tool_result(&result) {
-            return ToolCallEdgeOutcome::Cancelled { reason };
-        }
-
+        // Cancellation is the kernel's typed terminal state, never the text of a
+        // tool result, which an upstream server controls.
         match terminal_state {
             OperationTerminalState::Cancelled { reason } => ToolCallEdgeOutcome::Cancelled {
                 reason: client_denial.map_or_else(|| reason.clone(), |code| code.text().to_owned()),
+                result,
             },
             _ => ToolCallEdgeOutcome::Result(result),
         }
@@ -735,9 +734,10 @@ impl ChioMcpEdge {
             related_task_id,
         );
         match error {
-            chio_kernel::KernelError::RequestCancelled { reason, .. } => {
-                ToolCallEdgeOutcome::Cancelled { reason }
-            }
+            chio_kernel::KernelError::RequestCancelled { .. } => ToolCallEdgeOutcome::Cancelled {
+                reason: code.text().to_owned(),
+                result: denial_tool_result(code),
+            },
             chio_kernel::KernelError::UrlElicitationsRequired {
                 message,
                 elicitations,

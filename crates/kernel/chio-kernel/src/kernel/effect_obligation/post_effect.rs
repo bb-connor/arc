@@ -288,7 +288,7 @@ fn prepare_ordinary(
                                 "transport_return",
                                 &error,
                             )
-                            .reason,
+                            .denial(),
                             now,
                             Some(inputs.matched_grant_index),
                             RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),
@@ -310,7 +310,7 @@ fn prepare_ordinary(
                         kernel
                             .prepare_cancelled_response_with_metadata_and_payee_binding(
                                 inputs.request,
-                                &reason,
+                                &Denial::new(PostDispatchCancellation::Request.code(), reason),
                                 now,
                                 Some(inputs.matched_grant_index),
                                 RefusalReceiptMetadata::new(
@@ -330,7 +330,7 @@ fn prepare_ordinary(
                                 "transport_return",
                                 &error,
                             )
-                            .reason,
+                            .denial(),
                             now,
                             Some(inputs.matched_grant_index),
                             RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal),

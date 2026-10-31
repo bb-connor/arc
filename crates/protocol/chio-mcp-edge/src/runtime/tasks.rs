@@ -54,8 +54,11 @@ pub(super) enum EdgeTaskFinalOutcome {
 
 pub(super) enum ToolCallEdgeOutcome {
     Result(Value),
+    /// The call ended cancelled: `result` is the tool result the client sees,
+    /// carrying the closed denial code and receipt when the kernel decided it.
     Cancelled {
         reason: String,
+        result: Value,
     },
     JsonRpcError {
         code: i64,
@@ -123,10 +126,10 @@ impl EdgeTask {
         self.touch(observed);
     }
 
-    pub(super) fn mark_cancelled(&mut self, reason: &str, observed: ClockReading) {
+    pub(super) fn mark_cancelled(&mut self, reason: &str, result: Value, observed: ClockReading) {
         self.status = EdgeTaskStatus::Cancelled;
         self.status_message = Some(reason.to_string());
-        self.final_outcome = Some(EdgeTaskFinalOutcome::Result(tool_error_result(reason)));
+        self.final_outcome = Some(EdgeTaskFinalOutcome::Result(result));
         self.touch(observed);
     }
 
@@ -150,7 +153,9 @@ impl EdgeTask {
     pub(super) fn record_outcome(&mut self, outcome: ToolCallEdgeOutcome, observed: ClockReading) {
         match outcome {
             ToolCallEdgeOutcome::Result(result) => self.mark_completed(result, observed),
-            ToolCallEdgeOutcome::Cancelled { reason } => self.mark_cancelled(&reason, observed),
+            ToolCallEdgeOutcome::Cancelled { reason, result } => {
+                self.mark_cancelled(&reason, result, observed)
+            }
             ToolCallEdgeOutcome::JsonRpcError {
                 code,
                 message,
@@ -379,7 +384,8 @@ impl ChioMcpEdge {
             };
         }
 
-        task.mark_cancelled("task cancelled by client", observed);
+        let code = chio_kernel::ClientDenialCode::RequestCancelled;
+        task.mark_cancelled(code.text(), denial_tool_result(code), observed);
         self.dequeue_background_task(&task_id);
         let task_view = task.clone();
         self.queue_task_status_notification(&task_view);

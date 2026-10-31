@@ -164,6 +164,10 @@ fn dropped_async_retry_restores_the_original_threshold_claim() -> TestResult {
             reason: "evaluation cancelled before dispatch".into()
         }
     );
+    assert_eq!(
+        replay.denial_code,
+        Some(crate::ClientDenialCode::RequestCancelled)
+    );
     assert!(replay.output.is_none());
     assert_eq!(
         chio_core::canonical::canonical_json_bytes(&replay.receipt)?,

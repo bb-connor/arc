@@ -278,7 +278,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                                 None,
                                 DurableRefusalResponse {
                                     denial: &Denial::new(
-                                        ClientDenialCode::Denied,
+                                        ClientDenialCode::RequestCancelled,
                                         "evaluation cancelled before dispatch",
                                     ),
                                     cancelled: true,

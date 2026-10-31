@@ -1647,23 +1647,27 @@ impl ChioKernel {
         self.with_session(session_id, |session| {
             session
                 .try_mark_request_dispatch_started(&request_id)
-                .map_err(|failure| KernelError::RequestCancelled {
-                    request_id: request_id.clone(),
-                    reason: match failure {
-                        crate::session::DispatchStartFailure::RequestNotInflight => {
-                            "session request completed before dispatch".to_string()
+                .map_err(|failure| match failure {
+                    crate::session::DispatchStartFailure::RequestNotInflight => {
+                        KernelError::Session(crate::SessionError::RequestNotInflight {
+                            request_id: request_id.clone(),
+                        })
+                    }
+                    crate::session::DispatchStartFailure::CancellationRequested { reason } => {
+                        let reason = reason.unwrap_or_else(|| {
+                            "session request cancelled before dispatch".to_string()
+                        });
+                        cancellation = Some(reason.clone());
+                        KernelError::RequestCancelled {
+                            request_id: request_id.clone(),
+                            reason,
                         }
-                        crate::session::DispatchStartFailure::CancellationRequested { reason } => {
-                            let reason = reason.unwrap_or_else(|| {
-                                "session request cancelled before dispatch".to_string()
-                            });
-                            cancellation = Some(reason.clone());
-                            reason
-                        }
-                        crate::session::DispatchStartFailure::SessionAnchorChanged => {
-                            "session authorization changed before dispatch".to_string()
-                        }
-                    },
+                    }
+                    crate::session::DispatchStartFailure::SessionAnchorChanged => {
+                        KernelError::Session(crate::SessionError::RequestAnchorChanged {
+                            request_id: request_id.clone(),
+                        })
+                    }
                 })
         })
         .map_err(|error| SessionDispatchStartRefusal {

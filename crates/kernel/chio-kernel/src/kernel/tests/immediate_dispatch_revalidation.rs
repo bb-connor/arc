@@ -414,6 +414,54 @@ fn nested_bridge_cancellation_blocks_next_child_and_drop_clears_dispatch_scope(
 }
 
 #[test]
+fn dispatch_start_refusals_report_the_closed_code_of_their_cause(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let kernel = make_kernel(make_config());
+    let agent = make_keypair();
+    let session_id = kernel.open_session(agent.public_key().to_hex(), Vec::new())?;
+    kernel.activate_session(&session_id)?;
+
+    let error = kernel
+        .mark_session_request_dispatch_started(Some(&session_id), "dispatch-start-never-begun")
+        .expect_err("a request that is not in flight must not start dispatch");
+    assert!(
+        matches!(
+            &error,
+            KernelError::Session(crate::SessionError::RequestNotInflight { request_id })
+                if request_id.as_str() == "dispatch-start-never-begun"
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        error.client_denial_code(),
+        crate::ClientDenialCode::SessionUnsupported
+    );
+
+    let rotated = make_operation_context(
+        &session_id,
+        "dispatch-start-anchor-rotated",
+        &agent.public_key().to_hex(),
+    );
+    kernel.begin_session_request(&rotated, OperationKind::ToolCall, true)?;
+    kernel.set_session_auth_context(
+        &session_id,
+        SessionAuthContext::streamable_http_static_bearer(
+            "static-bearer:rotated",
+            "deadbeef",
+            Some("http://localhost:3000".to_string()),
+        ),
+    )?;
+    let error = kernel
+        .mark_session_request_dispatch_started(Some(&session_id), rotated.request_id.as_str())
+        .expect_err("a request whose session anchor rotated must not start dispatch");
+    assert_eq!(
+        error.client_denial_code(),
+        crate::ClientDenialCode::SessionUnsupported
+    );
+    Ok(())
+}
+
+#[test]
 fn cancelled_dispatch_start_preserves_authoritative_reason(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let kernel = make_kernel(make_config());
@@ -436,10 +484,14 @@ fn cancelled_dispatch_start_preserves_authoritative_reason(
         .mark_session_request_dispatch_started(Some(&session_id), context.request_id.as_str())
         .expect_err("cancelled request must not start dispatch");
     assert!(matches!(
-        error,
+        &error,
         KernelError::RequestCancelled { request_id, reason }
-            if request_id == context.request_id && reason == "cancelled before effect"
+            if *request_id == context.request_id && reason == "cancelled before effect"
     ));
+    assert_eq!(
+        error.client_denial_code(),
+        crate::ClientDenialCode::RequestCancelled
+    );
     Ok(())
 }
 

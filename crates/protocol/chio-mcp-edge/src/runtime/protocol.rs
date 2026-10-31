@@ -57,8 +57,8 @@ pub(super) use self::serialization::{
     serialize_resource_contents, serialize_resource_templates, serialize_resources,
 };
 pub(super) use self::tasks::{
-    cancellation_reason_from_tool_result, edge_task_status_label, parse_requested_task,
-    task_status_message, tool_result_is_error, RequestedTask,
+    edge_task_status_label, parse_requested_task, task_status_message, tool_result_is_error,
+    RequestedTask,
 };
 pub(super) use self::tool_results::{
     denial_tool_result, kernel_response_to_tool_result, tool_error_result,

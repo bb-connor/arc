@@ -395,7 +395,26 @@ fn cancel_against_denial(
         Some(&serde_json::json!("guard_denied")),
         "{entry:?}"
     );
-    let state = cleanup_state(&cancelled)?;
+    assert_eq!(
+        cancelled
+            .response
+            .as_ref()
+            .map_err(|error| error.to_string())?
+            .denial_code,
+        Some(crate::ClientDenialCode::RequestCancelled),
+        "{entry:?}"
+    );
+    let mut state = cleanup_state(&cancelled)?;
+    let cancellation_kernel_metadata = state
+        .pointer_mut("/receipt_metadata")
+        .and_then(serde_json::Value::as_object_mut)
+        .and_then(|metadata| metadata.remove("chio_kernel"))
+        .ok_or("cancellation kernel metadata")?;
+    assert_eq!(
+        cancellation_kernel_metadata.get("client_denial_code"),
+        Some(&serde_json::json!("request_cancelled")),
+        "{entry:?}"
+    );
     assert_eq!(state, denied_state, "{entry:?}");
     Ok((cancelled, state))
 }

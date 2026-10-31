@@ -174,6 +174,10 @@ fn chio_runtime_admission_retains_reservations_on_ambiguous_cancellation(
             reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
         })
     );
+    assert_eq!(
+        response.denial_code,
+        Some(crate::ClientDenialCode::RequestCancelled)
+    );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(side_effects.load(Ordering::SeqCst), 1);
     assert_eq!(
