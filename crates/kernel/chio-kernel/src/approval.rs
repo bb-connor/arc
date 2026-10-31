@@ -22,7 +22,7 @@ use std::sync::{Mutex, RwLock};
 use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedTransactionIntent,
 };
-use chio_core::crypto::{sha256_hex, PublicKey};
+use chio_core::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 
 use crate::security_admission_operation::ReplayReservationState;
@@ -631,34 +631,6 @@ pub trait ApprovalStore: Send + Sync {
         Err(ApprovalStoreError::Backend(
             "operation-owned approval reservations are unavailable".to_string(),
         ))
-    }
-}
-
-/// Compute the parameter hash that binds an `ApprovalRequest` to a
-/// specific set of arguments. Input is canonicalized via the existing
-/// `sha256_hex(chio_core::canonical::canonical_json_bytes(..))` helper
-/// so independent kernels produce identical hashes.
-#[must_use]
-pub fn compute_parameter_hash(
-    tool_server: &str,
-    tool_name: &str,
-    arguments: &serde_json::Value,
-    governed_intent: Option<&GovernedTransactionIntent>,
-) -> String {
-    let envelope = serde_json::json!({
-        "server_id": tool_server,
-        "tool_name": tool_name,
-        "arguments": arguments,
-        "governed_intent": governed_intent,
-    });
-    match chio_core::canonical::canonical_json_bytes(&envelope) {
-        Ok(bytes) => sha256_hex(&bytes),
-        // Canonicalization only fails on unserializable inputs -- the
-        // tool call arguments are already `serde_json::Value` so this
-        // path is unreachable in practice. Fall back to a tagged hash
-        // of the display form rather than panicking: we still return
-        // a stable string so callers do not have to handle the error.
-        Err(_) => sha256_hex(envelope.to_string().as_bytes()),
     }
 }
 

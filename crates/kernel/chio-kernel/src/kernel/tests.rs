@@ -10,8 +10,8 @@ use crate::admission_operation::{
     QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
 };
 use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalDecision, ApprovalOutcome,
-    ApprovalRequest, ApprovalStore, ApprovalToken, InMemoryApprovalStore,
+    resume_with_decision, ApprovalDecision, ApprovalOutcome, ApprovalRequest, ApprovalStore,
+    ApprovalToken, InMemoryApprovalStore,
 };
 use crate::compliance_score::{compliance_score, ComplianceScoreConfig, ComplianceScoreInputs};
 use crate::execution_nonce::{
@@ -220,7 +220,9 @@ mod session;
 mod session_sampling_elicitation;
 #[path = "tests/session_security_context.rs"]
 mod session_security_context;
-use approval_flow::{hitl_make_request, hitl_sign_token, CoreKeypair, FixedThresholdRequirement};
+use approval_flow::{
+    hitl_make_request, hitl_parameter_hash, hitl_sign_token, CoreKeypair, FixedThresholdRequirement,
+};
 #[path = "tests/approval_deadlines.rs"]
 mod approval_deadlines;
 #[path = "tests/boot_receipts.rs"]

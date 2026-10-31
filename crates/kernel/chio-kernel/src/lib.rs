@@ -259,9 +259,9 @@ pub use threshold_approval::{
 
 #[cfg(not(loom))]
 pub use approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalDecision, ApprovalFilter,
-    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalStoreError, ApprovalToken,
-    InMemoryApprovalStore, ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+    resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, InMemoryApprovalStore, ResolvedApproval,
+    MAX_APPROVAL_TTL_SECS,
 };
 #[cfg(not(loom))]
 pub use authority::{

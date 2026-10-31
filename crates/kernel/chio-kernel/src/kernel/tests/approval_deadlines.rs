@@ -14,12 +14,7 @@ fn inverted_signed_window_has_one_refusal_independent_of_verifier_time() {
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
         action: "invoke".into(),
-        parameter_hash: compute_parameter_hash(
-            &request.server_id,
-            &request.tool_name,
-            &request.arguments,
-            request.governed_intent.as_ref(),
-        ),
+        parameter_hash: hitl_parameter_hash(&request),
         expires_at: 3690,
         callback_hint: None,
         created_at: 90,

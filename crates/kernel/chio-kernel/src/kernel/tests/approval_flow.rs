@@ -23,6 +23,10 @@ impl ThresholdApprovalRequirementResolver for FixedThresholdRequirement {
 
 pub(super) type CoreKeypair = Keypair;
 
+pub(super) fn hitl_parameter_hash(request: &ToolCallRequest) -> String {
+    chio_core::crypto::sha256_hex(request.arguments.to_string().as_bytes())
+}
+
 pub(super) fn hitl_make_request() -> ToolCallRequest {
     let subject_kp = CoreKeypair::generate();
     let cap_builder_kernel = make_kernel(make_config());
@@ -452,12 +456,7 @@ fn threshold_approval_set_is_policy_bound_and_order_independent(
 fn hitl_resume_approved_executes() {
     let store = InMemoryApprovalStore::new();
     let request = hitl_make_request();
-    let hash = compute_parameter_hash(
-        &request.server_id,
-        &request.tool_name,
-        &request.arguments,
-        request.governed_intent.as_ref(),
-    );
+    let hash = hitl_parameter_hash(&request);
 
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
@@ -520,12 +519,7 @@ fn hitl_resume_approved_executes() {
 fn hitl_resume_denied_records_denial() {
     let store = InMemoryApprovalStore::new();
     let request = hitl_make_request();
-    let hash = compute_parameter_hash(
-        &request.server_id,
-        &request.tool_name,
-        &request.arguments,
-        request.governed_intent.as_ref(),
-    );
+    let hash = hitl_parameter_hash(&request);
 
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
@@ -588,12 +582,7 @@ fn hitl_resume_denied_records_denial() {
 fn hitl_replay_of_consumed_token_rejected() {
     let store = InMemoryApprovalStore::new();
     let request = hitl_make_request();
-    let hash = compute_parameter_hash(
-        &request.server_id,
-        &request.tool_name,
-        &request.arguments,
-        request.governed_intent.as_ref(),
-    );
+    let hash = hitl_parameter_hash(&request);
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
     let approval = ApprovalRequest {
@@ -681,12 +670,7 @@ fn hitl_replay_of_consumed_token_rejected() {
 fn hitl_batch_respond_applies_multiple_decisions() {
     let store = InMemoryApprovalStore::new();
     let request = hitl_make_request();
-    let hash = compute_parameter_hash(
-        &request.server_id,
-        &request.tool_name,
-        &request.arguments,
-        request.governed_intent.as_ref(),
-    );
+    let hash = hitl_parameter_hash(&request);
 
     let approver = CoreKeypair::generate();
     let subject = CoreKeypair::generate();
