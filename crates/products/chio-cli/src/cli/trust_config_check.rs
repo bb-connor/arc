@@ -7,12 +7,14 @@ use chio_control_plane::trust_control::caller_credentials::{
     CredentialKind, TenantAuthority, TrustAccess, TrustAccessConfig,
 };
 use chio_control_plane::trust_control::credential_roles::CredentialRole;
+use chio_egress_contract::{private_network_allowance_digest, EgressAllowanceSet};
 use serde_json::json;
 
 use crate::CliError;
 
 pub(crate) fn cmd_trust_config_check(
     access_config: &Path,
+    egress: &EgressAllowanceSet,
     json_output: bool,
 ) -> Result<(), CliError> {
     let access = TrustAccess::load(access_config)?;
@@ -53,12 +55,15 @@ pub(crate) fn cmd_trust_config_check(
             "nodePublicKey": access.node_keypair().map(|key| key.public_key().to_hex()),
         })
     });
+    let egress_digest = private_network_allowance_digest(egress.entries())
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let report = json!({
         "deployment": config.deployment,
         "internalListen": config.internal_listen.to_string(),
         "credentials": credentials,
         "cluster": identity,
         "peers": peers,
+        "egressAllowanceDigest": egress_digest,
     });
     if json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
@@ -66,6 +71,7 @@ pub(crate) fn cmd_trust_config_check(
     }
     println!("deployment:      {}", config.deployment);
     println!("internal listen: {}", config.internal_listen);
+    println!("egress allowances: {egress_digest}");
     for credential in report["credentials"].as_array().into_iter().flatten() {
         println!(
             "credential {} ({}, tenant authority {}): {}",

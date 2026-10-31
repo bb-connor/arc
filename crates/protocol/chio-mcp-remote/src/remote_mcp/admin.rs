@@ -826,9 +826,13 @@ fn control_client(
             "remote trust admin requires --control-token when --control-url is configured",
         ));
     };
-    trust_control::service_runtime::client::build_client(url, token)
-        .map(Some)
-        .map_err(admin_backend_failure)
+    trust_control::service_runtime::client::build_client(
+        url,
+        token,
+        &state.factory.config.egress_allowances,
+    )
+    .map(Some)
+    .map_err(admin_backend_failure)
 }
 
 /// A trust backend failure answers the fixed 500 URN. The cause stays in the

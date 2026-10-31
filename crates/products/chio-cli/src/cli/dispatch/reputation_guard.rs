@@ -11,6 +11,7 @@ pub(crate) fn dispatch_reputation(
     authority_seed_file: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         ReputationCommands::Local {
@@ -29,6 +30,7 @@ pub(crate) fn dispatch_reputation(
             control_url: control_url.as_deref(),
             control_token: control_token.as_deref(),
             authority_seed_file: authority_seed_file.as_deref(),
+            allowances: egress,
         }),
         ReputationCommands::Compare {
             subject_public_key,
@@ -50,6 +52,7 @@ pub(crate) fn dispatch_reputation(
             control_url: control_url.as_deref(),
             control_token: control_token.as_deref(),
             authority_seed_file: authority_seed_file.as_deref(),
+            allowances: egress,
         }),
     }
 }
@@ -60,6 +63,7 @@ pub(crate) fn dispatch_guard(
     json_output: bool,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         GuardCommands::New { name } => guard::cmd_guard_new(&name),
@@ -146,6 +150,7 @@ pub(crate) fn dispatch_guard(
                 json || json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             GuardMarketCommands::Info {
                 catalog,
@@ -165,6 +170,7 @@ pub(crate) fn dispatch_guard(
                 json || json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             GuardMarketCommands::Install {
                 catalog,
@@ -186,6 +192,7 @@ pub(crate) fn dispatch_guard(
                 json || json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
     }

@@ -1,10 +1,10 @@
 //! Bounded original-byte readers for operator files carrying authenticated data.
 
-#[cfg(unix)]
-use std::io::Read;
 use std::path::Path;
 
 use chio_core::canonical::UntrustedJsonText;
+use chio_secure_ipc::registry_file::{RegistryFile, RegistryFileError};
+use chio_secure_ipc::regular_file::{read_regular_file, OpenPolicy, RegularFileError};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -17,47 +17,17 @@ pub(crate) const MAX_SIGNED_FILE_BYTES: usize = 16 * 1024 * 1024;
 #[path = "signed_input/read_pause.rs"]
 pub(crate) mod read_pause;
 
-pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, std::io::Error> {
+pub(crate) fn read_bounded(path: &Path) -> Result<Vec<u8>, RegularFileError> {
     read_bounded_with_limit(path, MAX_SIGNED_FILE_BYTES)
 }
 
-#[cfg(unix)]
+/// Reads an operator file of at most `max_bytes` bytes. Its content is
+/// verified after the read, so any owner and mode is accepted.
 pub(crate) fn read_bounded_with_limit(
     path: &Path,
     max_bytes: usize,
-) -> Result<Vec<u8>, std::io::Error> {
-    use std::os::unix::fs::OpenOptionsExt;
-
-    let flags = rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK;
-    let flags = i32::try_from(flags.bits()).map_err(std::io::Error::other)?;
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(flags)
-        .open(path)?;
-    let metadata = file.metadata()?;
-    if !metadata.file_type().is_file() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "signed input must be a regular file",
-        ));
-    }
-    #[cfg(test)]
-    read_pause::wait(&metadata);
-    let mut bytes = Vec::new();
-    file.take(crate::integer::count(max_bytes).saturating_add(1))
-        .read_to_end(&mut bytes)?;
-    Ok(bytes)
-}
-
-#[cfg(not(unix))]
-pub(crate) fn read_bounded_with_limit(
-    _path: &Path,
-    _max_bytes: usize,
-) -> Result<Vec<u8>, std::io::Error> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "signed input requires nonblocking no-follow file reads",
-    ))
+) -> Result<Vec<u8>, RegularFileError> {
+    read_regular_file(path, max_bytes, OpenPolicy::Authenticated)
 }
 
 pub(crate) fn decode<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, CliError> {
@@ -74,6 +44,15 @@ pub(crate) const ISSUANCE_RESERVE_BYTES: usize = 1024 * 1024;
 #[cfg(test)]
 pub(crate) fn write_bounded_json<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
     write_bounded_json_with_limit(path, value, MAX_SIGNED_FILE_BYTES)
+}
+
+#[cfg(test)]
+pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
+    path: &Path,
+    value: &T,
+    limit: usize,
+) -> Result<(), CliError> {
+    write_bounded_registry(&RegistryFile::lock(path)?, value, limit)
 }
 
 /// Collects serializer output and refuses to grow past `limit` bytes, so an
@@ -101,25 +80,12 @@ impl std::io::Write for LimitedBuffer {
 
 /// Persists bounded JSON only through the lock that owns its destination.
 pub(crate) fn write_bounded_registry<T: Serialize>(
-    lock: &RegistryLock,
+    lock: &RegistryFile,
     value: &T,
     limit: usize,
 ) -> Result<(), CliError> {
-    write_bounded_at(lock.destination(), value, limit)
-}
-
-#[cfg(test)]
-pub(crate) fn write_bounded_json_with_limit<T: Serialize>(
-    path: &Path,
-    value: &T,
-    limit: usize,
-) -> Result<(), CliError> {
-    write_bounded_at(path, value, limit)
-}
-
-fn write_bounded_at<T: Serialize>(path: &Path, value: &T, limit: usize) -> Result<(), CliError> {
     match encode_within(value, limit)? {
-        Some(bytes) => replace_file(path, &bytes),
+        Some(bytes) => Ok(lock.replace(&bytes)?),
         None => Err(CliError::policy_constraint_error(format!(
             "registry file would exceed the {limit} byte limit; the existing file was left unchanged"
         ))),
@@ -186,28 +152,6 @@ pub(crate) trait RevocationReserve: Serialize + DeserializeOwned {
     fn revocation_reserve(&self) -> Result<usize, CliError>;
 }
 
-/// Exclusive writer lock for one registry file.
-///
-/// The lock is an advisory `flock` on a sibling file in the registry's
-/// canonical directory. That file is never renamed, replaced or removed, so
-/// every writer that names the registry by any path through that directory
-/// contends on the same inode, in this process or another on the same host.
-/// The registry file itself is replaced by rename on every write and is
-/// therefore never the lock target. Writers on other hosts sharing the
-/// directory over a network filesystem are not excluded.
-pub(crate) struct RegistryLock {
-    _file: std::fs::File,
-    destination: std::path::PathBuf,
-}
-
-impl RegistryLock {
-    /// The canonical path of the registry this lock guards; every read and
-    /// write under the lock uses it.
-    pub(crate) fn destination(&self) -> &Path {
-        &self.destination
-    }
-}
-
 /// Loads the registry at `path` under its writer lock, applies `change`, and
 /// persists the result before the lock is released.
 ///
@@ -219,7 +163,7 @@ pub(crate) fn update_registry<T: RevocationReserve, R>(
     load: impl FnOnce(&Path) -> Result<T, CliError>,
     change: impl FnOnce(&mut T) -> Result<R, CliError>,
 ) -> Result<R, RegistryUpdateError> {
-    let lock = lock_registry(path)?;
+    let lock = RegistryFile::lock(path)?;
     let mut registry = load(lock.destination()).map_err(RegistryUpdateError::Load)?;
     let outcome = change(&mut registry).map_err(RegistryUpdateError::Refused)?;
     write_reserving_registry(&lock, &registry).map_err(RegistryUpdateError::Persist)?;
@@ -234,101 +178,14 @@ pub(crate) fn update_bounded_registry<T: Serialize, R, E>(
     limit: usize,
     change: impl FnOnce(&mut T) -> Result<R, E>,
 ) -> Result<R, RegistryTransactionError<E>> {
-    let lock = lock_registry(path).map_err(RegistryTransactionError::Registry)?;
+    let lock = RegistryFile::lock(path)
+        .map_err(|error| RegistryTransactionError::Registry(error.into()))?;
     let mut registry = load(lock.destination())
         .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Load(error)))?;
     let outcome = change(&mut registry).map_err(RegistryTransactionError::Refused)?;
     write_bounded_registry(&lock, &registry, limit)
         .map_err(|error| RegistryTransactionError::Registry(RegistryUpdateError::Persist(error)))?;
     Ok(outcome)
-}
-
-/// Takes the writer lock of the registry at `path`.
-///
-/// The lock lives at `.<file name>.lock` in the canonicalized parent
-/// directory, so directory aliases of one registry share it. A hard link to
-/// the registry under another name is a different registry entry with its own
-/// lock; a write through it replaces only that entry. A registry path that is
-/// a symbolic link is refused, because a write would replace the link rather
-/// than the file it names.
-#[cfg(unix)]
-pub(crate) fn lock_registry(path: &Path) -> Result<RegistryLock, RegistryUpdateError> {
-    use std::os::unix::fs::OpenOptionsExt;
-    let load = |error: CliError| RegistryUpdateError::Load(error);
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| load(CliError::cli_io_error("registry path has no file name")))?;
-    let parent = match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    std::fs::create_dir_all(parent).map_err(|error| load(CliError::Io(error)))?;
-    let directory = std::fs::canonicalize(parent).map_err(|error| load(CliError::Io(error)))?;
-    let destination = directory.join(file_name);
-    match std::fs::symlink_metadata(&destination) {
-        Ok(metadata) if metadata.file_type().is_symlink() => {
-            return Err(load(CliError::policy_constraint_error(format!(
-                "registry file `{}` is a symbolic link; registries are written only at their own path",
-                destination.display()
-            ))));
-        }
-        Ok(_) => {}
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => return Err(load(CliError::Io(error))),
-    }
-    let lock_path = directory.join(format!(".{}.lock", file_name.to_string_lossy()));
-    let flags = rustix::fs::OFlags::CLOEXEC | rustix::fs::OFlags::NOFOLLOW;
-    let flags = i32::try_from(flags.bits())
-        .map_err(|_| load(CliError::cli_io_error("registry lock flags are invalid")))?;
-    let file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .mode(0o600)
-        .custom_flags(flags)
-        .open(&lock_path)
-        .map_err(|error| load(CliError::Io(error)))?;
-    check_lock_identity(&lock_path, &file).map_err(load)?;
-    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
-        Ok(()) => {}
-        Err(rustix::io::Errno::WOULDBLOCK) => return Err(RegistryUpdateError::Busy),
-        Err(error) => return Err(load(CliError::Io(error.into()))),
-    }
-    // The inode locked must still be the one at the lock path, or two writers
-    // could hold locks on different inodes.
-    check_lock_identity(&lock_path, &file).map_err(load)?;
-    Ok(RegistryLock {
-        _file: file,
-        destination,
-    })
-}
-
-#[cfg(not(unix))]
-pub(crate) fn lock_registry(_path: &Path) -> Result<RegistryLock, RegistryUpdateError> {
-    Err(RegistryUpdateError::Unsupported)
-}
-
-/// The lock file is a private regular file of this user with one link, and
-/// `file` is that file.
-#[cfg(unix)]
-fn check_lock_identity(lock_path: &Path, file: &std::fs::File) -> Result<(), CliError> {
-    use std::os::unix::fs::MetadataExt;
-    let at_path = std::fs::symlink_metadata(lock_path)?;
-    let held = file.metadata()?;
-    if !at_path.file_type().is_file()
-        || !held.file_type().is_file()
-        || at_path.dev() != held.dev()
-        || at_path.ino() != held.ino()
-        || held.nlink() != 1
-        || held.mode() & 0o077 != 0
-        || held.uid() != rustix::process::geteuid().as_raw()
-    {
-        return Err(CliError::policy_constraint_error(format!(
-            "registry lock `{}` is not a private regular file of this user with one link",
-            lock_path.display()
-        )));
-    }
-    Ok(())
 }
 
 /// Writes `registry` as compact JSON to the destination `lock` guards.
@@ -344,21 +201,21 @@ fn check_lock_identity(lock_path: &Path, file: &std::fs::File) -> Result<(), Cli
 ///
 /// The destination is untouched when the write is refused.
 pub(crate) fn write_reserving_registry<T: RevocationReserve>(
-    lock: &RegistryLock,
+    lock: &RegistryFile,
     registry: &T,
 ) -> Result<(), CliError> {
     let path = lock.destination();
     let reserved = registry.revocation_reserve()?;
     if let Some(limit) = MAX_SIGNED_FILE_BYTES.checked_sub(reserved) {
         if let Some(bytes) = encode_within(registry, limit)? {
-            return replace_file(path, &bytes);
+            return Ok(lock.replace(&bytes)?);
         }
     }
     let replaced = reserved_size_on_disk::<T>(path)?;
     if let Some(bytes) = encode_within(registry, MAX_SIGNED_FILE_BYTES)? {
         let reserved_size = bytes.len().saturating_add(reserved);
         if replaced.is_some_and(|replaced| reserved_size <= replaced) {
-            return replace_file(path, &bytes);
+            return Ok(lock.replace(&bytes)?);
         }
     }
     if replaced.is_some_and(|replaced| replaced > MAX_SIGNED_FILE_BYTES) {
@@ -376,8 +233,8 @@ pub(crate) fn write_reserving_registry<T: RevocationReserve>(
 fn reserved_size_on_disk<T: RevocationReserve>(path: &Path) -> Result<Option<usize>, CliError> {
     let bytes = match read_bounded(path) {
         Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(CliError::Io(error)),
+        Err(RegularFileError::Missing) => return Ok(None),
+        Err(error) => return Err(error.into()),
     };
     let replaced: T = decode(&bytes)?;
     Ok(Some(
@@ -411,93 +268,41 @@ fn escaped_len(text: &str) -> Result<usize, CliError> {
     Ok(encoded_len(text)?.saturating_sub(2))
 }
 
-/// Points in `replace_file_with` where a failure can be injected.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ReplaceStage {
-    /// After the temporary is fully written and synced, before the rename.
-    BeforeRename,
-    /// After the rename, at the parent directory sync.
-    DirectorySync,
-}
-
-/// Replaces `path` through a freshly created, randomly named sibling that is
-/// opened exclusively with owner-only permissions (never more permissive than
-/// the file it replaces), synced, and renamed into place.
-///
-/// A failure before the rename removes only the temporary this call created
-/// and leaves the prior file intact. A failure of the parent directory sync
-/// happens after the rename: the new file is already in place, and the result
-/// is `CliError::PersistedWithoutDurability`. The directory sync is performed
-/// on Unix only; other platforms rely on the file sync and the atomic rename.
-fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
-    let random = chio_core::Keypair::generate().public_key().to_hex();
-    replace_file_via(path, bytes, &random)
-}
-
-pub(crate) fn replace_file_via(path: &Path, bytes: &[u8], nonce: &str) -> Result<(), CliError> {
-    replace_file_with(path, bytes, nonce, &|_| Ok(()))
-}
-
-/// `nonce` names the temporary sibling; `inject` can fail a stage.
-pub(crate) fn replace_file_with(
-    path: &Path,
-    bytes: &[u8],
-    nonce: &str,
-    inject: &dyn Fn(ReplaceStage) -> std::io::Result<()>,
-) -> Result<(), CliError> {
-    use std::io::Write;
-    let directory = match path.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| CliError::cli_io_error("registry path has no file name"))?
-        .to_string_lossy();
-    let temporary = directory.join(format!(".{file_name}.{nonce}.tmp"));
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
-        let mode = match std::fs::metadata(path) {
-            Ok(existing) => existing.mode() & 0o600,
-            Err(_) => 0o600,
-        };
-        options.mode(mode);
+impl From<RegistryFileError> for CliError {
+    fn from(error: RegistryFileError) -> Self {
+        match error {
+            RegistryFileError::Io(error) => CliError::Io(error),
+            RegistryFileError::PersistedWithoutDurability(error) => {
+                CliError::PersistedWithoutDurability(error)
+            }
+            RegistryFileError::NoFileName => CliError::cli_io_error(error.to_string()),
+            RegistryFileError::SymlinkDestination(_) | RegistryFileError::LockNotPrivate(_) => {
+                CliError::policy_constraint_error(error.to_string())
+            }
+            RegistryFileError::Busy | RegistryFileError::Unsupported => {
+                CliError::cli_other_error(error.to_string())
+            }
+        }
     }
-    let mut file = options.open(&temporary)?;
-    let committed = (|| -> std::io::Result<()> {
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        inject(ReplaceStage::BeforeRename)?;
-        std::fs::rename(&temporary, path)
-    })();
-    if let Err(error) = committed {
-        let _ = std::fs::remove_file(&temporary);
-        return Err(CliError::Io(error));
+}
+
+impl From<RegistryFileError> for RegistryUpdateError {
+    fn from(error: RegistryFileError) -> Self {
+        match error {
+            RegistryFileError::Busy => RegistryUpdateError::Busy,
+            RegistryFileError::Unsupported => RegistryUpdateError::Unsupported,
+            RegistryFileError::Io(_)
+            | RegistryFileError::PersistedWithoutDurability(_)
+            | RegistryFileError::NoFileName
+            | RegistryFileError::SymlinkDestination(_)
+            | RegistryFileError::LockNotPrivate(_) => RegistryUpdateError::Load(error.into()),
+        }
     }
-    let durable = inject(ReplaceStage::DirectorySync).and_then(|()| sync_directory(directory));
-    durable.map_err(CliError::PersistedWithoutDurability)
-}
-
-#[cfg(unix)]
-fn sync_directory(directory: &Path) -> std::io::Result<()> {
-    std::fs::File::open(directory)?.sync_all()
-}
-
-#[cfg(not(unix))]
-fn sync_directory(_directory: &Path) -> std::io::Result<()> {
-    Ok(())
 }
 
 pub(crate) fn read<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
     decode(&read_bounded(path)?)
 }
-
-#[cfg(test)]
-#[path = "signed_input/file_tests.rs"]
-mod file_tests;
 
 #[cfg(test)]
 mod tests {

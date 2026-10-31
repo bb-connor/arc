@@ -89,6 +89,7 @@ impl RemoteCapabilityAuthority {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_egress_contract::EgressAllowanceSet;
     use chio_kernel::CapabilityAuthority;
     use chio_security_types::clock::FixedClock;
     type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -160,7 +161,11 @@ mod tests {
         });
         let remote = RemoteCapabilityAuthority {
             clock: Arc::new(FixedClock::new(100)),
-            client: build_client(&endpoint, "test-only-control")?,
+            client: build_client(
+                &endpoint,
+                "test-only-control",
+                &EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache::from_status(&before)?),
             refresh_lock: Mutex::new(()),
             pinned_current: None,

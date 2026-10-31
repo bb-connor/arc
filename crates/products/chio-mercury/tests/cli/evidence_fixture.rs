@@ -67,7 +67,6 @@ pub(super) fn export_fixture_package(receipt_db_path: &Path, output_dir: &Path) 
         false,
         Some(receipt_db_path),
         None,
-        None,
         &Keypair::from_seed(&[58; 32]),
     )
     .expect("export evidence fixture package");

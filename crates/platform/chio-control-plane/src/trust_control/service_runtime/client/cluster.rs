@@ -8,7 +8,7 @@ impl TrustControlClient {
             ));
         }
         for endpoint in self.endpoints.iter() {
-            super::super::super::report_validation::normalize_cluster_config_url(endpoint, true)?;
+            super::super::super::report_validation::normalize_cluster_config_url(endpoint)?;
         }
         Ok(())
     }

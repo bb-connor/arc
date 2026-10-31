@@ -123,6 +123,7 @@ reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
+chio-secure-ipc = { workspace = true, features = ["test-support"] }
 chio-runtime-core = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-link = { workspace = true }
@@ -134,6 +135,7 @@ proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
 tower = { workspace = true }
+ureq = { version = "2.10", features = ["json"] }
 
 [lints]
 workspace = true

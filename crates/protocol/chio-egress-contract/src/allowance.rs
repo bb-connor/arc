@@ -278,6 +278,12 @@ pub enum PrivateNetworkAllowanceError {
     DuplicateAllowance { host: String, port: u16 },
     #[error("allowance for {host}:{port} names both http and https")]
     SchemeConflict { host: String, port: u16 },
+    #[error("egress allowance document exceeds {max_bytes} bytes")]
+    DocumentTooLarge { max_bytes: usize },
+    #[error("egress allowance document is not UTF-8")]
+    DocumentNotUtf8,
+    #[error("egress allowance document is invalid: {reason}")]
+    DocumentInvalid { reason: String },
 }
 
 /// Ranges an allowance may open: RFC 1918, RFC 6598 shared address space and
@@ -305,6 +311,14 @@ const METADATA_RANGES: [IpCidr; 3] = [
     IpCidr::v4([100, 100, 100, 200], 32),
     IpCidr::v6([0xfd00, 0x0ec2, 0, 0, 0, 0, 0, 0], 32),
 ];
+
+/// Whether `address` is link-local or a cloud metadata address, which no
+/// contract or allowance can reach. An IPv4-mapped address is checked as IPv4.
+#[must_use]
+pub fn address_is_reserved(address: IpAddr) -> bool {
+    let address = canonical_ip(address);
+    RESERVED_RANGES.iter().any(|range| range.contains(address))
+}
 
 pub(crate) fn is_metadata_address(address: IpAddr) -> bool {
     let address = canonical_ip(address);
@@ -429,9 +443,10 @@ fn validate_cidr(cidr: &IpCidr) -> Result<(), PrivateNetworkAllowanceError> {
 }
 
 /// An operator's declared allowances, each entry validated on its own and no
-/// two for the same `host:port`. A contract takes only the entries for its own
+/// two for the same `host:port`. [`EgressAllowanceSet::from_toml_bytes`] is the only
+/// document form. A contract takes only the entries for its own
 /// authorities (see `HttpEgressContract::with_private_network_allowances`).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EgressAllowanceSet {
     allow: BTreeSet<PrivateNetworkAllowance>,
 }
@@ -465,18 +480,6 @@ impl EgressAllowanceSet {
             .filter(|entry| entry.host == host && entry.port == port)
             .cloned()
             .collect()
-    }
-}
-
-impl<'de> Deserialize<'de> for EgressAllowanceSet {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct Document {
-            allow: Vec<PrivateNetworkAllowance>,
-        }
-        let document = Document::deserialize(deserializer)?;
-        Self::new(document.allow).map_err(serde::de::Error::custom)
     }
 }
 

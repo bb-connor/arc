@@ -1,5 +1,6 @@
 //! Election ranks signing custodians ahead of lower custody-less URLs.
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 struct CustodyCluster {
     directory: tempfile::TempDir,
@@ -149,6 +150,7 @@ fn rank_after_late_custodian_status(change: impl FnOnce(&mut Value)) {
         service_runtime::client::build_cluster_peer_client(
             &cluster.lowest.state.config.access,
             &cluster.custodian.url,
+            &EgressAllowanceSet::default(),
         )
         .test_unwrap()
         .cluster_status()

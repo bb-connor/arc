@@ -28,6 +28,7 @@ pub(crate) fn dispatch_passport(
     budget_db: Option<PathBuf>,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         PassportCommands::Generate {
@@ -79,6 +80,7 @@ pub(crate) fn dispatch_passport(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
+            egress,
         ),
         PassportCommands::Evaluate {
             input,
@@ -93,6 +95,7 @@ pub(crate) fn dispatch_passport(
             json_output,
             control_url.as_deref(),
             control_token.as_deref(),
+            egress,
         ),
         PassportCommands::Present {
             input,
@@ -123,6 +126,7 @@ pub(crate) fn dispatch_passport(
                     json_output,
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                    egress,
                 })
             }
             PassportPolicyCommands::Verify { input, at } => {
@@ -135,6 +139,7 @@ pub(crate) fn dispatch_passport(
                 verifier_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportPolicyCommands::Get {
                 policy_id,
@@ -145,6 +150,7 @@ pub(crate) fn dispatch_passport(
                 verifier_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportPolicyCommands::Upsert {
                 input,
@@ -155,6 +161,7 @@ pub(crate) fn dispatch_passport(
                 verifier_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportPolicyCommands::Delete {
                 policy_id,
@@ -165,6 +172,7 @@ pub(crate) fn dispatch_passport(
                 verifier_policies_file.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
         PassportCommands::Challenge { command } => match command {
@@ -192,6 +200,7 @@ pub(crate) fn dispatch_passport(
                     json_output,
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                    egress,
                 },
             ),
             PassportChallengeCommands::Respond {
@@ -230,6 +239,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
         PassportCommands::Status { command } => match command {
@@ -246,6 +256,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportStatusCommands::List {
                 passport_statuses_file,
@@ -254,6 +265,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportStatusCommands::Get {
                 passport_id,
@@ -264,6 +276,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportStatusCommands::Resolve {
                 passport_id,
@@ -274,6 +287,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportStatusCommands::Revoke {
                 passport_id,
@@ -288,6 +302,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
         PassportCommands::Issuance { command } => match command {
@@ -304,6 +319,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportIssuanceCommands::Offer {
                 input,
@@ -326,6 +342,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportIssuanceCommands::Token {
                 offer,
@@ -338,6 +355,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             PassportIssuanceCommands::Credential {
                 offer,
@@ -360,6 +378,7 @@ pub(crate) fn dispatch_passport(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
         PassportCommands::Oid4vp { command } => match command {
@@ -387,6 +406,7 @@ pub(crate) fn dispatch_passport(
                     json_output,
                     control_url: control_url.as_deref(),
                     control_token: control_token.as_deref(),
+                    egress,
                 },
             ),
             PassportOid4vpCommands::Respond {

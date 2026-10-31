@@ -66,10 +66,11 @@ pub(crate) fn normalize_cluster_url(value: &str) -> Result<String, CliError> {
     Ok(normalized.to_string())
 }
 
-pub(crate) fn normalize_cluster_config_url(
-    value: &str,
-    allow_local: bool,
-) -> Result<String, CliError> {
+/// Shape of a configured cluster URL: http(s), plaintext only to a loopback
+/// literal, no credentials, query or fragment, and never a link-local or cloud
+/// metadata literal. Every other address class is enforced by the peer client's
+/// egress contract when it connects.
+pub(crate) fn normalize_cluster_config_url(value: &str) -> Result<String, CliError> {
     let normalized = normalize_cluster_url(value)?;
     let parsed = Url::parse(&normalized).map_err(|error| {
         CliError::cli_other_error(format!("cluster URL must be valid: {error}"))
@@ -106,61 +107,33 @@ pub(crate) fn normalize_cluster_config_url(
             "cluster URL must not contain a fragment".to_string(),
         ));
     }
-    if allow_local {
-        return Ok(normalized);
-    }
-    validate_cluster_url_host(&parsed)?;
-    Ok(normalized)
-}
-
-fn validate_cluster_url_host(parsed: &Url) -> Result<(), CliError> {
-    match parsed.host() {
-        Some(Host::Ipv4(address)) => {
-            if chio_external_guards::denied_external_guard_ip(IpAddr::V4(address)) {
-                return Err(CliError::cli_other_error(format!(
-                    "cluster URL must not target disallowed address `{address}` without --allow-local-peer-urls"
-                )));
-            }
-        }
-        Some(Host::Ipv6(address)) => {
-            if chio_external_guards::denied_external_guard_ip(IpAddr::V6(address)) {
-                return Err(CliError::cli_other_error(format!(
-                    "cluster URL must not target disallowed address `{address}` without --allow-local-peer-urls"
-                )));
-            }
-        }
-        Some(Host::Domain(host)) => {
-            let lower = host.to_ascii_lowercase();
-            if lower == "localhost" || lower.ends_with(".localhost") {
-                return Err(CliError::cli_other_error(
-                    "cluster URL must not target localhost without --allow-local-peer-urls"
-                        .to_string(),
-                ));
-            }
-            let port = parsed.port_or_known_default().ok_or_else(|| {
-                CliError::cli_other_error("cluster URL must include a resolvable port".to_string())
-            })?;
-            let addrs = (host, port).to_socket_addrs().map_err(|error| {
-                CliError::cli_other_error(format!(
-                    "cluster URL host `{host}` could not be resolved: {error}"
-                ))
-            })?;
-            for addr in addrs {
-                if chio_external_guards::denied_external_guard_ip(addr.ip()) {
-                    return Err(CliError::cli_other_error(format!(
-                        "cluster URL host `{host}` resolved to disallowed address `{}` without --allow-local-peer-urls",
-                        addr.ip()
-                    )));
-                }
-            }
-        }
+    let reserved = match parsed.host() {
+        Some(Host::Ipv4(address)) => Some(IpAddr::V4(address)),
+        Some(Host::Ipv6(address)) => Some(IpAddr::V6(address)),
+        Some(Host::Domain(_)) => None,
         None => {
             return Err(CliError::cli_other_error(
                 "cluster URL must include a host".to_string(),
-            ));
+            ))
         }
     }
-    Ok(())
+    .filter(|address| chio_egress_contract::address_is_reserved(*address));
+    if let Some(address) = reserved {
+        let host = address.to_string();
+        let link_local = match address {
+            IpAddr::V4(v4) => v4.is_link_local(),
+            IpAddr::V6(v6) => v6
+                .to_ipv4_mapped()
+                .map_or_else(|| v6.is_unicast_link_local(), |v4| v4.is_link_local()),
+        };
+        let refusal = if link_local {
+            chio_egress_contract::HttpEgressError::LinkLocalDenied { host }
+        } else {
+            chio_egress_contract::HttpEgressError::ReservedAddressDenied { host }
+        };
+        return Err(super::service_runtime::client::egress_refusal(refusal));
+    }
+    Ok(normalized)
 }
 
 pub(crate) fn bearer_token_from_headers(headers: &HeaderMap) -> Result<String, Response> {

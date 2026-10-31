@@ -1617,6 +1617,10 @@
       "semantics": "Local YAML/TOML configuration controls policy, identity, attestation or keyring composition and is subject to the existing typed validation in load_signed_from_path, parse_verified_str.",
       "remaining_risk": "Format-specific duplicate keys, aliases and numeric conversion are not enforced by the JSON reader. Configuration provenance and parser semantics require separate qualification."
     },
+    "crates/protocol/chio-egress-contract/src/allowance_file.rs": {
+      "semantics": "Local TOML operator egress allowance file named by --egress-allowance-file. The chio-cli loader opens only a regular file, reads at most 64 KiB plus one byte and refuses a longer file, and requires UTF-8; EgressAllowanceSet::EgressAllowanceSet::from_toml_bytes refuses a document over MAX_EGRESS_ALLOWANCE_DOCUMENT_BYTES, decodes with deny_unknown_fields at both levels, and validates every entry (canonical CIDR, breadth bound, private ranges only, no link-local or metadata range, no duplicate host:port) before any contract can use it.",
+      "remaining_risk": "TOML parser semantics (duplicate keys are refused by the format; integer and string conversion) belong to the toml crate. File provenance and permissions are the operator's; the file only narrows which private addresses a contract may reach and never admits link-local or metadata addresses."
+    },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs": {
       "semantics": "OAuth bearer validation or identity-provider HTTP responses feed the existing issuer, audience and identity checks.",
       "remaining_risk": "Direct HTTP response decoding requires a separate bounded-original-body and identity trust review; it is response ingress, not an incoming HTTP request extractor."

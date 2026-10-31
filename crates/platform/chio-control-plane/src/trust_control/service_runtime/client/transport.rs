@@ -1,6 +1,29 @@
+use chio_egress_contract::{BlockingContractAgent, BlockingContractStream, HttpEgressError};
+
 use super::super::*;
+use super::factory::{egress_refusal, is_transport_failure};
 use super::should_retry_status;
 use crate::ControlPlaneError;
+
+const JSON: &str = "application/json";
+const FORM: &str = "application/x-www-form-urlencoded";
+
+fn json_body<B: Serialize>(body: &B) -> Result<Vec<u8>, CliError> {
+    serde_json::to_vec(body).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to serialize trust control request: {error}"
+        ))
+    })
+}
+
+fn status_failure(status: u16, body: String) -> (CliError, bool) {
+    (
+        CliError::cli_other_error(format!(
+            "trust control service request failed with {status}: {body}"
+        )),
+        !should_retry_status(status),
+    )
+}
 
 impl TrustControlClient {
     pub(super) fn get_internal_json<T: for<'de> Deserialize<'de>>(
@@ -32,9 +55,9 @@ impl TrustControlClient {
         self.request_json(
             |client, url, token| {
                 client
-                    .get(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .call()
+                    .get(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call_streaming()
             },
             path,
         )
@@ -44,11 +67,17 @@ impl TrustControlClient {
         &self,
         path: &str,
     ) -> Result<T, CliError> {
-        self.request_json_without_service_auth(|client, url| client.get(url).call(), path)
+        self.request_json_without_service_auth(
+            |client, url| client.get(url)?.call_streaming(),
+            path,
+        )
     }
 
     pub(super) fn public_get_text(&self, path: &str) -> Result<String, CliError> {
-        self.request_text_without_service_auth(|client, url| client.get(url).call(), path)
+        self.request_text_without_service_auth(
+            |client, url| client.get(url)?.call_streaming(),
+            path,
+        )
     }
 
     pub(super) fn get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
@@ -67,9 +96,9 @@ impl TrustControlClient {
         self.request_json(
             |client, base_url, token| {
                 client
-                    .get(&format!("{base_url}{url}"))
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .call()
+                    .get(&format!("{base_url}{url}"))?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call_streaming()
             },
             "",
         )
@@ -80,17 +109,14 @@ impl TrustControlClient {
         path: &str,
         body: &B,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         self.request_json(
             |client, url, token| {
                 client
-                    .post(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .send_json(json.clone())
+                    .post(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
             },
             path,
         )
@@ -102,17 +128,14 @@ impl TrustControlClient {
         body: &B,
         response_limit: u64,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         self.request_json_capped(
             |client, url, token| {
                 client
-                    .post(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .send_json(json.clone())
+                    .post(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
             },
             path,
             response_limit,
@@ -130,22 +153,19 @@ impl TrustControlClient {
         body: &B,
         term: u64,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         let term = term.to_string();
         self.request_json(
             |client, url, token| {
                 client
-                    .post(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .set(
+                    .post(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .header(
                         super::super::super::report_validation::FORWARDED_AUTHORITY_TERM_HEADER,
                         &term,
                     )
-                    .send_json(json.clone())
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
             },
             path,
         )
@@ -156,13 +176,14 @@ impl TrustControlClient {
         path: &str,
         body: &B,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         self.request_json_without_service_auth(
-            |client, url| client.post(url).send_json(json.clone()),
+            |client, url| {
+                client
+                    .post(url)?
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
+            },
             path,
         )
     }
@@ -172,7 +193,18 @@ impl TrustControlClient {
         path: &str,
         body: &[(&str, &str)],
     ) -> Result<T, CliError> {
-        self.request_json_without_service_auth(|client, url| client.post(url).send_form(body), path)
+        let form = UrlFormSerializer::new(String::new())
+            .extend_pairs(body)
+            .finish();
+        self.request_json_without_service_auth(
+            |client, url| {
+                client
+                    .post(url)?
+                    .header("Content-Type", FORM)
+                    .send_bytes_streaming(form.as_bytes())
+            },
+            path,
+        )
     }
 
     pub(super) fn bearer_post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
@@ -181,17 +213,14 @@ impl TrustControlClient {
         bearer_token: &str,
         body: &B,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         self.request_json_with_bearer(
             |client, url| {
                 client
-                    .post(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {bearer_token}"))
-                    .send_json(json.clone())
+                    .post(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {bearer_token}"))
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
             },
             path,
         )
@@ -202,17 +231,14 @@ impl TrustControlClient {
         path: &str,
         body: &B,
     ) -> Result<T, CliError> {
-        let json = serde_json::to_value(body).map_err(|error| {
-            CliError::cli_other_error(format!(
-                "failed to serialize trust control request: {error}"
-            ))
-        })?;
+        let json = json_body(body)?;
         self.request_json(
             |client, url, token| {
                 client
-                    .put(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .send_json(json.clone())
+                    .put(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .header("Content-Type", JSON)
+                    .send_bytes_streaming(&json)
             },
             path,
         )
@@ -225,12 +251,76 @@ impl TrustControlClient {
         self.request_json(
             |client, url, token| {
                 client
-                    .delete(url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
-                    .call()
+                    .delete(url)?
+                    .header(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call_streaming()
             },
             path,
         )
+    }
+
+    /// Try each endpoint in preference order and return the first response
+    /// below 400. `on_status` maps an error response to the failure to report
+    /// and whether it ends the walk; a transport or name-resolution failure
+    /// moves to the next endpoint, and a contract refusal aborts the request.
+    fn dispatch<F, S>(
+        &self,
+        request: F,
+        path: &str,
+        on_status: S,
+        answered_outranks_unreachable: bool,
+    ) -> Result<BlockingContractStream, CliError>
+    where
+        F: Fn(&BlockingContractAgent, &str) -> Result<BlockingContractStream, HttpEgressError>,
+        S: Fn(u16, String) -> (CliError, bool),
+    {
+        let mut answered: Option<CliError> = None;
+        let mut unreachable: Option<CliError> = None;
+        for index in self.endpoint_order() {
+            let url = format!(
+                "{}{}",
+                self.endpoints
+                    .get(index)
+                    .ok_or_else(|| CliError::cli_other_error(
+                        "endpoint order contains an unknown endpoint".to_owned()
+                    ))?,
+                path
+            );
+            match request(&self.http, &url) {
+                Ok(response) if response.status() < 400 => {
+                    self.mark_preferred(index);
+                    return Ok(response);
+                }
+                Ok(response) => {
+                    let status = response.status();
+                    let body = response
+                        .read_all()
+                        .map(|read| String::from_utf8_lossy(read.body()).into_owned())
+                        .unwrap_or_default();
+                    let (error, stop) = on_status(status, body);
+                    if stop {
+                        return Err(error);
+                    }
+                    answered = Some(error);
+                }
+                Err(error) if is_transport_failure(&error) => {
+                    unreachable = Some(CliError::from(ControlPlaneError::Unreachable(
+                        error.to_string(),
+                    )));
+                }
+                Err(error) => return Err(egress_refusal(error)),
+            }
+        }
+        let failure = if answered_outranks_unreachable {
+            answered.or(unreachable)
+        } else {
+            unreachable.or(answered)
+        };
+        Err(failure.unwrap_or_else(|| {
+            CliError::cli_other_error(
+                "trust control service request failed with no endpoints".to_string(),
+            )
+        }))
     }
 
     fn request_internal_get_json<T>(
@@ -241,41 +331,34 @@ impl TrustControlClient {
     where
         T: for<'de> Deserialize<'de>,
     {
-        let endpoint_order = self.endpoint_order();
-        let mut last_error = None;
-        for index in endpoint_order {
-            let url = format!(
-                "{}{}",
-                self.endpoints
-                    .get(index)
-                    .ok_or_else(|| CliError::cli_other_error(
-                        "endpoint order contains an unknown endpoint".to_owned()
-                    ))?,
-                request_path
-            );
-            let request = self.build_internal_get_request(&self.http, &url, request_path, term)?;
-            match request.call() {
-                Ok(response) => {
-                    self.mark_preferred(index);
-                    return read_capped_json(response.into_reader(), MAX_PEER_RESPONSE_BYTES);
+        let local = std::cell::RefCell::new(None);
+        let response = self.dispatch(
+            |client, url| match self.build_internal_get_request(client, url, request_path, term) {
+                Ok(request) => request.call_streaming(),
+                Err(error) => {
+                    *local.borrow_mut() = Some(error);
+                    Err(HttpEgressError::MissingAuthority)
                 }
-                Err(ureq::Error::Status(_, response)) => {
-                    last_error = Some(response.into_string().unwrap_or_default());
-                }
-                Err(ureq::Error::Transport(error)) => {
-                    last_error = Some(format!("trust control service transport failed: {error}"));
-                }
-            }
+            },
+            request_path,
+            |_, body| (CliError::cli_other_error(body), false),
+            false,
+        );
+        if let Some(error) = local.into_inner() {
+            return Err(error);
         }
-        Err(CliError::cli_other_error(last_error.unwrap_or_else(|| {
-            "trust control service request failed".to_string()
-        })))
+        let response = response?;
+        read_capped_json(response.into_body(), MAX_PEER_RESPONSE_BYTES)
     }
 
     pub(crate) fn request_json<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
     where
         T: for<'de> Deserialize<'de>,
-        F: Fn(&Agent, &str, &str) -> Result<ureq::Response, ureq::Error>,
+        F: Fn(
+            &BlockingContractAgent,
+            &str,
+            &str,
+        ) -> Result<BlockingContractStream, HttpEgressError>,
     {
         self.request_json_capped(request, path, MAX_PEER_RESPONSE_BYTES)
     }
@@ -288,99 +371,33 @@ impl TrustControlClient {
     ) -> Result<T, CliError>
     where
         T: for<'de> Deserialize<'de>,
-        F: Fn(&Agent, &str, &str) -> Result<ureq::Response, ureq::Error>,
+        F: Fn(
+            &BlockingContractAgent,
+            &str,
+            &str,
+        ) -> Result<BlockingContractStream, HttpEgressError>,
     {
-        let endpoint_order = self.endpoint_order();
-        let mut answered = None;
-        let mut unreachable = None;
-        for index in endpoint_order {
-            let url = format!(
-                "{}{}",
-                self.endpoints
-                    .get(index)
-                    .ok_or_else(|| CliError::cli_other_error(
-                        "endpoint order contains an unknown endpoint".to_owned()
-                    ))?,
-                path
-            );
-            match request(&self.http, &url, &self.token) {
-                Ok(response) => {
-                    self.mark_preferred(index);
-                    return read_capped_json(response.into_reader(), response_limit);
-                }
-                Err(ureq::Error::Status(status, response)) => {
-                    let refusal = ControlPlaneError::from_status(
-                        status,
-                        response.into_string().unwrap_or_default(),
-                    );
-                    if !should_retry_status(status) {
-                        return Err(refusal.into());
-                    }
-                    answered = Some(refusal);
-                }
-                Err(ureq::Error::Transport(error)) => {
-                    unreachable = Some(ControlPlaneError::Unreachable(error.to_string()));
-                }
-            }
-        }
-        // An endpoint that answered outranks one that never did: the service
-        // was reached and refused.
-        Err(answered
-            .or(unreachable)
-            .map(CliError::from)
-            .unwrap_or_else(|| {
-                CliError::cli_other_error(
-                    "trust control service request failed with no endpoints".to_string(),
+        let response = self.dispatch(
+            |client, url| request(client, url, &self.token),
+            path,
+            |status, body| {
+                (
+                    CliError::from(ControlPlaneError::from_status(status, body)),
+                    !should_retry_status(status),
                 )
-            }))
+            },
+            true,
+        )?;
+        read_capped_json(response.into_body(), response_limit)
     }
 
     fn request_json_without_service_auth<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
     where
         T: for<'de> Deserialize<'de>,
-        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+        F: Fn(&BlockingContractAgent, &str) -> Result<BlockingContractStream, HttpEgressError>,
     {
-        let endpoint_order = self.endpoint_order();
-        let mut last_error = None;
-        for index in endpoint_order {
-            let url = format!(
-                "{}{}",
-                self.endpoints
-                    .get(index)
-                    .ok_or_else(|| CliError::cli_other_error(
-                        "endpoint order contains an unknown endpoint".to_owned()
-                    ))?,
-                path
-            );
-            match request(&self.http, &url) {
-                Ok(response) => {
-                    self.mark_preferred(index);
-                    return read_capped_json(response.into_reader(), MAX_PEER_RESPONSE_BYTES);
-                }
-                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
-                }
-                Err(ureq::Error::Status(status, response)) => {
-                    return Err(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
-                }
-                Err(ureq::Error::Transport(error)) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service transport failed: {error}"
-                    )));
-                }
-            }
-        }
-        Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error(
-                "trust control service request failed with no endpoints".to_string(),
-            )
-        }))
+        let response = self.dispatch(request, path, status_failure, false)?;
+        read_capped_json(response.into_body(), MAX_PEER_RESPONSE_BYTES)
     }
 
     pub(crate) fn request_text_without_service_auth<F>(
@@ -389,59 +406,22 @@ impl TrustControlClient {
         path: &str,
     ) -> Result<String, CliError>
     where
-        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+        F: Fn(&BlockingContractAgent, &str) -> Result<BlockingContractStream, HttpEgressError>,
     {
-        let endpoint_order = self.endpoint_order();
-        let mut last_error = None;
-        for index in endpoint_order {
-            let url = format!(
-                "{}{}",
-                self.endpoints
-                    .get(index)
-                    .ok_or_else(|| CliError::cli_other_error(
-                        "endpoint order contains an unknown endpoint".to_owned()
-                    ))?,
-                path
-            );
-            match request(&self.http, &url) {
-                Ok(response) => {
-                    self.mark_preferred(index);
-                    return response.into_string().map_err(|error| {
-                        CliError::cli_other_error(format!(
-                            "failed to decode trust control text response body: {error}"
-                        ))
-                    });
-                }
-                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
-                }
-                Err(ureq::Error::Status(status, response)) => {
-                    return Err(CliError::cli_other_error(format!(
-                        "trust control service request failed with {status}: {}",
-                        response.into_string().unwrap_or_default()
-                    )));
-                }
-                Err(ureq::Error::Transport(error)) => {
-                    last_error = Some(CliError::cli_other_error(format!(
-                        "trust control service transport failed: {error}"
-                    )));
-                }
-            }
-        }
-        Err(last_error.unwrap_or_else(|| {
-            CliError::cli_other_error(
-                "trust control service request failed with no endpoints".to_string(),
-            )
-        }))
+        let response = self.dispatch(request, path, status_failure, false)?;
+        let mut text = String::new();
+        std::io::Read::read_to_string(&mut response.into_body(), &mut text).map_err(|error| {
+            CliError::cli_other_error(format!(
+                "failed to decode trust control text response body: {error}"
+            ))
+        })?;
+        Ok(text)
     }
 
     fn request_json_with_bearer<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
     where
         T: for<'de> Deserialize<'de>,
-        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+        F: Fn(&BlockingContractAgent, &str) -> Result<BlockingContractStream, HttpEgressError>,
     {
         self.request_json_without_service_auth(request, path)
     }

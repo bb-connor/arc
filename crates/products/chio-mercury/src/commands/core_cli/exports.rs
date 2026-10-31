@@ -469,7 +469,6 @@ pub(super) fn export_mercury_run(
         true,
         Some(&receipt_db),
         None,
-        None,
         &kernel,
     )?;
 

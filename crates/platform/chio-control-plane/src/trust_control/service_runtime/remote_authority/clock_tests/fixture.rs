@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_security_types::clock::{Clock, ClockReading, MonotonicInstant, UnixMillis};
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
@@ -193,7 +194,11 @@ pub(super) fn remote(
     }
     Ok(RemoteCapabilityAuthority {
         clock,
-        client: build_client(endpoint, "test-only-control")?,
+        client: build_client(
+            endpoint,
+            "test-only-control",
+            &EgressAllowanceSet::default(),
+        )?,
         cache: Mutex::new(cache),
         refresh_lock: Mutex::new(()),
         pinned_current: None,

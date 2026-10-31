@@ -59,6 +59,15 @@ chio trust serve \
 The access configuration declares the trust-control credentials; see
 [Trust-Control Access Configuration](../reference/TRUST_CONTROL_ACCESS.md).
 
+When a payment rail, the trust-control leader or a cluster peer sits on a
+private network, pass `--egress-allowance-file <PATH>` to the `chio` process
+that dials it. Every command loads the file, and every trust-control, cluster
+peer and adapter client it builds dials under it. Each `[[allow]]` entry pins
+one `host:port` to a CIDR; nothing private is reachable without one. `chio
+trust config check` and `GET /v1/egress-allowances` (a `metrics:read`
+credential) report the loaded set's `egressAllowanceDigest`. See
+[Private network peers and control planes](../reference/TRUST_CONTROL_ACCESS.md#private-network-peers-and-control-planes).
+
 `chio mcp serve-http` runs as the sidecar:
 
 ```bash

@@ -536,3 +536,54 @@ fn unlisted_private_answer_is_refused() {
         })
     );
 }
+
+#[test]
+fn put_dispatches_its_method_and_body_and_reports_the_content_type() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let authority = listener.local_addr().expect("address").to_string();
+    let handle = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut request = Vec::new();
+        let mut byte = [0_u8; 1];
+        while !request.ends_with(b"\r\n\r\n") {
+            if stream.read(&mut byte).expect("read") == 0 {
+                break;
+            }
+            request.push(byte[0]);
+        }
+        let mut body = [0_u8; 7];
+        stream.read_exact(&mut body).expect("body");
+        stream
+            .write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+            )
+            .expect("write");
+        (String::from_utf8_lossy(&request).into_owned(), body)
+    });
+    let agent = agent_for(&authority, 1024);
+    let response = agent
+        .put(&format!("http://{authority}/item"))
+        .expect("allowed")
+        .send_bytes(b"{\"a\":1}")
+        .expect("response");
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.header("content-type"), Some("application/json"));
+    assert_eq!(response.body(), b"{}");
+    let (head, body) = handle.join().expect("server");
+    assert!(head.starts_with("PUT /item HTTP/1.1\r\n"), "{head}");
+    assert_eq!(&body, b"{\"a\":1}");
+}
+
+#[test]
+fn response_without_a_content_type_reports_none() {
+    let (authority, handle) =
+        serve_once("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+    let response = agent_for(&authority, 1024)
+        .get(&format!("http://{authority}/"))
+        .expect("allowed")
+        .call()
+        .expect("response");
+    assert_eq!(response.status(), 204);
+    assert_eq!(response.header("content-type"), None);
+    handle.join().expect("server");
+}

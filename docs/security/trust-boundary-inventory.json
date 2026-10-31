@@ -6740,7 +6740,6 @@
       "decode_strict::from_value"
     ],
     "crates/protocol/chio-egress-contract/src/allowance.rs": [
-      "for_endpoint::custom_deserialize",
       "serialize::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/receipt/metadata/financial.rs": [
@@ -12292,7 +12291,7 @@
     },
     "crates/protocol/chio-egress-contract/src/allowance.rs": {
       "kind": "typed-field-deserializer",
-      "contract": "Custom field deserialization of operator egress allowances inside an outer configuration reader. A CIDR must be canonical text (host bits zero, no IPv4-mapped form, no leading zeros) and an allowance set document refuses unknown fields and validates every entry (breadth bound, private ranges only, no link-local or metadata range, no duplicate host:port) before it is usable.",
+      "contract": "Custom field deserialization of a canonical CIDR inside an outer configuration reader: host bits zero, no IPv4-mapped form, no leading zeros. Allowance sets are built only through EgressAllowanceSet::new and the strict TOML loader in allowance_file.rs, which validate every entry before it is usable.",
       "readers": [
         {
           "reader": "deserialize",
@@ -12302,8 +12301,7 @@
           "apis": [
             "serde::Deserializer"
           ],
-          "checked": true,
-          "instances": 2
+          "checked": true
         }
       ]
     },
@@ -22186,6 +22184,9 @@
     ],
     "crates/protocol/chio-cohere-tools-adapter/src/streaming.rs": [
       "gate_sse_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames"
+    ],
+    "crates/protocol/chio-egress-contract/src/allowance_file.rs": [
+      "from_toml_bytes::format-toml::from_str"
     ],
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs": [
       "json#1::original-json-reader::UntrustedJsonText"

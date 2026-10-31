@@ -2,6 +2,7 @@ use super::super::super::*;
 use super::super::budget::build_remote_budget_store;
 use super::super::client::build_client;
 use super::support::{assert_json_post, assert_json_post_omits, StaticResponseServer};
+use chio_egress_contract::EgressAllowanceSet;
 
 const ARTIFACT_DIGEST_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const APPROVAL_SET_DIGEST: &str =
@@ -344,7 +345,7 @@ fn remote_budget_store_round_trips_exact_structured_authorization(
     let request = composite_request()?;
     let body = structured_authorize_body(&request)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     let decision = store.authorize_budget_hold(request)?;
     let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
@@ -400,7 +401,8 @@ fn remote_authorization_preserves_current_call_custody_and_defaults_to_unknown(
             assert!(fields.remove("cleanupCustody").is_some());
         }
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
+        let store =
+            build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
         let BudgetAuthorizeHoldDecision::Authorized(authorized) =
             store.authorize_budget_hold(request)?
         else {
@@ -432,7 +434,7 @@ fn remote_budget_store_looks_up_exact_cumulative_operation_projection(
         "application/json",
         2,
     );
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     assert_eq!(
         store.get_cumulative_approval_operation_usage("op-lookup")?,
@@ -461,7 +463,7 @@ fn remote_budget_store_looks_up_exact_cumulative_operation_projection(
 fn advisory_remote_authority_rejects_unescrowed_family_mutations_before_network(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = StaticResponseServer::spawn(500, "{}", "application/json", 0);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     let mut family = composite_request()?;
     family.max_invocations = None;
@@ -523,7 +525,7 @@ fn structured_authorization_normalizes_legacy_max_invocations_into_grant_quota(
     request.invocation_quotas.clear();
     let body = structured_authorize_body(&request)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     let BudgetAuthorizeHoldDecision::Authorized(authorized) =
         store.authorize_budget_hold(request)?
     else {
@@ -549,7 +551,7 @@ fn structured_quota_exhaustion_denial_does_not_invent_usage_sequence(
     let body = structured_denied_authorize_body(&request)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -570,7 +572,7 @@ fn structured_quota_exhaustion_denial_does_not_invent_usage_sequence(
         serde_json::from_str(&structured_denied_authorize_body(&composite_request()?)?)?;
     invented["usage"]["seq"] = serde_json::json!(7);
     let server = StaticResponseServer::spawn(200, &invented.to_string(), "application/json", 1);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     assert!(store.authorize_budget_hold(composite_request()?).is_err());
     Ok(())
 }
@@ -595,7 +597,7 @@ fn structured_remote_downgrades_unverified_partition_escrow_claim(
         "application/json",
         1,
     );
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     let decision = store.authorize_budget_hold(request)?;
     let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
@@ -632,7 +634,7 @@ fn structured_authorization_rejects_substitution_before_cache_mutation(
             replacement;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -655,7 +657,7 @@ fn structured_remote_does_not_fallback_to_legacy_on_mixed_version_peer(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         StaticResponseServer::spawn(404, "{\"error\":\"unknown route\"}", "application/json", 1);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     let result = store.authorize_budget_hold(composite_request()?);
     assert!(result.is_err());
     let requests = server.requests();
@@ -669,7 +671,7 @@ fn all_rich_lifecycle_methods_fail_before_mutation_after_restart_on_old_server(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         StaticResponseServer::spawn(404, "{\"error\":\"unknown route\"}", "application/json", 7);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     assert!(store
         .capture_budget_hold(BudgetCaptureHoldRequest {
@@ -789,7 +791,8 @@ fn structured_reconcile_uses_durable_server_state_after_client_restart(
     let request = composite_request()?;
     let body = structured_reconcile_body(&request)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let restarted_store = build_remote_budget_store(&server.url, "secret")?;
+    let restarted_store =
+        build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
 
     let mutation = restarted_store.reconcile_budget_hold(BudgetReconcileHoldRequest {
         capability_id: "cap-composite".to_string(),
@@ -828,7 +831,11 @@ fn structured_reconcile_uses_durable_server_state_after_client_restart(
 #[test]
 fn remote_budget_store_rejects_invalid_composite_identity_before_network_io(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let store = build_remote_budget_store("http://127.0.0.1:1", "secret")?;
+    let store = build_remote_budget_store(
+        "http://127.0.0.1:1",
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     let partial_identity = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
         capability_id: "cap-composite".to_string(),
         grant_index: 0,
@@ -946,7 +953,7 @@ fn remote_budget_store_preserves_structured_capture_decision(
         )?;
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1014,7 +1021,7 @@ fn remote_capture_retry_is_clock_free_after_delay() -> Result<(), Box<dyn std::e
         )?)?;
     let body = structured_capture_body(projection, CaptureInvocationDecision::AlreadyCaptured)?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 2);
-    let store = build_remote_budget_store(&server.url, "secret")?;
+    let store = build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     let capture = || {
         store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-composite".to_string(),
@@ -1091,7 +1098,7 @@ fn remote_budget_store_rejects_structured_capture_identity_substitution(
             .ok_or_else(|| std::io::Error::other("missing response field"))? = substituted;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1150,7 +1157,8 @@ fn remote_budget_store_rejects_stripped_or_mismatched_lifecycle_coupling(
                 serde_json::json!("cap-other");
         }
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
-        let store = build_remote_budget_store(&server.url, "secret")?;
+        let store =
+            build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
         let result = store.capture_invocation_reservations(BudgetCaptureInvocationRequest {
             capability_id: "cap-composite".to_string(),
             grant_index: 0,
@@ -1210,7 +1218,7 @@ fn remote_capture_rejects_projection_downgrade_exact_usage_swap_and_quota_drift(
     ] {
         let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1245,7 +1253,7 @@ fn remote_budget_store_rejects_structured_reconcile_mismatch_without_poisoning_c
             .ok_or_else(|| std::io::Error::other("missing response field"))? = replacement;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1282,7 +1290,7 @@ fn remote_budget_store_rejects_v1_shape_on_versioned_lifecycle_endpoint(
     body["budgetAuthority"]["budgetCommitIndex"] = serde_json::json!(8);
     let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -1331,7 +1339,7 @@ fn remote_budget_store_rejects_structured_reconcile_identity_substitution_withou
             .ok_or_else(|| std::io::Error::other("missing response field"))? = replacement;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1396,7 +1404,7 @@ fn remote_budget_store_rejects_impossible_structured_capture_event_state(
         }
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1434,7 +1442,11 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
         8,
     )?;
     let release_server = StaticResponseServer::spawn(200, &release_body, "application/json", 1);
-    let release_store = build_remote_budget_store(&release_server.url, "secret")?;
+    let release_store = build_remote_budget_store(
+        &release_server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     assert!(release_store
         .release_budget_hold(BudgetReleaseHoldRequest {
             capability_id: "cap-composite".to_string(),
@@ -1461,7 +1473,11 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
         9,
     )?;
     let reconcile_server = StaticResponseServer::spawn(200, &reconcile_body, "application/json", 1);
-    let reconcile_store = build_remote_budget_store(&reconcile_server.url, "secret")?;
+    let reconcile_store = build_remote_budget_store(
+        &reconcile_server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     assert!(reconcile_store
         .reconcile_budget_hold(BudgetReconcileHoldRequest {
             capability_id: "cap-composite".to_string(),
@@ -1489,7 +1505,11 @@ fn remote_budget_store_rejects_nonterminal_monetary_lifecycle_states(
         10,
     )?;
     let capture_server = StaticResponseServer::spawn(200, &capture_body, "application/json", 1);
-    let capture_store = build_remote_budget_store(&capture_server.url, "secret")?;
+    let capture_store = build_remote_budget_store(
+        &capture_server.url,
+        "secret",
+        &EgressAllowanceSet::default(),
+    )?;
     assert!(capture_store
         .capture_budget_hold(BudgetCaptureHoldRequest {
             capability_id: "cap-composite".to_string(),
@@ -1541,7 +1561,7 @@ fn remote_budget_store_rejects_structured_reverse_substitution_without_poisoning
             .ok_or_else(|| std::io::Error::other("missing response field"))? = replacement;
         let server = StaticResponseServer::spawn(200, &body.to_string(), "application/json", 1);
         let store = RemoteBudgetStore {
-            client: build_client(&server.url, "secret")?,
+            client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
             cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
             recovery: None,
         };
@@ -1586,7 +1606,7 @@ fn fenced_reverse_requires_returned_cumulative_state_without_poisoning_cache(
     )?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
     let store = RemoteBudgetStore {
-        client: build_client(&server.url, "secret")?,
+        client: build_client(&server.url, "secret", &EgressAllowanceSet::default())?,
         cached_usage: std::sync::Mutex::new(std::collections::HashMap::new()),
         recovery: None,
     };
@@ -1635,7 +1655,8 @@ fn remote_budget_store_cancels_durable_capture_without_process_local_state(
         8,
     )?;
     let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
-    let restarted_store = build_remote_budget_store(&server.url, "secret")?;
+    let restarted_store =
+        build_remote_budget_store(&server.url, "secret", &EgressAllowanceSet::default())?;
     let cancellation = restarted_store.cancel_captured_before_dispatch(
         BudgetCancelCapturedBeforeDispatchRequest {
             capability_id: "cap-composite".to_string(),

@@ -1,11 +1,12 @@
 #![cfg(unix)]
 
-use std::io::{ErrorKind, Write};
+use std::io::Write;
 
 use chio_control_plane::federation_policy::FederationAdmissionPolicyRegistry;
 use chio_control_plane::scim_lifecycle::ScimLifecycleRegistry;
 use chio_control_plane::CliError;
 use chio_core::canonical::UntrustedJsonError;
+use chio_secure_ipc::regular_file::RegularFileError;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -58,12 +59,18 @@ macro_rules! registry_reader_tests {
                 let dir = tempfile::tempdir()?;
                 let path = dir.path().join("registry.json");
                 std::fs::File::create(&path)?.set_len((REGISTRY_LIMIT + 4096) as u64)?;
-                let error = Registry::load(&path).err().ok_or("oversized file accepted")?;
-                let CliError::SignedJson(UntrustedJsonError::TooLarge { bytes, bound }) = error else {
-                    return Err(format!("unexpected refusal: {error:?}").into());
-                };
-                assert_eq!(bytes, REGISTRY_LIMIT + 1);
-                assert_eq!(bound, REGISTRY_LIMIT);
+                let error = Registry::load(&path)
+                    .err()
+                    .ok_or("oversized file accepted")?;
+                assert!(
+                    matches!(
+                        error,
+                        CliError::File(RegularFileError::TooLarge {
+                            max_bytes: REGISTRY_LIMIT
+                        })
+                    ),
+                    "{error:?}"
+                );
                 Ok(())
             }
 
@@ -74,14 +81,19 @@ macro_rules! registry_reader_tests {
                 let value = serde_json::to_string(&Registry::default())?;
                 std::fs::write(&path, &value)?;
                 Registry::load(&path)?;
-                let tail = value.strip_prefix('{').ok_or("registry must be an object")?;
+                let tail = value
+                    .strip_prefix('{')
+                    .ok_or("registry must be an object")?;
                 let repeated = format!("{{\"version\":\"discarded\",{tail}");
                 std::fs::write(&path, repeated.as_bytes())?;
                 let error = Registry::load(&path).err().ok_or("repeated key accepted")?;
-                assert!(matches!(
-                    error,
-                    CliError::SignedJson(UntrustedJsonError::SignedInput(_))
-                ), "{error:?}");
+                assert!(
+                    matches!(
+                        error,
+                        CliError::SignedJson(UntrustedJsonError::SignedInput(_))
+                    ),
+                    "{error:?}"
+                );
                 Ok(())
             }
 
@@ -95,11 +107,10 @@ macro_rules! registry_reader_tests {
                 Registry::load(&path)?;
                 std::os::unix::fs::symlink(&path, &link)?;
                 let error = Registry::load(&link).err().ok_or("symlink followed")?;
-                assert!(matches!(
-                    error,
-                    CliError::Io(ref io)
-                        if io.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error())
-                ), "{error:?}");
+                assert!(
+                    matches!(error, CliError::File(RegularFileError::SymbolicLink)),
+                    "{error:?}"
+                );
                 assert_eq!(std::fs::read(path)?, bytes);
                 Ok(())
             }
@@ -107,12 +118,13 @@ macro_rules! registry_reader_tests {
             #[test]
             fn directory_is_refused_before_reading() -> TestResult {
                 let dir = tempfile::tempdir()?;
-                let error = Registry::load(dir.path()).err().ok_or("directory accepted")?;
-                assert!(matches!(
-                    error,
-                    CliError::Io(ref io) if io.kind() == ErrorKind::InvalidInput
-                        && io.to_string() == "signed input must be a regular file"
-                ), "{error:?}");
+                let error = Registry::load(dir.path())
+                    .err()
+                    .ok_or("directory accepted")?;
+                assert!(
+                    matches!(error, CliError::File(RegularFileError::NotRegular)),
+                    "{error:?}"
+                );
                 Ok(())
             }
 
@@ -132,11 +144,10 @@ macro_rules! registry_reader_tests {
                 let result = receiver.recv_timeout(std::time::Duration::from_secs(5))?;
                 reader.join().map_err(|_| "registry reader panicked")?;
                 let error = result.err().ok_or("FIFO accepted")?;
-                assert!(matches!(
-                    error,
-                    CliError::Io(ref io) if io.kind() == ErrorKind::InvalidInput
-                        && io.to_string() == "signed input must be a regular file"
-                ), "{error:?}");
+                assert!(
+                    matches!(error, CliError::File(RegularFileError::NotRegular)),
+                    "{error:?}"
+                );
                 Ok(())
             }
         }

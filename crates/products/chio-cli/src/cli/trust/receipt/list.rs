@@ -28,7 +28,8 @@ pub(crate) fn cmd_receipt_list(
             ));
         }
         let token = require_control_token(backend.control_token)?;
-        let client = trust_control::service_runtime::client::build_client(url, token)?;
+        let client =
+            trust_control::service_runtime::client::build_client(url, token, backend.egress)?;
         let query = trust_control::ReceiptQueryHttpQuery {
             capability_id: args.capability.map(ToOwned::to_owned),
             tool_server: args.tool_server.map(ToOwned::to_owned),

@@ -337,8 +337,12 @@ mod receipt_operator_tests {
             receipt_db_path,
             control_url,
             control_token: None,
+            egress: &NO_EGRESS_ALLOWANCES,
         }
     }
+
+    static NO_EGRESS_ALLOWANCES: std::sync::LazyLock<chio_egress_contract::EgressAllowanceSet> =
+        std::sync::LazyLock::new(chio_egress_contract::EgressAllowanceSet::default);
 
     #[test]
     fn receipt_operator_json_envelope_includes_schema_and_null_fields() -> Result<(), CliError> {
@@ -515,6 +519,7 @@ mod receipt_operator_tests {
             receipt_db_path: Some(path.as_path()),
             control_url: None,
             control_token: None,
+            egress: &NO_EGRESS_ALLOWANCES,
         };
         let error = match cmd_receipt_retention_repair(&archive, human_backend) {
             Ok(()) => panic!("human retention repair must fail closed on a not-writable store"),

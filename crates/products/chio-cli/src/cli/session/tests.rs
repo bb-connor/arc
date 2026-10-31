@@ -1,4 +1,5 @@
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 use chio_kernel::ToolCallRequest as KernelToolCallRequest;
 #[path = "tests/failure_receipts.rs"]
 mod failure_receipts;
@@ -139,7 +140,8 @@ fn build_kernel_with_admission_db(
     .expect("enabled durable admission runtime");
     let mut kernel = build_kernel(loaded_policy, &durable_admission.kernel_keypair());
     let receipt_db_path = unique_db_path("chio-cli-session-receipts");
-    configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
+    let egress = EgressAllowanceSet::default();
+    configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None, &egress)
         .expect("configure receipt store for session test");
     durable_admission
         .attach(&mut kernel, None)
@@ -223,7 +225,9 @@ capabilities:
     let cap = {
         let mut kernel =
             build_kernel_with_admission_db(load_test_policy_runtime(&policy), &admission_db_path);
-        configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None).unwrap();
+        let egress = EgressAllowanceSet::default();
+        configure_revocation_store(&mut kernel, Some(&revocation_db_path), None, None, &egress)
+            .unwrap();
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "*".to_string(),
         }));
@@ -235,7 +239,15 @@ capabilities:
 
     let mut restarted =
         build_kernel_with_admission_db(load_test_policy_runtime(&policy), &admission_db_path);
-    configure_revocation_store(&mut restarted, Some(&revocation_db_path), None, None).unwrap();
+    let egress = EgressAllowanceSet::default();
+    configure_revocation_store(
+        &mut restarted,
+        Some(&revocation_db_path),
+        None,
+        None,
+        &egress,
+    )
+    .unwrap();
     restarted.register_tool_server(Box::new(StubToolServer {
         id: "*".to_string(),
     }));
@@ -320,6 +332,7 @@ capabilities:
         None,
         None,
         None,
+        &EgressAllowanceSet::default(),
     )
     .unwrap();
 
@@ -370,6 +383,7 @@ capabilities:
         None,
         None,
         None,
+        &EgressAllowanceSet::default(),
     )
     .unwrap();
 
@@ -400,6 +414,7 @@ capabilities:
         None,
         None,
         None,
+        &EgressAllowanceSet::default(),
     )
     .unwrap();
     let second_capability = issue_default_capabilities(
@@ -540,6 +555,7 @@ fn mcp_edge_kernel(policy: &policy::ChioPolicy, _kernel_kp: &Keypair) -> (ChioKe
             durable_admission: Some(&durable_admission),
             control_url: None,
             control_token: None,
+            egress: &chio_egress_contract::EgressAllowanceSet::default(),
         },
     )
     .expect("build mcp edge kernel");
@@ -1881,7 +1897,8 @@ fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() 
     )
     .unwrap();
     let receipts = unique_db_path("native-dpop-receipts");
-    configure_receipt_store(&mut kernel, Some(&receipts), None, None).unwrap();
+    let egress = EgressAllowanceSet::default();
+    configure_receipt_store(&mut kernel, Some(&receipts), None, None, &egress).unwrap();
     runtime.attach(&mut kernel, Some(&domain)).unwrap();
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "proof-srv".into(),

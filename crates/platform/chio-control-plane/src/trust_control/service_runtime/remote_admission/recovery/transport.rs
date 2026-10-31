@@ -7,6 +7,12 @@ struct RecoveryAuthorityRefusal {
     code: AdmissionAuthorityErrorCode,
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("recovery authority answered HTTP {status}")]
+struct RecoveryHttpStatus {
+    status: u16,
+}
+
 impl RemoteAdmissionAuthority {
     pub(super) fn call_recovery<B: Serialize, T: DeserializeOwned>(
         &self,
@@ -15,7 +21,7 @@ impl RemoteAdmissionAuthority {
     ) -> Result<T, AdmissionRecoveryPortError> {
         let request = AdmissionAuthorityRequest::new(Some(self.fence.clone()), action, payload)
             .map_err(json_error)?;
-        let body = serde_json::to_value(request).map_err(json_error)?;
+        let body = serde_json::to_vec(&request).map_err(json_error)?;
         let mut last_error = None;
         for index in self.client.endpoint_order() {
             let endpoint = self
@@ -24,22 +30,22 @@ impl RemoteAdmissionAuthority {
                 .get(index)
                 .ok_or_else(|| protocol_error(RecoveryProtocolError::Endpoint))?;
             let url = format!("{endpoint}{INTERNAL_ADMISSION_AUTHORITY_PATH}");
-            match self
-                .client
-                .http
-                .post(&url)
-                .set(
-                    AUTHORIZATION.as_str(),
-                    &format!("Bearer {}", self.client.token),
-                )
-                .send_json(body.clone())
-            {
-                Ok(response) => {
+            let sent = self.client.http.post(&url).and_then(|request| {
+                request
+                    .header(
+                        AUTHORIZATION.as_str(),
+                        &format!("Bearer {}", self.client.token),
+                    )
+                    .header(CONTENT_TYPE.as_str(), "application/json")
+                    .send_bytes(&body)
+            });
+            match sent {
+                Ok(response) if response.status() < 400 => {
                     self.client.mark_preferred(index);
                     let cap = usize::try_from(ADMISSION_AUTHORITY_RESPONSE_LIMIT)
                         .map_err(|_| protocol_error(RecoveryProtocolError::PageBounds))?;
                     let response =
-                        crate::json_input::read(response.into_reader(), cap).map_err(|error| {
+                        crate::json_input::read(response.body(), cap).map_err(|error| {
                             let kind = match &error {
                                 CliError::Io(_) | CliError::Clock(_) => {
                                     RemoteRecoveryFailureKind::Unavailable
@@ -50,15 +56,29 @@ impl RemoteAdmissionAuthority {
                         })?;
                     return decode_recovery_response(response);
                 }
-                Err(ureq::Error::Transport(error)) => {
+                Ok(response)
+                    if crate::trust_control::service_runtime::client::should_retry_status(
+                        response.status(),
+                    ) =>
+                {
                     last_error = Some(AdmissionRecoveryPortError::remote(
                         RemoteRecoveryFailureKind::Unavailable,
-                        error,
+                        RecoveryHttpStatus {
+                            status: response.status(),
+                        },
                     ));
                 }
-                Err(error @ ureq::Error::Status(status, _))
-                    if crate::trust_control::service_runtime::client::should_retry_status(
-                        status,
+                Ok(response) => {
+                    return Err(AdmissionRecoveryPortError::remote(
+                        RemoteRecoveryFailureKind::Unavailable,
+                        RecoveryHttpStatus {
+                            status: response.status(),
+                        },
+                    ));
+                }
+                Err(error)
+                    if crate::trust_control::service_runtime::client::is_transport_failure(
+                        &error,
                     ) =>
                 {
                     last_error = Some(AdmissionRecoveryPortError::remote(
@@ -68,7 +88,7 @@ impl RemoteAdmissionAuthority {
                 }
                 Err(error) => {
                     return Err(AdmissionRecoveryPortError::remote(
-                        RemoteRecoveryFailureKind::Unavailable,
+                        RemoteRecoveryFailureKind::Invariant,
                         error,
                     ));
                 }

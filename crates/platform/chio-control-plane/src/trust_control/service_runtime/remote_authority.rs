@@ -11,11 +11,13 @@ use super::*;
 pub fn build_remote_capability_authority(
     control_url: &str,
     control_token: &str,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     build_remote_capability_authority_with_clock(
         control_url,
         control_token,
         Arc::new(chio_security_types::clock::SystemClock),
+        allowances,
     )
 }
 
@@ -23,8 +25,9 @@ pub fn build_remote_capability_authority_with_clock(
     control_url: &str,
     control_token: &str,
     clock: Arc<dyn chio_security_types::clock::Clock>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
-    let client = build_client(control_url, control_token)?;
+    let client = build_client(control_url, control_token, allowances)?;
     let status = client.authority_status()?;
     let cache = AuthorityKeyCache::from_status(&status)?;
     Ok(Box::new(RemoteCapabilityAuthority {
@@ -42,6 +45,7 @@ pub fn build_pinned_remote_capability_authority(
     workload_token: &str,
     pinned_current: PublicKey,
     pinned_trusted: Vec<PublicKey>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     build_pinned_remote_capability_authority_with_clock(
         control_url,
@@ -49,6 +53,7 @@ pub fn build_pinned_remote_capability_authority(
         pinned_current,
         pinned_trusted,
         Arc::new(chio_security_types::clock::SystemClock),
+        allowances,
     )
 }
 
@@ -59,6 +64,7 @@ pub fn build_pinned_remote_capability_authority_with_clock(
     pinned_current: PublicKey,
     mut pinned_trusted: Vec<PublicKey>,
     clock: Arc<dyn chio_security_types::clock::Clock>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
 ) -> Result<Box<dyn CapabilityAuthority>, CliError> {
     if !pinned_trusted.contains(&pinned_current) {
         pinned_trusted.push(pinned_current.clone());
@@ -66,7 +72,7 @@ pub fn build_pinned_remote_capability_authority_with_clock(
     pinned_trusted.sort_by_key(PublicKey::to_hex);
     pinned_trusted.dedup();
 
-    let client = build_client(control_url, workload_token)?;
+    let client = build_client(control_url, workload_token, allowances)?;
     let status = client.authority_status()?;
     let cache = AuthorityKeyCache::from_status(&status)?;
     validate_authority_pins(&cache, &pinned_current, &pinned_trusted)?;
@@ -456,7 +462,11 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         listener.set_nonblocking(true)?;
         let mut remote = remote_with_trusted_key(Keypair::generate().public_key())?;
-        remote.client = build_client(&format!("http://{}", listener.local_addr()?), "test-token")?;
+        remote.client = build_client(
+            &format!("http://{}", listener.local_addr()?),
+            "test-token",
+            &chio_egress_contract::EgressAllowanceSet::default(),
+        )?;
         remote.clock = Arc::new(UnavailableClock);
         let stopped = Arc::new(AtomicBool::new(false));
         let server_stopped = stopped.clone();
@@ -615,7 +625,11 @@ mod tests {
     ) -> Result<RemoteCapabilityAuthority, CliError> {
         Ok(RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(public_key.clone()),
                 trusted: vec![public_key],
@@ -767,7 +781,11 @@ mod tests {
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: None,
                 trusted: vec![authority.authority_public_key()?],
@@ -850,7 +868,11 @@ mod tests {
         let issued = issue_test_capability(&authority)?;
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(authority.authority_public_key()?),
                 trusted: vec![authority.authority_public_key()?],
@@ -884,7 +906,11 @@ mod tests {
         let newer_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(newer_key.clone()),
                 trusted: vec![older_key.clone(), newer_key.clone()],
@@ -921,7 +947,11 @@ mod tests {
         let equivocated_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
                 trusted: vec![current_key.clone(), historical_key.clone()],
@@ -980,7 +1010,11 @@ mod tests {
         let next_key = Keypair::generate().public_key();
         let remote = RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(current_key.clone()),
                 trusted: vec![current_key.clone()],
@@ -1055,7 +1089,11 @@ mod tests {
         let second_key = Keypair::generate().public_key();
         let remote = Arc::new(RemoteCapabilityAuthority {
             clock: chio_test_support::clock::clock(),
-            client: build_client("http://127.0.0.1:1", "test-token")?,
+            client: build_client(
+                "http://127.0.0.1:1",
+                "test-token",
+                &chio_egress_contract::EgressAllowanceSet::default(),
+            )?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: Some(Keypair::generate().public_key()),
                 trusted: Vec::new(),

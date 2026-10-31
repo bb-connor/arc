@@ -499,6 +499,7 @@ fn minimal_config() -> ProtectConfig {
         approval: None,
         control_url: None,
         control_token: None,
+        control_egress_allowances: Default::default(),
         budget_db: None,
         revocation_db: None,
         allow_advisory: false,

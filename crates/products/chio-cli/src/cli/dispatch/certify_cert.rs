@@ -8,6 +8,7 @@ pub(crate) fn dispatch_certify(
     json_output: bool,
     control_url: Option<String>,
     control_token: Option<String>,
+    egress: &std::sync::Arc<chio_egress_contract::EgressAllowanceSet>,
 ) -> Result<(), CliError> {
     match command {
         CertifyCommands::Check {
@@ -41,6 +42,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::PublishNetwork {
                 input,
@@ -53,6 +55,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::List {
                 certification_registry_file,
@@ -61,6 +64,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Get {
                 artifact_id,
@@ -71,6 +75,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Resolve {
                 tool_server_id,
@@ -81,6 +86,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Discover {
                 tool_server_id,
@@ -91,6 +97,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Search {
                 certification_discovery_file,
@@ -109,6 +116,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Transparency {
                 certification_discovery_file,
@@ -121,6 +129,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Consume {
                 tool_server_id,
@@ -137,6 +146,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Revoke {
                 artifact_id,
@@ -151,6 +161,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
             CertifyRegistryCommands::Dispute {
                 artifact_id,
@@ -167,6 +178,7 @@ pub(crate) fn dispatch_certify(
                 json_output,
                 control_url.as_deref(),
                 control_token.as_deref(),
+                egress,
             ),
         },
     }

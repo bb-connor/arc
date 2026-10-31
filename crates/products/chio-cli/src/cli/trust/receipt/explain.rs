@@ -598,7 +598,8 @@ pub(crate) fn load_receipt_for_explain(
             ));
         }
         let token = require_control_token(backend.control_token)?;
-        let client = trust_control::service_runtime::client::build_client(url, token)?;
+        let client =
+            trust_control::service_runtime::client::build_client(url, token, backend.egress)?;
         let mut cursor = None;
         let mut matches = Vec::new();
         loop {

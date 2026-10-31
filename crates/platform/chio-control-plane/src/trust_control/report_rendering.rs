@@ -171,14 +171,16 @@ pub(crate) fn terminal_state_kind(state: &OperationTerminalState) -> &'static st
     }
 }
 
-fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliError> {
+fn forwarded_control_response(
+    response: chio_egress_contract::BlockingContractResponse,
+) -> Result<Response, CliError> {
     let status = StatusCode::from_u16(response.status()).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to map forwarded trust-control response status: {error}"
         ))
     })?;
-    let content_type = response.header(CONTENT_TYPE.as_str()).map(str::to_owned);
-    let body = response.into_string().map_err(|error| {
+    let content_type = response.header("content-type").map(str::to_owned);
+    let body = String::from_utf8(response.body().to_vec()).map_err(|error| {
         CliError::cli_other_error(format!(
             "failed to decode forwarded trust-control response body: {error}"
         ))
@@ -266,16 +268,25 @@ fn post_json_to_control_service(
         CliError::cli_other_error("trust control client requires at least one endpoint".to_string())
     })?;
     let url = format!("{endpoint}{path}");
-    let mut request = client.http.post(&url);
+    let mut request = client
+        .http
+        .post(&url)
+        .map_err(service_runtime::client::egress_refusal)?
+        .header(CONTENT_TYPE.as_str(), "application/json");
     if !client.token.is_empty() {
-        request = request.set(AUTHORIZATION.as_str(), &format!("Bearer {}", client.token));
+        request = request.header(AUTHORIZATION.as_str(), &format!("Bearer {}", client.token));
     }
-    match request.send_json(json) {
+    let body = serde_json::to_vec(&json).map_err(|error| {
+        CliError::cli_other_error(format!(
+            "failed to serialize trust control request: {error}"
+        ))
+    })?;
+    match request.send_bytes(&body) {
         Ok(response) => forwarded_control_response(response),
-        Err(ureq::Error::Status(_, response)) => forwarded_control_response(response),
-        Err(ureq::Error::Transport(error)) => Err(CliError::cli_other_error(format!(
-            "trust control service transport failed: {error}"
-        ))),
+        Err(error) if service_runtime::client::is_transport_failure(&error) => Err(
+            CliError::cli_other_error(format!("trust control service transport failed: {error}")),
+        ),
+        Err(error) => Err(service_runtime::client::egress_refusal(error)),
     }
 }
 
@@ -295,10 +306,14 @@ fn forwarded_bearer(headers: &HeaderMap) -> Result<&str, Response> {
         })
 }
 
-fn leader_client(leader_url: &str, bearer: Option<&str>) -> Result<TrustControlClient, CliError> {
+fn leader_client(
+    leader_url: &str,
+    bearer: Option<&str>,
+    allowances: &chio_egress_contract::EgressAllowanceSet,
+) -> Result<TrustControlClient, CliError> {
     match bearer {
-        Some(bearer) => service_runtime::client::build_client(leader_url, bearer),
-        None => service_runtime::client::build_public_client(leader_url),
+        Some(bearer) => service_runtime::client::build_client(leader_url, bearer, allowances),
+        None => service_runtime::client::build_public_client(leader_url, allowances),
     }
 }
 
@@ -371,9 +386,9 @@ async fn forward_post_to_leader_in_lane<B: Serialize>(
     }
 
     for _ in 0..2 {
-        let client = leader_client(&leader_url, bearer).map_err(|error| {
-            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        })?;
+        let client = leader_client(&leader_url, bearer, &state.config.egress_allowances).map_err(
+            |error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        )?;
         let attempt = match forwarded_request_json(body, "forwarded trust control request") {
             Ok(json) => {
                 let request_path = path.to_owned();
@@ -481,15 +496,18 @@ pub(crate) async fn forward_authority_post_to_leader<B: Serialize>(
     }
 
     for _ in 0..2 {
-        let peer_client =
-            service_runtime::client::build_cluster_peer_client(&state.config.access, &leader_url)
-                .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
-        let client =
-            service_runtime::client::build_client(&leader_url, &bearer).map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+        let peer_client = service_runtime::client::build_cluster_peer_client(
+            &state.config.access,
+            &leader_url,
+            &state.config.egress_allowances,
+        )
+        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
+        let client = service_runtime::client::build_client(
+            &leader_url,
+            &bearer,
+            &state.config.egress_allowances,
+        )
+        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
         let (attempt, attempt_term) = match forwarded_request_json(body, "trust control request") {
             Ok(json) => {
                 let peer_state = state.clone();
@@ -621,10 +639,14 @@ pub(crate) async fn forward_scim_post_to_leader<B: Serialize>(
     }
 
     for _ in 0..2 {
-        let client =
-            service_runtime::client::build_client(&leader_url, bearer).map_err(|error| {
-                scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+        let client = service_runtime::client::build_client(
+            &leader_url,
+            bearer,
+            &state.config.egress_allowances,
+        )
+        .map_err(|error| {
+            scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        })?;
         let attempt = match forwarded_request_json(body, "trust control request") {
             Ok(json) => {
                 let request_path = path.to_owned();
@@ -712,10 +734,14 @@ pub(crate) async fn forward_scim_delete_to_leader(
     }
 
     for _ in 0..2 {
-        let client =
-            service_runtime::client::build_client(&leader_url, bearer).map_err(|error| {
-                scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+        let client = service_runtime::client::build_client(
+            &leader_url,
+            bearer,
+            &state.config.egress_allowances,
+        )
+        .map_err(|error| {
+            scim_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        })?;
         let request_path = path.to_owned();
         let attempt = run_leader_forward(&state.leader_forward_lane, move || {
             client.delete_json::<Value>(&request_path).map(|value| {

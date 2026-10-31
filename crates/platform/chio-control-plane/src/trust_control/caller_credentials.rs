@@ -944,7 +944,7 @@ impl ClusterPeerPins {
                 return Err(TrustAccessError::SelfPinned(node_id));
             }
             let internal_url =
-                normalize_cluster_config_url(&entry.internal_url, true).map_err(|error| {
+                normalize_cluster_config_url(&entry.internal_url).map_err(|error| {
                     TrustAccessError::InvalidPeerUrl {
                         node_id: node_id.clone(),
                         reason: error.to_string(),

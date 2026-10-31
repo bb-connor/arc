@@ -1,3 +1,4 @@
+use chio_egress_contract::EgressAllowanceSet;
 use std::path::Path;
 
 use crate::enterprise_federation::CertificationDiscoveryNetwork;
@@ -468,6 +469,7 @@ pub fn publish_certification_across_network(
     network: &CertificationDiscoveryNetwork,
     artifact: &SignedCertificationCheck,
     operator_ids: &[String],
+    allowances: &EgressAllowanceSet,
 ) -> Result<CertificationNetworkPublishResponse, CliError> {
     verify_signed_certification_check(artifact)?;
     let artifact_id = certification_artifact_id(artifact)?;
@@ -511,6 +513,7 @@ pub fn publish_certification_across_network(
         match crate::trust_control::service_runtime::client::build_client(
             &operator.registry_url,
             token,
+            allowances,
         )
         .and_then(|client| client.publish_certification(artifact))
         {
@@ -543,10 +546,11 @@ pub fn cmd_certify_registry_discover(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
             .discover_certification(tool_server_id)?
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
@@ -595,11 +599,12 @@ pub fn cmd_certify_registry_publish_network(
     json_output: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    allowances: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
     let response = if let Some(url) = control_url {
         let token = crate::require_control_token(control_token)?;
-        crate::trust_control::service_runtime::client::build_client(url, token)?
+        crate::trust_control::service_runtime::client::build_client(url, token, allowances)?
             .publish_certification_network(&CertificationNetworkPublishRequest {
                 artifact,
                 operator_ids: operator_ids.to_vec(),
@@ -607,7 +612,7 @@ pub fn cmd_certify_registry_publish_network(
     } else {
         let path = require_certification_discovery_path(discovery_path)?;
         let network = CertificationDiscoveryNetwork::load(path)?;
-        publish_certification_across_network(&network, &artifact, operator_ids)?
+        publish_certification_across_network(&network, &artifact, operator_ids, allowances)?
     };
 
     if json_output {

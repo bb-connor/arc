@@ -1,9 +1,11 @@
 use super::output::{write_bytes, write_pretty_json_line};
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 fn fiscal_marketplace_client(
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<chio_control_plane::trust_control::TrustControlClient, CliError> {
     let url = control_url.ok_or_else(|| {
         CliError::cli_other_error(
@@ -12,7 +14,7 @@ fn fiscal_marketplace_client(
         )
     })?;
     let token = require_control_token(control_token)?;
-    chio_control_plane::trust_control::service_runtime::client::build_client(url, token)
+    chio_control_plane::trust_control::service_runtime::client::build_client(url, token, egress)
 }
 
 pub(crate) fn parse_market_tier(value: &str) -> Result<chio_reputation::ReputationTier, CliError> {
@@ -35,6 +37,7 @@ pub(crate) fn cmd_market_list(
     json: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let tier = parse_market_tier(tier_str)?;
     let context = crate::market::MarketTenantContext {
@@ -42,7 +45,7 @@ pub(crate) fn cmd_market_list(
         tier,
         currency: currency.to_owned(),
     };
-    let fiscal = fiscal_marketplace_client(control_url, control_token)?;
+    let fiscal = fiscal_marketplace_client(control_url, control_token, egress)?;
     let report = crate::market::market_list(catalog, &context, &fiscal)
         .map_err(|err| CliError::Other(format!("market list: {err}")))?;
     let mut stdout = std::io::stdout();
@@ -65,6 +68,7 @@ pub(crate) fn cmd_market_info(
     json: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let tier = parse_market_tier(tier_str)?;
     let context = crate::market::MarketTenantContext {
@@ -72,7 +76,7 @@ pub(crate) fn cmd_market_info(
         tier,
         currency: currency.to_owned(),
     };
-    let fiscal = fiscal_marketplace_client(control_url, control_token)?;
+    let fiscal = fiscal_marketplace_client(control_url, control_token, egress)?;
     let report =
         crate::market::market_info(catalog, &context, reference, publisher_revoked, &fiscal)
             .map_err(|err| CliError::Other(format!("market info: {err}")))?;
@@ -98,6 +102,7 @@ pub(crate) fn cmd_market_install(
     json: bool,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    egress: &EgressAllowanceSet,
 ) -> Result<(), CliError> {
     let tier = parse_market_tier(tier_str)?;
     let context = crate::market::MarketTenantContext {
@@ -105,7 +110,7 @@ pub(crate) fn cmd_market_install(
         tier,
         currency: currency.to_owned(),
     };
-    let fiscal = fiscal_marketplace_client(control_url, control_token)?;
+    let fiscal = fiscal_marketplace_client(control_url, control_token, egress)?;
     let record = crate::market::market_install(
         catalog,
         bundle_dir,

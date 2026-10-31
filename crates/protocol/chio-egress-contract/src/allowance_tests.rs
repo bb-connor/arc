@@ -738,29 +738,32 @@ fn allowance_set_validates_each_entry_and_refuses_duplicates() {
 }
 
 #[test]
-fn allowance_set_document_is_strict() {
-    let parsed: EgressAllowanceSet = serde_json::from_value(serde_json::json!({
-        "allow": [{"host": FACILITATOR, "port": 8443, "cidr": "10.20.0.0/24"}]
-    }))
-    .expect("set document");
-    assert_eq!(
-        parsed.entries(),
-        &BTreeSet::from([allowance(FACILITATOR, 8443, "10.20.0.0/24")])
-    );
-    let error = serde_json::from_value::<EgressAllowanceSet>(serde_json::json!({
-        "allow": [],
-        "allowPrivate": true
-    }))
-    .expect_err("unknown document field");
-    assert!(
-        error.to_string().contains("unknown field `allowPrivate`"),
-        "{error}"
-    );
-    let error = serde_json::from_value::<EgressAllowanceSet>(serde_json::json!({
-        "allow": [{"host": FACILITATOR, "port": 8443, "cidr": "10.0.0.0/8"}]
-    }))
-    .expect_err("broad CIDR in the document");
-    assert!(error.to_string().contains("broader than /16"), "{error}");
+fn reserved_addresses_are_link_local_and_metadata() {
+    for address in [
+        "169.254.169.254",
+        "169.254.0.1",
+        "100.100.100.200",
+        "fe80::1",
+        "fd00:ec2::254",
+        "::ffff:169.254.169.254",
+    ] {
+        assert!(
+            super::address_is_reserved(address.parse().expect("ip")),
+            "{address}"
+        );
+    }
+    for address in [
+        "10.0.0.1",
+        "100.100.100.201",
+        "fd00::1",
+        "127.0.0.1",
+        "8.8.8.8",
+    ] {
+        assert!(
+            !super::address_is_reserved(address.parse().expect("ip")),
+            "{address}"
+        );
+    }
 }
 
 fn ula_contract(allowances: serde_json::Value) -> HttpEgressContract {

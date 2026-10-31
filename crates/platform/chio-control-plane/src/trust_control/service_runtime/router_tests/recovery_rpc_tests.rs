@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! Actual authenticated recovery RPCs over a private temporary joint authority.
 use super::*;
+use chio_egress_contract::EgressAllowanceSet;
 
 #[path = "recovery_rpc_tests/retained_requests.rs"]
 mod retained_requests;
@@ -110,6 +111,7 @@ impl Fixture {
                 &url,
                 "recovery-rpc-secret",
                 chio_core::Keypair::generate(),
+                &EgressAllowanceSet::default(),
             )?;
         assert_eq!(remote.fence, authority.mutation_fence());
         Ok(Self {
@@ -548,7 +550,8 @@ fn remote_recovery_rpc_transport_retains_actual_native_source() -> TestResult {
 #[test]
 fn remote_recovery_rpc_stop_drains_and_closes_an_established_connection() -> TestResult {
     let mut fixture = Fixture::new()?;
-    // Building the stores left one pooled keep-alive connection to the authority.
+    // Building the stores made one request; every contract request dials its
+    // own connection.
     assert_eq!(fixture.accepted.load(Ordering::SeqCst), 1);
     let (caller_done, held) = fixture.hold.arm()?;
     let operations = fixture.remote.operations.clone();
@@ -568,8 +571,8 @@ fn remote_recovery_rpc_stop_drains_and_closes_an_established_connection() -> Tes
     }
     assert_eq!(
         fixture.accepted.load(Ordering::SeqCst),
-        1,
-        "held request did not ride the established keep-alive connection"
+        2,
+        "held request did not reach the authority on its own connection"
     );
     fixture.stop_server()?;
     let answered_before_stop_returned = fixture.hold.answered.load(Ordering::SeqCst);
@@ -599,7 +602,7 @@ fn remote_recovery_rpc_stop_drains_and_closes_an_established_connection() -> Tes
         error.kind(),
         chio_kernel::admission_operation::RemoteRecoveryFailureKind::Unavailable
     );
-    assert_eq!(fixture.accepted.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.accepted.load(Ordering::SeqCst), 2);
     Ok(())
 }
 
