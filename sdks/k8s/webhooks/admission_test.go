@@ -665,8 +665,8 @@ func TestVerifyCapabilityAdmitsSignedRootAnchor(t *testing.T) {
 	raw := signedRawToken(t, signer, body, body)
 
 	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
-	if err != nil && strings.Contains(err.Error(), "malformed capability token") {
-		t.Fatalf("expected the anchored token to decode, got %v", err)
+	if err != nil {
+		t.Fatalf("expected the anchored token to verify, got %v", err)
 	}
 }
 

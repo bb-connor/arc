@@ -31,6 +31,7 @@ const CAPABILITY_MEMBERS: ReadonlySet<string> = new Set([
   "scope_attenuations",
   "attenuation_proof",
   "budget_share_bps",
+  "root_anchor",
   "signature",
 ]);
 
@@ -45,6 +46,29 @@ const DELEGATION_LINK_MEMBERS: ReadonlySet<string> = new Set([
   "cumulative_approval",
   "signature",
 ]);
+
+const ROOT_ANCHOR_REQUIRED = [
+  "kind",
+  "context_digest",
+  "root_policy_digest",
+  "anchored_at",
+  "assertion_exp",
+] as const;
+
+const ROOT_ANCHOR_MEMBERS: ReadonlySet<string> = new Set(ROOT_ANCHOR_REQUIRED);
+
+const ROOT_ANCHOR_KINDS: ReadonlySet<unknown> = new Set([
+  "oauth_id_jag",
+  "entra_jwt",
+  "entra_agent_id",
+  "oidc_jwt",
+  "oauth_introspection",
+  "chio_local_as",
+  "chio_operator_key",
+  "operator_static_bearer",
+]);
+
+const ROOT_ANCHOR_DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 function rejectUnknownMembers(value: object, allowed: ReadonlySet<string>, kind: string): void {
   for (const key of Object.keys(value).sort()) {
@@ -68,7 +92,16 @@ export interface CapabilityToken {
   scope_attenuations?: unknown[];
   attenuation_proof?: unknown;
   budget_share_bps?: number;
+  root_anchor?: RootAnchor;
   signature: string;
+}
+
+export interface RootAnchor {
+  kind: string;
+  context_digest: string;
+  root_policy_digest: string;
+  anchored_at: number;
+  assertion_exp: number;
 }
 
 export interface CapabilityVerification {
@@ -129,11 +162,42 @@ export function parseCapabilityJson(input: string): CapabilityToken {
   return parsed as CapabilityToken;
 }
 
+function validateRootAnchor(value: unknown): void {
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
+    throw new ChioInvariantError("json", "root_anchor must be a JSON object");
+  }
+  rejectUnknownMembers(value, ROOT_ANCHOR_MEMBERS, "root_anchor");
+  const anchor = value as Record<string, unknown>;
+  for (const member of ROOT_ANCHOR_REQUIRED) {
+    if (!Object.hasOwn(anchor, member)) {
+      throw new ChioInvariantError("json", `root_anchor is missing member ${member}`);
+    }
+  }
+  if (!ROOT_ANCHOR_KINDS.has(anchor.kind)) {
+    throw new ChioInvariantError("json", "root_anchor kind is not a known anchor kind");
+  }
+  for (const member of ["context_digest", "root_policy_digest"]) {
+    const digest = anchor[member];
+    if (typeof digest !== "string" || !ROOT_ANCHOR_DIGEST.test(digest)) {
+      throw new ChioInvariantError("json", `root_anchor ${member} must be a sha256 digest`);
+    }
+  }
+  for (const member of ["anchored_at", "assertion_exp"]) {
+    const integer = anchor[member];
+    if (!Number.isSafeInteger(integer) || (integer as number) < 0) {
+      throw new ChioInvariantError("json", `root_anchor ${member} must be an unsigned integer`);
+    }
+  }
+}
+
 function requireCapabilitySchema(capability: CapabilityToken): void {
   if (capability.schema !== CAPABILITY_SCHEMA) {
     throw new ChioInvariantError("json", `capability schema must be "${CAPABILITY_SCHEMA}"`);
   }
   rejectUnknownMembers(capability, CAPABILITY_MEMBERS, "capability");
+  if (Object.hasOwn(capability, "root_anchor")) {
+    validateRootAnchor(capability.root_anchor);
+  }
 }
 
 function capabilityBody(capability: CapabilityToken): Omit<CapabilityToken, "signature"> {

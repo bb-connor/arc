@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..errors import ChioInvariantError, parse_json_text
@@ -25,6 +26,7 @@ _CAPABILITY_MEMBERS = frozenset(
         "scope_attenuations",
         "attenuation_proof",
         "budget_share_bps",
+        "root_anchor",
         "signature",
     }
 )
@@ -41,6 +43,30 @@ _DELEGATION_LINK_MEMBERS = frozenset(
         "signature",
     }
 )
+
+
+_ROOT_ANCHOR_REQUIRED = (
+    "kind",
+    "context_digest",
+    "root_policy_digest",
+    "anchored_at",
+    "assertion_exp",
+)
+_ROOT_ANCHOR_MEMBERS = frozenset(_ROOT_ANCHOR_REQUIRED)
+_ROOT_ANCHOR_KINDS = frozenset(
+    {
+        "oauth_id_jag",
+        "entra_jwt",
+        "entra_agent_id",
+        "oidc_jwt",
+        "oauth_introspection",
+        "chio_local_as",
+        "chio_operator_key",
+        "operator_static_bearer",
+    }
+)
+_ROOT_ANCHOR_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+_MAX_ROOT_ANCHOR_INTEGER = 2**53 - 1
 
 
 def _reject_unknown_members(value: dict[str, Any], allowed: frozenset[str], kind: str) -> None:
@@ -61,6 +87,35 @@ def _require_capability_schema(capability: dict[str, Any]) -> None:
     if capability.get("schema") != CAPABILITY_SCHEMA:
         raise ChioInvariantError("json", 'capability schema must be "chio.capability.v1"')
     _reject_unknown_members(capability, _CAPABILITY_MEMBERS, "capability")
+    if "root_anchor" in capability:
+        _validate_root_anchor(capability["root_anchor"])
+
+
+def _validate_root_anchor(anchor: Any) -> None:
+    if not isinstance(anchor, dict):
+        raise ChioInvariantError("json", "root_anchor must be a JSON object")
+    _reject_unknown_members(anchor, _ROOT_ANCHOR_MEMBERS, "root_anchor")
+    for member in _ROOT_ANCHOR_REQUIRED:
+        if member not in anchor:
+            raise ChioInvariantError("json", f"root_anchor is missing member {member}")
+    kind = anchor["kind"]
+    if not isinstance(kind, str) or kind not in _ROOT_ANCHOR_KINDS:
+        raise ChioInvariantError("json", "root_anchor kind is not a known anchor kind")
+    for member in ("context_digest", "root_policy_digest"):
+        digest = anchor[member]
+        if not isinstance(digest, str) or _ROOT_ANCHOR_DIGEST.fullmatch(digest) is None:
+            raise ChioInvariantError("json", f"root_anchor {member} must be a sha256 digest")
+    for member in ("anchored_at", "assertion_exp"):
+        if not _is_root_anchor_integer(anchor[member]):
+            raise ChioInvariantError("json", f"root_anchor {member} must be an unsigned integer")
+
+
+def _is_root_anchor_integer(value: Any) -> bool:
+    return (
+        isinstance(value, int)
+        and not isinstance(value, bool)
+        and 0 <= value <= _MAX_ROOT_ANCHOR_INTEGER
+    )
 
 
 def _capability_body(capability: dict[str, Any]) -> dict[str, Any]:

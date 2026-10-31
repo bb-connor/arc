@@ -6,7 +6,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -234,8 +236,21 @@ var capabilityMembers = map[string]struct{}{
 	"schema": {}, "id": {}, "issuer": {}, "subject": {}, "scope": {}, "issued_at": {},
 	"expires_at": {}, "delegation_chain": {}, "aggregate_invocation_budget": {}, "caveats": {},
 	"scope_attenuations": {}, "attenuation_proof": {}, "budget_share_bps": {},
-	"parameter_binding": {}, "signature": {},
+	"parameter_binding": {}, "root_anchor": {}, "signature": {},
 }
+
+var rootAnchorMembers = map[string]struct{}{
+	"kind": {}, "context_digest": {}, "root_policy_digest": {}, "anchored_at": {}, "assertion_exp": {},
+}
+
+var rootAnchorKinds = map[string]struct{}{
+	"oauth_id_jag": {}, "entra_jwt": {}, "entra_agent_id": {}, "oidc_jwt": {},
+	"oauth_introspection": {}, "chio_local_as": {}, "chio_operator_key": {}, "operator_static_bearer": {},
+}
+
+var rootAnchorDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+const maxRootAnchorInteger = 1<<53 - 1
 
 // signingWrapper returns the 88 bytes a Chio capability signature covers.
 func signingWrapper(schemaID string, canonical []byte) []byte {
@@ -262,6 +277,11 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 			return fmt.Errorf("malformed capability token: unknown member %q", key)
 		}
 	}
+	if anchor, ok := parsed["root_anchor"]; ok {
+		if err := validateRootAnchor(anchor); err != nil {
+			return fmt.Errorf("malformed capability token: %w", err)
+		}
+	}
 	delete(parsed, "signature")
 	if parsed["schema"] != capabilitySchema {
 		return fmt.Errorf("malformed capability token: schema must be %q", capabilitySchema)
@@ -283,6 +303,44 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 
 	if !ed25519.Verify(ed25519.PublicKey(publicKey), signingWrapper(capabilitySchema, canonical), signature) {
 		return fmt.Errorf("capability signature verification failed")
+	}
+	return nil
+}
+
+func validateRootAnchor(value any) error {
+	anchor, ok := value.(map[string]any)
+	if !ok {
+		return errors.New("root_anchor must be a JSON object")
+	}
+	for key := range anchor {
+		if _, ok := rootAnchorMembers[key]; !ok {
+			return fmt.Errorf("root_anchor has unknown member %q", key)
+		}
+	}
+	for _, member := range []string{"kind", "context_digest", "root_policy_digest", "anchored_at", "assertion_exp"} {
+		if _, ok := anchor[member]; !ok {
+			return fmt.Errorf("root_anchor is missing member %s", member)
+		}
+	}
+	kind, ok := anchor["kind"].(string)
+	if _, known := rootAnchorKinds[kind]; !ok || !known {
+		return errors.New("root_anchor kind is not a known anchor kind")
+	}
+	for _, member := range []string{"context_digest", "root_policy_digest"} {
+		digest, ok := anchor[member].(string)
+		if !ok || !rootAnchorDigest.MatchString(digest) {
+			return fmt.Errorf("root_anchor %s must be a sha256 digest", member)
+		}
+	}
+	for _, member := range []string{"anchored_at", "assertion_exp"} {
+		number, ok := anchor[member].(json.Number)
+		if !ok {
+			return fmt.Errorf("root_anchor %s must be an unsigned integer", member)
+		}
+		parsed, err := strconv.ParseUint(number.String(), 10, 64)
+		if err != nil || parsed > maxRootAnchorInteger {
+			return fmt.Errorf("root_anchor %s must be an unsigned integer", member)
+		}
 	}
 	return nil
 }
