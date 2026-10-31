@@ -337,25 +337,14 @@ fn boundary_request(bridge_security: BridgeSecurityMetadata) -> CrossProtocolExe
     let subject = Keypair::generate();
     CrossProtocolExecutionRequest {
         origin_request_id: "cross-protocol-security-origin".to_string(),
-        kernel_request_id: "cross-protocol-security-kernel".to_string(),
-        target_protocol: DiscoveryProtocol::Native,
-        target_server_id: "test-srv".to_string(),
-        target_tool_name: "echo".to_string(),
-        agent_id: subject.public_key().to_hex(),
         arguments: json!({"message": "security boundary"}),
-        capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
         source_envelope: json!({"message": {"role": "user"}}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        model_metadata: None,
-        authenticated_session_id: None,
-        security_context: None,
-        bridge_security,
+        ..execution_request(
+            "cross-protocol-security-kernel".to_string(),
+            subject.public_key().to_hex(),
+            capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+            bridge_security,
+        )
     }
 }
 
@@ -455,6 +444,45 @@ fn cross_protocol_routing_preserves_registry_admitted_flow_canonical_bytes() {
         chio_core::canonical_json_bytes(routed_flow).unwrap(),
         expected_flow
     );
+}
+
+/// A native `echo` hop on `test-srv` with no proof, nonce, approval, session
+/// or security context, for tests to override field by field.
+fn execution_request(
+    kernel_request_id: String,
+    agent_id: String,
+    capability: CapabilityToken,
+    bridge_security: BridgeSecurityMetadata,
+) -> CrossProtocolExecutionRequest {
+    CrossProtocolExecutionRequest {
+        origin_request_id: "wire-origin".to_string(),
+        kernel_request_id,
+        target_protocol: DiscoveryProtocol::Native,
+        target_server_id: "test-srv".to_string(),
+        target_tool_name: "echo".to_string(),
+        agent_id,
+        arguments: json!({"message":"hello"}),
+        capability,
+        source_envelope: json!({
+            "message": {"role":"user"},
+            "metadata": {
+                "chio": {
+                    "targetSkillId": "echo"
+                }
+            }
+        }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        authenticated_session_id: None,
+        security_context: None,
+        bridge_security,
+    }
 }
 
 fn capability_for_tool(
@@ -712,28 +740,12 @@ fn orchestrator_rejects_empty_origin_request_id_before_signed_lineage() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: " ".to_string(),
-                kernel_request_id: "a2a-empty-origin-kernel-1".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-empty-origin-kernel-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap_err();
@@ -764,28 +776,12 @@ fn orchestrator_rejects_padded_or_control_execution_identity_before_signed_linea
     for (field_name, malformed_value) in cases {
         let mut request = CrossProtocolExecutionRequest {
             origin_request_id: "a2a-valid-origin".to_string(),
-            kernel_request_id: "a2a-valid-kernel".to_string(),
-            target_protocol: DiscoveryProtocol::Native,
-            target_server_id: "test-srv".to_string(),
-            target_tool_name: "echo".to_string(),
-            bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-            agent_id: agent_id.clone(),
-            arguments: json!({"message":"hello"}),
-            capability: capability.clone(),
-            source_envelope: json!({
-                "message": {"role":"user"},
-                "metadata": { "chio": { "targetSkillId": "echo" } }
-            }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            authenticated_session_id: None,
-            security_context: None,
+            ..execution_request(
+                "a2a-valid-kernel".to_string(),
+                agent_id.clone(),
+                capability.clone(),
+                registry.bridge_security("test-srv", "echo").unwrap(),
+            )
         };
 
         match field_name {
@@ -821,14 +817,6 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-forged-cap-ref".to_string(),
-                kernel_request_id: "a2a-forged-cap-ref-kernel-1".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability,
                 source_envelope: json!({
                     "message": {"role":"user"},
                     "metadata": {
@@ -843,16 +831,12 @@ fn orchestrator_rejects_forged_capability_ref_parent_hash() {
                         }
                     }
                 }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-forged-cap-ref-kernel-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability,
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap_err();
@@ -877,14 +861,6 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-drifted-cap-ref".to_string(),
-                kernel_request_id: "a2a-drifted-cap-ref-kernel-1".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability,
                 source_envelope: json!({
                     "message": {"role":"user"},
                     "metadata": {
@@ -899,16 +875,12 @@ fn orchestrator_rejects_capability_ref_origin_protocol_drift() {
                         }
                     }
                 }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-drifted-cap-ref-kernel-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability,
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap_err();
@@ -931,28 +903,12 @@ fn orchestrator_executes_and_preserves_bridge_lineage() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-1".to_string(),
-                kernel_request_id: "a2a-a2a-task-1".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-a2a-task-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1017,28 +973,18 @@ fn orchestrator_fail_closes_with_empty_attenuation_on_out_of_scope_target() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-2".to_string(),
-                kernel_request_id: "a2a-a2a-task-2".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
                 target_tool_name: "write".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "write").unwrap(),
-                agent_id: subject.public_key().to_hex(),
                 arguments: json!({"message":"nope"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
                 source_envelope: json!({
                     "message": {"role":"user"},
                     "metadata": { "chio": { "targetSkillId": "write" } }
                 }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-a2a-task-2".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "write").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1068,28 +1014,12 @@ fn pending_approval_metadata_is_not_labeled_allow() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-pending".to_string(),
-                kernel_request_id: "a2a-a2a-task-pending".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-a2a-task-pending".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1120,28 +1050,13 @@ fn orchestrator_dispatches_to_registered_target_executor() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-mcp".to_string(),
-                kernel_request_id: "a2a-mcp-1".to_string(),
                 target_protocol: DiscoveryProtocol::Mcp,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-mcp-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1190,30 +1105,16 @@ fn orchestrator_capability_envelope_uses_selected_native_fallback_target() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-mcp-fallback".to_string(),
-                kernel_request_id: "a2a-mcp-fallback-1".to_string(),
                 target_protocol: DiscoveryProtocol::Mcp,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
                 governed_intent: Some(governed_intent_with_control_plane(json!({
                     "allowNativeFallback": true
                 }))),
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-mcp-fallback-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1248,34 +1149,6 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-model-1".to_string(),
-                kernel_request_id: "a2a-model-kernel-1".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool_with_constraints(
-                    &issuer,
-                    &subject,
-                    "test-srv",
-                    "echo",
-                    vec![Constraint::ModelConstraint {
-                        allowed_model_ids: vec!["gpt-5".to_string()],
-                        min_safety_tier: Some(ModelSafetyTier::High),
-                    }],
-                ),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
                 model_metadata: Some(ModelMetadata {
                     model_id: "gpt-5".to_string(),
                     safety_tier: Some(ModelSafetyTier::High),
@@ -1283,8 +1156,21 @@ fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
                     provenance_class:
                         chio_core::capability::governance::ProvenanceEvidenceClass::Asserted,
                 }),
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-model-kernel-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool_with_constraints(
+                        &issuer,
+                        &subject,
+                        "test-srv",
+                        "echo",
+                        vec![Constraint::ModelConstraint {
+                            allowed_model_ids: vec!["gpt-5".to_string()],
+                            min_safety_tier: Some(ModelSafetyTier::High),
+                        }],
+                    ),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1304,28 +1190,13 @@ fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selectio
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-mcp-missing".to_string(),
-                kernel_request_id: "a2a-mcp-missing-1".to_string(),
                 target_protocol: DiscoveryProtocol::Mcp,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-mcp-missing-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1354,28 +1225,13 @@ fn orchestrator_dispatches_to_registered_openai_target_executor() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-openai-1".to_string(),
-                kernel_request_id: "a2a-openai-kernel-1".to_string(),
                 target_protocol: DiscoveryProtocol::OpenAi,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-openai-kernel-1".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
@@ -1771,28 +1627,12 @@ fn orchestrator_metadata_projects_an_incomplete_denial_without_its_reason() {
             &MockBridge,
             CrossProtocolExecutionRequest {
                 origin_request_id: "a2a-task-incomplete".to_string(),
-                kernel_request_id: "a2a-a2a-task-incomplete".to_string(),
-                target_protocol: DiscoveryProtocol::Native,
-                target_server_id: "test-srv".to_string(),
-                target_tool_name: "echo".to_string(),
-                bridge_security: registry.bridge_security("test-srv", "echo").unwrap(),
-                agent_id: subject.public_key().to_hex(),
-                arguments: json!({"message":"hello"}),
-                capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
-                source_envelope: json!({
-                    "message": {"role":"user"},
-                    "metadata": { "chio": { "targetSkillId": "echo" } }
-                }),
-                dpop_proof: None,
-                execution_nonce: None,
-                governed_intent: None,
-                approval_token: None,
-                approval_tokens: Vec::new(),
-                threshold_approval_proposal: None,
-                supplemental_authorization: None,
-                model_metadata: None,
-                authenticated_session_id: None,
-                security_context: None,
+                ..execution_request(
+                    "a2a-a2a-task-incomplete".to_string(),
+                    subject.public_key().to_hex(),
+                    capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    registry.bridge_security("test-srv", "echo").unwrap(),
+                )
             },
         )
         .unwrap();
