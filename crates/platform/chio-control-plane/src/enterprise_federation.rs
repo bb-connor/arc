@@ -8,6 +8,10 @@ use crate::passport_verifier::RegistryTransactionError;
 use crate::CliError;
 use crate::JwtProviderProfile;
 
+mod identity;
+
+pub use identity::ProviderIdentityError;
+
 pub const ENTERPRISE_PROVIDER_REGISTRY_VERSION: &str = "chio.enterprise-providers.v1";
 pub const CERTIFICATION_DISCOVERY_NETWORK_VERSION: &str = "chio.certify.discovery-network.v1";
 
