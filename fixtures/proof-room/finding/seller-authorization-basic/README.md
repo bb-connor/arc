@@ -13,8 +13,8 @@ Interoperability preimages retain all members. For the authorization id,
 set only `body.authorization_id` to `""`; the RFC 8785 bytes of the body
 hash to
 `cd595cde853c1d2c42732748e9894cf0166b99bf85df47031eb89d4cf58a2af4`.
-The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
-`body`; the signature lives outside the body. The exact signed envelope
+The envelope signature is Ed25519 over the `chio.signing-wrapper.v1` wrapper of
+the populated `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
 `f8ee7c2311e258893f26fd9a6c58990012bad7441a31429687c17700bb5a0ecb`.
 No preimage omits a member or encodes it as `null`.

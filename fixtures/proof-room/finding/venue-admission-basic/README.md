@@ -16,8 +16,8 @@ challenge-administration pools.
 Interoperability preimages retain all members. For the admission id, set
 only `body.admission_id` to `""`; the RFC 8785 bytes of the body hash to
 `d54f98cf25f7e4ae5812ad1a38ee4b25fe0d007014d09e99c0d7d6f70ef883be`.
-The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
-`body`; the signature lives outside the body. The exact signed envelope
+The envelope signature is Ed25519 over the `chio.signing-wrapper.v1` wrapper of
+the populated `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
 `8a1e718a55f7500ab56c62f7f806e2d6ca4b4beb6eceebfa39e5b2d69d32fd5c`.
 No preimage omits a member or encodes it as `null`.
