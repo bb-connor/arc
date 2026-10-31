@@ -1314,8 +1314,11 @@ fn consumer_signed_manifest() -> chio_manifest::SignedManifest {
 
 fn consumer_corpus_text() -> String {
     let base = Ordered::from_value(
-        &serde_json::to_value(consumer_signed_manifest())
-            .unwrap_or_else(|error| panic!("serialize consumer manifest: {error}")),
+        &serde_json::from_slice(
+            &chio_core::canonical_json_bytes(&consumer_signed_manifest())
+                .unwrap_or_else(|error| panic!("serialize consumer manifest: {error}")),
+        )
+        .unwrap_or_else(|error| panic!("parse consumer manifest: {error}")),
     );
     let case = |name: &'static str, valid: bool, mutate: &dyn Fn(&mut Ordered)| {
         let mut instance = base.clone();
@@ -1410,10 +1413,9 @@ fn consumer_corpus_text() -> String {
             }),
         ],
     };
-    let mut rendered = serde_json::to_string_pretty(&corpus)
+    let rendered = serde_json::to_string_pretty(&corpus)
         .unwrap_or_else(|error| panic!("render consumer corpus: {error}"));
-    rendered.push('\n');
-    rendered
+    rendered + "\n"
 }
 
 fn consumer_corpus_path() -> PathBuf {

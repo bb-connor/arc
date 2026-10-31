@@ -13,8 +13,8 @@ content-address integrity, and envelope-signature integrity for
 Interoperability preimages retain all members. For the allocation id, set
 only `body.allocation_id` to `""`; the RFC 8785 bytes of the body hash to
 `2586e92a398e6dbbea299408add0610a881a847ec3523e839ef9eb9e175ef482`.
-The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
-`body`; the signature lives outside the body. The exact signed envelope
+The envelope signature is Ed25519 over the `chio.signing-wrapper.v1` wrapper of
+the populated `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
 `5d27cba919f0e463eea4a9091c5c2ee11770bd6e87f11c3645494ab78958b228`.
 No preimage omits a member or encodes it as `null`.

@@ -144,6 +144,12 @@ pub struct PackageContents<'a> {
     pub exported_at: u64,
 }
 
+/// Canonical bytes, so file hashes do not vary with serde_json map features.
+fn file_bytes<T: Serialize>(relative_path: &str, value: &T) -> Result<Vec<u8>, BundleVerifyError> {
+    canonical_json_bytes(value)
+        .map_err(|error| BundleVerifyError::schema(format!("{relative_path}: {error}")))
+}
+
 struct Writer<'a> {
     output: &'a Path,
     files: Vec<EvidenceExportFileHash>,
@@ -173,8 +179,7 @@ impl Writer<'_> {
         relative_path: &str,
         value: &T,
     ) -> Result<(), BundleVerifyError> {
-        let bytes = serde_json::to_vec_pretty(value)
-            .map_err(|error| BundleVerifyError::schema(format!("{relative_path}: {error}")))?;
+        let bytes = file_bytes(relative_path, value)?;
         self.bytes(relative_path, &bytes)
     }
 
@@ -185,9 +190,7 @@ impl Writer<'_> {
     ) -> Result<(), BundleVerifyError> {
         let mut bytes = Vec::new();
         for record in records {
-            let line = serde_json::to_string(record)
-                .map_err(|error| BundleVerifyError::schema(format!("{relative_path}: {error}")))?;
-            bytes.extend_from_slice(line.as_bytes());
+            bytes.extend_from_slice(&file_bytes(relative_path, record)?);
             bytes.push(b'\n');
         }
         self.bytes(relative_path, &bytes)
@@ -284,12 +287,10 @@ pub fn write_package(
         federation_policy,
         signing_key,
     )?;
-    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-        .map_err(|error| BundleVerifyError::schema(format!("{MANIFEST_FILE}: {error}")))?;
+    let manifest_bytes = file_bytes(MANIFEST_FILE, &manifest)?;
     fs::write(output.join(MANIFEST_FILE), manifest_bytes)
         .map_err(|error| BundleVerifyError::io(format!("cannot write {MANIFEST_FILE}: {error}")))?;
-    let envelope_bytes = serde_json::to_vec_pretty(&envelope)
-        .map_err(|error| BundleVerifyError::schema(format!("{ENVELOPE_FILE}: {error}")))?;
+    let envelope_bytes = file_bytes(ENVELOPE_FILE, &envelope)?;
     fs::write(output.join(ENVELOPE_FILE), envelope_bytes)
         .map_err(|error| BundleVerifyError::io(format!("cannot write {ENVELOPE_FILE}: {error}")))?;
     Ok(manifest)

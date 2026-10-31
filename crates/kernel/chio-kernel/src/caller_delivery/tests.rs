@@ -462,7 +462,8 @@ fn temporal_golden() -> TestResult<String> {
         "report": report,
         "report_body_canonical": String::from_utf8(canonical_json_bytes(&report.report)?)?,
     });
-    Ok(format!("{}\n", serde_json::to_string_pretty(&golden)?))
+    let sorted: serde_json::Value = serde_json::from_slice(&canonical_json_bytes(&golden)?)?;
+    Ok(format!("{}\n", serde_json::to_string_pretty(&sorted)?))
 }
 
 /// Set `CHIO_WRITE_TEMPORAL_GOLDEN=1` to rewrite the committed chio-temporal

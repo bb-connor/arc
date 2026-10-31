@@ -208,7 +208,7 @@ fn mutated_predicate(
 ) -> String {
     let mut decoded: Value = serde_json::from_str(canonical).expect("canonical predicate decodes");
     mutate(decoded.as_object_mut().expect("predicate is an object"));
-    serde_json::to_string(&decoded).expect("mutated predicate encodes")
+    chio_core_types::canonical_json_string(&decoded).expect("mutated predicate encodes")
 }
 
 fn vector_case(

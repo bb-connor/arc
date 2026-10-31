@@ -15,8 +15,8 @@ vocabulary in normative order with `status_liveness` reported
 Interoperability preimages retain all members. For the report id, set only
 `body.report_id` to `""`; the RFC 8785 bytes of the body hash to
 `99ee33f3026405bacd50047f4e063e12bdd85c382c5a64a54c7be9987af69c9c`.
-The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
-`body`; the signature lives outside the body. The exact signed envelope
+The envelope signature is Ed25519 over the `chio.signing-wrapper.v1` wrapper of
+the populated `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
 `6a63e923995cc50df2127746f8ffe8e04fe7ffca6875ebfbce3fae5c16f169d2`.
 No preimage omits a member or encodes it as `null`.

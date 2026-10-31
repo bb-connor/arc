@@ -288,7 +288,7 @@ fn vectors() -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
             .as_object()
             .ok_or("object")?
             .keys()
-            .next()
+            .min()
             .ok_or("key")?
             .clone();
         missing.as_object_mut().ok_or("object")?.remove(&key);

@@ -14,8 +14,8 @@ content-address integrity, and envelope-signature integrity for
 Interoperability preimages retain all members. For the profile id, set only
 `body.profile_id` to `""`; the RFC 8785 bytes of the body hash to
 `26845afc58111332f29b3f5e90766406061d151515e7a0957bafbfc1b1754681`.
-The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
-`body`; the signature lives outside the body. The exact signed envelope
+The envelope signature is Ed25519 over the `chio.signing-wrapper.v1` wrapper of
+the populated `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
 `1cc32ce68d85c5711669e93abf270222796115f4b4a2bc774e457ebb66a04e88`.
 No preimage omits a member or encodes it as `null`.

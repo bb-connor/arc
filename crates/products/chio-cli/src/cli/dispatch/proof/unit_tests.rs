@@ -1280,3 +1280,22 @@ fn repeated_commerce_payload_references_consume_one_retention_budget() {
     );
     assert_eq!(payloads.len(), 2);
 }
+
+#[test]
+fn json_line_files_are_written_as_canonical_json() {
+    #[derive(serde::Serialize)]
+    struct Unsorted {
+        z: u8,
+        a: u8,
+    }
+    let dir = proof_test_ok(tempfile::tempdir(), "tempdir");
+    let path = dir.path().join("value.json");
+    proof_test_ok(
+        write_json_line_file(&path, &Unsorted { z: 1, a: 2 }),
+        "write json line",
+    );
+    assert_eq!(
+        proof_test_ok(std::fs::read(&path), "read json line"),
+        b"{\"a\":2,\"z\":1}\n"
+    );
+}
