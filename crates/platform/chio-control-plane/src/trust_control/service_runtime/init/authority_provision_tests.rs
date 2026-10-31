@@ -8,43 +8,7 @@ fn fixed(at: u64) -> Arc<dyn Clock> {
 }
 
 fn config() -> TrustServiceConfig {
-    TrustServiceConfig {
-        transport: Default::default(),
-        listen: SocketAddr::from(([127, 0, 0, 1], 0)),
-        access: crate::trust_control::caller_credentials::tests::test_access("token"),
-        receipt_db_path: None,
-        receipt_query_snapshot_quota_bytes: 2_147_483_648,
-        revocation_db_path: None,
-        authority_seed_path: None,
-        authority_db_path: None,
-        authority_keyring_config_path: None,
-        authority_keyring_receipt_anchor_root: None,
-        budget_db_path: None,
-        cluster_peer_replay_db_path: None,
-        joint_authority_db_path: None,
-        fiscal_runtime: None,
-        enterprise_providers_file: None,
-        federation_policies_file: None,
-        scim_lifecycle_file: None,
-        verifier_policies_file: None,
-        verifier_challenge_db_path: None,
-        passport_statuses_file: None,
-        revocation_partners_file: None,
-        passport_issuance_offers_file: None,
-        certification_registry_file: None,
-        certification_discovery_file: None,
-        issuance_policy: None,
-        runtime_assurance_policy: None,
-        advertise_url: None,
-        allow_local_peer_urls: true,
-        certification_public_metadata_ttl_seconds: 300,
-        cluster_sync_interval: Duration::from_millis(25),
-        authority_replication_max_future_skew_seconds: 0,
-        roster_policy: None,
-        capital_authority: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        finding_market: None,
-    }
+    TrustServiceConfig::for_tests()
 }
 
 #[test]

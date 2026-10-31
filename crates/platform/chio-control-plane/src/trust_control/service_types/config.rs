@@ -330,19 +330,13 @@ pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), C
 }
 
 #[cfg(test)]
-mod service_config_tests {
-    use super::*;
-    use crate::trust_control::caller_credentials::tests::set_test_peers;
-    use chio_test_support::prelude::*;
-
-    fn base_config() -> TrustServiceConfig {
-        let listen = match "127.0.0.1:0".parse() {
-            Ok(addr) => addr,
-            Err(error) => panic!("test listen address should parse: {error}"),
-        };
-        TrustServiceConfig {
+impl TrustServiceConfig {
+    /// A loopback trust service with every optional store, registry and
+    /// policy unset, for tests to override field by field.
+    pub(crate) fn for_tests() -> Self {
+        Self {
             transport: Default::default(),
-            listen,
+            listen: SocketAddr::from(([127, 0, 0, 1], 0)),
             access: crate::trust_control::caller_credentials::tests::test_access("token"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2_147_483_648,
@@ -369,13 +363,31 @@ mod service_config_tests {
             runtime_assurance_policy: None,
             advertise_url: None,
             allow_local_peer_urls: true,
-            certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
+            certification_public_metadata_ttl_seconds: 300,
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
             capital_authority: None,
             memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
             finding_market: None,
+        }
+    }
+}
+
+#[cfg(test)]
+mod service_config_tests {
+    use super::*;
+    use crate::trust_control::caller_credentials::tests::set_test_peers;
+    use chio_test_support::prelude::*;
+
+    fn base_config() -> TrustServiceConfig {
+        let listen = match "127.0.0.1:0".parse() {
+            Ok(addr) => addr,
+            Err(error) => panic!("test listen address should parse: {error}"),
+        };
+        TrustServiceConfig {
+            listen,
+            ..TrustServiceConfig::for_tests()
         }
     }
 
