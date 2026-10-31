@@ -15,11 +15,8 @@ use chio_core::{
         scope::{ChioScope, Constraint, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
-    receipt::body::chio_receipt_id,
-    receipt::body::ChioReceipt,
-    receipt::body::ChioReceiptBody,
-    receipt::decision::Decision,
-    receipt::decision::ToolCallAction,
+    receipt::body::{chio_receipt_id, ChioReceipt, ChioReceiptBody},
+    receipt::decision::{Decision, ToolCallAction},
     receipt::kinds::BoundaryClass,
     receipt::kinds::ReceiptKind,
     receipt::kinds::RedactionMode,
@@ -71,18 +68,18 @@ fn signing_fixture_path() -> PathBuf {
 }
 
 fn pretty_json(value: &Value) -> String {
-    let mut rendered = serde_json::to_string_pretty(value).test_unwrap("serialize fixture");
-    rendered.push('\n');
-    rendered
+    let canonical = chio_core::canonical_json_string(value).test_unwrap("sort fixture keys");
+    let sorted: Value = serde_json::from_str(&canonical).test_unwrap("parse sorted fixture");
+    let rendered = serde_json::to_string_pretty(&sorted).test_unwrap("serialize fixture");
+    format!("{rendered}\n")
 }
 
 fn assert_fixture_matches(path: &Path, actual: &Value) {
     let expected = fs::read_to_string(path)
         .unwrap_or_else(|error| panic!("failed to read fixture {}: {error}", path.display()));
-    let rendered = pretty_json(actual);
     assert_eq!(
         expected,
-        rendered,
+        pretty_json(actual),
         "fixture {} is out of date",
         path.display()
     );
@@ -1409,12 +1406,12 @@ fn old_manifest_shape_under_the_current_id_is_refused_structurally() {
                     .test_unwrap("canonical old-shape manifest"),
             )
             .test_unwrap("sign old-shape manifest");
-        json!({
+        chio_core::canonical_json_string(&json!({
             "manifest": manifest,
             "signature": signature,
             "signer_key": server.public_key(),
-        })
-        .to_string()
+        }))
+        .test_unwrap("render signed manifest")
     };
     let cases = [
         (

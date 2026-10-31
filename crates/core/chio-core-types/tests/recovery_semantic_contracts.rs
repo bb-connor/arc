@@ -709,7 +709,8 @@ fn built_corpus() -> Result<String> {
             f.prerequisite.public_key(),
         ],
     });
-    Ok(format!("{}\n", serde_json::to_string_pretty(&output)?))
+    let sorted: Value = serde_json::from_str(&wire(&output)?)?;
+    Ok(format!("{}\n", serde_json::to_string_pretty(&sorted)?))
 }
 
 const COMMITTED: &str =
