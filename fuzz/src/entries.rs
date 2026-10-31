@@ -164,10 +164,7 @@ pub fn federation_trust_establishment(data: &[u8]) {
     let now = u64_at(data, 64, 1);
     let rotation_window_secs = u64_at(data, 72, 1);
     let max_handshake_skew_secs = u64_at(data, 80, 0);
-    let nonce_tail = match data.get(88..) {
-        Some(bytes) => bytes,
-        None => &[],
-    };
+    let nonce_tail = data.get(88..).unwrap_or(&[]);
     let nonce = nonce_from(nonce_tail);
 
     let exchange = KernelTrustExchange::new("kernel.local", local_keypair)
