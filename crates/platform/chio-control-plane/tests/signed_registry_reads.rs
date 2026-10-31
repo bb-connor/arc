@@ -62,15 +62,12 @@ macro_rules! registry_reader_tests {
                 let error = Registry::load(&path)
                     .err()
                     .ok_or("oversized file accepted")?;
-                assert!(
-                    matches!(
-                        error,
-                        CliError::File(RegularFileError::TooLarge {
-                            max_bytes: REGISTRY_LIMIT
-                        })
-                    ),
-                    "{error:?}"
-                );
+                let CliError::SignedJson(UntrustedJsonError::TooLarge { bytes, bound }) = error
+                else {
+                    return Err(format!("unexpected refusal: {error:?}").into());
+                };
+                assert_eq!(bytes, REGISTRY_LIMIT + 1);
+                assert_eq!(bound, REGISTRY_LIMIT);
                 Ok(())
             }
 

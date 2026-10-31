@@ -161,8 +161,15 @@ impl RevocationPartnerRegistry {
     /// Loads and validates the registry at `path` through the shared bounded
     /// registry reader. A missing, oversized or invalid file is refused.
     pub fn load(path: &Path) -> Result<Self, RevocationPartnerError> {
-        let bytes = crate::signed_input::read_bounded(path)
-            .map_err(|error| RevocationPartnerError::Unreadable(error.to_string()))?;
+        let bytes =
+            crate::signed_input::read_bounded(path).map_err(
+                |error| match crate::CliError::from(error) {
+                    crate::CliError::File(error) => {
+                        RevocationPartnerError::Unreadable(error.to_string())
+                    }
+                    error => RevocationPartnerError::Malformed(error.to_string()),
+                },
+            )?;
         Self::from_json(&bytes)
     }
 
