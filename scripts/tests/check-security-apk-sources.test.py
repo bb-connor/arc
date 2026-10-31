@@ -545,7 +545,7 @@ class CorrespondingSource(unittest.TestCase):
 
     def test_missing_listed_archive(self):
         self.fixture.write()
-        next((self.fixture.root / CHECKER.APK_DIR).glob("*.apk")).unlink()
+        (self.fixture.root / CHECKER.APK_DIR / "bar-2.0-r0.apk").unlink()
         self.assert_refused("security APK archive directory does not match its manifest (missing ['bar-2.0-r0.apk'], extra [])")
 
     def test_listed_but_unreferenced_file(self):
