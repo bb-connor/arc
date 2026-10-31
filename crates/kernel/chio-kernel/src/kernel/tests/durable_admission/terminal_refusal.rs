@@ -20,6 +20,7 @@ pub(super) fn compensation_response() -> DurableRefusalResponse<'static> {
 struct RefusingServer {
     store: std::sync::Arc<TestAdmissionOperationStore>,
     calls: std::sync::Arc<AtomicU64>,
+    refusal: Option<crate::ToolRefusal>,
 }
 
 #[async_trait::async_trait]
@@ -43,8 +44,9 @@ impl ToolServerConnection for RefusingServer {
             AdmissionOperationState::DispatchCommitted
         );
         self.calls.fetch_add(1, Ordering::SeqCst);
-        Err(KernelError::ToolServerError(
-            "child scope is refused".into(),
+        Err(self.refusal.map_or_else(
+            || KernelError::ToolServerError("child scope is refused".into()),
+            KernelError::ToolRefused,
         ))
     }
 }
@@ -57,6 +59,7 @@ fn install_refusing_server(
     kernel.register_tool_server(Box::new(RefusingServer {
         store: store.clone(),
         calls: calls.clone(),
+        refusal: None,
     }));
 }
 
@@ -89,6 +92,34 @@ fn assert_exact_response(original: &ToolCallResponse, replay: &ToolCallResponse)
         chio_core::canonical::canonical_json_bytes(&replay.receipt).expect("replay bytes"),
         chio_core::canonical::canonical_json_bytes(&original.receipt).expect("original bytes"),
     );
+}
+
+#[test]
+fn closed_tool_refusal_signs_its_reason_and_keeps_the_outcome_unknown() -> TestResult {
+    let (mut kernel, request, store, calls) = durable_admission_fixture_with_grants(
+        "closed-tool-refusal",
+        vec![make_grant("durable-server", "mutate")],
+    );
+    let refusal = crate::ToolRefusal::Conflict;
+    kernel.register_tool_server(Box::new(RefusingServer {
+        store: store.clone(),
+        calls,
+        refusal: Some(refusal),
+    }));
+    let denied = kernel.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(
+        denied.denial_code,
+        Some(crate::ClientDenialCode::ToolUnavailable)
+    );
+    assert_original_unknown_incident(
+        &store,
+        &request,
+        &chio_core::receipt::decision::Decision::Deny {
+            reason: KernelError::ToolRefused(refusal).to_string(),
+            guard: "kernel".into(),
+        },
+    );
+    Ok(())
 }
 
 #[test]

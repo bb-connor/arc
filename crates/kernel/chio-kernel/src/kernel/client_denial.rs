@@ -199,7 +199,8 @@ impl KernelError {
             | Self::ToolNotRegistered(_)
             | Self::ResourceNotRegistered(_)
             | Self::PromptNotRegistered(_)
-            | Self::ToolServerError(_) => Code::ToolUnavailable,
+            | Self::ToolServerError(_)
+            | Self::ToolRefused(_) => Code::ToolUnavailable,
             Self::GovernedApprovalLifetimeExceeded
             | Self::GovernedTransactionDenied(_)
             | Self::ApprovalRejected(_)

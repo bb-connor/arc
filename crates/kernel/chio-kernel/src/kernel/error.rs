@@ -141,6 +141,19 @@ impl std::fmt::Display for ReplayClockDirection {
     }
 }
 
+/// The closed reasons a tool server may give for refusing a dispatched call.
+/// The kernel signs this text and keeps the outcome unknown: a tool's claim
+/// never establishes that no effect occurred.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ToolRefusal {
+    #[error("caller is not one live attested process")]
+    CallerNotAttested,
+    #[error("request conflicts with recorded tool state")]
+    Conflict,
+    #[error("invalid tool operation")]
+    InvalidOperation,
+}
+
 /// Errors that can occur during kernel operations.
 #[derive(Debug, thiserror::Error)]
 pub enum KernelError {
@@ -236,6 +249,9 @@ pub enum KernelError {
 
     #[error("tool server error: {0}")]
     ToolServerError(String),
+
+    #[error("tool refused the call: {0}")]
+    ToolRefused(ToolRefusal),
 
     #[error("request stream incomplete: {0}")]
     RequestIncomplete(String),
@@ -663,6 +679,11 @@ impl KernelError {
                 "CHIO-KERNEL-TOOL-SERVER",
                 serde_json::json!({ "reason": reason }),
                 "Inspect the wrapped tool server logs and protocol compatibility, then retry once the server is healthy.",
+            ),
+            Self::ToolRefused(refusal) => self.report_with_context(
+                "CHIO-KERNEL-TOOL-SERVER",
+                serde_json::json!({ "reason": refusal.to_string() }),
+                "Correct the caller, request or recorded tool state the server refused.",
             ),
             Self::RequestIncomplete(reason) => self.report_with_context(
                 "CHIO-KERNEL-REQUEST-INCOMPLETE",
