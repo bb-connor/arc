@@ -86,17 +86,13 @@ fn process_abort_never_exposes_partial_import_and_new_owner_recovers_exact_pin(
     for stage in 1..=10 {
         let fixture = fixture_real_time();
         drop(source(&fixture)?);
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
             fence,
             _clock,
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let output = std::process::Command::new(std::env::current_exe()?)
             .args(["--exact", "admission_operation_store::tests::security_participant_migration::cutpoints::child_process_crash", "--nocapture"])
             .env("CHIO_SECURITY_DESTINATION_CRASH_STAGE", stage.to_string())

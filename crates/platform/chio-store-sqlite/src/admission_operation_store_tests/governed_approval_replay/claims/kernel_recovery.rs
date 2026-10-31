@@ -61,16 +61,13 @@ fn kernel_restart_releases_expired_approval_custody_from_original_history() -> A
         let port: &dyn AdmissionOperationStore = &fixture.store;
         let (operation, reference) =
             port.claim_governed_approval(&operation, &lease, &intent, now_ms())?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
         let now = (expires + 1) * 1000;
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;

@@ -87,17 +87,13 @@ fn destination_reopen_preserves_pending_and_imported_history_but_requires_the_li
 }
 
 fn reopen(fixture: Fixture) -> AnchoredTestResult<(Fixture, StoreMutationFence)> {
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     Ok((
         Fixture {

@@ -57,16 +57,13 @@ fn restoring_private_database_before_hydration_cannot_erase_the_anchored_initial
         [backup.to_str().ok_or("non-UTF8 fixture path")?],
     )?;
     hydrate(&fixture, &source)?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     // Only this disposable test database is restored; its independent anchor
     // retains the acknowledged native initialization.
     fs::copy(&backup, &database)?;

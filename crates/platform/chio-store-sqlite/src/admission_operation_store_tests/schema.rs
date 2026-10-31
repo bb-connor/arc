@@ -551,16 +551,13 @@ fn fresh_provision_creates_the_operation_schema_after_serving_lease_schema() {
 fn current_schema_reopen_rejects_assignment_results_without_evidence_columns() -> AnchoredTestResult
 {
     let fixture = fixture();
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let connection = Connection::open(&database)?;
     connection.execute_batch(
         r#"

@@ -111,16 +111,13 @@ fn current_schema_damage_is_not_repaired_on_reopen() -> AnchoredTestResult {
         "CREATE TABLE dpop_replay_unqualified(value TEXT)",
     ] {
         let fixture = fixture_real_time();
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         connection.execute_batch(sql)?;
         let before: i64 =

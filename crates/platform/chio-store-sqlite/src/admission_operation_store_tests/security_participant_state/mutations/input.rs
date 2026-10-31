@@ -350,17 +350,13 @@ fn input_join_cutpoints_recover_exactly_one_intent_without_downgrading_to_raw() 
         FAIL_AFTER.set(0);
         assert!(result.is_err(), "stage {stage}");
         assert_eq!(count(&fixture)?, i64::from(stage >= 10));
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
+            fence: _fence,
             _clock,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             _temp,
@@ -431,16 +427,13 @@ fn input_intent_schema_and_resolution_tampering_fail_recovery_with_recomputed_lo
             &input,
             now_ms(),
         )?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         let bytes: Vec<u8> = connection.query_row(
             "SELECT canonical_record FROM security_participant_state_mutations",

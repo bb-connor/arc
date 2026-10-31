@@ -93,16 +93,13 @@ fn decision_order_is_local_but_observation_order_is_global() -> AnchoredTestResu
     verify_admission_operation_invariants(&connection)?;
     drop(statement);
     drop(connection);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         reopened

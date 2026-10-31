@@ -35,17 +35,13 @@ fn reopened_history_recovers_exact_claim_and_retains_dispatch_disposition() -> T
         } else {
             operation
         };
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
             fence,
             _clock,
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let store = authority.admission_operation_store();
         assert!(matches!(

@@ -166,16 +166,13 @@ fn native_terminal_healthy_replay_survives_new_serving_owner_without_status_time
             .cloned()
             .ok_or("original replay")?
     );
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert_eq!(

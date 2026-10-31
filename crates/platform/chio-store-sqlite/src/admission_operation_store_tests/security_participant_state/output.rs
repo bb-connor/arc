@@ -18,16 +18,13 @@ fn missing_current_output_catalog_is_not_repaired() -> AnchoredTestResult {
                 now_ms()
             )
             .is_err());
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         let before: (i64,String) = connection.query_row("SELECT head_sequence, head_chain_digest FROM authority_global_commit_meta WHERE singleton = 1", [], |row| Ok((row.get(0)?,row.get(1)?)))?;
         assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());

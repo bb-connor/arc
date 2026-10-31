@@ -466,16 +466,13 @@ fn resurrected_evicted_session_row_is_refused_at_open() -> AnchoredTestResult {
             if detail.contains("native current row differs from anchored history")),
         "{refused}"
     );
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let refused = crate::test_authority::open_serving(&database, &lock_root)
         .err()
         .ok_or("resurrected session row was accepted at open")?;

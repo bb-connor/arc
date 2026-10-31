@@ -41,16 +41,13 @@ fn locally_rehashed_egress_history_cannot_replace_anchored_operation_custody() -
         let pending = pending(&fixture, "egress-history-damage", None)?;
         let acquired = pending.acquire(&fixture)?;
         pending.commit(&fixture, &commitment(&acquired)?)?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         connection.execute_batch("DROP TRIGGER security_participant_egress_events_no_update; DROP TRIGGER security_participant_egress_events_no_delete;")?;
         if damage == "delete" {

@@ -118,17 +118,13 @@ fn native_journal_checkpoint_ordinary_coverage_work_ignores_sealed_archive() -> 
 }
 
 fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
+        fence: _fence,
         _clock,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     Ok(Fixture {
         _temp,
@@ -371,16 +367,13 @@ fn native_journal_checkpoint_older_journal_corruption_refuses_reopen() -> Anchor
         &fixture.fence,
         now_ms(),
     )?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let connection = Connection::open(&database)?;
     connection.execute_batch(
         "DROP TRIGGER security_participant_state_mutations_no_update;
@@ -437,17 +430,13 @@ fn native_journal_checkpoint_abort_reopens_complete_old_or_new_state() -> Anchor
     for stage in 70..=74 {
         let fixture = fixture_real_time();
         let initialized = hydrate(&fixture, &imported(&fixture, "source")?)?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
+            fence: _fence,
             _clock,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let output = std::process::Command::new(std::env::current_exe()?)
             .args(["--exact","admission_operation_store::tests::security_participant_state::checkpoint::checkpoint_abort_child","--nocapture"])
             .env("CHIO_NATIVE_CHECKPOINT_CRASH_DIRECTORY",_temp.path())

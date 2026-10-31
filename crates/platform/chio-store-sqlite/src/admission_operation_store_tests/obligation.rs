@@ -743,16 +743,13 @@ fn obligation_lifecycle_and_head_survive_serving_owner_restart() -> AnchoredTest
     let fixture = fixture();
     let at = now_ms();
     let (atom, disposition) = commit_valid_per_call_projection(&fixture, "restart", at)?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
 
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let stored = authority
@@ -862,17 +859,13 @@ fn obligation_head_accepts_same_millisecond_serving_owner_rotation() -> Anchored
     let committed_at = now_ms();
     let (atom, disposition) =
         commit_valid_per_call_projection(&fixture, "head-owner-rotation", committed_at)?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence: first_fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
 
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fence = authority.mutation_fence();

@@ -121,16 +121,13 @@ fn restoring_database_before_join_cannot_erase_acknowledged_mutation_history() -
         &request,
         now_ms(),
     )?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     fs::copy(backup, &database)?;
     assert!(SqliteAuthorityStore::open_serving_with_clock(
         &database,
@@ -197,16 +194,13 @@ fn external_row_tampering_with_restored_catalog_is_rejected_on_reopen() -> TestR
         &request,
         now_ms(),
     )?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let connection = Connection::open(&database)?;
     connection.execute_batch(
         "DROP TRIGGER security_participant_state_7_inactive_update;
@@ -300,16 +294,13 @@ fn independent_process_abort_and_takeover_preserve_exact_mutation_custody() -> T
             let initialized = hydrate(&fixture, &source)?;
             let (context, request) = request("native-join")?;
             let (operation, _) = setup(&fixture, "native-operation", &context)?;
-            let Fixture {
+            let Closed {
                 _temp,
                 database,
                 lock_root,
-                authority,
-                store,
-                ..
-            } = fixture;
-            drop(store);
-            drop(authority);
+                fence: _fence,
+                _clock,
+            } = fixture.close();
             let output = std::process::Command::new(std::env::current_exe()?)
             .args(["--exact", "admission_operation_store::tests::security_participant_state::mutations::faults::child_process_native_join_crash", "--nocapture"])
             .env("CHIO_SECURITY_NATIVE_CRASH_STAGE", stage.to_string())

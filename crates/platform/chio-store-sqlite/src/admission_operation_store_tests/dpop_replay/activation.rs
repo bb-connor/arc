@@ -74,17 +74,13 @@ fn committed_activation_survives_source_loss_but_inactive_import_does_not_activa
             activate(&fixture, &source, &domain)?;
         }
         drop(source);
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
             fence,
             _clock,
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             store: authority.admission_operation_store(),

@@ -17,16 +17,13 @@ fn canonical_mutation_edits_and_missing_history_cannot_survive_owner_recovery() 
             &request,
             now_ms(),
         )?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         connection.execute_batch(
             "DROP TRIGGER security_participant_state_mutations_no_update;

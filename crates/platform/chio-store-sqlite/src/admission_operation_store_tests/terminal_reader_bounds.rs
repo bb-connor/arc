@@ -106,16 +106,13 @@ fn rc2_terminal_sealed_reopen_refuses_native_byte_bound_before_json_decode() -> 
     connection.pragma_update(None, "ignore_check_constraints", false)?;
     connection.execute_batch(&immutable_trigger)?;
     drop(connection);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let error = crate::test_authority::open_serving(&database, &lock_root)
         .err()
         .ok_or("corrupt terminal record was accepted on sealed reopen")?;
@@ -138,16 +135,13 @@ fn rc2_terminal_healthy_sealed_replay_and_empty_paging_remain_supported() -> Anc
         fixture.store.list_terminal_receipts_after(None, 1)?.len(),
         1
     );
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     assert_eq!(

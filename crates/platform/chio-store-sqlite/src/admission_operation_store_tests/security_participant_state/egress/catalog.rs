@@ -28,16 +28,13 @@ fn missing_current_egress_catalog_is_not_repaired() -> AnchoredTestResult {
                 .is_err(),
             "live reads must reject a missing current catalog"
         );
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            store,
-            authority,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let connection = Connection::open(&database)?;
         let before = global_history(&connection)?;
         assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());

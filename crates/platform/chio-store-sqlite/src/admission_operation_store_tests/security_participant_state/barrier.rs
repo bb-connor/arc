@@ -3,16 +3,13 @@ use super::*;
 #[test]
 fn missing_current_native_barrier_is_never_repaired() -> AnchoredTestResult {
     let fixture = fixture();
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let connection = Connection::open(&database)?;
     connection.execute_batch("DROP TRIGGER security_participant_state_0_inactive_insert")?;
     assert!(SqliteAuthorityStore::provision(&database, &lock_root).is_err());

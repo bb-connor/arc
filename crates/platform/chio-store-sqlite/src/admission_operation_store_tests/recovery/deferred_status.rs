@@ -116,17 +116,13 @@ fn recovery_status_cas_and_clear_tombstone_survive_new_serving_owner() -> Anchor
     assert_eq!(admission_commit_rows(&connection)?, after_clear);
     assert_eq!(fixture.authority.anchor_generation()?, clear_anchor);
     drop(connection);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence: old_fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();

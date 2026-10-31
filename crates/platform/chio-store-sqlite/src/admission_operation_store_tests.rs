@@ -115,6 +115,40 @@ struct Fixture {
     _clock: Option<ClockScope>,
 }
 
+/// What a closed fixture leaves for a reopen: its directory, paths, fence and
+/// clock scope, which live as long as the bindings that hold them.
+struct Closed {
+    _temp: TempDir,
+    database: PathBuf,
+    lock_root: PathBuf,
+    fence: StoreMutationFence,
+    _clock: Option<ClockScope>,
+}
+
+impl Fixture {
+    /// Drops the store and then the authority so the database can be reopened.
+    fn close(self) -> Closed {
+        let Self {
+            _temp,
+            database,
+            lock_root,
+            authority,
+            store,
+            fence,
+            _clock,
+        } = self;
+        drop(store);
+        drop(authority);
+        Closed {
+            _temp,
+            database,
+            lock_root,
+            fence,
+            _clock,
+        }
+    }
+}
+
 fn fixture() -> Fixture {
     open_fixture(Some(fixed_clock()))
 }
@@ -779,16 +813,13 @@ fn terminal_projection_is_atomic_replayable_and_retained() {
         .expect("retry clean terminal projection");
 
     let replay_key = first.replay_key();
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened =
         crate::test_authority::open_serving(&database, &lock_root).expect("reopen authority");
     assert!(reopened

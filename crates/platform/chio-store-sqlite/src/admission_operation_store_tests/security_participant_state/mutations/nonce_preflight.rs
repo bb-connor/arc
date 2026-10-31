@@ -342,16 +342,13 @@ fn preflight_cutpoints_preserve_only_committed_monotone_history_on_reopen() -> T
             )
             .is_err());
         FAIL_AFTER.set(0);
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            store,
-            authority,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();

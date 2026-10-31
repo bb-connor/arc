@@ -87,16 +87,13 @@ fn copies_all_actual_flow_and_declassification_history_but_never_activates_it() 
     );
     assert!(!format!("{imported:?}").contains("private-source"));
     drop(source);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     assert_eq!(
         authority

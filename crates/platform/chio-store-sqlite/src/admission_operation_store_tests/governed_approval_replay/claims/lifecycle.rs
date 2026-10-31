@@ -107,17 +107,13 @@ fn committed_approval_survives_expiry_and_restart_without_release_authority() ->
             now_ms(),
         )?
         .into_operation();
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let _clock = chio_test_support::clock::scope_unix_secs(expires + 1);
     let now = (expires + 1) * 1000;
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;

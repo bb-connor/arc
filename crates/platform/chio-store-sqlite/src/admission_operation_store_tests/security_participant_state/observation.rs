@@ -287,17 +287,13 @@ fn fresh_observation_requires_current_owner_but_preserves_original_initializatio
     let (_, request) = mutations::request("unjoined")?;
     let original = initialized.admission_binding()?;
     observe(&fixture, &initialized, &request.key)?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(database, lock_root)?;
     let current = authority.mutation_fence();
     assert!(current.owner_epoch > fence.owner_epoch);

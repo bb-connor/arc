@@ -403,16 +403,13 @@ fn signed_authorization_consumption_rejects_substitutions_and_reopens_exactly() 
             chio_kernel::admission_operation::AdmissionOperationError::TerminalProjectionBindingMismatch))));
     assert_eq!(terminal_counts(&fixture)?, committed);
     let original_bytes = verified.projection_json().to_vec();
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = reopened.admission_operation_store();
     let replay = store

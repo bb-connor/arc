@@ -437,17 +437,13 @@ fn native_join_errors_rollback_or_recover_exactly_one_committed_record() -> Test
         FAIL_AFTER.set(0);
         assert!(result.is_err(), "stage {stage}");
         assert_eq!(count(&fixture)?, i64::from(stage >= 10));
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
+            fence: _fence,
             _clock,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {
             _temp,
@@ -492,16 +488,13 @@ fn owner_takeover_preserves_join_history_without_reacquiring_old_authority() -> 
         &request,
         now_ms(),
     )?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert_eq!(

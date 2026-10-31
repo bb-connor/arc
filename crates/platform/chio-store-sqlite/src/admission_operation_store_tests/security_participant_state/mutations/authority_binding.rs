@@ -97,17 +97,13 @@ fn original_native_binding_remains_stable_across_serving_owner_rotation() -> Tes
         &request,
         now_ms(),
     )?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(database, lock_root)?;
     let next_fence = authority.mutation_fence();
     assert!(next_fence.owner_epoch > fence.owner_epoch);

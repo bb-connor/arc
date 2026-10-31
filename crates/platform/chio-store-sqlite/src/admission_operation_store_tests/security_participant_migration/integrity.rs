@@ -131,16 +131,13 @@ fn restoring_destination_before_import_is_rejected_by_independent_anchor() -> An
     )?;
     import(&fixture, &source, &expected)?;
     drop(source);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     // Replace only this private test database; its separately committed anchor
     // remains at the acknowledged import, as after a stale database restore.
     fs::copy(&backup, &database)?;

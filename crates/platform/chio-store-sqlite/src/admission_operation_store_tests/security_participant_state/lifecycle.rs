@@ -142,17 +142,13 @@ fn retry_and_new_owner_readback_need_no_remaining_source_file() -> AnchoredTestR
         fixture._temp.path().join("source.offline"),
     )?;
     assert_eq!(hydrate(&fixture, &imported)?, record);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     assert!(store

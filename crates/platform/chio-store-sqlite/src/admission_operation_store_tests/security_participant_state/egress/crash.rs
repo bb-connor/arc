@@ -108,17 +108,13 @@ fn independent_process_abort_recovers_acquire_and_commit_without_partial_custody
                 None
             };
             let before = counts(&fixture)?;
-            let Fixture {
+            let Closed {
                 _temp,
                 database,
                 lock_root,
-                authority,
-                store,
+                fence: _fence,
                 _clock,
-                ..
-            } = fixture;
-            drop(store);
-            drop(authority);
+            } = fixture.close();
             let child_temp_root = tempfile::tempdir()?;
             let output = std::process::Command::new(std::env::current_exe()?)
                 .args(["--exact", "admission_operation_store::tests::security_participant_state::egress::crash::child_process_crash", "--nocapture"])

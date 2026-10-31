@@ -18,16 +18,13 @@ fn committed_dpop_survives_kernel_reopen_and_rejects_a_fresh_signature_for_the_s
         calls,
     } = route;
     drop(original_kernel);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let _clock = chio_test_support::clock::scope_unix_secs(expires);
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let fixture = Fixture {
@@ -88,16 +85,13 @@ fn startup_releases_expired_pre_dispatch_dpop_without_recreating_the_source() ->
                 .store
                 .claim_dpop_replay(&operation, &lease, &intent, now_ms())?;
         drop(source);
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
-            ..
-        } = fixture;
-        drop(store);
-        drop(authority);
+            fence: _fence,
+            _clock,
+        } = fixture.close();
         let _clock = chio_test_support::clock::scope_unix_secs(expires);
         let authority = crate::test_authority::open_serving(&database, &lock_root)?;
         let fixture = Fixture {

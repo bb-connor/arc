@@ -66,17 +66,13 @@ fn owner_restart_preserves_sealed_source_and_idempotent_import() -> AnchoredTest
     let global_commits = global_count(&fixture)?;
     let anchor_generation = fixture.authority.anchor_generation()?;
     drop(source);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        store,
-        authority,
         fence: previous_fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let source_bytes = fs::read(&source_path)?;
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     authority.verify_database_path(&database)?;

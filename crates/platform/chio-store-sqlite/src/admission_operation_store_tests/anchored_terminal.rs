@@ -761,17 +761,13 @@ fn anchored_terminal_projection_survives_expiry_and_same_store_owner_takeover() 
         ));
     }
 
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
         fence: first_fence,
         _clock,
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
 
     let second = crate::test_authority::open_serving(&database, &lock_root)?;
     let second_fence = second.mutation_fence();

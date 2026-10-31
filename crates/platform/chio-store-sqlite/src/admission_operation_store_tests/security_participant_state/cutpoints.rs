@@ -51,17 +51,13 @@ fn independent_process_abort_and_owner_rotation_never_expose_partial_native_stat
     for stage in 1..=6 {
         let fixture = fixture_real_time();
         let source = imported(&fixture, "source")?;
-        let Fixture {
+        let Closed {
             _temp,
             database,
             lock_root,
-            authority,
-            store,
             fence,
             _clock,
-        } = fixture;
-        drop(store);
-        drop(authority);
+        } = fixture.close();
         let output = std::process::Command::new(std::env::current_exe()?)
             .args(["--exact", "admission_operation_store::tests::security_participant_state::cutpoints::child_process_crash", "--nocapture"])
             .env("CHIO_SECURITY_NATIVE_CRASH_STAGE", stage.to_string())

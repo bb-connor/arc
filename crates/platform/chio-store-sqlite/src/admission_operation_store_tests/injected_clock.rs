@@ -67,16 +67,13 @@ fn admission_uses_injected_authority_time_across_restart() -> AnchoredTestResult
         load_admission_commit_head(&*fixture.store.connection()?)?.trusted_time_high_water_unix_ms,
         EPOCH
     );
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     clock.set(Ok(TestClock::reading(EPOCH + 1_000, 200)))?;
     let reopened = SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, clock)?;
     let store = reopened.admission_operation_store();
@@ -245,16 +242,13 @@ fn sqlite_revocation_preserves_admission_clock_floor_across_restart() -> Anchore
         "clock-cap",
     );
     fixture.store.begin(&operation, &fixture.fence, EPOCH)?;
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     clock.set(Ok(TestClock::reading(EPOCH - 1_000, 200)))?;
     let reopened = SqliteAuthorityStore::open_serving_with_clock(&database, &lock_root, clock)?;
     let store = reopened.admission_operation_store();

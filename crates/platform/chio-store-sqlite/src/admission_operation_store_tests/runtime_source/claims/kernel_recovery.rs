@@ -42,17 +42,13 @@ fn kernel(fixture: &Fixture) -> TestResult<ChioKernel> {
 }
 
 fn reopen(fixture: Fixture) -> TestResult<Fixture> {
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
+        fence: _fence,
         _clock,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     let store = authority.admission_operation_store();
     let fence = authority.mutation_fence();

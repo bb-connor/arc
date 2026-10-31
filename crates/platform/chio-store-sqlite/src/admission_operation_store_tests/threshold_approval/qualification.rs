@@ -224,16 +224,13 @@ fn threshold_reservation_exact_replay_preserves_rows_and_reopens() {
         AdmissionCommandResult::Idempotent(_)
     ));
     assert_unchanged(&fixture, &reserved, before);
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+        fence: _fence,
+        _clock,
+    } = fixture.close();
     let reopened = crate::test_authority::open_serving(&database, &lock_root).expect("reopen");
     assert_eq!(
         reopened

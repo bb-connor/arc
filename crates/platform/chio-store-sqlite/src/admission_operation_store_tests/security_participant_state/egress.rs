@@ -212,17 +212,13 @@ fn joins(fixture: &Fixture) -> AnchoredTestResult<Vec<Vec<u8>>> {
 }
 
 fn reopen(fixture: Fixture) -> AnchoredTestResult<Fixture> {
-    let Fixture {
+    let Closed {
         _temp,
         database,
         lock_root,
-        authority,
-        store,
+        fence: _fence,
         _clock,
-        ..
-    } = fixture;
-    drop(store);
-    drop(authority);
+    } = fixture.close();
     let authority = crate::test_authority::open_serving(&database, &lock_root)?;
     Ok(Fixture {
         _temp,
