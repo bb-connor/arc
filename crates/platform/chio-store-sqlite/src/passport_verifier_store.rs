@@ -28,8 +28,8 @@ pub enum PassportVerifierStoreError {
     Io(#[from] std::io::Error),
     #[error("passport verifier store is unavailable: {0}")]
     Unavailable(String),
-    #[error("passport verifier store value is out of range: {0}")]
-    IntegerRange(#[from] IntegerRangeError),
+    #[error("passport verifier store value is out of range")]
+    IntegerRange,
     #[error("passport verifier store already holds `{0}`")]
     Duplicate(String),
     #[error("passport verifier store holds an invalid row")]
@@ -93,6 +93,12 @@ impl SqlitePassportVerifierStore {
     }
 }
 
+impl From<IntegerRangeError> for PassportVerifierStoreError {
+    fn from(_: IntegerRangeError) -> Self {
+        Self::IntegerRange
+    }
+}
+
 impl VerifierLedger for SqlitePassportVerifierStore {}
 
 /// The port-level fault for a store error. Damaged rows, schema and file
@@ -101,7 +107,7 @@ impl VerifierLedger for SqlitePassportVerifierStore {}
 fn ledger_fault(error: PassportVerifierStoreError) -> LedgerFault {
     match error {
         PassportVerifierStoreError::Duplicate(_) => LedgerFault::Duplicate,
-        PassportVerifierStoreError::IntegerRange(_) => LedgerFault::Unrepresentable,
+        PassportVerifierStoreError::IntegerRange => LedgerFault::Unrepresentable,
         PassportVerifierStoreError::InvalidRow
         | PassportVerifierStoreError::InvalidField(_)
         | PassportVerifierStoreError::Schema(_) => LedgerFault::IntegrityFailure,
