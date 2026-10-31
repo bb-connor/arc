@@ -281,7 +281,11 @@ mod receipt_fixture {
     fn with_origin(origin: Value) -> Value {
         let mut receipt = reference_receipt();
         receipt["tool_origin"] = origin;
-        receipt
+        sorted(&receipt)
+    }
+
+    fn sorted(value: &Value) -> Value {
+        serde_json::from_slice(&chio_core_types::canonical_json_bytes(value).unwrap()).unwrap()
     }
 
     fn indented(value: &impl Serialize) -> String {
@@ -315,7 +319,7 @@ mod receipt_fixture {
                 name: "receipt-unknown-field",
                 schema_file: RECEIPT_SCHEMA_FILE,
                 valid: false,
-                instance: unknown_field,
+                instance: sorted(&unknown_field),
             },
         ]
     }

@@ -161,7 +161,7 @@ fn shared_vectors() -> TestResult<serde_json::Value> {
         output_cases.push(serde_json::json!({"name":format!("{schema}:unknown-field"),"schema":schema,"body":unknown,"valid":false,"schema_valid":false}));
         let mut absent = body.clone();
         let object = absent.as_object_mut().ok_or("body")?;
-        let key = object.keys().next().cloned().ok_or("field")?;
+        let key = object.keys().min().cloned().ok_or("field")?;
         object.remove(&key);
         output_cases.push(serde_json::json!({"name":format!("{schema}:missing-field"),"schema":schema,"body":absent,"valid":false,"schema_valid":false}));
     }

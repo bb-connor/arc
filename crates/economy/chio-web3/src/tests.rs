@@ -2543,7 +2543,9 @@ const REFERENCE_ARTIFACTS_DIR: &str =
     concat!(env!("CARGO_MANIFEST_DIR"), "/../../../docs/standards");
 
 fn reference_artifact_bytes<T: serde::Serialize>(artifact: &T) -> Vec<u8> {
-    let mut bytes = serde_json::to_vec_pretty(artifact).unwrap();
+    let canonical = chio_core_types::canonical_json_bytes(artifact).unwrap();
+    let sorted: serde_json::Value = serde_json::from_slice(&canonical).unwrap();
+    let mut bytes = serde_json::to_vec_pretty(&sorted).unwrap();
     bytes.push(b'\n');
     bytes
 }
