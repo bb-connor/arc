@@ -1134,15 +1134,6 @@ fn post_admin_rotate_authority(client: &Client, base_url: &str, token: &str) -> 
         .expect("send admin authority rotate request")
 }
 
-fn post_control_rotate_authority(client: &Client, base_url: &str, token: &str) -> Response {
-    client
-        .post(format!("{base_url}/v1/authority"))
-        .header(AUTHORIZATION, format!("Bearer {token}"))
-        .json(&json!({}))
-        .send()
-        .expect("send control authority rotate request")
-}
-
 fn get_admin_session_trust(
     client: &Client,
     base_url: &str,
@@ -1225,20 +1216,6 @@ fn get_admin_tool_receipts(
         .expect("send admin tool receipts request")
 }
 
-fn get_control_tool_receipts(
-    client: &Client,
-    base_url: &str,
-    token: &str,
-    query: &[(&str, &str)],
-) -> Response {
-    client
-        .get(format!("{base_url}/v1/receipts/tools"))
-        .query(query)
-        .header(AUTHORIZATION, format!("Bearer {token}"))
-        .send()
-        .expect("send control tool receipts request")
-}
-
 fn get_admin_child_receipts(
     client: &Client,
     base_url: &str,
@@ -1265,20 +1242,6 @@ fn get_admin_revocations(
         .header(AUTHORIZATION, format!("Bearer {token}"))
         .send()
         .expect("send admin revocations request")
-}
-
-fn get_control_revocations(
-    client: &Client,
-    base_url: &str,
-    token: &str,
-    query: &[(&str, &str)],
-) -> Response {
-    client
-        .get(format!("{base_url}/v1/revocations"))
-        .query(query)
-        .header(AUTHORIZATION, format!("Bearer {token}"))
-        .send()
-        .expect("send control revocations request")
 }
 
 fn post_admin_capability_revoke(
