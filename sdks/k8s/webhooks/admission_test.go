@@ -697,6 +697,30 @@ func TestVerifyCapabilityRefusesNullRootAnchor(t *testing.T) {
 	}
 }
 
+func TestVerifyCapabilityRefusesRepeatedMembers(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = rootAnchorFixture()
+	raw := signedRawToken(t, signer, body, body)
+	cases := []struct {
+		from, to, key string
+	}{
+		{`"root_anchor":{`, `"root_anchor":{"kind":"oidc_jwt",`, "kind"},
+		{`{`, `{"root_anchor":null,`, "root_anchor"},
+	}
+	for _, testCase := range cases {
+		repeated := strings.Replace(raw, testCase.from, testCase.to, 1)
+		if repeated == raw {
+			t.Fatalf("%s did not apply", testCase.from)
+		}
+		err := VerifyCapability(repeated, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+		want := "webhook denies admission: malformed capability token: input contains duplicate object key: " + testCase.key
+		if err == nil || err.Error() != want {
+			t.Fatalf("expected %q, got %v", want, err)
+		}
+	}
+}
+
 func TestVerifyCapabilityRefusesSignedUnknownAnchorKind(t *testing.T) {
 	signer := newKernelSigner(t)
 	anchor := rootAnchorFixture()

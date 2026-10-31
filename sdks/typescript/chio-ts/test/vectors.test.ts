@@ -321,6 +321,7 @@ test("root_anchor refuses malformed values", async () => {
       { ...ROOT_ANCHOR, assertion_exp: 9007199254740992 },
       "root_anchor assertion_exp must be an unsigned integer",
     ],
+    [{ ...ROOT_ANCHOR, anchored_at: true }, "root_anchor anchored_at must be an unsigned integer"],
   ];
   for (const [anchor, message] of cases) {
     const input = await anchoredCapabilityJson(anchor);
@@ -328,6 +329,25 @@ test("root_anchor refuses malformed values", async () => {
       () => parseCapabilityJson(input),
       (error: unknown) =>
         error instanceof ChioInvariantError && error.code === "json" && error.message === message,
+    );
+  }
+});
+
+test("capability refuses a repeated member at any depth", async () => {
+  const anchored = await anchoredCapabilityJson(ROOT_ANCHOR);
+  const cases: Array<[string, string, string]> = [
+    ['"root_anchor":{', '"root_anchor":{"kind":"oidc_jwt",', "kind"],
+    ["{", '{"root_anchor":null,', "root_anchor"],
+  ];
+  for (const [from, to, key] of cases) {
+    const input = anchored.replace(from, to);
+    assert.notEqual(input, anchored);
+    assert.throws(
+      () => parseCapabilityJson(input),
+      (error: unknown) =>
+        error instanceof ChioInvariantError &&
+        error.code === "json" &&
+        error.message === `input contains duplicate object key: ${key}`,
     );
   }
 });

@@ -193,6 +193,20 @@ class VectorTests(unittest.TestCase):
             self.assertEqual(raised.exception.code, "json")
             self.assertEqual(str(raised.exception), message)
 
+    def test_capability_refuses_a_repeated_member_at_any_depth(self) -> None:
+        anchored = self._anchored_capability_json(ROOT_ANCHOR)
+        cases = [
+            ('"root_anchor": {', '"root_anchor": {"kind": "oidc_jwt", ', "kind"),
+            ("{", '{"root_anchor": null, ', "root_anchor"),
+        ]
+        for source, replacement, key in cases:
+            repeated = anchored.replace(source, replacement, 1)
+            self.assertNotEqual(repeated, anchored)
+            with self.assertRaises(ChioInvariantError) as raised:
+                parse_capability_json(repeated)
+            self.assertEqual(raised.exception.code, "json")
+            self.assertEqual(str(raised.exception), f"input contains duplicate object key: {key}")
+
     def test_signing_wrapper_vectors(self) -> None:
         fixture = json.loads((VECTORS_ROOT / "signing" / "wrapper" / "v1.json").read_text())
         skipped = set()

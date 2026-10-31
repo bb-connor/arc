@@ -276,6 +276,53 @@ func TestRootAnchorRefusesMalformedValues(t *testing.T) {
 	}
 }
 
+func TestCapabilityRefusesDuplicateMembers(t *testing.T) {
+	anchored := anchoredCapabilityJSON(t, rootAnchorFixture())
+	cases := []struct {
+		from, to, key string
+	}{
+		{`"root_anchor":{`, `"root_anchor":{"kind":"oidc_jwt",`, "kind"},
+		{`{`, `{"root_anchor":null,`, "root_anchor"},
+	}
+	for _, testCase := range cases {
+		input := strings.Replace(anchored, testCase.from, testCase.to, 1)
+		if input == anchored {
+			t.Fatalf("%s did not apply", testCase.from)
+		}
+		_, err := invariants.ParseCapabilityJSON(input)
+		assertInvariantError(t, err, "json", "input contains duplicate object key: "+testCase.key)
+	}
+}
+
+func TestRootAnchorTakesNativeIntegersUnderTheSameBound(t *testing.T) {
+	var vectors capabilityVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
+	withAnchoredAt := func(value any) map[string]any {
+		capability := cloneMap(t, vectors.Cases[0].Capability)
+		anchor := rootAnchorFixture()
+		anchor["anchored_at"] = value
+		capability["root_anchor"] = anchor
+		return capability
+	}
+	for _, value := range []any{
+		int(1700000000), int32(1700000000), int64(1700000000), uint(1700000000), uint32(1700000000), uint64(1700000000),
+	} {
+		canonical, err := invariants.CapabilitySigningBodyCanonicalJSON(withAnchoredAt(value))
+		if err != nil {
+			t.Fatalf("%T: %v", value, err)
+		}
+		if !strings.Contains(canonical, `"anchored_at":1700000000`) {
+			t.Fatalf("%T: anchored_at missing from %s", value, canonical)
+		}
+	}
+	for _, value := range []any{
+		float64(1700000000), float32(1), int(-1), int64(9007199254740992), uint64(9007199254740992), true,
+	} {
+		_, err := invariants.CapabilitySigningBodyCanonicalJSON(withAnchoredAt(value))
+		assertInvariantError(t, err, "json", "root_anchor anchored_at must be an unsigned integer")
+	}
+}
+
 type wrapperVectors struct {
 	SignatureCases []struct {
 		Algorithm      string `json:"algorithm"`
