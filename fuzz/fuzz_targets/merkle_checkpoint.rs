@@ -3,6 +3,7 @@
 use arbitrary::{Arbitrary, Unstructured};
 use chio_core::crypto::Keypair;
 use chio_core::merkle::{leaf_hash, MerkleTree};
+use chio_kernel_core::evidence_verify;
 use libfuzzer_sys::fuzz_target;
 
 const MAX_LEAVES: usize = 64;
@@ -97,31 +98,29 @@ fn exercise_merkle(
 
     assert_eq!(checkpoint.body.tree_size, leaves.len());
     assert_eq!(checkpoint.body.merkle_root, tree.root());
-    assert!(matches!(
-        chio_kernel_core::evidence_verify::verify_checkpoint_signature(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)),
-        Ok(_)
-    ));
-    if let Err(error) = chio_kernel_core::evidence_verify::validate_checkpoint(&checkpoint, std::slice::from_ref(&checkpoint.body.kernel_key)) {
+    let kernel_keys = std::slice::from_ref(&checkpoint.body.kernel_key);
+    assert!(evidence_verify::verify_checkpoint_signature(&checkpoint, kernel_keys).is_ok());
+    if let Err(error) = evidence_verify::validate_checkpoint(&checkpoint, kernel_keys) {
         panic!("built checkpoint should validate: {error}");
     }
 
     let mut body_tampered = checkpoint.clone();
     body_tampered.body.tree_size = body_tampered.body.tree_size.saturating_add(1);
     assert!(matches!(
-        chio_kernel_core::evidence_verify::verify_checkpoint_signature(&body_tampered, std::slice::from_ref(&body_tampered.body.kernel_key)),
-        Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
+        evidence_verify::verify_checkpoint_signature(&body_tampered, kernel_keys),
+        Err(evidence_verify::CheckpointError::InvalidSignature)
     ));
-    assert!(chio_kernel_core::evidence_verify::validate_checkpoint(&body_tampered, std::slice::from_ref(&body_tampered.body.kernel_key)).is_err());
+    assert!(evidence_verify::validate_checkpoint(&body_tampered, kernel_keys).is_err());
 
     let mut range_tampered = checkpoint.clone();
     range_tampered.body.batch_end_seq = range_tampered.body.batch_end_seq.saturating_add(1);
     assert!(matches!(
-        chio_kernel_core::evidence_verify::verify_checkpoint_signature(&range_tampered, std::slice::from_ref(&range_tampered.body.kernel_key)),
-        Err(chio_kernel_core::evidence_verify::CheckpointError::InvalidSignature)
+        evidence_verify::verify_checkpoint_signature(&range_tampered, kernel_keys),
+        Err(evidence_verify::CheckpointError::InvalidSignature)
     ));
-    assert!(chio_kernel_core::evidence_verify::validate_checkpoint(&range_tampered, std::slice::from_ref(&range_tampered.body.kernel_key)).is_err());
+    assert!(evidence_verify::validate_checkpoint(&range_tampered, kernel_keys).is_err());
 
-    let inclusion = match chio_kernel_core::evidence_verify::build_inclusion_proof(
+    let inclusion = match evidence_verify::build_inclusion_proof(
         &tree,
         proof_index,
         checkpoint.body.checkpoint_seq,
