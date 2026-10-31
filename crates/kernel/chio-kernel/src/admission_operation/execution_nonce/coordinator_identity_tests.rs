@@ -21,7 +21,10 @@ fn durable_nonce_identity_matches_independent_classical_vector(
 #[cfg(feature = "pq")]
 #[test]
 fn durable_nonce_identity_distinguishes_pq_components() -> Result<(), Box<dyn std::error::Error>> {
-    use chio_core::crypto::{Ed25519Backend, HybridBackend, MlDsa65Backend, SigningBackend};
+    use chio_core::crypto::{
+        verify_exempt, Ed25519Backend, ExemptFormat, HybridBackend, MlDsa65Backend, SigningBackend,
+        SigningMessage,
+    };
 
     let classical = chio_core::Keypair::from_seed(&[73; 32]);
     let classical_id = execution_nonce_coordinator_id(&classical.public_key())?;
@@ -32,8 +35,9 @@ fn durable_nonce_identity_distinguishes_pq_components() -> Result<(), Box<dyn st
             MlDsa65Backend::from_seed(&[seed; 32]),
         )?;
         let key = backend.public_key()?;
-        let signature = backend.sign_bytes(b"coordinator-identity-control")?;
-        assert!(key.verify_strict(b"coordinator-identity-control", &signature));
+        let control = SigningMessage::exempt(ExemptFormat::JwsSigningInput, b"e30.e30");
+        let signature = backend.sign_bytes(control)?;
+        verify_exempt(&key, ExemptFormat::JwsSigningInput, b"e30.e30", &signature)?;
         let identity = execution_nonce_coordinator_id(&key)?;
         assert_eq!(identity.as_str().len(), 71);
         assert_ne!(identity, classical_id);
