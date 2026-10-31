@@ -95,7 +95,7 @@ pub use client_denial::{ClientDenialCode, CLIENT_DENIAL_CODES};
 pub use construction::KernelBuildError;
 pub use error::{
     HotPathStage, KernelError, OverloadResource, ReceiptDeliveryStep, ReplayClockDirection,
-    SettlementRuntimeConfigError, StructuredErrorReport,
+    SettlementRuntimeConfigError, StructuredErrorReport, ToolRefusal,
 };
 pub use evaluation::{CallerExecutionReport, CallerStartCredentials, CallerStartResponse};
 pub use kernel_struct::{

@@ -1167,10 +1167,6 @@ impl ChioKernel {
             .map(|hook| hook.name())
     }
 
-    pub fn clear_security_pre_dispatch_hook(&mut self) {
-        self.security_pre_dispatch_hook = None;
-    }
-
     /// Install a settlement hook with its durable outcome store and retry policy.
     ///
     /// Before dispatch, the kernel requires a receipt store that can atomically
@@ -1379,15 +1375,6 @@ impl ChioKernel {
         prev
     }
 
-    /// Snapshot the currently registered capability trust-root registry.
-    /// Hot-path callers should prefer the resolver returned by
-    /// `capability_trust_root_resolver_snapshot`.
-    pub fn capability_trust_roots_snapshot(
-        &self,
-    ) -> HashMap<String, chio_core::capability::attenuation::ScopeHash> {
-        (*self.capability_trust_roots.load_full()).clone()
-    }
-
     /// Build an owned snapshot of the capability trust-root registry
     /// suitable for use as a `chio_kernel_core::TrustRootResolver`. The
     /// returned closure captures a frozen snapshot so concurrent
@@ -1492,13 +1479,6 @@ impl ChioKernel {
         } else {
             None
         }
-    }
-
-    /// Snapshot the currently-pinned federation peer set.
-    pub fn federation_peers_snapshot(
-        &self,
-    ) -> Vec<chio_federation::trust_establishment::FederationPeer> {
-        self.federation_peers.load().values().cloned().collect()
     }
 
     /// Look up the bilateral DSSE envelope by the underlying
@@ -1919,12 +1899,6 @@ impl ChioKernel {
     pub fn set_runtime_trace_observer(&mut self, observer: Arc<dyn RuntimeTraceObserver>) {
         self.runtime_trace_sequence = Arc::new(AtomicU64::new(0));
         self.runtime_trace_observer = Some(observer);
-    }
-
-    /// Remove the implementation-trace observer.
-    pub fn clear_runtime_trace_observer(&mut self) {
-        self.runtime_trace_observer = None;
-        self.runtime_trace_sequence = Arc::new(AtomicU64::new(0));
     }
 
     /// Register a tool server connection. This withdraws any recovery

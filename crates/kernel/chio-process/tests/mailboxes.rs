@@ -11,7 +11,7 @@ use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::crypto::Keypair;
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolCallOutput, ToolCallResponse,
-    ToolInvocationContext, ToolInvocationCost, ToolServerConnection, Verdict,
+    ToolInvocationContext, ToolInvocationCost, ToolRefusal, ToolServerConnection, Verdict,
 };
 use chio_process::mailboxes::{MailboxConfig, MailboxLimits, MailboxServer, SERVER_ID};
 use chio_process::{ProcessError, ProcessRegistry, ProcessRuntime};
@@ -471,6 +471,14 @@ async fn renewal_requires_its_grant_and_replays_the_original_deadline_after_rest
     Ok(())
 }
 
+fn assert_refused(response: &ToolCallResponse, refusal: ToolRefusal) {
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(KernelError::ToolRefused(refusal).to_string().as_str())
+    );
+}
+
 fn value(response: &ToolCallResponse) -> Result<Value> {
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
     assert!(response.receipt.verify_integrity_embedded_key()?);
@@ -543,7 +551,7 @@ async fn real_kernel_scopes_handoffs_and_replays_acknowledged_payloads_after_res
             json!({"message_key": "review", "payload": {"text": "different"}}),
         )
         .await?;
-        assert_eq!(changed.verdict, Verdict::Deny);
+        assert_refused(&changed, ToolRefusal::Conflict);
         (sent, read)
     };
     let kernel = kernel(directory.path())?;
@@ -1141,6 +1149,6 @@ async fn receive_waits_for_a_send_within_its_bound() -> Result {
         json!({"after_sequence": "0", "limit": 1, "wait_ms": 30_001}),
     )
     .await?;
-    assert_eq!(too_long.verdict, Verdict::Deny);
+    assert_refused(&too_long, ToolRefusal::InvalidOperation);
     Ok(())
 }

@@ -123,19 +123,14 @@ impl PostDispatchCancellation {
 pub(in crate::kernel) struct PostDispatchRefusal {
     pub(in crate::kernel) reason: String,
     pub(in crate::kernel) cancellation: Option<PostDispatchCancellation>,
+    code: ClientDenialCode,
 }
 
 impl PostDispatchRefusal {
-    /// The client code and signed detail: a cancellation reports its own code,
-    /// an unknown outcome reports `KernelUnavailable`.
+    /// The client code and signed detail: a cancellation or closed tool refusal
+    /// reports its own code, any other unknown outcome `KernelUnavailable`.
     pub(in crate::kernel) fn denial(&self) -> Denial {
-        Denial::new(
-            self.cancellation.map_or(
-                ClientDenialCode::KernelUnavailable,
-                PostDispatchCancellation::code,
-            ),
-            self.reason.as_str(),
-        )
+        Denial::new(self.code, self.reason.as_str())
     }
 
     pub(in crate::kernel) fn classify(
@@ -148,14 +143,22 @@ impl PostDispatchRefusal {
             KernelError::UrlElicitationsRequired { .. } => Self {
                 reason: URL_ELICITATION_AFTER_DISPATCH.to_owned(),
                 cancellation: Some(PostDispatchCancellation::UrlElicitation),
+                code: PostDispatchCancellation::UrlElicitation.code(),
             },
             KernelError::RequestCancelled { request_id, .. } => Self {
                 reason: kernel.cancellation_reason_after_dispatch(context, request_id),
                 cancellation: Some(PostDispatchCancellation::Request),
+                code: PostDispatchCancellation::Request.code(),
             },
             KernelError::HotPathDeadlineExceeded { stage, budget_ms } => Self {
                 reason: format!("hot-path deadline exceeded at {stage}: budget {budget_ms}ms"),
                 cancellation: Some(PostDispatchCancellation::HotPathDeadline),
+                code: PostDispatchCancellation::HotPathDeadline.code(),
+            },
+            KernelError::ToolRefused(_) => Self {
+                reason: error.to_string(),
+                cancellation: None,
+                code: error.client_denial_code(),
             },
             error => Self {
                 reason: format!(
@@ -163,6 +166,7 @@ impl PostDispatchRefusal {
                     error.report().code
                 ),
                 cancellation: None,
+                code: ClientDenialCode::KernelUnavailable,
             },
         }
     }

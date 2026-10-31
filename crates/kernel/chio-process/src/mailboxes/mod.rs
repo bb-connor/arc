@@ -14,7 +14,7 @@ use tokio::sync::Notify;
 
 use chio_kernel::{
     ChioKernel, KernelError, NestedFlowBridge, ToolInvocationContext, ToolInvocationCost,
-    ToolServerConnection,
+    ToolRefusal, ToolServerConnection,
 };
 use chio_manifest::{ToolDefinition, ToolManifest};
 use serde_json::{json, Value};
@@ -268,18 +268,17 @@ impl MailboxServer {
         Ok(self.clock.unix_millis().map_err(KernelError::from)?.get())
     }
 
+    /// Every refusal below is raised before a store commit, so it rolled back.
     fn tool_error(error: ProcessError) -> KernelError {
-        let reason = match error {
-            ProcessError::Conflict => {
-                "mailbox message key or claim conflicts with the recorded payload, sender or claimant"
-            }
+        let refusal = match error {
+            ProcessError::Conflict => ToolRefusal::Conflict,
             ProcessError::Unauthenticated | ProcessError::Cancelled(_) => {
-                "mailbox caller is not one live attested process"
+                ToolRefusal::CallerNotAttested
             }
-            ProcessError::Invalid(_) | ProcessError::Json(_) => "invalid mailbox operation",
-            _ => "mailbox storage failed",
+            ProcessError::Invalid(_) | ProcessError::Json(_) => ToolRefusal::InvalidOperation,
+            _ => return KernelError::ToolServerError("mailbox storage failed".to_owned()),
         };
-        KernelError::ToolServerError(reason.to_owned())
+        KernelError::ToolRefused(refusal)
     }
 }
 
