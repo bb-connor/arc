@@ -16,6 +16,8 @@ SCRIPT = ROOT / "scripts/check-review-slices.py"
 WORKFLOW_PATHS = ["docs/**", "scripts/**"]
 MANIFEST_PATH = "config/cognition-market-components.json"
 WORKFLOW_PATH = ".github/workflows/cognition-market-hosted.yml"
+SPEC_DRIFT_PATH = ".github/workflows/spec-drift.yml"
+GENERATED_TREE = "sdks/python/chio-sdk-python/src/chio_sdk/_generated"
 SCHEMA = "chio.cognition-market.components.v1"
 UNREADABLE = "review-slice error: cannot read cognition-market component ownership:"
 
@@ -41,6 +43,7 @@ class ReviewSlicesTests(unittest.TestCase):
             {"schema": SCHEMA, "workflowPaths": WORKFLOW_PATHS},
             workflow_text(WORKFLOW_PATHS),
         )
+        shutil.copyfile(ROOT / SPEC_DRIFT_PATH, self.repo / SPEC_DRIFT_PATH)
 
     def git(self, *args: str) -> str:
         return subprocess.check_output(
@@ -98,6 +101,38 @@ class ReviewSlicesTests(unittest.TestCase):
     def test_green_just_below_broad_threshold(self) -> None:
         result = self.run_check([f"docs/n{index}.md" for index in range(199)])
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_green_codegen_checked_files_leave_the_broad_count(self) -> None:
+        changed = [f"{GENERATED_TREE}/n{index}.py" for index in range(300)]
+        result = self.run_check(changed + ["docs/a.md", "scripts/x.py"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("review slice check passed (302 files across 3 slices)", result.stdout)
+        self.assertIn("outside the broad-diff count: 300", result.stdout)
+
+    def test_red_hand_files_stay_broad_beside_generated_files(self) -> None:
+        changed = [f"{GENERATED_TREE}/n{index}.py" for index in range(300)]
+        result = self.run_check(changed + [f"docs/n{index}.md" for index in range(200)])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("broad diff has 200 files but only 1 review slices", result.stderr)
+
+    def test_red_generated_sibling_path_is_counted(self) -> None:
+        result = self.run_check([f"{GENERATED_TREE}_copy/n{index}.py" for index in range(200)])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("broad diff has 200 files", result.stderr)
+
+    def test_red_hand_file_beside_a_generated_file_is_counted(self) -> None:
+        tree = "crates/core/chio-core-types/src/_generated"
+        result = self.run_check([f"{tree}/hand{index}.rs" for index in range(200)])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("broad diff has 200 files", result.stderr)
+
+    def test_red_workflow_without_codegen_check(self) -> None:
+        workflow = self.repo / SPEC_DRIFT_PATH
+        text = workflow.read_text(encoding="utf-8")
+        workflow.write_text(text.replace("run: make codegen-check", "run: true"), encoding="utf-8")
+        result = self.run_check(["docs/a.md"])
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("spec-drift workflow does not run make codegen-check", result.stderr)
 
     def test_red_unclassified_path(self) -> None:
         result = self.run_check(["docs/a.md", "zzz/unknown.txt"])
