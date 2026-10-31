@@ -1357,7 +1357,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `5d2b9c0cda4026b5b69993680ca2caee47a7e133a31d40cce0369029b3244d93`
+- Input digest: `7dc8aeae8e4c50baa373e5aea185cfb42a6b060ebdc209990c2b61fd180f25f0`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1368,7 +1368,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `af7be7b694e69d4aa9b87ac8eb68512e195f6319091736839f818184a6b84db2`
 - `.loom/harnesses.toml`: `f743ba9cada9ec9e51f74c1a1c22cad0bcb8dd25430db58553368920ac335b07`
-- `Cargo.lock`: `51d443d70df7302aa7db9ba990826c2c5ea7ea7421be7daeb3db634eed229f5f`
+- `Cargo.lock`: `86656ee3faca55e1979300841eb6c9ff94d49ca207ccbad9b3f0292dd716e26c`
 - `Cargo.toml`: `4497c87b81d3b6f9812f8169f420bb8a1a78e6a30cec315f207aac93ec73e1e7`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1428,10 +1428,12 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/economic_continuity/anchor/query.rs`: `979a51b077831fb2a3fb8a222209ed381239dd303d71d4b237ae8328f1a23378`
 - `crates/core/chio-core-types/src/economic_continuity_anchor_tests.rs`: `ab137f63c93116e829ced97bae8844b42b7473e3eba829142eec4a5fb193df06`
 - `crates/core/chio-core-types/src/economic_continuity_tests.rs`: `ccc4184e65c2d8f13d90ac568b1b83059ef6575a1f1ba71f8f27126f69110e64`
+- `crates/core/chio-core-types/src/enterprise_provider.rs`: `128eeb55260988154549c8286b5a84559c0c1317d116383a9927be6af1668db7`
+- `crates/core/chio-core-types/src/enterprise_provider_tests.rs`: `526e0ab8af4efc13d6c4d824912ca77240479f663a4d96b303361228a434188e`
 - `crates/core/chio-core-types/src/enterprise_subject.rs`: `e3058945c222fdbea62eab0cb71eb74681c1897a65c1e1f2eadae1fd2e1ca500`
 - `crates/core/chio-core-types/src/error.rs`: `17d27a8e90ce99d4aab83b4988a1d745466637a05bccf5e5005f336d773f8409`
 - `crates/core/chio-core-types/src/hashing.rs`: `1c769a1f353950c324855e0b678adca4b0212011dc48dfdf4ef62d084baef522`
-- `crates/core/chio-core-types/src/lib.rs`: `d5ad70a52ac068212c7f086e5555a3d9b6e47de74296a70445e754c20b2d4baf`
+- `crates/core/chio-core-types/src/lib.rs`: `c7e39bde2c8a3d3ded280e51f24138cdd64a36bf155c19c69eac6c33e7a3c829`
 - `crates/core/chio-core-types/src/loaded_weights.rs`: `61d456695ac3931a484536f6e8c9f0c7da5b631cc82f00ba9b7837c540980d76`
 - `crates/core/chio-core-types/src/manifest.rs`: `506b08d798ffa0b813f1319c6db90ebeb47d9fc8ca0528d0631972102b42b61b`
 - `crates/core/chio-core-types/src/merkle.rs`: `baeedab501a3ca750d5ef0894a0d098b59631b7846392a01085d888c6eaeccf0`
@@ -1697,7 +1699,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `d038b734481964f5f8f817a3e13cd5ff6e38d1fb54bfc6d99305a60c700d22d6`
 - `fuzz/target-map.toml`: `c717aa1f5b7c0939baef981c1809401e344f38bb6df4f3f802a70141f2e03680`
-- `git-worktree://rust-files`: `942f86869d60ce37e9647f075b09aaa06e44f85943b56130c41f948c193290f6`
+- `git-worktree://rust-files`: `0de190f19912c68531b314da3787bcb61688a155c34b0f8170e98f3398431ec2`
 - `releases.toml`: `8fb71e1482d0fdbcf4d10f60a1be8f5886cb7bf0ab461f0cc434c256ec8d8546`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`
