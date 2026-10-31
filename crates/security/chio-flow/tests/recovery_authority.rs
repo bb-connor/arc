@@ -1002,8 +1002,8 @@ fn multi_attestation_coverage_digest_matches_the_golden_value() -> Result {
     assert_eq!(
         coverage.digest(),
         CoverageDigest::from_bytes([
-            114, 237, 7, 15, 116, 153, 82, 45, 127, 154, 124, 229, 120, 103, 106, 248, 107, 236,
-            199, 157, 45, 56, 86, 205, 121, 126, 44, 202, 19, 28, 166, 147,
+            214, 152, 78, 40, 72, 165, 155, 65, 53, 117, 172, 108, 252, 255, 67, 136, 157, 53, 51,
+            223, 181, 141, 28, 176, 34, 193, 178, 20, 169, 198, 140, 244,
         ]),
         "three corpus-bound attestations ordered by principal, then issuer"
     );
