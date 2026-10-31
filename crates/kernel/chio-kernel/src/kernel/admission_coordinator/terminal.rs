@@ -600,18 +600,12 @@ impl ChioKernel {
         self.materialize_durable_admission_receipt(&receipt)?;
         self.mirror_durable_admission_receipt(&receipt)?;
         if let Some(binding) = recovery.as_ref() {
-            let verifier = self.finding_recovery_verifier.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "finding recovery verifier disappeared during replay".to_owned(),
-                )
-            })?;
-            verifier
-                .record_recovery_receipt(binding, &receipt.id, receipt.timestamp)
-                .map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "finding recovery lineage could not be recorded: {error}"
-                    ))
-                })?;
+            self.record_finding_recovery_receipt(
+                binding,
+                &receipt.id,
+                receipt.timestamp,
+                "replay",
+            )?;
         }
         if request.federated_origin_kernel_id.is_some()
             && self.federation_dsse_envelope(&receipt.id).is_none()
@@ -1761,22 +1755,12 @@ impl ChioKernel {
         self.materialize_durable_admission_receipt(&projected_receipt)?;
         self.mirror_durable_admission_receipt(&projected_receipt)?;
         if let Some(binding) = recovery.as_ref() {
-            let verifier = self.finding_recovery_verifier.as_ref().ok_or_else(|| {
-                KernelError::DurableAdmission(
-                    "finding recovery verifier disappeared during terminalization".to_owned(),
-                )
-            })?;
-            verifier
-                .record_recovery_receipt(
-                    binding,
-                    &projected_receipt.id,
-                    projected_receipt.timestamp,
-                )
-                .map_err(|error| {
-                    KernelError::DurableAdmission(format!(
-                        "finding recovery lineage could not be recorded: {error}"
-                    ))
-                })?;
+            self.record_finding_recovery_receipt(
+                binding,
+                &projected_receipt.id,
+                projected_receipt.timestamp,
+                "terminalization",
+            )?;
         }
         if let Some(denial) = self.revalidate_terminal_publication(
             TerminalPublicationInput {

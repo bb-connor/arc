@@ -138,6 +138,51 @@ pub(crate) fn purchase_marked_grant(
 }
 
 impl ChioKernel {
+    pub(crate) fn mark_finding_purchase_capture_pending(
+        &self,
+        purchase: &VerifiedFindingPurchase,
+        now_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        let verifier = self.finding_purchase_verifier.as_ref().ok_or_else(|| {
+            KernelError::DurableAdmission(
+                "purchase capture lost its configured verifier".to_owned(),
+            )
+        })?;
+        verifier
+            .mark_capture_pending(purchase, now_unix_secs)
+            .map_err(|error| {
+                KernelError::DurableAdmission(format!("purchase capture fence failed: {error}"))
+            })
+    }
+
+    pub(crate) fn verify_finding_memory_current_status(
+        &self,
+        finding_id: &str,
+        status_proof: &chio_core::receipt::metadata::FindingStatusProofMetadata,
+        now_unix_secs: u64,
+    ) -> Result<(), KernelError> {
+        let verifier = self.finding_status_proof_verifier.as_ref().ok_or_else(|| {
+            KernelError::GuardDenied(
+                "Finding memory write requires a configured finding status verifier".to_owned(),
+            )
+        })?;
+        verifier
+            .verify_current_status_admission(
+                &FindingCurrentStatusContextView {
+                    expected_finding_id: finding_id,
+                    expected_feed_id: &status_proof.feed_id,
+                    minimum_map_epoch: status_proof.map_epoch,
+                    minimum_non_inclusion_checked_at: status_proof.non_inclusion_checked_at,
+                },
+                now_unix_secs,
+            )
+            .map_err(|error| {
+                KernelError::GuardDenied(format!(
+                    "Finding memory write status revalidation failed: {error}"
+                ))
+            })
+    }
+
     /// Pin the long-lived signer for cognition-market pool mutation receipts.
     /// Reinstall this key unchanged when the ordinary kernel key rotates.
     pub fn set_finding_pool_receipt_authority(
