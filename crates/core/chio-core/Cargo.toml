@@ -30,7 +30,7 @@ chio-listing = { workspace = true }
 chio-market = { workspace = true }
 chio-open-market = { workspace = true }
 chio-underwriting = { workspace = true }
-chio-web3 = { workspace = true }
+chio-web3 = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
@@ -41,6 +41,7 @@ url = "2"
 
 [features]
 default = []
+web3 = ["dep:chio-web3", "chio-autonomy/web3"]
 pq = ["chio-core-types/pq"]
 pq-kat = ["pq", "chio-core-types/pq-kat"]
 
