@@ -1,0 +1,35 @@
+{
+  "delegation_chain": [],
+  "expires_at": 1710000800,
+  "id": "cap-bindings-valid",
+  "issued_at": 1710000200,
+  "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+  "root_anchor": {
+    "anchored_at": 1792234795,
+    "assertion_exp": 1792235090,
+    "context_digest": "sha256:98ce71691eb7f5fa848c099fc43a61ee896b83f995accf9c63b91993a1d4e54f",
+    "kind": "oauth_id_jag",
+    "root_policy_digest": "sha256:9b4f99320898437fa3e016f9995894f863b4197dcacf6a964d7b12967c077664"
+  },
+  "schema": "chio.capability.v1",
+  "scope": {
+    "grants": [
+      {
+        "constraints": [
+          {
+            "type": "path_prefix",
+            "value": "/workspace/"
+          }
+        ],
+        "max_invocations": 3,
+        "operations": [
+          "invoke",
+          "read_result"
+        ],
+        "server_id": "srv-files",
+        "tool_name": "file_read"
+      }
+    ]
+  },
+  "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+}

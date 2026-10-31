@@ -81,7 +81,7 @@ fn decode_example(path: &Path) -> Result<(), String> {
         .expect("example file name");
     let text = std::fs::read_to_string(path).expect("example bytes");
     match name.split('.').next().expect("example stem") {
-        "root-anchor" => decode::<root_authority_root_anchor::ChioRootAnchor>(&text),
+        "root-anchor" => decode::<shared::ChioRootAnchor>(&text),
         "delegation-context" => decode::<capability_presentation::ChioDelegationContext>(&text),
         "root-policy" => decode::<root_authority_root_policy::ChioRootPolicy>(&text),
         "enterprise-provider-identity" => decode::<
@@ -212,4 +212,48 @@ fn placeholder_example_signatures_are_refused() {
         refused += 1;
     }
     assert_eq!(refused, 7);
+}
+
+fn anchored_token() -> serde_json::Value {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let read = |path: &str| -> serde_json::Value {
+        let text = std::fs::read_to_string(root.join(path)).expect("json file");
+        serde_json::from_str(&text).expect("json value")
+    };
+    let vectors = read("tests/bindings/vectors/capability/v1.json");
+    let mut token = vectors["cases"][0]["capability"].clone();
+    token["delegation_chain"] = serde_json::json!([]);
+    token["root_anchor"] =
+        read("spec/schemas/chio-wire/v1/root_authority/examples/valid/root-anchor.json");
+    token
+}
+
+#[test]
+fn generated_token_decodes_a_root_anchor_member() {
+    let token = serde_json::to_string(&anchored_token()).expect("token text");
+    assert_eq!(
+        decode::<generated::shared::ChioCapabilityToken>(&token),
+        Ok(())
+    );
+}
+
+#[test]
+fn generated_token_refuses_padding_inside_root_anchor() {
+    let mut token = anchored_token();
+    token["root_anchor"]["padding"] = serde_json::Value::Bool(true);
+    let text = serde_json::to_string(&token).expect("token text");
+    let error = decode::<generated::shared::ChioCapabilityToken>(&text).expect_err("padded anchor");
+    assert!(error.contains("padding"), "{error}");
+}
+
+#[test]
+fn generated_signed_body_decodes_the_anchored_token_without_its_signature() {
+    let mut body = anchored_token();
+    let members = body.as_object_mut().expect("token object");
+    assert!(members.remove("signature").is_some());
+    let text = serde_json::to_string(&body).expect("body text");
+    assert_eq!(
+        decode::<generated::capability_capability_body::ChioCapabilityV1SignedBody>(&text),
+        Ok(())
+    );
 }

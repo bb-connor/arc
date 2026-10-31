@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: cff572cd647726251b5cdb39013d235e07916c80b9a46e5bc035b374e0fd7041
+# Schema sha256: 29f505f3691b4fbfea30cc6f60a7264757030799f7d4c23f1b591e15d011a565
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -16,6 +16,7 @@ from typing import Any, Literal
 
 from pydantic import StrictBool, BaseModel, ConfigDict, Field, RootModel, conint, constr
 
+from ..root_authority import root_anchor_schema
 from . import aggregate_invocation_budget_schema, cumulative_approval_root_schema
 
 
@@ -322,6 +323,10 @@ class ChioCapabilitytoken(BaseModel):
     budget_share_bps: conint(strict=True, ge=0, le=10000) | None = Field(
         None,
         description="Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.",
+    )
+    root_anchor: root_anchor_schema.ChioRootAnchor | None = Field(
+        None,
+        description="How the root of this token was anchored. A signed member, present only on anchored tokens; a delegated token carries its root's anchor byte for byte.",
     )
     signature: constr(
         pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
