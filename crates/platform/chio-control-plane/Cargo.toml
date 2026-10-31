@@ -119,7 +119,6 @@ windows-sys = { version = "0.60.2", features = [
 ] }
 
 [dev-dependencies]
-reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
@@ -129,7 +128,6 @@ chio-link = { workspace = true }
 chio-mcp-edge = { workspace = true }
 chio-store-sqlite = { workspace = true, features = ["receipt-query-test-support", "cognition-market-test-support", "admission-test-support", "security-admission-test-support"] }
 chio-test-support = { workspace = true }
-jsonschema = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
