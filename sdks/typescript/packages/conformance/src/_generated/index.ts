@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 3e8e51422168badb635820e4894962c4ca99733a4e9e31eede7818a2f0ec0ba3
+// Schema SHA: d656e49dae3fa870fe5b10b5d5e698d7cdc3de4c21f545469da5bd46be144a25
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -245,6 +245,7 @@ export namespace Agent_ToolCallRequest {
      * Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
      */
     budget_share_bps?: number;
+    root_anchor?: ChioRootAnchor;
     signature: string;
   };
   export type ChioAggregateInvocationBudget =
@@ -439,6 +440,39 @@ export namespace Agent_ToolCallRequest {
     childIndex: number;
     parentIndex: number;
     subset: true;
+  }
+  /**
+   * How the root of this token was anchored. A signed member, present only on anchored tokens; a delegated token carries its root's anchor byte for byte.
+   */
+  export interface ChioRootAnchor {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
   }
   export interface ChioGovernedTransactionIntent {
     id: string;
@@ -1270,6 +1304,7 @@ export namespace Capability_Presentation {
      * Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
      */
     budget_share_bps?: number;
+    root_anchor?: ChioRootAnchor;
     signature: string;
   };
   export type ChioAggregateInvocationBudget =
@@ -1315,19 +1350,19 @@ export namespace Capability_Presentation {
       | "chio_operator_key"
       | "operator_static_bearer";
     /**
-     * The provider record's issuer for provider-backed kinds; `urn:chio:operator` for `operator_static_bearer`.
+     * A bounded URI or URN, such as an issuer.
      */
     issuer: string;
     /**
-     * The enterprise provider record the exchange verified against. Present exactly for provider-backed kinds.
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
      */
     provider_record_id?: string;
     /**
-     * Digest of the record's `chio.enterprise-provider-identity.v1` projection; equals the matched rule's. Present exactly for provider-backed kinds.
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
      */
     provider_identity_digest?: string;
     /**
-     * Digest of the `chio.idp-key-snapshot.v1` in force when the assertion was verified.
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
      */
     key_snapshot_digest?: string;
     /**
@@ -1339,7 +1374,7 @@ export namespace Capability_Presentation {
      */
     alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
     /**
-     * SHA-256 of the exact compact JWS bytes received.
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
      */
     artifact_digest?: string;
     /**
@@ -1686,6 +1721,39 @@ export namespace Capability_Presentation {
     subset: true;
   }
   /**
+   * How the root of this token was anchored. A signed member, present only on anchored tokens; a delegated token carries its root's anchor byte for byte.
+   */
+  export interface ChioRootAnchor {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
+  }
+  /**
    * Required when the presenter is not the session holder, so the verifier can recompute `context_digest`.
    */
   export interface ChioDelegationContext {
@@ -1918,6 +1986,7 @@ export namespace Capability_Token {
      * Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
      */
     budget_share_bps?: number;
+    root_anchor?: ChioRootAnchor;
     signature: string;
   };
   export type Operation = "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate";
@@ -2104,6 +2173,39 @@ export namespace Capability_Token {
     childIndex: number;
     parentIndex: number;
     subset: true;
+  }
+  /**
+   * How the root of this token was anchored. A signed member, present only on anchored tokens; a delegated token carries its root's anchor byte for byte.
+   */
+  export interface ChioRootAnchor {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
   }
 }
 
@@ -8894,6 +8996,7 @@ export namespace Kernel_CapabilityList {
      * Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
      */
     budget_share_bps?: number;
+    root_anchor?: ChioRootAnchor;
     signature: string;
   };
   export type ChioAggregateInvocationBudget =
@@ -9092,6 +9195,39 @@ export namespace Kernel_CapabilityList {
     childIndex: number;
     parentIndex: number;
     subset: true;
+  }
+  /**
+   * How the root of this token was anchored. A signed member, present only on anchored tokens; a delegated token carries its root's anchor byte for byte.
+   */
+  export interface ChioRootAnchor {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
   }
 }
 
