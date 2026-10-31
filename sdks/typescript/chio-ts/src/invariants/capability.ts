@@ -1,6 +1,6 @@
-import { canonicalizeJson } from "./json.ts";
+import { canonicalizeJson, parseJsonTextUniqueKeys } from "./json.ts";
 import { wrappedSignatureValid } from "./crypto.ts";
-import { ChioInvariantError, parseJsonText } from "./errors.ts";
+import { ChioInvariantError } from "./errors.ts";
 
 export type CapabilityTimeStatus = "valid" | "not_yet_valid" | "expired";
 
@@ -154,7 +154,7 @@ function verifyDelegationChain(chain: DelegationLink[], maxDelegationDepth?: num
 }
 
 export function parseCapabilityJson(input: string): CapabilityToken {
-  const parsed = parseJsonText<unknown>(input);
+  const parsed = parseJsonTextUniqueKeys<unknown>(input);
   if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") {
     throw new ChioInvariantError("json", "capability must be a JSON object");
   }

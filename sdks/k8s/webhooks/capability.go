@@ -272,6 +272,9 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 	if err := decoder.Decode(&parsed); err != nil {
 		return fmt.Errorf("malformed capability token: %w", err)
 	}
+	if err := requireUniqueKeys(json.NewDecoder(strings.NewReader(raw))); err != nil {
+		return fmt.Errorf("malformed capability token: %w", err)
+	}
 	for key := range parsed {
 		if _, ok := capabilityMembers[key]; !ok {
 			return fmt.Errorf("malformed capability token: unknown member %q", key)
@@ -305,6 +308,39 @@ func verifyCapabilitySignature(raw, issuerHex, signatureHex string) error {
 		return fmt.Errorf("capability signature verification failed")
 	}
 	return nil
+}
+
+func requireUniqueKeys(decoder *json.Decoder) error {
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delim, isDelim := token.(json.Delim)
+	if !isDelim {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	for decoder.More() {
+		if delim == '{' {
+			keyToken, err := decoder.Token()
+			if err != nil {
+				return err
+			}
+			key, isKey := keyToken.(string)
+			if !isKey {
+				return errors.New("object key is not a string")
+			}
+			if _, duplicate := seen[key]; duplicate {
+				return fmt.Errorf("input contains duplicate object key: %s", key)
+			}
+			seen[key] = struct{}{}
+		}
+		if err := requireUniqueKeys(decoder); err != nil {
+			return err
+		}
+	}
+	_, err = decoder.Token()
+	return err
 }
 
 func validateRootAnchor(value any) error {

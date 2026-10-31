@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from ..errors import ChioInvariantError, parse_json_text
+from ..errors import ChioInvariantError, parse_json_text_unique_keys
 from .json import canonicalize_json
 from .signing import wrapped_signature_valid
 
@@ -76,7 +76,7 @@ def _reject_unknown_members(value: dict[str, Any], allowed: frozenset[str], kind
 
 
 def parse_capability_json(input_text: str) -> dict[str, Any]:
-    parsed = parse_json_text(input_text)
+    parsed = parse_json_text_unique_keys(input_text)
     if not isinstance(parsed, dict):
         raise ChioInvariantError("json", "capability must be a JSON object")
     _require_capability_schema(parsed)

@@ -2,6 +2,7 @@ package invariants
 
 import (
 	"encoding/json"
+	"reflect"
 	"regexp"
 	"strconv"
 )
@@ -121,12 +122,18 @@ func validateRootAnchor(value any) error {
 }
 
 func isRootAnchorInteger(value any) bool {
-	number, ok := value.(json.Number)
-	if !ok {
-		return false
+	if number, ok := value.(json.Number); ok {
+		parsed, err := strconv.ParseUint(number.String(), 10, 64)
+		return err == nil && parsed <= maxRootAnchorInteger
 	}
-	parsed, err := strconv.ParseUint(number.String(), 10, 64)
-	return err == nil && parsed <= maxRootAnchorInteger
+	integer := reflect.ValueOf(value)
+	switch {
+	case integer.CanInt():
+		return integer.Int() >= 0 && uint64(integer.Int()) <= maxRootAnchorInteger
+	case integer.CanUint():
+		return integer.Uint() <= maxRootAnchorInteger
+	}
+	return false
 }
 
 func capabilityBody(capability map[string]any) map[string]any {
