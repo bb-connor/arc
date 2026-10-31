@@ -32,8 +32,7 @@ pub use finding_status_sparse::{
 };
 pub use freshness::{verify_fresh_epoch_root, FreshnessConfig};
 pub use partner_mirror::{
-    check_history, ConflictRecord, PartnerMirrorConflict, PartnerMirrorRefusal,
-    MAX_RECORDED_PARTNER_CONFLICTS,
+    ConflictRecord, PartnerMirrorConflict, PartnerMirrorRefusal, MAX_RECORDED_PARTNER_CONFLICTS,
 };
 pub use passport_bridge::{
     apply_passport_revocation, credential_revocation_key, passport_revocation_key,

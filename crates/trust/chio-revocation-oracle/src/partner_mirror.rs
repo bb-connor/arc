@@ -5,7 +5,9 @@
 //! root. A root that contradicts the accepted history is a conflict the mirror
 //! records, up to [`MAX_RECORDED_PARTNER_CONFLICTS`].
 
-use crate::{EpochRoot, SignedEpochRoot};
+#[cfg(feature = "sqlite")]
+use crate::EpochRoot;
+use crate::SignedEpochRoot;
 
 /// Most distinct conflicting roots one mirror records.
 pub const MAX_RECORDED_PARTNER_CONFLICTS: u64 = 256;
@@ -52,7 +54,8 @@ impl PartnerMirrorRefusal {
 
 /// Refuses `offered` unless it moves forward from `accepted`: no older epoch,
 /// no second tree for the accepted epoch, and no older attestation.
-pub fn check_history(
+#[cfg(feature = "sqlite")]
+pub(crate) fn check_history(
     accepted: &EpochRoot,
     offered: &EpochRoot,
 ) -> Result<(), PartnerMirrorRefusal> {
@@ -95,7 +98,7 @@ pub enum ConflictRecord {
     LogFull,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sqlite"))]
 mod tests {
     use super::*;
 
