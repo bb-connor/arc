@@ -16,7 +16,7 @@ only `body.allocation_id` to `""`; the RFC 8785 bytes of the body hash to
 The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
 `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
-`dd924dc6577ffb36d42a81726652f51121ace3859eebf8fe6edbd5f82bd47f0e`.
+`5d27cba919f0e463eea4a9091c5c2ee11770bd6e87f11c3645494ab78958b228`.
 No preimage omits a member or encodes it as `null`.
 
 Validating this fixture does not prove that any collateral is actually

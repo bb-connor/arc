@@ -16,7 +16,7 @@ hash to
 The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
 `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
-`04a5959477ee012a70616ed91d6c612849b7be34154744ac60b46dd28a5af66f`.
+`f8ee7c2311e258893f26fd9a6c58990012bad7441a31429687c17700bb5a0ecb`.
 No preimage omits a member or encodes it as `null`.
 
 Validating this fixture does not prove that the embedded issuer actually
