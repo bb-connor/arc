@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::Path;
 
 use chio_core::Keypair;
@@ -114,7 +113,7 @@ impl VerifierPolicyRegistry {
     #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent)?;
         }
         crate::signed_input::write_bounded_json(path, self)
     }
@@ -670,7 +669,7 @@ impl PassportIssuanceOfferRegistry {
     #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent)?;
         }
         crate::signed_input::write_bounded_json(path, self)
     }
@@ -680,7 +679,7 @@ impl PassportIssuanceOfferRegistry {
     #[cfg(test)]
     pub fn save_for_issuance(&self, path: &Path) -> Result<(), CliError> {
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent)?;
         }
         crate::signed_input::write_bounded_json_with_limit(
             path,
