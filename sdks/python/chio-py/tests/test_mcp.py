@@ -9,14 +9,15 @@ import pytest
 from chio.invariants.hashing import sha256_hex_utf8
 from chio.invariants.json import canonicalize_json
 from chio.invariants.receipt import (
+    RECEIPT_SCHEMA,
     _content_addressed_receipt_id,
     receipt_signing_body_canonical_json,
 )
-from chio.invariants.signing import sign_utf8_message_ed25519
+from chio.invariants.signing import public_key_from_seed_ed25519, sign_wrapped_json_ed25519
 from chio.mcp import McpEvidenceError, VerifiedMcpSession, verify_mcp_result
 
 SEED = "43" * 32
-KEY = sign_utf8_message_ed25519("key", SEED)["public_key_hex"]
+KEY = public_key_from_seed_ed25519(SEED)
 ARGS = {"message": "Hello 世界", "threshold": 0.000001}
 OUTPUT = {"content": [{"type": "text", "text": "actual signed output"}]}
 
@@ -47,8 +48,8 @@ def signed_receipt(*, verdict, request_id, arguments, content_hash, admission=No
     if verdict == "deny":
         receipt["decision"]["reason"] = "budget exhausted"
     receipt["id"] = _content_addressed_receipt_id(receipt)
-    receipt["signature"] = sign_utf8_message_ed25519(
-        receipt_signing_body_canonical_json(receipt), SEED
+    receipt["signature"] = sign_wrapped_json_ed25519(
+        RECEIPT_SCHEMA, receipt_signing_body_canonical_json(receipt), SEED
     )["signature_hex"]
     return receipt
 
