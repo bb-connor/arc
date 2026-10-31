@@ -91,6 +91,16 @@ pub struct EpochRoot {
     pub issued_at_unix_ms: u64,
 }
 
+impl EpochRoot {
+    /// Whether `other` describes the same tree, whenever either was attested.
+    #[must_use]
+    pub fn same_tree(&self, other: &Self) -> bool {
+        self.epoch == other.epoch
+            && self.root_hash == other.root_hash
+            && self.leaf_count == other.leaf_count
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RootSignature {

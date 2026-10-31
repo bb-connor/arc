@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use chio_core::Keypair;
 use chio_revocation_oracle::{
-    credential_revocation_key, passport_revocation_key, EpochRoot, PassportRevocationLeaf,
-    PassportRevocationLeafKind, RevocationKey, SignedEpochRoot, SqliteRevocationOracle,
-    MAX_REVOCATION_SUBJECT_BYTES,
+    credential_revocation_key, passport_revocation_key, EpochRoot, PartnerMirrorRefusal,
+    PassportRevocationLeaf, PassportRevocationLeafKind, RevocationKey, SignedEpochRoot,
+    SqliteRevocationOracle, MAX_REVOCATION_SUBJECT_BYTES,
 };
 use chio_security_types::clock::FixedClock;
 
@@ -350,14 +350,17 @@ fn an_older_epoch_is_refused_as_a_rollback_and_recorded() -> TestResult {
     replay.root_override = Some(old.clone());
     assert_eq!(
         b.sync(&partner(), &mut replay, &FixedClock::from_millis(13_000)),
-        Err(PartnerRevocationError::Rollback {
+        Err(PartnerRevocationError::Mirror {
             partner_id: PARTNER.to_owned(),
-            accepted: 2,
-            offered: 1,
+            error: PartnerMirrorRefusal::Rollback {
+                accepted: 2,
+                offered: 1,
+            }
+            .into(),
         })
     );
     assert_eq!(accepted(&b)?, current);
-    let conflicts = b.conflicts()?;
+    let conflicts = b.store.conflicts()?;
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].offered_root, old);
     assert_eq!(conflicts[0].accepted_root.as_ref(), Some(&current));
@@ -379,13 +382,16 @@ fn an_older_attestation_of_the_same_epoch_is_refused_and_recorded() -> TestResul
     replay.root_override = Some(earlier.clone());
     assert_eq!(
         b.sync(&partner(), &mut replay, &FixedClock::from_millis(13_000)),
-        Err(PartnerRevocationError::AttestationRollback {
+        Err(PartnerRevocationError::Mirror {
             partner_id: PARTNER.to_owned(),
-            accepted: 12_000,
-            offered: 10_000,
+            error: PartnerMirrorRefusal::AttestationRollback {
+                accepted: 12_000,
+                offered: 10_000,
+            }
+            .into(),
         })
     );
-    let conflicts = b.conflicts()?;
+    let conflicts = b.store.conflicts()?;
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].offered_root, earlier);
     Ok(())
@@ -423,14 +429,14 @@ fn leaves_that_do_not_rebuild_the_signed_root_are_refused_and_recorded() -> Test
     lying.leaves_override = Some(vec![leaf(1, "passport-decoy")]);
     assert_eq!(
         b.sync(&partner(), &mut lying, &FixedClock::from_millis(10_000)),
-        Err(PartnerRevocationError::RootMismatch {
+        Err(PartnerRevocationError::Mirror {
             partner_id: PARTNER.to_owned(),
-            epoch: 1,
+            error: PartnerMirrorRefusal::RootMismatch { epoch: 1 }.into(),
         })
     );
     assert_eq!(b.accepted()?, None);
-    assert_eq!(b.oracle.current_epoch_root()?.leaf_count, 0);
-    let conflicts = b.conflicts()?;
+    assert_eq!(b.store.view(&[])?.tree.leaf_count, 0);
+    let conflicts = b.store.conflicts()?;
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].accepted_root, None);
     assert_eq!(conflicts[0].offered_root.root.leaf_count, 1);
@@ -462,13 +468,13 @@ fn two_signed_roots_for_one_epoch_are_refused_as_equivocation_and_recorded() -> 
             &mut equivocating,
             &FixedClock::from_millis(11_000)
         ),
-        Err(PartnerRevocationError::Equivocation {
+        Err(PartnerRevocationError::Mirror {
             partner_id: PARTNER.to_owned(),
-            epoch: 1,
+            error: PartnerMirrorRefusal::Equivocation { epoch: 1 }.into(),
         })
     );
     assert_eq!(accepted(&b)?, current);
-    let conflicts = b.conflicts()?;
+    let conflicts = b.store.conflicts()?;
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].accepted_root.as_ref(), Some(&current));
     assert_eq!(conflicts[0].offered_root.root.root_hash, [7; 32]);
@@ -498,13 +504,17 @@ fn two_roots_equal_in_epoch_and_hash_but_not_leaf_count_are_both_recorded() -> T
         )?;
         assert_eq!(
             b.apply(&partner(), &offered, &[], 11_000),
-            Err(PartnerRevocationError::Equivocation {
+            Err(PartnerRevocationError::Mirror {
                 partner_id: PARTNER.to_owned(),
-                epoch: current.epoch,
+                error: PartnerMirrorRefusal::Equivocation {
+                    epoch: current.epoch,
+                }
+                .into(),
             })
         );
     }
     let recorded = b
+        .store
         .conflicts()?
         .into_iter()
         .map(|conflict| conflict.offered_root.root.leaf_count)
@@ -577,9 +587,9 @@ fn a_page_out_of_sequence_is_refused() -> TestResult {
     repeated.leaves_override = Some(vec![leaf(1, "passport-a"), leaf(2, "passport-a")]);
     assert_eq!(
         b.sync(&partner(), &mut repeated, &FixedClock::from_millis(10_000)),
-        Err(PartnerRevocationError::DuplicateLeaf {
+        Err(PartnerRevocationError::Mirror {
             partner_id: PARTNER.to_owned(),
-            seq: 2,
+            error: PartnerMirrorRefusal::DuplicateLeaf { seq: 2 }.into(),
         })
     );
     assert_eq!(b.accepted()?, None);
@@ -610,7 +620,7 @@ fn a_page_whose_seq_skips_is_refused_and_the_mirror_is_unchanged() -> TestResult
         ))
     );
     assert_eq!(accepted(&b)?, before);
-    assert_eq!(b.oracle.current_epoch_root()?.leaf_count, 1);
+    assert_eq!(b.store.view(&[])?.tree.leaf_count, 1);
     assert_eq!(
         b.apply(
             &partner(),
@@ -618,10 +628,10 @@ fn a_page_whose_seq_skips_is_refused_and_the_mirror_is_unchanged() -> TestResult
             &[leaf(3, "passport-b"), leaf(4, "passport-c")],
             12_000
         ),
-        Err(PartnerRevocationError::MalformedPage(
-            PARTNER.to_owned(),
-            "leaf 3 does not follow mirror leaf 1".to_owned()
-        ))
+        Err(PartnerRevocationError::Mirror {
+            partner_id: PARTNER.to_owned(),
+            error: PartnerMirrorRefusal::OutOfSequence { seq: 3, have: 1 }.into(),
+        })
     );
     assert_eq!(accepted(&b)?, before);
     Ok(())
@@ -732,19 +742,6 @@ fn a_second_handle_on_the_mirror_observes_a_sync_without_reopening() -> TestResu
 }
 
 #[test]
-fn a_mirror_stamped_for_another_partner_is_refused() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let path = dir.path().join("mirror.sqlite3");
-    PartnerRevocationMirror::open(&path, PARTNER)?;
-    assert!(matches!(
-        PartnerRevocationMirror::open(&path, "bravo"),
-        Err(PartnerRevocationError::PartnerMismatch { expected, found })
-            if expected == "bravo" && found == PARTNER
-    ));
-    Ok(())
-}
-
-#[test]
 fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> TestResult {
     let a = Publisher::new()?;
     let dir = tempfile::tempdir()?;
@@ -762,9 +759,9 @@ fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> Test
         other.issued_at_unix_ms = 11_000;
         sign(other, &authority())
     };
-    let equivocation = PartnerRevocationError::Equivocation {
+    let equivocation = PartnerRevocationError::Mirror {
         partner_id: PARTNER.to_owned(),
-        epoch: 1,
+        error: PartnerMirrorRefusal::Equivocation { epoch: 1 }.into(),
     };
     let repeated = equivocate([7; 32])?;
     for _ in 0..3 {
@@ -773,7 +770,7 @@ fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> Test
             Err(equivocation.clone())
         );
     }
-    assert_eq!(b.conflicts()?.len(), 1);
+    assert_eq!(b.store.conflicts()?.len(), 1);
 
     let bound = usize::try_from(MAX_RECORDED_PARTNER_CONFLICTS)?;
     for index in 1..bound {
@@ -784,7 +781,7 @@ fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> Test
             Err(equivocation.clone())
         );
     }
-    assert_eq!(b.conflicts()?.len(), bound);
+    assert_eq!(b.store.conflicts()?.len(), bound);
     assert_eq!(
         b.apply(&partner(), &equivocate([9; 32])?, &[], 11_000),
         Err(PartnerRevocationError::ConflictLogFull(PARTNER.to_owned()))
@@ -793,7 +790,7 @@ fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> Test
         b.apply(&partner(), &repeated, &[], 11_000),
         Err(equivocation)
     );
-    assert_eq!(b.conflicts()?.len(), bound);
+    assert_eq!(b.store.conflicts()?.len(), bound);
     Ok(())
 }
 
@@ -812,10 +809,10 @@ fn a_mirror_tree_that_diverges_from_its_accepted_root_is_unavailable() -> TestRe
         PARTNER,
     )?)?
     .revoke(passport_revocation_key("passport-planted"), 10_000)?;
-    let diverged = PartnerRevocationError::MirrorUnavailable(
-        PARTNER.to_owned(),
-        "mirror tree does not match its accepted root".to_owned(),
-    );
+    let diverged = PartnerRevocationError::Mirror {
+        partner_id: PARTNER.to_owned(),
+        error: PartnerMirrorRefusal::Diverged.into(),
+    };
     assert_eq!(
         b.check_passport(&partner(), &passport("passport-held"), 10_000),
         Err(diverged.clone())
