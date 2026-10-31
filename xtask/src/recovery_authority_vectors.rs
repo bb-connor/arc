@@ -7,10 +7,11 @@
 
 use std::fs;
 
+use chio_core_types::canonical::CanonicalBytes;
 use chio_core_types::crypto::Keypair;
 use chio_core_types::recovery::{
-    RecoveryGrantBody, SignedAuthorityCoverageAttestationV1, SignedRecoveryGrant,
-    SignedRecoveryProviderFinalityV1,
+    RecoveryDigestDomain, RecoveryGrantBody, SignedAuthorityCoverageAttestationV1,
+    SignedRecoveryGrant, SignedRecoveryProviderFinalityV1,
 };
 use chio_core_types::SignedDeclassificationGrant;
 use serde::Serialize;
@@ -117,6 +118,24 @@ fn sign_positive(positive: &mut Value) -> Result<(), XtaskError> {
     let authority = Keypair::from_seed(&AUTHORITY_SEED);
     let coverage_signer = Keypair::from_seed(&COVERAGE_SEED);
 
+    let coverage = positive["coverage"]
+        .as_array_mut()
+        .ok_or_else(|| drift("coverage is not an array"))?;
+    let mut attestations = Vec::with_capacity(coverage.len());
+    for proof in coverage.iter_mut() {
+        let signed =
+            SignedAuthorityCoverageAttestationV1::sign(typed(&proof["body"])?, &coverage_signer)
+                .map_err(drift)?;
+        *proof = to_value(&signed)?;
+        attestations.push(signed);
+    }
+
+    // Same order as `chio_flow::verify_recovery_coverage`.
+    attestations.sort_by_key(|a| (a.body().principal.clone(), a.body().issuer_id.clone()));
+    let canonical = CanonicalBytes::new(&attestations).map_err(drift)?;
+    let digest = RecoveryDigestDomain::AuthorityCoverage.digest(&canonical);
+    positive["grant"]["body"]["recovery"]["coverage_digest"] = to_value(digest.as_bytes())?;
+
     let grant_body: RecoveryGrantBody = typed(&positive["grant"]["body"])?;
     let grant = SignedRecoveryGrant::sign(grant_body, &authority).map_err(drift)?;
     positive["grant"] = to_value(&grant)?;
@@ -129,16 +148,6 @@ fn sign_positive(positive: &mut Value) -> Result<(), XtaskError> {
     )
     .map_err(drift)?;
     positive["provider_finality"] = to_value(&finality)?;
-
-    let coverage = positive["coverage"]
-        .as_array_mut()
-        .ok_or_else(|| drift("coverage is not an array"))?;
-    for proof in coverage.iter_mut() {
-        let signed =
-            SignedAuthorityCoverageAttestationV1::sign(typed(&proof["body"])?, &coverage_signer)
-                .map_err(drift)?;
-        *proof = to_value(&signed)?;
-    }
     Ok(())
 }
 
@@ -193,6 +202,14 @@ fn replace_once(text: &str, from: &str, to: &str) -> Result<String, XtaskError> 
         return Err(drift(format!("expected exactly one {from}")));
     }
     Ok(text.replacen(from, to, 1))
+}
+
+fn with_unsafe_integer(text: &str, member: &str, value: &Value) -> Result<String, XtaskError> {
+    replace_once(
+        text,
+        &format!("\"{member}\":{value}"),
+        &format!("\"{member}\":{UNSAFE_INTEGER}"),
+    )
 }
 
 struct Corpus(Vec<Value>);
@@ -250,13 +267,8 @@ fn corpus(positive: &Value) -> Result<Vec<Value>, XtaskError> {
     }
 
     let binding = sample(positive, "grant_binding")?;
-    let fields: Vec<String> = binding
-        .as_object()
-        .ok_or_else(|| drift("grant binding is not an object"))?
-        .keys()
-        .cloned()
-        .collect();
-    for field in &fields {
+    let mut fields = binding.clone();
+    for field in object(&mut fields)?.keys() {
         let mut missing = binding.clone();
         object(&mut missing)?.remove(field);
         corpus.refused(
@@ -313,11 +325,7 @@ fn corpus(positive: &Value) -> Result<Vec<Value>, XtaskError> {
         "command",
         false,
         false,
-        replace_once(
-            &command,
-            &format!("\"expected_revision\":{revision}"),
-            &format!("\"expected_revision\":{UNSAFE_INTEGER}"),
-        )?,
+        with_unsafe_integer(&command, "expected_revision", &revision)?,
     );
     let binding_text = canonical_text(&binding)?;
     let epoch = binding["isolation_epoch"].clone();
@@ -326,11 +334,7 @@ fn corpus(positive: &Value) -> Result<Vec<Value>, XtaskError> {
         "grant_binding",
         false,
         false,
-        replace_once(
-            &binding_text,
-            &format!("\"isolation_epoch\":{epoch}"),
-            &format!("\"isolation_epoch\":{UNSAFE_INTEGER}"),
-        )?,
+        with_unsafe_integer(&binding_text, "isolation_epoch", &epoch)?,
     );
     corpus.wire(
         "grant_binding-duplicate-key",
@@ -417,11 +421,7 @@ fn origin_vectors(corpus: &mut Corpus, positive: &Value) -> Result<(), XtaskErro
         "action",
         false,
         false,
-        replace_once(
-            &text,
-            &version_token,
-            &format!("\"operation_version\":{UNSAFE_INTEGER}"),
-        )?,
+        with_unsafe_integer(&text, "operation_version", &version)?,
     );
     for (name, token) in [
         ("origin-operation-version-float-token", "1.0"),
@@ -479,13 +479,8 @@ fn utf8_vectors(corpus: &mut Corpus, positive: &Value) -> Result<(), XtaskError>
         ] {
             let mut value = sample(positive, contract)?;
             *member(&mut value, path)? = Value::String("\u{e9}".repeat(characters));
-            corpus.value(
-                &format!("utf8-{name}-{label}"),
-                contract,
-                valid,
-                valid,
-                &value,
-            )?;
+            let name = format!("utf8-{name}-{label}");
+            corpus.value(&name, contract, valid, valid, &value)?;
         }
     }
     for (label, characters, valid) in [("exact", 128, true), ("oversized", 129, false)] {
@@ -500,13 +495,8 @@ fn utf8_vectors(corpus: &mut Corpus, positive: &Value) -> Result<(), XtaskError>
                 "owners": owners,
                 "compartments": [],
             });
-            corpus.value(
-                &format!("utf8-{name}-{label}"),
-                "requirements",
-                valid,
-                valid,
-                &value,
-            )?;
+            let name = format!("utf8-{name}-{label}");
+            corpus.value(&name, "requirements", valid, valid, &value)?;
         }
     }
     Ok(())
