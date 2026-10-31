@@ -221,8 +221,8 @@ impl SqliteRevocationOracle {
     }
 
     /// Runs `body` against the connection, for owner state kept in the same
-    /// database. Writes belong in [`Self::write`].
-    pub(crate) fn read<T>(&self, body: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+    /// database. Writes belong in [`Self::transact`].
+    pub fn read<T>(&self, body: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
         let connection = self.lock_connection()?;
         body(&connection)
     }
@@ -359,7 +359,7 @@ pub struct RevocationTransaction<'t> {
 impl RevocationTransaction<'_> {
     /// The open transaction, for owner state kept in the same database.
     #[must_use]
-    pub(crate) fn connection(&self) -> &Connection {
+    pub fn connection(&self) -> &Connection {
         self.connection
     }
 
