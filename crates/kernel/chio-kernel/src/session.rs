@@ -1151,16 +1151,6 @@ impl Session {
         }
     }
 
-    pub fn queue_elicitation_completion(&self, elicitation_id: &str) {
-        let Some(pending) = self.write_pending_url_elicitations().remove(elicitation_id) else {
-            return;
-        };
-        self.queue_late_event(LateSessionEvent::ElicitationCompleted {
-            elicitation_id: elicitation_id.to_string(),
-            related_task_id: pending.related_task_id,
-        });
-    }
-
     pub fn subscribe_resource(&self, uri: impl Into<String>) {
         self.subscriptions.subscribe_resource(uri);
     }
