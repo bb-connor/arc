@@ -194,19 +194,6 @@ impl ChioKernel {
         block_on_async_tool_dispatch(self.drain_tool_server_events_async())
     }
 
-    pub fn drain_tool_server_events(&self) -> Vec<ToolServerEvent> {
-        match self.try_drain_tool_server_events() {
-            Ok(events) => events,
-            Err(error) => {
-                warn!(
-                    reason = %redacted!(&error),
-                    "failed to drain tool server events"
-                );
-                Vec::new()
-            }
-        }
-    }
-
     pub fn register_session_pending_url_elicitation(
         &self,
         session_id: &SessionId,
@@ -231,28 +218,6 @@ impl ChioKernel {
         })
     }
 
-    pub fn queue_session_elicitation_completion(
-        &self,
-        session_id: &SessionId,
-        elicitation_id: &str,
-    ) -> Result<(), KernelError> {
-        self.with_session_mut(session_id, |session| {
-            session.queue_elicitation_completion(elicitation_id);
-            Ok(())
-        })
-    }
-
-    pub fn queue_session_late_event(
-        &self,
-        session_id: &SessionId,
-        event: LateSessionEvent,
-    ) -> Result<(), KernelError> {
-        self.with_session_mut(session_id, |session| {
-            session.queue_late_event(event);
-            Ok(())
-        })
-    }
-
     pub fn queue_session_tool_server_event(
         &self,
         session_id: &SessionId,
@@ -269,19 +234,6 @@ impl ChioKernel {
         session_id: &SessionId,
     ) -> Result<(), KernelError> {
         let events = self.try_drain_tool_server_events()?;
-        self.with_session_mut(session_id, |session| {
-            for event in events {
-                session.queue_tool_server_event(event);
-            }
-            Ok(())
-        })
-    }
-
-    pub async fn queue_session_tool_server_events_async(
-        &self,
-        session_id: &SessionId,
-    ) -> Result<(), KernelError> {
-        let events = self.drain_tool_server_events_async().await?;
         self.with_session_mut(session_id, |session| {
             for event in events {
                 session.queue_tool_server_event(event);
