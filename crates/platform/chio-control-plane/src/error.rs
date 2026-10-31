@@ -85,7 +85,7 @@ pub enum CliError {
     Io(#[from] std::io::Error),
 
     #[error("file refused: {0}")]
-    File(#[from] chio_secure_ipc::regular_file::RegularFileError),
+    File(#[source] chio_secure_ipc::regular_file::RegularFileError),
 
     /// The replacement file is in place and readable, but syncing its parent
     /// directory failed, so the rename may not survive a crash.
@@ -412,6 +412,22 @@ impl CliError {
                 serde_json::json!({ "detail": message }),
                 "Read the error detail, correct the conflicting inputs or missing prerequisite, and retry the command.",
             ),
+        }
+    }
+}
+
+/// A signed-input file over its bound is refused as oversized signed JSON,
+/// the refusal decoding gives for the same bytes.
+impl From<chio_secure_ipc::regular_file::RegularFileError> for CliError {
+    fn from(error: chio_secure_ipc::regular_file::RegularFileError) -> Self {
+        match error {
+            chio_secure_ipc::regular_file::RegularFileError::TooLarge { max_bytes } => {
+                Self::SignedJson(chio_core::canonical::UntrustedJsonError::TooLarge {
+                    bytes: max_bytes.saturating_add(1),
+                    bound: max_bytes,
+                })
+            }
+            error => Self::File(error),
         }
     }
 }

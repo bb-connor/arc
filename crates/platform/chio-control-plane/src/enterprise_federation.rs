@@ -273,7 +273,16 @@ impl CertificationDiscoveryOperator {
 
 impl EnterpriseProviderRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        let bytes = crate::signed_input::read_bounded(path)?;
+        let bytes =
+            crate::signed_input::read_bounded(path).map_err(|error| {
+                match CliError::from(error) {
+                    CliError::File(error) => CliError::cli_io_error(format!(
+                        "failed to read enterprise provider registry {}: {error}",
+                        path.display()
+                    )),
+                    error => error,
+                }
+            })?;
         let registry: Self = crate::signed_input::decode(&bytes)?;
         registry.with_revalidated_records()
     }

@@ -111,8 +111,15 @@ fn offer_registry_save_over_read_cap_is_refused_and_prior_file_survives() -> Tes
         .contains(&oversize_error(MAX_SIGNED_FILE_BYTES)));
     assert_eq!(fs::read(&path)?, before);
     assert_eq!(PassportIssuanceOfferRegistry::load(&path)?, small);
-    let leftovers = fs::read_dir(directory.path())?.count();
-    assert_eq!(leftovers, 1, "no temporary file may remain");
+    let mut entries = fs::read_dir(directory.path())?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.sort();
+    assert_eq!(
+        entries,
+        [".offers.json.lock", "offers.json"],
+        "no temporary file may remain beside the registry and its writer lock"
+    );
     Ok(())
 }
 
