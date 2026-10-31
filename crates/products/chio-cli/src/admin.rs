@@ -49,16 +49,6 @@ fn load_enterprise_provider_registry_local(
     }
 }
 
-fn load_federation_policy_registry_local(
-    path: &Path,
-) -> Result<FederationAdmissionPolicyRegistry, CliError> {
-    if path.exists() {
-        FederationAdmissionPolicyRegistry::load(path)
-    } else {
-        Ok(FederationAdmissionPolicyRegistry::default())
-    }
-}
-
 pub(crate) fn load_admission_policy(
     path: &Path,
 ) -> Result<Option<chio_policy::HushSpec>, CliError> {
@@ -228,7 +218,7 @@ pub(crate) fn cmd_trust_federation_policy_list(
             .list_federation_policies()?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
-        let registry = load_federation_policy_registry_local(path)?;
+        let registry = FederationAdmissionPolicyRegistry::load(path)?;
         FederationAdmissionPolicyListResponse {
             configured: true,
             count: registry.policies.len(),
@@ -269,7 +259,7 @@ pub(crate) fn cmd_trust_federation_policy_get(
             .get_federation_policy(policy_id)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
-        let registry = load_federation_policy_registry_local(path)?;
+        let registry = FederationAdmissionPolicyRegistry::load(path)?;
         registry.get(policy_id).cloned().ok_or_else(|| {
             CliError::cli_other_error(format!("federation policy `{policy_id}` was not found"))
         })?
@@ -311,17 +301,10 @@ pub(crate) fn cmd_trust_federation_policy_upsert(
             .upsert_federation_policy(&record.policy.body.policy_id, &record)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
-        let mut registry = load_federation_policy_registry_local(path)?;
-        registry.upsert(record.clone())?;
-        registry.save(path)?;
-        registry
-            .get(&record.policy.body.policy_id)
-            .cloned()
-            .ok_or_else(|| {
-                CliError::cli_other_error(
-                    "federation policy upsert did not persist the requested record".to_string(),
-                )
-            })?
+        FederationAdmissionPolicyRegistry::update(path, |registry| {
+            registry.upsert(record.clone())?;
+            Ok::<_, CliError>(record)
+        })?
     };
 
     if json_output {
@@ -349,9 +332,9 @@ pub(crate) fn cmd_trust_federation_policy_delete(
             .delete_federation_policy(policy_id)?
     } else {
         let path = require_federation_policies_file(federation_policies_file)?;
-        let mut registry = load_federation_policy_registry_local(path)?;
-        let deleted = registry.remove(policy_id);
-        registry.save(path)?;
+        let deleted = FederationAdmissionPolicyRegistry::update(path, |registry| {
+            Ok::<_, CliError>(registry.remove(policy_id))
+        })?;
         FederationAdmissionPolicyDeleteResponse {
             policy_id: policy_id.to_string(),
             deleted,

@@ -561,7 +561,7 @@ pub(crate) fn evaluate_federation_policy_request(
     request: &FederationAdmissionEvaluationRequest,
     now: u64,
 ) -> Result<FederationAdmissionEvaluationResponse, CliError> {
-    let (_, registry) = load_federation_policy_registry_for_admin(&state.config)?;
+    let registry = load_federation_policy_registry_for_admin(&state.config)?;
     let record = registry.get(&request.policy_id).cloned().ok_or_else(|| {
         CliError::cli_other_error(format!(
             "federation policy `{}` was not found",
