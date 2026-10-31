@@ -95,6 +95,31 @@ fn signed_direct_v2_capability_token_json(issuer: &Keypair, id: &str) -> String 
     serde_json::to_string(&token).test_unwrap()
 }
 
+/// A POST to `/pets` with a three-byte body and no capability, denied by
+/// default, for tests to override field by field.
+fn authority_input(query: &HashMap<String, String>) -> HttpAuthorityInput<'_> {
+    HttpAuthorityInput {
+        request_id: "req-strict-nonce-http-authority".to_string(),
+        method: HttpMethod::Post,
+        route_pattern: "/pets".to_string(),
+        path: "/pets",
+        query,
+        caller: caller(),
+        body_hash: Some("abc".to_string()),
+        body_length: 3,
+        session_id: None,
+        capability_id_hint: None,
+        presented_capability: None,
+        requested_tool_server: None,
+        requested_tool_name: None,
+        requested_arguments: None,
+        model_metadata: None,
+        unsupported_authorization_extension: None,
+        execution_nonce: None,
+        policy: HttpAuthorityPolicy::DenyByDefault,
+    }
+}
+
 fn caller() -> CallerIdentity {
     CallerIdentity {
         subject: "tester".to_string(),
@@ -147,22 +172,10 @@ fn safe_policy_allows_without_capability() {
         .evaluate(HttpAuthorityInput {
             request_id: "req-1".to_string(),
             method: HttpMethod::Get,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -186,22 +199,10 @@ fn safe_get_input<'a>(query: &'a HashMap<String, String>) -> HttpAuthorityInput<
     HttpAuthorityInput {
         request_id: "req-durability-probe".to_string(),
         method: HttpMethod::Get,
-        route_pattern: "/pets".to_string(),
-        path: "/pets",
-        query,
-        caller: caller(),
         body_hash: None,
         body_length: 0,
-        session_id: None,
-        capability_id_hint: None,
-        presented_capability: None,
-        requested_tool_server: None,
-        requested_tool_name: None,
-        requested_arguments: None,
-        model_metadata: None,
-        unsupported_authorization_extension: None,
-        execution_nonce: None,
         policy: HttpAuthorityPolicy::SessionAllow,
+        ..authority_input(query)
     }
 }
 
@@ -230,23 +231,7 @@ fn failclosed_authority_surfaces_durability_error_for_denied_projection() {
     let error = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-denied-durability".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap_err();
     let message = error.to_string();
@@ -303,24 +288,8 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
     let authority = authority_with_strict_execution_nonce();
     let preflight = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -336,24 +305,9 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let allowed = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
     assert!(allowed.verdict.is_allowed());
@@ -361,24 +315,9 @@ fn strict_execution_nonce_preflight_round_trips_before_authorizing_http() {
 
     let replay = authority
         .evaluate(HttpAuthorityInput {
-            request_id: "req-strict-nonce-http-authority".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
             execution_nonce: Some(&nonce),
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap_err();
     assert!(
@@ -393,23 +332,7 @@ fn deny_by_default_requires_capability() {
     let result = authority()
         .evaluate(HttpAuthorityInput {
             request_id: "req-2".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -424,21 +347,9 @@ fn invalid_presented_capability_denies_even_safe_route() {
         .evaluate(HttpAuthorityInput {
             request_id: "req-invalid".to_string(),
             method: HttpMethod::Get,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some("{not-json"),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
         })
         .test_unwrap();
@@ -446,7 +357,8 @@ fn invalid_presented_capability_denies_even_safe_route() {
     assert!(result.verdict.is_denied());
     assert_eq!(result.receipt.evidence.len(), 1);
     assert_eq!(result.receipt.evidence[0].guard_name, "CapabilityGuard");
-}
+            ..authority_input(&query)
+        }
 
 #[test]
 fn valid_capability_allows_deny_by_default() {
@@ -459,20 +371,10 @@ fn valid_capability_allows_deny_by_default() {
             method: HttpMethod::Patch,
             route_pattern: "/pets/{petId}".to_string(),
             path: "/pets/42",
-            query: &query,
-            caller: caller(),
             body_hash: Some("def".to_string()),
-            body_length: 3,
             session_id: Some("session-1".to_string()),
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -507,20 +409,10 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             method: HttpMethod::Patch,
             route_pattern: "/pets/{petId}".to_string(),
             path: "/pets/42",
-            query: &query,
-            caller: caller(),
             body_hash: Some("def".to_string()),
-            body_length: 3,
             session_id: Some("session-1".to_string()),
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap_err();
     assert!(
@@ -540,20 +432,10 @@ fn approval_store_constructor_fails_closed_without_durable_stores() {
             method: HttpMethod::Patch,
             route_pattern: "/pets/{petId}".to_string(),
             path: "/pets/42",
-            query: &query,
-            caller: caller(),
             body_hash: Some("def".to_string()),
-            body_length: 3,
             session_id: Some("session-1".to_string()),
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
     assert!(
@@ -570,23 +452,10 @@ fn direct_v2_capability_denies_without_http_trust_root_resolver() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-v2-direct".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: Some("def".to_string()),
-            body_length: 3,
             session_id: Some("session-1".to_string()),
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -609,20 +478,11 @@ fn capability_hint_mismatch_becomes_denial() {
             method: HttpMethod::Put,
             route_pattern: "/pets/42".to_string(),
             path: "/pets/42",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
             capability_id_hint: Some("cap-other"),
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -638,23 +498,9 @@ fn untrusted_capability_denies_deny_by_default() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-untrusted".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: Some("ghi".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -675,23 +521,10 @@ fn configured_external_issuer_allows_deny_by_default() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-external".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: Some("issuer".to_string()),
             body_length: 6,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -727,23 +560,10 @@ fn revoked_presented_capability_denies_deny_by_default() -> Result<(), Box<dyn s
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-revoked".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: Some("revoked".to_string()),
             body_length: 7,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -772,22 +592,10 @@ fn finalized_receipt_links_decision_receipt_and_kernel_receipt() {
         .evaluate(HttpAuthorityInput {
             request_id: "req-5".to_string(),
             method: HttpMethod::Get,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap()
         .receipt;
@@ -908,23 +716,8 @@ fn deny_by_default_proxy_path_requires_http_authority_grant() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-proxy-scope".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -963,23 +756,11 @@ fn deny_by_default_proxy_path_ignores_spoofed_tool_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-proxy-spoofed-tool".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("math"),
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "value": 1 })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1018,23 +799,13 @@ fn deny_by_default_tools_path_honors_path_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-sidecar-tool-context".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/matrix/files.read".to_string(),
             path: "/chio/tools/matrix/files.read",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("matrix"),
             requested_tool_name: Some("files.read"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1070,23 +841,10 @@ fn deny_by_default_tools_path_without_sidecar_fields_binds_to_path_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-no-sidecar-fields".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/billing/charge".to_string(),
             path: "/chio/tools/billing/charge",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1122,23 +880,11 @@ fn deny_by_default_tools_path_with_arguments_only_binds_to_path_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-arguments-only".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/billing/charge".to_string(),
             path: "/chio/tools/billing/charge",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
-            requested_tool_server: None,
-            requested_tool_name: None,
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1177,20 +923,14 @@ fn reserved_tools_path_safe_policy_binds_to_path_identity() {
             method: HttpMethod::Get,
             route_pattern: "/chio/tools/billing/charge".to_string(),
             path: "/chio/tools/billing/charge",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("math"),
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1211,20 +951,13 @@ fn reserved_tools_path_safe_policy_requires_capability() {
             method: HttpMethod::Get,
             route_pattern: "/chio/tools/billing/read".to_string(),
             path: "/chio/tools/billing/read",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
             requested_tool_server: Some("billing"),
             requested_tool_name: Some("read"),
             requested_arguments: Some(&Value::Null),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1245,20 +978,10 @@ fn reserved_tools_path_safe_policy_requires_capability_without_sidecar_fields() 
             method: HttpMethod::Get,
             route_pattern: "/chio/tools/billing/read".to_string(),
             path: "/chio/tools/billing/read",
-            query: &query,
-            caller: caller(),
             body_hash: None,
             body_length: 0,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
             policy: HttpAuthorityPolicy::SessionAllow,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1295,23 +1018,13 @@ fn deny_by_default_unmatched_http_path_does_not_trust_synthetic_pattern() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-unmatched-spoofed-synthetic-pattern".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "matrix:admin.delete".to_string(),
             path: "/admin/delete",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("matrix"),
             requested_tool_name: Some("admin.delete"),
             requested_arguments: Some(&serde_json::json!({ "path": "/tmp/a" })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1350,23 +1063,13 @@ fn deny_by_default_tools_path_binds_to_path_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-spoofed-fields".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/billing/charge".to_string(),
             path: "/chio/tools/billing/charge",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("math"),
             requested_tool_name: Some("double"),
             requested_arguments: Some(&serde_json::json!({ "amount": 100 })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1403,23 +1106,13 @@ fn deny_by_default_tools_path_decodes_percent_encoded_identity() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-encoded-tool".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/acp/terminal%2Fcreate".to_string(),
             path: "/chio/tools/acp/terminal%2Fcreate",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("acp"),
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1446,23 +1139,13 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-malformed-tool".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/acp/terminal%ZZcreate".to_string(),
             path: "/chio/tools/acp/terminal%ZZcreate",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("acp"),
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1499,23 +1182,13 @@ fn deny_by_default_tools_path_rejects_malformed_percent_encoding_before_wildcard
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tools-path-malformed-wildcard".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/acp/terminal%ZZcreate".to_string(),
             path: "/chio/tools/acp/terminal%ZZcreate",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("acp"),
             requested_tool_name: Some("terminal/create"),
             requested_arguments: Some(&serde_json::json!({ "command": "ls" })),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1552,23 +1225,15 @@ fn deny_by_default_requires_matching_tool_grant() {
     let result = authority
         .evaluate(HttpAuthorityInput {
             request_id: "req-tool-mismatch".to_string(),
-            method: HttpMethod::Post,
             route_pattern: "/chio/tools/math/increment".to_string(),
             path: "/chio/tools/math/increment",
-            query: &query,
-            caller: caller(),
             body_hash: Some("toolhash".to_string()),
             body_length: 8,
-            session_id: None,
-            capability_id_hint: None,
             presented_capability: Some(&capability),
             requested_tool_server: Some("math"),
             requested_tool_name: Some("increment"),
             requested_arguments: Some(&Value::Null),
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
 
@@ -1627,23 +1292,7 @@ fn policy_deny_is_not_recorded_as_a_dispatch_failure() {
     let denied = authority()
         .evaluate(HttpAuthorityInput {
             request_id: "req-deny-no-page".to_string(),
-            method: HttpMethod::Post,
-            route_pattern: "/pets".to_string(),
-            path: "/pets",
-            query: &query,
-            caller: caller(),
-            body_hash: Some("abc".to_string()),
-            body_length: 3,
-            session_id: None,
-            capability_id_hint: None,
-            presented_capability: None,
-            requested_tool_server: None,
-            requested_tool_name: None,
-            requested_arguments: None,
-            model_metadata: None,
-            unsupported_authorization_extension: None,
-            execution_nonce: None,
-            policy: HttpAuthorityPolicy::DenyByDefault,
+            ..authority_input(&query)
         })
         .test_unwrap();
     assert!(denied.verdict.is_denied());
