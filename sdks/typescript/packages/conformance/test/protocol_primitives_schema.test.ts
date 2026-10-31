@@ -38,6 +38,8 @@ interface FixtureCase {
   name: string;
   schema_file: string;
   valid: boolean;
+  /** Present when only a decoder refuses the case, such as an underived id. */
+  schema_valid?: boolean;
   instance: ProtocolPrimitive | Record<string, unknown>;
 }
 
@@ -74,7 +76,9 @@ describe("protocol primitive generated schemas", () => {
       const schema = JSON.parse(
         readFileSync(resolve(schemaRoot, fixture.schema_file), "utf8"),
       ) as { $id: string };
-      expect(validateWire(schema.$id, fixture.instance), fixture.name).toBe(fixture.valid);
+      expect(validateWire(schema.$id, fixture.instance), fixture.name).toBe(
+        fixture.schema_valid ?? fixture.valid,
+      );
       if (fixture.valid) {
         expect(JSON.parse(JSON.stringify(fixture.instance))).toEqual(fixture.instance);
       }

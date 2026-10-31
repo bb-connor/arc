@@ -1,0 +1,8 @@
+{
+  "schema": "chio.revocation-entry.v1",
+  "entry_id": "rev_5ed57cd1bc7efbeee6f8d1118e99386abb4d05a9100018b6b14f9173b5a2d2fe",
+  "target_kind": "root_policy_rule",
+  "target_value": "okta-agents",
+  "revoked_at": 1792234800,
+  "reason": "policy_withdrawn"
+}

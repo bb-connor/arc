@@ -106,7 +106,14 @@ fn protocol_primitives_shared_fixtures_match_authoritative_schemas() {
             .as_str()
             .expect("fixture schema_file is a string");
         let instance = &case["instance"];
-        if case["valid"].as_bool().expect("fixture valid is a boolean") {
+        // `schema_valid` marks a case only a decoder refuses, such as an id the
+        // target does not derive.
+        let schema_valid = case
+            .get("schema_valid")
+            .unwrap_or(&case["valid"])
+            .as_bool()
+            .expect("fixture validity is a boolean");
+        if schema_valid {
             assert_schema_accepts(schema_file, instance);
         } else {
             assert_schema_rejects(schema_file, instance);

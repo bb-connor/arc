@@ -20,7 +20,7 @@ def verify(evidence: Path, root: Path) -> None:
     manifest = json.loads((root / "tests/bindings/fixtures/manifest-consumers.json").read_text())["cases"]
     corpus = json.loads((root / "tests/bindings/fixtures/protocol-primitives-v1.json").read_text())
     primitives, raw = corpus["cases"], corpus["raw_cases"]
-    if len(manifest) != 14 or len(primitives) != 42 or len(raw) != 2:
+    if len(manifest) != 14 or len(primitives) != 52 or len(raw) != 2:
         raise ValueError("shared consumer fixture inventory changed")
     if sorted(case["name"] for case in raw) != sorted(RAW_CASE_STATUS):
         raise ValueError("raw fixture decoder status is not recorded")

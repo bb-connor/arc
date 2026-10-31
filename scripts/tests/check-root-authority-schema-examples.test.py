@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import shutil
 import subprocess
@@ -15,18 +16,19 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/check-root-authority-schema-examples.py"
 WIRE = "spec/schemas/chio-wire/v1"
 EXAMPLES = f"{WIRE}/root_authority/examples"
-SCHEMAS = {
-    "root-anchor": "root_authority/root-anchor.schema.json",
-    "delegation-context": "root_authority/delegation-context.schema.json",
-    "root-policy": "root_authority/root-policy.schema.json",
-    "enterprise-provider-identity": "root_authority/enterprise-provider-identity.schema.json",
-    "idp-key-snapshot": "root_authority/idp-key-snapshot.schema.json",
-    "verifier-trust": "root_authority/verifier-trust.schema.json",
-    "revocation-request": "root_authority/revocation-request.schema.json",
-    "presentation": "capability/presentation.schema.json",
-    "disclosure": "receipt/disclosure.schema.json",
-    "settlement-closure": "receipt/settlement-closure.schema.json",
-}
+
+
+def checker_schemas() -> dict[str, str]:
+    """The checker's own stem table, read without importing its dependencies."""
+    for node in ast.parse(SCRIPT.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "SCHEMAS" for target in node.targets
+        ):
+            return ast.literal_eval(node.value)
+    raise AssertionError("checker defines no SCHEMAS table")
+
+
+SCHEMAS = checker_schemas()
 
 
 def schema_for(stem: str) -> dict:
@@ -94,7 +96,7 @@ class RootAuthorityExampleTests(unittest.TestCase):
         self.assertIn("ok valid   root-policy.json", result.stdout)
         self.assertIn("ok invalid root-policy.extra-member.json: (root): additionalProperties", result.stdout)
         self.assertIn(
-            "root-authority schema examples: 10 valid and 1 invalid examples behave as expected",
+            f"root-authority schema examples: {len(SCHEMAS)} valid and 1 invalid examples behave as expected",
             result.stdout,
         )
 

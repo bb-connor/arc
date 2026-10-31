@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 6a4f02054dab3f55b85533fd4f33677ec67db525b20471b63cbd2ab1264c0d90
+// Schema content SHA-256: 47386f8d6c2c840dd998e6807cc2188ac8b0a6803428a7f5c70c9a5da42db487
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -4158,6 +4158,44 @@ const (
 	RootAuthorityIdpKeySnapshotBodySchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotBodySchema = "chio.idp-key-snapshot.v1"
 )
 
+// Defines values for RootAuthorityRevocationAdminRequestCapabilityTargetKind.
+const (
+	RootAuthorityRevocationAdminRequestCapabilityTargetKindCapabilityId RootAuthorityRevocationAdminRequestCapabilityTargetKind = "capability_id"
+)
+
+// Defines values for RootAuthorityRevocationEntryNamedRevocationEntrySchema.
+const (
+	RootAuthorityRevocationEntryNamedRevocationEntrySchemaChioRevocationEntryV1 RootAuthorityRevocationEntryNamedRevocationEntrySchema = "chio.revocation-entry.v1"
+)
+
+// Defines values for RootAuthorityRevocationEntryNamedRevocationEntryTargetKind.
+const (
+	RootAuthorityRevocationEntryNamedRevocationEntryTargetKindCapabilityId   RootAuthorityRevocationEntryNamedRevocationEntryTargetKind = "capability_id"
+	RootAuthorityRevocationEntryNamedRevocationEntryTargetKindRootPolicyRule RootAuthorityRevocationEntryNamedRevocationEntryTargetKind = "root_policy_rule"
+)
+
+// Defines values for RootAuthorityRevocationEntryRevocationReason.
+const (
+	RootAuthorityRevocationEntryRevocationReasonCredentialCompromise RootAuthorityRevocationEntryRevocationReason = "credential_compromise"
+	RootAuthorityRevocationEntryRevocationReasonIncidentResponse     RootAuthorityRevocationEntryRevocationReason = "incident_response"
+	RootAuthorityRevocationEntryRevocationReasonOperatorRequest      RootAuthorityRevocationEntryRevocationReason = "operator_request"
+	RootAuthorityRevocationEntryRevocationReasonPolicyWithdrawn      RootAuthorityRevocationEntryRevocationReason = "policy_withdrawn"
+	RootAuthorityRevocationEntryRevocationReasonPrincipalOffboarded  RootAuthorityRevocationEntryRevocationReason = "principal_offboarded"
+	RootAuthorityRevocationEntryRevocationReasonTenantOffboarded     RootAuthorityRevocationEntryRevocationReason = "tenant_offboarded"
+)
+
+// Defines values for RootAuthorityRevocationEntryTaggedRevocationEntrySchema.
+const (
+	RootAuthorityRevocationEntryTaggedRevocationEntrySchemaChioRevocationEntryV1 RootAuthorityRevocationEntryTaggedRevocationEntrySchema = "chio.revocation-entry.v1"
+)
+
+// Defines values for RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind.
+const (
+	RootAuthorityRevocationEntryTaggedRevocationEntryTargetKindAnchorSubject RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind = "anchor_subject"
+	RootAuthorityRevocationEntryTaggedRevocationEntryTargetKindReplayKey     RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind = "replay_key"
+	RootAuthorityRevocationEntryTaggedRevocationEntryTargetKindTenantTag     RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind = "tenant_tag"
+)
+
 // Defines values for RootAuthorityRevocationRequestSchema.
 const (
 	RootAuthorityRevocationRequestSchemaChioRevocationRequestV1 RootAuthorityRevocationRequestSchema = "chio.revocation-request.v1"
@@ -7283,15 +7321,6 @@ type CapabilityPresentation struct {
 
 // CapabilityPresentationSchema defines model for CapabilityPresentation.Schema.
 type CapabilityPresentationSchema string
-
-// CapabilityRevocation A single revocation entry recording that a previously issued capability token (identified by its `id`) is no longer valid as of `revoked_at`. Mirrors `RevocationRecord` in `crates/kernel/chio-kernel/src/revocation_store.rs` (the kernel's persisted revocation row), and is the wire-level companion to the `capability_revoked` kernel notification under `chio-wire/v1/kernel/capability_revoked.schema.json`. Operators read these entries from `/admin/revocations` (hosted edge) and from the trust-control revocation list.
-type CapabilityRevocation struct {
-	// CapabilityId The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.
-	CapabilityId string `json:"capability_id"`
-
-	// RevokedAt Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape.
-	RevokedAt int64 `json:"revoked_at"`
-}
 
 // CapabilitySecurityBinding Decoded predicate of a bind_security_context caveat. The caveat predicate is the RFC 8785 canonical JSON text of this object, and the caveat carries no sig.
 type CapabilitySecurityBinding struct {
@@ -32901,6 +32930,81 @@ type RootAuthorityIdpKeySnapshotBody struct {
 // RootAuthorityIdpKeySnapshotBodySchema defines model for RootAuthorityIdpKeySnapshotBody.Schema.
 type RootAuthorityIdpKeySnapshotBodySchema string
 
+// RootAuthorityRevocationAdminRequest Body of `POST /admin/revocations` on a hosted edge: one target and a closed reason, strict at every level. The target is a tagged union on `kind`; this version accepts the `capability_id` kind. The response carries the stored `chio.revocation-entry.v1`.
+type RootAuthorityRevocationAdminRequest struct {
+	// Reason Closed set of revocation reasons. The first write's reason stands.
+	Reason RootAuthorityRevocationEntryRevocationReason        `json:"reason"`
+	Target RootAuthorityRevocationAdminRequestCapabilityTarget `json:"target"`
+}
+
+// RootAuthorityRevocationAdminRequestCapabilityTarget defines model for RootAuthorityRevocationAdminRequestCapabilityTarget.
+type RootAuthorityRevocationAdminRequestCapabilityTarget struct {
+	// CapabilityId The capability to revoke, with every descendant.
+	CapabilityId string                                                  `json:"capability_id"`
+	Kind         RootAuthorityRevocationAdminRequestCapabilityTargetKind `json:"kind"`
+}
+
+// RootAuthorityRevocationAdminRequestCapabilityTargetKind defines model for RootAuthorityRevocationAdminRequestCapabilityTarget.Kind.
+type RootAuthorityRevocationAdminRequestCapabilityTargetKind string
+
+// RootAuthorityRevocationEntry `chio.revocation-entry.v1`, unsigned. One stored revocation: its target is a closed kind and value, `entry_id` is `rev_` and the lowercase hex of SHA-256(`chio.revocation-entry-id.v1` NUL, kind, NUL, value), so retrying the same target names the same entry. A `capability_id` target revokes that capability and every descendant; the other kinds revoke every anchored root they match. Subject and tenant targets hold keyed tags, never plaintext. Operators write entries through `POST /admin/revocations` and trust-control `POST /v1/revocations`; a denial names the matching `entry_id`. A decoder also checks that `entry_id` is the id the target derives, which a schema cannot express.
+type RootAuthorityRevocationEntry struct {
+	union json.RawMessage
+}
+
+// RootAuthorityRevocationEntryNamedRevocationEntry defines model for RootAuthorityRevocationEntryNamedRevocationEntry.
+type RootAuthorityRevocationEntryNamedRevocationEntry struct {
+	// EntryId `rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it.
+	EntryId string `json:"entry_id"`
+
+	// Reason Closed set of revocation reasons. The first write's reason stands.
+	Reason RootAuthorityRevocationEntryRevocationReason `json:"reason"`
+
+	// RevokedAt Unix seconds at which the first write of this entry took effect.
+	RevokedAt int64                                                  `json:"revoked_at"`
+	Schema    RootAuthorityRevocationEntryNamedRevocationEntrySchema `json:"schema"`
+
+	// TargetKind Target kinds whose value is an identifier.
+	TargetKind RootAuthorityRevocationEntryNamedRevocationEntryTargetKind `json:"target_kind"`
+
+	// TargetValue The capability id or root policy rule id: 1 to 512 NUL-free characters.
+	TargetValue string `json:"target_value"`
+}
+
+// RootAuthorityRevocationEntryNamedRevocationEntrySchema defines model for RootAuthorityRevocationEntryNamedRevocationEntry.Schema.
+type RootAuthorityRevocationEntryNamedRevocationEntrySchema string
+
+// RootAuthorityRevocationEntryNamedRevocationEntryTargetKind Target kinds whose value is an identifier.
+type RootAuthorityRevocationEntryNamedRevocationEntryTargetKind string
+
+// RootAuthorityRevocationEntryRevocationReason Closed set of revocation reasons. The first write's reason stands.
+type RootAuthorityRevocationEntryRevocationReason string
+
+// RootAuthorityRevocationEntryTaggedRevocationEntry defines model for RootAuthorityRevocationEntryTaggedRevocationEntry.
+type RootAuthorityRevocationEntryTaggedRevocationEntry struct {
+	// EntryId `rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it.
+	EntryId string `json:"entry_id"`
+
+	// Reason Closed set of revocation reasons. The first write's reason stands.
+	Reason RootAuthorityRevocationEntryRevocationReason `json:"reason"`
+
+	// RevokedAt Unix seconds at which the first write of this entry took effect.
+	RevokedAt int64                                                   `json:"revoked_at"`
+	Schema    RootAuthorityRevocationEntryTaggedRevocationEntrySchema `json:"schema"`
+
+	// TargetKind Target kinds whose value is a 64-hex digest.
+	TargetKind RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind `json:"target_kind"`
+
+	// TargetValue The keyed subject tag, tenant tag or replay key digest: 64 lowercase hex characters.
+	TargetValue string `json:"target_value"`
+}
+
+// RootAuthorityRevocationEntryTaggedRevocationEntrySchema defines model for RootAuthorityRevocationEntryTaggedRevocationEntry.Schema.
+type RootAuthorityRevocationEntryTaggedRevocationEntrySchema string
+
+// RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind Target kinds whose value is a 64-hex digest.
+type RootAuthorityRevocationEntryTaggedRevocationEntryTargetKind string
+
 // RootAuthorityRevocationRequest `chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
 type RootAuthorityRevocationRequest struct {
 	IssuedAt int64 `json:"issued_at"`
@@ -49046,6 +49150,71 @@ func (t RootAuthorityIdpKeySnapshot_Source) MarshalJSON() ([]byte, error) {
 }
 
 func (t *RootAuthorityIdpKeySnapshot_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRootAuthorityRevocationEntryNamedRevocationEntry returns the union data inside the RootAuthorityRevocationEntry as a RootAuthorityRevocationEntryNamedRevocationEntry
+func (t RootAuthorityRevocationEntry) AsRootAuthorityRevocationEntryNamedRevocationEntry() (RootAuthorityRevocationEntryNamedRevocationEntry, error) {
+	var body RootAuthorityRevocationEntryNamedRevocationEntry
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRevocationEntryNamedRevocationEntry overwrites any union data inside the RootAuthorityRevocationEntry as the provided RootAuthorityRevocationEntryNamedRevocationEntry
+func (t *RootAuthorityRevocationEntry) FromRootAuthorityRevocationEntryNamedRevocationEntry(v RootAuthorityRevocationEntryNamedRevocationEntry) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRevocationEntryNamedRevocationEntry performs a merge with any union data inside the RootAuthorityRevocationEntry, using the provided RootAuthorityRevocationEntryNamedRevocationEntry
+func (t *RootAuthorityRevocationEntry) MergeRootAuthorityRevocationEntryNamedRevocationEntry(v RootAuthorityRevocationEntryNamedRevocationEntry) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRootAuthorityRevocationEntryTaggedRevocationEntry returns the union data inside the RootAuthorityRevocationEntry as a RootAuthorityRevocationEntryTaggedRevocationEntry
+func (t RootAuthorityRevocationEntry) AsRootAuthorityRevocationEntryTaggedRevocationEntry() (RootAuthorityRevocationEntryTaggedRevocationEntry, error) {
+	var body RootAuthorityRevocationEntryTaggedRevocationEntry
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRevocationEntryTaggedRevocationEntry overwrites any union data inside the RootAuthorityRevocationEntry as the provided RootAuthorityRevocationEntryTaggedRevocationEntry
+func (t *RootAuthorityRevocationEntry) FromRootAuthorityRevocationEntryTaggedRevocationEntry(v RootAuthorityRevocationEntryTaggedRevocationEntry) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRevocationEntryTaggedRevocationEntry performs a merge with any union data inside the RootAuthorityRevocationEntry, using the provided RootAuthorityRevocationEntryTaggedRevocationEntry
+func (t *RootAuthorityRevocationEntry) MergeRootAuthorityRevocationEntryTaggedRevocationEntry(v RootAuthorityRevocationEntryTaggedRevocationEntry) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RootAuthorityRevocationEntry) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RootAuthorityRevocationEntry) UnmarshalJSON(b []byte) error {
+	if err := validateRevocationEntryJSON(b); err != nil {
+		return err
+	}
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

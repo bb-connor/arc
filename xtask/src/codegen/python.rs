@@ -155,7 +155,50 @@ fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
             .join("agent")
             .join("active_response_governed_intent_schema.py"),
     )?;
+    harden_python_revocation_entry(
+        &root_dir
+            .join("root_authority")
+            .join("revocation_entry_schema.py"),
+    )?;
     Ok(())
+}
+
+/// Refuse a revocation entry whose `entry_id` is not the id its target
+/// derives, which the schema cannot express: `rev_` and the lowercase hex of
+/// SHA-256(`chio.revocation-entry-id.v1` NUL, kind, NUL, value).
+fn harden_python_revocation_entry(path: &Path) -> Result<(), XtaskError> {
+    let mut body =
+        fs::read_to_string(path).map_err(|err| XtaskError::Io(display_path(path), err))?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from enum import Enum\n",
+        "import hashlib\nfrom enum import Enum\n",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr",
+        "from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr, model_validator",
+    )?;
+    replace_python_codegen_snippet(
+        path,
+        &mut body,
+        "class NamedRevocationEntry(BaseModel):",
+        "def _derived_entry_id(kind: str, value: str) -> str:\n    preimage = b\"chio.revocation-entry-id.v1\\x00\" + kind.encode() + b\"\\x00\" + value.encode()\n    return \"rev_\" + hashlib.sha256(preimage).hexdigest()\n\n\nclass NamedRevocationEntry(BaseModel):",
+    )?;
+    for (class, next) in [
+        ("NamedRevocationEntry", "class TargetKind1(Enum):"),
+        ("TaggedRevocationEntry", "class ChioRevocationEntry("),
+    ] {
+        replace_python_codegen_snippet(
+            path,
+            &mut body,
+            &format!("    reason: RevocationReason\n\n\n{next}"),
+            &format!("    reason: RevocationReason\n\n    @model_validator(mode=\"after\")\n    def _entry_id_is_derived(self) -> \"{class}\":\n        if self.entry_id != _derived_entry_id(self.target_kind.value, self.target_value):\n            raise ValueError(\"entry_id is not the id the target derives\")\n        return self\n\n\n{next}"),
+        )?;
+    }
+    fs::write(path, body).map_err(|err| XtaskError::Io(display_path(path), err))
 }
 
 /// Enforce the active-response plan constraints that datamodel-code-generator

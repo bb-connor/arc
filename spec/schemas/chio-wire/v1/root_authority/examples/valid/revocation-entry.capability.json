@@ -1,0 +1,8 @@
+{
+  "schema": "chio.revocation-entry.v1",
+  "entry_id": "rev_80f3efe598784b0aab8c7b3152ce464826882c1dd968f64eb8e8dedae1f6a372",
+  "target_kind": "capability_id",
+  "target_value": "cap-01JZ9QK6Y2",
+  "revoked_at": 1792234800,
+  "reason": "operator_request"
+}

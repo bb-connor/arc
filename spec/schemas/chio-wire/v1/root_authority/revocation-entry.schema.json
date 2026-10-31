@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json",
+  "title": "Chio Revocation Entry",
+  "description": "`chio.revocation-entry.v1`, unsigned. One stored revocation: its target is a closed kind and value, `entry_id` is `rev_` and the lowercase hex of SHA-256(`chio.revocation-entry-id.v1` NUL, kind, NUL, value), so retrying the same target names the same entry. A `capability_id` target revokes that capability and every descendant; the other kinds revoke every anchored root they match. Subject and tenant targets hold keyed tags, never plaintext. Operators write entries through `POST /admin/revocations` and trust-control `POST /v1/revocations`; a denial names the matching `entry_id`. A decoder also checks that `entry_id` is the id the target derives, which a schema cannot express.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/NamedRevocationEntry"
+    },
+    {
+      "$ref": "#/$defs/TaggedRevocationEntry"
+    }
+  ],
+  "$defs": {
+    "RevocationReason": {
+      "type": "string",
+      "enum": [
+        "operator_request",
+        "credential_compromise",
+        "principal_offboarded",
+        "tenant_offboarded",
+        "policy_withdrawn",
+        "incident_response"
+      ],
+      "description": "Closed set of revocation reasons. The first write's reason stands."
+    },
+    "NamedRevocationEntry": {
+      "title": "Chio Named Revocation Entry",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "entry_id",
+        "target_kind",
+        "target_value",
+        "revoked_at",
+        "reason"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "chio.revocation-entry.v1"
+        },
+        "entry_id": {
+          "type": "string",
+          "pattern": "^rev_[0-9a-f]{64}$",
+          "description": "`rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it."
+        },
+        "target_kind": {
+          "type": "string",
+          "enum": [
+            "capability_id",
+            "root_policy_rule"
+          ],
+          "description": "Target kinds whose value is an identifier."
+        },
+        "target_value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000]+$",
+          "description": "The capability id or root policy rule id: 1 to 512 NUL-free characters."
+        },
+        "revoked_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807,
+          "description": "Unix seconds at which the first write of this entry took effect."
+        },
+        "reason": {
+          "$ref": "#/$defs/RevocationReason"
+        }
+      }
+    },
+    "TaggedRevocationEntry": {
+      "title": "Chio Tagged Revocation Entry",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "entry_id",
+        "target_kind",
+        "target_value",
+        "revoked_at",
+        "reason"
+      ],
+      "properties": {
+        "schema": {
+          "type": "string",
+          "const": "chio.revocation-entry.v1"
+        },
+        "entry_id": {
+          "type": "string",
+          "pattern": "^rev_[0-9a-f]{64}$",
+          "description": "`rev_` and 64 lowercase hex characters, derived from `target_kind` and `target_value`; the reason is not part of it."
+        },
+        "target_kind": {
+          "type": "string",
+          "enum": [
+            "anchor_subject",
+            "tenant_tag",
+            "replay_key"
+          ],
+          "description": "Target kinds whose value is a 64-hex digest."
+        },
+        "target_value": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "The keyed subject tag, tenant tag or replay key digest: 64 lowercase hex characters."
+        },
+        "revoked_at": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807,
+          "description": "Unix seconds at which the first write of this entry took effect."
+        },
+        "reason": {
+          "$ref": "#/$defs/RevocationReason"
+        }
+      }
+    }
+  }
+}

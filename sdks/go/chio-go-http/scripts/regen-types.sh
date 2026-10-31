@@ -1385,6 +1385,15 @@ text = text.replace(
     1,
 )
 
+revocation_decoder = "func (t *RootAuthorityRevocationEntry) UnmarshalJSON(b []byte) error {\n"
+if text.count(revocation_decoder) != 1:
+    raise SystemExit("generated revocation entry decoder inventory changed")
+text = text.replace(
+    revocation_decoder,
+    revocation_decoder + "\tif err := validateRevocationEntryJSON(b); err != nil {\n\t\treturn err\n\t}\n",
+    1,
+)
+
 path.write_text(text, encoding="utf-8")
 PY
 

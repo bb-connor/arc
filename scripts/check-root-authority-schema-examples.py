@@ -42,6 +42,8 @@ SCHEMAS = {
     "idp-key-snapshot": "root_authority/idp-key-snapshot.schema.json",
     "verifier-trust": "root_authority/verifier-trust.schema.json",
     "revocation-request": "root_authority/revocation-request.schema.json",
+    "revocation-entry": "root_authority/revocation-entry.schema.json",
+    "revocation-admin-request": "root_authority/revocation-admin-request.schema.json",
     "presentation": "capability/presentation.schema.json",
     "disclosure": "receipt/disclosure.schema.json",
     "settlement-closure": "receipt/settlement-closure.schema.json",

@@ -106,6 +106,18 @@ fn parse_generated(schema_file: &str, instance: Wire<'_>) -> Result<Value, Strin
         "capability/supplemental-authorization.schema.json" => round_trip::<
             generated::agent_tool_call_request::ChioOpaqueSupplementalAuthorization,
         >(instance),
+        // The generated binding carries the shape; the hand-written decoder also
+        // refuses an entry id its target does not derive.
+        "root_authority/revocation-entry.schema.json" => {
+            round_trip::<generated::root_authority_revocation_entry::ChioRevocationEntry>(instance)
+                .and_then(|value| {
+                    serde_json::from_value::<chio_core_types::root_authority::RevocationEntry>(
+                        value.clone(),
+                    )
+                    .map(|_| value)
+                    .map_err(|error| error.to_string())
+                })
+        }
         other => panic!("unmapped protocol-primitives fixture schema: {other}"),
     }
 }

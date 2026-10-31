@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/revocation-admin-request.schema.json",
+  "title": "Chio Revocation Admin Request",
+  "description": "Body of `POST /admin/revocations` on a hosted edge: one target and a closed reason, strict at every level. The target is a tagged union on `kind`; this version accepts the `capability_id` kind. The response carries the stored `chio.revocation-entry.v1`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "target",
+    "reason"
+  ],
+  "properties": {
+    "target": {
+      "$ref": "#/$defs/CapabilityTarget"
+    },
+    "reason": {
+      "$ref": "revocation-entry.schema.json#/$defs/RevocationReason"
+    }
+  },
+  "$defs": {
+    "CapabilityTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "capability_id"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "capability_id"
+        },
+        "capability_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000]+$",
+          "description": "The capability to revoke, with every descendant."
+        }
+      }
+    }
+  }
+}
