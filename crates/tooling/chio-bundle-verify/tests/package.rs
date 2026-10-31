@@ -84,6 +84,22 @@ fn package_round_trips_under_its_pinned_kernel_key() {
 }
 
 #[test]
+fn package_files_are_written_as_canonical_json() {
+    let (dir, _) = fixture();
+    for name in ["manifest.json", "export-envelope.json", "receipts.ndjson"] {
+        let text = fs::read_to_string(dir.path().join(name)).test_unwrap();
+        for line in text.lines() {
+            let value: serde_json::Value = serde_json::from_str(line).test_unwrap();
+            assert_eq!(
+                String::from_utf8(canonical_json_bytes(&value).test_unwrap()).test_unwrap(),
+                line,
+                "{name}"
+            );
+        }
+    }
+}
+
+#[test]
 fn package_rejects_receipt_checkpoint_signer_substitution() {
     let mut bundle = sample_bundle();
     let bytes = canonical_json_bytes(&bundle.tool_receipts[0].receipt).test_unwrap();
