@@ -9,6 +9,7 @@ use std::time::Duration;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
+use chio_control_plane::trust_control::caller_credentials::{CredentialSecret, TrustAccess};
 use chio_control_plane::trust_control::finding_challenge_coordinator::FindingChallengeCoordinator;
 use chio_control_plane::trust_control::finding_operator_filing_resolver::FindingOperatorFilingResolver;
 use chio_control_plane::trust_control::finding_operator_profile::{
@@ -1183,12 +1184,10 @@ fn trust_config(
     profile: &FindingOperatorProfile,
     paths: &ResolvedOperatorPaths,
 ) -> Result<TrustServiceConfig, CliError> {
-    let access = chio_control_plane::trust_control::caller_credentials::TrustAccess::single_client(
-        "finding-operator",
-        "finding-operator",
-        &profile.service_token,
-    )
-    .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    let secret = CredentialSecret::parse(profile.service_token.clone())
+        .map_err(|error| CliError::cli_other_error(format!("service token: {error}")))?;
+    let access = TrustAccess::single_client("finding-operator", "finding-operator", &secret)
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     Ok(TrustServiceConfig {
         transport: Default::default(),
         listen: profile.listen,

@@ -123,7 +123,7 @@ pub(crate) fn dispatch_trust(
                 &crate::trust_config_check::CredentialEntryArgs {
                     id: &id,
                     role: role.as_deref(),
-                    kind: kind.as_deref(),
+                    kind,
                     deployment: &deployment,
                     secret_file: secret_file.as_deref(),
                     secret_env: secret_env.as_deref(),

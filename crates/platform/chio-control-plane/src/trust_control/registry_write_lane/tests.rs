@@ -118,8 +118,8 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         .is_some_and(|error| error.is_cancelled()));
     assert_eq!(lane.available_permits(), 0);
     assert!(matches!(
-        crate::signed_input::lock_registry(&path),
-        Err(RegistryUpdateError::Busy)
+        chio_secure_ipc::registry_file::RegistryFile::lock(&path),
+        Err(chio_secure_ipc::registry_file::RegistryFileError::Busy)
     ));
 
     pause.release();
@@ -135,6 +135,6 @@ async fn a_dropped_write_keeps_its_permit_and_lock_until_the_write_ends() -> Tes
         "the write ran to completion after its request was dropped"
     );
     assert!(std::fs::symlink_metadata(&path)?.file_type().is_file());
-    drop(crate::signed_input::lock_registry(&path).map_err(|error| error.to_string())?);
+    drop(chio_secure_ipc::registry_file::RegistryFile::lock(&path)?);
     Ok(())
 }

@@ -1,5 +1,6 @@
 #![allow(clippy::expect_used)]
 
+use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
 #[test]
@@ -48,7 +49,7 @@ fn trust_serve_refuses_the_removed_shared_secret_flags() {
 }
 
 #[test]
-fn trust_config_check_refuses_a_document_naming_removed_keys() {
+fn trust_config_check_refuses_an_unknown_key() {
     let directory =
         std::env::temp_dir().join(format!("chio-trust-config-check-{}", std::process::id()));
     std::fs::create_dir_all(&directory).expect("create directory");
@@ -59,6 +60,8 @@ fn trust_config_check_refuses_a_document_naming_removed_keys() {
             format!("{key} = \"x\"\ndeployment = \"d\"\ninternal_listen = \"127.0.0.1:0\"\n"),
         )
         .expect("write access config");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+            .expect("restrict access config");
         let output = Command::new(env!("CARGO_BIN_EXE_chio"))
             .args(["trust", "config", "check", "--access-config"])
             .arg(&path)
@@ -67,9 +70,7 @@ fn trust_config_check_refuses_a_document_naming_removed_keys() {
         assert!(!output.status.success(), "{key} was accepted");
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(
-            stderr.contains(&format!(
-                "trust-control configuration key \"{key}\" is removed; declare [[credentials]] entries with scopes and tenant authority instead"
-            )),
+            stderr.contains(&format!("unknown field `{key}`")),
             "{key}: {stderr}"
         );
     }

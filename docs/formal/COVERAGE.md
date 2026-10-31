@@ -1357,7 +1357,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `5d2b9c0cda4026b5b69993680ca2caee47a7e133a31d40cce0369029b3244d93`
+- Input digest: `6974af7a6b3a82ae5a746af732c272b096df28fa64f65e8de0c737bac819e2bf`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1368,7 +1368,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `af7be7b694e69d4aa9b87ac8eb68512e195f6319091736839f818184a6b84db2`
 - `.loom/harnesses.toml`: `f743ba9cada9ec9e51f74c1a1c22cad0bcb8dd25430db58553368920ac335b07`
-- `Cargo.lock`: `51d443d70df7302aa7db9ba990826c2c5ea7ea7421be7daeb3db634eed229f5f`
+- `Cargo.lock`: `0275f6141748df02db32a020b65a14deaf5fe13f9d493fc34b32fc560bd6c2a5`
 - `Cargo.toml`: `4497c87b81d3b6f9812f8169f420bb8a1a78e6a30cec315f207aac93ec73e1e7`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1697,7 +1697,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `d038b734481964f5f8f817a3e13cd5ff6e38d1fb54bfc6d99305a60c700d22d6`
 - `fuzz/target-map.toml`: `c717aa1f5b7c0939baef981c1809401e344f38bb6df4f3f802a70141f2e03680`
-- `git-worktree://rust-files`: `942f86869d60ce37e9647f075b09aaa06e44f85943b56130c41f948c193290f6`
+- `git-worktree://rust-files`: `38faab198715b95f86ef15fc207fcb0b05d12055e54a9276b4f6f82fbdd54dab`
 - `releases.toml`: `8fb71e1482d0fdbcf4d10f60a1be8f5886cb7bf0ab461f0cc434c256ec8d8546`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

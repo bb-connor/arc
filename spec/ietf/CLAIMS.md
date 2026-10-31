@@ -172,10 +172,13 @@ MAY of the September 30 snapshot.
   no scopes, or a secret another credential shares. The removed
   `service_token`, `tenant_read_tokens`, and `authority_workload_token`
   keys refuse at load. Evidence:
-  `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:68-213` (`Scope`, `CredentialKind`,
-  `TenantAuthority`), `:346-375` (`from_toml_str`), `:659-728`
-  (`from_entries`), `:759-804` (`authenticate`, `validate_caller`,
-  `bearer_token`).
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials/scope.rs:1-45` (`Scope`);
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials/caller.rs:21-72` (`CredentialKind`, `TenantAuthority`),
+  `:187-263` (`from_entries`), `:330-374` (`authenticate`,
+  `validate_caller`, `bearer_token`);
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials/access.rs:126-136` (`from_document`);
+  `crates/products/chio-cli/src/cli/trust_access_file.rs:18-38`
+  (`load_trust_access`).
 - **Route requirements.** The draft's new table
   `tab-trust-control-routes` states the `ROUTE_TABLE` rows of the four
   documented endpoints: `POST /v1/capabilities/issue` needs a
@@ -195,7 +198,7 @@ MAY of the September 30 snapshot.
   deployment-only row (403). A 401 carries `WWW-Authenticate: Bearer`.
   Load shedding sits outside the router. Evidence:
   `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:471-493,575-586,638-681`;
-  `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:850-890`;
+  `crates/platform/chio-control-plane/src/trust_control/caller_credentials/caller.rs:438-461`;
   `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`;
   `crates/protocol/chio-http-serve/src/hygiene.rs:64-73`.
 - **Tenant reads.** A deployment-authority credential reads every
@@ -1417,7 +1420,7 @@ REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07
 | ID | Final requirement or claim | Current draft anchor | Exact source evidence | Final status and bounded qualification |
 |---|---|---|---|---|
 | C01 | /v1 versioned paths and camelCase outer JSON, nested objects keep defined names | trust-control (draft line 3449) | `spec/versions/chio-protocol-negotiation.v1.json:29-34`; `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:16-61`; `crates/platform/chio-control-plane/src/trust_control/service_types/paths.rs:11-12,124,163` | FINAL SUPPORTED |
-| C02 | Caller credential (id, `caller`/`deployment` kind, nonempty closed scopes, deployment or tenant authority); one nonempty Bearer header whose SHA-256 is compared with every configured digest in constant time; MUST check order before body/query parsing: peer headers 401, no credential 401 with `WWW-Authenticate: Bearer`, missing scope 403, wrong kind 403, tenant on deployment-only 403; per-endpoint scope table; followers forward writes with the caller's bearer | trust-control-credentials (draft line 3592) | `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:68-213,659-728,759-804,850-890`; `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:156,173,280,330-331,471-493,575-586`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`; `crates/platform/chio-control-plane/src/trust_control/report_rendering.rs:284-314,441-447` | FINAL SUPPORTED |
+| C02 | Caller credential (id, `caller`/`deployment` kind, nonempty closed scopes, deployment or tenant authority); one nonempty Bearer header whose SHA-256 is compared with every configured digest in constant time; MUST check order before body/query parsing: peer headers 401, no credential 401 with `WWW-Authenticate: Bearer`, missing scope 403, wrong kind 403, tenant on deployment-only 403; per-endpoint scope table; followers forward writes with the caller's bearer | trust-control-credentials (draft line 3592) | `crates/platform/chio-control-plane/src/trust_control/caller_credentials/caller.rs:21-72,187-263,330-374,438-461`, `crates/platform/chio-control-plane/src/trust_control/caller_credentials/scope.rs:1-45`; `crates/platform/chio-control-plane/src/trust_control/route_authorization.rs:156,173,280,330-331,471-493,575-586`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`; `crates/platform/chio-control-plane/src/trust_control/report_rendering.rs:284-314,441-447` | FINAL SUPPORTED |
 | C03 | JSON error body/error HTTP status; parser rejection follows the credential checks and can carry a different body; 503 shed can precede them | trust-control (draft line 3449) | `crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs:978-980`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:69-76`; `crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs:259-267`; `crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs:636-651`; `crates/protocol/chio-http-serve/src/hygiene.rs:64-73` | FINAL SUPPORTED |
 | C04 | Direct issue request requires subjectPublicKey, scope, ttlSeconds; runtimeAttestation is optional; success returns capability | tab-issue-request (draft line 3486) | `crates/platform/chio-control-plane/src/trust_control/service_types/requests.rs:16-30`; `crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs:98-106` | FINAL QUALIFIED: ttlSeconds is parsed as unsigned64. The table says integer; its implemented accepted range remains 0 through 18446744073709551615. |
 | C05 | Authority signs a direct token with exact subject, issued_at now and unsigned64 saturating expiry addition; policy can constrain scope and lifetime; delegation chain is empty | issuance (draft line 3473) | `crates/kernel/chio-kernel/src/authority.rs:181-214`; `crates/platform/chio-control-plane/src/issuance/authority.rs:99-159`; `crates/platform/chio-control-plane/src/issuance/scope.rs:47-82` | FINAL QUALIFIED: The revised text now explicitly matches unsigned64 saturation. Configured policy may deny issuance or impose extra constraints. |

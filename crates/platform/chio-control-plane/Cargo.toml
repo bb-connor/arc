@@ -80,7 +80,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 yaml_serde = { workspace = true }
 thiserror = { workspace = true }
-toml = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 tracing = { workspace = true }
 tokio = { workspace = true }
@@ -123,6 +122,7 @@ reqwest = { workspace = true, features = ["form", "json", "query", "rustls"] }
 tracing-subscriber = { workspace = true }
 chio-anchor = { workspace = true }
 chio-secret-broker = { workspace = true, features = ["kernel-admission"] }
+chio-secure-ipc = { workspace = true, features = ["test-support"] }
 chio-runtime-core = { workspace = true }
 chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-link = { workspace = true }
@@ -133,6 +133,7 @@ jsonschema = { workspace = true }
 proptest = { workspace = true }
 rcgen = "0.13"
 tempfile = { workspace = true }
+toml = { workspace = true }
 tower = { workspace = true }
 
 [lints]

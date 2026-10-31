@@ -298,7 +298,7 @@ use crate::{
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
 mod budget_handlers;
-#[path = "trust_control/caller_credentials.rs"]
+#[path = "trust_control/caller_credentials/mod.rs"]
 pub mod caller_credentials;
 #[path = "trust_control/capital_and_liability.rs"]
 mod capital_and_liability;

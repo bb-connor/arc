@@ -1514,9 +1514,7 @@ pub(crate) fn cmd_trust_serve(
 ) -> Result<(), CliError> {
     // Validate identity before CLI-side key creation or policy/store work.
     chio_control_plane::server_transport::prepare(&transport, listen)?;
-    let access = std::sync::Arc::new(trust_control::caller_credentials::TrustAccess::load(
-        access_config,
-    )?);
+    let access = std::sync::Arc::new(crate::trust_access_file::load_trust_access(access_config)?);
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
