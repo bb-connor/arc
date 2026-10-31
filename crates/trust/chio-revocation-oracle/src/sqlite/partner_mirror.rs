@@ -176,7 +176,16 @@ impl SqlitePartnerMirror {
                             SqliteRevocationOracleError::SubjectTooLong => {
                                 PartnerMirrorRefusal::SubjectTooLong { seq: leaf.seq }.into()
                             }
-                            other => PartnerMirrorError::Store(other),
+                            error @ (SqliteRevocationOracleError::UnstampedDatabase
+                            | SqliteRevocationOracleError::UnsupportedSchema(_)
+                            | SqliteRevocationOracleError::CatalogMismatch
+                            | SqliteRevocationOracleError::CorruptRecord(_)
+                            | SqliteRevocationOracleError::CursorOutOfRange(_)
+                            | SqliteRevocationOracleError::Poisoned
+                            | SqliteRevocationOracleError::Oracle(_)
+                            | SqliteRevocationOracleError::Storage(_)) => {
+                                PartnerMirrorError::Store(error)
+                            }
                         })?;
                 if !inserted {
                     return Err(PartnerMirrorRefusal::DuplicateLeaf { seq: leaf.seq }.into());
