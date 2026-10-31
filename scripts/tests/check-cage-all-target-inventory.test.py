@@ -22,21 +22,13 @@ SPEC.loader.exec_module(MODULE)
 HEADERS = {
     "lib_chio_cage_plan": "Running unittests src/lib.rs (/tmp/chio_cage_plan-lib)",
     "lib_chio_cage_init": "Running unittests src/lib.rs (/tmp/chio_cage_init-lib)",
-    "entrypoint": "Running tests/entrypoint.rs (/tmp/entrypoint)",
     "lib": "Running unittests src/lib.rs (/tmp/chio_cage-lib)",
-    "bin_chio_cage_init": (
-        "Running unittests src/main.rs (/tmp/chio_cage_init-bin)"
-    ),
-    "cage_receipt_disclosure_audit": (
-        "Running tests/cage_receipt_disclosure_audit.rs (/tmp/cage_receipt_disclosure_audit)"
-    ),
-    "enforcement_evidence": (
-        "Running tests/enforcement_evidence.rs (/tmp/enforcement_evidence)"
-    ),
-    "linux_compile": "Running tests/linux_compile.rs (/tmp/linux_compile)",
-    "linux_enforcement": (
-        "Running tests/linux_enforcement.rs (/tmp/linux_enforcement)"
-    ),
+    "bin_chio_cage_init": "Running unittests src/main.rs (/tmp/chio_cage_init-bin)",
+    **{
+        target: f"Running tests/{target}.rs (/tmp/{target})"
+        for target in MODULE.EXPECTED_COUNTS
+        if not target.startswith(("lib", "bin_"))
+    },
 }
 
 
