@@ -910,7 +910,7 @@ fn verify_public_passport_challenge(
             );
         }
     };
-    let store = match configured_verifier_ledger(&state) {
+    let store = match configured_verifier_ledger(state) {
         Ok(ledger) => ledger,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
@@ -1119,7 +1119,7 @@ fn get_public_oid4vp_request(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    let store = match configured_verifier_ledger(&state) {
+    let store = match configured_verifier_ledger(state) {
         Ok(ledger) => ledger,
         Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
     };
