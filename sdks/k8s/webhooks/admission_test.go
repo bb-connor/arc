@@ -648,6 +648,93 @@ func TestVerifyCapabilityRefusesAlgorithmMember(t *testing.T) {
 	}
 }
 
+func rootAnchorFixture() map[string]any {
+	return map[string]any{
+		"kind":               "oidc_jwt",
+		"context_digest":     "sha256:" + strings.Repeat("a", 64),
+		"root_policy_digest": "sha256:" + strings.Repeat("b", 64),
+		"anchored_at":        1700000000,
+		"assertion_exp":      1700000600,
+	}
+}
+
+func TestVerifyCapabilityAdmitsSignedRootAnchor(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = rootAnchorFixture()
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err != nil {
+		t.Fatalf("expected the anchored token to verify, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesSignedRootAnchorPadding(t *testing.T) {
+	signer := newKernelSigner(t)
+	anchor := rootAnchorFixture()
+	anchor["padding"] = "x"
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = anchor
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor has unknown member "padding"` {
+		t.Fatalf("expected root_anchor padding refusal, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesNullRootAnchor(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	emitted := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	emitted["root_anchor"] = nil
+	raw := signedRawToken(t, signer, body, emitted)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor must be a JSON object` {
+		t.Fatalf("expected null root_anchor refusal, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesRepeatedMembers(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = rootAnchorFixture()
+	raw := signedRawToken(t, signer, body, body)
+	cases := []struct {
+		from, to, key string
+	}{
+		{`"root_anchor":{`, `"root_anchor":{"kind":"oidc_jwt",`, "kind"},
+		{`{`, `{"root_anchor":null,`, "root_anchor"},
+	}
+	for _, testCase := range cases {
+		repeated := strings.Replace(raw, testCase.from, testCase.to, 1)
+		if repeated == raw {
+			t.Fatalf("%s did not apply", testCase.from)
+		}
+		err := VerifyCapability(repeated, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+		want := "webhook denies admission: malformed capability token: input contains duplicate object key: " + testCase.key
+		if err == nil || err.Error() != want {
+			t.Fatalf("expected %q, got %v", want, err)
+		}
+	}
+}
+
+func TestVerifyCapabilityRefusesSignedUnknownAnchorKind(t *testing.T) {
+	signer := newKernelSigner(t)
+	anchor := rootAnchorFixture()
+	anchor["kind"] = "spiffe"
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = anchor
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor kind is not a known anchor kind` {
+		t.Fatalf("expected unknown anchor kind refusal, got %v", err)
+	}
+}
+
 func TestVerifyCapabilityRefusesRawBodySignature(t *testing.T) {
 	signer := newKernelSigner(t)
 	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)

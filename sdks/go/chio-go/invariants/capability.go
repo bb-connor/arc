@@ -1,5 +1,12 @@
 package invariants
 
+import (
+	"encoding/json"
+	"reflect"
+	"regexp"
+	"strconv"
+)
+
 type CapabilityTimeStatus string
 
 const (
@@ -24,13 +31,27 @@ const DelegationLinkSchema = "chio.delegation-link.v1"
 var capabilityMembers = map[string]struct{}{
 	"schema": {}, "id": {}, "issuer": {}, "subject": {}, "scope": {}, "issued_at": {},
 	"expires_at": {}, "delegation_chain": {}, "aggregate_invocation_budget": {}, "caveats": {},
-	"scope_attenuations": {}, "attenuation_proof": {}, "budget_share_bps": {}, "signature": {},
+	"scope_attenuations": {}, "attenuation_proof": {}, "budget_share_bps": {}, "root_anchor": {},
+	"signature": {},
 }
 
 var delegationLinkMembers = map[string]struct{}{
 	"capability_id": {}, "delegator": {}, "delegatee": {}, "attenuations": {}, "timestamp": {},
 	"scope_hash": {}, "aggregate_budget": {}, "cumulative_approval": {}, "signature": {},
 }
+
+var rootAnchorMembers = map[string]struct{}{
+	"kind": {}, "context_digest": {}, "root_policy_digest": {}, "anchored_at": {}, "assertion_exp": {},
+}
+
+var rootAnchorKinds = map[string]struct{}{
+	"oauth_id_jag": {}, "entra_jwt": {}, "entra_agent_id": {}, "oidc_jwt": {},
+	"oauth_introspection": {}, "chio_local_as": {}, "chio_operator_key": {}, "operator_static_bearer": {},
+}
+
+var rootAnchorDigest = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+
+const maxRootAnchorInteger = 1<<53 - 1
 
 func rejectUnknownMembers(value map[string]any, allowed map[string]struct{}, kind string) error {
 	for key := range value {
@@ -60,7 +81,59 @@ func validateCapabilitySchema(capability map[string]any) error {
 	if schema, ok := capability["schema"].(string); !ok || schema != CapabilitySchema {
 		return newInvariantError("json", `capability schema must be "chio.capability.v1"`)
 	}
-	return rejectUnknownMembers(capability, capabilityMembers, "capability")
+	if err := rejectUnknownMembers(capability, capabilityMembers, "capability"); err != nil {
+		return err
+	}
+	if anchor, ok := capability["root_anchor"]; ok {
+		return validateRootAnchor(anchor)
+	}
+	return nil
+}
+
+func validateRootAnchor(value any) error {
+	anchor, ok := value.(map[string]any)
+	if !ok {
+		return newInvariantError("json", "root_anchor must be a JSON object")
+	}
+	if err := rejectUnknownMembers(anchor, rootAnchorMembers, "root_anchor"); err != nil {
+		return err
+	}
+	for _, member := range []string{"kind", "context_digest", "root_policy_digest", "anchored_at", "assertion_exp"} {
+		if _, ok := anchor[member]; !ok {
+			return newInvariantError("json", "root_anchor is missing member "+member)
+		}
+	}
+	kind, ok := anchor["kind"].(string)
+	if _, known := rootAnchorKinds[kind]; !ok || !known {
+		return newInvariantError("json", "root_anchor kind is not a known anchor kind")
+	}
+	for _, member := range []string{"context_digest", "root_policy_digest"} {
+		digest, ok := anchor[member].(string)
+		if !ok || !rootAnchorDigest.MatchString(digest) {
+			return newInvariantError("json", "root_anchor "+member+" must be a sha256 digest")
+		}
+	}
+	for _, member := range []string{"anchored_at", "assertion_exp"} {
+		if !isRootAnchorInteger(anchor[member]) {
+			return newInvariantError("json", "root_anchor "+member+" must be an unsigned integer")
+		}
+	}
+	return nil
+}
+
+func isRootAnchorInteger(value any) bool {
+	if number, ok := value.(json.Number); ok {
+		parsed, err := strconv.ParseUint(number.String(), 10, 64)
+		return err == nil && parsed <= maxRootAnchorInteger
+	}
+	integer := reflect.ValueOf(value)
+	switch {
+	case integer.CanInt():
+		return integer.Int() >= 0 && uint64(integer.Int()) <= maxRootAnchorInteger
+	case integer.CanUint():
+		return integer.Uint() <= maxRootAnchorInteger
+	}
+	return false
 }
 
 func capabilityBody(capability map[string]any) map[string]any {
