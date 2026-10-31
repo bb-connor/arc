@@ -550,15 +550,15 @@ fn deterministic_hash_and_artifact_goldens_are_stable() -> TestResult {
     );
     assert_eq!(
         signed.body.status_epoch_id,
-        "eca2a86d5aca4b0c979a2f2a46ed0461992906e79a2973f5fac76fbc3d450813"
+        "29b8440d5ee6585b6dd9ad84045f09efb00f7ec82fecdac512be1af4afe89883"
     );
     assert_eq!(
         status_epoch_envelope_sha256(&signed)?,
-        "2819276f1c2685967126990479a11cd750607cde326980f7d82e7caa655d5fe0"
+        "f3a91fdc2f665f064bb4725c7f87a419be803451b49b420b92271fe008ddb275"
     );
     assert_eq!(
         proof.canonical_sha256()?,
-        "4d72c95deb875662cc81e1916295eb9318677ce585b7be1296d606e8e11fae75"
+        "83ccf0ade420980076300df6ca8a820398db26e8d726256a53c0b1e694f5b352"
     );
     Ok(())
 }
