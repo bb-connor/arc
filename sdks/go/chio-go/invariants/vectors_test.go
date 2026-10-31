@@ -195,6 +195,86 @@ func TestCapabilityWithAlgorithmMemberIsRefused(t *testing.T) {
 	}
 }
 
+func rootAnchorFixture() map[string]any {
+	return map[string]any{
+		"kind":               "oidc_jwt",
+		"context_digest":     "sha256:" + strings.Repeat("a", 64),
+		"root_policy_digest": "sha256:" + strings.Repeat("b", 64),
+		"anchored_at":        json.Number("1700000000"),
+		"assertion_exp":      json.Number("1700000600"),
+	}
+}
+
+func anchoredCapabilityJSON(t *testing.T, anchor any) string {
+	t.Helper()
+	var vectors capabilityVectors
+	loadVectorFile(t, filepath.Join(vectorRoot, "capability", "v1.json"), &vectors)
+	capability := cloneMap(t, vectors.Cases[0].Capability)
+	capability["root_anchor"] = anchor
+	encoded, err := json.Marshal(capability)
+	if err != nil {
+		t.Fatalf("marshal capability: %v", err)
+	}
+	return string(encoded)
+}
+
+func TestRootAnchorDecodesEveryKindAndEntersTheSigningBody(t *testing.T) {
+	for _, kind := range []string{
+		"oauth_id_jag", "entra_jwt", "entra_agent_id", "oidc_jwt",
+		"oauth_introspection", "chio_local_as", "chio_operator_key", "operator_static_bearer",
+	} {
+		anchor := rootAnchorFixture()
+		anchor["kind"] = kind
+		capability, err := invariants.ParseCapabilityJSON(anchoredCapabilityJSON(t, anchor))
+		if err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		canonical, err := invariants.CapabilitySigningBodyCanonicalJSON(capability)
+		if err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		want := `"root_anchor":{"anchored_at":1700000000,"assertion_exp":1700000600,` +
+			`"context_digest":"sha256:` + strings.Repeat("a", 64) + `","kind":"` + kind +
+			`","root_policy_digest":"sha256:` + strings.Repeat("b", 64) + `"}`
+		if !strings.Contains(canonical, want) {
+			t.Fatalf("%s: signing body lost root_anchor bytes: %s", kind, canonical)
+		}
+	}
+}
+
+func TestRootAnchorRefusesMalformedValues(t *testing.T) {
+	with := func(member string, value any) map[string]any {
+		anchor := rootAnchorFixture()
+		anchor[member] = value
+		return anchor
+	}
+	without := func(member string) map[string]any {
+		anchor := rootAnchorFixture()
+		delete(anchor, member)
+		return anchor
+	}
+	cases := []struct {
+		anchor  any
+		message string
+	}{
+		{"oidc_jwt", "root_anchor must be a JSON object"},
+		{with("padding", "x"), "root_anchor has unknown member padding"},
+		{without("kind"), "root_anchor is missing member kind"},
+		{without("assertion_exp"), "root_anchor is missing member assertion_exp"},
+		{with("kind", "spiffe"), "root_anchor kind is not a known anchor kind"},
+		{with("kind", json.Number("1")), "root_anchor kind is not a known anchor kind"},
+		{with("context_digest", "sha256:"+strings.Repeat("A", 64)), "root_anchor context_digest must be a sha256 digest"},
+		{with("root_policy_digest", strings.Repeat("b", 64)), "root_anchor root_policy_digest must be a sha256 digest"},
+		{with("anchored_at", json.Number("-1")), "root_anchor anchored_at must be an unsigned integer"},
+		{with("assertion_exp", "1700000600"), "root_anchor assertion_exp must be an unsigned integer"},
+		{with("assertion_exp", json.Number("9007199254740992")), "root_anchor assertion_exp must be an unsigned integer"},
+	}
+	for _, testCase := range cases {
+		_, err := invariants.ParseCapabilityJSON(anchoredCapabilityJSON(t, testCase.anchor))
+		assertInvariantError(t, err, "json", testCase.message)
+	}
+}
+
 type wrapperVectors struct {
 	SignatureCases []struct {
 		Algorithm      string `json:"algorithm"`

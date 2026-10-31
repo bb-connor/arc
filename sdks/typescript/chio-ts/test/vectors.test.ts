@@ -258,6 +258,79 @@ test("capability with an algorithm member is refused", async () => {
   }
 });
 
+const ROOT_ANCHOR = {
+  kind: "oidc_jwt",
+  context_digest: `sha256:${"a".repeat(64)}`,
+  root_policy_digest: `sha256:${"b".repeat(64)}`,
+  anchored_at: 1700000000,
+  assertion_exp: 1700000600,
+};
+
+async function anchoredCapabilityJson(anchor: unknown): Promise<string> {
+  const fixture = await readJson("tests/bindings/vectors/capability/v1.json") as {
+    cases: Array<{ capability: Record<string, unknown> }>;
+  };
+  return JSON.stringify({ ...fixture.cases[0].capability, root_anchor: anchor });
+}
+
+test("root_anchor decodes every kind and enters the signing body", async () => {
+  for (const kind of [
+    "oauth_id_jag",
+    "entra_jwt",
+    "entra_agent_id",
+    "oidc_jwt",
+    "oauth_introspection",
+    "chio_local_as",
+    "chio_operator_key",
+    "operator_static_bearer",
+  ]) {
+    const capability = parseCapabilityJson(await anchoredCapabilityJson({ ...ROOT_ANCHOR, kind }));
+    const expected =
+      `"root_anchor":{"anchored_at":1700000000,"assertion_exp":1700000600,` +
+      `"context_digest":"${ROOT_ANCHOR.context_digest}","kind":"${kind}",` +
+      `"root_policy_digest":"${ROOT_ANCHOR.root_policy_digest}"}`;
+    assert.ok(capabilitySigningBodyCanonicalJson(capability).includes(expected), kind);
+  }
+});
+
+test("root_anchor refuses malformed values", async () => {
+  const { kind: _kind, ...withoutKind } = ROOT_ANCHOR;
+  const { assertion_exp: _exp, ...withoutExp } = ROOT_ANCHOR;
+  const cases: Array<[unknown, string]> = [
+    ["oidc_jwt", "root_anchor must be a JSON object"],
+    [{ ...ROOT_ANCHOR, padding: "x" }, "root_anchor has unknown member padding"],
+    [withoutKind, "root_anchor is missing member kind"],
+    [withoutExp, "root_anchor is missing member assertion_exp"],
+    [{ ...ROOT_ANCHOR, kind: "spiffe" }, "root_anchor kind is not a known anchor kind"],
+    [{ ...ROOT_ANCHOR, kind: 1 }, "root_anchor kind is not a known anchor kind"],
+    [
+      { ...ROOT_ANCHOR, context_digest: `sha256:${"A".repeat(64)}` },
+      "root_anchor context_digest must be a sha256 digest",
+    ],
+    [
+      { ...ROOT_ANCHOR, root_policy_digest: "b".repeat(64) },
+      "root_anchor root_policy_digest must be a sha256 digest",
+    ],
+    [{ ...ROOT_ANCHOR, anchored_at: -1 }, "root_anchor anchored_at must be an unsigned integer"],
+    [
+      { ...ROOT_ANCHOR, assertion_exp: "1700000600" },
+      "root_anchor assertion_exp must be an unsigned integer",
+    ],
+    [
+      { ...ROOT_ANCHOR, assertion_exp: 9007199254740992 },
+      "root_anchor assertion_exp must be an unsigned integer",
+    ],
+  ];
+  for (const [anchor, message] of cases) {
+    const input = await anchoredCapabilityJson(anchor);
+    assert.throws(
+      () => parseCapabilityJson(input),
+      (error: unknown) =>
+        error instanceof ChioInvariantError && error.code === "json" && error.message === message,
+    );
+  }
+});
+
 test("signing wrapper vectors verify as expected", async () => {
   const fixture = await readJson("tests/bindings/vectors/signing/wrapper/v1.json") as {
     signature_cases: Array<{

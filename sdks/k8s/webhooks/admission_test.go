@@ -648,6 +648,56 @@ func TestVerifyCapabilityRefusesAlgorithmMember(t *testing.T) {
 	}
 }
 
+func rootAnchorFixture() map[string]any {
+	return map[string]any{
+		"kind":               "oidc_jwt",
+		"context_digest":     "sha256:" + strings.Repeat("a", 64),
+		"root_policy_digest": "sha256:" + strings.Repeat("b", 64),
+		"anchored_at":        1700000000,
+		"assertion_exp":      1700000600,
+	}
+}
+
+func TestVerifyCapabilityAdmitsSignedRootAnchor(t *testing.T) {
+	signer := newKernelSigner(t)
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = rootAnchorFixture()
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err != nil && strings.Contains(err.Error(), "malformed capability token") {
+		t.Fatalf("expected the anchored token to decode, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesSignedRootAnchorPadding(t *testing.T) {
+	signer := newKernelSigner(t)
+	anchor := rootAnchorFixture()
+	anchor["padding"] = "x"
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = anchor
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor has unknown member "padding"` {
+		t.Fatalf("expected root_anchor padding refusal, got %v", err)
+	}
+}
+
+func TestVerifyCapabilityRefusesSignedUnknownAnchorKind(t *testing.T) {
+	signer := newKernelSigner(t)
+	anchor := rootAnchorFixture()
+	anchor["kind"] = "spiffe"
+	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
+	body["root_anchor"] = anchor
+	raw := signedRawToken(t, signer, body, body)
+
+	err := VerifyCapability(raw, AdmissionContext{}, trustingConfig(t, signer, "tool:*:db:invoke"), time.Now().UTC())
+	if err == nil || err.Error() != `webhook denies admission: malformed capability token: root_anchor kind is not a known anchor kind` {
+		t.Fatalf("expected unknown anchor kind refusal, got %v", err)
+	}
+}
+
 func TestVerifyCapabilityRefusesRawBodySignature(t *testing.T) {
 	signer := newKernelSigner(t)
 	body := withSchema(schemaLessTokenBody(signer), capabilitySchema)
