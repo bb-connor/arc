@@ -7,15 +7,14 @@
 //! whose preimage holds the target argv, the target environment and the
 //! descriptor paths, and `fd_table_digest` is an unsalted SHA-256 over the
 //! descriptor table with its paths. Each confirms a guessed argument, path
-//! or environment value, so the block is not committed-safe and stays
-//! unregistered until a cage projection replaces it.
+//! or environment value, so the key refuses until the producer projects it.
 
 use chio_cage::{CageReceiptBindings, CageReceiptBody};
 use chio_cage_plan::{
     CageEnforcementFailure, CageEnforcementFailureCode, CageEnforcementRecord, CageInitPlan,
     EnforcementPrepared, ExecTransitionObserved, FullyEnforcedEvidence, ProcessExitEvidence,
 };
-use chio_core::receipt::metadata::metadata_key_spec;
+use chio_core::receipt::metadata::{check_internal_receipt_metadata, metadata_key_spec};
 use chio_test_support::prelude::*;
 
 const NATIVE_PLAN: &str = include_str!(
@@ -26,12 +25,8 @@ const ARGUMENT_MARKER: &str = "marker-argument-7f3a";
 const ENVIRONMENT_MARKER: &str = "marker-environment-7f3a";
 const PATH_MARKER: &str = "/marker-path-7f3a/mcp-server";
 
-fn plan_digest(plan: &CageInitPlan) -> String {
-    chio_core::sha256_hex(&chio_core::canonical_json_bytes(plan).test_unwrap())
-}
-
-fn fd_table_digest(plan: &CageInitPlan) -> String {
-    chio_core::sha256_hex(&chio_core::canonical_json_bytes(&plan.fd_table).test_unwrap())
+fn digest(value: &impl serde::Serialize) -> String {
+    chio_core::sha256_hex(&chio_core::canonical_json_bytes(value).test_unwrap())
 }
 
 fn marked_plan() -> CageInitPlan {
@@ -61,13 +56,13 @@ fn cage_plan_digest_preimages_carry_arguments_environment_and_paths() {
 
     let mut other_argument = plan.clone();
     other_argument.target_argv[1] = "other-argument".to_string();
-    assert_ne!(plan_digest(&plan), plan_digest(&other_argument));
+    assert_ne!(digest(&plan), digest(&other_argument));
 
     let mut other_environment = plan.clone();
     other_environment
         .environment
         .insert("CHIO_ENV".to_string(), "other-environment".to_string());
-    assert_ne!(plan_digest(&plan), plan_digest(&other_environment));
+    assert_ne!(digest(&plan), digest(&other_environment));
 
     let mut other_path = plan.clone();
     for entry in &mut other_path.fd_table {
@@ -75,8 +70,8 @@ fn cage_plan_digest_preimages_carry_arguments_environment_and_paths() {
             entry.path = Some("/other/mcp-server".to_string());
         }
     }
-    assert_ne!(fd_table_digest(&plan), fd_table_digest(&other_path));
-    assert_ne!(plan_digest(&plan), plan_digest(&other_path));
+    assert_ne!(digest(&plan.fd_table), digest(&other_path.fd_table));
+    assert_ne!(digest(&plan), digest(&other_path));
 }
 
 /// Names every member of the block. A new member fails to compile here until
@@ -164,6 +159,10 @@ fn cage_receipt_block_is_not_committed_safe() {
     let body = CageReceiptBody::new("attempt-1", None, record, 1_000, 2_000).test_unwrap();
     audit_members(&body);
 
-    assert!(metadata_key_spec("cage_receipt").is_none());
+    let refused = check_internal_receipt_metadata(&serde_json::json!({ "cage_receipt": body }));
+    assert_eq!(
+        refused.test_unwrap_err().to_string(),
+        "canonical JSON error: receipt metadata key \"cage_receipt\" is not committed-safe"
+    );
     assert!(metadata_key_spec("schema").is_none());
 }
