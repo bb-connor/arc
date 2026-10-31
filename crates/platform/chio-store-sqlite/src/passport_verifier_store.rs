@@ -75,7 +75,7 @@ impl SqlitePassportVerifierStore {
 
     /// Runs `operation` as one single-statement read outside a transaction.
     fn read<T>(&self, operation: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        operation(&self.lock()?)
+        operation(&*self.lock()?)
     }
 
     fn transact<T>(&self, operation: impl FnOnce(&Transaction<'_>) -> Result<T>) -> Result<T> {
