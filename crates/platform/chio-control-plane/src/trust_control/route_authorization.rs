@@ -545,11 +545,11 @@ pub(crate) fn open_peer_nonce_cache(
         }
         return Ok(None);
     };
-    let refused = |error: chio_store_sqlite::ClusterPeerReplayStoreError| {
+    fn refused(error: impl std::fmt::Debug) -> CliError {
         CliError::cli_other_error(format!(
-            "failed to open trust-control cluster peer replay store: {error}"
+            "failed to open trust-control cluster peer replay store: {error:?}"
         ))
-    };
+    }
     let store = chio_store_sqlite::SqliteClusterPeerReplayStore::open(path).map_err(refused)?;
     PeerNonceCache::open(
         Arc::new(store),

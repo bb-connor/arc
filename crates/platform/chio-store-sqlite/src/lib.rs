@@ -422,9 +422,7 @@ pub use channel_release_publisher_store::{
     SqliteChannelReleasePublisherStore, VerifiedChannelReleasePublicationV1,
 };
 pub use clearing_lifecycle_store::{ClearingLifecycleStoreError, SqliteClearingLifecycleStore};
-pub use cluster_peer_replay_store::{
-    ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore, CLUSTER_PEER_REPLAY_MAX_PEERS,
-};
+pub use cluster_peer_replay_store::{ClusterPeerReplayStoreError, SqliteClusterPeerReplayStore};
 pub use economic_state_cache::{
     admission_terminal_projection_effect_result, EconomicOperationStageBinding,
     EconomicOperationStageContext, EconomicStateCacheError, EconomicStateStageDescriptor,
