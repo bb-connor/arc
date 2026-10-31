@@ -1,28 +1,64 @@
 {
-  "schema": "chio.anchor-inclusion-proof.v1",
+  "chain_anchor": {
+    "anchored_checkpoint_seq": 1042,
+    "anchored_merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
+    "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "block_number": 12345678,
+    "chain_id": "eip155:8453",
+    "contract_address": "0x1000000000000000000000000000000000000001",
+    "operator_address": "0x1111111111111111111111111111111111111111",
+    "operator_epoch": 1,
+    "operator_key_hash": "0x0791868d8f29ea735f26a17a9aea038cd4255baac26eac5a74e58a07ed2f1975",
+    "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "checkpoint_statement": {
+    "batch_end_seq": 104101,
+    "batch_start_seq": 104101,
+    "checkpoint_seq": 1042,
+    "issued_at": 1743292800,
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+    "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
+    "schema": "chio.checkpoint_statement.v1",
+    "signature": "d1e9ef54183509d3d73f0ac079c8055cc42394f6ba38b6884e7fb4ba0be68da4f71d1e387cfe91853052c137581f0d2f2f1e04e22a04f0d21d4c9d5c22fe0603",
+    "tree_size": 1
+  },
+  "key_binding_certificate": {
+    "certificate": {
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "expires_at": 1774828800,
+      "issued_at": 1743292800,
+      "nonce": "0123456789abcdef0123456789abcdef",
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "schema": "chio.key-binding-certificate.v1",
+      "settlement_address": "0x1111111111111111111111111111111111111111"
+    },
+    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
+  },
   "receipt": {
-    "id": "9efc43ad289d55120be289a3b2509f68094afb618cddbaa7419797a08dda7504",
-    "timestamp": 1743292800,
-    "capability_id": "cap-web3-1",
-    "tool_server": "chio-settle",
-    "tool_name": "release_escrow",
     "action": {
+      "parameter_hash": "46f33e98c10f37a46625ba93402c262878b694af71ea1d2f35ab89b53404e127",
       "parameters": {
         "amount": 150,
         "currency": "USDC",
         "to": "0x2222222222222222222222222222222222222222"
-      },
-      "parameter_hash": "46f33e98c10f37a46625ba93402c262878b694af71ea1d2f35ab89b53404e127"
+      }
     },
+    "boundary_class": "prevent",
+    "capability_id": "cap-web3-1",
+    "content_hash": "5e74c65ed50fb26585825e1bca068b65bff562e9d781605efa46c1fb4fbffae1",
     "decision": {
       "verdict": "allow"
     },
-    "receipt_kind": "mediated_decision",
-    "boundary_class": "prevent",
-    "tool_origin": "caller_executed",
-    "redaction_mode": "none",
-    "content_hash": "5e74c65ed50fb26585825e1bca068b65bff562e9d781605efa46c1fb4fbffae1",
-    "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
+    "id": "9efc43ad289d55120be289a3b2509f68094afb618cddbaa7419797a08dda7504",
+    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
     "metadata": {
       "chio_receipt_signing_nonce": "rcpt-web3-1",
       "financial": {
@@ -56,60 +92,24 @@
         "settlement_status": "pending"
       }
     },
-    "trust_level": "mediated",
-    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-    "signature": "17ea8549ecaf4f689f4d083fcaf35a8675068dd08156fb59c0fa111eb0c12ded32cbc4c21a62ac17278d3400d196e303c90c6120860d313cd18c7954acfab003"
+    "policy_hash": "dc6d6cc7acce9b97eb353f08426fefba0b54cc98f38d794dab4f6770252f50df",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "signature": "17ea8549ecaf4f689f4d083fcaf35a8675068dd08156fb59c0fa111eb0c12ded32cbc4c21a62ac17278d3400d196e303c90c6120860d313cd18c7954acfab003",
+    "timestamp": 1743292800,
+    "tool_name": "release_escrow",
+    "tool_origin": "caller_executed",
+    "tool_server": "chio-settle",
+    "trust_level": "mediated"
   },
   "receipt_inclusion": {
     "checkpoint_seq": 1042,
     "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
     "proof": {
-      "tree_size": 1,
+      "audit_path": [],
       "leaf_index": 0,
-      "audit_path": []
+      "tree_size": 1
     }
   },
-  "checkpoint_statement": {
-    "schema": "chio.checkpoint_statement.v1",
-    "checkpoint_seq": 1042,
-    "batch_start_seq": 104101,
-    "batch_end_seq": 104101,
-    "tree_size": 1,
-    "merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
-    "issued_at": 1743292800,
-    "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-    "signature": "d1e9ef54183509d3d73f0ac079c8055cc42394f6ba38b6884e7fb4ba0be68da4f71d1e387cfe91853052c137581f0d2f2f1e04e22a04f0d21d4c9d5c22fe0603"
-  },
-  "chain_anchor": {
-    "chain_id": "eip155:8453",
-    "contract_address": "0x1000000000000000000000000000000000000001",
-    "operator_address": "0x1111111111111111111111111111111111111111",
-    "tx_hash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "block_number": 12345678,
-    "block_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    "operator_key_hash": "0x0791868d8f29ea735f26a17a9aea038cd4255baac26eac5a74e58a07ed2f1975",
-    "operator_epoch": 1,
-    "anchored_merkle_root": "0x4bd45f2b3c738c3ea0691f5b2d76e219dbec49dafc7546d3cbc7dd42d5222ce0",
-    "anchored_checkpoint_seq": 1042
-  },
-  "key_binding_certificate": {
-    "certificate": {
-      "schema": "chio.key-binding-certificate.v1",
-      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "chain_scope": [
-        "eip155:8453",
-        "eip155:42161"
-      ],
-      "purpose": [
-        "anchor",
-        "settle"
-      ],
-      "settlement_address": "0x1111111111111111111111111111111111111111",
-      "issued_at": 1743292800,
-      "expires_at": 1774828800,
-      "nonce": "0123456789abcdef0123456789abcdef"
-    },
-    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
-  }
+  "schema": "chio.anchor-inclusion-proof.v1"
 }

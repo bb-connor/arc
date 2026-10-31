@@ -1,78 +1,78 @@
 {
-  "schema": "chio.web3-trust-profile.v1",
-  "profile_id": "chio.official-web3-stack",
   "chio_contract_version": "2.0",
-  "primary_chain_id": "eip155:8453",
-  "secondary_chain_ids": [
-    "eip155:42161"
-  ],
-  "operator_binding": {
-    "certificate": {
-      "schema": "chio.key-binding-certificate.v1",
-      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
-      "chain_scope": [
-        "eip155:8453",
-        "eip155:42161"
-      ],
-      "purpose": [
-        "anchor",
-        "settle"
-      ],
-      "settlement_address": "0x1111111111111111111111111111111111111111",
-      "issued_at": 1743292800,
-      "expires_at": 1774828800,
-      "nonce": "0123456789abcdef0123456789abcdef"
-    },
-    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
-  },
-  "proof_bundle_required": true,
+  "custody_boundary_note": "Chio governs intent, proofs, and policy admission; custodians and payment institutions remain explicit operators of record.",
   "dispute_windows": [
     {
-      "settlement_path": "dual_signature",
       "challenge_window_secs": 600,
+      "dispute_policy": "off_chain_arbitration",
       "recovery_window_secs": 3600,
-      "dispute_policy": "off_chain_arbitration"
+      "settlement_path": "dual_signature"
     },
     {
-      "settlement_path": "merkle_proof",
       "challenge_window_secs": 900,
+      "dispute_policy": "timeout_refund",
       "recovery_window_secs": 86400,
-      "dispute_policy": "timeout_refund"
+      "settlement_path": "merkle_proof"
     }
   ],
   "finality_rules": [
     {
       "chain_id": "eip155:8453",
-      "mode": "optimistic_l2",
-      "min_confirmations": 20
+      "min_confirmations": 20,
+      "mode": "optimistic_l2"
     },
     {
       "chain_id": "eip155:42161",
-      "mode": "l1_finalized",
-      "min_confirmations": 12
+      "min_confirmations": 12,
+      "mode": "l1_finalized"
     }
   ],
+  "local_policy_activation_required": true,
+  "operator_binding": {
+    "certificate": {
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "chio_identity": "did:chio:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chio_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "expires_at": 1774828800,
+      "issued_at": 1743292800,
+      "nonce": "0123456789abcdef0123456789abcdef",
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "schema": "chio.key-binding-certificate.v1",
+      "settlement_address": "0x1111111111111111111111111111111111111111"
+    },
+    "signature": "0a75951435639027dd777138d87313db46e3c70722a47b9de712eefbd57e11878aeecc1b728badd62f75251e5cff775ea267e3f0b740a27b976b3d1bbb06330f"
+  },
+  "primary_chain_id": "eip155:8453",
+  "profile_id": "chio.official-web3-stack",
+  "proof_bundle_required": true,
   "regulated_roles": [
     {
-      "role": "operator",
       "actor_id": "chio-operator-main",
+      "custody_boundary_explicit": true,
       "responsibility": "Originates governed dispatch and maintains local policy activation.",
-      "custody_boundary_explicit": true
+      "role": "operator"
     },
     {
-      "role": "custodian",
       "actor_id": "custodian-base-main",
+      "custody_boundary_explicit": true,
       "responsibility": "Holds settlement-side keys and custody accounts for the official stack.",
-      "custody_boundary_explicit": true
+      "role": "custodian"
     },
     {
-      "role": "arbitrator",
       "actor_id": "settlement-dispute-panel",
+      "custody_boundary_explicit": true,
       "responsibility": "Handles off-chain challenge and reversal review during dispute windows.",
-      "custody_boundary_explicit": true
+      "role": "arbitrator"
     }
   ],
-  "custody_boundary_note": "Chio governs intent, proofs, and policy admission; custodians and payment institutions remain explicit operators of record.",
-  "local_policy_activation_required": true
+  "schema": "chio.web3-trust-profile.v1",
+  "secondary_chain_ids": [
+    "eip155:42161"
+  ]
 }
