@@ -12,10 +12,11 @@ use std::time::Duration;
 use serde::Deserialize;
 
 use chio_cage::CageEnforcementState;
+use chio_process::run_journal::{ContainerIntent, ResourceUsage};
 use chio_process::{ContainerLaunchFailure, ContainerLaunchRecord, SignedContainerLaunchRecord};
 
 use super::super::state::error;
-use super::child::{self, Outcome, Spawned, Usage};
+use super::child::{self, Outcome, Spawned};
 use super::container_profile::{self, EffectiveConfig, PROCESS_SOCKET};
 use super::journal::{ContainerWriter, Journal};
 use super::plan::Worker;
@@ -55,22 +56,13 @@ static ENGINE_COMMAND: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync:
 static ENGINE_FIXTURE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
-type AttachmentTransport = fn(&Lease) -> Result<Spawned, CliError>;
+type AttachmentTransport = fn(&ContainerIntent) -> Result<Spawned, CliError>;
 #[cfg(test)]
 static ATTACHMENT_TRANSPORT: std::sync::Mutex<Option<AttachmentTransport>> =
     std::sync::Mutex::new(None);
 
-pub(super) struct Lease {
-    pub owner: String,
-    pub engine: String,
-    pub id: Option<String>,
-    pub create_rejected: bool,
-}
-
-impl Lease {
-    fn name(&self) -> String {
-        format!("chio-run-{}", self.owner)
-    }
+fn container_name(intent: &ContainerIntent) -> String {
+    format!("chio-run-{}", intent.owner)
 }
 
 fn command(arguments: &[String]) -> Command {
@@ -233,7 +225,7 @@ pub(super) async fn qualify(image: &str) -> Result<String, CliError> {
 
 pub(super) async fn create(
     journal: &mut ContainerWriter,
-    lease: &mut Lease,
+    lease: &mut ContainerIntent,
     worker: &Worker,
     socket: &Path,
 ) -> Result<(), CliError> {
@@ -264,7 +256,7 @@ pub(super) async fn create(
         "--pull=never",
         "--interactive",
         "--name",
-        &lease.name(),
+        &container_name(lease),
         "--label",
         &format!("{OWNER}={}", lease.owner),
         "--network=none",
@@ -344,7 +336,7 @@ pub(super) async fn create(
     Ok(())
 }
 
-pub(super) fn attach(lease: &Lease) -> Result<Spawned, CliError> {
+pub(super) fn attach(lease: &ContainerIntent) -> Result<Spawned, CliError> {
     #[cfg(test)]
     if let Some(transport) = *ATTACHMENT_TRANSPORT
         .lock()
@@ -400,9 +392,9 @@ async fn inspect(id: &str) -> Result<Record, CliError> {
         r#"{"id":{{json .Id}},"name":{{json .Name}},"labels":{{json .Config.Labels}},"running":{{json .State.Running}},"status":{{json .State.Status}},"started_at":{{json .State.StartedAt}},"exit_code":{{json .State.ExitCode}},"oom_killed":{{json .State.OOMKilled}}}"#, id]).await?)
 }
 
-fn owned(lease: &Lease, record: &Record) -> Result<(), CliError> {
+fn owned(lease: &ContainerIntent, record: &Record) -> Result<(), CliError> {
     if !valid_id(&record.id)
-        || record.name != format!("/{}", lease.name())
+        || record.name != format!("/{}", container_name(lease))
         || record.labels.get(OWNER) != Some(&lease.owner)
         || lease.id.as_ref().is_some_and(|id| *id != record.id)
     {
@@ -414,7 +406,7 @@ fn owned(lease: &Lease, record: &Record) -> Result<(), CliError> {
 }
 
 /// Authoritative inventory avoids interpreting arbitrary daemon errors as absence.
-async fn inventory(lease: &Lease) -> Result<Vec<String>, CliError> {
+async fn inventory(lease: &ContainerIntent) -> Result<Vec<String>, CliError> {
     let bytes = control(&[
         "container",
         "ls",
@@ -422,7 +414,7 @@ async fn inventory(lease: &Lease) -> Result<Vec<String>, CliError> {
         "--no-trunc",
         "--quiet",
         "--filter",
-        &format!("name=^/{}$", lease.name()),
+        &format!("name=^/{}$", container_name(lease)),
     ])
     .await?;
     let text = std::str::from_utf8(&bytes).map_err(error)?;
@@ -433,7 +425,7 @@ async fn inventory(lease: &Lease) -> Result<Vec<String>, CliError> {
     Ok(ids)
 }
 
-async fn remove(lease: &Lease) -> Result<bool, CliError> {
+async fn remove(lease: &ContainerIntent) -> Result<bool, CliError> {
     if engine().await?.id != lease.engine {
         return Err(error("container journal belongs to another Docker engine"));
     }
@@ -480,7 +472,10 @@ pub(super) async fn reconcile(journal: &Journal<'_>) -> Result<(), CliError> {
     Ok(())
 }
 
-pub(super) async fn outcome(lease: &Lease, outcome: &mut Outcome) -> Result<(), CliError> {
+pub(super) async fn outcome(
+    lease: &ContainerIntent,
+    outcome: &mut Outcome,
+) -> Result<(), CliError> {
     let record = inspect(
         lease
             .id
@@ -550,7 +545,7 @@ fn classify(record: &Record, outcome: &mut Outcome) {
     }
     // wait4 accounted the Docker client, not the worker cgroup. Do not publish
     // those host-side numbers as worker resource measurements.
-    outcome.usage = Usage::default();
+    outcome.usage = ResourceUsage::default();
 }
 
 /// Fixed category of how the Docker attach client ended. Only exact fixed
@@ -643,7 +638,7 @@ impl LaunchEvidence<'_> {
 
     /// Require the started object to be the exact owned container, running,
     /// with an engine start time and the configuration inspected before start.
-    async fn confirm_start(&self, lease: &Lease) -> Result<(String, String), CliError> {
+    async fn confirm_start(&self, lease: &ContainerIntent) -> Result<(String, String), CliError> {
         for _ in 0..START_CONFIRMATION_POLLS {
             let record = inspect(&self.container_id).await?;
             owned(lease, &record)?;
@@ -667,7 +662,7 @@ impl LaunchEvidence<'_> {
     async fn confirm_and_release(
         &self,
         writer: &mut ContainerWriter,
-        lease: &Lease,
+        lease: &ContainerIntent,
         release: tokio::sync::oneshot::Sender<()>,
         control: &AttemptControl,
     ) -> Result<(), CliError> {
@@ -717,7 +712,7 @@ impl LaunchEvidence<'_> {
 /// durable container records before releasing its host lock.
 pub(super) async fn run(
     mut writer: ContainerWriter,
-    mut lease: Lease,
+    mut lease: ContainerIntent,
     worker: Worker,
     socket: std::path::PathBuf,
     input: Vec<u8>,
@@ -826,7 +821,7 @@ pub(super) async fn run(
             Ok(Outcome {
                 success: false,
                 reason: "container_create_rejected".into(),
-                usage: Usage::default(),
+                usage: ResourceUsage::default(),
                 stdout: vec![],
                 stderr: failure.to_string().into_bytes(),
                 diagnostic: None,
@@ -842,7 +837,7 @@ fn cancelled_outcome() -> Outcome {
     Outcome {
         success: false,
         reason: "process_cancelled".into(),
-        usage: Usage::default(),
+        usage: ResourceUsage::default(),
         stdout: vec![],
         stderr: vec![],
         diagnostic: None,
@@ -850,7 +845,7 @@ fn cancelled_outcome() -> Outcome {
 }
 
 async fn observe_attachment(
-    lease: &Lease,
+    lease: &ContainerIntent,
     attachment: Result<Outcome, CliError>,
 ) -> Result<Outcome, CliError> {
     let client_failed = attachment.is_err();
@@ -859,7 +854,7 @@ async fn observe_attachment(
         Outcome {
             success: false,
             reason: "container_attachment_error".into(),
-            usage: Usage::default(),
+            usage: ResourceUsage::default(),
             stdout: vec![],
             stderr: diagnostic.as_bytes().to_vec(),
             diagnostic: Some(diagnostic),
@@ -889,7 +884,7 @@ async fn observe_attachment(
 
 pub(super) struct Cleanup {
     writer: ContainerWriter,
-    lease: Lease,
+    lease: ContainerIntent,
 }
 
 impl Cleanup {

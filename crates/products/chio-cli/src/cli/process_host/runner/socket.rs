@@ -10,13 +10,13 @@ use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
-use rusqlite::{params, Connection, OptionalExtension};
+use chio_process::run_journal::FileIdentity;
+use chio_store_sqlite::process_run_store::SqliteRunJournal;
 
 use super::super::state::error;
 use crate::CliError;
 
 const SOCKET: &str = "process.sock";
-const MAX_ABANDONED: i64 = 8;
 
 pub(super) struct Endpoint {
     parent: File,
@@ -25,14 +25,11 @@ pub(super) struct Endpoint {
     path: PathBuf,
 }
 
-struct Record {
-    name: String,
-    directory: Option<(u64, u64)>,
-    socket: Option<(u64, u64)>,
-}
-
-fn identity(metadata: &Metadata) -> (u64, u64) {
-    (metadata.dev(), metadata.ino())
+fn identity(metadata: &Metadata) -> FileIdentity {
+    FileIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    }
 }
 
 fn owned_private(metadata: &Metadata) -> bool {
@@ -95,31 +92,6 @@ fn parent() -> Result<File, CliError> {
     Ok(parent)
 }
 
-fn record(db: &Connection) -> Result<Option<Record>, CliError> {
-    db.query_row("SELECT name,directory_device,directory_inode,socket_device,socket_inode FROM run_socket_leases WHERE singleton=1", [], |row| {
-        Ok(Record { name: row.get(0)?, directory: read_identity(row, 1)?, socket: read_identity(row, 3)? })
-    }).optional().map_err(error)
-}
-
-fn read_identity(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<Option<(u64, u64)>> {
-    let device: Option<String> = row.get(index)?;
-    let inode: Option<String> = row.get(index + 1)?;
-    let parse = |value: String| {
-        value.parse().map_err(|failure| {
-            rusqlite::Error::FromSqlConversionFailure(
-                index,
-                rusqlite::types::Type::Text,
-                Box::new(failure),
-            )
-        })
-    };
-    match (device, inode) {
-        (Some(device), Some(inode)) => Ok(Some((parse(device)?, parse(inode)?))),
-        (None, None) => Ok(None),
-        _ => Err(rusqlite::Error::InvalidQuery),
-    }
-}
-
 fn validate_name(name: &str) -> Result<(), CliError> {
     if !name.strip_prefix("chio-worker-").is_some_and(|suffix| {
         suffix.len() == 32
@@ -132,55 +104,18 @@ fn validate_name(name: &str) -> Result<(), CliError> {
     Ok(())
 }
 
-fn abandon(db: &Connection) -> Result<(), CliError> {
-    let last: i64 = db
-        .query_row(
-            "SELECT COALESCE(MAX(singleton),1) FROM run_socket_leases",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(error)?;
-    if last > MAX_ABANDONED {
-        return Err(error("worker socket abandoned-intent limit reached; preserve and inspect the runner journal before further runs"));
-    }
-    db.execute(
-        "UPDATE run_socket_leases SET singleton=?1 WHERE singleton=1",
-        [last + 1],
-    )
-    .map_err(error)?;
-    Ok(())
-}
-
-fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
+fn reconcile(store: &SqliteRunJournal, parent: &File) -> Result<(), CliError> {
     // Hold the journal's write lock across lookup and retirement. Only a
     // positively absent, validated pre-credential intent may be forgotten.
-    let transaction =
-        rusqlite::Transaction::new_unchecked(db, rusqlite::TransactionBehavior::Immediate)
-            .map_err(error)?;
-    let abandoned = transaction
-        .prepare(
-            "SELECT singleton,name FROM run_socket_leases WHERE singleton>1 ORDER BY singleton",
-        )
-        .map_err(error)?
-        .query_map([], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })
-        .map_err(error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(error)?;
-    for (index, name) in abandoned {
-        validate_name(&name)?;
-        if entry(parent, &name)?.is_none() {
-            transaction
-                .execute(
-                    "DELETE FROM run_socket_leases WHERE singleton=?1 AND name=?2",
-                    params![index, name],
-                )
-                .map_err(error)?;
+    let retirement = store.retire_socket_intents().map_err(error)?;
+    for intent in retirement.intents() {
+        validate_name(&intent.name)?;
+        if entry(parent, &intent.name)?.is_none() {
+            retirement.forget(intent).map_err(error)?;
         }
     }
-    transaction.commit().map_err(error)?;
-    let Some(record) = record(db)? else {
+    retirement.commit().map_err(error)?;
+    let Some(record) = store.socket_lease().map_err(error)? else {
         return Ok(());
     };
     validate_name(&record.name)?;
@@ -188,7 +123,7 @@ fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
         if record.directory.is_none() {
             // The pre-bind intent never issued worker credentials. Preserve the
             // unknown object and history, then use a new random endpoint.
-            return abandon(db);
+            return store.abandon_socket_intent().map_err(error);
         }
         if !metadata.is_dir()
             || !owned_private(&metadata)
@@ -204,7 +139,7 @@ fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
             if record.socket.is_none() {
                 // A listener may have existed, but no worker credential was
                 // delivered before the socket identity commit.
-                return abandon(db);
+                return store.abandon_socket_intent().map_err(error);
             }
             if !metadata.file_type().is_socket()
                 || !owned_private(&metadata)
@@ -222,23 +157,13 @@ fn reconcile(db: &Connection, parent: &File) -> Result<(), CliError> {
         }
         remove_at(parent, &record.name, true)?;
     }
-    db.execute("DELETE FROM run_socket_leases WHERE singleton=1", [])
-        .map_err(error)?;
-    Ok(())
+    store.forget_socket_intent().map_err(error)
 }
 
-pub(super) fn cleanup_for_export(db: &Connection) -> Result<(), CliError> {
-    let exists: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_socket_leases')", [], |row| row.get(0)).map_err(error)?;
-    if exists {
-        reconcile(db, &parent()?)?;
-        if db
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM run_socket_leases)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )
-            .map_err(error)?
-        {
+pub(super) fn cleanup_for_export(store: &SqliteRunJournal) -> Result<(), CliError> {
+    if store.has_socket_intents().map_err(error)? {
+        reconcile(store, &parent()?)?;
+        if store.has_socket_intents().map_err(error)? {
             return Err(error("worker socket ownership is unresolved; preserve abandoned endpoint records on the original host before export"));
         }
     }
@@ -246,18 +171,13 @@ pub(super) fn cleanup_for_export(db: &Connection) -> Result<(), CliError> {
 }
 
 impl Endpoint {
-    pub fn prepare(db: &Connection) -> Result<Self, CliError> {
-        db.execute_batch("CREATE TABLE IF NOT EXISTS run_socket_leases(singleton INTEGER PRIMARY KEY CHECK(singleton BETWEEN 1 AND 9), name TEXT NOT NULL UNIQUE, directory_device TEXT, directory_inode TEXT, socket_device TEXT, socket_inode TEXT, CHECK((directory_device IS NULL)=(directory_inode IS NULL)), CHECK((socket_device IS NULL)=(socket_inode IS NULL)))").map_err(error)?;
+    pub fn prepare(store: &SqliteRunJournal) -> Result<Self, CliError> {
         let parent = parent()?;
-        reconcile(db, &parent)?;
+        reconcile(store, &parent)?;
         let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
         // A crash at either filesystem creation boundary leaves a tracked lease.
         // Missing identity is never inferred from a name, owner or permissions.
-        db.execute(
-            "INSERT INTO run_socket_leases(singleton,name) VALUES(1,?1)",
-            [&name],
-        )
-        .map_err(error)?;
+        store.record_socket_intent(&name).map_err(error)?;
         let c_name = CString::new(name.as_bytes()).map_err(error)?;
         // SAFETY: the name is NUL-terminated and parent remains open.
         if unsafe { libc::mkdirat(parent.as_raw_fd(), c_name.as_ptr(), 0o700) } != 0 {
@@ -269,7 +189,9 @@ impl Endpoint {
         if !owned_private(&metadata) {
             return Err(error("new worker socket directory must be private"));
         }
-        db.execute("UPDATE run_socket_leases SET directory_device=?1,directory_inode=?2 WHERE singleton=1 AND name=?3", params![metadata.dev().to_string(), metadata.ino().to_string(), name]).map_err(error)?;
+        store
+            .socket_directory_created(&name, identity(&metadata))
+            .map_err(error)?;
         let path = Path::new("/tmp").join(&name).join(SOCKET);
         Ok(Self {
             parent,
@@ -283,7 +205,7 @@ impl Endpoint {
         &self.path
     }
 
-    pub fn bound(&self, db: &Connection) -> Result<(), CliError> {
+    pub fn bound(&self, store: &SqliteRunJournal) -> Result<(), CliError> {
         let directory = self.directory.metadata()?;
         if entry(&self.parent, &self.name)?.as_ref().map(identity) != Some(identity(&directory)) {
             return Err(error("worker socket directory changed during bind"));
@@ -296,87 +218,96 @@ impl Endpoint {
             ));
         }
         self.directory.sync_all()?;
-        db.execute("UPDATE run_socket_leases SET socket_device=?1,socket_inode=?2 WHERE singleton=1 AND name=?3", params![metadata.dev().to_string(), metadata.ino().to_string(), self.name]).map_err(error)?;
-        Ok(())
+        store
+            .socket_bound(&self.name, identity(&metadata))
+            .map_err(error)
     }
 
-    pub fn cleanup(&self, db: &Connection) -> Result<(), CliError> {
-        reconcile(db, &self.parent)
+    pub fn cleanup(&self, store: &SqliteRunJournal) -> Result<(), CliError> {
+        reconcile(store, &self.parent)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chio_store_sqlite::process_run_store::tamper::{tamper, JournalTamper};
     use std::os::unix::fs::{symlink, PermissionsExt};
     use std::os::unix::net::UnixListener;
 
     type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+    /// The store under test and its path for tampering.
+    fn journal(
+    ) -> Result<(tempfile::TempDir, SqliteRunJournal, PathBuf), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("runner.db");
+        let store = SqliteRunJournal::open(&path, "binding")?;
+        Ok((directory, store, path))
+    }
+
+    /// Live and abandoned intents the journal retains.
+    fn intents(store: &SqliteRunJournal) -> Result<u32, Box<dyn std::error::Error>> {
+        Ok(store.abandoned_socket_intents()? + u32::from(store.socket_lease()?.is_some()))
+    }
+
     fn bind(
         endpoint: &Endpoint,
-        db: &Connection,
+        store: &SqliteRunJournal,
     ) -> Result<UnixListener, Box<dyn std::error::Error>> {
         let listener = UnixListener::bind(endpoint.path())?;
         std::fs::set_permissions(endpoint.path(), std::fs::Permissions::from_mode(0o600))?;
-        endpoint.bound(db)?;
+        endpoint.bound(store)?;
         Ok(listener)
     }
 
     #[test]
     fn short_endpoint_recovers_socket_and_cleans_completed_runs() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let first = Endpoint::prepare(&db)?;
+        let (_journal, store, _) = journal()?;
+        let first = Endpoint::prepare(&store)?;
         assert!(first.path().as_os_str().len() < 104);
-        let listener = bind(&first, &db)?;
+        let listener = bind(&first, &store)?;
         std::os::unix::net::UnixStream::connect(first.path())?;
         drop(listener); // Host death leaves the filesystem socket behind.
-        let second = Endpoint::prepare(&db)?;
+        let second = Endpoint::prepare(&store)?;
         assert!(!first.path.parent().ok_or("parent")?.exists());
         assert_ne!(first.path(), second.path());
-        let listener = bind(&second, &db)?;
+        let listener = bind(&second, &store)?;
         drop(listener);
-        second.cleanup(&db)?;
+        second.cleanup(&store)?;
         assert!(!second.path.parent().ok_or("parent")?.exists());
-        assert!(record(&db)?.is_none());
+        assert!(store.socket_lease()?.is_none());
         Ok(())
     }
 
     #[test]
     fn socket_creation_gaps_preserve_objects_and_resume_with_a_new_endpoint() -> TestResult {
         for directory_gap in [true, false] {
-            let db = Connection::open_in_memory()?;
-            let first = Endpoint::prepare(&db)?;
+            let (_journal, store, path) = journal()?;
+            let first = Endpoint::prepare(&store)?;
             let listener = if directory_gap {
                 None
             } else {
-                Some(bind(&first, &db)?)
+                Some(bind(&first, &store)?)
             };
-            db.execute(
+            tamper(
+                &path,
                 if directory_gap {
-                    "UPDATE run_socket_leases SET directory_device=NULL,directory_inode=NULL"
+                    JournalTamper::LiveDirectoryUncommitted
                 } else {
-                    "UPDATE run_socket_leases SET socket_device=NULL,socket_inode=NULL"
+                    JournalTamper::LiveSocketUncommitted
                 },
-                [],
             )?;
             let before = first.directory.metadata()?;
-            let second = Endpoint::prepare(&db)?;
+            let second = Endpoint::prepare(&store)?;
             assert_eq!(
                 identity(&before),
                 identity(&std::fs::metadata(first.path.parent().ok_or("parent")?)?)
             );
-            assert_eq!(
-                db.query_row(
-                    "SELECT COUNT(*) FROM run_socket_leases WHERE singleton>1",
-                    [],
-                    |row| row.get::<_, i64>(0)
-                )?,
-                1
-            );
-            assert!(cleanup_for_export(&db).is_err());
+            assert_eq!(store.abandoned_socket_intents()?, 1);
+            assert!(cleanup_for_export(&store).is_err());
             assert!(first.path.parent().ok_or("parent")?.exists());
-            second.cleanup(&db)?;
+            second.cleanup(&store)?;
             drop(listener);
             if first.path.exists() {
                 std::fs::remove_file(first.path())?;
@@ -389,9 +320,9 @@ mod tests {
     #[test]
     fn recorded_socket_replacement_is_never_unlinked() -> TestResult {
         for symlink_replacement in [true, false] {
-            let db = Connection::open_in_memory()?;
-            let endpoint = Endpoint::prepare(&db)?;
-            let listener = bind(&endpoint, &db)?;
+            let (_journal, store, _) = journal()?;
+            let endpoint = Endpoint::prepare(&store)?;
+            let listener = bind(&endpoint, &store)?;
             let original = endpoint.path.with_extension("original");
             std::fs::rename(endpoint.path(), &original)?;
             if symlink_replacement {
@@ -399,51 +330,51 @@ mod tests {
             } else {
                 std::fs::write(endpoint.path(), b"must survive")?;
             }
-            assert!(Endpoint::prepare(&db).is_err());
+            assert!(Endpoint::prepare(&store).is_err());
             assert!(endpoint.path.symlink_metadata().is_ok());
-            assert!(record(&db)?.is_some());
+            assert!(store.socket_lease()?.is_some());
             std::fs::remove_file(endpoint.path())?;
             std::fs::rename(&original, endpoint.path())?;
             drop(listener);
-            endpoint.cleanup(&db)?;
+            endpoint.cleanup(&store)?;
         }
         Ok(())
     }
 
     #[test]
     fn replaced_directory_and_unexpected_siblings_survive_cleanup() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let endpoint = Endpoint::prepare(&db)?;
+        let (_journal, store, _) = journal()?;
+        let endpoint = Endpoint::prepare(&store)?;
         let directory = endpoint.path.parent().ok_or("parent")?;
         let moved = directory.with_extension("original");
         std::fs::rename(directory, &moved)?;
         std::fs::create_dir(directory)?;
         std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700))?;
-        assert!(endpoint.cleanup(&db).is_err());
+        assert!(endpoint.cleanup(&store).is_err());
         assert!(directory.exists());
         std::fs::remove_dir(directory)?;
         std::fs::rename(&moved, directory)?;
         let sibling = directory.join("unrelated");
         std::fs::write(&sibling, b"must survive")?;
-        assert!(endpoint.cleanup(&db).is_err());
+        assert!(endpoint.cleanup(&store).is_err());
         assert_eq!(std::fs::read(&sibling)?, b"must survive");
-        assert!(record(&db)?.is_some());
+        assert!(store.socket_lease()?.is_some());
         std::fs::remove_file(sibling)?;
-        endpoint.cleanup(&db)?;
+        endpoint.cleanup(&store)?;
         Ok(())
     }
 
     #[test]
     fn replacement_socket_identity_blocks_export_until_original_is_restored() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let endpoint = Endpoint::prepare(&db)?;
-        let listener = bind(&endpoint, &db)?;
+        let (_journal, store, _) = journal()?;
+        let endpoint = Endpoint::prepare(&store)?;
+        let listener = bind(&endpoint, &store)?;
         let original = endpoint.path.with_extension("original");
         std::fs::rename(endpoint.path(), &original)?;
         let replacement = UnixListener::bind(endpoint.path())?;
         std::fs::set_permissions(endpoint.path(), std::fs::Permissions::from_mode(0o600))?;
         let replacement_identity = identity(&std::fs::symlink_metadata(endpoint.path())?);
-        assert!(cleanup_for_export(&db).is_err());
+        assert!(cleanup_for_export(&store).is_err());
         assert_eq!(
             identity(&std::fs::symlink_metadata(endpoint.path())?),
             replacement_identity
@@ -452,56 +383,53 @@ mod tests {
         std::fs::remove_file(endpoint.path())?;
         std::fs::rename(&original, endpoint.path())?;
         drop(listener);
-        cleanup_for_export(&db)?;
+        cleanup_for_export(&store)?;
         assert!(!endpoint.path.parent().ok_or("parent")?.exists());
-        assert!(record(&db)?.is_none());
+        assert!(store.socket_lease()?.is_none());
         Ok(())
     }
 
     #[test]
     fn broad_permissions_and_hardlinked_socket_preserve_the_lease() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let endpoint = Endpoint::prepare(&db)?;
-        let listener = bind(&endpoint, &db)?;
+        let (_journal, store, _) = journal()?;
+        let endpoint = Endpoint::prepare(&store)?;
+        let listener = bind(&endpoint, &store)?;
         let directory = endpoint.path.parent().ok_or("parent")?;
         for (path, invalid, restored) in
             [(directory, 0o755, 0o700), (endpoint.path(), 0o644, 0o600)]
         {
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(invalid))?;
-            assert!(endpoint.cleanup(&db).is_err());
+            assert!(endpoint.cleanup(&store).is_err());
             assert!(endpoint.path.exists());
-            assert!(record(&db)?.is_some());
+            assert!(store.socket_lease()?.is_some());
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(restored))?;
         }
         let alias = directory.join("alias");
         std::fs::hard_link(endpoint.path(), &alias)?;
-        assert!(endpoint.cleanup(&db).is_err());
+        assert!(endpoint.cleanup(&store).is_err());
         assert!(endpoint.path.exists());
         std::fs::remove_file(alias)?;
         drop(listener);
-        endpoint.cleanup(&db)?;
+        endpoint.cleanup(&store)?;
         Ok(())
     }
 
     #[test]
     fn absent_intents_clear_and_abandoned_history_is_bounded() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let endpoint = Endpoint::prepare(&db)?;
+        let (_journal, store, path) = journal()?;
+        let endpoint = Endpoint::prepare(&store)?;
         std::fs::remove_dir(endpoint.path.parent().ok_or("parent")?)?;
-        endpoint.cleanup(&db)?;
-        assert!(record(&db)?.is_none());
-        for index in 2..=9 {
-            db.execute(
-                "INSERT INTO run_socket_leases(singleton,name) VALUES(?1,?2)",
-                params![index, format!("chio-worker-{index:032x}")],
+        endpoint.cleanup(&store)?;
+        assert!(store.socket_lease()?.is_none());
+        for slot in 2..=9 {
+            let name = format!("chio-worker-{slot:032x}");
+            tamper(
+                &path,
+                JournalTamper::AbandonedSocketIntent { slot, name: &name },
             )?;
         }
-        let _endpoint = Endpoint::prepare(&db)?;
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| row
-                .get::<_, i64>(0))?,
-            1
-        );
+        let _endpoint = Endpoint::prepare(&store)?;
+        assert_eq!(intents(&store)?, 1);
         // Foreign objects, including symlinks, are never unlinked or retired.
         let foreign = tempfile::Builder::new()
             .prefix("chio-worker-")
@@ -509,47 +437,35 @@ mod tests {
         let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
         let alias = Path::new("/tmp").join(&name);
         std::os::unix::fs::symlink(foreign.path(), &alias)?;
-        db.execute(
-            "INSERT INTO run_socket_leases(singleton,name) VALUES(2,?1)",
-            [&name],
+        tamper(
+            &path,
+            JournalTamper::AbandonedSocketIntent {
+                slot: 2,
+                name: &name,
+            },
         )?;
-        reconcile(&db, &parent()?)?;
+        reconcile(&store, &parent()?)?;
         assert!(alias.symlink_metadata()?.file_type().is_symlink());
-        assert_eq!(
-            db.query_row(
-                "SELECT COUNT(*) FROM run_socket_leases WHERE singleton=2",
-                [],
-                |row| row.get::<_, i64>(0)
-            )?,
-            1
-        );
+        assert_eq!(store.abandoned_socket_intents()?, 1);
         std::fs::remove_file(&alias)?;
-        reconcile(&db, &parent()?)?;
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| row
-                .get::<_, i64>(0))?,
-            0
-        );
-        let endpoint = Endpoint::prepare(&db)?;
+        reconcile(&store, &parent()?)?;
+        assert_eq!(intents(&store)?, 0);
+        let endpoint = Endpoint::prepare(&store)?;
         let mut retained = Vec::new();
-        for index in 2..=9 {
+        for slot in 2..=9 {
             let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
             let alias = Path::new("/tmp").join(&name);
             symlink(endpoint.path.parent().ok_or("parent")?, &alias)?;
-            db.execute(
-                "INSERT INTO run_socket_leases(singleton,name) VALUES(?1,?2)",
-                params![index, name],
+            tamper(
+                &path,
+                JournalTamper::AbandonedSocketIntent { slot, name: &name },
             )?;
             retained.push(alias);
         }
-        db.execute("UPDATE run_socket_leases SET directory_device=NULL,directory_inode=NULL WHERE singleton=1", [])?;
-        assert!(Endpoint::prepare(&db).is_err());
+        tamper(&path, JournalTamper::LiveDirectoryUncommitted)?;
+        assert!(Endpoint::prepare(&store).is_err());
         assert!(endpoint.path.parent().ok_or("parent")?.exists());
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| row
-                .get::<_, i64>(0))?,
-            9
-        );
+        assert_eq!(intents(&store)?, 9);
         for alias in retained {
             std::fs::remove_file(alias)?;
         }
@@ -559,26 +475,24 @@ mod tests {
 
     #[test]
     fn abandoned_invalid_names_and_lookup_errors_retain_journal_rows() -> TestResult {
-        let db = Connection::open_in_memory()?;
-        let endpoint = Endpoint::prepare(&db)?;
-        endpoint.cleanup(&db)?;
-        db.execute(
-            "INSERT INTO run_socket_leases(singleton,name) VALUES(2,'../foreign')",
-            [],
+        let (_journal, store, path) = journal()?;
+        let endpoint = Endpoint::prepare(&store)?;
+        endpoint.cleanup(&store)?;
+        tamper(
+            &path,
+            JournalTamper::AbandonedSocketIntent {
+                slot: 2,
+                name: "../foreign",
+            },
         )?;
-        assert!(reconcile(&db, &parent()?).is_err());
-        let count = || -> rusqlite::Result<i64> {
-            db.query_row("SELECT COUNT(*) FROM run_socket_leases", [], |row| {
-                row.get(0)
-            })
-        };
-        assert_eq!(count()?, 1);
+        assert!(reconcile(&store, &parent()?).is_err());
+        assert_eq!(intents(&store)?, 1);
         let name = format!("chio-worker-{}", uuid::Uuid::new_v4().simple());
-        db.execute("UPDATE run_socket_leases SET name=?1", [&name])?;
-        assert!(reconcile(&db, &File::open("/dev/null")?).is_err());
-        assert_eq!(count()?, 1);
-        reconcile(&db, &parent()?)?;
-        assert_eq!(count()?, 0);
+        tamper(&path, JournalTamper::SocketIntentRenamed(&name))?;
+        assert!(reconcile(&store, &File::open("/dev/null")?).is_err());
+        assert_eq!(intents(&store)?, 1);
+        reconcile(&store, &parent()?)?;
+        assert_eq!(intents(&store)?, 0);
         Ok(())
     }
 }

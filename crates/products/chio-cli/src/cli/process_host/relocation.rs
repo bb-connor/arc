@@ -12,8 +12,8 @@ use std::io::Read;
 use std::path::Path;
 
 use chio_control_plane::DurableAdmissionRuntime;
-use chio_store_sqlite::{RelocationImportPhase, RelocationSeal};
-use rusqlite::{Connection, OpenFlags};
+use chio_store_sqlite::process_run_store::{Access, SqliteRunJournal};
+use chio_store_sqlite::{checkpoint_for_export, RelocationImportPhase, RelocationSeal};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -58,33 +58,17 @@ pub(super) fn export(state: &Path) -> Result<(), CliError> {
     digests(&directory, SidecarPolicy::Checkpointable)?;
     let runner = directory.join("runner.db");
     if runner.try_exists()? {
-        let db = Connection::open_with_flags(
-            &runner,
-            OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-        )
-        .map_err(error)?;
-        let table: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_containers')", [], |row| row.get(0)).map_err(error)?;
-        if table {
-            let pending: bool = db
-                .query_row("SELECT EXISTS(SELECT 1 FROM run_containers)", [], |row| {
-                    row.get(0)
-                })
-                .map_err(error)?;
-            if pending {
-                return Err(error("container ownership is unresolved; resume the same run plan on its original Docker engine before export"));
-            }
+        let journal = SqliteRunJournal::open_existing(&runner, Access::Export).map_err(error)?;
+        if journal.has_container_intents().map_err(error)? {
+            return Err(error("container ownership is unresolved; resume the same run plan on its original Docker engine before export"));
         }
         #[cfg(target_os = "linux")]
-        {
-            db.pragma_update(None, "synchronous", "FULL")
-                .map_err(error)?;
-            super::runner::cleanup_socket_for_export(&db)?;
-        }
+        super::runner::cleanup_socket_for_export(&journal)?;
     }
     for name in CHECKPOINTED {
         let path = directory.join(name);
         if path.try_exists()? {
-            checkpoint(&path)?;
+            checkpoint_for_export(&path).map_err(error)?;
         }
     }
     let seal = DurableAdmissionRuntime::export_relocation(&directory.join("authority.db"))?;
@@ -173,28 +157,6 @@ pub(super) fn import(state: &Path) -> Result<(), CliError> {
         serde_json::json!({"imported": true, "store_uuid": imported.seal.store_uuid,
             "export_id": imported.seal.export_id, "import_id": imported.import_id})
     );
-    Ok(())
-}
-
-/// Fold an application database's write-ahead log into its main file so the
-/// copied file is complete on its own. The host lock guarantees no writer.
-fn checkpoint(path: &Path) -> Result<(), CliError> {
-    let connection = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
-    )
-    .map_err(error)?;
-    connection
-        .busy_timeout(std::time::Duration::from_secs(5))
-        .map_err(error)?;
-    let busy: i64 = connection
-        .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
-        .map_err(error)?;
-    if busy != 0 {
-        return Err(error("relocation checkpoint is busy"));
-    }
     Ok(())
 }
 

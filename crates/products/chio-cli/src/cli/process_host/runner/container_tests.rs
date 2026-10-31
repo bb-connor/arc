@@ -1,5 +1,31 @@
 use super::*;
+use chio_store_sqlite::process_run_store::{tamper, Access, SqliteRunJournal};
 use std::os::unix::fs::PermissionsExt;
+
+fn journal(state: &Path) -> Result<SqliteRunJournal, Box<dyn std::error::Error>> {
+    Ok(SqliteRunJournal::open_existing(
+        &state.join("runner.db"),
+        Access::Read,
+    )?)
+}
+
+/// The run's only worker as (state, attempts, outcome).
+fn worker(state: &Path) -> Result<(String, u32, String), Box<dyn std::error::Error>> {
+    let record = journal(state)?
+        .snapshots()?
+        .into_iter()
+        .next()
+        .ok_or("run has no worker")?;
+    Ok((
+        record.state.as_str().to_owned(),
+        record.attempts,
+        record.outcome.unwrap_or_default(),
+    ))
+}
+
+fn containers(state: &Path) -> Result<usize, Box<dyn std::error::Error>> {
+    Ok(journal(state)?.containers()?.len())
+}
 
 struct EngineDouble {
     root: tempfile::TempDir,
@@ -210,7 +236,7 @@ fn cancellation_after_attachment_keeps_custody_until_removal_is_confirmed(
     Ok(())
 }
 
-fn attachment_error_after_request(lease: &Lease) -> Result<Spawned, CliError> {
+fn attachment_error_after_request(lease: &ContainerIntent) -> Result<Spawned, CliError> {
     use std::io::Write;
     // Only external request delivery is substituted. The fixture starts its
     // owned worker before reporting a lost client-supervision result. Real
@@ -271,12 +297,7 @@ fn attachment_error_preserves_authoritative_exit_and_uncertainty(
                 "{failure}"
             );
         }
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        let snapshot: (String, u32, String) = db.query_row(
-            "SELECT state,attempts,outcome FROM run_workers",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let snapshot = worker(&state)?;
         assert_eq!(
             snapshot.0,
             if completed { "completed" } else { "failed" },
@@ -299,24 +320,11 @@ fn attachment_error_preserves_authoritative_exit_and_uncertainty(
             std::fs::read_to_string(state.join("run-logs/root-1.stderr"))?
                 .contains("attachment transport failed after request delivery")
         );
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            retained,
-            "{scenario}"
-        );
+        assert_eq!(containers(&state)?, retained, "{scenario}");
         engine.scenario(serde_json::json!({}))?;
         assert_eq!(super::super::run(&state, &plan).is_ok(), completed);
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            0
-        );
-        assert_eq!(
-            db.query_row("SELECT attempts FROM run_workers", [], |row| row
-                .get::<_, i64>(0))?,
-            1
-        );
+        assert_eq!(containers(&state)?, 0);
+        assert_eq!(worker(&state)?.1, 1);
         assert_eq!(
             std::fs::read_to_string(engine.root.path().join("starts"))?,
             "1"
@@ -333,17 +341,9 @@ fn completion_survives_cleanup_debt_and_restart() -> Result<(), Box<dyn std::err
         super::super::run(&state, &plan).is_err(),
         "cleanup debt cannot report a complete run"
     );
-    let db = rusqlite::Connection::open(state.join("runner.db"))?;
-    let snapshot: (String, u32, String) =
-        db.query_row("SELECT state,attempts,outcome FROM run_workers", [], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })?;
+    let snapshot = worker(&state)?;
     assert_eq!(snapshot, ("completed".into(), 1, "exit_0".into()));
-    assert_eq!(
-        db.query_row("SELECT COUNT(*) FROM run_containers", [], |r| r
-            .get::<_, i64>(0))?,
-        1
-    );
+    assert_eq!(containers(&state)?, 1);
     assert!(
         super::super::super::relocation::export(&state).is_err(),
         "owned container debt must fence export"
@@ -354,16 +354,8 @@ fn completion_survives_cleanup_debt_and_restart() -> Result<(), Box<dyn std::err
         std::fs::read_to_string(engine.root.path().join("starts"))?,
         "1"
     );
-    assert_eq!(
-        db.query_row("SELECT attempts FROM run_workers", [], |r| r
-            .get::<_, i64>(0))?,
-        1
-    );
-    assert_eq!(
-        db.query_row("SELECT COUNT(*) FROM run_containers", [], |r| r
-            .get::<_, i64>(0))?,
-        0
-    );
+    assert_eq!(worker(&state)?.1, 1);
+    assert_eq!(containers(&state)?, 0);
     Ok(())
 }
 
@@ -373,13 +365,7 @@ fn create_rejection_requires_positive_empty_inventory() -> Result<(), Box<dyn st
         let engine = EngineDouble::new(serde_json::json!({"create": create}))?;
         let (state, plan) = engine.host()?;
         assert!(super::super::run(&state, &plan).is_err());
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |r| r
-                .get::<_, i64>(0))?,
-            retained,
-            "{create}"
-        );
+        assert_eq!(containers(&state)?, retained, "{create}");
         assert!(!engine.root.path().join("starts").exists());
     }
     Ok(())
@@ -393,12 +379,7 @@ fn diagnostic_failure_does_not_erase_completed_exit() -> Result<(), Box<dyn std:
         super::super::run(&state, &plan).is_err(),
         "output diagnostic must fail the command"
     );
-    let db = rusqlite::Connection::open(state.join("runner.db"))?;
-    assert_eq!(
-        db.query_row("SELECT state FROM run_workers", [], |r| r
-            .get::<_, String>(0))?,
-        "completed"
-    );
+    assert_eq!(worker(&state)?.0, "completed");
     engine.scenario(serde_json::json!({}))?;
     super::super::run(&state, &plan)?;
     assert_eq!(
@@ -427,22 +408,13 @@ fn controlled_limits_retain_worker_restart_budget() -> Result<(), Box<dyn std::e
         definition["workers"][0]["max_attempts"] = serde_json::json!(2);
         std::fs::write(&plan, serde_json::to_vec(&definition)?)?;
         assert!(super::super::run(&state, &plan).is_err());
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        let snapshot: (String, u32, String) = db.query_row(
-            "SELECT state,attempts,outcome FROM run_workers",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let snapshot = worker(&state)?;
         assert_eq!(snapshot, ("failed".into(), 2, reason.into()));
         assert_eq!(
             std::fs::read_to_string(engine.root.path().join("starts"))?,
             "2"
         );
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            0
-        );
+        assert_eq!(containers(&state)?, 0);
     }
     Ok(())
 }
@@ -473,7 +445,7 @@ fn ready_completion_is_durable_before_interruption() -> Result<(), Box<dyn std::
                 result: Ok(Outcome {
                     success: true,
                     reason: "exit_0".into(),
-                    usage: Usage::default(),
+                    usage: ResourceUsage::default(),
                     stdout: vec![],
                     stderr: vec![],
                     diagnostic: None,
@@ -496,38 +468,6 @@ fn ready_completion_is_durable_before_interruption() -> Result<(), Box<dyn std::
         );
         Ok::<_, Box<dyn std::error::Error>>(())
     })?;
-    Ok(())
-}
-
-#[test]
-fn journal_without_v1_columns_is_refused_at_open() -> Result<(), Box<dyn std::error::Error>> {
-    for (table, column) in [
-        ("run_containers", "create_rejected"),
-        ("run_workers", "cpu_ms"),
-        ("run_workers", "peak_resident_bytes"),
-    ] {
-        let engine = EngineDouble::new(serde_json::json!({"create": "response_lost"}))?;
-        let (state, plan) = engine.host()?;
-        assert!(super::super::run(&state, &plan).is_err());
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        db.execute_batch(&format!("ALTER TABLE {table} DROP COLUMN {column}"))?;
-        let refusal = match super::super::run(&state, &plan) {
-            Ok(()) => return Err(format!("{table} without {column} was opened").into()),
-            Err(error) => error.to_string(),
-        };
-        assert!(
-            refusal.contains(&format!(
-                "process host: runner journal table {table} does not have the v1 columns"
-            )),
-            "{refusal}"
-        );
-        assert_eq!(
-            db.query_row("SELECT attempts FROM run_workers", [], |row| row
-                .get::<_, i64>(0))?,
-            1
-        );
-        assert!(!engine.root.path().join("starts").exists());
-    }
     Ok(())
 }
 
@@ -623,7 +563,7 @@ fn observed_container_states() -> Result<(), Box<dyn std::error::Error>> {
         let mut outcome = Outcome {
             success: reason == "exit_0",
             reason: reason.into(),
-            usage: Usage::default(),
+            usage: ResourceUsage::default(),
             stdout: vec![],
             stderr: vec![],
             diagnostic: None,
@@ -652,7 +592,7 @@ fn client_outcome(reason: &str, stderr: &[u8]) -> Outcome {
     Outcome {
         success: reason == "exit_0",
         reason: reason.into(),
-        usage: Usage::default(),
+        usage: ResourceUsage::default(),
         stdout: vec![],
         stderr: stderr.to_vec(),
         diagnostic: None,
@@ -849,12 +789,7 @@ fn attachment_loss_stays_terminal_and_names_fixed_client_reason(
             marker.is_none(),
             "{scenario}"
         );
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        let snapshot: (String, u32, String) = db.query_row(
-            "SELECT state,attempts,outcome FROM run_workers",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-        )?;
+        let snapshot = worker(&state)?;
         let finished = if marker.is_some() {
             "failed"
         } else {
@@ -866,12 +801,7 @@ fn attachment_loss_stays_terminal_and_names_fixed_client_reason(
             "1",
             "{scenario}"
         );
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            0,
-            "{scenario}"
-        );
+        assert_eq!(containers(&state)?, 0, "{scenario}");
         let log = std::fs::read_to_string(state.join("run-logs/root-1.stderr"))?;
         match marker {
             Some(fixed) => {
@@ -897,13 +827,9 @@ fn launch_records(
 ) -> Result<Vec<chio_process::ContainerLaunchRecord>, Box<dyn std::error::Error>> {
     let host = super::super::super::state::Host::open(state, true)?;
     let signer = host.authority.kernel_keypair().public_key();
-    let db = rusqlite::Connection::open(state.join("runner.db"))?;
-    let mut statement = db.prepare(
-        "SELECT record FROM run_container_launches WHERE process='root' ORDER BY attempt",
-    )?;
     let mut records = Vec::new();
-    for row in statement.query_map([], |row| row.get::<_, String>(0))? {
-        let signed: chio_process::SignedContainerLaunchRecord = serde_json::from_str(&row?)?;
+    for record in tamper::launch_records(&state.join("runner.db"), "root")? {
+        let signed: chio_process::SignedContainerLaunchRecord = serde_json::from_str(&record)?;
         records.push(signed.verify(&signer)?.clone());
     }
     Ok(records)
@@ -976,13 +902,7 @@ fn any_profile_deviation_is_rejected_before_start() -> Result<(), Box<dyn std::e
             Some(record.profile_digest.as_str()),
             "{drift}"
         );
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            0,
-            "{drift}"
-        );
+        assert_eq!(containers(&state)?, 0, "{drift}");
     }
     Ok(())
 }
@@ -1017,13 +937,7 @@ fn unconfirmed_start_withholds_the_bootstrap() -> Result<(), Box<dyn std::error:
             Some(chio_process::ContainerLaunchFailure::StartUnconfirmed),
             "{scenario}"
         );
-        let db = rusqlite::Connection::open(state.join("runner.db"))?;
-        assert_eq!(
-            db.query_row("SELECT COUNT(*) FROM run_containers", [], |row| row
-                .get::<_, i64>(0))?,
-            0,
-            "{scenario}"
-        );
+        assert_eq!(containers(&state)?, 0, "{scenario}");
     }
     Ok(())
 }
