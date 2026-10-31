@@ -15,7 +15,7 @@ Interoperability preimages retain all members. For the terms id, set only
 The envelope signature is Ed25519 over the RFC 8785 bytes of the populated
 `body`; the signature lives outside the body. The exact signed envelope
 digest (sha256 of the RFC 8785 bytes of the whole envelope) is
-`3a9cf540163aa9547bc39741e14c30df3afa0f64b65780c6eaca8dfa8ab8af24`.
+`9263180b432ae0f32957f839df0b6f3c8dcb12f33b251fb8efffed3963c497a2`.
 No preimage omits a member or encodes it as `null`.
 
 Validating this fixture does not prove that the referenced Finding exists
