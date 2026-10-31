@@ -7,8 +7,9 @@ use chio_core::federation::verifier_ledger::presentation_challenges::{
     PresentationChallengeLedger, PresentationChallengeRecord, PresentationHash,
     StoredPresentationChallenge,
 };
+use chio_core::federation::verifier_ledger::LedgerFault;
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_store_sqlite::{PassportVerifierStoreError, SqlitePassportVerifierStore};
+use chio_store_sqlite::SqlitePassportVerifierStore;
 
 use super::*;
 use crate::verifier_ledger::*;
@@ -29,7 +30,7 @@ fn ledger() -> (impl Sized, SqlitePassportVerifierStore) {
 struct RivalSpends<'a>(&'a SqlitePassportVerifierStore);
 
 impl PresentationChallengeLedger for RivalSpends<'_> {
-    type Error = PassportVerifierStoreError;
+    type Error = LedgerFault;
 
     fn insert(&self, record: &PresentationChallengeRecord) -> Result<(), Self::Error> {
         PresentationChallengeLedger::insert(self.0, record)
@@ -63,7 +64,7 @@ impl PresentationChallengeLedger for RivalSpends<'_> {
 }
 
 impl Oid4vpRequestLedger for RivalSpends<'_> {
-    type Error = PassportVerifierStoreError;
+    type Error = LedgerFault;
 
     fn insert(&self, record: &Oid4vpRequestRecord) -> Result<(), Self::Error> {
         Oid4vpRequestLedger::insert(self.0, record)

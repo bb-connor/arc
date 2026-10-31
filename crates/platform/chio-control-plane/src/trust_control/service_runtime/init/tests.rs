@@ -528,9 +528,11 @@ static VERIFIER_LEDGER_OPENS: std::sync::atomic::AtomicUsize =
 
 fn refusing_verifier_ledger(
     _database: &std::path::Path,
-) -> Result<Arc<dyn chio_federation::verifier_ledger::VerifierLedger>, CliError> {
+) -> Result<std::sync::Arc<dyn chio_federation::verifier_ledger::VerifierLedger>, crate::CliError> {
     VERIFIER_LEDGER_OPENS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-    Err(CliError::cli_other_error("verifier ledger refused to open"))
+    Err(crate::CliError::cli_other_error(
+        "verifier ledger refused to open",
+    ))
 }
 
 #[tokio::test]
@@ -546,7 +548,7 @@ async fn trust_service_refuses_to_start_when_the_verifier_ledger_cannot_open(
         .await
         .err()
         .ok_or("trust service started without its verifier ledger")?;
-    let CliError::Chio(error) = error else {
+    let crate::CliError::Chio(error) = error else {
         return Err(format!("unexpected startup error: {error}").into());
     };
     assert_eq!(error.message(), "verifier ledger refused to open");

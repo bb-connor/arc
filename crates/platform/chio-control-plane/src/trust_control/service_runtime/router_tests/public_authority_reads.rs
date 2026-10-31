@@ -172,7 +172,11 @@ fn register_oid4vp_request(
     let transport = build_oid4vp_request_transport(&request, signer)?;
     let store = crate::trust_control::verifier_ledger_fixture::open(config)
         .ok_or("verifier ledger is not configured")?;
-    register_oid4vp_request(store.as_ref(), &request, &transport.request_jwt)?;
+    chio_credentials::verifier_ledger::register_oid4vp_request(
+        store.as_ref(),
+        &request,
+        &transport.request_jwt,
+    )?;
     Ok(request.jti)
 }
 

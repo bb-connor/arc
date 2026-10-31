@@ -609,6 +609,7 @@ fn market_state(
         budget_store: None,
         revocation_store: None,
         passport_revocation_oracle: None,
+        verifier_ledger: None,
         partner_revocation_door: Arc::new(crate::trust_control::PartnerRevocationDoor::strict()),
         receipt_store: None,
         receipt_query_snapshots: None,
