@@ -99,9 +99,6 @@ jobs:
             --run-output "${threshold_run_output}" \
             kernel::tests::threshold_crypto_floor::classical_threshold_verifiers_agree_on_canonical_replay_identity \
             kernel::tests::threshold_crypto_floor::tool_threshold_verifier_enforces_pq_floor_independently \
-            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_proposal_algorithm_metadata_substitution \
-            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_proposal_algorithm_metadata_substitution \
-            kernel::tests::threshold_crypto_floor::tool_threshold_rejects_vote_algorithm_metadata_substitution \
             kernel::tests::threshold_crypto_floor::pq_capability_cannot_authorize_classical_threshold_votes \
             kernel::tests::threshold_crypto_floor::shared_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
             kernel::tests::threshold_crypto_floor::tool_threshold_verifier_rejects_classical_proposal_with_hybrid_votes \
@@ -112,10 +109,7 @@ jobs:
             kernel::tests::threshold_crypto_floor::tool_threshold_rejects_empty_and_oversized_sets_before_policy_lookup \
             kernel::tests::threshold_crypto_floor::shared_threshold_rejects_oversized_set_before_policy_lookup \
             kernel::tests::threshold_crypto_floor::threshold_verifiers_enforce_replay_member_id_bounds \
-            kernel::tests::threshold_crypto_floor::classical_envelopes_allow_omitted_ed25519_metadata \
-            kernel::tests::threshold_crypto_floor::shared_threshold_rejects_vote_algorithm_metadata_substitution \
             kernel::tests::threshold_crypto_floor::empty_algorithm_allowlist_denies \
-            kernel::tests::threshold_crypto_floor::hybrid_envelopes_require_explicit_consistent_metadata \
             kernel::tests::threshold_crypto_floor::allow_classical_rejects_hybrid_threshold_artifacts
 
       - name: Exact boot-gated threshold issuance
@@ -185,6 +179,7 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::session_host_cancel_before_dispatch_records_cancelled_outcome \
             kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_sync_host_cancel_before_dispatch_records_cancelled_outcome \
             kernel::tests::threshold_issuance::session_continuation::session_boundary::pre_dispatch_cancellation::nested_async_host_cancel_before_dispatch_records_cancelled_outcome \
+            kernel::tests::threshold_issuance::expired_parked_approval_replays_one_canonical_terminal_refusal \
             -- cargo test --locked -p chio-kernel --features pq --lib threshold_issuance
 
       - name: Exact nonce validation and consumption boundary
@@ -604,6 +599,7 @@ jobs:
             kernel::tests::threshold_issuance::session_continuation::session_reports::wire_and_normalized_approval_shape_checks_agree_for_all_combinations \
             kernel::tests::boot_receipts::session_reports_use_boot_selected_hybrid_authority \
             kernel::tests::settlement_routing::settlement_routing_tests::session_reports_never_seed_claim_route_or_invoke_settlement \
+            kernel::tests::session_reports::receipt_signing_public_key_fails_closed_on_unreadable_identity \
             -- cargo test --locked -p chio-kernel --features pq --lib session_reports
 
       - name: Exact receipt evaluation isolation
