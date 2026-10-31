@@ -72,6 +72,7 @@ use typify::{TypeSpace, TypeSpaceSettings};
 mod duplicate_types;
 mod errors_pass;
 mod schema_catalog;
+mod schema_docs;
 mod shared_types;
 pub use schema_catalog::LocalSchemaCatalog;
 pub mod statemachines_pass;
@@ -424,6 +425,7 @@ fn render_schema_modules(
     let mut file = syn::parse_file(&source).map_err(CodegenError::SynParse)?;
     duplicate_types::alias_duplicate_types(&mut file);
     check_no_duplicate_types(&file)?;
+    schema_docs::strip_schema_docs(&mut file);
     let pretty = prettyplease::unparse(&file);
     if pretty.len() > MAX_CHIO_WIRE_V1_BYTES {
         return Err(CodegenError::OutputTooLarge(pretty.len()));
