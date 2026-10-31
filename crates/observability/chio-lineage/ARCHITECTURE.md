@@ -82,10 +82,10 @@ it relies on the input graph's evidence labels.
 
 `diff` compares `(from, to, kind)` keys and evidence classes. Node metadata,
 timestamps, tenant fields, and labels are outside the comparison.
-`frontier_bytes` sorts node IDs and edge-key tuples and serializes them with
+`frontier_bytes` sorts node IDs and edge-key tuples and canonicalizes them with
 the graph schema. Evidence and metadata are outside the digest and signature.
-The artifact records `CanonicalSource::EquivalenceShim`; construction does
-not use `CanonicalBytes`. This is a structural projection commitment.
+The artifact records `CanonicalSource::CanonicalBytes`. This is a structural
+projection commitment.
 
 `pin_frontier` always produces an unsigned state, including when a signer
 hint is supplied. `pin_frontier_signed` verifies an externally supplied

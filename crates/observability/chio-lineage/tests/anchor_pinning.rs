@@ -2,7 +2,7 @@
 
 use chio_core_types::crypto::Keypair;
 use chio_lineage::anchor::{
-    frontier_digest, frontier_signature_body, pin_frontier, pin_frontier_signed,
+    frontier_bytes, frontier_digest, frontier_signature_body, pin_frontier, pin_frontier_signed,
     verify_frontier_signature, CanonicalSource, SigningState,
 };
 use chio_lineage::ingest_replay_corpus::{ingest_corpus, CorpusIngestError, CorpusReceiptRow};
@@ -23,10 +23,20 @@ fn fixture_graph() -> Result<chio_lineage::schema::LineageGraph, CorpusIngestErr
 #[test]
 fn deterministic_frontier_hash_through_canonical_bytes() -> Result<(), Box<dyn std::error::Error>> {
     let g = fixture_graph()?;
-    let a = frontier_digest(&g);
-    let b = frontier_digest(&g);
+    let a = frontier_digest(&g)?;
+    let b = frontier_digest(&g)?;
     assert_eq!(a.hex, b.hex);
     assert_eq!(a.algo, "sha256");
+    Ok(())
+}
+
+#[test]
+fn frontier_bytes_order_keys_canonically() -> Result<(), Box<dyn std::error::Error>> {
+    let g = fixture_graph()?;
+    let bytes = frontier_bytes(&g)?;
+    let text = std::str::from_utf8(&bytes)?;
+    assert!(text.starts_with("{\"edges\":["));
+    assert!(text.ends_with(&format!(",\"schema_version\":\"{}\"}}", g.schema_version)));
     Ok(())
 }
 
@@ -34,15 +44,14 @@ fn deterministic_frontier_hash_through_canonical_bytes() -> Result<(), Box<dyn s
 fn missing_hybrid_signer_records_unsigned_state_and_exits_cleanly(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let g = fixture_graph()?;
-    let pinned = pin_frontier(&g, None);
+    let pinned = pin_frontier(&g, None)?;
     assert!(matches!(
         pinned.signing,
         SigningState::UnsignedSoftDepAbsent
     ));
-    // Equivalence shim is the documented soft-dep fallback for canonical bytes.
     assert!(matches!(
         pinned.canonical_source,
-        CanonicalSource::EquivalenceShim
+        CanonicalSource::CanonicalBytes
     ));
     assert_eq!(pinned.node_count, g.nodes.len());
     assert_eq!(pinned.edge_count, g.edges.len());
@@ -56,7 +65,7 @@ fn signer_hint_without_signature_is_unsigned_stub() -> Result<(), Box<dyn std::e
     // otherwise be tricked into trusting an unsigned anchor (lineage
     // tamper, fail-closed contract).
     let g = fixture_graph()?;
-    let pinned = pin_frontier(&g, Some("hybrid-ed25519-mldsa65"));
+    let pinned = pin_frontier(&g, Some("hybrid-ed25519-mldsa65"))?;
     if let SigningState::UnsignedSignerStubbed { algorithm } = &pinned.signing {
         assert_eq!(algorithm, "hybrid-ed25519-mldsa65");
     } else {
