@@ -78,7 +78,7 @@ pub fn finding_worker_protocol(data: &[u8]) {
     }
     if let Ok(capability) = serde_json::from_slice::<SignedFindingWorkerCapability>(data) {
         let _ = capability.body.validate();
-        let _ = capability.verify_signature();
+        let _ = capability.verify_signature(&capability.signer_key);
         let _ = serde_json::to_vec(&capability);
     }
     if let Ok(job) = serde_json::from_slice::<FindingWorkerJobSpec>(data) {
@@ -105,7 +105,7 @@ pub fn finding_worker_protocol(data: &[u8]) {
         let _ = serde_json::to_vec(&result);
     }
     if let Ok(envelope) = serde_json::from_slice::<SignedFindingWorkerResult>(data) {
-        let _ = envelope.verify_signature();
+        let _ = envelope.verify_signature(&envelope.signer_key);
         let _ = serde_json::to_vec(&envelope);
     }
 }
@@ -142,7 +142,7 @@ pub fn federation_trust_establishment(data: &[u8]) {
     }
 
     if let Ok(envelope) = serde_json::from_slice::<PeerHandshakeEnvelope>(data) {
-        let _ = envelope.verify_signature();
+        let _ = envelope.verify_integrity_embedded_key();
         let _ = serde_json::to_vec(&envelope);
     }
 
@@ -188,7 +188,7 @@ pub fn federation_trust_establishment(data: &[u8]) {
         Err(_) => return,
     };
 
-    let _ = remote_envelope.verify_signature();
+    let _ = remote_envelope.verify_integrity_embedded_key();
     if exchange
         .accept_envelope(&remote_envelope, "kernel.remote", now)
         .is_ok()

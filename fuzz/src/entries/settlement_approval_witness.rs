@@ -90,12 +90,12 @@ fn exercise(data: &[u8]) -> bool {
     .unwrap_or_else(|error| panic!("checked-in dispatch fixture: {error}"));
     let mut body = dispatch.capital_instruction.body.clone();
     body.query.capability_id = Some("settlement-capability".to_owned());
-    dispatch.capital_instruction =
-        SignedCapitalExecutionInstruction::sign(body, &Keypair::from_seed(&[93; 32]))
-            .unwrap_or_else(|error| panic!("fixed capital signer: {error}"));
+    let capital_signer = Keypair::from_seed(&[93; 32]);
+    dispatch.capital_instruction = SignedCapitalExecutionInstruction::sign(body, &capital_signer)
+        .unwrap_or_else(|error| panic!("fixed capital signer: {error}"));
     assert!(dispatch
         .capital_instruction
-        .verify_signature()
+        .verify_signature(&capital_signer.public_key())
         .unwrap_or_else(|error| panic!("generated capital signature: {error}")));
     let tokens = vec![binding.token_symbol.clone()];
     let prepared = build_x402_payment_requirements(
