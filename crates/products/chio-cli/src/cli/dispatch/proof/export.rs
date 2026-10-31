@@ -141,7 +141,7 @@ fn redact_public_proof_archive_entries(
         &mut manifest,
         signature_path.as_deref(),
     )?;
-    let manifest_bytes = pretty_json_line(&manifest)?;
+    let manifest_bytes = canonical_json_line(&manifest)?;
     let signature_bytes = signature_path
         .as_deref()
         .map(|path| redact_public_bundle_signature(&entries, path, &manifest_bytes, export_signer))
@@ -495,7 +495,7 @@ fn update_export_trust_roots(
         }));
     }
     sign_export_json_artifact(&mut trust_roots, keypair)?;
-    *bytes = pretty_json_line(&trust_roots)?;
+    *bytes = canonical_json_line(&trust_roots)?;
     Ok(chio_core::sha256_hex(bytes))
 }
 
@@ -509,7 +509,7 @@ fn update_export_signed_json_artifact(
     };
     let mut artifact: serde_json::Value = crate::input::json(bytes)?;
     sign_export_json_artifact(&mut artifact, keypair)?;
-    *bytes = pretty_json_line(&artifact)?;
+    *bytes = canonical_json_line(&artifact)?;
     Ok(Some(chio_core::sha256_hex(bytes)))
 }
 
@@ -579,7 +579,7 @@ fn update_export_evidence_graph_optional_node(
             }
         }
     }
-    *bytes = pretty_json_line(&evidence_graph)?;
+    *bytes = canonical_json_line(&evidence_graph)?;
     Ok(chio_core::sha256_hex(bytes))
 }
 
@@ -605,7 +605,7 @@ fn update_export_transaction_passport(
         )
         .map_err(map_proof_error)?,
     );
-    *bytes = pretty_json_line(&passport)?;
+    *bytes = canonical_json_line(&passport)?;
     Ok(chio_core::sha256_hex(bytes))
 }
 
@@ -617,7 +617,7 @@ fn update_export_verifier_report(
     let bytes = archive_entry_bytes_mut(entries, verifier_report_path)?;
     let mut report: serde_json::Value = crate::input::json(bytes)?;
     report["evidence_graph_sha256"] = serde_json::Value::String(evidence_graph_sha256.to_string());
-    *bytes = pretty_json_line(&report)?;
+    *bytes = canonical_json_line(&report)?;
     Ok(chio_core::sha256_hex(bytes))
 }
 
@@ -630,7 +630,7 @@ fn update_export_ui_report(
     let mut report: serde_json::Value = crate::input::json(bytes)?;
     report["source_verifier_report_ref"]["sha256"] =
         serde_json::Value::String(verifier_report_sha256.to_string());
-    *bytes = pretty_json_line(&report)?;
+    *bytes = canonical_json_line(&report)?;
     Ok(chio_core::sha256_hex(bytes))
 }
 
@@ -730,7 +730,7 @@ fn redact_public_bundle_signature(
                 .to_hex()
         }));
     }
-    pretty_json_line(&signature)
+    canonical_json_line(&signature)
 }
 
 fn dsse_pre_auth_encoding(payload_type: &str, payload: &[u8]) -> Vec<u8> {
@@ -747,8 +747,8 @@ fn dsse_pre_auth_encoding(payload_type: &str, payload: &[u8]) -> Vec<u8> {
     encoded
 }
 
-fn pretty_json_line(value: &serde_json::Value) -> Result<Vec<u8>, CliError> {
-    let mut bytes = serde_json::to_vec_pretty(value)?;
+fn canonical_json_line(value: &serde_json::Value) -> Result<Vec<u8>, CliError> {
+    let mut bytes = chio_core::canonical_json_bytes(value)?;
     bytes.push(b'\n');
     Ok(bytes)
 }
