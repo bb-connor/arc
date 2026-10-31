@@ -840,14 +840,7 @@ pub(crate) fn compose_trust_fiscal_runtime_with_anchor(
             )
         })
         .map_err(fiscal_startup_error)?;
-    let seed_hex =
-        std::fs::read_to_string(&config.admission_signing_seed_path).map_err(|error| {
-            fiscal_startup_error(format!(
-                "failed to read fiscal admission signing seed {}: {error}",
-                config.admission_signing_seed_path.display()
-            ))
-        })?;
-    let admission_signer = Keypair::from_seed_hex(seed_hex.trim()).map_err(fiscal_startup_error)?;
+    let admission_signer = load_fiscal_admission_signer(&config.admission_signing_seed_path)?;
     reconcile_fiscal_runtime_startup(
         &store,
         anchor.as_ref(),
@@ -866,6 +859,16 @@ pub(crate) fn compose_trust_fiscal_runtime_with_anchor(
         admission_signer_key_epoch: config.admission_signer_key_epoch,
         admission_signer,
     }))
+}
+
+fn load_fiscal_admission_signer(path: &std::path::Path) -> Result<Keypair, CliError> {
+    crate::load_existing_authority_keypair(path).map_err(|error| match error {
+        CliError::KeyCustody(_) => error,
+        error => fiscal_startup_error(format!(
+            "failed to read fiscal admission signing seed {}: {error}",
+            path.display()
+        )),
+    })
 }
 
 fn fiscal_startup_error(error: impl std::fmt::Display) -> CliError {
@@ -911,6 +914,18 @@ mod tests {
             "../../../spec/schemas/chio-fiscal/v1/fixtures/{name}.positive.json"
         ));
         Ok(std::fs::read(path)?)
+    }
+
+    #[test]
+    fn fiscal_admission_seed_resolves_through_key_custody() {
+        let credential = std::path::Path::new("credential:chio-fiscal-admission-seed");
+        assert!(matches!(
+            load_fiscal_admission_signer(credential),
+            Err(CliError::KeyCustody(
+                chio_secure_ipc::seed_custody::KeyCustodyError::CredentialsDirectoryUnset
+            ))
+        ));
+        assert!(!credential.exists());
     }
 
     #[test]
@@ -982,10 +997,7 @@ mod tests {
             &authority.mutation_fence(),
         )?;
         let admission_seed_path = temp.path().join("fiscal-admission.seed");
-        std::fs::write(
-            &admission_seed_path,
-            format!("{}\n", Keypair::from_seed(&[7; 32]).seed_hex()),
-        )?;
+        crate::write_authority_seed_file(&admission_seed_path, &Keypair::from_seed(&[7; 32]))?;
         let config = TrustFiscalRuntimeConfig {
             genesis_policy: policy,
             anchor_url: "https://fiscal-anchor.example".to_owned(),

@@ -80,7 +80,7 @@ fn read_canonical_private_json<T: serde::de::DeserializeOwned + serde::Serialize
     let _ = label;
     let maximum = usize::try_from(maximum)
         .map_err(|_| CliError::cli_other_error("invalid private input bound"))?;
-    let bytes = chio_control_plane::read_private_signing_custody(path, maximum)?;
+    let bytes = chio_secure_ipc::seed_custody::read_private_file(path, maximum)?;
     Ok(chio_core::canonical::UntrustedJsonText::from_wire(&bytes, maximum)?.decode_canonical()?)
 }
 

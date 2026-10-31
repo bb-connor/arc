@@ -25,7 +25,7 @@ impl Serialize for Seed {
 pub(crate) fn read<T: serde::de::DeserializeOwned>(
     path: &std::path::Path,
 ) -> Result<T, crate::CliError> {
-    let bytes = chio_control_plane::read_private_signing_custody(path, 16 * 1024)?;
+    let bytes = chio_secure_ipc::seed_custody::read_private_file(path, 16 * 1024)?;
     chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 16 * 1024)?;
     serde_json::from_slice(&bytes)
         .map_err(chio_core::canonical::UntrustedJsonError::Decode)

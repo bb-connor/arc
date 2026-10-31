@@ -1230,7 +1230,7 @@ fn trust_config(
 
 pub(super) fn load_profile(path: &Path) -> Result<(FindingOperatorProfile, PathBuf), CliError> {
     require_secret_file(path)?;
-    let raw = chio_control_plane::read_private_signing_custody(path, PROFILE_MAX_BYTES)?;
+    let raw = chio_secure_ipc::seed_custody::read_private_file(path, PROFILE_MAX_BYTES)?;
     if raw.is_empty() || raw.len() > PROFILE_MAX_BYTES {
         return Err(CliError::cli_other_error(
             "operator profile is empty or exceeds its size bound".to_owned(),
@@ -1534,7 +1534,7 @@ fn require_exact_regular_file(path: &Path, expected: &[u8]) -> Result<(), CliErr
 }
 
 fn require_exact_private_file(path: &Path, expected: &[u8]) -> Result<(), CliError> {
-    let actual = chio_control_plane::read_private_signing_custody(path, expected.len())?;
+    let actual = chio_secure_ipc::seed_custody::read_private_file(path, expected.len())?;
     if actual.as_slice() != expected {
         return Err(CliError::cli_other_error(format!(
             "{} already contains different initialization data",

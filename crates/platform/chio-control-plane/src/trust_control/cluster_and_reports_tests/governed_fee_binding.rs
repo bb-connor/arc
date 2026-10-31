@@ -405,11 +405,7 @@ fn fiscal_fee_node(rotate_on_read: Option<usize>, governed: bool) -> GovernedFee
     };
 
     let admission_seed_path = directory.path().join("fiscal-admission.seed");
-    std::fs::write(
-        &admission_seed_path,
-        format!("{}\n", admission_key.seed_hex()),
-    )
-    .test_unwrap();
+    crate::write_authority_seed_file(&admission_seed_path, &admission_key).test_unwrap();
     let config = TrustFiscalRuntimeConfig {
         genesis_policy: policy,
         anchor_url: "https://fiscal-anchor.example".to_owned(),

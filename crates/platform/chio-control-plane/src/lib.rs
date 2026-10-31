@@ -21,6 +21,7 @@ pub use chio_agent_web_interop as agent_web;
 use chio_core::capability::threshold_approval::ThresholdApprovalRequirement;
 use chio_core::crypto::Keypair;
 use chio_kernel::{ChioKernel, KernelConfig};
+#[cfg(test)]
 use std::fs;
 #[cfg(not(unix))]
 use std::fs::OpenOptions;
@@ -468,39 +469,14 @@ pub fn require_control_token(control_token: Option<&str>) -> Result<&str, CliErr
     })
 }
 
-pub fn authority_public_key_from_seed_file(
-    path: &Path,
-) -> Result<Option<chio_core::PublicKey>, CliError> {
-    match fs::read_to_string(path) {
-        Ok(seed_hex) => Ok(Some(Keypair::from_seed_hex(seed_hex.trim())?.public_key())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(CliError::Io(error)),
-    }
-}
-
-pub fn rotate_authority_keypair(path: &Path) -> Result<chio_core::PublicKey, CliError> {
-    let keypair = Keypair::generate();
-    write_authority_seed_file(path, &keypair)?;
-    Ok(keypair.public_key())
-}
-
-pub fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
-    match authority_public_key_from_seed_file(path)? {
-        Some(_) => {
-            let seed_hex = fs::read_to_string(path)?;
-            Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
-        }
-        None => {
-            let keypair = Keypair::generate();
-            write_authority_seed_file(path, &keypair)?;
-            Ok(keypair)
-        }
-    }
-}
-
 pub mod server_transport;
 mod signing_custody;
-pub use signing_custody::{load_existing_authority_keypair, read_private_signing_custody};
+#[cfg(test)]
+pub(crate) use signing_custody::write_authority_seed_file;
+pub use signing_custody::{
+    authority_public_key_from_seed_file, load_existing_authority_keypair,
+    load_or_create_authority_keypair, rotate_authority_keypair, writable_authority_seed_file,
+};
 
 pub fn issue_default_capabilities(
     kernel: &ChioKernel,
@@ -520,10 +496,6 @@ pub fn issue_default_capabilities(
                 })
         })
         .collect()
-}
-
-fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliError> {
-    write_private_file_atomically(path, format!("{}\n", keypair.seed_hex()).as_bytes())
 }
 
 #[cfg(test)]

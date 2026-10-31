@@ -1176,9 +1176,11 @@ fn persist_key_enterprise_receipt(
     }
 }
 
+/// Keyring rotation replaces the active seed, so it must be a writable seed file.
 fn load_existing_authority_keypair_with_identity(
     path: &Path,
 ) -> Result<(Keypair, PrivateFileIdentity), CliError> {
+    let path = crate::writable_authority_seed_file(path)?;
     let (bytes, identity) = read_private_file(path, 256)?;
     let seed_hex = std::str::from_utf8(&bytes)
         .map_err(|_| CliError::cli_other_error("authority seed is not valid UTF-8".to_string()))?;
@@ -1743,6 +1745,19 @@ fn sync_parent_directory(path: &Path) -> Result<(), std::io::Error> {
 pub(crate) mod tests {
     use super::*;
     use chio_test_support::prelude::*;
+
+    #[test]
+    fn keyring_authority_seed_refuses_read_only_credential_custody() {
+        assert!(matches!(
+            load_existing_authority_keypair_with_identity(Path::new(
+                "credential:chio-authority-seed"
+            )),
+            Err(CliError::KeyCustody(
+                chio_secure_ipc::seed_custody::KeyCustodyError::ReadOnlyCustody
+            ))
+        ));
+        assert!(!Path::new("credential:chio-authority-seed").exists());
+    }
 
     /// A rotating backend whose current selector cannot be read.
     pub(crate) struct UnreadableSelectorBackend(pub(crate) chio_core::crypto::Ed25519Backend);

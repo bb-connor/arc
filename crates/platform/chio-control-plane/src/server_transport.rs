@@ -11,7 +11,7 @@ pub fn prepare(
     config.validate(listen).map_err(std::io::Error::other)?;
     match (&config.tls_cert, &config.tls_key) {
         (Some(certificate), Some(key)) => {
-            let key = crate::read_private_signing_custody(key, 64 * 1024)?;
+            let key = chio_secure_ipc::seed_custody::read_private_file(key, 64 * 1024)?;
             let certificate = read_certificate(certificate)?;
             PreparedServerTransport::from_pem(&certificate, &key)
                 .map_err(|error| std::io::Error::other(error).into())
