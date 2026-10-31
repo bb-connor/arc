@@ -1,5 +1,6 @@
 #![allow(clippy::expect_used)]
 
+use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
 #[test]
@@ -59,6 +60,8 @@ fn trust_config_check_refuses_an_unknown_key() {
             format!("{key} = \"x\"\ndeployment = \"d\"\ninternal_listen = \"127.0.0.1:0\"\n"),
         )
         .expect("write access config");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
+            .expect("restrict access config");
         let output = Command::new(env!("CARGO_BIN_EXE_chio"))
             .args(["trust", "config", "check", "--access-config"])
             .arg(&path)
