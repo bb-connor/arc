@@ -2,6 +2,56 @@ use super::*;
 
 use chio_kernel::{RuntimeAdmissionContext, RuntimeAdmissionDecision, RuntimeAdmissionHook};
 
+/// A `research` call carrying `capability` with no proof, nonce, approval or
+/// governed intent, for tests to override field by field.
+fn tool_call_request(
+    capability: CapabilityToken,
+    server_id: String,
+    agent_id: String,
+) -> ToolCallRequest {
+    ToolCallRequest {
+        request_id: "req-a2a".to_string(),
+        capability,
+        tool_name: "research".to_string(),
+        server_id,
+        agent_id,
+        arguments: json!({ "message": "answer the question" }),
+        dpop_proof: None,
+        execution_nonce: None,
+        governed_intent: None,
+        approval_token: None,
+        approval_tokens: Vec::new(),
+        threshold_approval_proposal: None,
+        supplemental_authorization: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
+        declassification_grant: None,
+    }
+}
+
+/// A kernel with a fresh signing key that trusts `issuer` and keeps its
+/// receipt log and revocation store in memory.
+fn kernel_config(issuer: &Keypair) -> KernelConfig {
+    KernelConfig {
+        keypair: Keypair::generate(),
+        ca_public_keys: vec![issuer.public_key()],
+        max_delegation_depth: 5,
+        policy_hash: "test-policy".to_string(),
+        allow_sampling: false,
+        allow_sampling_tool_use: false,
+        allow_elicitation: false,
+        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
+        allow_ephemeral_receipt_log: true,
+        allow_ephemeral_revocation_store: true,
+        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
+        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
+        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
+    }
+}
+
 struct DenyingA2aRuntimeAdmissionHook;
 
 impl RuntimeAdmissionHook for DenyingA2aRuntimeAdmissionHook {
@@ -41,24 +91,7 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
     let server_id = adapter.server_id().to_string();
     let expected_server_id = server_id.clone();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = CapabilityToken::sign(
@@ -90,25 +123,11 @@ async fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
 
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
-            request_id: "req-a2a".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Summarize the current blood pressure guidance",
                 "metadata": { "origin": "kernel-test" }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate A2A tool call");
@@ -142,47 +161,17 @@ async fn kernel_e2e_a2a_runtime_admission_denies_before_send_message() {
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.set_runtime_admission_hook(Arc::new(DenyingA2aRuntimeAdmissionHook));
     kernel.register_tool_server(Box::new(adapter));
 
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-runtime-denied".to_string(),
-            capability: test_capability(&issuer, &subject, &server_id, "cap-a2a-runtime-denied"),
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "this must not reach the remote A2A server"
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(test_capability(&issuer, &subject, &server_id, "cap-a2a-runtime-denied"), server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate A2A tool call");
@@ -219,47 +208,14 @@ async fn kernel_e2e_a2a_query_api_key_invocation_produces_allow_receipt() {
     .expect("discover query-auth adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-query-auth");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-query-auth".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
-            arguments: json!({
-                "message": "answer the question"
-            }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate query-auth A2A tool call");
@@ -293,47 +249,14 @@ async fn kernel_e2e_a2a_basic_auth_invocation_produces_allow_receipt() {
     .expect("discover basic-auth adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-basic-auth");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-basic-auth".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
-            arguments: json!({
-                "message": "answer the question"
-            }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate basic-auth A2A tool call");
@@ -376,47 +299,17 @@ async fn kernel_e2e_a2a_mtls_invocation_produces_allow_receipt() {
     let server_id = adapter.server_id().to_string();
     let expected_server_id = server_id.clone();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-mtls");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-mtls".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Summarize the current blood pressure guidance"
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate mTLS A2A tool call");
@@ -452,24 +345,7 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
     let server_id = adapter.server_id().to_string();
     let expected_server_id = server_id.clone();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = CapabilityToken::sign(
@@ -502,24 +378,11 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
     let initial = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-start".to_string(),
-            capability: capability.clone(),
-            tool_name: "research".to_string(),
-            server_id: server_id.clone(),
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Begin longer research task",
                 "return_immediately": true
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability.clone(), server_id.clone(), subject.public_key().to_hex())
         })
         .await
         .expect("evaluate initial A2A tool call");
@@ -534,26 +397,13 @@ async fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
     let follow_up = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-poll".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "get_task": {
                     "id": "task-1",
                     "history_length": 1
                 }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate follow-up A2A tool call");
@@ -592,48 +442,18 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-follow-up-denied");
     let initial = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-follow-up-denied-start".to_string(),
-            capability: capability.clone(),
-            tool_name: "research".to_string(),
-            server_id: server_id.clone(),
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Begin longer research task",
                 "return_immediately": true
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability.clone(), server_id.clone(), subject.public_key().to_hex())
         })
         .await
         .expect("evaluate initial A2A tool call");
@@ -647,26 +467,13 @@ async fn kernel_e2e_a2a_deferred_get_task_runtime_admission_denies_before_remote
     let denied = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-follow-up-denied-poll".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "get_task": {
                     "id": "task-1",
                     "history_length": 1
                 }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate denied follow-up A2A tool call");
@@ -718,50 +525,20 @@ async fn kernel_e2e_a2a_cancel_task_produces_allow_receipt() {
     let server_id = adapter.server_id().to_string();
     seed_a2a_task(&adapter, "research", "task-1");
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-cancel");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-cancel".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "cancel_task": {
                     "id": "task-1",
                     "metadata": { "reason": "user-request" }
                 }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate cancel-task A2A tool call");
@@ -793,48 +570,18 @@ async fn kernel_e2e_a2a_streaming_invocation_produces_allow_receipt() {
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-stream");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-stream".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Stream the answer",
                 "stream": true
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate streaming A2A tool call");
@@ -865,48 +612,18 @@ async fn kernel_e2e_a2a_incomplete_streaming_invocation_produces_incomplete_rece
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-stream-incomplete");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-stream-incomplete".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "message": "Stream the answer",
                 "stream": true
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate incomplete streaming A2A tool call");
@@ -942,47 +659,17 @@ async fn kernel_e2e_a2a_subscribe_task_produces_allow_receipt() {
     let server_id = adapter.server_id().to_string();
     seed_a2a_task(&adapter, "research", "task-1");
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-subscribe");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-subscribe".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "subscribe_task": { "id": "task-1" }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate subscribe-to-task A2A tool call");
@@ -1016,24 +703,7 @@ async fn kernel_e2e_a2a_incomplete_subscribe_task_produces_incomplete_receipt() 
     let server_id = adapter.server_id().to_string();
     seed_a2a_task(&adapter, "research", "task-1");
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(
@@ -1045,23 +715,10 @@ async fn kernel_e2e_a2a_incomplete_subscribe_task_produces_incomplete_receipt() 
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-subscribe-incomplete".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
             arguments: json!({
                 "subscribe_task": { "id": "task-1" }
             }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate incomplete subscribe-to-task A2A tool call");
@@ -1094,47 +751,14 @@ async fn kernel_e2e_missing_required_bearer_security_denies_request() {
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-auth-deny");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-auth-deny".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
-            arguments: json!({
-                "message": "answer the question"
-            }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate A2A tool call");
@@ -1165,47 +789,14 @@ async fn kernel_e2e_oauth_client_credentials_allows_request() {
     .expect("discover adapter");
     let server_id = adapter.server_id().to_string();
 
-    let mut kernel = ChioKernel::new(KernelConfig {
-        keypair: Keypair::generate(),
-        ca_public_keys: vec![issuer.public_key()],
-        max_delegation_depth: 5,
-        policy_hash: "test-policy".to_string(),
-        allow_sampling: false,
-        allow_sampling_tool_use: false,
-        allow_elicitation: false,
-        max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        require_web3_evidence: false,
-        allow_ephemeral_receipt_log: true,
-        allow_ephemeral_revocation_store: true,
-        checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-        memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
-        deadlines: chio_kernel::HotPathDeadlineConfig::default(),
-    });
+    let mut kernel = ChioKernel::new(kernel_config(&issuer));
     kernel.register_tool_server(Box::new(adapter));
 
     let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-oauth");
     let response = kernel
         .evaluate_tool_call(&ToolCallRequest {
             request_id: "req-a2a-oauth".to_string(),
-            capability,
-            tool_name: "research".to_string(),
-            server_id,
-            agent_id: subject.public_key().to_hex(),
-            arguments: json!({
-                "message": "answer the question"
-            }),
-            dpop_proof: None,
-            execution_nonce: None,
-            governed_intent: None,
-            approval_token: None,
-            approval_tokens: Vec::new(),
-            threshold_approval_proposal: None,
-            supplemental_authorization: None,
-            model_metadata: None,
-            federated_origin_kernel_id: None,
-            declassification_grant: None,
+            ..tool_call_request(capability, server_id, subject.public_key().to_hex())
         })
         .await
         .expect("evaluate OAuth-backed A2A tool call");
