@@ -328,6 +328,9 @@
     "n": {
       "type": "integer"
     },
+    "root_anchor": {
+      "$ref": "../root_authority/root-anchor.schema.json"
+    },
     "schema": {
       "const": "chio.capability.v1"
     },

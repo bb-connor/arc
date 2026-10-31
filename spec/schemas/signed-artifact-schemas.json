@@ -221,7 +221,12 @@
       "introducedBy": "schema-registry/v1/capability-token-v1",
       "schemaFile": "spec/schemas/chio-wire/v1/capability/capability-body.schema.json",
       "title": "chio.capability.v1 signed body",
-      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/capability/token.schema.json"
+      "envelopeSchemaFile": "spec/schemas/chio-wire/v1/capability/token.schema.json",
+      "overrides": {
+        "/root_anchor": {
+          "$ref": "../root_authority/root-anchor.schema.json"
+        }
+      }
     },
     {
       "schema": "chio.capital-pool-optimization.v1",

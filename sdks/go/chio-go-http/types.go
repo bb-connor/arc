@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 7414bd527155a5f79b1cc4063abcc9c205845c2b4aec5d106fbd2181c0f03867
+// Schema content SHA-256: eac28a2b68bcc97fb01c3d3944c720b658130237219cc38a4856bc0c497ac7ee
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -6976,14 +6976,17 @@ type CapabilityCapabilityBody struct {
 		Signature string  `json:"signature"`
 		Timestamp int64   `json:"timestamp"`
 	} `json:"delegation_chain,omitempty"`
-	ExpiresAt *int64                          `json:"expires_at,omitempty"`
-	Fixture   *string                         `json:"fixture,omitempty"`
-	Id        *string                         `json:"id,omitempty"`
-	IssuedAt  *int64                          `json:"issued_at,omitempty"`
-	Issuer    *string                         `json:"issuer,omitempty"`
-	N         *int64                          `json:"n,omitempty"`
-	Schema    *CapabilityCapabilityBodySchema `json:"schema,omitempty"`
-	Scope     *struct {
+	ExpiresAt *int64  `json:"expires_at,omitempty"`
+	Fixture   *string `json:"fixture,omitempty"`
+	Id        *string `json:"id,omitempty"`
+	IssuedAt  *int64  `json:"issued_at,omitempty"`
+	Issuer    *string `json:"issuer,omitempty"`
+	N         *int64  `json:"n,omitempty"`
+
+	// RootAnchor The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
+	RootAnchor *RootAuthorityRootAnchor        `json:"root_anchor,omitempty"`
+	Schema     *CapabilityCapabilityBodySchema `json:"schema,omitempty"`
+	Scope      *struct {
 		Grants *[]struct {
 			Constraints *[]struct {
 				Type  string                                                   `json:"type"`

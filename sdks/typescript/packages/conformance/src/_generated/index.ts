@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: d656e49dae3fa870fe5b10b5d5e698d7cdc3de4c21f545469da5bd46be144a25
+// Schema SHA: 8a68f0614123617498652970f6f09fc0becfa2affeb33e56fd3b0c3440948908
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -978,6 +978,7 @@ export namespace Capability_CapabilityBody {
     issued_at?: number;
     issuer?: string;
     n?: number;
+    root_anchor?: ChioRootAnchor;
     schema?: "chio.capability.v1";
     scope?: {
       grants?: {
@@ -1058,6 +1059,39 @@ export namespace Capability_CapabilityBody {
       type: string;
     }[];
     subject?: string;
+  }
+  /**
+   * The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
+   */
+  export interface ChioRootAnchor {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
   }
 }
 

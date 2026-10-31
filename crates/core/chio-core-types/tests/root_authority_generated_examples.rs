@@ -245,3 +245,15 @@ fn generated_token_refuses_padding_inside_root_anchor() {
     let error = decode::<generated::shared::ChioCapabilityToken>(&text).expect_err("padded anchor");
     assert!(error.contains("padding"), "{error}");
 }
+
+#[test]
+fn generated_signed_body_decodes_the_anchored_token_without_its_signature() {
+    let mut body = anchored_token();
+    let members = body.as_object_mut().expect("token object");
+    assert!(members.remove("signature").is_some());
+    let text = serde_json::to_string(&body).expect("body text");
+    assert_eq!(
+        decode::<generated::capability_capability_body::ChioCapabilityV1SignedBody>(&text),
+        Ok(())
+    );
+}

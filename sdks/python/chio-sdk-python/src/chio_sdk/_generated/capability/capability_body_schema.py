@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: cdaf59925a71448dee294bc7dd11837a988bac5f39ad022834183bd6833707a0
+# Schema sha256: 29f505f3691b4fbfea30cc6f60a7264757030799f7d4c23f1b591e15d011a565
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,6 +14,8 @@ from __future__ import annotations
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from ..root_authority import root_anchor_schema
 
 
 class Body(BaseModel):
@@ -292,6 +294,7 @@ class ChioCapabilityV1SignedBody(BaseModel):
     issued_at: int | None = None
     issuer: str | None = None
     n: int | None = None
+    root_anchor: root_anchor_schema.ChioRootAnchor | None = None
     schema_: Literal["chio.capability.v1"] = Field("chio.capability.v1", alias="schema")
     scope: Scope | None = None
     scope_attenuations: list[ScopeAttenuation] | None = None
