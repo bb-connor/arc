@@ -110,7 +110,7 @@ cargo test -p chio-provider-conformance \
 ./scripts/check-chio-go-release.sh
 
 # Flagship demo + launch-acceptance regression assets (lane wiring).
-cargo build -p chio-cli --bin chio
+cargo build -p chio-cli --features finding-market --bin chio
 CHIO_BIN="$(pwd)/target/debug/chio" bash ./scripts/check-chio-transaction-passport.sh
 CHIO_BIN="$(pwd)/target/debug/chio" cargo xtask verify launch-acceptance --out target/proof-room/public-bundle
 bash ./scripts/tests/check-chio-proof-room-launch-acceptance.test.sh
@@ -166,12 +166,12 @@ run_external_consumer_smoke() {
   case "${peer_mode}" in
     published)
       # Published rows prove the immutable download and digest boundary.
-      cargo run -p chio-cli --bin chio -- conformance fetch-peers \
+      cargo run -p chio-cli --features finding-market --bin chio -- conformance fetch-peers \
         --lockfile "${release_peer_lock}" \
         --language python \
         --out "${peer_root}"
 
-      cargo run -p chio-cli --bin chio -- conformance run \
+      cargo run -p chio-cli --features finding-market --bin chio -- conformance run \
         --peer python \
         --peer-binary "${peer_root}/python-${peer_target}/${peer_binary}" \
         --report json \
@@ -179,13 +179,13 @@ run_external_consumer_smoke() {
       ;;
     source-pre-release)
       # Pre-release locks prove their shape, then execute the real source peer.
-      cargo run -p chio-cli --bin chio -- conformance fetch-peers \
+      cargo run -p chio-cli --features finding-market --bin chio -- conformance fetch-peers \
         --lockfile "${release_peer_lock}" \
         --language python \
         --check \
         --allow-unpublished-only
 
-      cargo run -p chio-cli --bin chio -- conformance run \
+      cargo run -p chio-cli --features finding-market --bin chio -- conformance run \
         --peer python \
         --report json \
         --output "${report_path}"
@@ -280,7 +280,7 @@ run_conformance_area() {
     --results-dir "${area_dir}/results" \
     --report-output "${report_path}"
 
-  cargo run -p chio-cli --bin chio -- certify check \
+  cargo run -p chio-cli --features finding-market --bin chio -- certify check \
     --scenarios-dir "${scenarios_dir}" \
     --results-dir "${area_dir}/results" \
     --output "${certification_path}" \
@@ -289,7 +289,7 @@ run_conformance_area() {
     --tool-server-name "Chio Conformance ${area}" \
     --signing-seed-file "${certify_seed}"
 
-  cargo run -p chio-cli --bin chio -- certify verify \
+  cargo run -p chio-cli --features finding-market --bin chio -- certify verify \
     --input "${certification_path}" >"${verification_path}"
 }
 
@@ -313,7 +313,7 @@ verified_fix_sandbox_tests=(
 )
 for sandbox_test in "${verified_fix_sandbox_tests[@]}"; do
   sandbox_log="${log_root}/verified-fix-sandbox-${sandbox_test##*::}.log"
-  cargo test -p chio-cli --bin chio "${sandbox_test}" -- --exact --ignored --nocapture \
+  cargo test -p chio-cli --features finding-market --bin chio "${sandbox_test}" -- --exact --ignored --nocapture \
     | tee "${sandbox_log}"
   if ! grep -Eq '^test result: ok\. 1 passed; 0 failed; 0 ignored;' "${sandbox_log}"; then
     echo "verified-fix sandbox test did not execute exactly once: ${sandbox_test}" >&2

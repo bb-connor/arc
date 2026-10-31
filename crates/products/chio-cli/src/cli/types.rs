@@ -21,8 +21,10 @@ pub(crate) use workflow::*;
 #[path = "types/replay.rs"]
 mod replay;
 pub(crate) use replay::*;
+#[cfg(feature = "finding-market")]
 #[path = "types/finding.rs"]
 mod finding;
+#[cfg(feature = "finding-market")]
 pub(crate) use finding::*;
 
 /// Chio -- Chio.
@@ -842,6 +844,7 @@ pub(crate) enum Commands {
     },
 
     /// Publish, discover, verify, and purchase cognition-market findings.
+    #[cfg(feature = "finding-market")]
     Finding {
         #[command(subcommand)]
         command: FindingCommands,
