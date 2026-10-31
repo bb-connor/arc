@@ -72,6 +72,7 @@ pub mod dead_letters;
 pub mod delegation_store;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
+pub mod enterprise_identity_store;
 pub mod enterprise_migration_state;
 pub mod evidence_export;
 pub mod execution_nonce_store;
@@ -434,6 +435,9 @@ pub use encrypted_blob::{
     decrypt_blob, encrypt_blob, BlobHandle, BlobReference, BlobReferenceMutationOutcome,
     BlobStoreError, DecryptError, EncryptError, EncryptedBlob, SqliteEncryptedBlobStore, TenantId,
     TenantKey,
+};
+pub use enterprise_identity_store::{
+    SqliteEnterpriseIdentityStore, SqliteEnterpriseIdentityStoreError,
 };
 pub use enterprise_migration_state::{
     enterprise_migration_transition_digest, sign_enterprise_migration_transition,
