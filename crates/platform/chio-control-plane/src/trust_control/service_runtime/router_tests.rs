@@ -32,6 +32,9 @@ mod receipt_store_ownership_tests;
 mod attestation_authentication_tests;
 
 #[cfg(target_os = "linux")]
+#[path = "router_tests/root_exchange_sign_tests.rs"]
+mod root_exchange_sign_tests;
+
 #[path = "router_tests/behavioral_signing_custody.rs"]
 mod behavioral_signing_custody;
 

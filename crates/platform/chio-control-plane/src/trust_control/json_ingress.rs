@@ -64,6 +64,7 @@ fn contract(method: &str, path: &str) -> Option<(Mode, usize)> {
     match (method, path) {
         ("POST", AUTHORITY_KEY_LOG_SYNC_PATH) => Some((Mode::Signed, 4 * 1024)),
         ("POST", ISSUE_CAPABILITY_PATH) => Some((Mode::Signed, 1024 * 1024)),
+        ("POST", ROOT_EXCHANGE_SIGN_PATH) => Some((Mode::Signed, 1024 * 1024)),
         ("POST", FEDERATED_ISSUE_PATH) => Some((Mode::Signed, 1024 * 1024)),
         ("POST", SCIM_USERS_PATH) => Some((Mode::Signed, 1024 * 1024)),
         ("PUT", FEDERATION_PROVIDER_PATH) => Some((Mode::Signed, 1024 * 1024)),

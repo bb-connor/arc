@@ -154,6 +154,7 @@ pub static ROUTE_TABLE: &[RouteRule] = &[
     route!(Post, BUDGET_RECONCILE_SPEND_PATH, Public, Deployment, Some(Scope::BudgetsWrite), DeploymentOnly),
     route!(Post, BUDGET_RELEASE_EXPOSURE_PATH, Public, Deployment, Some(Scope::BudgetsWrite), DeploymentOnly),
     route!(Post, ISSUE_CAPABILITY_PATH, Public, Deployment, Some(Scope::CapabilitiesIssue), DeploymentOnly),
+    route!(Post, ROOT_EXCHANGE_SIGN_PATH, Public, Deployment, Some(Scope::RootExchangeSign), DeploymentOnly),
     route!(Post, CAPITAL_ALLOCATION_ISSUE_PATH, Public, Caller, Some(Scope::CreditWrite), DeploymentOnly),
     route!(Post, CAPITAL_INSTRUCTION_ISSUE_PATH, Public, Caller, Some(Scope::CreditWrite), DeploymentOnly),
     route!(Get, CERTIFICATIONS_PATH, Public, Caller, Some(Scope::CertificationsRead), DeploymentOnly),

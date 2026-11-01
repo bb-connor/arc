@@ -375,6 +375,8 @@ pub(crate) mod report_validation;
 pub mod reports;
 #[path = "trust_control/risk_finance_handlers.rs"]
 mod risk_finance_handlers;
+#[path = "trust_control/root_exchange_signing.rs"]
+mod root_exchange_signing;
 #[path = "trust_control/route_authorization.rs"]
 pub mod route_authorization;
 #[path = "trust_control/service_runtime.rs"]
@@ -420,6 +422,7 @@ pub(crate) use self::finding_search_routes::{
 };
 pub use self::finding_status_handlers::build_operator_voluntary_retraction;
 pub(crate) use self::finding_status_handlers::*;
+pub(crate) use self::root_exchange_signing::*;
 // The evidenced-rail seam is part of the finding lane's deployment
 // surface: the dispute-fee charge takes it by injection exactly as the
 // admission and participation charges do.

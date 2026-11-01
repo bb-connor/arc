@@ -228,11 +228,21 @@ pub(crate) fn validate_authority_mutation_auth(
     headers: &HeaderMap,
     state: &TrustServiceState,
 ) -> Result<Option<u64>, Response> {
-    validate_caller(
+    validate_authority_scope_auth(
         headers,
-        &state.config,
+        state,
         super::caller_credentials::Scope::AuthorityAdmin,
-    )?;
+    )
+}
+
+/// Authenticate a request that signs under the authority (`scope`) and return
+/// the forwarded authority term when a follower forwarded it.
+pub(crate) fn validate_authority_scope_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    scope: super::caller_credentials::Scope,
+) -> Result<Option<u64>, Response> {
+    validate_caller(headers, &state.config, scope)?;
     let term = forwarded_authority_term(headers)?;
     validate_authority_mutation_term(state, term)?;
     Ok(term)
@@ -266,22 +276,6 @@ pub(crate) fn validate_authority_mutation_term(
         ));
     }
     Ok(())
-}
-
-/// Authenticate capability issuance (`capabilities:issue`) and return the
-/// forwarded authority term when a follower forwarded it.
-pub(crate) fn validate_authority_issue_auth(
-    headers: &HeaderMap,
-    state: &TrustServiceState,
-) -> Result<Option<u64>, Response> {
-    validate_caller(
-        headers,
-        &state.config,
-        super::caller_credentials::Scope::CapabilitiesIssue,
-    )?;
-    let term = forwarded_authority_term(headers)?;
-    validate_authority_mutation_term(state, term)?;
-    Ok(term)
 }
 
 pub(crate) fn enforce_authority_mutation_fence(
@@ -457,7 +451,7 @@ pub(crate) fn validate_metered_billing_reconciliation_request(
     Ok(())
 }
 
-fn open_authority_for_state(
+pub(crate) fn open_authority_for_state(
     state: &TrustServiceState,
     path: &Path,
 ) -> Result<SqliteCapabilityAuthority, CliError> {

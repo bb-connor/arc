@@ -107,7 +107,7 @@ fn route_table_covers_every_router_route() {
         })
         .collect();
     table.sort();
-    assert_eq!(router.len(), 213);
+    assert_eq!(router.len(), 214);
     let mut unique = router.clone();
     unique.dedup();
     assert_eq!(
@@ -1290,19 +1290,4 @@ async fn peer_handlers_recheck_their_row_scope() {
         assert_eq!(status, StatusCode::UNAUTHORIZED);
         assert!(body.contains(UNAUTHENTICATED_PEER), "{body}");
     }
-}
-
-#[test]
-fn root_exchange_sign_loads_but_no_route_accepts_it() {
-    assert!(ROUTE_TABLE
-        .iter()
-        .all(|rule| rule.scope != Some(Scope::RootExchangeSign)));
-    TrustAccessConfig::from_toml_str(&config(&credential(
-        "root-exchange",
-        "deployment",
-        "root-exchange-secret",
-        &["root-exchange:sign"],
-        None,
-    )))
-    .test_unwrap();
 }

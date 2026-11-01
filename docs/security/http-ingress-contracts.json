@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "Framework request extraction, transport response decoding, non-JSON formats, and resolved shared-reader call sites. This supplements the direct serde census and never changes its raw-input baseline.",
-  "control_reader_sha256": "f2ec1eb0f22fd22ad42ff6308aa452a648b72dd4b6e854ea1318a16db1f45b88",
+  "control_reader_sha256": "0330aabe4a11a70f165b7291d93a8238e791367e15c3288c7a39835917ca94c2",
   "requests": [
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
@@ -42,8 +42,22 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
       "method": "POST",
       "route": "ISSUE_CAPABILITY_PATH",
-      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `capabilities:issue` with deployment tenant authority. After typed extraction, validate_authority_issue_auth repeats validate_caller with `capabilities:issue` and checks any x-chio-forwarded-authority-term against the live authority lease; the handler then forwards to the leader, or applies validate_authority_mutation_term and enforce_authority_mutation_fence before issuance.",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `capabilities:issue` with deployment tenant authority. After typed extraction, validate_authority_scope_auth repeats validate_caller with `capabilities:issue` and checks any x-chio-forwarded-authority-term against the live authority lease; the handler then forwards to the leader, or applies validate_authority_mutation_term and enforce_authority_mutation_fence before issuance.",
       "semantics": "Capability issuance requests select subject, scope, grants and attestation inputs; the capability authority applies issuance policy before signing."
+    },
+    {
+      "source": "crates/platform/chio-control-plane/src/trust_control/root_exchange_signing.rs",
+      "owner": "handle_root_exchange_sign",
+      "format": "json",
+      "request_type": "RootExchangeSignRequest",
+      "disposition": "bounded-signed-json",
+      "reader": "signed",
+      "max_bytes": 1048576,
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router",
+      "method": "POST",
+      "route": "ROOT_EXCHANGE_SIGN_PATH",
+      "authentication": "authorize_route enforces the ROUTE_TABLE row before any body read: a deployment-kind credential holding `root-exchange:sign` with deployment tenant authority. validate_authority_scope_auth repeats validate_caller and checks any forwarded authority term; the handler then forwards to the leader, or applies validate_authority_mutation_term and enforce_authority_mutation_fence before signing.",
+      "semantics": "The closed request union, then check_snapshot_sign against the provider registry and the current exchange key, before the store signs under the current head."
     },
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
@@ -1682,7 +1696,7 @@
   ],
   "router_compositions": {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs::build_router": {
-      "sha256": "890cf4082cbf8da2d3b9e6192db0834d299233dfe7889f9655fb2209c36f72ee",
+      "sha256": "3b4cbc2dcb224352d7d47a364f509b014475939ec4d3f76c264cce36e5773aa3",
       "merges": {
         "finding_market_routes": "802d9fd0e181fe667edacb380510d4b99f95f27629fa2471c2dc6a978e999b7b"
       },

@@ -9,10 +9,11 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::PublicKey;
+use crate::crypto::{PublicKey, Signature};
 
 use super::idp_key_snapshot::{
-    IdpKeySnapshot, IdpKeySnapshotSigningBody, KeySnapshotSource, CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+    IdpKeySnapshot, IdpKeySnapshotFields, IdpKeySnapshotSigningBody, KeySnapshotSource,
+    CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
 };
 use super::jwk::Jwk;
 use super::provider_identity::EnterpriseProviderIdentity;
@@ -63,6 +64,20 @@ impl IdpKeySnapshotBody {
             keys: &self.keys,
             observed_at: self.observed_at,
             exchange_key: &self.exchange_key,
+        }
+    }
+
+    /// The snapshot members with `signature` attached.
+    #[must_use]
+    pub fn signed(&self, signature: Signature) -> IdpKeySnapshotFields {
+        IdpKeySnapshotFields {
+            schema: self.schema.clone(),
+            issuer: self.issuer.clone(),
+            source: self.source.clone(),
+            keys: self.keys.clone(),
+            observed_at: self.observed_at,
+            exchange_key: self.exchange_key.clone(),
+            signature,
         }
     }
 }

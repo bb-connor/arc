@@ -9,6 +9,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{Keypair, PublicKey, Signature};
+use chio_core::root_authority::{IdpKeySnapshot, IdpKeySnapshotBody, CHIO_IDP_KEY_SNAPSHOT_SCHEMA};
 use chio_kernel::authority::lifecycle::AuthorityKeyLifecycle;
 use chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy;
 use chio_kernel::{
@@ -190,6 +191,50 @@ impl SqliteCapabilityAuthority {
     pub fn local_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
         let connection = Self::open_connection(&self.custody)?;
         Self::read_keypair_from_connection(&connection)
+    }
+
+    /// Run `operation` with the key of the current head, inside one immediate
+    /// transaction that observes time and proves custody of that head.
+    fn with_current_head<T>(
+        &self,
+        operation: impl FnOnce(&Keypair, u64) -> Result<T, AuthorityStoreError>,
+    ) -> Result<T, AuthorityStoreError> {
+        let mut connection = Self::open_connection(&self.custody)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let observed = self.clock.unix_millis()?;
+        lifecycle::observe_time(&transaction, observed)?;
+        let keypair = Self::read_keypair_from_connection(&transaction)?;
+        let snapshot = replication::read_snapshot(&transaction)?;
+        chio_kernel::authority::replication::validate_state(&snapshot)?;
+        if keypair.public_key().to_hex() != snapshot.public_key_hex {
+            return Err(AuthorityStoreError::Fence(
+                "issuance requires custody of the current head".into(),
+            ));
+        }
+        let outcome = operation(&keypair, observed.as_secs())?;
+        transaction.commit()?;
+        Ok(outcome)
+    }
+
+    /// Sign `body` under the current head, which must be its `exchange_key`.
+    pub fn sign_idp_key_snapshot(
+        &self,
+        body: &IdpKeySnapshotBody,
+    ) -> Result<IdpKeySnapshot, AuthorityStoreError> {
+        self.with_current_head(|keypair, _| {
+            if keypair.public_key() != body.exchange_key {
+                return Err(AuthorityStoreError::Fence(
+                    "snapshot exchange_key is not the current head".into(),
+                ));
+            }
+            let signature = chio_core::CanonicalBytes::from_serializable(&body.signing_body())
+                .and_then(|canonical| {
+                    keypair.sign_wrapped(CHIO_IDP_KEY_SNAPSHOT_SCHEMA, &canonical)
+                })
+                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))?;
+            IdpKeySnapshot::new(body.signed(signature))
+                .map_err(|error| AuthorityStoreError::Fence(error.to_string()))
+        })
     }
 
     pub fn commit_budget_snapshot_anchor_set(
@@ -712,21 +757,7 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
         ttl_seconds: u64,
     ) -> Result<CapabilityToken, KernelError> {
         ensure_capability_issuance_supported(&scope)?;
-        let issue = || -> Result<CapabilityToken, AuthorityStoreError> {
-            let mut connection = Self::open_connection(&self.custody)?;
-            let transaction =
-                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-            let observed = self.clock.unix_millis()?;
-            lifecycle::observe_time(&transaction, observed)?;
-            let keypair = Self::read_keypair_from_connection(&transaction)?;
-            let snapshot = replication::read_snapshot(&transaction)?;
-            chio_kernel::authority::replication::validate_state(&snapshot)?;
-            if keypair.public_key().to_hex() != snapshot.public_key_hex {
-                return Err(AuthorityStoreError::Fence(
-                    "issuance requires custody of the current head".into(),
-                ));
-            }
-            let now = observed.as_secs();
+        let issue = self.with_current_head(|keypair, now| {
             let body = CapabilityTokenBody {
                 id: format!("cap-{}", Uuid::now_v7()),
                 issuer: keypair.public_key(),
@@ -741,12 +772,9 @@ impl CapabilityAuthority for SqliteCapabilityAuthority {
                 delegation_chain: vec![],
                 aggregate_invocation_budget: None,
             };
-
-            let capability = CapabilityToken::sign(body, &keypair)?;
-            transaction.commit()?;
-            Ok(capability)
-        };
-        issue().map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+            Ok(CapabilityToken::sign(body, keypair)?)
+        });
+        issue.map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 }
 

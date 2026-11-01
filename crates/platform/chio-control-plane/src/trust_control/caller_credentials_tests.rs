@@ -1176,6 +1176,16 @@ pub(crate) const TENANT_READ_SCOPES: &[&str] = &["receipts:read", "reports:read"
 /// Access with the full deployment credential for `secret`, an optional
 /// authority workload credential, and one tenant read credential per
 /// `(tenant, secret)`.
+pub(crate) fn test_access_with_deployment_scopes(
+    secret: &str,
+    scopes: &[&str],
+) -> std::sync::Arc<TrustAccess> {
+    let body = credential("test-deployment", "deployment", secret, scopes, None);
+    let text = format!("deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:0\"\n{body}");
+    let config = TrustAccessConfig::from_toml_str(&text).test_unwrap();
+    std::sync::Arc::new(TrustAccess::from_parts(config, None).test_unwrap())
+}
+
 pub(crate) fn test_access_with_roles(
     secret: &str,
     workload_secret: Option<&str>,

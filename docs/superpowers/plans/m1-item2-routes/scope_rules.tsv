@@ -15,6 +15,7 @@
 ^/v1/(reports|fiscal/marketplace)/	.	resolve_control_read_principal	public	caller	reports:read	Tenant(t) sees only tenant t; Deployment sees its deployment
 ^/v1/authority$	GET	.	public	deployment	authority:read	Deployment only
 ^/v1/authority($|/)	POST	.	public	caller	authority:admin	Deployment only
+^/v1/root-exchange/sign$	POST	.	public	deployment	root-exchange:sign	Deployment only
 ^/v1/capabilities/issue$	POST	.	public	deployment	capabilities:issue	Deployment only
 ^(/v1/admin)?/emergency-	.	.	public	caller	admin:emergency	Deployment only
 ^/metrics$	GET	.	public	caller	metrics:read	Deployment only

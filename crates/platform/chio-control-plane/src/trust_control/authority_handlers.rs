@@ -10,8 +10,8 @@ use super::report_rendering::{
 use super::report_validation::{
     enforce_authority_mutation_fence, inspect_authority_state, load_authority_status_for_state,
     load_capability_authority, refresh_authority_mutation_fence, rotate_authority_for_state,
-    run_authority_commit, validate_authority_issue_auth, validate_authority_mutation_auth,
-    validate_authority_mutation_term, validate_caller,
+    run_authority_commit, validate_authority_mutation_auth, validate_authority_mutation_term,
+    validate_authority_scope_auth, validate_caller,
 };
 use super::*;
 
@@ -114,7 +114,11 @@ pub(crate) async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    let forwarded = match validate_authority_issue_auth(&headers, &state) {
+    let forwarded = match validate_authority_scope_auth(
+        &headers,
+        &state,
+        super::caller_credentials::Scope::CapabilitiesIssue,
+    ) {
         Ok(forwarded) => forwarded,
         Err(response) => return response,
     };

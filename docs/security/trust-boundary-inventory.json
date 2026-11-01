@@ -18940,6 +18940,9 @@
       "handle_upsert_enterprise_provider::request-json::EnterpriseProviderRecord",
       "handle_upsert_federation_policy::request-json::FederationAdmissionPolicyRecord"
     ],
+    "crates/platform/chio-control-plane/src/trust_control/root_exchange_signing.rs": [
+      "handle_root_exchange_sign::request-json::RootExchangeSignRequest"
+    ],
     "crates/platform/chio-control-plane/src/trust_control/budget_handlers.rs": [
       "handle_capture_invocation::request-json::CaptureInvocationRequest",
       "handle_reduce_charge_cost::request-json::ReduceChargeCostRequest",
