@@ -12,6 +12,7 @@ use core::fmt;
 pub mod claims;
 pub mod consistency;
 pub mod delegation_context;
+pub mod exchange_sign;
 pub mod idp_key_snapshot;
 pub mod jwk;
 pub mod presentation;
@@ -29,6 +30,11 @@ pub use consistency::{check_root_consistency, RootConsistencyError, RootConsiste
 pub use delegation_context::{
     DelegationAnchor, DelegationAnchorFields, DelegationContext, DelegationContextFields,
     DelegationExchange, HolderClass, CHIO_DELEGATION_CONTEXT_SCHEMA, OPERATOR_ISSUER,
+};
+pub use exchange_sign::{
+    check_snapshot_sign, IdpKeySnapshotBody, IdpKeySnapshotBodyFields, RootExchangeSignRefusal,
+    RootExchangeSignRequest, RootExchangeSignResponse, CHIO_ROOT_EXCHANGE_SIGN_REQUEST_SCHEMA,
+    CHIO_ROOT_EXCHANGE_SIGN_RESPONSE_SCHEMA, MAX_SIGN_CLOCK_SKEW_SECS,
 };
 pub use idp_key_snapshot::{
     IdpKeySnapshot, IdpKeySnapshotFields, IdpKeySnapshotSignatureError, KeySnapshotSource,
