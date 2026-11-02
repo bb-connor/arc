@@ -110,7 +110,7 @@ run_gate digest-mismatch-zero-charge \
   cargo test -p chio-control-plane wedge_purchase_digest_mismatch_denies_and_releases --lib -- \
     --nocapture --test-threads=1
 run_gate cli-finding-surface \
-  cargo test -p chio-cli dispatch_cli::finding_cmd --bin chio -- \
+  cargo test -p chio-cli --features finding-market dispatch_cli::finding_cmd --bin chio -- \
     --nocapture --test-threads=1
 run_gate transaction-passport \
   cargo test -p chio-transaction-passport --test cognition_market -- \

@@ -24,8 +24,7 @@ use transaction_error::{
 mod proof_env;
 use proof_env::{
     agent_web_replay_store_from_env_if_configured, agent_web_verifier_trust_from_env,
-    claim_set_bytes_advertise_verified_claim, claim_set_bytes_advertise_verified_prefix,
-    cognition_market_proof_trust_from_env,
+    claim_set_bytes_advertise_verified_prefix,
     commerce_trusted_event_authority_receipt_kernel_keys_from_env,
     commerce_trusted_payment_signer_keys_from_env, commerce_trusted_provider_keys_from_env,
     disclosure_lineage_verifier_trust_from_env, enterprise_trusted_approval_signer_keys_from_env,
@@ -36,6 +35,8 @@ use proof_env::{
     transaction_trusted_root_keys_from_env, trust_market_trusted_authority_keys_from_env,
     AgentWebReplayMode,
 };
+#[cfg(feature = "finding-market")]
+use proof_env::{claim_set_bytes_advertise_verified_claim, cognition_market_proof_trust_from_env};
 
 const REQUIRED_RUNTIME_AUTHORITY_CLAIMS: [&str; 6] = [
     "claim.runtime.execution_lease_valid",
@@ -62,6 +63,9 @@ const CLAIM_PREFIX_COMMERCE: &str = "claim.commerce.";
 const CLAIM_PREFIX_TRANSACTION: &str = "claim.transaction.";
 const CLAIM_PREFIX_MARKET: &str = "claim.market.";
 const CLAIM_PREFIX_FINDING: &str = "claim.finding.";
+#[cfg(not(feature = "finding-market"))]
+const FINDING_MARKET_NOT_COMPILED: &str =
+    "proof verify: finding claims need finding market support, which is not compiled into this CLI";
 const CLAIM_DISCLOSURE_CRYPTO_CONTEXT_BOUND: &str = "claim.disclosure.crypto_context_bound";
 const STANDALONE_TRANSACTION_VERIFIED_CLAIMS: [&str; 6] = [
     "claim.transaction.passport_root_verified",
@@ -1070,6 +1074,11 @@ fn verify_transaction_passport_file_with_mode(
     let finding_claim_set = crate::input::read(finding_claim_set_path)?;
     let finding_claims_advertised =
         claim_set_bytes_advertise_verified_prefix(&finding_claim_set, CLAIM_PREFIX_FINDING)?;
+    #[cfg(not(feature = "finding-market"))]
+    if claim_requirements.requires(CLAIM_PREFIX_FINDING) || finding_claims_advertised {
+        return Err(verifier_feature_unsupported(FINDING_MARKET_NOT_COMPILED));
+    }
+    #[cfg(feature = "finding-market")]
     if claim_requirements.requires(CLAIM_PREFIX_FINDING) || finding_claims_advertised {
         let status_claim_selected = claim_set_bytes_advertise_verified_claim(
             &finding_claim_set,

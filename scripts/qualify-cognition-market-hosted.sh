@@ -130,9 +130,9 @@ run_gate status-control \
   cargo test -p chio-control-plane --lib finding_status
 run_gate hosted-profile \
   cargo test -p chio-control-plane --lib finding_hosted
-run_gate hosted-cli cargo test -p chio-cli --bin chio hosted
+run_gate hosted-cli cargo test -p chio-cli --features finding-market --bin chio hosted
 run_gate hosted-secret-failure \
-  cargo test -p chio-cli missing_secret_references_fail_closed
+  cargo test -p chio-cli --features finding-market missing_secret_references_fail_closed
 run_gate deployment-contract bash scripts/check-cognition-market-deployment.sh
 run_gate python-hosted-sdk bash -lc \
   'cd sdks/python/chio-sdk-python && uv run --extra dev pytest tests/test_cognition_market.py'

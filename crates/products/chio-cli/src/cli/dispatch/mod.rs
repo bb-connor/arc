@@ -5,6 +5,7 @@ mod attest;
 mod certify_cert;
 mod did_passport;
 mod federation;
+#[cfg(feature = "finding-market")]
 #[path = "finding.rs"]
 mod finding_cmd;
 #[path = "lineage.rs"]
@@ -35,6 +36,7 @@ pub(crate) use self::runtime::dispatch_chio_runtime_command;
 use api_mcp::{dispatch_api, dispatch_mcp};
 use certify_cert::{dispatch_cert, dispatch_certify};
 use did_passport::{dispatch_did, dispatch_passport};
+#[cfg(feature = "finding-market")]
 use finding_cmd::dispatch_finding;
 pub(crate) use output::write_cli_error;
 use policy_analysis::dispatch_policy;
@@ -385,6 +387,7 @@ pub(crate) fn run() {
             }
         },
         Commands::Pheromone { command } => dispatch_chio_pheromone_command(command),
+        #[cfg(feature = "finding-market")]
         Commands::Finding { command } => {
             dispatch_finding(command, json_output, control_url, control_token)
         }

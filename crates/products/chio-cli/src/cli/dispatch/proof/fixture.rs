@@ -25,10 +25,35 @@ mod fixture_cleanup;
 use fixture_cleanup::strip_collected_bundle_outputs;
 #[path = "fixture_committed_disclosure.rs"]
 mod fixture_committed_disclosure;
+#[cfg(feature = "finding-market")]
 #[path = "fixture_finding.rs"]
 mod fixture_finding;
+#[cfg(feature = "finding-market")]
 #[path = "fixture_finding_cognition.rs"]
 mod fixture_finding_cognition;
+/// Without finding market support the finding-family directories are not
+/// regeneration targets of this binary.
+#[cfg(not(feature = "finding-market"))]
+mod fixture_finding {
+    use super::*;
+
+    pub(super) const FINDING_FIXTURE_KIND: &str = "finding-golden";
+
+    pub(super) fn finding_fixture_descriptors(_root: &Path) -> Vec<ProofFixtureDescriptor> {
+        Vec::new()
+    }
+
+    pub(super) fn materialize_finding_fixture(
+        descriptor: &ProofFixtureDescriptor,
+        _committed: &Path,
+        _out: &Path,
+    ) -> Result<(), CliError> {
+        Err(CliError::cli_other_error(format!(
+            "finding market support is not compiled into this CLI: {}",
+            descriptor.id
+        )))
+    }
+}
 #[path = "fixture_regenerate.rs"]
 mod fixture_regenerate;
 #[path = "fixture_resign.rs"]
